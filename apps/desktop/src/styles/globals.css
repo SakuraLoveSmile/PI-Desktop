@@ -6914,7 +6914,7 @@ textarea:disabled {
   border: 1px solid var(--border-subtle, #2a3144);
   background: transparent;
   color: var(--text-secondary, #9aa6bf);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   padding: 6px 12px;
   cursor: pointer;
 }
@@ -6937,28 +6937,27 @@ textarea:disabled {
   border: 0;
   background: color-mix(in srgb, var(--accent, #4f7cff) 12%, transparent);
   color: var(--text-primary, #e8eefc);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 .plugins-badge {
   display: inline-flex;
   margin-left: 8px;
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, #35c28a 20%, transparent);
   color: #8df0c2;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--text-2xs);
   vertical-align: middle;
 }
 .plugins-perms {
   display: block;
   margin-top: 4px;
   color: var(--text-secondary, #9aa6bf);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
 }
 .plugins-empty-actions {
   display: flex;
@@ -6973,7 +6972,7 @@ textarea:disabled {
 .plugins-search {
   flex: 1;
   min-width: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle, #2a3144);
   background: var(--bg-elevated, #121826);
   color: var(--text-primary, #e8eefc);
@@ -6992,8 +6991,8 @@ textarea:disabled {
 }
 .plugins-market-desc {
   color: var(--text-secondary, #9aa6bf);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
   min-height: 3.2em;
 }
 .plugins-market-actions {
@@ -7014,7 +7013,7 @@ textarea:disabled {
 }
 .plugins-modal {
   width: min(520px, 100%);
-  border-radius: 16px;
+  border-radius: var(--radius-lg-plus);
   border: 1px solid var(--border-subtle, #2a3144);
   background: var(--bg-elevated, #121826);
   color: var(--text-primary, #e8eefc);
@@ -7022,14 +7021,13 @@ textarea:disabled {
   padding: 18px;
 }
 .plugins-modal-title {
-  font-size: 16px;
-  font-weight: 650;
+  font-size: var(--text-lg);
   margin-bottom: 8px;
 }
 .plugins-modal-body {
   color: var(--text-secondary, #9aa6bf);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
 }
 .plugins-perm-list {
   margin: 12px 0;
@@ -7042,12 +7040,12 @@ textarea:disabled {
   display: grid;
   gap: 2px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg-primary, #0b1020) 70%, transparent);
 }
 .plugins-perm-list strong {
   color: var(--text-primary, #e8eefc);
-  font-size: 13px;
+  font-size: var(--text-md);
 }
 .plugins-auto-update {
   display: flex;
