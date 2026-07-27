@@ -5372,6 +5372,16 @@ textarea:disabled {
   animation: sidebar-status-breathe 1.6s ease-in-out infinite;
 }
 
+.thread-item-status.permission::before {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--ds-purple);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ds-purple) 15%, transparent);
+  content: "";
+  animation: sidebar-status-pulse-purple 1.2s ease-in-out infinite;
+}
+
 .thread-item-status.selected::before {
   width: 9px;
   height: 9px;
@@ -5408,8 +5418,23 @@ textarea:disabled {
   }
 }
 
+@keyframes sidebar-status-pulse-purple {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.15);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .thread-item-status.running::before {
+    animation: none;
+  }
+  .thread-item-status.permission::before {
     animation: none;
   }
 }

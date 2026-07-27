@@ -157,6 +157,7 @@ export function Sidebar({
   const projectSort = useAppStore((s) => s.projectSort);
   const runningSessions = useAppStore((s) => s.runningSessions);
   const sessionOutcomes = useAppStore((s) => s.sessionOutcomes);
+  const pendingPermissions = useAppStore((s) => s.pendingPermissions);
   const setPage = useAppStore((s) => s.setPage);
   const settings = useAppStore((s) => s.settings);
   const page = useAppStore((s) => s.page);
@@ -481,7 +482,9 @@ export function Sidebar({
           ? "nav.sessionSelected"
           : status === "completed"
             ? "nav.sessionCompleted"
-            : "nav.sessionFailed";
+            : status === "failed"
+              ? "nav.sessionFailed"
+              : "nav.sessionPermission";
     const fallback =
       status === "running"
         ? "In progress"
@@ -489,7 +492,9 @@ export function Sidebar({
           ? "Selected"
           : status === "completed"
             ? "Completed"
-            : "Failed";
+            : status === "failed"
+              ? "Failed"
+              : "Permission required";
     const label = t(labelKey, { defaultValue: fallback });
     return (
       <span className={`thread-item-status ${status}`} aria-label={label} title={label}>
@@ -738,10 +743,12 @@ export function Sidebar({
     const active = page === "chat" && activeSessionId === session.id;
     const archived = sessionArchived(session, meta);
     const running = Boolean(runningSessions[session.id]);
+    const hasPendingPermission = Boolean(pendingPermissions[session.id]);
     const status = sidebarSessionStatus({
       running,
       selected: active,
       outcome: sessionOutcomes[session.id],
+      hasPendingPermission,
     });
     return (
       <div
