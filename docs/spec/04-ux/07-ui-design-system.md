@@ -156,13 +156,17 @@ token rather than introducing a decorative palette:
 |---|---|---|---|
 | Selected | accent blue | static outlined ring | current conversation |
 | In progress | warning orange | filled dot with a restrained breathing pulse | agent is producing or executing |
-| Completed | success green | check mark | latest task turn completed |
-| Failed | error red | circled alert mark | latest task turn failed |
+| Completed | success green | check mark | latest unread task turn completed |
+| Failed | error red | circled alert mark | latest unread task turn failed |
 
 Precedence is `in progress → selected → completed/failed`. Starting another
 turn clears the prior terminal outcome; abort clears the live indicator without
-creating a failure. Reduced-motion mode disables the breathing animation while
-retaining its orange fill and localized accessible name.
+creating a failure. Opening a conversation acknowledges its unread terminal
+outcome: the terminal mark clears immediately and the matching durable task
+notification is marked read so the mark cannot return after a notification
+refresh or app restart. Outcomes already marked read never produce a terminal
+mark. Reduced-motion mode disables the breathing animation while retaining its
+orange fill and localized accessible name.
 
 ### 4.6 Tailwind CSS variable stub
 

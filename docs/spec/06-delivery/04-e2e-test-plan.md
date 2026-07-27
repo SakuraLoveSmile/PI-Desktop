@@ -1112,9 +1112,10 @@ Each scenario is documented in this format:
   window and complete another turn in A. 4) Abort a fourth turn. 5) Repeat each
   terminal RPC. 6) Confirm the main titlebar has no bell, then open the bell in
   the expanded sidebar footer and switch between All and Unread. 7) Mark one
-  row read, close/reopen the popover, and restart the app. 8) Select the other
-  row. 9) Generate a host fixture with 205 eligible terminal turns. 10) Use
-  Mark all read, then Clear.
+  row read and confirm its session has no terminal sidebar mark, then
+  close/reopen the popover and restart the app. 8) Select the other session
+  from its terminal-marked sidebar row. 9) Generate a host fixture with 205
+  eligible terminal turns. 10) Use Mark all read, then Clear.
 - **Expected**: A's visible-current completion creates no row. Exactly two rows
   exist, newest first: the unfocused A completion and background B failure,
   with localized labels, snapshotted session titles, and B's stable code.
@@ -1124,11 +1125,14 @@ Each scenario is documented in this format:
   reading rows. Read state and both
   records survive restart. Row selection marks it read and activates its bound
   project/session. The fixture retains exactly the newest 200 rows. Mark all
-  preserves rows with zero unread; Clear empties only the inbox and leaves
+  preserves rows with zero unread. Selecting the other session clears its
+  terminal sidebar mark and marks its task notification read; neither mark
+  returns after refresh or restart. Clear empties only the inbox and leaves
   sessions, turns, and transcripts intact.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, `03-runtime/01-ipc-protocol.md`,
-  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D117/D130)
+  `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
+  `08-meta/decisions-log.md` (D117/D130)
 - **Acceptance**: C (turn completion), F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Draft
@@ -1982,3 +1986,8 @@ This test plan spec is accepted when:
   text through its accessible name and tooltip. Reduced motion makes the orange
   dot static without changing its color or meaning. Row height, title truncation,
   pin icon, hover actions, and focus ring remain stable in both themes.
+- Open a conversation with a completed or failed mark and expect that terminal
+  mark to clear immediately while its durable task notification becomes read.
+  Refresh notifications and restart the app; the acknowledged mark must not
+  return. A terminal notification marked read from the inbox likewise produces
+  no sidebar terminal mark.
