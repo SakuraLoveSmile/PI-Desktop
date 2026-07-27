@@ -23,6 +23,7 @@ import {
   IconChevronDown,
   IconCheck,
   IconSearch,
+  IconSparkles,
 } from "./icons";
 
 const COMPOSER_MIN_HEIGHT_PX = 28;
@@ -140,6 +141,8 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const [inputFocused, setInputFocused] = useState(false);
   const [permissionOpen, setPermissionOpen] = useState(false);
   const permissionRef = useRef<HTMLDivElement>(null);
+  const [thinkingOpen, setThinkingOpen] = useState(false);
+  const thinkingRef = useRef<HTMLDivElement>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [modelQuery, setModelQuery] = useState("");
   const [modelHighlight, setModelHighlight] = useState(-1);
@@ -240,6 +243,23 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
     };
   }, [permissionOpen]);
 
+  useEffect(() => {
+    if (!thinkingOpen) return;
+    const onPointer = (e: MouseEvent) => {
+      if (!thinkingRef.current?.contains(e.target as Node))
+        setThinkingOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setThinkingOpen(false);
+    };
+    window.addEventListener("mousedown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [thinkingOpen]);
+
   const activeSession = sessions.find((session) => session.id === activeSessionId);
   const mode = activeSession?.mode ?? settings?.defaultMode ?? "agent";
   // Permission mode (D115): the chip shows the effective mode — session
@@ -296,12 +316,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const thinkingLabel = t(THINKING_LEVEL_I18N_KEYS[thinkingLevel], {
     defaultValue: THINKING_LEVEL_LABELS[thinkingLevel],
   });
-  const modelLabel =
-    modelId
-      ? thinkingProvider?.supportsReasoning
-        ? `${modelId} · ${thinkingLabel}`
-        : modelId
-      : t("chat.model");
+  const modelLabel = modelId || t("chat.model");
   const modelReady =
     !!provider &&
     provider.enabled &&
@@ -438,6 +453,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
         modelId,
         thinkingLevel: nextLevel,
       });
+      setModelOpen(false);
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), {
         variant: "error",
@@ -570,6 +586,9 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                 title={t("settings.mode")}
                 disabled={isRunning || !activeSession}
                 onClick={async () => {
+                  setThinkingOpen(false);
+                  setPermissionOpen(false);
+                  setModelOpen(false);
                   const next = mode === "agent" ? "chat" : "agent";
                   try {
                     await configureActiveSession({
@@ -592,6 +611,74 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                     : t("settings.modeAgent")}
                 </span>
               </button>
+              {thinkingProvider?.supportsReasoning &&
+              availableThinkingLevels.length ? (
+                <div className="composer-thinking" ref={thinkingRef}>
+                  <button
+                    className={`icon-btn mode-chip thinking-chip ${
+                      thinkingOpen ? "active" : ""
+                    }`}
+                    title={`${t("chat.thinking")} · ${thinkingLabel}`}
+                    aria-haspopup="menu"
+                    aria-expanded={thinkingOpen}
+                    disabled={isRunning || !activeSession}
+                    onClick={() => {
+                      setPermissionOpen(false);
+                      setModelOpen(false);
+                      setThinkingOpen((open) => !open);
+                    }}
+                  >
+                    <IconSparkles size={14} />
+                    <span className="text-sm">
+                      {t("chat.thinking")} · {thinkingLabel}
+                    </span>
+                    <IconChevronDown size={12} />
+                  </button>
+                  {thinkingOpen ? (
+                    <div
+                      className="composer-model-menu composer-thinking-menu"
+                      role="menu"
+                      aria-label={t("chat.thinking")}
+                    >
+                      <div className="composer-thinking-levels">
+                        {availableThinkingLevels.map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            className={`composer-thinking-level ${
+                              thinkingLevel === level ? "active" : ""
+                            }`}
+                            role="menuitemradio"
+                            aria-checked={thinkingLevel === level}
+                            onClick={async () => {
+                              try {
+                                await configureActiveSession({
+                                  mode,
+                                  providerId: thinkingProvider.id,
+                                  modelId,
+                                  thinkingLevel: level,
+                                });
+                                setThinkingOpen(false);
+                              } catch (error) {
+                                showToast(
+                                  error instanceof Error
+                                    ? error.message
+                                    : String(error),
+                                  { variant: "error" },
+                                );
+                              }
+                            }}
+                          >
+                            {t(THINKING_LEVEL_I18N_KEYS[level], {
+                              defaultValue: THINKING_LEVEL_LABELS[level],
+                            })}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               {mode === "agent" ? (
                 <div className="composer-permission" ref={permissionRef}>
                   <button
@@ -600,7 +687,11 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                     aria-haspopup="menu"
                     aria-expanded={permissionOpen}
                     disabled={isRunning || !activeSession}
-                    onClick={() => setPermissionOpen((v) => !v)}
+                    onClick={() => {
+                      setThinkingOpen(false);
+                      setModelOpen(false);
+                      setPermissionOpen((open) => !open);
+                    }}
                   >
                     <span className="text-sm">
                       {t(PERMISSION_MODE_I18N_KEYS[effectivePermissionMode])}
@@ -668,7 +759,11 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                   aria-haspopup="menu"
                   aria-expanded={modelOpen}
                   disabled={isRunning}
-                  onClick={() => setModelOpen((v) => !v)}
+                  onClick={() => {
+                    setThinkingOpen(false);
+                    setPermissionOpen(false);
+                    setModelOpen((open) => !open);
+                  }}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     useAppStore.getState().setSettingsTab("agent");
@@ -690,74 +785,23 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                         {provider?.name || t("chat.provider")}
                       </div>
                     </div>
-                    <div className="composer-plus-sep" />
-                    <div
-                      className="composer-thinking-section"
-                      role="group"
-                      aria-label={t("chat.thinking", {
-                        defaultValue: "Thinking",
-                      })}
-                    >
-                      <div className="composer-thinking-heading">
-                        <span>
-                          {t("chat.thinking", { defaultValue: "Thinking" })}
-                        </span>
-                        <span className="composer-thinking-value">
-                          {thinkingLabel}
-                        </span>
-                      </div>
-                      {thinkingProvider?.supportsReasoning &&
-                      availableThinkingLevels.length ? (
-                        <div className="composer-thinking-levels">
-                          {availableThinkingLevels.map((level) => (
-                            <button
-                              key={level}
-                              type="button"
-                              className={`composer-thinking-level ${
-                                thinkingLevel === level ? "active" : ""
-                              }`}
-                              role="menuitemradio"
-                              aria-checked={thinkingLevel === level}
-                              onClick={async () => {
-                                try {
-                                  await configureActiveSession({
-                                    mode,
-                                    providerId: thinkingProvider.id,
-                                    modelId,
-                                    thinkingLevel: level,
-                                  });
-                                } catch (error) {
-                                  showToast(
-                                    error instanceof Error
-                                      ? error.message
-                                      : String(error),
-                                    { variant: "error" },
-                                  );
-                                }
-                              }}
-                            >
-                              {t(THINKING_LEVEL_I18N_KEYS[level], {
-                                defaultValue: THINKING_LEVEL_LABELS[level],
-                              })}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="composer-thinking-unavailable">
-                          <span>{t("chat.thinkingUnavailable")}</span>
-                          {canEnableThinkingOverride ? (
-                            <button
-                              type="button"
-                              className="composer-thinking-enable"
-                              onClick={() => void enableThinkingOverride()}
-                            >
-                              {t("chat.thinkingEnable")}
-                            </button>
-                          ) : null}
-                        </div>
-                      )}
-                    </div>
-                    <div className="composer-plus-sep" />
+                    {canEnableThinkingOverride ? (
+                      <>
+                        <div className="composer-plus-sep" />
+                        <button
+                          type="button"
+                          className="composer-plus-item"
+                          role="menuitem"
+                          onClick={() => void enableThinkingOverride()}
+                        >
+                          <IconSparkles size={14} />
+                          <span>{t("chat.thinkingEnable")}</span>
+                        </button>
+                        <div className="composer-plus-sep" />
+                      </>
+                    ) : (
+                      <div className="composer-plus-sep" />
+                    )}
                     {showModelSearch ? (
                       <div className="composer-model-search">
                         <IconSearch size={13} />

@@ -884,14 +884,16 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Chat / Agent and provider/model changes update the active session, not the
   app default. They are disabled while a turn runs.
 - The model menu lists only enabled, runnable providers with a default model.
-- The model menu always shows a dedicated Thinking section and current level.
-  For the exact active provider/model, it renders only supported levels in a
-  compact grid, canonical order, and persists a selection with the complete
-  session config without closing the menu.
+- For a reasoning-capable active model, a separate Thinking trigger appears
+  immediately to the right of Chat / Agent and before the Agent permission
+  control. It shows the current level and opens only the exact model's supported
+  levels in a compact grid and canonical order. Selecting a level persists the
+  complete session config and closes the menu. Non-reasoning models render no
+  Thinking trigger.
 - Unknown Custom/OpenAI-compatible models can enable an explicit reasoning
-  override from the same section. The provider refreshes, the session selects
-  the supported level nearest `medium`, and known non-reasoning models remain
-  unavailable rather than receiving an override.
+  override from the model menu. The provider refreshes, the session selects the
+  supported level nearest `medium`, and the toolbar trigger appears; known
+  non-reasoning models remain unavailable rather than receiving an override.
 - Switching provider preserves an available level, otherwise uses the nearest
   supported level (upward first, then downward); a non-reasoning provider
   persists `off`.

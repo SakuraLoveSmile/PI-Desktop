@@ -480,19 +480,23 @@ appears on project home and in the thread-docked composer.
 The composer renders only controls connected to the active pi session:
 
 - Chat / Agent updates the durable session mode and changes the next pi toolset.
-- The model trigger shows the active model ID. Its menu selects a configured
-  provider/default-model pair for the active session and links to Agent.
-- Both controls are disabled while the active session is running.
+- The model trigger shows only the active model ID. Its menu selects a
+  configured provider/default-model pair for the active session and links to
+  Agent.
+- A reasoning-capable model exposes a separate Thinking trigger immediately to
+  the right of Chat / Agent in the left toolbar group. The trigger shows the
+  current level and opens the model's real `supportedThinkingLevels`; models
+  without reasoning support render no trigger.
+- Runtime controls are disabled while the active session is running.
 - File, photo, and appshot controls remain hidden until their payload contracts
   are implemented end to end.
-- The model menu always exposes a dedicated Thinking section with the current
-  level. Reasoning-capable models render only their real
-  `supportedThinkingLevels` set in a compact selector and persist changes
-  without closing the menu. Boolean-like custom models such as mimo may expose
-  only Off/High rather than a fake graded ladder. Unknown Custom/OpenAI-
-  compatible models expose an explicit Enable thinking action; known
-  non-reasoning models remain unavailable. Changing provider clamps or resets
-  the durable session value before the next turn.
+- The Thinking menu persists changes to the active session and closes after a
+  selection. Boolean-like custom models such as mimo may expose only Off/High
+  rather than a fake graded ladder. Unknown Custom/OpenAI-compatible models
+  keep an explicit Enable thinking action in the model menu; after enablement,
+  the separate Thinking trigger appears. Known non-reasoning models expose
+  neither action. Changing provider clamps or resets the durable session value
+  before the next turn.
 - Local and branch context are non-interactive status labels; the project name
   remains an action because it opens the project picker.
 
