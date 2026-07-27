@@ -6,6 +6,10 @@ const sidebarSource = await readFile(
   new URL("../src/components/Sidebar.tsx", import.meta.url),
   "utf8",
 );
+const globalStyles = await readFile(
+  new URL("../src/styles/globals.css", import.meta.url),
+  "utf8",
+);
 
 test("home sidebar exposes only the supported destination entries", () => {
   assert.match(sidebarSource, /data-nav="home"/);
@@ -28,7 +32,7 @@ test("sidebar brand returns to the chat home", () => {
   assert.match(brandButton, /t\("app\.shellName"\)/);
 });
 
-test("sidebar separates retained projects from standalone sessions", () => {
+test("sidebar shows a bounded standalone session list before retained projects", () => {
   const newProjectAction = sidebarSource.match(
     /<div className="sidebar-list-toolbar">[\s\S]*?data-action="new-project"[\s\S]*?<\/div>/,
   )?.[0] ?? "";
@@ -44,8 +48,12 @@ test("sidebar separates retained projects from standalone sessions", () => {
   assert.match(standaloneSessions, /createSession\(\{ projectPath: null \}\)/);
   assert.match(standaloneSessions, /renderSessionRows\(temporarySessions/);
   assert.ok(
-    sidebarSource.indexOf('data-action="new-project"') <
-      sidebarSource.indexOf('data-sidebar-session-section="temporary"'),
+    sidebarSource.indexOf('data-sidebar-session-section="temporary"') <
+      sidebarSource.indexOf('data-action="new-project"'),
+  );
+  assert.match(
+    globalStyles,
+    /\.sidebar-session-group-body\.standalone\s*\{[\s\S]*?max-height:\s*140px;[\s\S]*?overflow-x:\s*hidden;[\s\S]*?overflow-y:\s*auto;/,
   );
   assert.doesNotMatch(sidebarSource, /data-sidebar-project-group="temporary"/);
 });

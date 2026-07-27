@@ -1775,11 +1775,15 @@ This test plan spec is accepted when:
 
 ### US-UI-57 Multi-project sidebar groups
 - Open projects A and B without closing either.
-- Expect a `Projects` heading with a new-project folder action, one path-keyed
-  group per retained project, and an active-state marker on exactly one group.
-  Below those groups, expect a separate `Sessions` heading containing path-less
-  conversations plus new-session and sort actions. Adjacent project groups read
-  as a compact continuous tree without detached card spacing.
+- Expect a `Sessions` heading above `Projects`, containing path-less
+  conversations plus new-session and sort actions. With more than five
+  standalone conversations, expect a five-row-high list that scrolls to every
+  remaining row without growing further.
+- Expect the following `Projects` heading to retain its new-project folder
+  action, one path-keyed group per retained project, and an active-state marker
+  on exactly one group. Its list consumes the remaining height and scrolls
+  independently. Adjacent project groups read as a compact continuous tree
+  without detached card spacing.
 - Collapse A by clicking its directory label, expand it from the chevron area,
   then activate B and return to A. Only A's child rows collapse; project `+`
   and overflow actions do not toggle it; the

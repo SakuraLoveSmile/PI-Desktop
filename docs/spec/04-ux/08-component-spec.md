@@ -141,10 +141,10 @@ button, and settings entry.
 ### 3.1 Purpose
 
 Scoped project and session navigation, management, and notification access. The
-expanded sidebar shows retained project tabs under a `Projects` heading and
-path-less conversations under a separate `Sessions` heading; the collapsed
-state is an icon rail. Retained tabs are renderer presentation state, not
-additional host workspaces.
+expanded sidebar shows path-less conversations first under a compact `Sessions`
+heading and retained project tabs under a following `Projects` heading; the
+collapsed state is an icon rail. Retained tabs are renderer presentation state,
+not additional host workspaces.
 The home destination controls expose Plugins only; Projects is managed through
 Settings → Project archive, while Pull requests and Scheduled are not rendered
 in the sidebar.
@@ -157,12 +157,12 @@ Expanded (~275px, D034/D070):
 | [π] PI-Desktop            |
 | [message+ New Chat] button |
 | Plugins                   |
+| SESSIONS         [msg+][↕]|
+|   • Path-less session   ↕|
 | PROJECTS            [dir+]|
 | [v] project-A      [+] … |
 |   • Project session      |
 | project-B      [>] [+] … |
-| SESSIONS         [msg+][↕]|
-|   • Path-less session   |
 |                           |
 | [(user) Custom       v][?]|
 |        Local profile     |
@@ -507,8 +507,10 @@ SESSIONS                                      [msg+][↕]
   local view controls rather than host queries.
 - Temporary means **not bound to a project**, not ephemeral storage; these
   sessions survive restart.
-- All project groups and the standalone Sessions section share one
-  independently scrollable sidebar region.
+- The standalone Sessions body shows at most five compact 28px rows and
+  scrolls internally when more rows exist. The Projects list uses the remaining
+  sidebar height and scrolls independently; neither region scrolls the footer
+  or primary navigation.
 
 ---
 

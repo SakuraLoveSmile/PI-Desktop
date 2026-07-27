@@ -1090,6 +1090,63 @@ export function Sidebar({
           </button>
         </nav>
 
+        <section
+          className="sidebar-standalone-sessions"
+          aria-labelledby="sidebar-standalone-sessions-label"
+          data-sidebar-session-section="temporary"
+        >
+          <div className="sidebar-list-toolbar sidebar-list-toolbar-secondary">
+            <span id="sidebar-standalone-sessions-label" className="sidebar-list-label">
+              {t("nav.sessions", { defaultValue: "Sessions" })}
+            </span>
+            <div className="sidebar-toolbar-actions">
+              <button
+                type="button"
+                className="sidebar-toolbar-button"
+                data-action="new-standalone-session"
+                title={t("nav.newTemporarySession")}
+                aria-label={t("nav.newTemporarySession")}
+                onClick={() => void createSession({ projectPath: null })}
+              >
+                <IconNewSession size={14} />
+              </button>
+              <div className="sidebar-menu-wrap">
+                <button
+                  type="button"
+                  className={`sidebar-toolbar-button ${sortOpen ? "active" : ""}`}
+                  data-action="session-sort"
+                  aria-label={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
+                  aria-haspopup="menu"
+                  aria-expanded={sortOpen}
+                  onClick={(event) => {
+                    if (sortOpen) {
+                      closeMenus();
+                      return;
+                    }
+                    placeMenu(event);
+                    menuTriggerRef.current = event.currentTarget;
+                    setSessionMenu(null);
+                    setProjectMenu(null);
+                    setSortOpen(true);
+                  }}
+                >
+                  <IconArrowUpDown size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+          <div
+            className="sidebar-session-group-body standalone"
+            onScroll={() => {
+              if (sessionMenu || projectMenu || sortOpen) closeMenus(false);
+            }}
+          >
+            {temporarySessions.length > 0 ? renderSessionRows(temporarySessions, { temporary: true }) : (
+              <div className="sidebar-session-empty">{t("nav.noTemporarySessions")}</div>
+            )}
+          </div>
+        </section>
+
         <div className="sidebar-list-toolbar">
           <span className="sidebar-list-label">{t("nav.projects")}</span>
           <button
@@ -1120,57 +1177,6 @@ export function Sidebar({
               </div>
             </section>
           )}
-          <section
-            className="sidebar-standalone-sessions"
-            aria-labelledby="sidebar-standalone-sessions-label"
-            data-sidebar-session-section="temporary"
-          >
-            <div className="sidebar-list-toolbar sidebar-list-toolbar-secondary">
-              <span id="sidebar-standalone-sessions-label" className="sidebar-list-label">
-                {t("nav.sessions", { defaultValue: "Sessions" })}
-              </span>
-              <div className="sidebar-toolbar-actions">
-                <button
-                  type="button"
-                  className="sidebar-toolbar-button"
-                  data-action="new-standalone-session"
-                  title={t("nav.newTemporarySession")}
-                  aria-label={t("nav.newTemporarySession")}
-                  onClick={() => void createSession({ projectPath: null })}
-                >
-                  <IconNewSession size={14} />
-                </button>
-                <div className="sidebar-menu-wrap">
-                  <button
-                    type="button"
-                    className={`sidebar-toolbar-button ${sortOpen ? "active" : ""}`}
-                    data-action="session-sort"
-                    aria-label={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
-                    aria-haspopup="menu"
-                    aria-expanded={sortOpen}
-                    onClick={(event) => {
-                      if (sortOpen) {
-                        closeMenus();
-                        return;
-                      }
-                      placeMenu(event);
-                      menuTriggerRef.current = event.currentTarget;
-                      setSessionMenu(null);
-                      setProjectMenu(null);
-                      setSortOpen(true);
-                    }}
-                  >
-                    <IconArrowUpDown size={14} />
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="sidebar-session-group-body standalone">
-              {temporarySessions.length > 0 ? renderSessionRows(temporarySessions, { temporary: true }) : (
-                <div className="sidebar-session-empty">{t("nav.noTemporarySessions")}</div>
-              )}
-            </div>
-          </section>
         </div>
 
         <div className="sidebar-footer no-drag" ref={profileRef}>

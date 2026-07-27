@@ -20,18 +20,19 @@ destination, chat as the home surface, tools and permissions inline.
 |  New task        |  chat home / transcript        |  (optional,      |
 |  Plugins         |  or Plugins page               |   resizable      |
 |                  |                                |   320–720px)     |
+|  Sessions     +↕ |                                | surface          |
+|   Recent rows ↕  |                                |                  |
 |  Projects      + |                                | App.tsx Review × |
 |   Project A      |                                | ───────────────  |
 |   Project B      |                                | Active artifact  |
-|  Sessions     +↕ |                                | surface          |
 | Footer + bell    |  Floating composer (chat)      |                  |
 +------------------+--------------------------------+------------------+
 ```
 
-- **Sidebar**: primary navigation — New task, the Plugins destination, retained
-  open-project groups under a **Projects**
-  section with a persistent new-project action, path-less conversations under
-  a separate **Sessions** section with new-session and sort actions, and the
+- **Sidebar**: primary navigation — New task, the Plugins destination,
+  path-less conversations under a compact **Sessions** section with new-session
+  and sort actions, retained open-project groups under a following **Projects**
+  section with a persistent new-project action, and the
   WorkBuddy-inspired local profile footer
   (Custom / Local profile → Settings / Logs / Theme, plus the durable
   notification bell and unread badge, D130/D117). Pull requests and Scheduled
@@ -90,10 +91,12 @@ destination, chat as the home surface, tools and permissions inline.
 
 ### 3.2 Sidebar project groups
 
-- **Sections**: the compact `Projects` heading precedes retained project groups
-  and exposes the folder-picker action. A separate `Sessions` heading follows
-  those groups and owns path-less conversation creation plus the existing
-  sort/archive-view menu.
+- **Sections**: the compact `Sessions` heading precedes `Projects` and owns
+  path-less conversation creation plus the existing sort/archive-view menu.
+  Its list shows at most five compact rows (140px) before scrolling internally,
+  so standalone work stays visible without displacing project navigation. The
+  following `Projects` heading exposes the folder-picker action; retained
+  project groups use the remaining height and scroll independently.
 - **Identity**: each group is keyed by the normalized full project path, never
   by a potentially ambiguous folder basename.
 - **Header**: project name/path, active state, disclosure, new-task action,
