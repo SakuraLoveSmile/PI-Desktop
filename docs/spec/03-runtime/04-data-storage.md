@@ -313,6 +313,10 @@ CREATE INDEX idx_sessions_project ON sessions(project_id) WHERE project_id IS NO
   row while retaining the exact `project_id`, provider/model, mode, thinking,
   and permission configuration. No parent/child column is stored: the result
   is an independent session, not a durable navigation tree.
+- A message-scoped fork copies only the canonical prefix through the selected
+  message. Assistant Edit uses that child and records the original/edited
+  response tails in the child's existing `message_revisions` store; the source
+  transcript and source revisions are never rewritten.
 
 ### 4.6 turns — one row per agent run
 

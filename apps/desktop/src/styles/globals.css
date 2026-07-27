@@ -1550,6 +1550,16 @@ textarea:disabled {
   color: var(--ds-text-secondary);
 }
 
+.copy-btn.primary {
+  background: var(--ds-accent);
+  color: #ffffff;
+}
+
+.copy-btn.primary:hover {
+  background: var(--ds-accent-hover);
+  color: #ffffff;
+}
+
 .copy-btn.danger:hover {
   background: color-mix(in oklab, var(--ds-error) 10%, transparent);
   color: var(--ds-error);
@@ -1599,6 +1609,39 @@ textarea:disabled {
   font-size: var(--text-xs);
   line-height: var(--leading-compact);
   font-variant-numeric: tabular-nums;
+}
+
+.message-edit {
+  display: flex;
+  width: min(100%, 720px);
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-edit-input {
+  width: 100%;
+  min-height: 112px;
+  max-height: 50vh;
+  resize: vertical;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-bg-elevated-opaque);
+  padding: 10px 12px;
+  color: var(--ds-text-primary);
+  font: inherit;
+  line-height: var(--leading-chat);
+  outline: none;
+}
+
+.message-edit-input:focus {
+  border-color: var(--ds-accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 18%, transparent);
+}
+
+.message-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 .message-revision-label {

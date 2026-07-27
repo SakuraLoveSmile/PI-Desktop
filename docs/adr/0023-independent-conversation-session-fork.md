@@ -21,14 +21,21 @@ pass startup handshake and fail only when the new command is invoked.
 
 - Protocol v5 adds required host RPC `session.fork` and renderer IPC
   `session/fork`.
-- The Rust host owns one snapshot operation: it copies the source's complete
-  active canonical transcript into a new session and remaps message and
-  tool-call identifiers.
+- The Rust host owns one snapshot operation: by default it copies the source's
+  complete active canonical transcript into a new session and remaps message
+  and tool-call identifiers. Optional `throughMessageId` makes the snapshot end
+  inclusively at that message; an unknown boundary creates no child and returns
+  `NOT_FOUND`.
 - The child inherits project, provider, model, mode, thinking, and permission
   mode. It does not inherit turns, regenerate revisions, notifications,
   artifacts, session grants, scratch data, pin state, or live runtime state.
 - No parent/child lineage is stored. This is an independent conversation copy,
   not a message tree and not a replacement for linear regenerate history.
+- Assistant response Fork uses the bounded snapshot directly. Assistant Edit
+  uses the same bounded child, stores original/edited response tails in that
+  child's existing linear revision store, and activates the edited tail. The
+  source transcript, revisions, runtime, and provider-cache state remain
+  untouched.
 - Fork is available only while the source is idle. Electron exposes
   `AGENT_BUSY`; the host retains a persisted running-turn `CONFLICT` guard that
   Electron normalizes at the IPC boundary.
@@ -42,8 +49,13 @@ pass startup handshake and fail only when the new command is invoked.
   instead of failing lazily when Create branch is selected.
 - Source and child can evolve, reconfigure, persist, and delete independently.
 - Fork storage cost is proportional to the active transcript size.
+- Message-scoped Fork/Edit storage cost is proportional to the canonical
+  prefix through the selected response plus any child-only revision payloads.
+- Every child has a new session id and first creates/reseeds its own pi runtime;
+  edited context never reuses cache state built from the source transcript.
 - The initial implementation intentionally has no ancestry UI, merge operation,
-  or arbitrary message-level branch tree.
+  or arbitrary message-level branch tree; Edit rollback stays a two-entry
+  linear revision family.
 
 ## Alternatives
 

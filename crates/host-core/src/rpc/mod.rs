@@ -580,18 +580,22 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
             let title = params.get("title").and_then(|v| v.as_str());
+            let through_message_id = params
+                .get("throughMessageId")
+                .and_then(|v| v.as_str());
             let st = state.lock().await;
-            let session = match sessions::fork_session(&st.db, session_id, title)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
-            {
-                sessions::ForkSessionResult::Created(session) => session,
-                sessions::ForkSessionResult::NotFound => {
-                    return Err(rpc_err(1007, "session not found", "NOT_FOUND"))
-                }
-                sessions::ForkSessionResult::Busy => {
-                    return Err(rpc_err(1008, "session is running", "CONFLICT"))
-                }
-            };
+            let session =
+                match sessions::fork_session_through(&st.db, session_id, title, through_message_id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                {
+                    sessions::ForkSessionResult::Created(session) => session,
+                    sessions::ForkSessionResult::NotFound => {
+                        return Err(rpc_err(1007, "session not found", "NOT_FOUND"))
+                    }
+                    sessions::ForkSessionResult::Busy => {
+                        return Err(rpc_err(1008, "session is running", "CONFLICT"))
+                    }
+                };
             Ok(json!({ "session": session }))
         }
         "session.get" => {

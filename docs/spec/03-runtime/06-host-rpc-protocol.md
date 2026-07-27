@@ -136,15 +136,17 @@ Rules:
 - `session.list`
 - `session.create` — accepts optional `thinkingLevel`; missing/null defaults
   to `off`
-- `session.fork` — accepts `sessionId` and an optional caller-provided display
-  `title`; creates
+- `session.fork` — accepts `sessionId`, an optional caller-provided display
+  `title`, and optional `throughMessageId`; creates
   one independent session from the source's current active canonical
-  transcript. The child inherits project/provider/model/mode/thinking and
+  transcript, truncated inclusively at the selected message when supplied.
+  The child inherits project/provider/model/mode/thinking and
   permission configuration, receives new message/tool-call ids, and starts
   without turns, revisions, notifications, artifacts, grants, or scratch data.
   Missing sources return `NOT_FOUND`; Electron rejects active sources with
   `AGENT_BUSY` before forwarding and normalizes the host's persisted
-  running-turn `CONFLICT` fallback to `AGENT_BUSY`
+  running-turn `CONFLICT` fallback to `AGENT_BUSY`; an unknown source or
+  `throughMessageId` returns `NOT_FOUND`
 - `session.get`
 - `session.delete`
 - `session.rename`
@@ -368,6 +370,10 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
    is never rewritten, and a handled child write/index failure leaves no
    visible session or orphan transcript file. A process crash follows D119's
    existing orphan-transcript recovery policy.
+6. A message-scoped fork is identical except that the canonical snapshot ends
+   inclusively at `throughMessageId`. It still remaps message/tool-call ids and
+   creates no runtime or revision state, so later child reseed/cache state is
+   isolated by the new session id.
 
 ## 9. Logging rules
 
@@ -391,3 +397,5 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 8. Forking an idle session produces an independently mutable child with the
    same active transcript and durable execution configuration while leaving
    the source and its regenerate revisions unchanged
+9. Forking through a message excludes every later source row and rejects an
+   unknown message without creating a child

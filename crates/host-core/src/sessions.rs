@@ -697,10 +697,15 @@ pub enum ForkSessionResult {
     Busy,
 }
 
-pub fn fork_session(
+/// Create an independent session from the source transcript, optionally
+/// stopping after one message. Message-scoped forks use this to keep later
+/// turns out of the child while preserving the same cache/runtime isolation as
+/// a full session fork.
+pub fn fork_session_through(
     db: &Database,
     source_id: &str,
     title: Option<&str>,
+    through_message_id: Option<&str>,
 ) -> Result<ForkSessionResult> {
     let Some(source) = get_session(db, source_id)? else {
         return Ok(ForkSessionResult::NotFound);
@@ -715,7 +720,22 @@ pub fn fork_session(
     if has_running_turn {
         return Ok(ForkSessionResult::Busy);
     }
-    let source_records = transcripts::read_transcript(db.data_dir(), source_id)?;
+    let mut source_records = dedupe_records(transcripts::read_transcript(
+        db.data_dir(),
+        source_id,
+    )?);
+    if let Some(message_id) = through_message_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        let Some(position) = source_records
+            .iter()
+            .position(|record| record.id == message_id)
+        else {
+            return Ok(ForkSessionResult::NotFound);
+        };
+        source_records.truncate(position + 1);
+    }
     let records = clone_records_for_fork(source_records);
     let texts = records.iter().map(record_index_text).collect::<Vec<_>>();
     let id = Uuid::new_v4().to_string();
@@ -1843,7 +1863,7 @@ mod tests {
         save_message_revision(&db, &source.id, "user-1", &[user.clone()], true).unwrap();
 
         let ForkSessionResult::Created(fork) =
-            fork_session(&db, &source.id, Some("Source (branch)")).unwrap()
+            fork_session_through(&db, &source.id, Some("Source (branch)"), None).unwrap()
         else {
             panic!("expected forked session");
         };
@@ -1923,12 +1943,12 @@ mod tests {
         assert_eq!(fork_reopened.messages[2].content, "continue here");
 
         assert!(matches!(
-            fork_session(&db, "missing", None).unwrap(),
+            fork_session_through(&db, "missing", None, None).unwrap(),
             ForkSessionResult::NotFound
         ));
         let turn = begin_turn(&db, &source.id, None, None).unwrap();
         assert!(matches!(
-            fork_session(&db, &source.id, None).unwrap(),
+            fork_session_through(&db, &source.id, None, None).unwrap(),
             ForkSessionResult::Busy
         ));
         end_turn(&db, &turn, "aborted", None, None, false).unwrap();
@@ -1942,6 +1962,51 @@ mod tests {
                 .len(),
             3
         );
+    }
+
+    #[test]
+    fn message_scoped_fork_stops_at_selected_assistant_response() {
+        let db = test_db();
+        let source = create_session(&db, Some("Source".into()), None, None, None, None).unwrap();
+        let mut assistant_a = user_msg("assistant-a", "first response", "2025-05-01T00:00:01Z");
+        assistant_a.role = "assistant".into();
+        let mut assistant_b = user_msg("assistant-b", "second response", "2025-05-01T00:00:03Z");
+        assistant_b.role = "assistant".into();
+        for message in [
+            user_msg("user-a", "first prompt", "2025-05-01T00:00:00Z"),
+            assistant_a,
+            user_msg("user-b", "second prompt", "2025-05-01T00:00:02Z"),
+            assistant_b,
+        ] {
+            append_message(&db, &source.id, &message, None).unwrap();
+        }
+
+        let ForkSessionResult::Created(fork) = fork_session_through(
+            &db,
+            &source.id,
+            Some("Response branch"),
+            Some("assistant-a"),
+        )
+        .unwrap() else {
+            panic!("expected message-scoped fork");
+        };
+
+        assert_eq!(fork.messages.len(), 2);
+        assert_eq!(fork.messages[0].content, "first prompt");
+        assert_eq!(fork.messages[1].content, "first response");
+        assert_ne!(fork.messages[1].id, "assistant-a");
+        assert_eq!(
+            get_session(&db, &source.id)
+                .unwrap()
+                .unwrap()
+                .messages
+                .len(),
+            4
+        );
+        assert!(matches!(
+            fork_session_through(&db, &source.id, None, Some("missing")).unwrap(),
+            ForkSessionResult::NotFound
+        ));
     }
 
     #[test]

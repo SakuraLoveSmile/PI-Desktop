@@ -87,7 +87,7 @@ test("stopping a turn undoes an unanswered prompt or settles the partial reply",
   assert.match(storeSource, /replaceSessionMessages\(sessionId,\s*settled\)/);
 });
 
-test("messages can be deleted and a user turn takes its reply with it", async () => {
+test("delete remains on user turns and is removed from assistant toolbar", async () => {
   const storeSource = await readFile(
     new URL("../src/stores/app-store.ts", import.meta.url),
     "utf8",
@@ -96,7 +96,25 @@ test("messages can be deleted and a user turn takes its reply with it", async ()
   assert.match(storeSource, /replaceSessionMessages\(sessionId,\s*next\)/);
   assert.match(transcriptSource, /deleteMessage\(message\.id\)/);
   assert.match(transcriptSource, /chat\.deleteMessage/);
+  assert.match(transcriptSource, /\{isUser && !streaming \? \(/);
   assert.match(stylesSource, /\.copy-btn\.danger:hover/);
+});
+
+test("assistant edit creates an isolated fork with reversible revisions", async () => {
+  const storeSource = await readFile(
+    new URL("../src/stores/app-store.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(transcriptSource, /editAssistantMessage\(message\.id, editValue\)/);
+  assert.match(transcriptSource, /className="message-edit-input selectable"/);
+  assert.match(transcriptSource, /chat\.editResponse/);
+  assert.match(storeSource, /editAssistantMessage:\s*async \(messageId, content\)/);
+  assert.match(storeSource, /api\.forkSession\([\s\S]*?messageId/);
+  assert.match(storeSource, /saveSessionRevision\([\s\S]*?originalBranch/);
+  assert.match(storeSource, /saveSessionRevision\([\s\S]*?editedBranch/);
+  assert.match(storeSource, /revisionCount:\s*2/);
+  assert.match(storeSource, /activeRevision:\s*2/);
+  assert.match(stylesSource, /\.message-edit-input/);
 });
 
 test("assistant meta chips and retry action are wired", () => {

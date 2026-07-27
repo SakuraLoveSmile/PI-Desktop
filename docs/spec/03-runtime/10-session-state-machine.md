@@ -49,6 +49,9 @@ accept_prompt
    active runtime guard and normalizes the host's persisted running-turn
    `CONFLICT` fallback to the same IPC error. Neither path produces a partial
    child.
+10. Supplying `throughMessageId` changes only the snapshot boundary. Assistant
+    Fork/Edit still creates a new idle session id with no shared turn,
+    permission wait, runtime, or provider-cache state (D134).
 
 ## 4. Persistence points
 
@@ -62,7 +65,8 @@ transcript-file line first, index transaction second.
 - assistant/tool messages: on message_end/tool_end
 - mode/project fields: on change
 - fork snapshot: new transcript file plus one child session/index transaction;
-  source persistence remains untouched
+  source persistence remains untouched; a message-scoped snapshot ends
+  inclusively at the selected message
 
 ## 5. Acceptance
 
@@ -75,3 +79,5 @@ transcript-file line first, index transaction second.
    while a visible-current result or aborted turn produces none
 6. an idle fork starts as an independent idle session; a busy source cannot
    produce a child
+7. a message-scoped fork excludes later rows and begins with no source runtime
+   or provider-cache state
