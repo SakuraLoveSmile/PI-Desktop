@@ -295,3 +295,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - `--ds-accent` / `--ds-accent-hover` / `--ds-accent-soft` / `--ds-info` now resolve to the gray scale (dark: white→gray-100→gray-300; light: `#1a1c1f`→`#303030`→`#5d5d5d`) instead of Codex blue.
 - Markdown links, blockquotes, focus rings, plugin CTAs, toggles, and selected-session rings inherit the neutral accent automatically via tokens.
 - Project color dots and docs/specs updated to drop blue as the brand accent.
+
+## 2026-07-28 — Plugins page light-theme token pass
+
+- Marketplace/plugin chrome CSS dropped raw blue-slate fallbacks (`#4f7cff`, `#2a3144`, `#121826`, …) and now consumes only `--ds-*` tokens.
+- Tabs, actions, search, cards, permission modal, and badges adapt to light/dark via the neutral gray accent system.

@@ -1105,13 +1105,16 @@ Each scenario is documented in this format:
   links and a blockquote. 3) Switch theme and re-check.
 - **Expected**: No blue brand accent remains. Interactive accent, markdown
   links/rules, and plugin primary actions resolve through the neutral gray
-  accent tokens (`white/gray` dark, dark-ink light). Semantic success/warning
-  /error colors are unchanged.
+  accent tokens (`white/gray` dark, dark-ink light). The plugins
+  installed/market UI (tabs, search, cards, permission modal) uses only
+  `--ds-*` tokens with no blue-slate fallbacks in either theme. Semantic
+  success/warning/error colors are unchanged.
 - **Specs linked**: `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`
 - **Acceptance**: Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`neutral-accent.test.mjs`); visual scenario Draft
+- **Status**: Unit-covered (`neutral-accent.test.mjs`,
+  `plugins-page-style.test.mjs`); visual scenario Draft
 
 #### E2E-060: Assistant markdown prose hierarchy and code chrome
 
