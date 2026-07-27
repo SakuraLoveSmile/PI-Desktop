@@ -61,14 +61,14 @@
   commands as renderer controls. Native Edit/View/Window roles retain
   platform text-editing, zoom, fullscreen, hide, and quit behavior.
 - Windows/Linux render no application menu in the window. Their frameless
-  titlebar keeps collapsed-state New task at the left edge when needed, the
-  session-pane sidebar toggle at the top-right ahead of native window controls,
-  and never parks collapse inside the sidebar navigation header. Destination
-  history has no visible back/forward controls and remains available through the
-  renderer shortcuts. The first transcript row starts below the 46px titlebar
-  control band so user and assistant content cannot overlap the minimize,
-  maximize/restore, or close targets. F10 and Shift+F10 are not consumed by
-  shell chrome.
+  titlebar keeps sidebar actions at the left edge and native window controls at
+  the right edge. While the work panel is open, its sole collapse control sits
+  in the session pane top-right ahead of those window controls rather than in
+  the work-panel tab strip. Destination history has no visible back/forward
+  controls and remains available through the renderer shortcuts. The first
+  transcript row starts below the 46px titlebar control band so user and
+  assistant content cannot overlap the minimize, maximize/restore, or close
+  targets. F10 and Shift+F10 are not consumed by shell chrome.
 - Windows/Linux keep New Task, Open Project, Settings, close-window,
   zoom, fullscreen, search, command-palette, and sidebar shortcuts through
   renderer key handling. Standard editing shortcuts remain native web-content
@@ -232,7 +232,8 @@ may be retained while exactly one workspace supplies the visible shell context.
   singletons; repeated triggers preserve tab order and activate the existing tab.
 - Every tab has its own close control. Closing the active tab selects the right
   neighbor, then the left; closing the final tab hides the panel. The separate
-  panel collapse control hides the panel without deleting tabs.
+  panel collapse control in the session pane top-right hides the panel without
+  deleting tabs.
 - On Windows, opening or hiding the panel keeps the native window bounds
   unchanged. The docked renderer layout updates in one pass, avoiding the
   intermediate frameless-window repaint caused by a later native resize.

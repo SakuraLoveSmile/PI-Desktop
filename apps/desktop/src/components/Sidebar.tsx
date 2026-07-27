@@ -39,6 +39,7 @@ import {
   IconNewProject,
   IconPin,
   IconSearch,
+  IconSidebar,
   IconSettings,
   IconSliders,
   IconUser,
@@ -135,8 +136,12 @@ function compareOptionalDate(
 
 export function Sidebar({
   onOpenSearch,
+  onToggleSidebar,
+  sidebarToggleShortcut,
 }: {
   onOpenSearch: () => void;
+  onToggleSidebar: () => void;
+  sidebarToggleShortcut: string;
 }) {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
@@ -1131,6 +1136,17 @@ export function Sidebar({
             onClick={onOpenSearch}
           >
             <IconSearch size={15} />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            title={`${t("nav.collapseSidebar")} (${sidebarToggleShortcut})`}
+            aria-label={t("nav.collapseSidebar")}
+            aria-expanded={true}
+            data-nav="toggle-sidebar"
+            onClick={onToggleSidebar}
+          >
+            <IconSidebar size={15} />
           </button>
         </div>
       </div>

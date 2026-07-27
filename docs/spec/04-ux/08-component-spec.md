@@ -47,9 +47,10 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 ### 1.4 Interactions
 
-- Sidebar toggle: keyboard shortcut + icon button in the session pane titlebar
-  top-right (always available); the expanded sidebar header keeps Search only
-  and no longer hosts the collapse control
+- Sidebar toggle: keyboard shortcut + icon button beside Search in the expanded
+  sidebar header; the button moves to the main titlebar while collapsed
+- Work panel collapse: sole control lives in the session pane titlebar top-right
+  while the panel is open, so the work-panel tab strip is not occupied
 - Work panel resize: left-edge drag handle (§5.4)
 - Window resize: responsive collapse per [07-ui-design-system.md](07-ui-design-system.md) §10.1
 
@@ -69,9 +70,9 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 | Platform | Top-level chrome | Application menu |
 |---|---|---|
-| macOS | Native inset traffic lights at `{x:16,y:16}`; expanded sidebar Search stays on the header row at right, with no logo/title; sidebar collapse/expand lives in the session pane top-right | System menu: PI-Desktop, File, Edit, View, Window, Help |
-| Windows | Frameless 46px titlebar; sidebar Search at left header, session-pane collapse/expand at main top-right ahead of minimize/maximize/close | None inside the window |
-| Linux | Frameless 46px titlebar; sidebar Search at left header, session-pane collapse/expand at main top-right ahead of minimize/maximize/close | None inside the window |
+| macOS | Native inset traffic lights at `{x:16,y:16}`; expanded sidebar Search and Collapse controls share the row at right, with no logo/title; open work-panel collapse sits in the session pane top-right | System menu: PI-Desktop, File, Edit, View, Window, Help |
+| Windows | Frameless 46px titlebar; sidebar actions at left, open work-panel collapse in session pane top-right ahead of minimize/maximize/close | None inside the window |
+| Linux | Frameless 46px titlebar; sidebar actions at left, open work-panel collapse in session pane top-right ahead of minimize/maximize/close | None inside the window |
 
 - The macOS system menu exposes New Task, Open Project, Settings, Command
   Palette, Sidebar, standard editing, zoom/fullscreen, window, Help, Logs, and
@@ -217,9 +218,11 @@ Collapsed (48px):
 - On Windows/Linux, click the PI-Desktop brand to return the main pane to the
   chat home while preserving the active conversation and workspace; macOS
   intentionally omits this brand control from the sidebar header
-- Click Search at the right of the sidebar header row to open global search
-- Click the session-pane top-right sidebar toggle to collapse or expand the
-  sidebar without consuming sidebar navigation chrome
+- Click Search or Collapse sidebar at the right of the header row to
+  open global search or collapse the sidebar respectively
+- While the work panel is open, click the session-pane top-right panel collapse
+  control to hide the panel without deleting tabs; the work-panel header keeps
+  only dynamic tabs
 - Click the `Projects` heading folder-plus action: open the project picker and
   retain the selected project
 - Right-click the `Projects` heading or empty project-list chrome: open a
@@ -243,8 +246,8 @@ Collapsed (48px):
   cards. Directory `+` and overflow actions remain hidden until hover or
   keyboard focus.
 - Sidebar toggle: expanded-header icon beside Search + keyboard shortcut; the
-  session-pane top-right toggle expands or collapses the sidebar; when collapsed,
-  the main titlebar left edge keeps New task only
+  collapsed main titlebar retains an Expand sidebar icon; when the work panel is
+  open, the session-pane top-right hosts the sole panel collapse control
 - Click the local profile trigger: open or close the identity menu containing
   Settings, Logs, and Theme
 - Click the footer bell: open or close the durable notification inbox
@@ -398,7 +401,8 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 ```text
 +--------------------------------------+
-| App.tsx [×] | Review [×]       [◧]  |  dynamic tabs + collapse, 46px
+| App.tsx [×] | Review [×]              |  dynamic tabs only, 46px
+| (session pane top-right hosts [◧] while open) |
 +--------------------------------------+
 | Active tab body                      |
 |  Review: file cards + unified diff   |
@@ -447,8 +451,9 @@ preview), and Files (workspace browser). Codex-parity surface.
   renderer-memory state and is discarded on relaunch with D142's work-panel
   contexts.
 - Tab close: closing an active tab selects its right neighbor, then its left;
-  closing the last tab hides the panel. The panel-level collapse control hides
-  the panel without deleting the runtime tab set; a later artifact reopens it.
+  closing the last tab hides the panel. The panel-level collapse control lives
+  in the session pane top-right (not the work-panel tab strip) and hides the
+  panel without deleting the runtime tab set; a later artifact reopens it.
   Terminal mounts only after its first command artifact and stays mounted while
   its tab exists so the PTY and scrollback survive switches.
 - Context change: selecting another session atomically projects that session's
@@ -473,7 +478,8 @@ preview), and Files (workspace browser). Codex-parity surface.
   localized `aria-label`; each resource uses `role="tab"`, `aria-selected`,
   `aria-controls`, and a corresponding `role="tabpanel"`
 - Resize handle: `role="separator"` `aria-orientation="vertical"`
-- Every tab close and the sole panel collapse button expose localized names
+- Every tab close and the sole session-pane panel collapse button expose
+  localized names
 
 ### 5.6 MVP constraints
 

@@ -8,7 +8,6 @@ import {
   IconDiff,
   IconFileText,
   IconGlobe,
-  IconPanel,
   IconTerminal,
 } from "../icons";
 import { ReviewTab } from "./ReviewTab";
@@ -57,7 +56,6 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
   const width = useAppStore((s) => s.workPanelWidth);
   const activateTab = useAppStore((s) => s.activateWorkPanelTab);
   const closeTab = useAppStore((s) => s.closeWorkPanelTab);
-  const collapsePanel = useAppStore((s) => s.collapseWorkPanel);
   const setWidth = useAppStore((s) => s.setWorkPanelWidth);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
   const terminalOpen = tabs.some((tab) => tab.kind === "terminal");
@@ -171,15 +169,6 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
               );
             })}
           </nav>
-          <button
-            type="button"
-            className="icon-btn work-panel-collapse no-drag"
-            onClick={collapsePanel}
-            title={t("panel.collapse")}
-            aria-label={t("panel.collapse")}
-          >
-            <IconPanel size={15} />
-          </button>
         </header>
         <div className="work-panel-body">
           {activeTab?.kind === "review" && (
