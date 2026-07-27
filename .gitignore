@@ -42,3 +42,4 @@ coverage/
 .pi-desktop-test/
 
 .playwright-mcp/
+.claude/
