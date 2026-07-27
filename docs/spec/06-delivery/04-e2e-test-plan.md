@@ -1999,6 +1999,9 @@ This test plan spec is accepted when:
 - Right-click the `Projects` heading or empty project-list chrome and expect a
   one-item create menu that opens the same project picker as the folder-plus
   action.
+- Expect the sidebar collapse/expand control in the session pane top-right, not
+  in the sidebar header beside Search; project and session lists scroll inside
+  the sidebar body without clipping behind the footer.
 - Collapse A by clicking its directory label, expand it from the chevron area,
   then activate B and return to A. Only A's child rows collapse; project `+`
   and overflow actions do not toggle it; the

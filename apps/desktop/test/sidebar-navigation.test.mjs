@@ -39,16 +39,40 @@ test("sidebar brand returns to the chat home", () => {
   assert.match(brandButton, /t\("app\.shellName"\)/);
 });
 
-test("sidebar header retains non-mac branding and keeps collapse beside search", () => {
+test("sidebar header retains non-mac branding and keeps search without collapse", () => {
   const header = sidebarSource.match(
     /<div className="sidebar-header">[\s\S]*?<\/div>\s*<\/div>/,
   )?.[0] ?? "";
 
   assert.match(header, /className="brand no-drag"/);
   assert.match(header, /className="sidebar-header-actions no-drag"/);
-  assert.ok(header.indexOf("<IconSearch") < header.indexOf("<IconSidebar"));
-  assert.match(header, /data-nav="toggle-sidebar"/);
+  assert.match(header, /<IconSearch/);
+  assert.doesNotMatch(header, /data-nav="toggle-sidebar"/);
+  assert.doesNotMatch(header, /IconSidebar/);
   assert.doesNotMatch(appSource, /IconChevronLeft|IconChevronRight/);
+});
+
+test("session pane hosts the sidebar collapse control at the top-right", () => {
+  assert.match(appSource, /className="main-titlebar-right no-drag"/);
+  assert.match(appSource, /function SessionPaneSidebarToggle/);
+  assert.match(appSource, /data-nav="toggle-sidebar"/);
+  assert.match(appSource, /data-sidebar-state=\{collapsed \? "collapsed" : "expanded"\}/);
+  assert.match(
+    globalStyles,
+    /\.session-pane-toggle\s*\{[^}]*display:\s*inline-flex;/s,
+  );
+  assert.match(
+    globalStyles,
+    /\.sidebar\s*\{[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/s,
+  );
+  assert.match(
+    globalStyles,
+    /\.sidebar-body\s*\{[^}]*min-height:\s*0;[^}]*flex:\s*1 1 auto;[^}]*overflow:\s*hidden;/s,
+  );
+  assert.match(
+    globalStyles,
+    /\.sidebar-session-groups\s*\{[^}]*overflow-y:\s*auto;/s,
+  );
 });
 
 test("macOS hides sidebar branding and keeps header actions beside traffic lights", () => {
@@ -117,4 +141,6 @@ test("sidebar section toolbars open create actions from context menus", () => {
     sidebarSource,
     /className=\"sidebar-row-menu sidebar-floating-menu sidebar-section-menu\"/,
   );
+  assert.match(sidebarSource, /e\.button === 2/);
+  assert.match(sidebarSource, /addEventListener\("pointerdown"/);
 });
