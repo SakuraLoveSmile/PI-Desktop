@@ -4101,6 +4101,14 @@ textarea:disabled {
   font-size: var(--text-sm-plus);
 }
 
+/* Chromium on Windows paints the opened native list separately from the
+   select trigger, so give that surface opaque theme colors explicitly. */
+.settings-shell select option,
+.settings-shell select optgroup {
+  background-color: var(--ds-bg-elevated-opaque);
+  color: var(--ds-text-primary);
+}
+
 :root[data-theme="light"] .settings-pill-select,
 :root[data-theme="light"] .settings-row-control .field-select {
   background: #f5f5f5;

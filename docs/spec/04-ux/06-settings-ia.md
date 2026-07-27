@@ -24,6 +24,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ### Basics
 - **Appearance** card:
   - theme system/light/dark (select + theme cards)
+  - native select triggers and their opened option lists use the active theme's
+    readable foreground/background pairing on macOS, Windows, and Linux
 - Permission defaults, file-open target, language override, menu-bar behavior,
   and bottom-panel behavior are not rendered until their host-backed settings
   schemas and runtime effects exist.
@@ -94,6 +96,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     duplicating the index in the app shell
 13. Info renders disabled, checking, up-to-date, available, downloading,
     downloaded, and error update states without adding another destination
+14. Native select option lists remain readable in both light and dark themes,
+    including when Chromium delegates the opened list surface to Windows
 
 ## 5. Basics chrome metrics
 

@@ -1279,6 +1279,25 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`renderer-branding.test.mjs`,
   `sidebar-navigation.test.mjs`); rendered interaction scenario Draft
 
+#### E2E-070: Settings native select menus follow the Windows theme
+
+- **Preconditions**: PI-Desktop is running on Windows with Settings available
+  in both light and dark themes.
+- **Steps**: 1) Open Settings → Basics in light theme. 2) Open the Language and
+  Default permission mode selects. 3) Repeat in dark theme. 4) Open Settings →
+  Model configuration and inspect the default-model and provider API-style
+  selects. 5) Scan importable sessions and open the Import grouping select.
+- **Expected**: Every closed trigger and opened native option list uses the
+  active theme's readable foreground/background pairing. No dark-theme list
+  falls back to a light Windows surface with light text, no light-theme list
+  uses dark-theme ink, and changing theme updates subsequent openings.
+- **Specs linked**: `04-ux/06-settings-ia.md`,
+  `04-ux/07-ui-design-system.md`
+- **Acceptance**: Quality (cross-platform theme readability)
+- **Milestone**: M5
+- **Status**: Unit-covered (`settings-general.test.mjs`); Windows rendered
+  scenario Draft
+
 ## 8. Traceability Matrix
 
 
@@ -1296,7 +1315,7 @@ Each scenario is documented in this format:
 | G — Plugins | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -1304,7 +1323,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069 (+ packaging scenarios in release runbook) |
+| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070 (+ packaging scenarios in release runbook) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
