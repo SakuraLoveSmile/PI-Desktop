@@ -286,6 +286,9 @@ heights (≈28–32px) so density stays WorkBuddy/Codex-like while glyphs scale 
 - The notification trigger has a localized accessible name containing the
   unread count, exposes `aria-expanded`/`aria-controls`, and never relies on
   the badge color alone
+- Profile and notification popovers portal to `document.body` with fixed
+  positioning so the main chat pane cannot paint over them; work-panel tool
+  context menus use the same body-level floating layer
 
 
 ### 3.7 Brand and icon contract

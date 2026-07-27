@@ -1,11 +1,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import type { AppNotification } from "@pi-desktop/shared";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../stores/app-store";
@@ -72,6 +74,7 @@ export function NotificationCenter({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<NotificationFilter>("all");
+  const [popoverPos, setPopoverPos] = useState<{ bottom: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -90,6 +93,26 @@ export function NotificationCenter({
       requestAnimationFrame(() => triggerRef.current?.focus());
     }
   }, []);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPopoverPos(null);
+      return;
+    }
+    const place = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(360, window.innerWidth - 24);
+      const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+      setPopoverPos({
+        bottom: Math.max(12, window.innerHeight - rect.top + 8),
+        left,
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -113,7 +136,10 @@ export function NotificationCenter({
   useEffect(() => {
     if (!open) return;
     const onMouseDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) closePopover(false);
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      closePopover(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -213,15 +239,17 @@ export function NotificationCenter({
         {unreadLabel}
       </span>
 
-      {open ? (
-        <div
-          ref={popoverRef}
-          id="notification-popover"
-          className="notification-popover"
-          role="dialog"
-          aria-labelledby="notification-title"
-          onKeyDown={onPopoverKeyDown}
-        >
+      {open && popoverPos && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={popoverRef}
+              id="notification-popover"
+              className="notification-popover notification-popover-portaled"
+              role="dialog"
+              aria-labelledby="notification-title"
+              onKeyDown={onPopoverKeyDown}
+              style={{ bottom: popoverPos.bottom, left: popoverPos.left }}
+            >
           <header className="notification-header">
             <h2 id="notification-title">{t("notifications.title")}</h2>
             <div className="notification-actions">
@@ -344,8 +372,10 @@ export function NotificationCenter({
               </span>
             </div>
           )}
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

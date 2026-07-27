@@ -566,7 +566,7 @@ The composer renders only controls connected to the active pi session:
 | `z-overlay` | 30 | Tooltips |
 | `z-dialog` | 40 | Settings and confirmation dialogs |
 | `z-toast` | 50 | Toast notifications |
-| `z-command-palette` | 60 | Command palette overlay |
+| `z-command-palette` | 60 | Command palette overlay, body-portaled menus/popovers |
 | `z-devtools` | 100 | DevTools overlay (non-production) |
 
 Rules:

@@ -71,6 +71,8 @@ test("work panel renders only dynamic artifact tabs with close controls", () => 
   assert.match(panelSource, /data-work-panel-section="tools"/);
   assert.match(panelSource, /onContextMenu=\{onHeaderContextMenu\}/);
   assert.match(panelSource, /data-work-panel-tools-menu/);
+  assert.match(panelSource, /panel\.openTool/);
+  assert.match(panelSource, /defaultValue:\s*"Open tool"/);
   assert.match(panelSource, /openWorkPanelTab\(toolWorkPanelTab\(kind\)\)/);
   assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
   assert.match(panelSource, /activeTabRef\.current\?\.scrollIntoView/);
