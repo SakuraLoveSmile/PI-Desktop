@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { ProviderPublic, ThinkingLevel } from "@pi-desktop/shared";
+import type { ProviderPublic } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import { Badge, Button, cx } from "../ui";
@@ -10,11 +10,7 @@ import {
   EMPTY_PROVIDER_FORM,
   formFromProvider,
   hostFromBaseUrl,
-  levelsForThinkingMode,
   normalizeApiStyle,
-  parseTemperature,
-  parseThinkingLevelsInput,
-  parseTokenCount,
   type ProviderForm,
 } from "./provider-form";
 import { ProviderDialog } from "./ProviderDialog";
@@ -93,21 +89,7 @@ export function ProvidersSection() {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      const supportsReasoning = form.thinkingMode !== "off";
-      const customLevels = parseThinkingLevelsInput(form.customThinkingLevels);
-      const contextWindow = parseTokenCount(form.contextWindow);
-      const maxOutputTokens = parseTokenCount(form.maxOutputTokens);
-      const temperature = parseTemperature(form.temperature);
       if (editingProvider) {
-        // Empty levels array clears an explicit override (graded default).
-        const levelsForUpdate =
-          form.thinkingMode === "custom"
-            ? customLevels.length > 0
-              ? customLevels
-              : (["off", "high"] as ThinkingLevel[])
-            : form.thinkingMode === "toggle"
-              ? (["off", "high"] as ThinkingLevel[])
-              : [];
         await api.updateProvider({
           id: editingProvider.id,
           name: form.name.trim(),
@@ -115,11 +97,6 @@ export function ProvidersSection() {
           defaultModelId: form.modelId.trim(),
           apiStyle: form.apiStyle,
           ...(form.apiKey ? { secretValue: form.apiKey } : {}),
-          supportsReasoning,
-          supportedThinkingLevels: levelsForUpdate,
-          contextWindow,
-          maxOutputTokens,
-          temperature,
         });
         // Keep the global default model in step when it points at this provider.
         if (settings.defaultProviderId === editingProvider.id) {
@@ -130,10 +107,6 @@ export function ProvidersSection() {
         }
         showToast(t("settings.providerUpdated"), { variant: "success" });
       } else {
-        const selectedLevels =
-          form.thinkingMode === "custom"
-            ? customLevels
-            : levelsForThinkingMode(form.thinkingMode);
         const created = await api.createProvider({
           name: form.name.trim(),
           vendorKey: "custom",
@@ -144,13 +117,6 @@ export function ProvidersSection() {
           defaultModelId: form.modelId.trim(),
           secretValue: form.apiKey || undefined,
           apiStyle: form.apiStyle,
-          supportsReasoning,
-          ...(selectedLevels && selectedLevels.length > 0
-            ? { supportedThinkingLevels: selectedLevels }
-            : {}),
-          ...(contextWindow > 0 ? { contextWindow } : {}),
-          ...(maxOutputTokens > 0 ? { maxOutputTokens } : {}),
-          ...(temperature > 0 ? { temperature } : {}),
         });
         await api.setSettings({
           ...settings,

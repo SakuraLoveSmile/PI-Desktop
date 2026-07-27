@@ -11,6 +11,17 @@ const provider: RuntimeProviderConfig = {
   authKind: "none",
   supportsReasoning: true,
   supportedThinkingLevels: ["off", "low", "medium", "high"],
+  modelConfig: {
+    source: "pi",
+    name: "Local Catalog Model",
+    baseUrl: "https://catalog.invalid/v1",
+    reasoning: true,
+    thinkingLevelMap: { minimal: null, xhigh: null, max: null },
+    input: ["text", "image"],
+    cost: { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0.2 },
+    contextWindow: 256_000,
+    maxTokens: 32_000,
+  },
 };
 
 function createRuntime(
@@ -72,6 +83,7 @@ describe("DesktopAgentRuntime thinking configuration", () => {
       ...provider,
       supportsReasoning: false,
       supportedThinkingLevels: ["off"],
+      modelConfig: undefined,
     };
     const runtime = createRuntime({
       provider: noReasoning,
@@ -85,12 +97,21 @@ describe("DesktopAgentRuntime thinking configuration", () => {
     await runtime.dispose();
   });
 
-  it("applies wire-dialect compat so off emits an explicit disable", async () => {
+  it("applies the complete pi model record while preserving endpoint identity", async () => {
     const mimo: RuntimeProviderConfig = {
       ...provider,
       modelId: "mimo-v2.5-pro-think",
       supportedThinkingLevels: ["off", "high"],
-      modelCompat: {
+      modelConfig: {
+        source: "pi",
+        name: "MiMo-V2.5-Pro",
+        baseUrl: "https://api.xiaomimimo.com/v1",
+        reasoning: true,
+        input: ["text"],
+        cost: { input: 0.435, output: 0.87, cacheRead: 0.0036, cacheWrite: 0 },
+        contextWindow: 1_048_576,
+        maxTokens: 131_072,
+        headers: { "X-Catalog-Model": "mimo-v2.5-pro" },
         compat: {
           thinkingFormat: "deepseek",
           requiresReasoningContentOnAssistantMessages: true,
@@ -103,71 +124,66 @@ describe("DesktopAgentRuntime thinking configuration", () => {
     expect(model.compat).toMatchObject({
       thinkingFormat: "deepseek",
       requiresReasoningContentOnAssistantMessages: true,
-      supportsDeveloperRole: false,
     });
-    // off must stay expressible (not null) so the deepseek dialect sends
-    // thinking {type: "disabled"} instead of omitting the parameter.
-    expect(model.thinkingLevelMap.off).toBeUndefined();
-    expect(model.thinkingLevelMap.medium).toBeNull();
+    expect(model.name).toBe("MiMo-V2.5-Pro");
+    expect(model.baseUrl).toBe(provider.baseUrl);
+    expect(model.contextWindow).toBe(1_048_576);
+    expect(model.maxTokens).toBe(131_072);
+    expect(model.input).toEqual(["text"]);
+    expect(model.cost).toEqual({
+      input: 0.435,
+      output: 0.87,
+      cacheRead: 0.0036,
+      cacheWrite: 0,
+    });
+    expect(model.headers).toEqual({ "X-Catalog-Model": "mimo-v2.5-pro" });
     expect((runtime as any).thinkingLevel).toBe("off");
 
     await runtime.dispose();
   });
 
-  it("merges catalog level values with declared provider support", async () => {
-    const effortStyle: RuntimeProviderConfig = {
-      ...provider,
-      modelCompat: {
-        thinkingLevelMap: { off: "none", low: null, minimal: null },
-      },
-    };
-    const runtime = createRuntime({
-      provider: effortStyle,
-      thinkingLevel: "off",
-    });
-    const model = (runtime as any).agent.state.model;
-
-    // Catalog off value survives so reasoning_effort "none" is emitted.
-    expect(model.thinkingLevelMap.off).toBe("none");
-    // Declared provider support ("low") beats a catalog null…
-    expect(model.thinkingLevelMap.low).toBeUndefined();
-    // …while levels the provider does not declare stay null.
-    expect(model.thinkingLevelMap.minimal).toBeNull();
-
-    await runtime.dispose();
-  });
-
-  it("clamps off and omits the disabled dialect for adaptive models", async () => {
+  it("preserves adaptive model metadata without desktop-side rewrites", async () => {
     const adaptive: RuntimeProviderConfig = {
       ...provider,
       apiStyle: "anthropic_messages",
       modelId: "claude-opus-4-6",
-      supportedThinkingLevels: ["minimal", "low", "medium", "high", "max"],
-      modelCompat: {
+      supportedThinkingLevels: ["off", "minimal", "low", "medium", "high", "max"],
+      modelConfig: {
+        source: "pi",
+        name: "Claude Opus 4.6",
+        baseUrl: "https://api.anthropic.com",
+        reasoning: true,
+        input: ["text", "image"],
+        cost: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
         compat: { forceAdaptiveThinking: true },
-        thinkingLevelMap: { off: null, max: "max" },
+        thinkingLevelMap: { max: "max" },
       },
     };
     const runtime = createRuntime({ provider: adaptive, thinkingLevel: "off" });
     const agent = (runtime as any).agent;
 
-    expect(agent.state.thinkingLevel).toBe("minimal");
+    expect(agent.state.thinkingLevel).toBe("off");
     expect(agent.state.model.compat.forceAdaptiveThinking).toBe(true);
-    expect(agent.state.model.thinkingLevelMap.off).toBeNull();
+    expect(agent.state.model.thinkingLevelMap).toEqual({ max: "max" });
 
     await runtime.dispose();
   });
 
-  it("recreates the runtime when wire compat changes", async () => {
+  it("recreates the runtime when the pi model record changes", async () => {
     const mimo: RuntimeProviderConfig = {
       ...provider,
-      modelCompat: { compat: { thinkingFormat: "deepseek" } },
+      modelConfig: {
+        ...provider.modelConfig!,
+        compat: { thinkingFormat: "deepseek" },
+      },
     };
     const runtime = createRuntime({ provider: mimo, thinkingLevel: "medium" });
 
     expect(runtime.matches("agent", mimo, "medium")).toBe(true);
     expect(
-      runtime.matches("agent", { ...mimo, modelCompat: undefined }, "medium"),
+      runtime.matches("agent", { ...mimo, modelConfig: undefined }, "medium"),
     ).toBe(false);
 
     await runtime.dispose();

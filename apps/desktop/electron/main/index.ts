@@ -37,7 +37,7 @@ import {
 } from "@pi-desktop/shared";
 import {
   clampThinkingLevel,
-  resolveModelWireCompat,
+  resolvePiModelConfig,
   resolveThinkingCapabilities,
   expandSlashInvocation,
   loadComposerTemplates,
@@ -126,13 +126,6 @@ type RuntimeProvider = {
   apiStyle?: string;
   hasSecret?: boolean;
   enabled?: boolean;
-  contextWindow?: number;
-  maxOutputTokens?: number;
-  temperature?: number;
-  /** Host may return an explicit override; effective values are enriched below. */
-  supportsReasoning?: boolean;
-  /** Optional sparse override from provider config_json.compatibility. */
-  supportedThinkingLevels?: ThinkingLevel[];
 };
 
 type RuntimeSession = {
@@ -150,8 +143,6 @@ function enrichProvider<T extends RuntimeProvider>(
     vendorKey: provider.vendorKey || "custom",
     modelId,
     apiStyle: provider.apiStyle,
-    supportsReasoning: provider.supportsReasoning,
-    supportedThinkingLevels: provider.supportedThinkingLevels,
   });
   return {
     ...provider,
@@ -189,8 +180,6 @@ function enrichSession<T extends RuntimeSession>(
     vendorKey: provider.vendorKey || "custom",
     modelId: session.modelId,
     apiStyle: provider.apiStyle,
-    supportsReasoning: provider.supportsReasoning,
-    supportedThinkingLevels: provider.supportedThinkingLevels,
   });
   return {
     ...session,
@@ -877,7 +866,6 @@ async function createWindow() {
                   defaultModelId: "mimo-v2.5",
                   secretValue: "sk-capture-fixture",
                   apiStyle: "chat_completions",
-                  supportsReasoning: true,
                 });
                 await mainWindow!.webContents.executeJavaScript(
                   `void window.__PI_DESKTOP__?.refreshProviders?.()`,
@@ -2270,8 +2258,6 @@ function registerIpc() {
           vendorKey: provider?.vendorKey || "custom",
           modelId: model.modelId,
           apiStyle,
-          supportsReasoning: provider?.supportsReasoning,
-          supportedThinkingLevels: provider?.supportedThinkingLevels,
         });
         if (thinking.supportsReasoning) capabilities.add("reasoning");
         else capabilities.delete("reasoning");
@@ -3042,18 +3028,14 @@ function registerIpc() {
       thinkingCapabilities,
       normalizeThinkingLevel(session.thinkingLevel),
     );
-    // Wire-dialect hints from the pi-ai catalog (exact or alias-suffix model
-    // id match). Without them, thinking "off" emits no request parameter on
-    // custom OpenAI-compatible endpoints and default-on reasoners (e.g.
-    // MiMo *-think) keep thinking. Resolved here because the sidecar never
-    // loads the catalog.
-    const modelCompat = thinkingCapabilities.supportsReasoning
-      ? resolveModelWireCompat({
-          vendorKey: provider.vendorKey || "custom",
-          modelId,
-          apiStyle: provider.apiStyle,
-        })
-      : undefined;
+    // Keep the sidecar catalog-free: main serializes pi-ai's complete model
+    // record and the runtime only replaces connection identity. Unknown
+    // free-form ids intentionally use the generic runtime fallback.
+    const modelConfig = resolvePiModelConfig({
+      vendorKey: provider.vendorKey || "custom",
+      modelId,
+      apiStyle: provider.apiStyle,
+    });
 
     // Open a durable turn row, then persist the user message under it.
     const turn = await host
@@ -3153,10 +3135,7 @@ function registerIpc() {
             supportsReasoning: thinkingCapabilities.supportsReasoning,
             supportedThinkingLevels:
               thinkingCapabilities.supportedThinkingLevels,
-            contextWindow: provider.contextWindow,
-            maxOutputTokens: provider.maxOutputTokens,
-            temperature: provider.temperature,
-            ...(modelCompat ? { modelCompat } : {}),
+            ...(modelConfig ? { modelConfig } : {}),
           },
           // Registered plugin agent tools join the model's toolset; execution
           // round-trips host -> main (plugins.execute) -> plugin JS.

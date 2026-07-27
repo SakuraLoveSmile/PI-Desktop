@@ -68,25 +68,13 @@ Tables (canonical DDL in [04-data-storage](04-data-storage.md) §4.3–4.4, §4.
 }
 ```
 
-`compatibility.supportsReasoning` is optional and tri-state at runtime:
-
-- omitted: infer from pi's catalog for the exact selected model
-- `true`: explicitly enable reasoning for custom/compatible models absent
-  from the catalog
-- `false`: explicitly disable reasoning and remove stale catalog-derived
-  reasoning capability
-
-`compatibility.supportedThinkingLevels` is an optional sparse override for
-custom/compatible endpoints. Values are canonical thinking levels such as
-`["off","high"]` for boolean-like thinking support. When present and non-empty,
-the declared set is authoritative for that provider even if the model id
-collides with a catalog entry. An empty update clears the override and restores
-catalog/default resolution. Invalid entries are dropped; if nothing remains the
-override is treated as absent.
-
-The public provider shape is enriched in Electron main with the effective
-`supportsReasoning` and `supportedThinkingLevels` for its selected/default
-model. The raw secret and internal compatibility JSON remain hidden.
+`compatibility.supportsReasoning` and
+`compatibility.supportedThinkingLevels` remain readable for stored-record and
+older-client compatibility, but Electron main ignores them during runtime
+model resolution. The public provider shape is enriched from the exact pi-ai
+model record instead. Unknown free-form models expose `supportsReasoning=false`
+and `supportedThinkingLevels=["off"]`. The raw secret and internal compatibility
+JSON remain hidden.
 
 ## 3. Built-in vendor presets
 
@@ -177,10 +165,11 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
 - `ProviderPublic` excludes raw secrets; includes `hasSecret: boolean`
 
 ### `providers.create` / `providers.update`
-- in: provider fields + optional `secretValue` + optional
+- in: provider fields + optional `secretValue`; legacy clients may still send
   `supportsReasoning` / `supportedThinkingLevels`
 - behavior: persist config; if secretValue present, write secret store and set
-  `secretRef`; thinking fields map into `config_json.compatibility`
+  `secretRef`; legacy thinking fields may remain in
+  `config_json.compatibility` but do not affect runtime resolution
 - out: `ProviderPublic`
 
 ### `providers.delete`
@@ -197,9 +186,9 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
   runs discovery in Electron main
 - host RPC in: `{ providerId?: string }`; reads only the Rust-owned `models`
   table
-- out: `{ models: ModelCatalogItem[] }`; each model carries effective
-  `reasoning` capability and `supportedThinkingLevels`. Explicit provider
-  `false` removes any stale catalog/cache reasoning tag.
+- out: `{ models: ModelCatalogItem[] }`; each model carries pi-resolved
+  `reasoning` capability and `supportedThinkingLevels`. Cached capability tags
+  and legacy provider fields cannot override the pi model record.
 
 ### `providers.cacheModels` (internal host RPC)
 - in: `{ providerId, models: DiscoveredModelInput[] }`
@@ -225,11 +214,10 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
 5. secretValue max length enforced (e.g. 8KB)
 6. modelId must be non-empty trimmed string; allow `/`, `.`, `:`, `-`
 7. unknown protocol on older clients => provider shown disabled with warning, not crash
-8. `supportsReasoning`, when present, must be boolean; omission preserves an
-   existing override on update and keeps catalog inference on create
-9. `supportedThinkingLevels`, when present, must be an array of canonical
-   thinking levels; invalid entries are dropped, duplicates collapse, and an
-   empty array clears the override on update
+8. Legacy `supportsReasoning`, when present, must still validate as boolean but
+   has no runtime effect
+9. Legacy `supportedThinkingLevels`, when present, must still validate as an
+   array of canonical thinking levels but has no runtime effect
 
 ## 11. Secret ref format
 

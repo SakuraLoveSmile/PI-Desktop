@@ -30,7 +30,7 @@ import type {
 } from "@pi-desktop/shared";
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
-import { clampThinkingLevel, type ModelWireCompat } from "./thinking-level.js";
+import { clampThinkingLevel, type PiModelConfig } from "./thinking-level.js";
 
 
 function usageFromPi(usage: Usage | undefined | null): MessageUsage | undefined {
@@ -72,16 +72,8 @@ export type RuntimeProviderConfig = {
   apiStyle?: string;
   supportsReasoning: boolean;
   supportedThinkingLevels: ThinkingLevel[];
-  /** Context window override in tokens. */
-  contextWindow?: number;
-  /** Max output tokens override. */
-  maxOutputTokens?: number;
-  /** Sampling temperature override; omitted keeps the provider default. */
-  temperature?: number;
-  /** Wire-dialect hints resolved from the pi-ai catalog by the main process
-   * (the sidecar never loads the catalog). Controls how thinking on/off is
-   * expressed on compatible endpoints. */
-  modelCompat?: ModelWireCompat;
+  /** Complete model metadata resolved from pi-ai by Electron main. */
+  modelConfig?: PiModelConfig;
 };
 
 const DEFAULT_CONTEXT_WINDOW = 128_000;
@@ -154,16 +146,6 @@ export type AgentRuntimeOptions = {
 function nowIso() {
   return new Date().toISOString();
 }
-
-const THINKING_LEVELS: ThinkingLevel[] = [
-  "off",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-  "max",
-];
 
 type AssistantContent = {
   text: string;
@@ -325,7 +307,6 @@ export class DesktopAgentRuntime {
     });
     models.setProvider(provider);
 
-    const temperature = this.provider.temperature;
     this.agent = new Agent({
       streamFn: (m, context, options) =>
         models.streamSimple(m, context, {
@@ -336,7 +317,6 @@ export class DesktopAgentRuntime {
           // regenerate, which forks the transcript and reseeds the agent —
           // far more expensive than a retry.
           maxRetries: 2,
-          ...(temperature !== undefined ? { temperature } : {}),
         }),
       getApiKey: async () => runtimeApiKey,
       initialState: {
@@ -412,13 +392,10 @@ export class DesktopAgentRuntime {
       this.provider.apiKey === provider.apiKey &&
       this.provider.authKind === provider.authKind &&
       (this.provider.apiStyle ?? "") === (provider.apiStyle ?? "") &&
-      (this.provider.contextWindow ?? 0) === (provider.contextWindow ?? 0) &&
-      (this.provider.maxOutputTokens ?? 0) === (provider.maxOutputTokens ?? 0) &&
-      (this.provider.temperature ?? null) === (provider.temperature ?? null) &&
       this.provider.supportsReasoning === provider.supportsReasoning &&
       currentThinkingLevels === nextThinkingLevels &&
-      safeJson(this.provider.modelCompat ?? null) ===
-        safeJson(provider.modelCompat ?? null) &&
+      safeJson(this.provider.modelConfig ?? null) ===
+        safeJson(provider.modelConfig ?? null) &&
       this.thinkingLevel === clampThinkingLevel(provider, thinkingLevel) &&
       current === next
     );
@@ -514,46 +491,25 @@ export class DesktopAgentRuntime {
   }
 
   private buildModel(): Model<Api> {
-    const wire = this.provider.modelCompat;
-    // Seed with catalog wire values so "off" emits an explicit disable —
-    // e.g. off -> "none" (gpt-5.1-style reasoning_effort) — instead of no
-    // parameter, which leaves default-on reasoners thinking.
-    const thinkingLevelMap: Partial<Record<ThinkingLevel, string | null>> = {
-      ...(wire?.thinkingLevelMap ?? {}),
-    };
-    const supported = this.provider.supportedThinkingLevels ?? ["off"];
-    for (const level of THINKING_LEVELS) {
-      if (!supported.includes(level)) {
-        thinkingLevelMap[level] = null;
-      } else if (level === "xhigh" || level === "max") {
-        // pi-ai requires extended levels to be explicitly opted into.
-        if (typeof thinkingLevelMap[level] !== "string") {
-          thinkingLevelMap[level] = level;
-        }
-      } else if (thinkingLevelMap[level] === null) {
-        // The provider's declared support wins over a catalog null.
-        delete thinkingLevelMap[level];
-      }
-    }
-
     const binding = apiBindingForStyle(this.provider.apiStyle);
+    const catalog = this.provider.modelConfig;
+    const catalogModel = catalog
+      ? (({ source: _source, ...model }) => model)(catalog)
+      : {
+          name: this.provider.modelId,
+          reasoning: false,
+          input: ["text" as const],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: DEFAULT_CONTEXT_WINDOW,
+          maxTokens: DEFAULT_MAX_TOKENS,
+        };
     return {
+      ...catalogModel,
       id: this.provider.modelId,
-      name: this.provider.modelId,
       api: binding.api,
       provider: this.provider.id,
-      baseUrl: this.provider.baseUrl ?? binding.defaultBaseUrl,
-      reasoning: this.provider.supportsReasoning,
-      thinkingLevelMap,
-      input: ["text"],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: this.provider.contextWindow || DEFAULT_CONTEXT_WINDOW,
-      maxTokens: this.provider.maxOutputTokens || DEFAULT_MAX_TOKENS,
-      ...(binding.api === "openai-completions"
-        ? { compat: { ...(wire?.compat ?? {}), supportsDeveloperRole: false } }
-        : wire?.compat
-          ? { compat: { ...wire.compat } }
-          : {}),
+      baseUrl:
+        this.provider.baseUrl ?? catalog?.baseUrl ?? binding.defaultBaseUrl,
     } as Model<Api>;
   }
 

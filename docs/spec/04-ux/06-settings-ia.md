@@ -38,7 +38,11 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - Enter to send as a switch (local preference; not on Codex General gold)
 - **Providers** studio:
   - OpenAI-compatible add-provider dialog (opened from Add provider / empty-state CTA)
-  - provider cards with avatar initials, host, default model, secret status, thinking mode, and test / make-default / delete actions
+  - provider cards with avatar initials, host, default model, secret status,
+    and test / make-default / delete actions
+  - the add/edit dialog configures connection identity only (name, endpoint,
+    API style, model id, and secret); model parameters come from pi-ai and are
+    not editable here
   - empty state with primary add action
   - API keys are never shown raw after save
 

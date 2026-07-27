@@ -770,28 +770,24 @@ Each scenario is documented in this format:
 #### E2E-050: Thinking selector follows exact model capability
 
 - **Preconditions**: One catalogued reasoning model, one non-reasoning model,
-  and a custom provider with an explicit reasoning override.
+  and one unknown free-form model id.
 - **Steps**: 1) Select each provider/model in turn. 2) Inspect the composer
   controls beside Chat / Agent. 3) Open the Thinking trigger and choose multiple
-  supported levels. 4) Use Enable thinking from the model menu on the unknown
-  custom provider. 5) Disable its override in Agent and refresh model data.
+  supported levels. 4) Inspect the unknown model's menu and Provider Settings.
 - **Expected**: Reasoning models show the current Thinking level immediately to
   the right of Chat / Agent, expose only their sparse supported levels as a
   single-column list in canonical order, mark the selected row with a trailing
   check, expose no inherit/default row, size the menu to its content without
   exceeding 160px or the available viewport, truncate overlong labels, and close
   the menu after selection. Non-reasoning models show no Thinking trigger.
-  Custom providers may persist
-  `supportedThinkingLevels` such as `["off","high"]` from Settings and the
-  Composer must not invent graded options for those sets. The custom action
-  persists `supportsReasoning` and selects the supported level nearest
-  `medium`; explicit `false` removes stale reasoning tags and resets the
-  effective level to `off`; known non-reasoning and legacy providers remain
-  unavailable without a crash. Catalogued adaptive-only Anthropic models omit
-  `off` and clamp a stale/default `off` selection upward to the nearest level.
+  Every level comes from pi's selected model record. The unknown model exposes
+  neither a Thinking trigger nor an Enable thinking action, and Provider
+  Settings exposes no reasoning/level override. Refreshing discovered model
+  data cannot replace pi's known-model semantics or invent capabilities for the
+  unknown model.
 - **Specs linked**: `03-runtime/11-provider-model-system.md`,
   `03-runtime/12-provider-config-schema.md`,
-  `03-runtime/13-model-catalog-and-selection.md`, ADR 0018
+  `03-runtime/13-model-catalog-and-selection.md`, ADR 0018, ADR 0027
 - **Acceptance**: B (model config), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`thinking-ui.test.mjs`, agent-runtime capability tests); full UI scenario Draft
@@ -816,15 +812,16 @@ Each scenario is documented in this format:
 - **Preconditions**: Instrumented reasoning-capable provider with a sparse
   level set and request capture; one session configured above and below gaps.
 - **Steps**: 1) Select each available level and run a prompt. 2) Seed an
-  unsupported stored level and run again. 3) repeat with reasoning disabled.
+  unsupported stored level and run again. 3) Repeat with a pi-catalogued
+  non-reasoning model.
 - **Expected**: Main resolves capability using the session's actual model id;
   Composer, main, sidecar, and pi use the same upward-first/downward-second
-  clamp; pi receives the effective level; disabled reasoning receives `off`.
-  For an adaptive-only Anthropic model behind a compatible gateway, repeat with
-  a stored `off`: the request must use adaptive thinking at the clamped level
-  and must not contain `thinking.type=disabled`.
+  clamp; pi receives the effective level and the non-reasoning model receives
+  `off`. Model-specific request semantics, including adaptive thinking and
+  whether `off` is expressible, match the pinned pi record without a desktop
+  rewrite.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
-  `03-runtime/02-agent-runtime.md`, `03-runtime/13-model-catalog-and-selection.md`, ADR 0018
+  `03-runtime/02-agent-runtime.md`, `03-runtime/13-model-catalog-and-selection.md`, ADR 0018, ADR 0027
 - **Acceptance**: B (model config), C (chat and stream)
 - **Milestone**: M5
 - **Status**: Unit-covered (agent-runtime prompt/clamp tests); integration scenario Draft

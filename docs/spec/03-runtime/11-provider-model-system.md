@@ -107,11 +107,14 @@ Any vendor not listed but reachable by:
 ### 6.1 No hard model allowlist ceiling
 PI-Desktop must not permanently restrict users to a short fixed model list.
 
-### 6.2 Catalog sources (priority)
-1. **Runtime-native discovery** from pi-ai/provider APIs when available
-2. **Bundled catalog snapshot** shipped with app
-3. **Refreshed catalog** (manual refresh / update channel)
-4. **User-defined model entries**
+### 6.2 Catalog responsibilities
+1. **pi-ai's bundled catalog** is the sole runtime metadata source for known
+   models.
+2. **Runtime-native discovery** and the durable cache provide selection and
+   offline availability, but never rewrite known-model runtime semantics.
+3. **User-defined model ids** remain selectable; ids absent from pi use the
+   explicit generic fallback.
+4. **pi-ai upgrades** refresh the authoritative model metadata snapshot.
 
 ### 6.3 Model families to cover
 Catalog and custom model entry must support common capability classes:
@@ -186,16 +189,11 @@ type ThinkingLevel =
   | "max"
 ```
 
-`compatibility.supportsReasoning` is an explicit override, not merely a UI
-hint. `false` disables reasoning even when the model id matches pi's catalog;
-`true` enables the conservative default level set for a custom model missing
-from the catalog. If omitted, the runtime infers capability from the exact
-selected `(vendorKey, modelId)`.
-
-`compatibility.supportedThinkingLevels` is the sparse custom-provider override.
-Settings expose presets for Off / On-off only (`["off","high"]`) / Graded, and
-advanced free-form lists. Composer must render only that resolved set and must
-not invent graded options for boolean-like models such as mimo.
+The compatibility fields above are retained as a persisted-schema compatibility
+surface for older clients. PI-Desktop no longer reads them as runtime model
+overrides. Reasoning support and supported thinking levels come from the
+resolved pi-ai model record; unknown free-form ids expose no inferred
+reasoning capability.
 
 ## 8. Secrets
 
@@ -244,6 +242,8 @@ type ModelDescriptor = {
 - set/replace/delete key
 - enable/disable provider
 - test connection
+- do not expose reasoning, thinking-level, context-window, output-limit,
+  temperature, or compatibility overrides for a selected model
 
 ### Model selector
 - search all models across enabled providers
@@ -266,22 +266,21 @@ When starting a turn with `(providerId, modelId)`:
 1. load provider config from host
 2. if missing/disabled → fail (`MODEL_NOT_CONFIGURED`; reserved detail: `PROVIDER_DISABLED`)
 3. resolve secret via `secretRef` (never log secret; missing → `PROVIDER_SECRET_MISSING`)
-4. resolve model metadata:
-   - user-defined model override
-   - catalog cache
-   - otherwise accept raw modelId if provider allows free-form ids
-5. resolve reasoning capability from the explicit provider override or pi
-   catalog for the exact model; clamp the session thinking level upward first,
-   then downward, or to `off` when unsupported. Adaptive-only Anthropic models
-   exclude `off`; stale/default `off` values clamp upward and the runtime
-   preserves the catalog's adaptive-thinking flag plus a null `off` mapping so
-   compatible gateways never receive unsupported `thinking.type=disabled`
-6. build runtime provider adapter request for pi-ai (merge baseUrl/headers/auth)
+4. resolve the complete pi-ai model record by exact vendor/id or a compatible
+   gateway alias with a separator-bounded suffix
+5. when resolved, copy pi's name, reasoning flag, thinking-level map, input
+   modes, pricing, context window, output limit, headers, and compatibility
+   verbatim; when unresolved, accept the raw model id with the generic
+   text-only, non-reasoning fallback
+6. clamp the session thinking level against pi's supported levels and build the
+   runtime provider adapter by replacing only provider/model identity, selected
+   API adapter, auth, and an explicitly configured endpoint URL
 7. execute stream with abort handle and separate answer/thinking events
 8. translate vendor errors into shared `AppError` codes (§15)
 
-If the model is not in the catalog, still allow it when the user explicitly
-enters a model id and the provider accepts unknown ids.
+If the model is not in pi's catalog, still allow it when the user explicitly
+enters a model id and the provider accepts unknown ids. Cached/discovered
+capability fields do not promote that fallback into a known runtime model.
 
 ## 12. Compatibility tiers
 

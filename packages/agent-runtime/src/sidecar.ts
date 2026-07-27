@@ -12,7 +12,7 @@ import {
   normalizeSupportedThinkingLevels,
   normalizeThinkingLevel,
 } from "./sidecar-config.js";
-import type { ModelWireCompat } from "./thinking-level.js";
+import type { PiModelConfig } from "./thinking-level.js";
 import type {
   AgentEventEnvelope,
   Mode,
@@ -64,11 +64,8 @@ async function handle(method: string, params: any): Promise<unknown> {
         apiStyle?: string;
         supportsReasoning: boolean;
         supportedThinkingLevels: ThinkingLevel[];
-        contextWindow?: number;
-        maxOutputTokens?: number;
-        temperature?: number;
-        /** Wire-dialect hints resolved by main; passed through verbatim. */
-        modelCompat?: ModelWireCompat;
+        /** Complete pi-ai model metadata resolved by main; passed through verbatim. */
+        modelConfig?: PiModelConfig;
       };
       const provider = {
         ...providerInput,

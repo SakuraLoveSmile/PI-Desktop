@@ -517,12 +517,10 @@ The composer renders only controls connected to the active pi session:
 - File, photo, and appshot controls remain hidden until their payload contracts
   are implemented end to end.
 - The Thinking menu persists changes to the active session and closes after a
-  selection. Boolean-like custom models such as mimo may expose only Off/High
-  rather than a fake graded ladder. Unknown Custom/OpenAI-compatible models
-  keep an explicit Enable thinking action in the model menu; after enablement,
-  the separate Thinking trigger appears. Known non-reasoning models expose
-  neither action. Changing provider clamps or resets the durable session value
-  before the next turn.
+  selection. It renders exactly the levels published by pi-ai for the selected
+  model. Unknown Custom/OpenAI-compatible models expose no invented reasoning
+  action or graded ladder. Changing provider clamps or resets the durable
+  session value before the next turn.
 - Local and branch context are non-interactive status labels; the project name
   remains an action because it opens the project picker.
 

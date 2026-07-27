@@ -130,7 +130,6 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const providers = useAppStore((s) => s.providers);
   const providerModels = useAppStore((s) => s.providerModels);
   const loadProviderModels = useAppStore((s) => s.loadProviderModels);
-  const refreshProviders = useAppStore((s) => s.refreshProviders);
   const configureActiveSession = useAppStore((s) => s.configureActiveSession);
   const showToast = useAppStore((s) => s.showToast);
   const composerPrefill = useAppStore((s) => s.composerPrefill);
@@ -301,13 +300,6 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
     ? sessionThinkingLevel
     : "off";
   const availableThinkingLevels = providerThinkingLevels(thinkingProvider);
-  const canEnableThinkingOverride =
-    !!provider &&
-    !!modelId &&
-    !thinkingProvider?.supportsReasoning &&
-    (provider.vendorKey === "custom" ||
-      provider.type === "custom" ||
-      provider.type === "openai_compatible");
   const thinkingLevel = thinkingLevelForProvider(
     thinkingProvider,
     configuredThinkingLevel,
@@ -432,31 +424,6 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
         e.preventDefault();
         void selectModel(entry.provider, entry.model.modelId);
       }
-    }
-  };
-  const enableThinkingOverride = async () => {
-    if (!provider || !modelId || !canEnableThinkingOverride) return;
-    try {
-      await api.updateProvider({
-        id: provider.id,
-        supportsReasoning: true,
-      });
-      await refreshProviders();
-      const updatedProvider = useAppStore
-        .getState()
-        .providers.find((candidate) => candidate.id === provider.id);
-      const nextLevel = thinkingLevelForProvider(updatedProvider, "medium");
-      await configureActiveSession({
-        mode,
-        providerId: provider.id,
-        modelId,
-        thinkingLevel: nextLevel,
-      });
-      setModelOpen(false);
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), {
-        variant: "error",
-      });
     }
   };
   const submit = async () => {
@@ -788,23 +755,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                         {provider?.name || t("chat.provider")}
                       </div>
                     </div>
-                    {canEnableThinkingOverride ? (
-                      <>
-                        <div className="composer-plus-sep" />
-                        <button
-                          type="button"
-                          className="composer-plus-item"
-                          role="menuitem"
-                          onClick={() => void enableThinkingOverride()}
-                        >
-                          <IconSparkles size={14} />
-                          <span>{t("chat.thinkingEnable")}</span>
-                        </button>
-                        <div className="composer-plus-sep" />
-                      </>
-                    ) : (
-                      <div className="composer-plus-sep" />
-                    )}
+                    <div className="composer-plus-sep" />
                     {showModelSearch ? (
                       <div className="composer-model-search">
                         <IconSearch size={13} />

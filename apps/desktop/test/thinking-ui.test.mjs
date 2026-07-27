@@ -76,11 +76,10 @@ test("reasoning-capable models show thinking immediately after the mode control"
   assert.match(leftToolbar, /composer-thinking-menu/);
 });
 
-test("compatible providers can enable thinking from the model menu", () => {
-  assert.match(composerSource, /canEnableThinkingOverride/);
-  assert.match(composerSource, /supportsReasoning:\s*true/);
-  assert.match(composerSource, /chat\.thinkingEnable/);
-  assert.match(composerSource, /await refreshProviders\(\)/);
+test("model menus do not expose desktop-owned reasoning overrides", () => {
+  assert.doesNotMatch(composerSource, /canEnableThinkingOverride/);
+  assert.doesNotMatch(composerSource, /chat\.thinkingEnable/);
+  assert.doesNotMatch(composerSource, /supportsReasoning:\s*true/);
 });
 
 test("switching to a provider without reasoning resets the session level", () => {
@@ -122,22 +121,16 @@ test("thinking-only assistant streams open the transcript surface", () => {
   assert.match(appSource, /hasContent \|\| hasThinking/);
 });
 
-test("settings exposes thinking mode presets and sparse levels", () => {
-  assert.match(settingsSource, /thinkingMode/);
-  assert.match(settingsSource, /thinkingModeToggle/);
-  assert.match(settingsSource, /thinkingModeGraded/);
-  assert.match(settingsSource, /supportedThinkingLevels/);
-  assert.match(settingsSource, /\["off", "high"\]/);
-  assert.match(settingsSource, /levelsForThinkingMode/);
+test("provider settings do not override pi-owned model parameters", () => {
+  assert.doesNotMatch(settingsSource, /thinkingMode/);
+  assert.doesNotMatch(settingsSource, /supportedThinkingLevels/);
+  assert.doesNotMatch(settingsSource, /contextWindow/);
+  assert.doesNotMatch(settingsSource, /maxOutputTokens/);
+  assert.doesNotMatch(settingsSource, /temperature/);
 });
 
-test("main forwards provider supportedThinkingLevels into capability resolution", () => {
-  assert.match(
-    mainSource,
-    /supportedThinkingLevels:\s*provider\.supportedThinkingLevels/,
-  );
-  assert.match(
-    mainSource,
-    /supportedThinkingLevels:\s*provider\?\.supportedThinkingLevels/,
-  );
+test("main forwards the complete pi model record to the sidecar", () => {
+  assert.match(mainSource, /resolvePiModelConfig/);
+  assert.match(mainSource, /\.\.\.\(modelConfig \? \{ modelConfig \} : \{\}\)/);
+  assert.doesNotMatch(mainSource, /modelCompat/);
 });
