@@ -62,6 +62,11 @@ Codex as a visual reference. The identity contract is deliberately small:
   name, version, and canonical icon; no stock Electron name or icon is visible.
   Development launches use a generated branded host bundle because AppKit
   reads this identity from the host bundle rather than Electron runtime APIs.
+- On Windows, Electron Main registers the canonical `com.pi-desktop.app`
+  AppUserModelID before readiness. The runtime ID, packaged executable name,
+  and NSIS shortcut identity stay aligned so native notifications,
+  notification settings, and taskbar groups identify the app as `PI-Desktop`
+  rather than Electron.
 - The home hero logo is 56px. Expanded/collapsed sidebar logos are 20px/18px,
   and the docked composer logo is 15px. The image keeps its native colors in
   both themes and is not replaced by a theme-tinted vector approximation.

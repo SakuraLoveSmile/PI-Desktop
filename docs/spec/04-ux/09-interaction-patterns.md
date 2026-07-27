@@ -191,7 +191,9 @@ may be retained while exactly one workspace supplies the visible shell context.
    badge and currently open inbox refresh.
 4. If the main window is focused, no other surface appears. If it is
    unfocused and native notifications are supported, Electron shows one
-   platform notification derived from the event kind and session title.
+   platform notification derived from the event kind and session title. On
+   Windows, the banner is attributed to the canonical PI-Desktop
+   AppUserModelID shared with the NSIS package and taskbar identity.
 5. Clicking the native notification shows/restores and focuses the main
    window, then emits `notification.activated { sessionId }`.
 6. Renderer activation selects the bound project when present, loads the

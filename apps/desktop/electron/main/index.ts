@@ -15,6 +15,7 @@ import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { existsSync, mkdirSync } from "node:fs";
 import {
+  APP_ID,
   APP_NAME,
   APP_VERSION,
   APP_MENU_COMMANDS,
@@ -64,6 +65,11 @@ import {
 } from "./importers";
 import { installApplicationMenu } from "./application-menu";
 import { AppUpdaterController } from "./updater";
+
+app.setName(APP_NAME);
+if (process.platform === "win32") {
+  app.setAppUserModelId(APP_ID);
+}
 
 let mainWindow: BrowserWindow | null = null;
 let windowCreationPromise: Promise<void> | null = null;
@@ -3341,7 +3347,6 @@ function registerIpc() {
 
 app.whenReady().then(async () => {
   applyDevelopmentBranding();
-  app.setName(APP_NAME);
   app.setAboutPanelOptions({
     applicationName: APP_NAME,
     applicationVersion: APP_VERSION,

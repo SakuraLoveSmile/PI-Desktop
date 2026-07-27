@@ -30,6 +30,28 @@ const devScriptSource = await readFile(
 const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
+const protocolSource = await readFile(
+  new URL("../../../packages/shared/src/protocol.ts", import.meta.url),
+  "utf8",
+);
+
+test("Windows runtime registers the canonical native application identity", () => {
+  const appId = protocolSource.match(/APP_ID = "([^"]+)"/)?.[1];
+  const readinessIndex = mainSource.indexOf("app.whenReady()");
+
+  assert.equal(appId, packageJson.build.appId);
+  assert.ok(readinessIndex > 0, "main process readiness hook");
+  assert.match(mainSource.slice(0, readinessIndex), /app\.setName\(APP_NAME\)/);
+  assert.match(
+    mainSource.slice(0, readinessIndex),
+    /process\.platform === "win32"[\s\S]*app\.setAppUserModelId\(APP_ID\)/,
+  );
+});
+
+test("Windows packages pin PI-Desktop executable and shortcut names", () => {
+  assert.equal(packageJson.build.win.executableName, "PI-Desktop");
+  assert.equal(packageJson.build.nsis.shortcutName, "PI-Desktop");
+});
 
 test("macOS development uses the canonical PI-Desktop Dock icon", () => {
   assert.match(
