@@ -76,11 +76,20 @@ export const WORK_PANEL_MIN_WIDTH = 320;
 export const WORK_PANEL_DEFAULT_WIDTH = 420;
 
 // Opening the panel grows the OS window outward so the chat column keeps its
-// width; closing shrinks it back by whatever the expansion actually achieved
-// (0 when maximized/fullscreen — the panel then overlays existing space).
+// width; closing shrinks it back by whatever the expansion actually achieved.
+// Windows keeps the native bounds stable because a frameless BrowserWindow
+// visibly repaints between the renderer layout and asynchronous bounds update.
 let panelWindowGrowth: number | null = null;
 
+function canResizeWindowForPanel() {
+  return window.piDesktop?.platform !== "win32";
+}
+
 function expandWindowForPanel(width: number) {
+  if (!canResizeWindowForPanel()) {
+    panelWindowGrowth = 0;
+    return;
+  }
   panelWindowGrowth = null;
   api.windowResizeBy(width).then(
     (r) => {
@@ -93,6 +102,10 @@ function expandWindowForPanel(width: number) {
 }
 
 function shrinkWindowForPanel(width: number) {
+  if (!canResizeWindowForPanel()) {
+    panelWindowGrowth = null;
+    return;
+  }
   // After a restart the growth is unknown, but the persisted window bounds
   // already include it — shrinking by the panel width restores the chat size.
   const growth = panelWindowGrowth ?? width;
@@ -1985,7 +1998,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveWorkPanelWidth(get().workPanelWidth);
     // Committed drag-resize also extends the window instead of the chat.
     const next = get().workPanelWidth;
-    if (get().workPanelOpen && next !== prev) {
+    if (canResizeWindowForPanel() && get().workPanelOpen && next !== prev) {
       api.windowResizeBy(next - prev).then(
         (r) => {
           if (panelWindowGrowth !== null) panelWindowGrowth += r.applied;

@@ -211,6 +211,9 @@ context.
 - Every tab has its own close control. Closing the active tab selects the right
   neighbor, then the left; closing the final tab hides the panel. The separate
   panel collapse control hides the panel without deleting tabs.
+- On Windows, opening or hiding the panel keeps the native window bounds
+  unchanged. The docked renderer layout updates in one pass, avoiding the
+  intermediate frameless-window repaint caused by a later native resize.
 - A successful active-session workspace Write/Edit opens Review. Failed and
   scratch writes do not; background-session artifacts stay rooted in their
   session and never take focus from the current project.

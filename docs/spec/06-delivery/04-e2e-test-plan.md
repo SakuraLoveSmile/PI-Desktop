@@ -885,7 +885,9 @@ Each scenario is documented in this format:
   then the active middle and edge tabs. 4) Use the sole collapse control and
   trigger another artifact. 5) Switch sessions and projects with tabs open.
   6) Drag the left-edge handle below 320px and beyond every upper bound at
-  960px, 1200px, and 1600px window widths. 7) Relaunch.
+  960px, 1200px, and 1600px window widths. 7) On Windows, record the native
+  window bounds before opening a file artifact, collapsing the panel, and
+  closing its final tab; inspect each transition frame. 8) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one closeable top tab; file
@@ -899,7 +901,9 @@ Each scenario is documented in this format:
   Session/workspace changes clear tabs before relative resources can cross
   contexts. Only `{width}` is restored after relaunch; open state and tabs
   reset, and temporary panel expansion does not enlarge the restored base
-  window. The former context-panel overlay no longer exists.
+  window. On Windows, the native bounds stay unchanged throughout open,
+  collapse, and final-tab close transitions, with no intermediate compressed
+  or expanded frame. The former context-panel overlay no longer exists.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5

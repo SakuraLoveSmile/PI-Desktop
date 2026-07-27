@@ -386,7 +386,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 | State | Behavior |
 |---|---|
 | Closed (default) | Not rendered; no manual open control and no retained tabs after startup |
-| Open | Docked flex row right of the main pane; opened by an artifact with width 320–`min(720, 60vw, viewport − visible sidebar − 360px)` |
+| Open | Docked flex row right of the main pane; opened by an artifact with width 320–`min(720, 60vw, viewport − visible sidebar − 360px)`. Windows keeps the native window bounds stable so its frameless window does not repaint between the panel layout and an asynchronous bounds change; other platforms may grow the window outward when space permits. |
 | Multiple artifacts | Tabs follow first-open order, scroll horizontally, keep the active tab visible, and preserve readable labels at the panel minimum |
 | Resizing | Live width follows pointer while preserving a 360px MainChat; committed (and persisted) on release |
 | No workspace | Each tab renders its own "open a project" empty state |
@@ -407,8 +407,11 @@ preview), and Files (workspace browser). Codex-parity surface.
   can therefore never be reinterpreted against a different workspace.
 - Resize: pointer drag on the left-edge handle.
 - Persistence: only `{width}` in localStorage `pi.desktop.workPanel`; open and
-  tabs reset on app startup. OS window-state persistence excludes width added
-  by an open work panel, so relaunch starts at the same base shell width.
+  tabs reset on app startup. Where supported, OS window-state persistence
+  excludes width added by an open work panel, so relaunch starts at the same
+  base shell width. Windows docks within the existing client bounds and does
+  not add or remove native window width when the panel opens, collapses, or
+  closes its final tab.
 
 ### 5.5 Accessibility
 

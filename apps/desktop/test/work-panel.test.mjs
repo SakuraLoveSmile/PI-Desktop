@@ -104,6 +104,25 @@ test("work panel window growth is excluded from persisted launch bounds", () => 
   );
 });
 
+test("Windows work panel toggles without resizing the frameless window", () => {
+  assert.match(
+    storeSource,
+    /function canResizeWindowForPanel\(\) \{\s*return window\.piDesktop\?\.platform !== "win32";/,
+  );
+  assert.match(
+    storeSource,
+    /function expandWindowForPanel\(width: number\) \{\s*if \(!canResizeWindowForPanel\(\)\) \{\s*panelWindowGrowth = 0;\s*return;/,
+  );
+  assert.match(
+    storeSource,
+    /function shrinkWindowForPanel\(width: number\) \{\s*if \(!canResizeWindowForPanel\(\)\) \{\s*panelWindowGrowth = null;\s*return;/,
+  );
+  assert.match(
+    storeSource,
+    /if \(canResizeWindowForPanel\(\) && get\(\)\.workPanelOpen && next !== prev\)/,
+  );
+});
+
 test("terminal mounts on demand and survives switches while its tab stays open", () => {
   assert.match(panelSource, /terminalOpen && \(/);
   assert.match(panelSource, /activeTab\?\.kind !== "terminal" && "is-hidden"/);
