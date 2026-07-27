@@ -1029,6 +1029,9 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Auto-grow: textarea measures wrapped visual lines, starts at one visible
   line, expands through seven lines, then scrolls internally; deleting content
   shrinks it back to one line
+- Text correction off (D145): composer textarea sets `spellCheck={false}`,
+  `autoCorrect="off"`, and `autoCapitalize="off"` so browser/OS spelling and
+  autocorrect never rewrite coding prompts
 - Chat / Agent and provider/model changes update the active session, not the
   app default. They are disabled while a turn runs.
 - The model menu lists only enabled, runnable providers with a default model.
@@ -1052,6 +1055,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 ### 11.6 Accessibility
 
 - `role="textbox"` with `aria-label="Message input"`
+- Editable text controls never enable browser spellcheck or autocorrect (D145)
 - Send button: `aria-label="Send message"`
 - Abort button: `aria-label="Abort active turn"`
 - Disabled send: `aria-disabled="true"` with tooltip explanation

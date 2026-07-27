@@ -449,6 +449,9 @@ export function PluginsPage() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void refreshMarket(query);
                   }}
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="off"
                 />
                 <Button variant="secondary" onClick={() => void refreshMarket(query)}>
                   {t("plugins.search")}

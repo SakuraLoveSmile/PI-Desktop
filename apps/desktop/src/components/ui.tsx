@@ -28,12 +28,28 @@ export function Button({
   );
 }
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cx("field-input", className)} {...props} />;
+export function Input({ className, spellCheck = false, autoCorrect = "off", autoCapitalize = "off", ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      className={cx("field-input", className)}
+      spellCheck={spellCheck}
+      autoCorrect={autoCorrect}
+      autoCapitalize={autoCapitalize}
+      {...props}
+    />
+  );
 }
 
-export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={cx("field-textarea", className)} {...props} />;
+export function Textarea({ className, spellCheck = false, autoCorrect = "off", autoCapitalize = "off", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      className={cx("field-textarea", className)}
+      spellCheck={spellCheck}
+      autoCorrect={autoCorrect}
+      autoCapitalize={autoCapitalize}
+      {...props}
+    />
+  );
 }
 
 export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {

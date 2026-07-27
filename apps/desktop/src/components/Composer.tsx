@@ -492,6 +492,9 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
               className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}
               rows={1}
               placeholder={t(variant === "home" ? "chat.placeholderHome" : "chat.placeholder")}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
               value={value}
               onChange={(e) => {
                 setValue(e.target.value);
@@ -765,6 +768,8 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                           value={modelQuery}
                           placeholder={t("chat.searchModels")}
                           spellCheck={false}
+                          autoCorrect="off"
+                          autoCapitalize="off"
                           onChange={(e) => setModelQuery(e.target.value)}
                         />
                       </div>

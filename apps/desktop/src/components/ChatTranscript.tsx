@@ -887,6 +887,9 @@ const MessageRow = memo(function MessageRow({
                   rows={Math.min(12, Math.max(3, editValue.split("\n").length))}
                   aria-label={editLabel}
                   autoFocus
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="off"
                   disabled={savingEdit}
                   onChange={(event) => setEditValue(event.target.value)}
                   onKeyDown={(event) => {

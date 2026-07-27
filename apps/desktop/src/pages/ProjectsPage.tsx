@@ -277,6 +277,9 @@ export function ProjectsPage() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("project.searchPlaceholder")}
                 aria-label={t("project.searchPlaceholder")}
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
               />
             </div>
             <Button
