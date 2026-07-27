@@ -544,6 +544,7 @@ export const en = {
   panel: {
     title: "Work panel",
     collapse: "Collapse work panel",
+    openTool: "Open tool",
     closeTab: "Close {{name}}",
     tabs: {
       review: "Review",

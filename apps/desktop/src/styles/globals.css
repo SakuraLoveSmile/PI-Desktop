@@ -5884,6 +5884,10 @@ textarea:disabled {
   flex: 0 0 auto;
 }
 
+.work-panel-tools-menu {
+  min-width: 176px;
+}
+
 .work-panel-body {
   position: relative;
   display: flex;

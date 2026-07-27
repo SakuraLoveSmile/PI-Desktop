@@ -456,6 +456,10 @@ preview), and Files (workspace browser). Codex-parity surface.
   panel without deleting the runtime tab set; a later artifact reopens it.
   Terminal mounts only after its first command artifact and stays mounted while
   its tab exists so the PTY and scrollback survive switches.
+- Header context menu: right-click the work-panel top strip or empty tab-list
+  chrome (not an existing tab) opens a one-shot tools menu that creates/activates
+  Review, Terminal, or Browser via the same `openWorkPanelTab` path as artifacts.
+  Existing tab rows keep their select/close behavior and do not open the menu.
 - Context change: selecting another session atomically projects that session's
   retained `{open, tabs, activeTabId, browserResource}` state. The previous
   session's context remains in renderer memory and is restored when selected

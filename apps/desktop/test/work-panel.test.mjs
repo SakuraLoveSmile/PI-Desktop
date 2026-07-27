@@ -50,7 +50,7 @@ test("work panel docks as an app-shell column, not a main-pane overlay", () => {
 });
 
 test("work panel renders only dynamic artifact tabs with close controls", () => {
-  const headerIndex = panelSource.indexOf('<header className="work-panel-header">');
+  const headerIndex = panelSource.indexOf('className="work-panel-header"');
   const tabsIndex = panelSource.indexOf('className="work-panel-tabs no-drag"');
   const bodyIndex = panelSource.indexOf('<div className="work-panel-body">');
 
@@ -68,6 +68,11 @@ test("work panel renders only dynamic artifact tabs with close controls", () => 
   assert.doesNotMatch(panelSource, /work-panel-collapse/);
   assert.match(appSource, /data-action="collapse-work-panel"/);
   assert.match(appSource, /SessionPaneWorkPanelCollapse/);
+  assert.match(panelSource, /data-work-panel-section="tools"/);
+  assert.match(panelSource, /onContextMenu=\{onHeaderContextMenu\}/);
+  assert.match(panelSource, /data-work-panel-tools-menu/);
+  assert.match(panelSource, /openWorkPanelTab\(toolWorkPanelTab\(kind\)\)/);
+  assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
   assert.match(panelSource, /activeTabRef\.current\?\.scrollIntoView/);
   assert.match(panelSource, /inline:\s*"nearest"/);
   assert.doesNotMatch(panelSource, /work-panel-rail/);

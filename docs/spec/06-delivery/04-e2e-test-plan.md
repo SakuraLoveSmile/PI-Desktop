@@ -929,20 +929,23 @@ Each scenario is documented in this format:
 - **Preconditions**: App running with any workspace state.
 - **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
   Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
-  a URL preview, and a completed command artifact. 3) Close an inactive tab,
-  then the active middle and edge tabs. 4) Use the sole collapse control and
-  trigger another artifact. 5) In session A, leave the panel open with multiple
+  a URL preview, and a completed command artifact. 3) Right-click empty
+  work-panel header chrome to open Review/Terminal/Browser; confirm existing
+  tab rows do not open that menu. 4) Close an inactive tab, then the active
+  middle and edge tabs. 5) Use the sole session-pane collapse control and
+  trigger another artifact. 6) In session A, leave the panel open with multiple
   tabs and a Browser resource; switch to session B, create a different tab set,
   then switch repeatedly between A and B and select a project without an active
-  conversation. 6) Drag the left-edge handle below 320px and beyond every upper
-  bound at 960px, 1200px, and 1600px window widths. 7) On Windows, record the
+  conversation. 7) Drag the left-edge handle below 320px and beyond every upper
+  bound at 960px, 1200px, and 1600px window widths. 8) On Windows, record the
   native window bounds before opening a file artifact, collapsing the panel,
-  and closing its final tab; inspect each transition frame. 8) Relaunch.
+  and closing its final tab; inspect each transition frame. 9) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one closeable top tab; file
   tabs are path-keyed, repeated resources deduplicate, and tabs scroll across
-  the full work-panel header while keeping the active tab visible. The sole
+  the full work-panel header while keeping the active tab visible. Right-click
+  empty header chrome opens Review/Terminal/Browser; tab rows do not. The sole
   collapse control sits in the session pane top-right rather than the tab strip.
   Active close selects the right neighbor then left; closing the last tab hides
   the panel. Collapse retains runtime
