@@ -1056,6 +1056,7 @@ export function Sidebar({
 
   return (
     <aside className="sidebar">
+      <div className="sidebar-macos-drag-row" aria-hidden="true" />
       <div className="sidebar-header">
         <button
           type="button"

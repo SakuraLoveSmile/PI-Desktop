@@ -10,6 +10,10 @@ const appSource = await readFile(
   new URL("../src/App.tsx", import.meta.url),
   "utf8",
 );
+const stylesSource = await readFile(
+  new URL("../src/styles/globals.css", import.meta.url),
+  "utf8",
+);
 
 test("home sidebar exposes only the supported destination entries", () => {
   assert.match(sidebarSource, /data-nav="home"/);
@@ -42,6 +46,29 @@ test("sidebar header leads with branding and keeps collapse beside search", () =
   assert.ok(header.indexOf("<IconSearch") < header.indexOf("<IconSidebar"));
   assert.match(header, /data-nav="toggle-sidebar"/);
   assert.doesNotMatch(appSource, /IconChevronLeft|IconChevronRight/);
+});
+
+test("macOS traffic lights use a separate row above the sidebar header", () => {
+  assert.ok(
+    sidebarSource.indexOf('className="sidebar-macos-drag-row"') <
+      sidebarSource.indexOf('className="sidebar-header"'),
+  );
+  assert.match(
+    stylesSource,
+    /:root\[data-platform="darwin"\] \.sidebar-macos-drag-row\s*\{[^}]*display:\s*block;[^}]*height:\s*46px;[^}]*flex:\s*0 0 46px;/s,
+  );
+  assert.match(
+    stylesSource,
+    /:root\[data-platform="darwin"\]\[data-fullscreen="true"\] \.sidebar-macos-drag-row\s*\{[^}]*display:\s*none;/s,
+  );
+  assert.match(
+    stylesSource,
+    /\.sidebar-header\s*\{[^}]*height:\s*46px;[^}]*padding:\s*0 8px;/s,
+  );
+  assert.doesNotMatch(
+    stylesSource.match(/\.sidebar-header\s*\{[^}]*\}/s)?.[0] ?? "",
+    /padding[^;]*76px/,
+  );
 });
 
 test("destination history is available through shortcuts without titlebar buttons", () => {

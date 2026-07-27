@@ -357,11 +357,6 @@ textarea:disabled {
   padding-left: 0;
 }
 
-/* macOS fullscreen hides the traffic lights: reclaim the reserved space. */
-:root[data-platform="darwin"][data-fullscreen="true"] .sidebar-header {
-  padding-left: 8px;
-}
-
 :root[data-platform="darwin"][data-fullscreen="true"] .main-titlebar-left {
   padding-left: 0;
 }
@@ -723,6 +718,21 @@ textarea:disabled {
 }
 
 
+.sidebar-macos-drag-row {
+  display: none;
+}
+
+:root[data-platform="darwin"] .sidebar-macos-drag-row {
+  display: block;
+  height: 46px;
+  flex: 0 0 46px;
+  -webkit-app-region: drag;
+}
+
+:root[data-platform="darwin"][data-fullscreen="true"] .sidebar-macos-drag-row {
+  display: none;
+}
+
 .sidebar-header {
   display: flex;
   height: 46px;
@@ -730,13 +740,8 @@ textarea:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  padding: 0 8px 0 76px;
+  padding: 0 8px;
   -webkit-app-region: drag;
-}
-
-:root[data-platform="win32"] .sidebar-header,
-:root[data-platform="linux"] .sidebar-header {
-  padding-left: 8px;
 }
 
 .sidebar-header-actions {
