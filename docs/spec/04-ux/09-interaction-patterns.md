@@ -17,6 +17,8 @@
 | `Cmd/Ctrl + W` | Close window | Global |
 | `Cmd/Ctrl + ,` | Open settings | Global |
 | `Cmd/Ctrl + B` | Toggle sidebar | Global |
+| `Cmd/Ctrl + [` | Previous destination | Global |
+| `Cmd/Ctrl + ]` | Next destination | Global |
 | `Cmd/Ctrl + .` | Abort active turn | Global (same as abort button) |
 | `Cmd/Ctrl + K` | Open command palette | Global |
 
@@ -56,8 +58,10 @@
   commands as renderer controls. Native Edit/View/Window roles retain
   platform text-editing, zoom, fullscreen, hide, and quit behavior.
 - Windows/Linux render no application menu in the window. Their frameless
-  titlebar keeps navigation at the left edge and native window controls at the
-  right edge. F10 and Shift+F10 are not consumed by shell chrome.
+  titlebar keeps sidebar actions at the left edge and native window controls at
+  the right edge. Destination history has no visible back/forward controls and
+  remains available through the renderer shortcuts. F10 and Shift+F10 are not
+  consumed by shell chrome.
 - Windows/Linux keep New Task, Open Project, Settings, close-window,
   zoom, fullscreen, search, command-palette, and sidebar shortcuts through
   renderer key handling. Standard editing shortcuts remain native web-content

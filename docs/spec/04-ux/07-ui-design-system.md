@@ -347,9 +347,9 @@ first block repeats the local identity with the same glyph and two-line text,
 followed by a divider and compact Settings / Logs / Theme rows.
 
 Toolbar: 46px on every platform. macOS places traffic lights at
-`{x:16,y:16}`. Windows/Linux place navigation at the left edge and reserve the
-rightmost 112px for three frameless-window controls. Each control owns its full
-share of the 46px-high reserved band. Main, Settings, and work-panel drag
+`{x:16,y:16}`. Windows/Linux place sidebar actions at the left edge and reserve
+the rightmost 112px for three frameless-window controls. Each control owns its
+full share of the 46px-high reserved band. Main, Settings, and work-panel drag
 regions must terminate before this reservation rather than overlap it and rely
 only on descendant `no-drag`, so every visible control pixel remains clickable.
 No application menu is rendered inside the window. Other menu popovers use the

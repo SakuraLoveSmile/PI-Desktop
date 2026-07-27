@@ -30,8 +30,6 @@ import { api } from "./lib/api";
 import { toolWorkPanelTab } from "./lib/work-panel-tabs";
 import { BrandLogo } from "./components/BrandLogo";
 import {
-  IconChevronLeft,
-  IconChevronRight,
   IconNewSession,
   IconSidebar,
 } from "./components/icons";
@@ -82,54 +80,36 @@ function projectName(path?: string | null, name?: string | null) {
   return parts[parts.length - 1] || path;
 }
 
-function TitlebarNav({
-  sidebarCollapsed,
+function CollapsedTitlebarActions({
   onToggleSidebar,
   onNewTask,
 }: {
-  sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   onNewTask: () => void;
 }) {
   const { t } = useTranslation();
-  const navBack = useAppStore((s) => s.navBack);
-  const navForward = useAppStore((s) => s.navForward);
-  const navIndex = useAppStore((s) => s.navIndex);
-  const navStack = useAppStore((s) => s.navStack);
-  const canBack = navIndex > 0;
-  const canForward = navIndex < navStack.length - 1;
-  const toggleLabel = sidebarCollapsed
-    ? t("nav.expandSidebar")
-    : t("nav.collapseSidebar");
+  const toggleLabel = t("nav.expandSidebar");
   return (
     <div className="titlebar-nav no-drag">
       <button
         className="title-nav-btn"
         title={`${toggleLabel} (${sidebarToggleShortcut})`}
         aria-label={toggleLabel}
-        aria-expanded={!sidebarCollapsed}
+        aria-expanded={false}
         data-nav="toggle-sidebar"
         onClick={onToggleSidebar}
       >
         <IconSidebar size={13} />
       </button>
-      <button className="title-nav-btn" title={t("nav.back")} disabled={!canBack} onClick={() => navBack()}>
-        <IconChevronLeft size={13} />
+      <button
+        className="title-nav-btn"
+        title={t("nav.newTask")}
+        aria-label={t("nav.newTask")}
+        data-nav="new-task"
+        onClick={onNewTask}
+      >
+        <IconNewSession size={13} />
       </button>
-      <button className="title-nav-btn" title={t("nav.forward")} disabled={!canForward} onClick={() => navForward()}>
-        <IconChevronRight size={13} />
-      </button>
-      {sidebarCollapsed && (
-        <button
-          className="title-nav-btn"
-          title={t("nav.newTask")}
-          aria-label={t("nav.newTask")}
-          data-nav="new-task"
-          onClick={onNewTask}
-        >
-          <IconNewSession size={13} />
-        </button>
-      )}
     </div>
   );
 }
@@ -332,6 +312,14 @@ function AppShell() {
       if (commandKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
         setSidebarCollapsed((v) => !v);
+      }
+      if (commandKey && !e.shiftKey && e.key === "[") {
+        e.preventDefault();
+        useAppStore.getState().navBack();
+      }
+      if (commandKey && !e.shiftKey && e.key === "]") {
+        e.preventDefault();
+        useAppStore.getState().navForward();
       }
 
       if (platform === "darwin") return;
@@ -701,13 +689,8 @@ function AppShell() {
       {!sidebarCollapsed && (
         <Sidebar
           onOpenSearch={() => setSearchOpen(true)}
-          titlebarNav={
-            <TitlebarNav
-              sidebarCollapsed={false}
-              onToggleSidebar={() => setSidebarCollapsed(true)}
-              onNewTask={() => void runMenuCommand("newTask")}
-            />
-          }
+          onToggleSidebar={() => setSidebarCollapsed(true)}
+          sidebarToggleShortcut={sidebarToggleShortcut}
         />
       )}
 
@@ -715,8 +698,7 @@ function AppShell() {
         <div className="main-titlebar">
           {sidebarCollapsed && (
             <div className="main-titlebar-left no-drag">
-              <TitlebarNav
-                sidebarCollapsed
+              <CollapsedTitlebarActions
                 onToggleSidebar={() => setSidebarCollapsed(false)}
                 onNewTask={() => void runMenuCommand("newTask")}
               />

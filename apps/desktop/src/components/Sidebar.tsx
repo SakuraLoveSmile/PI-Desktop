@@ -6,7 +6,6 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
-  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -40,6 +39,7 @@ import {
   IconNewProject,
   IconPin,
   IconSearch,
+  IconSidebar,
   IconSettings,
   IconSliders,
   IconUser,
@@ -136,10 +136,12 @@ function compareOptionalDate(
 
 export function Sidebar({
   onOpenSearch,
-  titlebarNav,
+  onToggleSidebar,
+  sidebarToggleShortcut,
 }: {
   onOpenSearch: () => void;
-  titlebarNav?: ReactNode;
+  onToggleSidebar: () => void;
+  sidebarToggleShortcut: string;
 }) {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
@@ -1054,21 +1056,21 @@ export function Sidebar({
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-drag">{titlebarNav}</div>
-      <div className="no-drag flex min-h-0 flex-1 flex-col px-2 pb-1.5">
-        <div className="sidebar-header">
+      <div className="sidebar-header">
+        <button
+          type="button"
+          className="brand no-drag"
+          data-nav="home"
+          title={t("nav.home")}
+          aria-label={t("nav.home")}
+          onClick={() => setPage("chat")}
+        >
+          <BrandLogo size={20} />
+          <span>{t("app.shellName")}</span>
+        </button>
+        <div className="sidebar-header-actions no-drag">
           <button
             type="button"
-            className="brand"
-            data-nav="home"
-            title={t("nav.home")}
-            aria-label={t("nav.home")}
-            onClick={() => setPage("chat")}
-          >
-            <BrandLogo size={20} />
-            <span>{t("app.shellName")}</span>
-          </button>
-          <button
             className="icon-btn"
             title={t("nav.search")}
             aria-label={t("nav.search")}
@@ -1076,7 +1078,21 @@ export function Sidebar({
           >
             <IconSearch size={15} />
           </button>
+          <button
+            type="button"
+            className="icon-btn"
+            title={`${t("nav.collapseSidebar")} (${sidebarToggleShortcut})`}
+            aria-label={t("nav.collapseSidebar")}
+            aria-expanded={true}
+            data-nav="toggle-sidebar"
+            onClick={onToggleSidebar}
+          >
+            <IconSidebar size={15} />
+          </button>
         </div>
+      </div>
+
+      <div className="no-drag flex min-h-0 flex-1 flex-col px-2 pb-1.5">
 
         <button className="nav-item new-task-btn mb-1" data-nav="new-task" onClick={() => void createSession()}>
           <IconNewSession size={15} />
