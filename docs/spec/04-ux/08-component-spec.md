@@ -47,7 +47,8 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 ### 1.4 Interactions
 
-- Sidebar toggle: keyboard shortcut + hamburger button in topbar
+- Sidebar toggle: keyboard shortcut + icon button beside Search in the expanded
+  sidebar header; the button moves to the main titlebar while collapsed
 - Work panel resize: left-edge drag handle (§5.4)
 - Window resize: responsive collapse per [07-ui-design-system.md](07-ui-design-system.md) §10.1
 
@@ -68,8 +69,8 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 | Platform | Top-level chrome | Application menu |
 |---|---|---|
 | macOS | Native inset traffic lights at `{x:16,y:16}` | System menu: PI-Desktop, File, Edit, View, Window, Help |
-| Windows | Frameless 46px titlebar; navigation at left, minimize/maximize/close at right | None inside the window |
-| Linux | Frameless 46px titlebar; navigation at left, minimize/maximize/close at right | None inside the window |
+| Windows | Frameless 46px titlebar; sidebar actions at left, minimize/maximize/close at right | None inside the window |
+| Linux | Frameless 46px titlebar; sidebar actions at left, minimize/maximize/close at right | None inside the window |
 
 - The macOS system menu exposes New Task, Open Project, Settings, Command
   Palette, Sidebar, standard editing, zoom/fullscreen, window, Help, Logs, and
@@ -154,7 +155,7 @@ in the sidebar.
 ```text
 Expanded (~275px, D034/D070):
 +---------------------------+
-| [π] PI-Desktop            |
+| [π] PI-Desktop    [⌕][◧] |
 | [message+ New Chat] button |
 | Plugins                   |
 | PROJECTS            [dir+]|
@@ -209,6 +210,8 @@ Collapsed (48px):
 - Click the message-plus New Chat control: create/reuse a draft in the current workspace scope
 - Click the PI-Desktop brand: return the main pane to the chat home while
   preserving the active conversation and workspace
+- Click Search or Collapse sidebar at the right of the topmost brand row to
+  open global search or collapse the sidebar respectively
 - Click the `Projects` heading folder-plus action: open the project picker and
   retain the selected project
 - Click project `+`: activate that project and create/reuse a session bound to
@@ -227,7 +230,8 @@ Collapsed (48px):
   conversation rows read as one dense navigation list rather than detached
   cards. Directory `+` and overflow actions remain hidden until hover or
   keyboard focus.
-- Sidebar toggle: Topbar hamburger + keyboard shortcut
+- Sidebar toggle: expanded-header icon beside Search + keyboard shortcut; the
+  collapsed main titlebar retains an Expand sidebar icon
 - Click the local profile trigger: open or close the identity menu containing
   Settings, Logs, and Theme
 - Click the footer bell: open or close the durable notification inbox
@@ -264,7 +268,9 @@ Collapsed (48px):
 - Icons are decorative when a localized text label or accessible name is
   present; click, keyboard, and focus behavior remain unchanged.
 - The expanded sidebar brand is a localized button with a 20px logo and the
-  shell name; pointer or keyboard activation navigates to the chat home.
+  shell name; pointer or keyboard activation navigates to the chat home. It is
+  the first item in the topmost 46px row, with Search and Collapse sidebar
+  controls ordered at the right.
 
 ### 3.7 MVP constraints
 
