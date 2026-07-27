@@ -143,9 +143,10 @@ button, durable notification inbox entry, and settings entry.
 ### 3.1 Purpose
 
 Scoped project and session navigation and management. The expanded sidebar
-shows every retained project tab as an independently collapsible group plus
-path-less Temporary sessions; the collapsed state is an icon rail. Retained
-tabs are renderer presentation state, not additional host workspaces.
+shows retained project tabs under a `Projects` heading and path-less
+conversations under a separate `Sessions` heading; the collapsed state is an
+icon rail. Retained tabs are renderer presentation state, not additional host
+workspaces.
 The home destination controls expose Projects and Plugins only; Pull requests
 and Scheduled are not rendered in the sidebar.
 
@@ -157,10 +158,11 @@ Expanded (~275px, D034/D070):
 | [π] PI-Desktop            |
 | [message+ New Chat] button |
 | Projects / Plugins        |
+| PROJECTS            [dir+]|
 | [v] project-A      [+] … |
 |   • Project session      |
 | project-B      [>] [+] … |
-| Temporary sessions   [+] |
+| SESSIONS         [msg+][↕]|
 |   • Path-less session   |
 |                           |
 | [(user) Custom       v][?]|
@@ -189,7 +191,7 @@ Collapsed (48px):
 | Active project | Header carries active state; topbar follows that workspace; composer exposes no workspace identity |
 | Collapsed project | Header remains visible; child conversations are hidden |
 | Archived row | Hidden by default; visible in the explicit archived view |
-| No retained project | Compact Open project entry; Temporary rows remain available |
+| No retained project | Compact Open project entry; standalone Sessions rows remain available |
 | Empty group | Muted one-line empty state; group create action remains available |
 | Footer idle | Transparent 58px band; profile and Help controls remain visually quiet |
 | Footer hover/focus | Only the targeted control receives the semantic hover/focus treatment |
@@ -203,18 +205,20 @@ Collapsed (48px):
 - Click session: activate its bound project when necessary, switch the active
   session, and scroll to the last message
 - Click the message-plus New Chat control: create/reuse a draft in the current workspace scope
+- Click the `Projects` heading folder-plus action: open the project picker and
+  retain the selected project
 - Click project `+`: activate that project and create/reuse a session bound to
   its exact path
-- Click Temporary sessions `+`: clear the workspace and create/reuse a
+- Click the `Sessions` heading message-plus action: clear the workspace and create/reuse a
   path-less persistent session
 - Project overflow: switch, pin/unpin, archive/restore, close retained tab
 - Conversation overflow: pin/unpin, archive/restore, Create branch, open
   folder, delete. Create branch is disabled while that conversation is
   running; success activates the independent child session and focuses the
   composer.
-- Sort menu: Recently updated, Created date, Oldest first, and Name; pinned
-  rows stay ahead of unpinned rows. A stored `manual` compatibility value
-  requires no drag-reorder UI.
+- The sort menu remains beside the `Sessions` heading: Recently updated,
+  Created date, Oldest first, and Name; pinned rows stay ahead of unpinned rows.
+  A stored `manual` compatibility value requires no drag-reorder UI.
 - Project groups use compact vertical spacing so adjacent directories and
   conversation rows read as one dense navigation list rather than detached
   cards. Directory `+` and overflow actions remain hidden until hover or
@@ -226,12 +230,12 @@ Collapsed (48px):
 
 ### 3.5 Accessibility
 
-- Project and Temporary headings have localized names; each disclosure and `+`
-  has a scope-specific accessible name
+- Projects and Sessions headings have localized names; each disclosure and
+  create action has a scope-specific accessible name
 - Session groups use semantic `section` containers
 - Active session: `aria-current="true"`
-- Project and Temporary directory rows expose `aria-expanded` and
-  `aria-controls`; menu check/radio items expose `aria-checked`
+- Project directory rows expose `aria-expanded` and `aria-controls`; menu
+  check/radio items expose `aria-checked`
 - Collapsed state: each icon has `aria-label` with session title
 - Keyboard: arrow keys navigate session list
 - The profile trigger exposes `aria-haspopup="menu"` and its expanded state;
@@ -436,7 +440,7 @@ Groups and session items:
            Session title
 [folder] another-project                         [+]
            Session title
-[panel]  Temporary sessions                      [+]
+SESSIONS                                      [msg+][↕]
            Session title
 ```
 
@@ -465,7 +469,7 @@ Groups and session items:
   the explicit durable host operation.
 - Create branch snapshots the idle conversation's complete current transcript
   into an independent session. The child stays in the same project or
-  Temporary group and becomes active; later transcript/configuration changes
+  standalone Sessions section and becomes active; later transcript/configuration changes
   do not affect the source. The action is disabled for a running source.
 - Selecting a conversation with a different project first activates that
   project's workspace. A running turn in the previously selected session is
@@ -488,8 +492,8 @@ Groups and session items:
   local view controls rather than host queries.
 - Temporary means **not bound to a project**, not ephemeral storage; these
   sessions survive restart.
-- All project groups and the Temporary group share one independently scrollable
-  sidebar region.
+- All project groups and the standalone Sessions section share one
+  independently scrollable sidebar region.
 
 ---
 

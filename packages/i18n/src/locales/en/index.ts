@@ -58,6 +58,7 @@ export const en = {
   },
   nav: {
     newTask: "New task",
+    newProject: "New project",
     projects: "Projects",
     plugins: "Plugins",
     recents: "Recents",

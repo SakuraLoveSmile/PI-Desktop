@@ -20,17 +20,19 @@ destination, chat as the home surface, tools and permissions inline.
 |  New task        |  chat home / transcript        |  (optional,      |
 |  Projects        |  or Projects / Plugins page    |   resizable      |
 |  Plugins         |                                |   320–720px)     |
-|  Open projects   |                                | App.tsx Review × |
+|  Projects      + |                                | App.tsx Review × |
 |   Project A      |                                | ───────────────  |
 |   Project B      |                                | Active artifact  |
-|  Temporary       |                                | surface          |
+|  Sessions     +↕ |                                | surface          |
 |  Footer: local   |  Floating composer (chat)      |                  |
 +------------------+--------------------------------+------------------+
 ```
 
 - **Sidebar**: primary navigation — New task, destination entries
-  (Projects / Plugins), retained open-project groups, a path-less Temporary
-  sessions group, and the WorkBuddy-inspired local profile footer
+  (Projects / Plugins), retained open-project groups under a **Projects**
+  section with a persistent new-project action, path-less conversations under
+  a separate **Sessions** section with new-session and sort actions, and the
+  WorkBuddy-inspired local profile footer
   (Custom / Local profile → Settings / Logs / Theme, plus a direct Help
   shortcut to Settings → Info, D113/D093). Pull requests and Scheduled are
   intentionally omitted from the home sidebar. Each retained project is a
@@ -93,6 +95,10 @@ Other retained tabs stay open.
 
 ### 3.2.1 Sidebar project groups
 
+- **Sections**: the compact `Projects` heading precedes retained project groups
+  and exposes the folder-picker action. A separate `Sessions` heading follows
+  those groups and owns path-less conversation creation plus the existing
+  sort/archive-view menu.
 - **Identity**: each group is keyed by the normalized full project path, never
   by a potentially ambiguous folder basename.
 - **Header**: project name/path, active state, disclosure, new-task action,
@@ -107,8 +113,8 @@ Other retained tabs stay open.
 - **Sort**: user-facing modes are Recently updated, Created date, Oldest
   first, and Name. Pinned rows precede unpinned rows. A legacy persisted
   `manual` value remains readable but does not imply a drag-reorder gesture.
-- **Temporary sessions**: path-less sessions remain in a separate group and
-  never inherit the last active project's workspace.
+- **Standalone sessions**: path-less sessions remain in the separate Sessions
+  section and never inherit the last active project's workspace.
 - **Concurrency**: the shell selects one visible project at a time, while
   agent run state remains keyed by session. Switching project tabs does not
   cancel a background turn.

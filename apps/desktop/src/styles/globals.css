@@ -1602,6 +1602,15 @@ textarea:disabled {
   padding-left: 9px;
 }
 
+.sidebar-session-group-body.standalone {
+  padding: 0 2px;
+}
+
+.sidebar-standalone-sessions {
+  min-width: 0;
+  margin-top: 4px;
+}
+
 .sidebar-session-empty {
   padding: 5px 8px;
   color: var(--ds-text-muted);
@@ -4971,7 +4980,7 @@ textarea:disabled {
   text-transform: uppercase;
 }
 
-.sidebar-sort-button {
+.sidebar-toolbar-button {
   display: inline-flex;
   width: 24px;
   height: 24px;
@@ -4981,10 +4990,21 @@ textarea:disabled {
   color: var(--ds-text-muted);
 }
 
-.sidebar-sort-button:hover,
-.sidebar-sort-button.active {
+.sidebar-toolbar-button:hover,
+.sidebar-toolbar-button.active {
   background: var(--ds-bg-hover);
   color: var(--ds-text-primary);
+}
+
+.sidebar-list-toolbar-secondary {
+  padding-right: 4px;
+  padding-left: 4px;
+}
+
+.sidebar-toolbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
 }
 
 .sidebar-popover {

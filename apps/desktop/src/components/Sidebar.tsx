@@ -31,7 +31,7 @@ import {
   IconFileText,
   IconHelp,
   IconMore,
-  IconPanel,
+  IconNewProject,
   IconPin,
   IconSearch,
   IconSettings,
@@ -177,7 +177,6 @@ export function Sidebar({
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
-  const [temporaryCollapsed, setTemporaryCollapsed] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
@@ -848,52 +847,39 @@ export function Sidebar({
     );
   };
 
-  const renderTemporaryGroup = () => (
-    <section className="sidebar-session-group" aria-labelledby="sidebar-temporary-group-label" data-sidebar-project-group="temporary">
-      <div className="sidebar-session-group-header">
-        <button
-          type="button"
-          id="sidebar-temporary-group-label"
-          className="sidebar-session-group-title project-toggle static"
-          aria-expanded={!temporaryCollapsed}
-          aria-controls="sidebar-temporary-sessions"
-          data-action="toggle-temporary-collapse"
-          onClick={() => setTemporaryCollapsed((value) => !value)}
-        >
-          <IconChevronDown
-            size={13}
-            className={`sidebar-disclosure-icon ${temporaryCollapsed ? "collapsed" : ""}`}
-          />
-          <IconPanel size={13} />
-          <span>{t("nav.temporarySessions")}</span>
-        </button>
-        <button
-          type="button"
-          className="sidebar-session-group-add"
-          title={t("nav.newTemporarySession")}
-          aria-label={t("nav.newTemporarySession")}
-          onClick={() => void createSession({ projectPath: null })}
-        >
-          <IconNewSession size={13} />
-        </button>
-      </div>
-      {!temporaryCollapsed ? (
-        <div id="sidebar-temporary-sessions" className="sidebar-session-group-body temporary">
-          {temporarySessions.length > 0 ? renderSessionRows(temporarySessions, { temporary: true }) : (
-            <div className="sidebar-session-empty">{t("nav.noTemporarySessions")}</div>
-          )}
-        </div>
-      ) : null}
-    </section>
-  );
-
   const renderFloatingMenu = () => {
     if (
       !menuPosition ||
       typeof document === "undefined" ||
-      (!sessionMenu && !projectMenu)
+      (!sessionMenu && !projectMenu && !sortOpen)
     ) {
       return null;
+    }
+    if (sortOpen) {
+      return createPortal(
+        <div
+          className="sidebar-popover sidebar-sort-menu sidebar-floating-menu"
+          role="menu"
+          onKeyDown={onMenuKeyDown}
+          style={{ top: menuPosition.top, right: menuPosition.right }}
+        >
+          <div className="sidebar-popover-title">
+            {t("nav.sortSessions", { defaultValue: "Sort sessions" })}
+          </div>
+          {(["recent", "oldest", "name", "created"] as const).map((value, index) => (
+            <button ref={index === 0 ? menuFirstItemRef : undefined} key={value} type="button" role="menuitemradio" aria-checked={displaySessionSort === value} className={displaySessionSort === value ? "selected" : ""} data-sort={value} onClick={() => setSort(value)}>
+              <span>{value === "recent" ? t("nav.sortRecent", { defaultValue: "Recently updated" }) : value === "oldest" ? t("nav.sortOldest", { defaultValue: "Oldest first" }) : value === "name" ? t("nav.sortName", { defaultValue: "Name" }) : t("nav.sortCreated", { defaultValue: "Created date" })}</span>
+              {displaySessionSort === value ? <span className="sidebar-sort-check">✓</span> : null}
+            </button>
+          ))}
+          <div className="sidebar-popover-divider" />
+          <button type="button" role="menuitemcheckbox" aria-checked={showArchived} data-action="toggle-show-archived" onClick={toggleShowArchived}>
+            <span>{showArchived ? t("nav.hideArchived", { defaultValue: "Hide archived" }) : t("nav.showArchived", { defaultValue: "Show archived" })}</span>
+            <span className={`sidebar-checkbox ${showArchived ? "checked" : ""}`}>{showArchived ? "✓" : ""}</span>
+          </button>
+        </div>,
+        document.body,
+      );
     }
     const session = sessionMenu
       ? sessions.find((item) => item.id === sessionMenu)
@@ -1066,52 +1052,23 @@ export function Sidebar({
         </nav>
 
         <div className="sidebar-list-toolbar">
-          <span className="sidebar-list-label">{t("nav.sessions", { defaultValue: "Sessions" })}</span>
-          <div className="sidebar-menu-wrap">
-            <button
-              type="button"
-              className={`sidebar-sort-button ${sortOpen ? "active" : ""}`}
-              data-action="session-sort"
-              aria-label={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
-              aria-haspopup="menu"
-              aria-expanded={sortOpen}
-              onClick={(event) => {
-                if (sortOpen) {
-                  closeMenus();
-                  return;
-                }
-                menuTriggerRef.current = event.currentTarget;
-                setSessionMenu(null);
-                setProjectMenu(null);
-                setMenuPosition(null);
-                setSortOpen(true);
-              }}
-            >
-              <IconArrowUpDown size={14} />
-            </button>
-            {sortOpen ? (
-              <div className="sidebar-popover sidebar-sort-menu" role="menu" onKeyDown={onMenuKeyDown}>
-                <div className="sidebar-popover-title">{t("nav.sortSessions", { defaultValue: "Sort sessions" })}</div>
-                {(["recent", "oldest", "name", "created"] as const).map((value, index) => (
-                  <button ref={index === 0 ? menuFirstItemRef : undefined} key={value} type="button" role="menuitemradio" aria-checked={displaySessionSort === value} className={displaySessionSort === value ? "selected" : ""} data-sort={value} onClick={() => setSort(value)}>
-                    <span>{value === "recent" ? t("nav.sortRecent", { defaultValue: "Recently updated" }) : value === "oldest" ? t("nav.sortOldest", { defaultValue: "Oldest first" }) : value === "name" ? t("nav.sortName", { defaultValue: "Name" }) : t("nav.sortCreated", { defaultValue: "Created date" })}</span>
-                    {displaySessionSort === value ? <span className="sidebar-sort-check">✓</span> : null}
-                  </button>
-                ))}
-                <div className="sidebar-popover-divider" />
-                <button type="button" role="menuitemcheckbox" aria-checked={showArchived} data-action="toggle-show-archived" onClick={toggleShowArchived}>
-                  <span>{showArchived ? t("nav.hideArchived", { defaultValue: "Hide archived" }) : t("nav.showArchived", { defaultValue: "Show archived" })}</span>
-                  <span className={`sidebar-checkbox ${showArchived ? "checked" : ""}`}>{showArchived ? "✓" : ""}</span>
-                </button>
-              </div>
-            ) : null}
-          </div>
+          <span className="sidebar-list-label">{t("nav.projects")}</span>
+          <button
+            type="button"
+            className="sidebar-toolbar-button"
+            data-action="new-project"
+            title={t("nav.newProject")}
+            aria-label={t("nav.newProject")}
+            onClick={() => void openProjectPicker()}
+          >
+            <IconNewProject size={14} />
+          </button>
         </div>
 
         <div
           className="sidebar-session-groups min-h-0 flex-1 overflow-auto px-0.5"
           onScroll={() => {
-            if (sessionMenu || projectMenu) closeMenus(false);
+            if (sessionMenu || projectMenu || sortOpen) closeMenus(false);
           }}
         >
           {projectEntries.length > 0 ? projectEntries.map(renderProjectGroup) : (
@@ -1124,7 +1081,57 @@ export function Sidebar({
               </div>
             </section>
           )}
-          {renderTemporaryGroup()}
+          <section
+            className="sidebar-standalone-sessions"
+            aria-labelledby="sidebar-standalone-sessions-label"
+            data-sidebar-session-section="temporary"
+          >
+            <div className="sidebar-list-toolbar sidebar-list-toolbar-secondary">
+              <span id="sidebar-standalone-sessions-label" className="sidebar-list-label">
+                {t("nav.sessions", { defaultValue: "Sessions" })}
+              </span>
+              <div className="sidebar-toolbar-actions">
+                <button
+                  type="button"
+                  className="sidebar-toolbar-button"
+                  data-action="new-standalone-session"
+                  title={t("nav.newTemporarySession")}
+                  aria-label={t("nav.newTemporarySession")}
+                  onClick={() => void createSession({ projectPath: null })}
+                >
+                  <IconNewSession size={14} />
+                </button>
+                <div className="sidebar-menu-wrap">
+                  <button
+                    type="button"
+                    className={`sidebar-toolbar-button ${sortOpen ? "active" : ""}`}
+                    data-action="session-sort"
+                    aria-label={t("nav.sortSessions", { defaultValue: "Sort sessions" })}
+                    aria-haspopup="menu"
+                    aria-expanded={sortOpen}
+                    onClick={(event) => {
+                      if (sortOpen) {
+                        closeMenus();
+                        return;
+                      }
+                      placeMenu(event);
+                      menuTriggerRef.current = event.currentTarget;
+                      setSessionMenu(null);
+                      setProjectMenu(null);
+                      setSortOpen(true);
+                    }}
+                  >
+                    <IconArrowUpDown size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="sidebar-session-group-body standalone">
+              {temporarySessions.length > 0 ? renderSessionRows(temporarySessions, { temporary: true }) : (
+                <div className="sidebar-session-empty">{t("nav.noTemporarySessions")}</div>
+              )}
+            </div>
+          </section>
         </div>
 
         <div className="sidebar-footer no-drag" ref={profileRef}>
