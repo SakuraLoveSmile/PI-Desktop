@@ -246,6 +246,8 @@ export type AppState = {
   selectSession: (id: string, opts?: { record?: boolean }) => Promise<void>;
   newSession: (options?: { projectPath?: string | null }) => Promise<void>;
   forkSession: (id: string) => Promise<void>;
+  forkAssistantMessage: (messageId: string) => Promise<void>;
+  editAssistantMessage: (messageId: string, content: string) => Promise<boolean>;
   configureActiveSession: (config: {
     mode: "chat" | "agent";
     providerId?: string;
@@ -751,6 +753,162 @@ export const useAppStore = create<AppState>((set, get) => ({
         navIndex: nextStack.length - 1,
       };
     });
+  },
+
+  forkAssistantMessage: async (messageId) => {
+    const state = get();
+    const sessionId = state.activeSessionId;
+    if (!sessionId || state.runningSessions[sessionId]) return;
+    const message = state.messages.find((candidate) => candidate.id === messageId);
+    const source = state.sessions.find((session) => session.id === sessionId);
+    if (!message || message.role !== "assistant" || !source) return;
+
+    try {
+      const sourceTitle = source.title.trim() || i18n.t("chat.untitledTask");
+      const result = await api.forkSession(
+        sessionId,
+        i18n.t("nav.branchTitle", { title: sourceTitle }),
+        messageId,
+      );
+      const { messages, ...summary } = result.session;
+      get().resetWorkPanelContext();
+      set((current) => {
+        const sessions = decorateSessions(
+          [summary, ...current.sessions.filter((session) => session.id !== summary.id)],
+          current.sessionMeta,
+        );
+        const stack = current.navStack.slice(0, current.navIndex + 1);
+        const entry = { page: "chat" as const, sessionId: summary.id };
+        const nextStack = [...stack, entry].slice(-50);
+        return {
+          sessions,
+          activeSessionId: summary.id,
+          messages,
+          page: "chat" as const,
+          isRunning: false,
+          navStack: nextStack,
+          navIndex: nextStack.length - 1,
+          error: null,
+          errorCode: null,
+        };
+      });
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: (error as { code?: string })?.code ?? null,
+      });
+    }
+  },
+
+  editAssistantMessage: async (messageId, content) => {
+    const state = get();
+    const sessionId = state.activeSessionId;
+    const editedContent = content.trim();
+    if (!sessionId || state.runningSessions[sessionId] || !editedContent) return false;
+    const messageIndex = state.messages.findIndex(
+      (candidate) => candidate.id === messageId,
+    );
+    const source = state.sessions.find((session) => session.id === sessionId);
+    if (messageIndex < 0 || state.messages[messageIndex].role !== "assistant" || !source) {
+      return false;
+    }
+    if (state.messages[messageIndex].content === editedContent) return true;
+
+    let childId: string | null = null;
+    try {
+      const sourceTitle = source.title.trim() || i18n.t("chat.untitledTask");
+      const result = await api.forkSession(
+        sessionId,
+        i18n.t("nav.branchTitle", { title: sourceTitle }),
+        messageId,
+      );
+      const forkedSessionId = result.session.id;
+      childId = forkedSessionId;
+      const originalMessages = result.session.messages;
+      const childAssistantIndex = originalMessages.length - 1;
+      if (
+        childAssistantIndex < 0 ||
+        originalMessages[childAssistantIndex]?.role !== "assistant"
+      ) {
+        throw new Error("Forked response is missing");
+      }
+      let rootIndex = -1;
+      for (let index = childAssistantIndex - 1; index >= 0; index -= 1) {
+        if (originalMessages[index].role === "user") {
+          rootIndex = index;
+          break;
+        }
+      }
+      if (rootIndex < 0) throw new Error("Response prompt is missing");
+
+      const rootUserId = originalMessages[rootIndex].id;
+      const editedMessages = originalMessages.map((candidate, index) =>
+        index === childAssistantIndex
+          ? {
+              ...candidate,
+              content: editedContent,
+              status: "complete" as const,
+              thinking: undefined,
+              modelId: undefined,
+              providerId: undefined,
+              usage: undefined,
+              error: undefined,
+            }
+          : index === rootIndex
+            ? {
+                ...candidate,
+                revisionRootId: rootUserId,
+                revisionCount: 2,
+                activeRevision: 2,
+              }
+            : candidate,
+      );
+      const originalBranch = originalMessages.slice(rootIndex);
+      const editedBranch = editedMessages.slice(rootIndex);
+      await api.saveSessionRevision({
+        sessionId: forkedSessionId,
+        rootUserId,
+        messages: originalBranch,
+      });
+      await api.saveSessionRevision({
+        sessionId: forkedSessionId,
+        rootUserId,
+        messages: editedBranch,
+        makeActive: true,
+      });
+      await api.replaceSessionMessages(forkedSessionId, editedMessages);
+
+      const { messages: _messages, ...summary } = result.session;
+      get().resetWorkPanelContext();
+      set((current) => {
+        const sessions = decorateSessions(
+          [summary, ...current.sessions.filter((session) => session.id !== summary.id)],
+          current.sessionMeta,
+        );
+        const stack = current.navStack.slice(0, current.navIndex + 1);
+        const entry = { page: "chat" as const, sessionId: summary.id };
+        const nextStack = [...stack, entry].slice(-50);
+        return {
+          sessions,
+          activeSessionId: summary.id,
+          messages: editedMessages,
+          page: "chat" as const,
+          isRunning: false,
+          navStack: nextStack,
+          navIndex: nextStack.length - 1,
+          error: null,
+          errorCode: null,
+        };
+      });
+      return true;
+    } catch (error) {
+      if (childId) await api.deleteSession(childId).catch(() => undefined);
+      set({
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: (error as { code?: string })?.code ?? null,
+      });
+      return false;
+    }
   },
 
   configureActiveSession: async (config) => {

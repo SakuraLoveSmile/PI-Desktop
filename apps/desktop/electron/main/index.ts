@@ -1846,7 +1846,9 @@ function registerIpc() {
   });
   handle(
     IPC.invoke.sessionFork,
-    async (input: { sessionId?: string; title?: string } = {}) => {
+    async (
+      input: { sessionId?: string; title?: string; throughMessageId?: string } = {},
+    ) => {
       if (!host) throw new Error("host unavailable");
       const sessionId = String(input.sessionId ?? "").trim();
       if (!sessionId) {
@@ -1867,6 +1869,8 @@ function registerIpc() {
         result = await host.call("session.fork", {
           sessionId,
           title: String(input.title ?? "").trim() || undefined,
+          throughMessageId:
+            String(input.throughMessageId ?? "").trim() || undefined,
         });
       } catch (error: any) {
         if (error?.data?.errorCode === ErrorCodes.CONFLICT) {

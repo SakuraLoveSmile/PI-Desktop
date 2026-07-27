@@ -291,7 +291,7 @@ Minimal interface:
 
 - `session/list`
 - `session/create`
-- `session/fork({ sessionId, title? }) -> { session: SessionDetail }`
+- `session/fork({ sessionId, title?, throughMessageId? }) -> { session: SessionDetail }`
 - `session/get`
 - `session/delete`
 - `session/rename`
@@ -302,7 +302,9 @@ Import candidates carry `projectPath: string | null`. A successful import
 refreshes both sessions and the durable Projects index.
 
 `session/fork` is a protocol-v5 channel that creates an independent
-session from the source session's current active transcript. Electron rejects
+session from the source session's current active transcript. When optional
+`throughMessageId` is present, the copied snapshot ends at that message; an
+unknown id returns `NOT_FOUND`. Electron rejects
 the request with `AGENT_BUSY` while that source session has an active turn.
 Electron owns localization and supplies the user-facing branch title; the host
 fallback title is reserved for non-UI callers.
@@ -310,6 +312,9 @@ The host assigns a new session id, message ids, and tool-call ids; it copies
 the durable project/provider/model/mode/thinking/permission configuration but
 does not copy turns, notifications, artifacts, scratch data, permission
 grants, or regenerate revisions. The source session remains unchanged.
+Message-scoped assistant Fork/Edit uses this option so the child receives a
+new session id and therefore cannot reuse or mutate the source pi runtime or
+its provider cache.
 
 Protocol version 2 adds `thinkingLevel`, `UiMessage.thinking`, and
 `message_update.deltaThinking`. A v1 peer must fail the version check instead

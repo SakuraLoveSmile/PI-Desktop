@@ -116,6 +116,10 @@ interface AgentRuntime {
 - A forked session receives a new session id and no shared runtime. Its first
   prompt creates a fresh pi runtime and restores context only from the child
   transcript, including the remapped tool call/result pairs.
+- Message-scoped assistant Fork/Edit follows the same rule: the child
+  transcript may stop at or replace the selected assistant response, but its
+  next prompt cannot reuse the source session's runtime/provider cache because
+  the session id and remapped transcript identities are independent (D134).
 
 ## 6. Providers & models
 

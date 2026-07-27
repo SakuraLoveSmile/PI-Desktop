@@ -628,8 +628,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
   background or outer border. Its Sparkles/chevron trigger uses secondary text,
   and the expanded markdown is indented by a subtle theme-token left rule. It
   is never concatenated into answer markdown.
-- Hover actions: quiet action chips under the bubble (copy always; regenerate
-  on completed assistant turns). Right-aligned for user turns, left-aligned for
+- Hover actions: quiet action chips under the bubble (copy always; regenerate,
+  Fork, and Edit on completed assistant turns). Assistant rows do not expose a
+  Delete action. Right-aligned for user turns, left-aligned for
   assistant turns; visible on hover/focus-within. Regenerate truncates the
   durable transcript to the nearest preceding user prompt and re-runs that turn
   in place instead of appending a duplicate branch. When more than one
@@ -640,6 +641,13 @@ Single message render — either user (plaintext) or assistant (markdown streami
   tail must not move or detach that pager from the user bubble. The pager is
   part of the message action toolbar: hidden by default and revealed together
   with Copy on row hover or keyboard focus.
+  Fork creates and activates an independent session whose snapshot ends at the
+  selected assistant response. Edit opens a focused inline textarea; saving
+  creates the same isolated message-scoped session first, changes only the
+  selected response in the child, and stores the original and edited branches
+  as a two-entry linear revision family. The existing pager restores either
+  response. Both actions require an idle source and leave its transcript, live
+  runtime, and provider cache state untouched (D134).
 - Assistant meta: optional model badge + token-usage chip under the answer
   (collapsed summary with hover breakdown for input/output/cache/reasoning)
 - Gap: 10px vertical padding between consecutive message rows (denser than

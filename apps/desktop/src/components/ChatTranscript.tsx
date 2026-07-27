@@ -739,11 +739,19 @@ const MessageRow = memo(function MessageRow({
 }) {
   const { t } = useTranslation();
   const retryAssistantMessage = useAppStore((s) => s.retryAssistantMessage);
+  const forkAssistantMessage = useAppStore((s) => s.forkAssistantMessage);
+  const editAssistantMessage = useAppStore((s) => s.editAssistantMessage);
   const activateMessageRevision = useAppStore((s) => s.activateMessageRevision);
   const deleteMessage = useAppStore((s) => s.deleteMessage);
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(message.content);
+  const [savingEdit, setSavingEdit] = useState(false);
   const isUser = message.role === "user";
+  const isAssistant = message.role === "assistant";
   const copyLabel = t("chat.copy");
   const retryLabel = t("chat.retry");
+  const forkLabel = t("chat.forkResponse");
+  const editLabel = t("chat.editResponse");
   const deleteLabel = t("chat.deleteMessage");
   const displayed = useTypewriter(message);
   const hasAnswer = Boolean((message.content || "").trim());
@@ -751,12 +759,19 @@ const MessageRow = memo(function MessageRow({
   const streaming =
     !isUser && isRunning && message.status === "streaming";
   const completeAssistant =
-    !isUser && message.status !== "streaming" && hasAnswer;
+    isAssistant && message.status !== "streaming" && hasAnswer;
   const showAnswer = isUser || Boolean(displayed) || isRunning || hasError;
   const showMeta = completeAssistant && Boolean(message.modelId || message.usage);
   const revisionCount = message.revisionCount ?? 0;
   const activeRevision = message.activeRevision ?? revisionCount;
   const showRevisionPager = isUser && revisionCount > 1;
+  const saveEdit = async () => {
+    if (savingEdit || !editValue.trim()) return;
+    setSavingEdit(true);
+    const saved = await editAssistantMessage(message.id, editValue);
+    setSavingEdit(false);
+    if (saved) setEditing(false);
+  };
   return (
     <div
       className={`message-row ${isUser ? "user" : message.role}${streaming ? " streaming" : ""}`}
@@ -783,6 +798,48 @@ const MessageRow = memo(function MessageRow({
                   <LinkifiedText text={String(message.content || "")} />
                 )}
               </div>
+            ) : editing ? (
+              <div className="message-edit">
+                <textarea
+                  className="message-edit-input selectable"
+                  value={editValue}
+                  rows={Math.min(12, Math.max(3, editValue.split("\n").length))}
+                  aria-label={editLabel}
+                  autoFocus
+                  disabled={savingEdit}
+                  onChange={(event) => setEditValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      setEditValue(message.content);
+                      setEditing(false);
+                    } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                      event.preventDefault();
+                      void saveEdit();
+                    }
+                  }}
+                />
+                <div className="message-edit-actions">
+                  <button
+                    type="button"
+                    className="copy-btn"
+                    disabled={savingEdit}
+                    onClick={() => {
+                      setEditValue(message.content);
+                      setEditing(false);
+                    }}
+                  >
+                    {t("chat.cancelEdit")}
+                  </button>
+                  <button
+                    type="button"
+                    className="copy-btn primary"
+                    disabled={savingEdit || !editValue.trim()}
+                    onClick={() => void saveEdit()}
+                  >
+                    {savingEdit ? t("chat.savingEdit") : t("chat.saveEdit")}
+                  </button>
+                </div>
+              </div>
             ) : (
               <>
                 {displayed ? (
@@ -800,10 +857,10 @@ const MessageRow = memo(function MessageRow({
             )}
           </div>
         ) : null}
-        {showMeta ? (
+        {showMeta && !editing ? (
           <MessageMeta modelId={message.modelId} usage={message.usage} />
         ) : null}
-        {hasAnswer || hasError || showRevisionPager ? (
+        {!editing && (hasAnswer || hasError || showRevisionPager) ? (
           <div className="message-actions">
             {showRevisionPager ? (
               <div className="message-revision-pager" role="group" aria-label={t("chat.revisions")}>
@@ -844,6 +901,33 @@ const MessageRow = memo(function MessageRow({
             {completeAssistant ? (
               <button
                 className="copy-btn"
+                title={forkLabel}
+                aria-label={forkLabel}
+                disabled={isRunning}
+                onClick={() => void forkAssistantMessage(message.id)}
+              >
+                <IconBranch size={13} />
+                <span>{forkLabel}</span>
+              </button>
+            ) : null}
+            {completeAssistant ? (
+              <button
+                className="copy-btn"
+                title={editLabel}
+                aria-label={editLabel}
+                disabled={isRunning}
+                onClick={() => {
+                  setEditValue(message.content);
+                  setEditing(true);
+                }}
+              >
+                <IconPencil size={13} />
+                <span>{editLabel}</span>
+              </button>
+            ) : null}
+            {completeAssistant ? (
+              <button
+                className="copy-btn"
                 title={retryLabel}
                 aria-label={retryLabel}
                 disabled={isRunning}
@@ -853,7 +937,7 @@ const MessageRow = memo(function MessageRow({
                 <span>{retryLabel}</span>
               </button>
             ) : null}
-            {!streaming ? (
+            {isUser && !streaming ? (
               <button
                 className="copy-btn danger"
                 title={deleteLabel}
