@@ -47,8 +47,13 @@ test("composer exposes the runtime thinking level order and provider filtering",
   assert.doesNotMatch(stylesSource, /\.composer-thinking-level\b/);
   assert.match(
     stylesSource,
-    /\.composer-model-menu\.composer-thinking-menu\s*\{[\s\S]*?width:\s*max-content;[\s\S]*?max-width:\s*min\(200px,\s*calc\(100vw - 24px\)\);/,
+    /\.composer-model-menu\.composer-thinking-menu\s*\{[\s\S]*?width:\s*auto;[\s\S]*?max-width:\s*min\(160px,\s*calc\(100vw - 24px\)\);/,
   );
+  const thinkingControlSource = composerSource.slice(
+    composerSource.indexOf('<div className="composer-thinking"'),
+    composerSource.indexOf('<div className="composer-permission"'),
+  );
+  assert.doesNotMatch(thinkingControlSource, /permissionInherit|"inherit"/);
   assert.match(composerSource, /availableThinkingLevels/);
 });
 

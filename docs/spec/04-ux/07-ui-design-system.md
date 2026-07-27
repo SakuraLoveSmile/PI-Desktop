@@ -488,8 +488,9 @@ The composer renders only controls connected to the active pi session:
   the right of Chat / Agent in the left toolbar group. The trigger shows the
   current level and opens the model's real `supportedThinkingLevels` as a
   compact single-column list with a check on the selected row. The menu fits its
-  content, caps at 200px and the available viewport width, and truncates labels
-  that exceed that cap; models without reasoning support render no trigger.
+  content, caps at 160px and the available viewport width, and truncates labels
+  that exceed that cap. It contains only concrete supported levels, with no
+  inherit/default row; models without reasoning support render no trigger.
 - Runtime controls are disabled while the active session is running.
 - File, photo, and appshot controls remain hidden until their payload contracts
   are implemented end to end.
