@@ -220,10 +220,14 @@ Collapsed (48px):
   open global search or collapse the sidebar respectively
 - Click the `Projects` heading folder-plus action: open the project picker and
   retain the selected project
+- Right-click the `Projects` heading or empty project-list chrome: open a
+  single-item create menu that runs the same new-project picker action
 - Click project `+`: activate that project and create/reuse a session bound to
   its exact path
 - Click the `Sessions` heading message-plus action: clear the workspace and create/reuse a
   path-less persistent session
+- Right-click the `Sessions` heading or empty standalone-list chrome: open a
+  single-item create menu that creates/reuses a path-less temporary session
 - Project overflow: switch, pin/unpin, archive/restore, close retained tab
 - Conversation overflow: pin/unpin, archive/restore, Create branch, open
   folder, delete. Create branch is disabled while that conversation is

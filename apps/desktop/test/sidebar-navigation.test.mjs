@@ -83,7 +83,7 @@ test("destination history is available through shortcuts without titlebar button
 
 test("sidebar shows a bounded standalone session list before retained projects", () => {
   const newProjectAction = sidebarSource.match(
-    /<div className="sidebar-list-toolbar">[\s\S]*?data-action="new-project"[\s\S]*?<\/div>/,
+    /<div[\s\S]*?className="sidebar-list-toolbar"[\s\S]*?data-action="new-project"[\s\S]*?<\/div>/,
   )?.[0] ?? "";
   const standaloneSessions = sidebarSource.match(
     /data-sidebar-session-section="temporary"[\s\S]*?<\/section>/,
@@ -105,4 +105,16 @@ test("sidebar shows a bounded standalone session list before retained projects",
     /\.sidebar-session-group-body\.standalone\s*\{[\s\S]*?max-height:\s*140px;[\s\S]*?overflow-x:\s*hidden;[\s\S]*?overflow-y:\s*auto;/,
   );
   assert.doesNotMatch(sidebarSource, /data-sidebar-project-group="temporary"/);
+});
+
+test("sidebar section toolbars open create actions from context menus", () => {
+  assert.match(sidebarSource, /data-sidebar-section=\"sessions\"/);
+  assert.match(sidebarSource, /data-sidebar-section=\"projects\"/);
+  assert.match(sidebarSource, /openSectionMenu\(\"sessions\"/);
+  assert.match(sidebarSource, /openSectionMenu\(\"projects\"/);
+  assert.match(sidebarSource, /data-sidebar-section-menu=\{sectionMenu\}/);
+  assert.match(
+    sidebarSource,
+    /className=\"sidebar-row-menu sidebar-floating-menu sidebar-section-menu\"/,
+  );
 });

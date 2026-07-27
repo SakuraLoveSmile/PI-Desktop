@@ -185,6 +185,7 @@ export function Sidebar({
   const [sortOpen, setSortOpen] = useState(false);
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
+  const [sectionMenu, setSectionMenu] = useState<"sessions" | "projects" | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -211,6 +212,7 @@ export function Sidebar({
     setSortOpen(false);
     setSessionMenu(null);
     setProjectMenu(null);
+    setSectionMenu(null);
     setMenuPosition(null);
     if (restoreFocus && trigger) requestAnimationFrame(() => trigger.focus());
   }, []);
@@ -241,6 +243,7 @@ export function Sidebar({
       menuTriggerRef.current = trigger;
       setSortOpen(false);
       setProjectMenu(null);
+      setSectionMenu(null);
       setSessionMenu(sessionId);
     },
     [],
@@ -251,13 +254,27 @@ export function Sidebar({
       menuTriggerRef.current = trigger;
       setSortOpen(false);
       setSessionMenu(null);
+      setSectionMenu(null);
       setProjectMenu(projectKey);
     },
     [],
   );
 
+  const openSectionMenu = useCallback(
+    (section: "sessions" | "projects", x: number, y: number) => {
+      menuTriggerRef.current = null;
+      setProfileOpen(false);
+      setSortOpen(false);
+      setSessionMenu(null);
+      setProjectMenu(null);
+      placeMenuAtPoint(x, y);
+      setSectionMenu(section);
+    },
+    [placeMenuAtPoint],
+  );
+
   useEffect(() => {
-    if (!profileOpen && !sortOpen && !sessionMenu && !projectMenu) return;
+    if (!profileOpen && !sortOpen && !sessionMenu && !projectMenu && !sectionMenu) return;
     const onPointer = (e: MouseEvent) => {
       const target = e.target as Node;
       if (profileRef.current?.contains(target)) return;
@@ -277,12 +294,12 @@ export function Sidebar({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", onViewportChange);
     };
-  }, [profileOpen, sortOpen, sessionMenu, projectMenu, closeMenus]);
+  }, [profileOpen, sortOpen, sessionMenu, projectMenu, sectionMenu, closeMenus]);
 
   useEffect(() => {
-    if (!sessionMenu && !projectMenu && !sortOpen && !profileOpen) return;
+    if (!sessionMenu && !projectMenu && !sectionMenu && !sortOpen && !profileOpen) return;
     requestAnimationFrame(() => menuFirstItemRef.current?.focus());
-  }, [sessionMenu, projectMenu, sortOpen, profileOpen]);
+  }, [sessionMenu, projectMenu, sectionMenu, sortOpen, profileOpen]);
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -896,9 +913,42 @@ export function Sidebar({
     if (
       !menuPosition ||
       typeof document === "undefined" ||
-      (!sessionMenu && !projectMenu && !sortOpen)
+      (!sessionMenu && !projectMenu && !sectionMenu && !sortOpen)
     ) {
       return null;
+    }
+    if (sectionMenu) {
+      const isSessions = sectionMenu === "sessions";
+      const action = isSessions ? "new-standalone-session" : "new-project";
+      const label = isSessions
+        ? t("nav.newTemporarySession")
+        : t("nav.newProject");
+      const Icon = isSessions ? IconNewSession : IconNewProject;
+      return createPortal(
+        <div
+          className="sidebar-row-menu sidebar-floating-menu sidebar-section-menu"
+          role="menu"
+          data-sidebar-section-menu={sectionMenu}
+          onKeyDown={onMenuKeyDown}
+          style={{ top: menuPosition.top, right: menuPosition.right }}
+        >
+          <button
+            ref={menuFirstItemRef}
+            type="button"
+            role="menuitem"
+            data-action={action}
+            onClick={() => {
+              closeMenus(false);
+              if (isSessions) void createSession({ projectPath: null });
+              else void openProjectPicker();
+            }}
+          >
+            <Icon size={14} />
+            <span>{label}</span>
+          </button>
+        </div>,
+        document.body,
+      );
     }
     if (sortOpen) {
       return createPortal(
@@ -1118,7 +1168,15 @@ export function Sidebar({
           aria-labelledby="sidebar-standalone-sessions-label"
           data-sidebar-session-section="temporary"
         >
-          <div className="sidebar-list-toolbar sidebar-list-toolbar-secondary">
+          <div
+            className="sidebar-list-toolbar sidebar-list-toolbar-secondary"
+            data-sidebar-section="sessions"
+            onContextMenu={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              openSectionMenu("sessions", event.clientX, event.clientY);
+            }}
+          >
             <span id="sidebar-standalone-sessions-label" className="sidebar-list-label">
               {t("nav.sessions", { defaultValue: "Sessions" })}
             </span>
@@ -1150,6 +1208,7 @@ export function Sidebar({
                     menuTriggerRef.current = event.currentTarget;
                     setSessionMenu(null);
                     setProjectMenu(null);
+                    setSectionMenu(null);
                     setSortOpen(true);
                   }}
                 >
@@ -1161,7 +1220,13 @@ export function Sidebar({
           <div
             className="sidebar-session-group-body standalone"
             onScroll={() => {
-              if (sessionMenu || projectMenu || sortOpen) closeMenus(false);
+              if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
+            }}
+            onContextMenu={(event) => {
+              if ((event.target as Element).closest?.("[data-sidebar-session-row]")) return;
+              event.preventDefault();
+              event.stopPropagation();
+              openSectionMenu("sessions", event.clientX, event.clientY);
             }}
           >
             {temporarySessions.length > 0 ? renderSessionRows(temporarySessions, { temporary: true }) : (
@@ -1170,7 +1235,15 @@ export function Sidebar({
           </div>
         </section>
 
-        <div className="sidebar-list-toolbar">
+        <div
+          className="sidebar-list-toolbar"
+          data-sidebar-section="projects"
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openSectionMenu("projects", event.clientX, event.clientY);
+          }}
+        >
           <span className="sidebar-list-label">{t("nav.projects")}</span>
           <button
             type="button"
@@ -1187,7 +1260,19 @@ export function Sidebar({
         <div
           className="sidebar-session-groups min-h-0 flex-1 overflow-auto px-0.5"
           onScroll={() => {
-            if (sessionMenu || projectMenu || sortOpen) closeMenus(false);
+            if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
+          }}
+          onContextMenu={(event) => {
+            if (
+              (event.target as Element).closest?.(
+                "[data-sidebar-session-row], [data-sidebar-project-group]",
+              )
+            ) {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            openSectionMenu("projects", event.clientX, event.clientY);
           }}
         >
           {projectEntries.length > 0 ? projectEntries.map(renderProjectGroup) : (

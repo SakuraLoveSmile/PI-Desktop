@@ -113,10 +113,13 @@ destination, chat as the home surface, tools and permissions inline.
 
 - **Sections**: the compact `Sessions` heading precedes `Projects` and owns
   path-less conversation creation plus the existing sort/archive-view menu.
-  Its list shows at most five compact rows (140px) before scrolling internally,
-  so standalone work stays visible without displacing project navigation. The
-  following `Projects` heading exposes the folder-picker action; retained
-  project groups use the remaining height and scroll independently.
+  Both headings keep quiet glyph actions and also accept a right-click create
+  menu on the heading or empty list chrome so section creation stays discoverable
+  without extra chrome. Its list shows at most five compact rows (140px) before
+  scrolling internally, so standalone work stays visible without displacing
+  project navigation. The following `Projects` heading exposes the
+  folder-picker action; retained project groups use the remaining height and
+  scroll independently.
 - **Identity**: each group is keyed by the normalized full project path, never
   by a potentially ambiguous folder basename.
 - **Header**: project name/path, active state, disclosure, new-task action,
