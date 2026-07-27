@@ -14,6 +14,7 @@ const [
   bannerSource,
   settingsSource,
   appSource,
+  stylesSource,
   pkgSource,
   releaseWorkflowSource,
   enSource,
@@ -28,6 +29,7 @@ const [
   read("../src/components/UpdateBanner.tsx"),
   read("../src/pages/SettingsPage.tsx"),
   read("../src/App.tsx"),
+  read("../src/styles/globals.css"),
   read("../package.json"),
   read("../../../.github/workflows/release.yml"),
   read("../../../packages/i18n/src/locales/en/index.ts"),
@@ -95,8 +97,23 @@ test("renderer exposes the updates API, banner and settings row", () => {
   assert.match(bannerSource, /updates\.restart/);
   assert.match(bannerSource, /updates\.viewRelease/);
   assert.match(bannerSource, /availableVersion}:\$\{update\.status/);
+  assert.match(bannerSource, /className="update-notice"/);
+  assert.match(bannerSource, /role="progressbar"/);
   assert.match(settingsSource, /<UpdatesRow \/>/);
-  assert.match(appSource, /<UpdateBanner \/>/);
+  assert.match(
+    appSource,
+    /<section className="main-pane">[\s\S]*?<UpdateBanner \/>/,
+    "chat update notice is anchored inside the main pane",
+  );
+  assert.match(
+    stylesSource,
+    /\.update-notice \{[\s\S]*?position: absolute;[\s\S]*?top: 54px;/,
+  );
+  assert.doesNotMatch(
+    bannerSource,
+    /fixed bottom-4 right-4/,
+    "update notice must not occupy the composer edge",
+  );
   assert.match(appSource, /case "checkForUpdates"/);
 });
 

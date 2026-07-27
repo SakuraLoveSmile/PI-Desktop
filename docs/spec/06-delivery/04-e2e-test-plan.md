@@ -1779,3 +1779,16 @@ This test plan spec is accepted when:
 - Mark all read and Clear expose icon tooltips/accessible names, disabled and
   empty states remain understandable, and reduced-motion mode changes the
   popover instantly without suppressing focus or unread state.
+
+### US-UI-66 Application update notice layout
+- In a conversation with the docked composer visible, exercise manual
+  `available`, in-app `downloading`, and `downloaded` update fixtures in light
+  and dark themes at default and minimum supported window sizes. Grow the
+  composer draft to its maximum visible height.
+- Expect one compact update notice below the titlebar in the main pane's
+  top-right safe area. It never intersects the composer, including while the
+  draft grows, and it does not cover an open work panel.
+- Expect a stable update icon/title/message hierarchy, determinate progress for
+  `downloading`, the applicable View release or Restart to update action, and a
+  24px dismiss control with an accessible name. Dismissing one status stage
+  does not suppress a later stage for the same version.

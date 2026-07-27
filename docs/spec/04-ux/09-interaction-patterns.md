@@ -234,9 +234,13 @@ context.
   `downloading` to the stable `downloaded` state.
 - `downloaded` remains actionable until Restart to update or normal app quit;
   later scheduled/manual checks do not replace it with `checking`.
-- The bottom-right banner appears only for manual `available`, in-app
-  `downloading`, or `downloaded`. Dismissal suppresses the current
-  version-and-status stage; a later stage such as `downloaded` appears again.
+- A compact update notice appears in the main pane's top-right safe area only
+  for manual `available`, in-app `downloading`, or `downloaded`. It stays clear
+  of the bottom composer at every supported window size and draft height. The
+  notice uses a stable icon/title/message hierarchy, shows determinate download
+  progress when available, and keeps the relevant action inside the same
+  surface. Dismissal suppresses the current version-and-status stage; a later
+  stage such as `downloaded` appears again.
 - D126 tag releases publish all platform manifests and installers. Windows
   NSIS and Linux AppImage therefore use the in-app lane; macOS and Linux deb
   remain notify-and-link delivery modes.

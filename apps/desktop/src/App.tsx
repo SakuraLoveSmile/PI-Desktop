@@ -703,6 +703,7 @@ function AppShell() {
             </div>
           )}
         </div>
+        <UpdateBanner />
 
         {backendDown && (
           <div
@@ -843,7 +844,6 @@ function AppShell() {
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ToastHost />
-      <UpdateBanner />
     </div>
   );
 }

@@ -2783,6 +2783,117 @@ textarea:disabled {
   pointer-events: none;
 }
 
+/*
+  Persistent update notices live in the main pane's top safe area. Keeping
+  them opposite the bottom composer prevents multi-line drafts and update
+  actions from competing for the same screen space.
+*/
+.update-notice {
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+  position: absolute;
+  top: 54px;
+  right: 16px;
+  z-index: 45;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 24px;
+  gap: 10px;
+  width: min(356px, calc(100% - 32px));
+  padding: 12px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-dialog);
+  color: var(--ds-text-primary);
+  animation: update-notice-in 180ms ease-out;
+}
+
+.settings-mode > .update-notice {
+  position: fixed;
+}
+
+.update-notice-icon {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ds-accent) 12%, transparent);
+  color: var(--ds-accent);
+}
+
+.update-notice-body {
+  min-width: 0;
+}
+
+.update-notice-title {
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-compact-plus);
+}
+
+.update-notice-message {
+  margin-top: 2px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}
+
+.update-notice-progress {
+  height: 3px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 10%, transparent);
+}
+
+.update-notice-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ds-accent);
+  transition: width 180ms ease;
+}
+
+.update-notice-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.update-notice-actions:empty {
+  display: none;
+}
+
+.update-notice-dismiss {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-muted);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.update-notice-dismiss:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+@keyframes update-notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .toast {
   -webkit-app-region: no-drag;
   pointer-events: auto;
@@ -2954,6 +3065,12 @@ textarea:disabled {
   .toast,
   .toast.closing {
     animation-duration: 0.01ms;
+  }
+  .update-notice {
+    animation: none;
+  }
+  .update-notice-progress > span {
+    transition: none;
   }
 }
 
