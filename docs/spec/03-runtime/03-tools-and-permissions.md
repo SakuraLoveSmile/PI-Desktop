@@ -216,6 +216,13 @@ Each tool call records:
 
 MVP may start by writing to SQLite or a log file.
 
+Timing is recorded in segments, not as one duration (D137): `prompted`
+(whether a permission card was shown), `permissionWaitMs`, `durationMs` (the
+tool body), `overheadMs` (host bookkeeping), and `totalMs`. Denied calls carry
+the same fields with a zero tool body. See
+[09. Logging and Observability](09-logging-and-observability.md) for the
+matching log lines.
+
 ## 10. Mode matrix (Chat vs Agent)
 
 | Mode | Read/Glob/Grep | Write/Edit | Bash |
