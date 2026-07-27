@@ -539,7 +539,7 @@ SESSIONS                                      [msg+][↕]
 
 | State | Appearance |
 |---|---|
-| Active | accent-blue outlined ring, active bg highlight, text-primary |
+| Active | neutral-accent outlined ring, active bg highlight, text-primary |
 | Inactive | bg-secondary, text-secondary |
 | Hover (inactive) | bg-tertiary |
 | In progress | warning-orange breathing dot; no motion under reduced-motion |
@@ -801,9 +801,9 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
 - **Prose**: calmer chat density — body at text-base / leading-prose with
   pretty wrapping; heading ramp h1 `text-xl` (hairline underline) → h2
   `text-lg-plus` → h3 `text-lg` → h4 `text-base-plus` → h5/h6 `text-base`
-  secondary; blockquotes use a 3px accent-tinted rule over a soft plate;
+  secondary; blockquotes use a 3px neutral-accent rule over a soft plate;
   hr is a faded center gradient; lists use quieter markers and flex task
-  rows; inline code gets a hairline border + soft accent tint; tables wrap
+  rows; inline code gets a hairline border + soft gray tint; tables wrap
   in `.table-wrap` (rounded shell, header row, even-row wash, hover wash);
   display math sits in a subtle inset plate. Thinking prose reuses the same
   hierarchy at text-sm-plus / secondary color.

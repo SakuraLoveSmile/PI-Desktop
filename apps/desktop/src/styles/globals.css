@@ -2,7 +2,8 @@
 
 /*
   Visual system aligned to local Codex desktop (ChatGPT.app / electron-dark).
-  Palette sourced from Codex CSS tokens: gray-0..1000, blue-*, surface #181818.
+  Palette sourced from Codex CSS tokens: gray-0..1000, surface #181818.
+  Accent is neutral gray-scale (not blue) so chrome, markdown, and plugins stay monochrome.
 */
 
 :root,
@@ -21,11 +22,12 @@
   --gray-800: #212121;
   --gray-900: #181818;
   --gray-1000: #0d0d0d;
-  --blue-50: #e5f3ff;
-  --blue-100: #99ceff;
-  --blue-300: #339cff;
-  --blue-400: #0285ff;
-  --blue-900: #00284d;
+  /* Neutral accent ramp (replaces legacy blue-* accent). */
+  --accent-50: #f3f3f3;
+  --accent-100: #ededed;
+  --accent-300: #afafaf;
+  --accent-400: #ffffff;
+  --accent-900: #303030;
 
   --ds-bg-primary: var(--gray-900);
   --ds-bg-sidebar: var(--ds-bg-under); /* Codex surface-under / sideBar */
@@ -47,13 +49,13 @@
   --ds-border-default: color-mix(in oklab, var(--gray-0) 8%, transparent);
   --ds-border-subtle: color-mix(in oklab, var(--gray-0) 5%, transparent);
   --ds-border-strong: color-mix(in oklab, var(--gray-0) 14%, transparent);
-  --ds-accent: var(--blue-400);
-  --ds-accent-hover: var(--blue-300);
-  --ds-accent-soft: var(--blue-100);
+  --ds-accent: var(--gray-0);
+  --ds-accent-hover: var(--gray-100);
+  --ds-accent-soft: var(--gray-300);
   --ds-success: #40c977;
   --ds-warning: #ff8549;
   --ds-error: #ff6764;
-  --ds-info: var(--blue-300);
+  --ds-info: var(--gray-300);
   --ds-purple: #c27aff;
   --ds-shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.55);
   /* Codex --elevation-prominent (same stroke+lift in dark and light) */
@@ -88,13 +90,14 @@
   --ds-border-default: color-mix(in oklab, #1a1c1f 8%, transparent);
   --ds-border-subtle: color-mix(in oklab, #1a1c1f 5%, transparent);
   --ds-border-strong: color-mix(in oklab, #1a1c1f 12%, transparent);
-  --ds-accent: #0285ff;
-  --ds-accent-hover: #339cff;
-  --ds-accent-soft: #e5f3ff;
+  /* Light theme accent inverts: dark ink on pale surfaces. */
+  --ds-accent: #1a1c1f;
+  --ds-accent-hover: #303030;
+  --ds-accent-soft: #5d5d5d;
   --ds-success: #00a240;
   --ds-warning: #e25507;
   --ds-error: #e02e2a;
-  --ds-info: #0285ff;
+  --ds-info: #5d5d5d;
   --ds-purple: #7c3aed;
   --ds-shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.12);
   --ds-elevation-stroke: 0 0 0 0.5px color-mix(in oklab, #1a1c1f 12%, transparent);
@@ -1787,12 +1790,12 @@ textarea:disabled {
 
 .copy-btn.primary {
   background: var(--ds-accent);
-  color: #ffffff;
+  color: var(--ds-bg-primary);
 }
 
 .copy-btn.primary:hover {
   background: var(--ds-accent-hover);
-  color: #ffffff;
+  color: var(--ds-bg-primary);
 }
 
 .copy-btn.danger:hover {
@@ -2621,7 +2624,7 @@ textarea:disabled {
 :root[data-theme="light"] .prose-chat code {
   background: color-mix(in oklab, #1a1c1f 5.5%, transparent);
   border-color: color-mix(in oklab, #1a1c1f 7%, transparent);
-  color: color-mix(in oklab, #1a1c1f 92%, #0285ff);
+  color: color-mix(in oklab, #1a1c1f 92%, #5d5d5d);
 }
 
 /* Fallback for a bare <pre> that bypassed the code-block chrome */
@@ -4722,7 +4725,7 @@ textarea:disabled {
   }
 }
 
-/* Codex settings switches ~32×20 (gold capture), accent blue */
+/* Codex settings switches ~32×20 (gold capture), neutral accent */
 .settings-toggle {
   position: relative;
   width: 32px;
@@ -4744,13 +4747,14 @@ textarea:disabled {
   width: 16px;
   height: 16px;
   border-radius: var(--radius-full);
-  background: #ffffff;
+  background: var(--ds-bg-elevated-opaque);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
-  transition: transform 140ms ease;
+  transition: transform 140ms ease, background 140ms ease;
 }
 
 .settings-toggle.on .settings-toggle-thumb {
   transform: translateX(12px);
+  background: var(--ds-bg-primary);
 }
 
 .settings-theme-grid {

@@ -1096,6 +1096,23 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`transcript-style.test.mjs`); full visual scenario Draft
 
+#### E2E-060b: Neutral gray accent across chrome
+
+- **Preconditions**: App running in dark and light themes; plugins page and a
+  chat with markdown links/blockquotes available.
+- **Steps**: 1) Inspect focus rings, primary buttons, toggles, selected
+  session ring, plugin market primary CTAs. 2) Open an assistant answer with
+  links and a blockquote. 3) Switch theme and re-check.
+- **Expected**: No blue brand accent remains. Interactive accent, markdown
+  links/rules, and plugin primary actions resolve through the neutral gray
+  accent tokens (`white/gray` dark, dark-ink light). Semantic success/warning
+  /error colors are unchanged.
+- **Specs linked**: `04-ux/07-ui-design-system.md`,
+  `04-ux/08-component-spec.md`
+- **Acceptance**: Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`neutral-accent.test.mjs`); visual scenario Draft
+
 #### E2E-060: Assistant markdown prose hierarchy and code chrome
 
 - **Preconditions**: A completed assistant answer containing headings, a

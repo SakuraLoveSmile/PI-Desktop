@@ -147,5 +147,5 @@ the current window width:
 | Section title | 28px / 560, first baseline ~y70 |
 | Content width | Full available pane width after rail and gutters |
 | Card radius | ~14px elevated stroke |
-| Toggle | **32×20** thumb 16, accent blue on (not green) |
+| Toggle | **32×20** thumb 16, neutral accent on (not green) |
 | Open-target pill | leading VS Code glyph |

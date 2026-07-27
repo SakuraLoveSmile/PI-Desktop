@@ -10,7 +10,7 @@ export type RecentProject = {
 const KEY = "pi.desktop.recentProjects";
 const MAX = 24;
 
-const COLORS = ["#0285ff", "#7c5cff", "#00a240", "#e25507", "#e02e2a", "#5d5d5d"];
+const COLORS = ["#6b6b6b", "#5d5d5d", "#4f4f4f", "#414141", "#383838", "#303030"];
 
 export function projectColor(path: string): string {
   let h = 0;
