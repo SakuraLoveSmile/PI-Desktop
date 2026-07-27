@@ -100,21 +100,58 @@ test("delete remains on user turns and is removed from assistant toolbar", async
   assert.match(stylesSource, /\.copy-btn\.danger:hover/);
 });
 
-test("assistant edit creates an isolated fork with reversible revisions", async () => {
+test("editing a user prompt regenerates it and keeps the old branch reachable", async () => {
   const storeSource = await readFile(
     new URL("../src/stores/app-store.ts", import.meta.url),
     "utf8",
   );
-  assert.match(transcriptSource, /editAssistantMessage\(message\.id, editValue\)/);
+  // Edit lives on the user turn (the prompt is what gets rewritten), not on
+  // the assistant answer.
+  assert.match(transcriptSource, /editUserMessage\(message\.id, next\)/);
   assert.match(transcriptSource, /className="message-edit-input selectable"/);
-  assert.match(transcriptSource, /chat\.editResponse/);
-  assert.match(storeSource, /editAssistantMessage:\s*async \(messageId, content\)/);
-  assert.match(storeSource, /api\.forkSession\([\s\S]*?messageId/);
-  assert.match(storeSource, /saveSessionRevision\([\s\S]*?originalBranch/);
-  assert.match(storeSource, /saveSessionRevision\([\s\S]*?editedBranch/);
-  assert.match(storeSource, /revisionCount:\s*2/);
-  assert.match(storeSource, /activeRevision:\s*2/);
+  assert.match(transcriptSource, /chat\.editMessage/);
+  assert.doesNotMatch(transcriptSource, /editAssistantMessage/);
+  assert.doesNotMatch(storeSource, /editAssistantMessage/);
+  // Slash prompts edit their typed form so the resend re-expands the template.
+  assert.match(transcriptSource, /const editSeed = \(isUser && message\.command\) \|\| message\.content/);
+  // Same branch mechanics as regenerate, so main archives the replaced turn
+  // as a revision the pager can walk back to.
+  assert.match(storeSource, /editUserMessage:\s*async \(messageId, content\)/);
+  assert.match(storeSource, /truncateBefore:\s*userIndex/);
+  assert.match(storeSource, /editUserMessage\(root\.id, root\.content\)/);
   assert.match(stylesSource, /\.message-edit-input/);
+  assert.match(
+    stylesSource,
+    /\.message-row\.user \.message-col:has\(\.message-edit\)/,
+  );
+});
+
+test("message toolbars are icon-only with hover tooltips", () => {
+  // No worded chips in the toolbar: labels ride on data-tip + aria-label.
+  assert.doesNotMatch(
+    transcriptSource,
+    /<span>\{(?:forkLabel|retryLabel|editLabel|copyLabel)\}<\/span>/,
+  );
+  for (const label of ["forkLabel", "retryLabel", "editLabel", "deleteLabel"]) {
+    assert.ok(
+      transcriptSource.includes(`aria-label={${label}}`),
+      `${label} needs an aria-label`,
+    );
+    assert.ok(
+      transcriptSource.includes(`data-tip={${label}}`),
+      `${label} needs a hover tooltip`,
+    );
+  }
+  assert.ok(transcriptSource.includes("label={copyLabel}"));
+  assert.match(transcriptSource, /className="copy-btn icon"/);
+  assert.match(transcriptSource, /data-tip=\{forkLabel\}/);
+  assert.match(stylesSource, /\.copy-btn\[data-tip\]::after \{[\s\S]*?content:\s*attr\(data-tip\);/);
+  assert.match(
+    stylesSource,
+    /\.copy-btn\[data-tip\]:hover::after,\s*\.copy-btn\[data-tip\]:focus-visible::after \{\s*opacity:\s*1;/,
+  );
+  // Worded surfaces (error details) keep their label.
+  assert.match(transcriptSource, /withLabel/);
 });
 
 test("assistant meta chips and retry action are wired", () => {

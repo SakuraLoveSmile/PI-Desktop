@@ -259,7 +259,6 @@ export type AppState = {
   newSession: (options?: { projectPath?: string | null }) => Promise<void>;
   forkSession: (id: string) => Promise<void>;
   forkAssistantMessage: (messageId: string) => Promise<void>;
-  editAssistantMessage: (messageId: string, content: string) => Promise<boolean>;
   configureActiveSession: (config: {
     mode: "chat" | "agent";
     providerId?: string;
@@ -269,6 +268,8 @@ export type AppState = {
   }) => Promise<void>;
   sendPrompt: (content: string) => Promise<void>;
   retryAssistantMessage: (messageId: string) => Promise<void>;
+  /** Replace a user prompt and regenerate from it; the old branch stays in the revision pager. */
+  editUserMessage: (messageId: string, content: string) => Promise<boolean>;
   retryLastPrompt: () => Promise<void>;
   clearError: () => void;
   activateMessageRevision: (rootUserId: string, revisionIndex: number) => Promise<void>;
@@ -814,117 +815,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  editAssistantMessage: async (messageId, content) => {
-    const state = get();
-    const sessionId = state.activeSessionId;
-    const editedContent = content.trim();
-    if (!sessionId || state.runningSessions[sessionId] || !editedContent) return false;
-    const messageIndex = state.messages.findIndex(
-      (candidate) => candidate.id === messageId,
-    );
-    const source = state.sessions.find((session) => session.id === sessionId);
-    if (messageIndex < 0 || state.messages[messageIndex].role !== "assistant" || !source) {
-      return false;
-    }
-    if (state.messages[messageIndex].content === editedContent) return true;
-
-    let childId: string | null = null;
-    try {
-      const sourceTitle = source.title.trim() || i18n.t("chat.untitledTask");
-      const result = await api.forkSession(
-        sessionId,
-        i18n.t("nav.branchTitle", { title: sourceTitle }),
-        messageId,
-      );
-      const forkedSessionId = result.session.id;
-      childId = forkedSessionId;
-      const originalMessages = result.session.messages;
-      const childAssistantIndex = originalMessages.length - 1;
-      if (
-        childAssistantIndex < 0 ||
-        originalMessages[childAssistantIndex]?.role !== "assistant"
-      ) {
-        throw new Error("Forked response is missing");
-      }
-      let rootIndex = -1;
-      for (let index = childAssistantIndex - 1; index >= 0; index -= 1) {
-        if (originalMessages[index].role === "user") {
-          rootIndex = index;
-          break;
-        }
-      }
-      if (rootIndex < 0) throw new Error("Response prompt is missing");
-
-      const rootUserId = originalMessages[rootIndex].id;
-      const editedMessages = originalMessages.map((candidate, index) =>
-        index === childAssistantIndex
-          ? {
-              ...candidate,
-              content: editedContent,
-              status: "complete" as const,
-              thinking: undefined,
-              modelId: undefined,
-              providerId: undefined,
-              usage: undefined,
-              error: undefined,
-            }
-          : index === rootIndex
-            ? {
-                ...candidate,
-                revisionRootId: rootUserId,
-                revisionCount: 2,
-                activeRevision: 2,
-              }
-            : candidate,
-      );
-      const originalBranch = originalMessages.slice(rootIndex);
-      const editedBranch = editedMessages.slice(rootIndex);
-      await api.saveSessionRevision({
-        sessionId: forkedSessionId,
-        rootUserId,
-        messages: originalBranch,
-      });
-      await api.saveSessionRevision({
-        sessionId: forkedSessionId,
-        rootUserId,
-        messages: editedBranch,
-        makeActive: true,
-      });
-      await api.replaceSessionMessages(forkedSessionId, editedMessages);
-
-      const { messages: _messages, ...summary } = result.session;
-      get().resetWorkPanelContext();
-      set((current) => {
-        const sessions = decorateSessions(
-          [summary, ...current.sessions.filter((session) => session.id !== summary.id)],
-          current.sessionMeta,
-        );
-        const stack = current.navStack.slice(0, current.navIndex + 1);
-        const entry = { page: "chat" as const, sessionId: summary.id };
-        const nextStack = [...stack, entry].slice(-50);
-        return {
-          sessions,
-          activeSessionId: summary.id,
-          messages: editedMessages,
-          page: "chat" as const,
-          isRunning: false,
-          navStack: nextStack,
-          navIndex: nextStack.length - 1,
-          error: null,
-          errorCode: null,
-        };
-      });
-      return true;
-    } catch (error) {
-      if (childId) await api.deleteSession(childId).catch(() => undefined);
-      set({
-        error: error instanceof Error ? error.message : String(error),
-        errorCode: (error as { code?: string })?.code ?? null,
-      });
-      return false;
-    }
-  },
-
   configureActiveSession: async (config) => {
     const sessionId = get().activeSessionId;
     if (!sessionId || get().runningSessions[sessionId]) return;
@@ -989,16 +879,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   retryAssistantMessage: async (messageId) => {
     const state = get();
     if (state.isRunning) return;
-    const sessionId = state.activeSessionId;
-    if (!sessionId) return;
     const index = state.messages.findIndex((message) => message.id === messageId);
     if (index < 0) return;
     const target = state.messages[index];
     if (target.role !== "assistant") return;
 
-    // Branch from the nearest preceding user prompt: keep history up to that
-    // prompt (exclusive), then re-send it so the durable transcript and live
-    // agent both drop the discarded assistant/tool tail.
+    // Branch from the nearest preceding user prompt, resending it verbatim.
+    // Slash prompts resend their expanded body so the model sees exactly what
+    // it saw before (D123).
     let userIndex = -1;
     for (let i = index - 1; i >= 0; i -= 1) {
       const candidate = state.messages[i];
@@ -1008,7 +896,26 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
     if (userIndex < 0) return;
-    const prompt = state.messages[userIndex].content;
+    const root = state.messages[userIndex];
+    await get().editUserMessage(root.id, root.content);
+  },
+
+  editUserMessage: async (messageId, content) => {
+    // Editing a prompt is a regenerate with different text: keep history up to
+    // that prompt (exclusive), then send the new text so the durable
+    // transcript and live agent both drop the discarded assistant/tool tail.
+    // Main archives the replaced branch as a revision, so the pager can walk
+    // back to the original prompt and its answer.
+    const state = get();
+    if (state.isRunning) return false;
+    const sessionId = state.activeSessionId;
+    if (!sessionId) return false;
+    const prompt = content.trim();
+    if (!prompt) return false;
+    const userIndex = state.messages.findIndex(
+      (message) => message.id === messageId,
+    );
+    if (userIndex < 0 || state.messages[userIndex].role !== "user") return false;
     const kept = state.messages.slice(0, userIndex);
 
     set((s) => ({
@@ -1027,6 +934,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         content: prompt,
         truncateBefore: userIndex,
       });
+      return true;
     } catch (e) {
       // Reload durable state if the branch failed mid-flight.
       try {
@@ -1051,6 +959,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           errorCode: (e as { code?: string })?.code ?? null,
         }));
       }
+      return false;
     }
   },
 

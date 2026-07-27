@@ -47,18 +47,33 @@ import {
 } from "./icons";
 import { useAppStore } from "../stores/app-store";
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+/**
+ * Copy chip. Message toolbars are glyph-only (`icon`) with the label in a
+ * hover tooltip; surfaces that need a worded button (error details) pass
+ * `withLabel`.
+ */
+function CopyButton({
+  text,
+  label,
+  withLabel = false,
+}: {
+  text: string;
+  label: string;
+  withLabel?: boolean;
+}) {
   const { copied, copy } = useCopy();
   const { t } = useTranslation();
+  const tip = copied ? t("chat.copied") : label;
   return (
     <button
-      className={`copy-btn ${copied ? "copied" : ""}`}
-      title={copied ? t("chat.copied") : label}
+      className={`copy-btn ${withLabel ? "" : "icon"} ${copied ? "copied" : ""}`}
+      data-tip={withLabel ? undefined : tip}
+      title={withLabel ? tip : undefined}
       aria-label={label}
       onClick={() => copy(text)}
     >
       {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
-      <span>{copied ? t("chat.copied") : label}</span>
+      {withLabel ? <span>{tip}</span> : null}
     </button>
   );
 }
@@ -175,7 +190,11 @@ function AssistantErrorMessage({ message }: { message: UiMessage }) {
           ) : null}
         </dl>
         <pre className="selectable">{error.message}</pre>
-        <CopyButton text={error.message} label={t("chat.copyErrorDetails")} />
+        <CopyButton
+          text={error.message}
+          label={t("chat.copyErrorDetails")}
+          withLabel
+        />
       </div>
       <div className="message-error-actions">
         {configurationError ? (
@@ -740,18 +759,21 @@ const MessageRow = memo(function MessageRow({
   const { t } = useTranslation();
   const retryAssistantMessage = useAppStore((s) => s.retryAssistantMessage);
   const forkAssistantMessage = useAppStore((s) => s.forkAssistantMessage);
-  const editAssistantMessage = useAppStore((s) => s.editAssistantMessage);
+  const editUserMessage = useAppStore((s) => s.editUserMessage);
   const activateMessageRevision = useAppStore((s) => s.activateMessageRevision);
   const deleteMessage = useAppStore((s) => s.deleteMessage);
-  const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState(message.content);
-  const [savingEdit, setSavingEdit] = useState(false);
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+  // Slash prompts are stored expanded; editing works on the typed form so the
+  // resent turn re-expands the template (D123).
+  const editSeed = (isUser && message.command) || message.content || "";
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(editSeed);
+  const [savingEdit, setSavingEdit] = useState(false);
   const copyLabel = t("chat.copy");
   const retryLabel = t("chat.retry");
   const forkLabel = t("chat.forkResponse");
-  const editLabel = t("chat.editResponse");
+  const editLabel = t("chat.editMessage");
   const deleteLabel = t("chat.deleteMessage");
   const displayed = useTypewriter(message);
   const hasAnswer = Boolean((message.content || "").trim());
@@ -765,10 +787,20 @@ const MessageRow = memo(function MessageRow({
   const revisionCount = message.revisionCount ?? 0;
   const activeRevision = message.activeRevision ?? revisionCount;
   const showRevisionPager = isUser && revisionCount > 1;
+  const cancelEdit = () => {
+    setEditValue(editSeed);
+    setEditing(false);
+  };
   const saveEdit = async () => {
-    if (savingEdit || !editValue.trim()) return;
+    const next = editValue.trim();
+    if (savingEdit || !next) return;
+    // An unchanged prompt is not worth a regenerate branch.
+    if (next === editSeed.trim()) {
+      setEditing(false);
+      return;
+    }
     setSavingEdit(true);
-    const saved = await editAssistantMessage(message.id, editValue);
+    const saved = await editUserMessage(message.id, next);
     setSavingEdit(false);
     if (saved) setEditing(false);
   };
@@ -782,7 +814,45 @@ const MessageRow = memo(function MessageRow({
       <div className="message-col">
         {showAnswer ? (
           <div className="message-bubble">
-            {isUser ? (
+            {editing ? (
+              <div className="message-edit">
+                <textarea
+                  className="message-edit-input selectable"
+                  value={editValue}
+                  rows={Math.min(12, Math.max(3, editValue.split("\n").length))}
+                  aria-label={editLabel}
+                  autoFocus
+                  disabled={savingEdit}
+                  onChange={(event) => setEditValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      cancelEdit();
+                    } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                      event.preventDefault();
+                      void saveEdit();
+                    }
+                  }}
+                />
+                <div className="message-edit-actions">
+                  <button
+                    type="button"
+                    className="copy-btn"
+                    disabled={savingEdit}
+                    onClick={cancelEdit}
+                  >
+                    {t("chat.cancelEdit")}
+                  </button>
+                  <button
+                    type="button"
+                    className="copy-btn primary"
+                    disabled={savingEdit || !editValue.trim()}
+                    onClick={() => void saveEdit()}
+                  >
+                    {savingEdit ? t("chat.savingEdit") : t("chat.saveEdit")}
+                  </button>
+                </div>
+              </div>
+            ) : isUser ? (
               <div className="message-user-text selectable">
                 {message.command ? (
                   // Slash invocations show the typed form as a chip; the
@@ -797,48 +867,6 @@ const MessageRow = memo(function MessageRow({
                 ) : (
                   <LinkifiedText text={String(message.content || "")} />
                 )}
-              </div>
-            ) : editing ? (
-              <div className="message-edit">
-                <textarea
-                  className="message-edit-input selectable"
-                  value={editValue}
-                  rows={Math.min(12, Math.max(3, editValue.split("\n").length))}
-                  aria-label={editLabel}
-                  autoFocus
-                  disabled={savingEdit}
-                  onChange={(event) => setEditValue(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      setEditValue(message.content);
-                      setEditing(false);
-                    } else if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                      event.preventDefault();
-                      void saveEdit();
-                    }
-                  }}
-                />
-                <div className="message-edit-actions">
-                  <button
-                    type="button"
-                    className="copy-btn"
-                    disabled={savingEdit}
-                    onClick={() => {
-                      setEditValue(message.content);
-                      setEditing(false);
-                    }}
-                  >
-                    {t("chat.cancelEdit")}
-                  </button>
-                  <button
-                    type="button"
-                    className="copy-btn primary"
-                    disabled={savingEdit || !editValue.trim()}
-                    onClick={() => void saveEdit()}
-                  >
-                    {savingEdit ? t("chat.savingEdit") : t("chat.saveEdit")}
-                  </button>
-                </div>
               </div>
             ) : (
               <>
@@ -865,8 +893,8 @@ const MessageRow = memo(function MessageRow({
             {showRevisionPager ? (
               <div className="message-revision-pager" role="group" aria-label={t("chat.revisions")}>
                 <button
-                  className="copy-btn revision-nav"
-                  title={t("chat.revisionPrev")}
+                  className="copy-btn icon revision-nav"
+                  data-tip={t("chat.revisionPrev")}
                   aria-label={t("chat.revisionPrev")}
                   disabled={isRunning || activeRevision <= 1}
                   onClick={() =>
@@ -882,8 +910,8 @@ const MessageRow = memo(function MessageRow({
                   })}
                 </span>
                 <button
-                  className="copy-btn revision-nav"
-                  title={t("chat.revisionNext")}
+                  className="copy-btn icon revision-nav"
+                  data-tip={t("chat.revisionNext")}
                   aria-label={t("chat.revisionNext")}
                   disabled={isRunning || activeRevision >= revisionCount}
                   onClick={() =>
@@ -900,47 +928,44 @@ const MessageRow = memo(function MessageRow({
             {hasAnswer ? <CopyButton text={message.content} label={copyLabel} /> : null}
             {completeAssistant ? (
               <button
-                className="copy-btn"
-                title={forkLabel}
+                className="copy-btn icon"
+                data-tip={forkLabel}
                 aria-label={forkLabel}
                 disabled={isRunning}
                 onClick={() => void forkAssistantMessage(message.id)}
               >
                 <IconBranch size={13} />
-                <span>{forkLabel}</span>
               </button>
             ) : null}
             {completeAssistant ? (
               <button
-                className="copy-btn"
-                title={editLabel}
-                aria-label={editLabel}
-                disabled={isRunning}
-                onClick={() => {
-                  setEditValue(message.content);
-                  setEditing(true);
-                }}
-              >
-                <IconPencil size={13} />
-                <span>{editLabel}</span>
-              </button>
-            ) : null}
-            {completeAssistant ? (
-              <button
-                className="copy-btn"
-                title={retryLabel}
+                className="copy-btn icon"
+                data-tip={retryLabel}
                 aria-label={retryLabel}
                 disabled={isRunning}
                 onClick={() => void retryAssistantMessage(message.id)}
               >
                 <IconReview size={13} />
-                <span>{retryLabel}</span>
               </button>
             ) : null}
             {isUser && !streaming ? (
               <button
-                className="copy-btn danger"
-                title={deleteLabel}
+                className="copy-btn icon"
+                data-tip={editLabel}
+                aria-label={editLabel}
+                disabled={isRunning}
+                onClick={() => {
+                  setEditValue(editSeed);
+                  setEditing(true);
+                }}
+              >
+                <IconPencil size={13} />
+              </button>
+            ) : null}
+            {isUser && !streaming ? (
+              <button
+                className="copy-btn icon danger"
+                data-tip={deleteLabel}
                 aria-label={deleteLabel}
                 disabled={isRunning}
                 onClick={() => void deleteMessage(message.id)}
