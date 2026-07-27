@@ -3354,8 +3354,7 @@ textarea:disabled {
 .composer-thinking-menu {
   left: 0;
   right: auto;
-  width: min(280px, calc(100vw - 24px));
-  padding: 8px;
+  width: min(200px, calc(100vw - 24px));
 }
 
 /* Permission-mode chip menu (D115): anchored left above the mode chips. */
@@ -3412,41 +3411,9 @@ textarea:disabled {
   text-transform: uppercase;
 }
 
-.composer-thinking-levels {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.composer-thinking-level {
-  min-width: 0;
-  min-height: 28px;
-  overflow: hidden;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  padding: 4px 7px;
-  color: var(--ds-text-secondary);
-  font-size: var(--text-xs-plus);
-  line-height: var(--leading-compact);
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    color 120ms ease;
-}
-
-.composer-thinking-level:hover {
-  background: var(--ds-bg-hover);
-  color: var(--ds-text-primary);
-}
-
-.composer-thinking-level.active {
-  border-color: var(--ds-border-default);
-  background: var(--ds-bg-active);
-  color: var(--ds-text-primary);
-  font-weight: var(--font-weight-medium);
+.composer-thinking-list {
+  display: flex;
+  flex-direction: column;
 }
 
 .model-chip {

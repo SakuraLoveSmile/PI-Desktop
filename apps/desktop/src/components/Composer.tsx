@@ -640,12 +640,12 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                       role="menu"
                       aria-label={t("chat.thinking")}
                     >
-                      <div className="composer-thinking-levels">
+                      <div className="composer-thinking-list">
                         {availableThinkingLevels.map((level) => (
                           <button
                             key={level}
                             type="button"
-                            className={`composer-thinking-level ${
+                            className={`composer-plus-item ${
                               thinkingLevel === level ? "active" : ""
                             }`}
                             role="menuitemradio"
@@ -669,9 +669,17 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                               }
                             }}
                           >
-                            {t(THINKING_LEVEL_I18N_KEYS[level], {
-                              defaultValue: THINKING_LEVEL_LABELS[level],
-                            })}
+                            <span className="flex-1">
+                              {t(THINKING_LEVEL_I18N_KEYS[level], {
+                                defaultValue: THINKING_LEVEL_LABELS[level],
+                              })}
+                            </span>
+                            {thinkingLevel === level ? (
+                              <IconCheck
+                                size={14}
+                                className="composer-model-check"
+                              />
+                            ) : null}
                           </button>
                         ))}
                       </div>
