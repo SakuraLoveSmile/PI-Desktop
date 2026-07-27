@@ -250,6 +250,7 @@ section mirrors only marketplace/catalog items still blocking nothing.
 | D123 | Composer slash commands, three sources | **Typing `/` at position 0 of the composer opens an inline command menu merging (a) pi prompt templates from `<workspace>/.pi/prompts/*.md` and `~/.pi/agent/prompts/*.md` (project overrides user-global on name conflict; frontmatter `description`/`argument-hint`), (b) builtin palette commands through slash aliases defined in one registry shared with palette search, and (c) plugin palette commands. On send, builtin/plugin invocations execute locally through the existing renderer switch / `commandPalette/execute` without creating a session or prompting the model; template invocations are expanded in the Electron main `agent/prompt` handler before persistence (`parseCommandArgs` + `substituteArgs` from pi-agent-core), persisting `content = expanded` plus a new optional `command` field carrying the typed form; unknown `/foo` is sent as literal text.** | Reuses pi's exact CLI semantics and template assets, keeps agent reseed faithful (reseed replays `content`), and keeps the transcript readable by rendering the typed invocation as a chip (ADR 0024). |
 | D124 | `@` file references are plain-text light references | **`@` at a token boundary opens a fuzzy file menu over a workspace index served by the new Electron-only channel `pi-desktop/fs/index` (files+dirs, `git ls-files -co --exclude-standard` fast path with ignore-set walk fallback, 8000-entry cap with truncation flag, short TTL cache, workspace-rooted, fails soft without a workspace). Accepting inserts literal text — `@rel/path ` for files (quoted `@"a b.txt" ` when the path has spaces), `@dir/` without trailing space for directories — and the prompt is sent unchanged: the model follows references with its Read tool in both chat and agent modes. No content inlining and no attachment conversion.** | Matches pi CLI interactive semantics exactly, avoids context inflation and truncation rules, and keeps user-driven file browsing out of the agent tool/permission path per ADR 0019. |
 | D125 | Composer autocomplete interaction and IME contract | **One menu component anchored above the composer, full composer width, focus always stays in the textarea. Keys while open: ↑/↓ cycle with wraparound, Enter/Tab accept, Escape closes only the menu (takes precedence over the composer's clear/blur Escape), typing filters live; Enter never sends while an item is highlighted, and an empty result list counts as closed. The menu closes on outside mousedown, blur, deleting past the trigger character, or session switch. All key handling and trigger detection sit behind the IME guard (`isComposing || keyCode === 229` plus composition start/end tracking): during composition nothing triggers, updates, or intercepts, and state is re-evaluated on compositionend.** | First explicit IME rule in the spec — zh-CN Enter-to-send plus candidate confirmation must never fight the menu; uniform insert-then-dispatch keeps two-Enter flows fast and predictable. |
+| D144 | Sidebar primary chrome at 14px | **Expanded sidebar primary chrome (New task, Plugins, session titles, footer identity name, profile menu actions) uses `--text-base` (14px). Project/group titles and empty-state copy use `--text-md` (13px). Section labels use `--text-sm` (12px). Primary sidebar content must not use the micro `--text-xs` band.** | 13px sidebar body felt undersized next to the 14px chat surface; bumping only primary chrome keeps density while restoring visual balance without a global type-scale change. |
 
 
 ## T. Release delivery decisions
@@ -272,9 +273,14 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Plugin maintainers pack sources with repo scripts and publish by pushing to that repository.
 - Local bundled catalog remains fallback only when remote fetch fails.
 
-
 ## 2026-07-28 — Marketplace template + detail pane
 
 - Official warehouse gained a practical template plugin `demo.workspace-summary` and CONTRIBUTING guide.
 - PI-Desktop marketplace UI now opens a detail pane with README, changelog, and version list via `market.getDetail`.
+
+## 2026-07-28 — Sidebar type balance
+
+- Expanded sidebar primary chrome uses `--text-base` (14px) instead of `--text-md` (13px).
+- Project/group titles step to `--text-md`; section labels stay secondary at `--text-sm`.
+- Decision D144: keep micro tokens off primary left-rail content so the rail matches body readability without changing the global type ramp.
 
