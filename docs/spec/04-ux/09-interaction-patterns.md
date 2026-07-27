@@ -77,11 +77,11 @@
 ### 1.6 Sidebar project and conversation organization
 
 The sidebar is a path-keyed presentation of host-owned projects and sessions.
-The `Projects` section heading exposes the project picker above retained
-project groups. The `Sessions` heading appears below those groups and contains
-path-less conversations plus their create and sort controls. Several project
-groups may be retained while exactly one workspace supplies the visible shell
-context.
+The `Sessions` heading appears first and contains path-less conversations plus
+their create and sort controls. Its bounded list keeps standalone work visible
+without consuming the full sidebar. The following `Projects` section heading
+exposes the project picker above retained project groups. Several project groups
+may be retained while exactly one workspace supplies the visible shell context.
 
 #### Project tab lifecycle
 
@@ -526,10 +526,14 @@ When drag/drop is implemented, these patterns should apply:
 
 ### 9.2 Sidebar scrolling
 
-- All retained project groups and the standalone Sessions section share one
-  scrollable sidebar region independent from the footer and primary navigation.
+- The standalone Sessions body is capped at five compact rows and scrolls
+  internally when additional sessions exist.
+- Retained project groups occupy the remaining sidebar height and scroll in a
+  separate region. Both regions stay independent from the footer and primary
+  navigation.
 - No horizontal scroll in sidebar
-- Scroll indicator: subtle fade at top/bottom edges (gradient mask, not scrollbar thumb)
+- Scroll indicators use the platform's subtle overlay treatment without
+  changing either region's width.
 
 ### 9.3 Settings scrolling
 
