@@ -3572,7 +3572,7 @@ textarea:disabled {
 .composer-permission-menu {
   left: 0;
   right: auto;
-  width: min(180px, calc(100vw - 24px));
+  width: min(120px, calc(100vw - 24px));
 }
 
 .composer-model-menu {
