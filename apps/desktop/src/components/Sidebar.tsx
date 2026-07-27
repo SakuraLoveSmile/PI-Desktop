@@ -1350,21 +1350,22 @@ export function Sidebar({
             : null}
 
           <button className={`footer-profile ${profileOpen ? "active" : ""}`} data-nav="profile" aria-haspopup="menu" aria-controls="sidebar-profile-menu" aria-expanded={profileOpen} onClick={(event) => {
-              menuTriggerRef.current = event.currentTarget;
-              setProfileOpen((value) => {
-                const next = !value;
-                if (!next) {
-                  setProfileMenuPos(null);
-                  return false;
-                }
-                const rect = event.currentTarget.getBoundingClientRect();
-                const width = Math.min(280, window.innerWidth - 16);
-                setProfileMenuPos({
-                  bottom: Math.max(12, window.innerHeight - rect.top + 8),
-                  left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
-                });
-                return true;
+              const trigger = event.currentTarget;
+              menuTriggerRef.current = trigger;
+              if (profileOpen) {
+                setProfileOpen(false);
+                setProfileMenuPos(null);
+                return;
+              }
+              // Capture geometry before any state update; React nulls currentTarget
+              // once the event callback finishes / inside updater functions.
+              const rect = trigger.getBoundingClientRect();
+              const width = Math.min(280, window.innerWidth - 16);
+              setProfileMenuPos({
+                bottom: Math.max(12, window.innerHeight - rect.top + 8),
+                left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
               });
+              setProfileOpen(true);
             }} title={t("nav.openProfileMenu")}>
             <span className="footer-profile-avatar" aria-hidden>
               <IconUser size={14} />
