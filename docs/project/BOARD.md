@@ -107,8 +107,10 @@ provider error mapping, D003 default-mode restored, cross-session event
 bleed fixed, permission countdown + timeout auto-close, onboarding
 checklist UI, palette session-delete + spec-conformant builtins,
 plugin agent tools wired to the model (E2E-024), real provider network
-test, capture fixtures gated. Known deferred (documented): plugin
-process isolation + panels (ADR 0008 / post-MVP), model catalog +
+test, capture fixtures gated. Plugin marketplace browse/install, .piplug package install, isolated
+plugin panels, auto-update policy, and gated high-risk plugin APIs are
+implemented on the feature branch. Remaining deferred (documented):
+full separate-process plugin runtime (ADR 0008 target), model catalog +
 native Anthropic/Google adapters (11-provider §5 status), session-
 scoped mode (02-agent-runtime §11).
 

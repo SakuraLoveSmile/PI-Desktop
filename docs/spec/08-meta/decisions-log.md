@@ -257,3 +257,11 @@ section mirrors only marketplace/catalog items still blocking nothing.
 | ID | Topic | Decision | Rationale |
 |---|---|---|---|
 | D126 | Three-platform release delivery (lifts D010) | **Tag builds publish every artifact the matrix produces to the GitHub Release: macOS dmg/zip (arm64), Windows NSIS x64, Linux AppImage + deb (x64), each with blockmaps and the platform's `latest*.yml` electron-updater feed. Publishing the feeds activates D120's in-app update lanes for Windows NSIS and Linux AppImage; macOS stays in notify-and-link mode until a signed channel is qualified. The NSIS artifact name is pinned space-free (`PI-Desktop-Setup-${version}.${ext}`) because GitHub asset URLs mangle spaces. D010's macOS-only scope is lifted per the baseline-bump rule (baseline `0.4.7`); the release pipeline itself was qualified end-to-end on v0.1.1-rc.1/v0.1.1.** | The pipeline builds and validates all three platforms on every tag anyway; keeping installers as expiring Actions artifacts (90-day retention) withheld them from users without adding safety. Publishing the update feeds is the point of shipping: platforms with in-app lanes update silently, and future platform regressions surface through real installs instead of unused artifacts. |
+
+## 2026-07-28 — Plugin marketplace, panels, and high-risk APIs
+
+- Official local marketplace provider can browse/search/install `.piplug` packages with checksum verification.
+- Plugin panels run in sandboxed isolated windows via `pluginBridge`.
+- High-risk plugin host APIs (`fs.write`, `net.fetch`, clipboard, openExternal) are available only with explicit grants.
+- Per-plugin auto-update is supported; permission-expanding upgrades require review.
+

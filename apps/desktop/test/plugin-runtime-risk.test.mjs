@@ -1,0 +1,55 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const desktopRoot = join(here, "..");
+const repoRoot = join(desktopRoot, "../..");
+
+const runtimeSrc = readFileSync(join(desktopRoot, "electron/main/plugin-runtime.ts"), "utf8");
+const panelSrc = readFileSync(join(desktopRoot, "electron/main/plugin-panel-host.ts"), "utf8");
+const pageSrc = readFileSync(join(desktopRoot, "src/pages/PluginsPage.tsx"), "utf8");
+const protocolSrc = readFileSync(join(repoRoot, "packages/shared/src/protocol.ts"), "utf8");
+
+test("plugin runtime exposes gated high-risk host APIs", () => {
+  for (const token of [
+    "fs.write.workspace",
+    "net.fetch",
+    "shell.openExternal",
+    "clipboard.read",
+    "clipboard.write",
+    "assertPermission",
+  ]) {
+    assert.match(runtimeSrc, new RegExp(token.replaceAll(".", "\\.")));
+  }
+});
+
+test("plugin panels use sandboxed isolated host windows", () => {
+  assert.match(panelSrc, /session\.fromPartition/);
+  assert.match(panelSrc, /sandbox:\s*true/);
+  assert.match(panelSrc, /nodeIntegration:\s*false/);
+  assert.match(panelSrc, /plugin-panel\.js/);
+});
+
+test("plugins page includes marketplace install and auto-update controls", () => {
+  assert.match(pageSrc, /tabMarket/);
+  assert.match(pageSrc, /marketInstall/);
+  assert.match(pageSrc, /applyAutoUpdates|marketApplyUpdates|checkUpdates/);
+  assert.match(pageSrc, /permissionReview|grantedPermissions/);
+});
+
+test("shared protocol declares marketplace and package install IPC", () => {
+  for (const channel of [
+    "pluginInstallFromPackage",
+    "marketSearch",
+    "marketInstall",
+    "marketCheckUpdates",
+    "marketApplyUpdates",
+    "pluginOpenPanel",
+    "pluginSetAutoUpdate",
+  ]) {
+    assert.match(protocolSrc, new RegExp(channel));
+  }
+});

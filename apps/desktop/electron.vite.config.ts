@@ -38,10 +38,13 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, "electron/preload/index.ts"),
+          "plugin-panel": resolve(__dirname, "electron/preload/plugin-panel.ts"),
         },
         output: {
           format: "cjs",
-          entryFileNames: "[name].cjs",
+          // Main window preload stays .cjs; plugin panels use .js as referenced by panel host.
+          entryFileNames: (chunk) =>
+            chunk.name === "plugin-panel" ? "[name].js" : "[name].cjs",
         },
       },
     },

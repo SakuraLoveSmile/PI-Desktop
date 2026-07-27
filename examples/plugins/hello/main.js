@@ -1,5 +1,5 @@
 /**
- * Example plugin entry (spec sample, not wired to runtime yet)
+ * Example plugin entry used by local dev load and marketplace packaging samples
  * Host injects global `pi`.
  */
 

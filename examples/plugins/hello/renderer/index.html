@@ -38,7 +38,7 @@
     <script>
       document.getElementById("ping").addEventListener("click", async () => {
         if (window.pluginBridge?.invoke) {
-          await window.pluginBridge.invoke("hello/ping");
+          await window.pluginBridge.invoke("ui.showToast", { message: "Hello panel bridge" });
         } else {
           alert("pluginBridge not available in sample preview");
         }

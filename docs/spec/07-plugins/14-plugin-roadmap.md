@@ -8,7 +8,7 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
 
 ## 2. Roadmap
 
-### R1 — Foundation (with M4)
+### R1 — Foundation (with M4) ✅
 - manifest v1
 - Local directory loading
 - enable/disable/uninstall
@@ -16,32 +16,32 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
 - hello example plugin
 - permission declaration display
 
-### R2 — Agent Extension
+### R2 — Agent Extension ✅ (core)
 - Full agentTools pipeline
 - skills contribution
 - Per-plugin settings within the app shell's Plugins destination
-- Plugin log panel
+- Plugin log panel (host audit channel)
 - Unified namespace and audit
 
-### R3 — DX & Packaging
+### R3 — DX & Packaging (partial ✅)
 - plugin-sdk
-- Template generation
-- `pi-plugin check/pack`
-- `.piplug` install
-- dev hot reload
+- Template generation (still planned)
+- `pi-plugin check/pack` (still planned)
+- `.piplug` install ✅
+- dev hot reload (still planned)
 
-### R4 — Marketplace Read-only
-- market provider abstraction
+### R4 — Marketplace Read-only ✅
+- market provider abstraction (official local catalog provider)
 - Official-source browse/search
 - Download + checksum install
 - updates list (manual update)
 
-### R5 — Trust & Auto Update
-- Publisher verification
-- Signature verification
-- Permission-diff upgrade
-- Auto-update policy
-- Malicious-version yank response
+### R5 — Trust & Auto Update (partial ✅)
+- Publisher verification (verified flag in catalog)
+- Signature verification (still planned; checksum enforced now)
+- Permission-diff upgrade ✅
+- Auto-update policy ✅
+- Malicious-version yank response (still planned)
 
 ### R6 — Advanced Ecosystem
 - MCP plugin type

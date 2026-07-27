@@ -24,15 +24,17 @@ The host is responsible for:
 
 ## 2. Phase strategy
 
-### Phase A (spec only for now)
+### Phase A ✅
 - Protocol and data model
-- Local mock market provider
+- Local official market provider (`plugins/market/catalog.json`)
 
-### Phase B
-- Remote marketplace read-only browsing + download install
+### Phase B (partial ✅)
+- Browse/search + download install are implemented against the official provider
+- Remote HTTP(S) package URLs are supported for `file://` and `http://` in host-core; HTTPS package transport remains provider-dependent
 
-### Phase C
-- Auto-update, ratings, publisher certification, mandatory signing
+### Phase C (partial ✅)
+- Auto-update policy + permission-diff gating implemented
+- Ratings / mandatory signing still planned
 
 ## 3. Market Provider abstraction
 
@@ -206,3 +208,16 @@ All download metadata must include `shasum`.
 3. Can download and install
 4. Cannot install if validation fails
 5. Appears in Installed after install
+
+
+## 12. Implementation status
+
+Desktop Plugins page now includes a Marketplace tab that calls:
+
+- `market.search`
+- `market.getDetail`
+- `market.install`
+- `market.checkUpdates`
+- `market.applyUpdates`
+
+Installs always pass through checksum verification and permission review before enable.

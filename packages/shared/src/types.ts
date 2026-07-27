@@ -301,16 +301,87 @@ export type AppSettings = {
   onboardingDismissed: boolean;
 };
 
+export type PluginUpdateInfo = {
+  version: string;
+  changelog?: string;
+  shasum: string;
+  url: string;
+  permissionDiff?: string[];
+};
+
+export type PluginMarketplaceMeta = {
+  providerId: string;
+  shasum?: string;
+  publisherId?: string;
+};
+
+export type PluginUiMeta = {
+  panel?: string;
+  width?: number;
+  height?: number;
+  title?: string;
+};
+
 export type PluginSummary = {
   id: string;
   name: string;
   version: string;
   enabled: boolean;
-  source: "installed" | "dev";
-  status: "ready" | "error" | "disabled";
+  source: "installed" | "dev" | "marketplace";
+  status: "ready" | "error" | "disabled" | "load_error";
   errorMessage?: string;
   permissions: string[];
   path?: string;
+  description?: string;
+  author?: string;
+  installedAt?: string;
+  updatedAt?: string;
+  marketplace?: PluginMarketplaceMeta;
+  autoUpdate?: boolean;
+  updateAvailable?: PluginUpdateInfo;
+  ui?: PluginUiMeta;
+};
+
+export type MarketPluginSummary = {
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  iconUrl?: string;
+  latestVersion: string;
+  downloads?: number;
+  updatedAt: string;
+  categories?: string[];
+  permissionSummary: string[];
+  verified?: boolean;
+  installed?: boolean;
+  installedVersion?: string;
+  updateAvailable?: boolean;
+};
+
+export type MarketPluginDetail = MarketPluginSummary & {
+  readmeMarkdown?: string;
+  versions: Array<{
+    version: string;
+    publishedAt: string;
+    changelog?: string;
+    minPiDesktop?: string;
+    shasum: string;
+    url: string;
+    sizeBytes: number;
+    permissions: string[];
+  }>;
+  screenshots?: string[];
+  homepage?: string;
+  repository?: string;
+  permissions: string[];
+  safetyNotes?: string;
+};
+
+export type PluginInstallResult = {
+  plugin: PluginSummary;
+  upgraded: boolean;
+  permissionDiff: string[];
 };
 
 export type CommandItem = {

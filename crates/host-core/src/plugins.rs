@@ -1,9 +1,15 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::io::{Read, Write};
+use std::path::{Component, Path, PathBuf};
+use std::time::Duration;
+
+const MAX_PACKAGE_BYTES: u64 = 50 * 1024 * 1024;
+const MAX_PACKAGE_FILES: usize = 2000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,6 +25,57 @@ pub struct PluginSummary {
     pub permissions: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installed_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marketplace: Option<PluginMarketplaceMeta>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_update: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_available: Option<PluginUpdateInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui: Option<PluginUiMeta>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginMarketplaceMeta {
+    pub provider_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shasum: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub publisher_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginUpdateInfo {
+    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub changelog: Option<String>,
+    pub shasum: String,
+    pub url: String,
+    #[serde(default)]
+    pub permission_diff: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginUiMeta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panel: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,9 +87,162 @@ pub struct PluginManifest {
     pub version: String,
     pub main: String,
     #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub author: Option<String>,
+    #[serde(default)]
     pub permissions: Vec<String>,
     #[serde(default)]
     pub contributes: Option<Value>,
+    #[serde(default)]
+    pub ui: Option<PluginUiMeta>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketPluginSummary {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub author: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_url: Option<String>,
+    pub latest_version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub downloads: Option<u64>,
+    pub updated_at: String,
+    #[serde(default)]
+    pub categories: Vec<String>,
+    pub permission_summary: Vec<String>,
+    #[serde(default)]
+    pub verified: bool,
+    #[serde(default)]
+    pub installed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installed_version: Option<String>,
+    #[serde(default)]
+    pub update_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketPluginDetail {
+    #[serde(flatten)]
+    pub summary: MarketPluginSummary,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub readme_markdown: Option<String>,
+    pub versions: Vec<MarketVersion>,
+    #[serde(default)]
+    pub screenshots: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub homepage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository: Option<String>,
+    pub permissions: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub safety_notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketVersion {
+    pub version: String,
+    pub published_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changelog: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_pi_desktop: Option<String>,
+    pub shasum: String,
+    pub url: String,
+    pub size_bytes: u64,
+    pub permissions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketDownloadInfo {
+    pub plugin_id: String,
+    pub version: String,
+    pub url: String,
+    pub size_bytes: u64,
+    pub shasum: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature_alg: Option<String>,
+    pub published_at: String,
+    pub permissions: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changelog: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MarketCatalogEntry {
+    id: String,
+    name: String,
+    description: String,
+    author: String,
+    #[serde(default)]
+    icon_url: Option<String>,
+    #[serde(default)]
+    categories: Vec<String>,
+    #[serde(default)]
+    verified: bool,
+    #[serde(default)]
+    downloads: Option<u64>,
+    #[serde(default)]
+    homepage: Option<String>,
+    #[serde(default)]
+    repository: Option<String>,
+    #[serde(default)]
+    readme_markdown: Option<String>,
+    #[serde(default)]
+    safety_notes: Option<String>,
+    versions: Vec<MarketVersion>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MarketCatalogFile {
+    #[serde(default = "default_provider_id")]
+    provider_id: String,
+    #[serde(default)]
+    plugins: Vec<MarketCatalogEntry>,
+}
+
+fn default_provider_id() -> String {
+    "official".into()
+}
+
+#[derive(Debug, Clone)]
+pub struct InstallOptions {
+    pub source: String,
+    pub enable: bool,
+    pub marketplace: Option<PluginMarketplaceMeta>,
+    pub expected_shasum: Option<String>,
+    pub auto_update: bool,
+    pub granted_permissions: Option<Vec<String>>,
+}
+
+impl Default for InstallOptions {
+    fn default() -> Self {
+        Self {
+            source: "installed".into(),
+            enable: true,
+            marketplace: None,
+            expected_shasum: None,
+            auto_update: false,
+            granted_permissions: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallResult {
+    pub plugin: PluginSummary,
+    pub upgraded: bool,
+    #[serde(default)]
+    pub permission_diff: Vec<String>,
 }
 
 pub struct PluginManager {
@@ -46,16 +256,49 @@ impl PluginManager {
             data_dir: data_dir.to_path_buf(),
             runtime: Vec::new(),
         };
+        let _ = mgr.ensure_dirs();
+        let _ = mgr.ensure_default_catalog();
         let _ = mgr.reload_from_disk();
         mgr
+    }
+
+    fn ensure_dirs(&self) -> Result<()> {
+        for rel in [
+            "plugins/installed",
+            "plugins/disabled",
+            "plugins/data",
+            "plugins/logs",
+            "plugins/cache/download",
+            "plugins/cache/backup",
+            "plugins/market",
+        ] {
+            fs::create_dir_all(self.data_dir.join(rel))?;
+        }
+        Ok(())
     }
 
     fn registry_path(&self) -> PathBuf {
         self.data_dir.join("plugins/registry.json")
     }
 
+    fn catalog_path(&self) -> PathBuf {
+        self.data_dir.join("plugins/market/catalog.json")
+    }
+
+    fn installed_dir(&self, id: &str) -> PathBuf {
+        self.data_dir.join("plugins/installed").join(sanitize_id(id))
+    }
+
+    fn data_dir_for(&self, id: &str) -> PathBuf {
+        self.data_dir.join("plugins/data").join(sanitize_id(id))
+    }
+
     pub fn list(&self) -> Vec<PluginSummary> {
         self.runtime.clone()
+    }
+
+    pub fn get(&self, id: &str) -> Option<PluginSummary> {
+        self.runtime.iter().find(|p| p.id == id).cloned()
     }
 
     pub fn reload_from_disk(&mut self) -> Result<()> {
@@ -78,23 +321,47 @@ impl PluginManager {
         Ok(())
     }
 
-    pub fn load_dev(&mut self, plugin_path: &str) -> Result<PluginSummary> {
-        let path = PathBuf::from(plugin_path);
+    fn read_manifest(path: &Path) -> Result<PluginManifest> {
         let manifest_path = path.join("manifest.json");
         if !manifest_path.exists() {
-            return Err(anyhow!("PLUGIN_INVALID: manifest.json missing"));
+            bail!("PLUGIN_INVALID: manifest.json missing");
         }
-        let raw = fs::read_to_string(&manifest_path)?;
-        let manifest: PluginManifest =
-            serde_json::from_str(&raw).map_err(|e| anyhow!("PLUGIN_INVALID: {e}"))?;
-        if manifest.id.is_empty() || manifest.main.is_empty() {
-            return Err(anyhow!("PLUGIN_INVALID: id/main required"));
+        let raw = fs::read_to_string(&manifest_path)
+            .with_context(|| format!("read manifest {}", manifest_path.display()))?;
+        let manifest: PluginManifest = serde_json::from_str(&raw)
+            .map_err(|e| anyhow!("PLUGIN_INVALID: {e}"))?;
+        if manifest.id.trim().is_empty() || manifest.main.trim().is_empty() {
+            bail!("PLUGIN_INVALID: id/main required");
+        }
+        if manifest.name.trim().is_empty() || manifest.version.trim().is_empty() {
+            bail!("PLUGIN_INVALID: name/version required");
         }
         let main_path = path.join(&manifest.main);
         if !main_path.exists() {
-            return Err(anyhow!("PLUGIN_LOAD_FAILED: main entry missing"));
+            bail!("PLUGIN_LOAD_FAILED: main entry missing");
         }
+        if let Some(ui) = &manifest.ui {
+            if let Some(panel) = &ui.panel {
+                let panel_path = path.join(panel);
+                if !panel_path.exists() {
+                    bail!("PLUGIN_INVALID: ui.panel missing");
+                }
+            }
+        }
+        Ok(manifest)
+    }
 
+    fn upsert_summary(&mut self, summary: PluginSummary) -> Result<PluginSummary> {
+        self.runtime.retain(|p| p.id != summary.id);
+        self.runtime.push(summary.clone());
+        self.save()?;
+        Ok(summary)
+    }
+
+    pub fn load_dev(&mut self, plugin_path: &str) -> Result<PluginSummary> {
+        let path = PathBuf::from(plugin_path);
+        let manifest = Self::read_manifest(&path)?;
+        let now = Utc::now().to_rfc3339();
         let summary = PluginSummary {
             id: manifest.id.clone(),
             name: manifest.name.clone(),
@@ -105,13 +372,159 @@ impl PluginManager {
             error_message: None,
             permissions: manifest.permissions.clone(),
             path: Some(path.to_string_lossy().to_string()),
+            description: manifest.description.clone(),
+            author: manifest.author.clone(),
+            installed_at: Some(now.clone()),
+            updated_at: Some(now),
+            marketplace: None,
+            auto_update: Some(false),
+            update_available: None,
+            ui: manifest.ui.clone(),
         };
+        self.upsert_summary(summary)
+    }
 
-        self.runtime.retain(|p| p.id != summary.id);
-        self.runtime.push(summary.clone());
-        self.save()?;
-        let _ = Utc::now();
-        Ok(summary)
+    pub fn install_from_path(
+        &mut self,
+        source_path: &str,
+        opts: InstallOptions,
+    ) -> Result<InstallResult> {
+        let source = PathBuf::from(source_path);
+        if !source.exists() {
+            bail!("PLUGIN_INVALID: package path missing");
+        }
+
+        let stage = self
+            .data_dir
+            .join("plugins/cache/download")
+            .join(format!("stage-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&stage)?;
+        let cleanup_stage = stage.clone();
+        let result = (|| -> Result<InstallResult> {
+            let extracted_root = if source.is_dir() {
+                copy_dir_filtered(&source, &stage.join("content"))?;
+                stage.join("content")
+            } else {
+                let bytes = fs::read(&source)
+                    .with_context(|| format!("read package {}", source.display()))?;
+                if bytes.len() as u64 > MAX_PACKAGE_BYTES {
+                    bail!("PLUGIN_INVALID: package exceeds 50MB limit");
+                }
+                if let Some(expected) = &opts.expected_shasum {
+                    let actual = sha256_hex(&bytes);
+                    if !actual.eq_ignore_ascii_case(expected) {
+                        bail!("PLUGIN_INTEGRITY: checksum mismatch");
+                    }
+                }
+                let extract_dir = stage.join("extract");
+                fs::create_dir_all(&extract_dir)?;
+                extract_zip_bytes(&bytes, &extract_dir)?;
+                find_plugin_root(&extract_dir)?
+            };
+
+            let manifest = Self::read_manifest(&extracted_root)?;
+            let existing = self.get(&manifest.id);
+            let upgraded = existing
+                .as_ref()
+                .map(|p| p.version != manifest.version)
+                .unwrap_or(false);
+            let permission_diff = permission_diff(
+                existing
+                    .as_ref()
+                    .map(|p| p.permissions.as_slice())
+                    .unwrap_or(&[]),
+                &manifest.permissions,
+            );
+
+            if upgraded {
+                if let Some(prev) = &existing {
+                    if let Some(prev_path) = prev.path.as_ref() {
+                        let backup = self
+                            .data_dir
+                            .join("plugins/cache/backup")
+                            .join(sanitize_id(&prev.id))
+                            .join(&prev.version);
+                        let _ = fs::remove_dir_all(&backup);
+                        if PathBuf::from(prev_path).exists() {
+                            copy_dir_filtered(Path::new(prev_path), &backup)?;
+                        }
+                    }
+                }
+            }
+
+            let target = self.installed_dir(&manifest.id);
+            if target.exists() {
+                fs::remove_dir_all(&target)?;
+            }
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            copy_dir_filtered(&extracted_root, &target)?;
+            fs::create_dir_all(self.data_dir_for(&manifest.id))?;
+
+            let now = Utc::now().to_rfc3339();
+            let granted = opts
+                .granted_permissions
+                .clone()
+                .unwrap_or_else(|| manifest.permissions.clone());
+            for required in &manifest.permissions {
+                if !granted.iter().any(|g| g == required) {
+                    bail!("PLUGIN_PERMISSION_DENIED: missing grant for {required}");
+                }
+            }
+
+            let summary = PluginSummary {
+                id: manifest.id.clone(),
+                name: manifest.name.clone(),
+                version: manifest.version.clone(),
+                enabled: opts.enable,
+                source: opts.source.clone(),
+                status: if opts.enable {
+                    "ready".into()
+                } else {
+                    "disabled".into()
+                },
+                error_message: None,
+                permissions: granted,
+                path: Some(target.to_string_lossy().to_string()),
+                description: manifest.description.clone(),
+                author: manifest.author.clone(),
+                installed_at: existing
+                    .as_ref()
+                    .and_then(|p| p.installed_at.clone())
+                    .or_else(|| Some(now.clone())),
+                updated_at: Some(now),
+                marketplace: opts.marketplace.clone().or_else(|| {
+                    existing.as_ref().and_then(|p| p.marketplace.clone())
+                }),
+                auto_update: Some(
+                    opts.auto_update
+                        || existing
+                            .as_ref()
+                            .and_then(|p| p.auto_update)
+                            .unwrap_or(false),
+                ),
+                update_available: None,
+                ui: manifest.ui.clone(),
+            };
+            let plugin = self.upsert_summary(summary)?;
+            Ok(InstallResult {
+                plugin,
+                upgraded,
+                permission_diff,
+            })
+        })();
+
+        let _ = fs::remove_dir_all(cleanup_stage);
+        result
+    }
+
+    pub fn install_from_package(
+        &mut self,
+        package_path: &str,
+        opts: InstallOptions,
+    ) -> Result<InstallResult> {
+        self.install_from_path(package_path, opts)
     }
 
     pub fn set_enabled(&mut self, id: &str, enabled: bool) -> Result<Option<PluginSummary>> {
@@ -122,6 +535,18 @@ impl PluginManager {
             } else {
                 "disabled".into()
             };
+            plugin.updated_at = Some(Utc::now().to_rfc3339());
+            let out = plugin.clone();
+            self.save()?;
+            return Ok(Some(out));
+        }
+        Ok(None)
+    }
+
+    pub fn set_auto_update(&mut self, id: &str, enabled: bool) -> Result<Option<PluginSummary>> {
+        if let Some(plugin) = self.runtime.iter_mut().find(|p| p.id == id) {
+            plugin.auto_update = Some(enabled);
+            plugin.updated_at = Some(Utc::now().to_rfc3339());
             let out = plugin.clone();
             self.save()?;
             return Ok(Some(out));
@@ -130,9 +555,1074 @@ impl PluginManager {
     }
 
     pub fn uninstall(&mut self, id: &str) -> Result<bool> {
+        let existing = self.get(id);
         let before = self.runtime.len();
         self.runtime.retain(|p| p.id != id);
         self.save()?;
+        if let Some(plugin) = existing {
+            if plugin.source != "dev" {
+                let installed = self.installed_dir(id);
+                if installed.exists() {
+                    let _ = fs::remove_dir_all(installed);
+                }
+            }
+            // Default policy: delete plugin private data on uninstall.
+            let data = self.data_dir_for(id);
+            if data.exists() {
+                let _ = fs::remove_dir_all(data);
+            }
+            let log = self
+                .data_dir
+                .join("plugins/logs")
+                .join(format!("{}.log", sanitize_id(id)));
+            let _ = fs::remove_file(log);
+        }
         Ok(self.runtime.len() < before)
+    }
+
+    pub fn grant_permissions(
+        &mut self,
+        id: &str,
+        permissions: Vec<String>,
+    ) -> Result<Option<PluginSummary>> {
+        if let Some(plugin) = self.runtime.iter_mut().find(|p| p.id == id) {
+            for perm in permissions {
+                if !plugin.permissions.iter().any(|p| p == &perm) {
+                    plugin.permissions.push(perm);
+                }
+            }
+            plugin.updated_at = Some(Utc::now().to_rfc3339());
+            let out = plugin.clone();
+            self.save()?;
+            return Ok(Some(out));
+        }
+        Ok(None)
+    }
+
+    pub fn revoke_permissions(
+        &mut self,
+        id: &str,
+        permissions: Vec<String>,
+    ) -> Result<Option<PluginSummary>> {
+        if let Some(plugin) = self.runtime.iter_mut().find(|p| p.id == id) {
+            plugin
+                .permissions
+                .retain(|p| !permissions.iter().any(|x| x == p));
+            plugin.updated_at = Some(Utc::now().to_rfc3339());
+            let out = plugin.clone();
+            self.save()?;
+            return Ok(Some(out));
+        }
+        Ok(None)
+    }
+
+    fn ensure_default_catalog(&self) -> Result<()> {
+        let path = self.catalog_path();
+        if path.exists() {
+            return Ok(());
+        }
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let catalog = built_in_catalog();
+        fs::write(path, serde_json::to_string_pretty(&catalog)?)?;
+        // Materialize package payloads referenced by file:// URLs.
+        for plugin in &catalog.plugins {
+            for version in &plugin.versions {
+                if let Some(local) = version.url.strip_prefix("file://") {
+                    let target = PathBuf::from(local);
+                    if let Some(parent) = target.parent() {
+                        fs::create_dir_all(parent)?;
+                    }
+                    if !target.exists() {
+                        if let Some(bytes) = bundled_package_bytes(&plugin.id, &version.version) {
+                            fs::write(&target, bytes)?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn load_catalog(&self) -> Result<MarketCatalogFile> {
+        self.ensure_default_catalog()?;
+        let raw = fs::read_to_string(self.catalog_path())?;
+        let mut catalog: MarketCatalogFile = serde_json::from_str(&raw)
+            .map_err(|e| anyhow!("PLUGIN_MARKET_INVALID: {e}"))?;
+        if catalog.plugins.is_empty() {
+            catalog = built_in_catalog();
+        }
+        Ok(catalog)
+    }
+
+    pub fn market_search(&self, query: Option<&str>, category: Option<&str>) -> Result<Vec<MarketPluginSummary>> {
+        let catalog = self.load_catalog()?;
+        let q = query.unwrap_or("").trim().to_lowercase();
+        let mut out = Vec::new();
+        for entry in catalog.plugins {
+            if let Some(cat) = category {
+                if !cat.is_empty()
+                    && !entry
+                        .categories
+                        .iter()
+                        .any(|c| c.eq_ignore_ascii_case(cat))
+                {
+                    continue;
+                }
+            }
+            if !q.is_empty() {
+                let hay = format!(
+                    "{} {} {} {}",
+                    entry.id,
+                    entry.name,
+                    entry.description,
+                    entry.author
+                )
+                .to_lowercase();
+                if !hay.contains(&q) {
+                    continue;
+                }
+            }
+            out.push(self.to_market_summary(&entry));
+        }
+        out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        Ok(out)
+    }
+
+    pub fn market_get(&self, plugin_id: &str) -> Result<MarketPluginDetail> {
+        let catalog = self.load_catalog()?;
+        let entry = catalog
+            .plugins
+            .into_iter()
+            .find(|p| p.id == plugin_id)
+            .ok_or_else(|| anyhow!("PLUGIN_NOT_FOUND: {plugin_id}"))?;
+        let summary = self.to_market_summary(&entry);
+        let permissions = entry
+            .versions
+            .first()
+            .map(|v| v.permissions.clone())
+            .unwrap_or_default();
+        Ok(MarketPluginDetail {
+            summary,
+            readme_markdown: entry.readme_markdown,
+            versions: entry.versions,
+            screenshots: vec![],
+            homepage: entry.homepage,
+            repository: entry.repository,
+            permissions,
+            safety_notes: entry.safety_notes,
+        })
+    }
+
+    pub fn market_download_info(
+        &self,
+        plugin_id: &str,
+        version: Option<&str>,
+    ) -> Result<MarketDownloadInfo> {
+        let detail = self.market_get(plugin_id)?;
+        let selected = if let Some(version) = version {
+            detail
+                .versions
+                .iter()
+                .find(|v| v.version == version)
+                .cloned()
+        } else {
+            detail.versions.first().cloned()
+        }
+        .ok_or_else(|| anyhow!("PLUGIN_NOT_FOUND: version missing"))?;
+        Ok(MarketDownloadInfo {
+            plugin_id: plugin_id.to_string(),
+            version: selected.version,
+            url: selected.url,
+            size_bytes: selected.size_bytes,
+            shasum: selected.shasum,
+            signature: None,
+            signature_alg: None,
+            published_at: selected.published_at,
+            permissions: selected.permissions,
+            changelog: selected.changelog,
+        })
+    }
+
+    pub fn check_updates(&mut self) -> Result<Vec<PluginUpdateInfo>> {
+        let catalog = self.load_catalog()?;
+        let mut updates = Vec::new();
+        for plugin in self.runtime.iter_mut() {
+            let Some(entry) = catalog.plugins.iter().find(|p| p.id == plugin.id) else {
+                plugin.update_available = None;
+                continue;
+            };
+            let Some(latest) = entry.versions.first() else {
+                plugin.update_available = None;
+                continue;
+            };
+            if latest.version == plugin.version {
+                plugin.update_available = None;
+                continue;
+            }
+            let diff = permission_diff(&plugin.permissions, &latest.permissions);
+            let info = PluginUpdateInfo {
+                version: latest.version.clone(),
+                changelog: latest.changelog.clone(),
+                shasum: latest.shasum.clone(),
+                url: latest.url.clone(),
+                permission_diff: diff,
+            };
+            plugin.update_available = Some(info.clone());
+            updates.push(info);
+        }
+        self.save()?;
+        Ok(updates)
+    }
+
+    pub fn install_from_market(
+        &mut self,
+        plugin_id: &str,
+        version: Option<&str>,
+        enable: bool,
+        auto_update: bool,
+        granted_permissions: Option<Vec<String>>,
+    ) -> Result<InstallResult> {
+        let info = self.market_download_info(plugin_id, version)?;
+        let package_path = self.download_market_package(&info)?;
+        let result = self.install_from_path(
+            &package_path.to_string_lossy(),
+            InstallOptions {
+                source: "marketplace".into(),
+                enable,
+                marketplace: Some(PluginMarketplaceMeta {
+                    provider_id: "official".into(),
+                    shasum: Some(info.shasum.clone()),
+                    publisher_id: Some("pi-desktop".into()),
+                }),
+                expected_shasum: Some(info.shasum),
+                auto_update,
+                granted_permissions,
+            },
+        );
+        let _ = fs::remove_file(package_path);
+        result
+    }
+
+    pub fn apply_updates(&mut self, only_auto: bool) -> Result<Vec<InstallResult>> {
+        let _ = self.check_updates()?;
+        let pending: Vec<(String, PluginUpdateInfo, bool, Vec<String>)> = self
+            .runtime
+            .iter()
+            .filter_map(|p| {
+                let update = p.update_available.clone()?;
+                if only_auto && !p.auto_update.unwrap_or(false) {
+                    return None;
+                }
+                // Auto-update refuses silent permission expansion.
+                if only_auto && !update.permission_diff.is_empty() {
+                    return None;
+                }
+                Some((
+                    p.id.clone(),
+                    update,
+                    p.auto_update.unwrap_or(false),
+                    p.permissions.clone(),
+                ))
+            })
+            .collect();
+
+        let mut results = Vec::new();
+        for (id, update, auto_update, current_permissions) in pending {
+            let mut granted = current_permissions;
+            for perm in &update.permission_diff {
+                if !granted.iter().any(|p| p == perm) {
+                    granted.push(perm.clone());
+                }
+            }
+            let installed = self.install_from_market(
+                &id,
+                Some(&update.version),
+                true,
+                auto_update,
+                Some(granted),
+            )?;
+            results.push(installed);
+        }
+        Ok(results)
+    }
+
+    fn download_market_package(&self, info: &MarketDownloadInfo) -> Result<PathBuf> {
+        let cache = self
+            .data_dir
+            .join("plugins/cache/download")
+            .join(format!(
+                "{}-{}.piplug",
+                sanitize_id(&info.plugin_id),
+                sanitize_id(&info.version)
+            ));
+        if let Some(parent) = cache.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let bytes = if let Some(path) = info.url.strip_prefix("file://") {
+            fs::read(path).with_context(|| format!("read market package {path}"))?
+        } else if info.url.starts_with("http://") || info.url.starts_with("https://") {
+            download_url(&info.url)?
+        } else {
+            // Allow bare local paths in catalogs.
+            fs::read(&info.url).with_context(|| format!("read market package {}", info.url))?
+        };
+        if bytes.len() as u64 > MAX_PACKAGE_BYTES {
+            bail!("PLUGIN_INVALID: package exceeds 50MB limit");
+        }
+        let actual = sha256_hex(&bytes);
+        if !actual.eq_ignore_ascii_case(&info.shasum) {
+            bail!("PLUGIN_INTEGRITY: checksum mismatch");
+        }
+        fs::write(&cache, &bytes)?;
+        Ok(cache)
+    }
+
+    fn to_market_summary(&self, entry: &MarketCatalogEntry) -> MarketPluginSummary {
+        let latest = entry
+            .versions
+            .first()
+            .map(|v| v.version.clone())
+            .unwrap_or_else(|| "0.0.0".into());
+        let installed = self.get(&entry.id);
+        MarketPluginSummary {
+            id: entry.id.clone(),
+            name: entry.name.clone(),
+            description: entry.description.clone(),
+            author: entry.author.clone(),
+            icon_url: entry.icon_url.clone(),
+            latest_version: latest.clone(),
+            downloads: entry.downloads,
+            updated_at: entry
+                .versions
+                .first()
+                .map(|v| v.published_at.clone())
+                .unwrap_or_else(|| Utc::now().to_rfc3339()),
+            categories: entry.categories.clone(),
+            permission_summary: entry
+                .versions
+                .first()
+                .map(|v| v.permissions.clone())
+                .unwrap_or_default(),
+            verified: entry.verified,
+            installed: installed.is_some(),
+            installed_version: installed.as_ref().map(|p| p.version.clone()),
+            update_available: installed
+                .as_ref()
+                .map(|p| p.version != latest)
+                .unwrap_or(false),
+        }
+    }
+}
+
+fn built_in_catalog() -> MarketCatalogFile {
+    let data_dir = std::env::var("PI_DESKTOP_DATA_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".pi-desktop")
+        });
+    let package_dir = data_dir.join("plugins/market/packages");
+    let hello_path = package_dir.join("demo.hello-0.2.0.piplug");
+    let notes_path = package_dir.join("demo.workspace-notes-0.1.0.piplug");
+    let hello_bytes = bundled_package_bytes("demo.hello", "0.2.0").unwrap_or_default();
+    let notes_bytes = bundled_package_bytes("demo.workspace-notes", "0.1.0").unwrap_or_default();
+    MarketCatalogFile {
+        provider_id: "official".into(),
+        plugins: vec![
+            MarketCatalogEntry {
+                id: "demo.hello".into(),
+                name: "Hello".into(),
+                description: "Official sample plugin with panel, command, and echo tool.".into(),
+                author: "PI-Desktop".into(),
+                icon_url: None,
+                categories: vec!["demo".into(), "official".into()],
+                verified: true,
+                downloads: Some(1280),
+                homepage: Some("https://github.com/vastsa/PI-Desktop".into()),
+                repository: Some("https://github.com/vastsa/PI-Desktop".into()),
+                readme_markdown: Some(
+                    "# Hello\n\nOfficial demo plugin used by the local marketplace provider.".into(),
+                ),
+                safety_notes: Some("Low risk demo. Registers one agent tool and one panel.".into()),
+                versions: vec![MarketVersion {
+                    version: "0.2.0".into(),
+                    published_at: "2026-07-28T00:00:00Z".into(),
+                    changelog: Some("Marketplace package with isolated panel bridge.".into()),
+                    min_pi_desktop: Some(">=0.2.0".into()),
+                    shasum: sha256_hex(&hello_bytes),
+                    url: format!("file://{}", hello_path.to_string_lossy()),
+                    size_bytes: hello_bytes.len() as u64,
+                    permissions: vec![
+                        "ui.panel".into(),
+                        "agent.tool.register".into(),
+                        "notify".into(),
+                    ],
+                }],
+            },
+            MarketCatalogEntry {
+                id: "demo.workspace-notes".into(),
+                name: "Workspace Notes".into(),
+                description: "Read/write a notes file in the current workspace and fetch optional snippets.".into(),
+                author: "PI-Desktop".into(),
+                icon_url: None,
+                categories: vec!["productivity".into(), "official".into()],
+                verified: true,
+                downloads: Some(420),
+                homepage: None,
+                repository: None,
+                readme_markdown: Some(
+                    "# Workspace Notes\n\nDemonstrates high-risk plugin capabilities with explicit grants.".into(),
+                ),
+                safety_notes: Some(
+                    "Requests workspace write and network access. Review permissions before install.".into(),
+                ),
+                versions: vec![MarketVersion {
+                    version: "0.1.0".into(),
+                    published_at: "2026-07-28T00:00:00Z".into(),
+                    changelog: Some("Initial marketplace release.".into()),
+                    min_pi_desktop: Some(">=0.2.0".into()),
+                    shasum: sha256_hex(&notes_bytes),
+                    url: format!("file://{}", notes_path.to_string_lossy()),
+                    size_bytes: notes_bytes.len() as u64,
+                    permissions: vec![
+                        "ui.panel".into(),
+                        "fs.read.workspace".into(),
+                        "fs.write.workspace".into(),
+                        "net.fetch".into(),
+                        "shell.openExternal".into(),
+                        "clipboard.read".into(),
+                        "clipboard.write".into(),
+                        "notify".into(),
+                        "agent.tool.register".into(),
+                    ],
+                }],
+            },
+        ],
+    }
+}
+
+fn bundled_package_bytes(plugin_id: &str, version: &str) -> Option<Vec<u8>> {
+    match (plugin_id, version) {
+        ("demo.hello", "0.2.0") => Some(make_zip(&[
+            (
+                "manifest.json",
+                br#"{
+  "schemaVersion": 1,
+  "id": "demo.hello",
+  "name": "Hello",
+  "version": "0.2.0",
+  "description": "Official sample plugin with panel, command, and echo tool.",
+  "author": "PI-Desktop",
+  "main": "main.js",
+  "ui": {
+    "panel": "renderer/index.html",
+    "width": 420,
+    "height": 320,
+    "title": "Hello Plugin"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "id": "hello.open",
+        "title": "Hello: Open Panel",
+        "keywords": ["hello", "demo"],
+        "category": "Demo"
+      }
+    ],
+    "agentTools": [
+      {
+        "name": "echo_text",
+        "description": "Echo text back to the agent",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": { "text": { "type": "string" } },
+          "required": ["text"]
+        }
+      }
+    ],
+    "settings": [
+      {
+        "key": "greeting",
+        "type": "string",
+        "default": "Hello from marketplace",
+        "title": "Greeting"
+      }
+    ]
+  },
+  "permissions": ["ui.panel", "agent.tool.register", "notify"]
+}"#,
+            ),
+            (
+                "main.js",
+                br#"async function onLoad() {
+  const settings = await pi.plugin.getSettings();
+  await pi.commands.register({
+    id: "hello.open",
+    title: "Hello: Open Panel",
+    keywords: ["hello", "demo"],
+    run: async () => {
+      await pi.ui.openPanel({ title: "Hello Plugin" });
+      await pi.ui.showToast(settings.greeting || "Hello from marketplace");
+    },
+  });
+  await pi.agent.registerTool({
+    name: "echo_text",
+    description: "Echo text back to the agent",
+    risk: "low",
+    schema: {
+      type: "object",
+      properties: { text: { type: "string" } },
+      required: ["text"],
+    },
+    execute: async (args) => ({
+      ok: true,
+      echo: String(args?.text ?? ""),
+      pluginId: pi.plugin.getId(),
+    }),
+  });
+}
+async function onUnload() {
+  await pi.commands.unregister("hello.open");
+  await pi.agent.unregisterTool("echo_text");
+}
+module.exports = { onLoad, onUnload };
+"#,
+            ),
+            (
+                "renderer/index.html",
+                br#"<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hello Plugin</title>
+    <style>
+      body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 16px; background: #0b1020; color: #e8eefc; }
+      .card { border: 1px solid #24304d; border-radius: 12px; padding: 16px; background: #121a2f; }
+      button { margin-top: 12px; border: 0; border-radius: 8px; padding: 8px 12px; background: #4f7cff; color: white; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2>Hello Plugin</h2>
+      <p>Isolated marketplace panel with host bridge.</p>
+      <button id="ping">Toast Ping</button>
+    </div>
+    <script>
+      document.getElementById("ping").addEventListener("click", async () => {
+        if (window.pluginBridge?.invoke) {
+          await window.pluginBridge.invoke("ui.showToast", { message: "Hello panel bridge" });
+        }
+      });
+    </script>
+  </body>
+</html>
+"#,
+            ),
+        ])),
+        ("demo.workspace-notes", "0.1.0") => Some(make_zip(&[
+            (
+                "manifest.json",
+                br#"{
+  "schemaVersion": 1,
+  "id": "demo.workspace-notes",
+  "name": "Workspace Notes",
+  "version": "0.1.0",
+  "description": "Read/write workspace notes and fetch remote snippets with explicit high-risk grants.",
+  "author": "PI-Desktop",
+  "main": "main.js",
+  "ui": {
+    "panel": "renderer/index.html",
+    "width": 480,
+    "height": 420,
+    "title": "Workspace Notes"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "id": "notes.open",
+        "title": "Notes: Open Panel",
+        "keywords": ["notes", "workspace"],
+        "category": "Productivity"
+      }
+    ],
+    "agentTools": [
+      {
+        "name": "save_note",
+        "description": "Append a note to NOTES.md in the workspace",
+        "risk": "high",
+        "schema": {
+          "type": "object",
+          "properties": { "text": { "type": "string" } },
+          "required": ["text"]
+        }
+      }
+    ]
+  },
+  "permissions": [
+    "ui.panel",
+    "fs.read.workspace",
+    "fs.write.workspace",
+    "net.fetch",
+    "shell.openExternal",
+    "clipboard.read",
+    "clipboard.write",
+    "notify",
+    "agent.tool.register"
+  ]
+}"#,
+            ),
+            (
+                "main.js",
+                br#"const NOTE_FILE = "NOTES.md";
+async function onLoad() {
+  await pi.commands.register({
+    id: "notes.open",
+    title: "Notes: Open Panel",
+    keywords: ["notes", "workspace"],
+    run: async () => {
+      await pi.ui.openPanel({ title: "Workspace Notes" });
+    },
+  });
+  await pi.agent.registerTool({
+    name: "save_note",
+    description: "Append a note to NOTES.md in the workspace",
+    risk: "high",
+    schema: {
+      type: "object",
+      properties: { text: { type: "string" } },
+      required: ["text"],
+    },
+    execute: async (args) => {
+      const text = String(args?.text ?? "").trim();
+      let current = "";
+      try { current = await pi.fs.readText(NOTE_FILE); } catch {}
+      const next = current ? `${current.trimEnd()}\n- ${text}\n` : `# Notes\n\n- ${text}\n`;
+      await pi.fs.writeText(NOTE_FILE, next);
+      await pi.ui.notify({ title: "Note saved", body: text.slice(0, 80) });
+      return { ok: true, path: NOTE_FILE, bytes: next.length };
+    },
+  });
+}
+async function onUnload() {
+  await pi.commands.unregister("notes.open");
+  await pi.agent.unregisterTool("save_note");
+}
+module.exports = { onLoad, onUnload };
+"#,
+            ),
+            (
+                "renderer/index.html",
+                br#"<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workspace Notes</title>
+  <style>
+    body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0b1020; color: #e8eefc; padding: 16px; }
+    textarea { width: 100%; min-height: 180px; border-radius: 10px; border: 1px solid #24304d; background: #121a2f; color: inherit; padding: 10px; box-sizing: border-box; }
+    .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    button { border: 0; border-radius: 8px; padding: 8px 12px; background: #4f7cff; color: white; cursor: pointer; }
+    button.secondary { background: #24304d; }
+    .meta { color: #9db0d4; font-size: 12px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="meta">High-risk demo: workspace files, clipboard, network, external links.</div>
+  <textarea id="notes" placeholder="Workspace NOTES.md"></textarea>
+  <div class="row">
+    <button id="reload">Reload</button>
+    <button id="save">Save</button>
+    <button class="secondary" id="clip">Copy</button>
+    <button class="secondary" id="fetch">Fetch sample</button>
+    <button class="secondary" id="docs">Open docs</button>
+  </div>
+  <script>
+    const notes = document.getElementById('notes');
+    async function reload() {
+      try { notes.value = await window.pluginBridge.invoke('fs.readText', { path: 'NOTES.md' }); }
+      catch { notes.value = '# Notes\n\n'; }
+    }
+    document.getElementById('reload').onclick = reload;
+    document.getElementById('save').onclick = async () => {
+      await window.pluginBridge.invoke('fs.writeText', { path: 'NOTES.md', content: notes.value });
+      await window.pluginBridge.invoke('ui.showToast', { message: 'Saved NOTES.md' });
+    };
+    document.getElementById('clip').onclick = async () => {
+      await window.pluginBridge.invoke('clipboard.writeText', { text: notes.value });
+      await window.pluginBridge.invoke('ui.showToast', { message: 'Copied to clipboard' });
+    };
+    document.getElementById('fetch').onclick = async () => {
+      const res = await window.pluginBridge.invoke('net.fetch', {
+        url: 'https://example.com',
+        method: 'GET',
+        timeoutMs: 8000,
+      });
+      notes.value = `${notes.value.trim()}\n\n<!-- fetched status ${res.status} -->\n`;
+    };
+    document.getElementById('docs').onclick = async () => {
+      await window.pluginBridge.invoke('shell.openExternal', { url: 'https://example.com' });
+    };
+    reload();
+  </script>
+</body>
+</html>
+"#,
+            ),
+        ])),
+        _ => None,
+    }
+}
+
+fn make_zip(files: &[(&str, &[u8])]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let mut offset: u32 = 0;
+    let mut central = Vec::new();
+    let mut entries = 0u16;
+    for (name, data) in files {
+        let name_bytes = name.as_bytes();
+        let crc = crc32(data);
+        let mut local = Vec::new();
+        local.extend_from_slice(&0x04034b50u32.to_le_bytes());
+        local.extend_from_slice(&20u16.to_le_bytes()); // version needed
+        local.extend_from_slice(&0u16.to_le_bytes()); // flags
+        local.extend_from_slice(&0u16.to_le_bytes()); // method store
+        local.extend_from_slice(&0u16.to_le_bytes()); // time
+        local.extend_from_slice(&0u16.to_le_bytes()); // date
+        local.extend_from_slice(&crc.to_le_bytes());
+        local.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        local.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        local.extend_from_slice(&(name_bytes.len() as u16).to_le_bytes());
+        local.extend_from_slice(&0u16.to_le_bytes()); // extra
+        local.extend_from_slice(name_bytes);
+        local.extend_from_slice(data);
+        out.extend_from_slice(&local);
+
+        let mut cen = Vec::new();
+        cen.extend_from_slice(&0x02014b50u32.to_le_bytes());
+        cen.extend_from_slice(&20u16.to_le_bytes());
+        cen.extend_from_slice(&20u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&crc.to_le_bytes());
+        cen.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        cen.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        cen.extend_from_slice(&(name_bytes.len() as u16).to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u32.to_le_bytes());
+        cen.extend_from_slice(&offset.to_le_bytes());
+        cen.extend_from_slice(name_bytes);
+        central.extend_from_slice(&cen);
+        offset += local.len() as u32;
+        entries += 1;
+    }
+    let central_offset = out.len() as u32;
+    out.extend_from_slice(&central);
+    let central_size = central.len() as u32;
+    out.extend_from_slice(&0x06054b50u32.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes());
+    out.extend_from_slice(&entries.to_le_bytes());
+    out.extend_from_slice(&entries.to_le_bytes());
+    out.extend_from_slice(&central_size.to_le_bytes());
+    out.extend_from_slice(&central_offset.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes());
+    out
+}
+
+fn extract_zip_bytes(bytes: &[u8], dest: &Path) -> Result<()> {
+    if bytes.len() < 22 {
+        bail!("PLUGIN_INVALID: zip too small");
+    }
+    let mut file_count = 0usize;
+    let mut total_bytes = 0u64;
+    let mut offset = 0usize;
+    while offset + 30 <= bytes.len() {
+        let sig = read_u32(bytes, offset)?;
+        if sig == 0x02014b50 || sig == 0x06054b50 {
+            break;
+        }
+        if sig != 0x04034b50 {
+            bail!("PLUGIN_INVALID: bad zip local header");
+        }
+        let method = read_u16(bytes, offset + 8)?;
+        let comp_size = read_u32(bytes, offset + 18)? as usize;
+        let uncomp_size = read_u32(bytes, offset + 22)? as u64;
+        let name_len = read_u16(bytes, offset + 26)? as usize;
+        let extra_len = read_u16(bytes, offset + 28)? as usize;
+        let name_start = offset + 30;
+        let name_end = name_start + name_len;
+        if name_end + extra_len + comp_size > bytes.len() {
+            bail!("PLUGIN_INVALID: zip entry truncated");
+        }
+        let name = std::str::from_utf8(&bytes[name_start..name_end])
+            .map_err(|_| anyhow!("PLUGIN_INVALID: zip name not utf8"))?;
+        if method != 0 {
+            bail!("PLUGIN_INVALID: only store-compressed piplug supported");
+        }
+        let data_start = name_end + extra_len;
+        let data_end = data_start + comp_size;
+        let data = &bytes[data_start..data_end];
+        total_bytes += uncomp_size;
+        if total_bytes > MAX_PACKAGE_BYTES {
+            bail!("PLUGIN_INVALID: package exceeds 50MB limit");
+        }
+        file_count += 1;
+        if file_count > MAX_PACKAGE_FILES {
+            bail!("PLUGIN_INVALID: too many files in package");
+        }
+        if name.ends_with('/') {
+            let dir = safe_join(dest, name)?;
+            fs::create_dir_all(dir)?;
+        } else {
+            let path = safe_join(dest, name)?;
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(path, data)?;
+        }
+        offset = data_end;
+    }
+    Ok(())
+}
+
+fn find_plugin_root(extract_dir: &Path) -> Result<PathBuf> {
+    let direct = extract_dir.join("manifest.json");
+    if direct.exists() {
+        return Ok(extract_dir.to_path_buf());
+    }
+    for entry in fs::read_dir(extract_dir)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            let candidate = entry.path();
+            if candidate.join("manifest.json").exists() {
+                return Ok(candidate);
+            }
+        }
+    }
+    bail!("PLUGIN_INVALID: manifest.json missing in package")
+}
+
+fn copy_dir_filtered(src: &Path, dest: &Path) -> Result<()> {
+    fs::create_dir_all(dest)?;
+    let mut file_count = 0usize;
+    let mut total_bytes = 0u64;
+    fn walk(
+        src_root: &Path,
+        from: &Path,
+        to: &Path,
+        file_count: &mut usize,
+        total_bytes: &mut u64,
+    ) -> Result<()> {
+        for entry in fs::read_dir(from)? {
+            let entry = entry?;
+            let file_type = entry.file_type()?;
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str == ".git" || name_str == "node_modules" {
+                continue;
+            }
+            let target = to.join(&name);
+            if file_type.is_symlink() {
+                bail!("PLUGIN_INVALID: symlinks are not allowed");
+            } else if file_type.is_dir() {
+                fs::create_dir_all(&target)?;
+                walk(src_root, &entry.path(), &target, file_count, total_bytes)?;
+            } else if file_type.is_file() {
+                *file_count += 1;
+                if *file_count > MAX_PACKAGE_FILES {
+                    bail!("PLUGIN_INVALID: too many files in package");
+                }
+                let meta = entry.metadata()?;
+                *total_bytes += meta.len();
+                if *total_bytes > MAX_PACKAGE_BYTES {
+                    bail!("PLUGIN_INVALID: package exceeds 50MB limit");
+                }
+                if let Some(parent) = target.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::copy(entry.path(), &target)?;
+            }
+        }
+        Ok(())
+    }
+    walk(src, src, dest, &mut file_count, &mut total_bytes)
+}
+
+fn safe_join(base: &Path, rel: &str) -> Result<PathBuf> {
+    let rel = rel.replace('\\', "/");
+    if rel.starts_with('/') || rel.contains(':') {
+        bail!("PLUGIN_INVALID: absolute paths are not allowed");
+    }
+    let mut out = base.to_path_buf();
+    for comp in Path::new(&rel).components() {
+        match comp {
+            Component::Normal(p) => out.push(p),
+            Component::CurDir => {}
+            Component::ParentDir => bail!("PLUGIN_INVALID: path traversal is not allowed"),
+            _ => bail!("PLUGIN_INVALID: unsupported path component"),
+        }
+    }
+    if !out.starts_with(base) {
+        bail!("PLUGIN_INVALID: path escaped package root");
+    }
+    Ok(out)
+}
+
+fn permission_diff(old: &[String], new: &[String]) -> Vec<String> {
+    new.iter()
+        .filter(|p| !old.iter().any(|o| o == *p))
+        .cloned()
+        .collect()
+}
+
+fn sanitize_id(id: &str) -> String {
+    id.chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '_' })
+        .collect()
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
+}
+
+fn crc32(data: &[u8]) -> u32 {
+    let mut crc: u32 = 0xFFFF_FFFF;
+    for b in data {
+        crc ^= u32::from(*b);
+        for _ in 0..8 {
+            let mask = (!(crc & 1)).wrapping_add(1);
+            crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+        }
+    }
+    !crc
+}
+
+fn read_u16(bytes: &[u8], offset: usize) -> Result<u16> {
+    let slice = bytes
+        .get(offset..offset + 2)
+        .ok_or_else(|| anyhow!("PLUGIN_INVALID: zip truncated"))?;
+    Ok(u16::from_le_bytes([slice[0], slice[1]]))
+}
+
+fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
+    let slice = bytes
+        .get(offset..offset + 4)
+        .ok_or_else(|| anyhow!("PLUGIN_INVALID: zip truncated"))?;
+    Ok(u32::from_le_bytes([slice[0], slice[1], slice[2], slice[3]]))
+}
+
+fn download_url(url: &str) -> Result<Vec<u8>> {
+    // Minimal blocking HTTP(S) client using std + system curl-less raw TCP is
+    // brittle; use ureq-less approach via std::process is undesirable.
+    // For host-core we implement a tiny HTTPS-capable fetch with reqwest-free
+    // std only for http, and for https rely on native `curl` if present is also
+    // undesirable. Use a pure-Rust fallback via `std::net` HTTP only, else error.
+    if let Some(rest) = url.strip_prefix("http://") {
+        let (host_port, path) = rest.split_once('/').unwrap_or((rest, ""));
+        let path = if path.is_empty() { "/" } else { &format!("/{path}") };
+        let host = host_port.split(':').next().unwrap_or(host_port);
+        let port: u16 = host_port
+            .split(':')
+            .nth(1)
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(80);
+        let mut stream = std::net::TcpStream::connect((host, port))
+            .with_context(|| format!("connect {host}:{port}"))?;
+        stream.set_read_timeout(Some(Duration::from_secs(15)))?;
+        stream.set_write_timeout(Some(Duration::from_secs(15)))?;
+        let req = format!(
+            "GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\nUser-Agent: pi-desktop-host-core\r\nAccept: */*\r\n\r\n"
+        );
+        stream.write_all(req.as_bytes())?;
+        let mut buf = Vec::new();
+        stream.read_to_end(&mut buf)?;
+        let text = String::from_utf8_lossy(&buf);
+        let Some(idx) = text.find("\r\n\r\n") else {
+            bail!("PLUGIN_NETWORK: invalid HTTP response");
+        };
+        let body = buf[idx + 4..].to_vec();
+        if body.len() as u64 > MAX_PACKAGE_BYTES {
+            bail!("PLUGIN_INVALID: package exceeds 50MB limit");
+        }
+        return Ok(body);
+    }
+    bail!("PLUGIN_NETWORK: only file:// and http:// market urls are supported in host-core")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn install_market_package_and_check_update_metadata() {
+        let dir = tempdir().unwrap();
+        let mut mgr = PluginManager::new(dir.path());
+        let search = mgr.market_search(Some("hello"), None).unwrap();
+        assert!(!search.is_empty());
+        let installed = mgr
+            .install_from_market("demo.hello", None, true, true, None)
+            .unwrap();
+        assert_eq!(installed.plugin.id, "demo.hello");
+        assert!(installed.plugin.path.unwrap().contains("installed"));
+        assert_eq!(installed.plugin.source, "marketplace");
+        let listed = mgr.list();
+        assert_eq!(listed.len(), 1);
+    }
+
+    #[test]
+    fn package_path_traversal_rejected() {
+        let dir = tempdir().unwrap();
+        let bad = make_zip(&[("../evil.js", b"alert(1)")]);
+        let pkg = dir.path().join("bad.piplug");
+        fs::write(&pkg, bad).unwrap();
+        let mut mgr = PluginManager::new(dir.path());
+        let err = mgr
+            .install_from_package(
+                pkg.to_str().unwrap(),
+                InstallOptions {
+                    source: "installed".into(),
+                    enable: true,
+                    marketplace: None,
+                    expected_shasum: None,
+                    auto_update: false,
+                    granted_permissions: None,
+                },
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("path traversal") || err.contains("PLUGIN_INVALID"));
+    }
+
+    #[test]
+    fn high_risk_permissions_roundtrip_on_notes_plugin() {
+        let dir = tempdir().unwrap();
+        let mut mgr = PluginManager::new(dir.path());
+        let installed = mgr
+            .install_from_market("demo.workspace-notes", None, true, false, None)
+            .unwrap();
+        assert!(installed
+            .plugin
+            .permissions
+            .iter()
+            .any(|p| p == "fs.write.workspace"));
+        assert!(installed
+            .plugin
+            .permissions
+            .iter()
+            .any(|p| p == "net.fetch"));
     }
 }

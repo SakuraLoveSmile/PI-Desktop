@@ -52,25 +52,69 @@ export type PluginTool = {
   description: string;
   risk?: "low" | "medium" | "high";
   schema?: unknown;
-  execute: (args: unknown) => Promise<unknown> | unknown;
+  execute: (args: unknown, ctx?: PluginToolExecContext) => Promise<unknown> | unknown;
+};
+
+export type PluginToolExecContext = {
+  sessionId?: string;
+  turnId?: string;
+  signal?: AbortSignal;
+  log: (msg: string) => void;
 };
 
 export type PluginHostApi = {
+  app: {
+    getVersion: () => Promise<string>;
+    getLocale: () => Promise<string>;
+  };
   plugin: {
     getId: () => string;
+    getManifest: () => PluginManifest;
     getSettings: () => Promise<Record<string, unknown>>;
+    setSettings: (partial: Record<string, unknown>) => Promise<void>;
+    getDataPath: () => Promise<string>;
   };
   commands: {
     register: (command: PluginCommand) => Promise<void>;
     unregister: (id: string) => Promise<void>;
   };
+  ui: {
+    openPanel: (opts?: { title?: string }) => Promise<void>;
+    closePanel: () => Promise<void>;
+    showToast: (message: string, level?: "info" | "warn" | "error") => Promise<void>;
+    notify: (input: { title: string; body?: string }) => Promise<void>;
+  };
+  workspace: {
+    get: () => Promise<{ path: string; name: string } | null>;
+  };
+  fs: {
+    readText: (pathFromWorkspaceRoot: string) => Promise<string>;
+    writeText: (pathFromWorkspaceRoot: string, content: string) => Promise<void>;
+    glob: (pattern: string) => Promise<string[]>;
+  };
   agent: {
     registerTool: (tool: PluginTool) => Promise<void>;
     unregisterTool: (name: string) => Promise<void>;
   };
-  ui: {
-    openPanel: (opts?: { title?: string }) => Promise<void>;
-    showToast: (message: string) => Promise<void>;
+  clipboard: {
+    readText: () => Promise<string>;
+    writeText: (text: string) => Promise<void>;
+  };
+  shell: {
+    openExternal: (url: string) => Promise<void>;
+  };
+  net: {
+    fetch: (input: {
+      url: string;
+      method?: string;
+      headers?: Record<string, string>;
+      body?: string;
+      timeoutMs?: number;
+    }) => Promise<{ status: number; headers: Record<string, string>; bodyText: string }>;
+  };
+  events: {
+    on: (event: string, handler: (...args: unknown[]) => void) => void;
+    off: (event: string, handler: (...args: unknown[]) => void) => void;
   };
 };
 
@@ -78,6 +122,21 @@ export type PluginModule = {
   onLoad?: () => Promise<void> | void;
   onUnload?: () => Promise<void> | void;
 };
+
+export const PLUGIN_PERMISSIONS = [
+  "ui.panel",
+  "clipboard.read",
+  "clipboard.write",
+  "notify",
+  "fs.read.workspace",
+  "fs.write.workspace",
+  "agent.tool.register",
+  "agent.prompt.inject",
+  "net.fetch",
+  "shell.openExternal",
+] as const;
+
+export type PluginPermission = (typeof PLUGIN_PERMISSIONS)[number];
 
 export function validateManifest(raw: unknown): {
   ok: boolean;

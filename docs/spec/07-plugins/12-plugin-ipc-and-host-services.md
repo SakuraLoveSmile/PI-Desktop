@@ -27,8 +27,8 @@ PluginManager
 - `plugin/list`
 - `plugin/detail`
 - `plugin/loadDev`
-- `plugin/installFromPath`
-- `plugin/installFromPackage`
+- `plugin/installFromPath` ✅
+- `plugin/installFromPackage` ✅
 - `plugin/enable`
 - `plugin/disable`
 - `plugin/uninstall`
@@ -39,18 +39,21 @@ PluginManager
 - `plugin/revokePermissions`
 - `plugin/openDataDir`
 - `plugin/openInstallDir`
+- `plugin/openPanel`
+- `plugin/setAutoUpdate`
 
 ### commandPalette domain
 - `commandPalette/search`
 - `commandPalette/execute`
 - `commandPalette/listRecent`
 
-### market domain (implemented later, protocol defined first)
+### market domain (implemented)
 - `market/search`
 - `market/getDetail`
 - `market/install`
 - `market/checkUpdates`
-- `market/listProviders`
+- `market/applyUpdates`
+- `market/listProviders` (single official provider for now)
 
 ## 4. Events (main → renderer)
 

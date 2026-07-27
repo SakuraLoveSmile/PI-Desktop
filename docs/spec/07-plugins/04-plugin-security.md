@@ -99,3 +99,15 @@ The host should be able to:
 3. A plugin cannot read API keys
 4. A plugin panel cannot call arbitrary host IPC
 5. An uncaught exception from a plugin does not cause the app to exit
+
+
+## 11. Implementation status
+
+Current enforcement:
+
+1. Default-deny permission checks in `PluginRuntime`
+2. Workspace path boundary checks for plugin fs APIs
+3. Panel windows use sandboxed preload + isolated session partitions
+4. Secrets / host DB remain inaccessible to plugins
+5. Marketplace/package install requires explicit permission acceptance in UI
+6. Auto-update refuses silent permission expansion
