@@ -778,8 +778,9 @@ Each scenario is documented in this format:
 - **Expected**: Reasoning models show the current Thinking level immediately to
   the right of Chat / Agent, expose only their sparse supported levels as a
   single-column list in canonical order, mark the selected row with a trailing
-  check, and close the menu after selection. Non-reasoning models show no
-  Thinking trigger. Custom providers may persist
+  check, size the menu to its content without exceeding 200px or the available
+  viewport, truncate overlong labels, and close the menu after selection.
+  Non-reasoning models show no Thinking trigger. Custom providers may persist
   `supportedThinkingLevels` such as `["off","high"]` from Settings and the
   Composer must not invent graded options for those sets. The custom action
   persists `supportsReasoning` and selects the supported level nearest
@@ -1101,22 +1102,25 @@ Each scenario is documented in this format:
 - **Steps**: 1) Focus and view session A, then complete a turn in A. 2) While
   still focused on A, fail a turn in background session B. 3) Unfocus the
   window and complete another turn in A. 4) Abort a fourth turn. 5) Repeat each
-  terminal RPC. 6) Open the bell and switch between All and Unread. 7) Mark one
+  terminal RPC. 6) Confirm the main titlebar has no bell, then open the bell in
+  the expanded sidebar footer and switch between All and Unread. 7) Mark one
   row read, close/reopen the popover, and restart the app. 8) Select the other
   row. 9) Generate a host fixture with 205 eligible terminal turns. 10) Use
   Mark all read, then Clear.
 - **Expected**: A's visible-current completion creates no row. Exactly two rows
   exist, newest first: the unfocused A completion and background B failure,
   with localized labels, snapshotted session titles, and B's stable code.
-  Abort/repeated terminal calls create no row. Badge and Unread show the exact
-  unread count without opening implicitly reading rows. Read state and both
+  Abort/repeated terminal calls create no row. The former footer Help shortcut
+  is absent; the 32px footer bell and its upward-opening popover replace it.
+  Badge and Unread show the exact unread count without opening implicitly
+  reading rows. Read state and both
   records survive restart. Row selection marks it read and activates its bound
   project/session. The fixture retains exactly the newest 200 rows. Mark all
   preserves rows with zero unread; Clear empties only the inbox and leaves
   sessions, turns, and transcripts intact.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, `03-runtime/01-ipc-protocol.md`,
-  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D117)
+  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D117/D130)
 - **Acceptance**: C (turn completion), F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Draft
@@ -1404,9 +1408,9 @@ This test plan spec is accepted when:
   with no separator. It shows a 44px profile trigger containing a 30px circular
   user glyph, `Custom` + `Local profile` / `本地配置` on two lines, and a
   trailing chevron.
-- A separate 32px Help shortcut remains visible at the right. Clicking it opens
-  Settings with Info selected; it is not an inert or mislabeled Settings
-  shortcut.
+- A separate 32px notification Bell remains visible at the right with its
+  unread badge. It replaces the former Help shortcut and opens the inbox above
+  the footer; the main titlebar has no duplicate Bell.
 - Traffic lights sit at Codex `{x:16,y:16}` with 46px toolbar; back/forward nav lives in the drag row after lights.
 
 ### US-UI-17 PI-Desktop home hero logo
@@ -1755,12 +1759,13 @@ This test plan spec is accepted when:
 - Card click still prefills the composer and focuses the draft.
 
 
-### US-UI-65 Durable notification inbox (D117)
+### US-UI-65 Durable notification inbox (D117/D130)
 - Verify a focused-current completion leaves the inbox unchanged, then
   populate it through background/unfocused completed and failed task rows,
-  including one long session title. Inspect the titlebar and popover in
-  light/dark themes at default and narrow supported widths.
-- Expect a stable 32px bell control, non-overlapping `1`–`99` / `99+` badge,
+  including one long session title. Inspect the expanded sidebar footer and
+  popover in light/dark themes at default and narrow supported widths.
+- Expect no titlebar bell, a stable 32px footer bell in the former Help position,
+  a non-overlapping `1`–`99` / `99+` badge,
   dense 360px-or-narrower list, localized kind/session/time/error content, and
   distinct text/icon/unread-dot semantics without nested cards or clipped text.
 - Switch All/Unread; use Tab, arrow keys, Home/End, Enter/Space, Escape, and

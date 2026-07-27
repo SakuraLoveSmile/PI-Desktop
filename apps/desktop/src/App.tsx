@@ -20,7 +20,6 @@ import { CommandPalette } from "./components/CommandPalette";
 import { SearchDialog } from "./components/SearchDialog";
 import { ToastHost } from "./components/Toast";
 import { UpdateBanner } from "./components/UpdateBanner";
-import { NotificationCenter } from "./components/NotificationCenter";
 import { WindowControls } from "./components/WindowControls";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
@@ -703,9 +702,6 @@ function AppShell() {
               />
             </div>
           )}
-          <div className="main-titlebar-right no-drag">
-            <NotificationCenter />
-          </div>
         </div>
 
         {backendDown && (

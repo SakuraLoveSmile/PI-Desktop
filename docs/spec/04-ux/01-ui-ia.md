@@ -14,7 +14,7 @@ destination, chat as the home surface, tools and permissions inline.
 
 ```text
 +----------------------------------------------------------------------+
-| Titlebar row (46px): traffic lights · back/forward · bell · actions  |
+| Titlebar row (46px): traffic lights · back/forward · actions         |
 +------------------+--------------------------------+------------------+
 | Sidebar (~275px) | Main pane (active destination) | Work panel       |
 |  New task        |  chat home / transcript        |  (optional,      |
@@ -24,7 +24,7 @@ destination, chat as the home surface, tools and permissions inline.
 |   Project A      |                                | ───────────────  |
 |   Project B      |                                | Active artifact  |
 |  Sessions     +↕ |                                | surface          |
-|  Footer: local   |  Floating composer (chat)      |                  |
+| Footer + bell    |  Floating composer (chat)      |                  |
 +------------------+--------------------------------+------------------+
 ```
 
@@ -33,9 +33,9 @@ destination, chat as the home surface, tools and permissions inline.
   section with a persistent new-project action, path-less conversations under
   a separate **Sessions** section with new-session and sort actions, and the
   WorkBuddy-inspired local profile footer
-  (Custom / Local profile → Settings / Logs / Theme, plus a direct Help
-  shortcut to Settings → Info, D113/D093). Pull requests and Scheduled are
-  intentionally omitted from the home sidebar. Each retained project is a
+  (Custom / Local profile → Settings / Logs / Theme, plus the durable
+  notification bell and unread badge, D130/D117). Pull requests and Scheduled
+  are intentionally omitted from the home sidebar. Each retained project is a
   path-keyed tab/group that can be
   collapsed independently. Project and conversation rows expose
   non-destructive pin/archive actions, an independent conversation-branch
@@ -52,9 +52,9 @@ destination, chat as the home surface, tools and permissions inline.
   `hiddenInset` traffic lights and the system application menu.
   Windows/Linux use a menu-free frameless 46px row with navigation on the
   left and accessible minimize / maximize-or-restore / close controls on the
-  right (D129). Back/forward controls traverse destination history; the right
-  side also contains the notification bell/unread badge. The bell opens a
-  durable local inbox rather than a separate destination (D117).
+  right (D129). Back/forward controls traverse destination history. The main
+  titlebar has no notification action; the durable local inbox opens from the
+  sidebar footer bell instead (D130/D117).
 - **Work panel**: docked right column (not an overlay) created only by file,
   URL, browser-preview, successful-command, or successful workspace-edit
   artifacts. Its
@@ -151,7 +151,7 @@ independent Plugins destination described in §3.5.
 | Permission dialog | tool permission request | risk copy, args preview, allow-once / allow-session / deny, 120s countdown → deny |
 | Model menu | composer model chip | configured provider/model choices + settings entry (D091) |
 | Profile menu | sidebar footer | Settings / Logs / Theme cycle (D041) |
-| Notification inbox | titlebar bell | All/Unread views, task completion/failure rows, mark-all-read and clear actions (D117) |
+| Notification inbox | sidebar footer bell | All/Unread views, task completion/failure rows, mark-all-read and clear actions (D130/D117) |
 | Toasts | events (plugin toast, backend restored, copy) | top-center; 4s default, 8s for errors |
 
 ## 5. Navigation model
@@ -192,8 +192,9 @@ independent Plugins destination described in §3.5.
 - Completed/failed turn not already visible → host-core appends one durable
   inbox row. A result shown in the visible, focused current chat and every
   `aborted` turn append none. Background sessions and any turn finishing while
-  the window is unfocused still append. The bell badge shows the unread count;
-  selecting a row marks it read and activates its bound project/session.
+  the window is unfocused still append. The sidebar footer bell badge shows the
+  unread count; selecting a row marks it read and activates its bound
+  project/session.
   Electron additionally presents a native system notification only when the
   app window is unfocused, and clicking it focuses the window before activating
   the same session (D117).

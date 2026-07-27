@@ -19,8 +19,10 @@ const chineseCatalog = await readFile(
   "utf8",
 );
 
-test("notification center exposes an accessible titlebar trigger and dialog", () => {
+test("notification center exposes an accessible sidebar footer trigger and dialog", () => {
   assert.match(componentSource, /<IconBell size=\{14\} aria-hidden \/>/);
+  assert.match(componentSource, /className=\{`footer-notification notification-trigger/);
+  assert.match(componentSource, /onBeforeOpen\?\.\(\)/);
   assert.match(componentSource, /aria-haspopup="dialog"/);
   assert.match(componentSource, /aria-controls="notification-popover"/);
   assert.match(componentSource, /aria-expanded=\{open\}/);
@@ -69,8 +71,9 @@ test("notification popover has bounded desktop and mobile layouts", () => {
   );
   assert.match(
     globalStyles,
-    /@media \(max-width: 480px\)\s*\{\s*\.notification-popover\s*\{[^}]*position:\s*fixed;[^}]*left:\s*8px;/s,
+    /\.notification-popover\s*\{[^}]*bottom:\s*calc\(100% \+ 8px\);[^}]*left:\s*0;/s,
   );
+  assert.match(globalStyles, /\.notification-badge\s*\{[^}]*var\(--ds-bg-sidebar\)/s);
   assert.match(globalStyles, /\.notification-list\s*\{[^}]*overflow-y:\s*auto;/s);
   assert.match(globalStyles, /\.notification-item\.unread\s*\{/);
 });

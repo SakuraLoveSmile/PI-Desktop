@@ -314,10 +314,11 @@ Sidebar footer (D113): a transparent `58px`-high band with no separator. The
 left profile trigger is `44px` high and flexes to fill the available width. It
 contains a `30px` circular user glyph, a two-line identity stack (`Custom` at
 the primary text size and `Local profile` / localized equivalent as muted
-metadata), and a trailing chevron. The Help shortcut is a separate `32px`
-square icon button on the right and opens Settings → Info. Hover and active
+metadata), and a trailing chevron. The notification inbox trigger is a separate
+`32px` square Bell icon button on the right, carries the unread badge, and opens
+its popover above the footer. Hover and active
 states use semantic sidebar surfaces; neither control adds a persistent card
-fill or cloud/update badge.
+fill.
 
 The profile menu is `280px` wide, opens `8px` above the footer, and uses the
 standard opaque elevated-menu surface, subtle border, and dialog shadow. Its
@@ -486,8 +487,9 @@ The composer renders only controls connected to the active pi session:
 - A reasoning-capable model exposes a separate Thinking trigger immediately to
   the right of Chat / Agent in the left toolbar group. The trigger shows the
   current level and opens the model's real `supportedThinkingLevels` as a
-  compact single-column list with a check on the selected row; models without
-  reasoning support render no trigger.
+  compact single-column list with a check on the selected row. The menu fits its
+  content, caps at 200px and the available viewport width, and truncates labels
+  that exceed that cap; models without reasoning support render no trigger.
 - Runtime controls are disabled while the active session is running.
 - File, photo, and appshot controls remain hidden until their payload contracts
   are implemented end to end.

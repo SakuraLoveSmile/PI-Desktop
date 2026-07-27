@@ -45,6 +45,10 @@ test("composer exposes the runtime thinking level order and provider filtering",
   assert.match(composerSource, /composer-thinking-list/);
   assert.doesNotMatch(stylesSource, /\.composer-thinking-levels/);
   assert.doesNotMatch(stylesSource, /\.composer-thinking-level\b/);
+  assert.match(
+    stylesSource,
+    /\.composer-model-menu\.composer-thinking-menu\s*\{[\s\S]*?width:\s*max-content;[\s\S]*?max-width:\s*min\(200px,\s*calc\(100vw - 24px\)\);/,
+  );
   assert.match(composerSource, /availableThinkingLevels/);
 });
 
