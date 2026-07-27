@@ -999,9 +999,10 @@ Each scenario is documented in this format:
 - **Steps**: 1) Open the session in dark theme. 2) Inspect user and assistant
   rows at rest and on hover. 3) Start a streaming assistant answer. 4) Switch
   to light theme and repeat. 5) Focus the copy control with the keyboard.
-- **Expected**: User turns are right-aligned soft plates capped near 560px with
-  subtle border/shadow; assistant answers remain transparent full-width prose
-  in the 720px content band. Row spacing is denser (~10px). Copy chips are
+- **Expected**: User turns are right-aligned, theme-neutral soft plates capped
+  near 560px, derived from each theme's primary text ink rather than an accent
+  tint, with a subtle border; assistant answers remain transparent full-width
+  prose in the 720px content band. Row spacing is denser (~10px). Copy chips are
   hidden at rest, appear on hover/focus-within, and stay right-aligned under
   user turns. Streaming assistant answers show a thin accent left rule without
   boxing the whole answer. Both themes keep readable contrast on the user
@@ -1712,6 +1713,8 @@ This test plan spec is accepted when:
 - The row shows a semantic 15–16px icon, progressive/past-tense action,
   ellipsized monospace argument hint, quiet disclosure chevron, and localized
   running/error/denied state.
+- Fork-family tools show the GitFork branch icon instead of the generic tool
+  glyph.
 - Expanding a completed call reveals output before input. Both sections are
   independently copyable and capped with internal scrolling.
 - Reloading the session preserves the action label and argument hint instead of

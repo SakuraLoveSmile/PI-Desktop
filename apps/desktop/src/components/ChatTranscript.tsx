@@ -28,6 +28,7 @@ import {
 } from "../lib/chat-links";
 import {
   IconArrowDown,
+  IconBranch,
   IconCheck,
   IconCircleAlert,
   IconChevronLeft,
@@ -211,6 +212,7 @@ const TOOL_ACTION_KEYS: Record<ToolAction, string> = {
   edit: "chat.toolEdited",
   run: "chat.toolRan",
   fetch: "chat.toolFetched",
+  fork: "chat.toolUsed",
   use: "chat.toolUsed",
 };
 
@@ -222,6 +224,7 @@ const TOOL_RUNNING_KEYS: Record<ToolAction, string> = {
   edit: "chat.toolEditing",
   run: "chat.toolRunning",
   fetch: "chat.toolFetching",
+  fork: "chat.toolUsing",
   use: "chat.toolUsing",
 };
 
@@ -241,6 +244,8 @@ function ToolActionIcon({ action }: { action: ToolAction }) {
       return <IconTerminal {...props} />;
     case "fetch":
       return <IconGlobe {...props} />;
+    case "fork":
+      return <IconBranch {...props} />;
     default:
       return <IconWrench {...props} />;
   }

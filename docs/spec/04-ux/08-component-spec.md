@@ -612,8 +612,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
 ### 8.3 Layout
 
 - Max content band: 760px thread column; assistant body max 720px
-- User: right-aligned soft plate (`color-mix` on primary ink, subtle border,
-  `radius-lg-plus`), capped at `min(78%, 560px)` so short prompts read as
+- User: right-aligned, theme-neutral soft plate (`color-mix` on primary ink,
+  never a fixed accent tint), with a subtle primary-ink border,
+  `radius-lg-plus`, capped at `min(78%, 560px)` so short prompts read as
   chat turns rather than full-width blocks. User body is plaintext with
   preserved hard newlines (`white-space: pre-wrap`);
   only trailing/leading composer trim is applied, never internal newline
@@ -641,6 +642,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
 - Gap: 10px vertical padding between consecutive message rows (denser than
   consumer chat, closer to WorkBuddy task transcript)
 - Font: text-base (14px) for body; text-sm (13px) mono for code
+- Tool activity: tool-name classification selects a semantic 15px icon;
+  `fork`, `fork_agent`, `fork_task`, and `fork_session` use the GitFork branch
+  icon instead of the generic tool glyph.
 
 ### 8.4 States
 

@@ -17,6 +17,8 @@ test("maps built-in tools to concise Codex-style actions", () => {
   assert.equal(getToolAction("exec_command"), "run");
   assert.equal(getToolAction("functions.exec_command"), "run");
   assert.equal(getToolAction("web_search"), "fetch");
+  assert.equal(getToolAction("fork"), "fork");
+  assert.equal(getToolAction("functions.fork_agent"), "fork");
 });
 
 test("builds a single-line bounded hint from the most useful argument", () => {
