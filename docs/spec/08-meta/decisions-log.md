@@ -272,3 +272,9 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Plugin maintainers pack sources with repo scripts and publish by pushing to that repository.
 - Local bundled catalog remains fallback only when remote fetch fails.
 
+
+## 2026-07-28 — Marketplace template + detail pane
+
+- Official warehouse gained a practical template plugin `demo.workspace-summary` and CONTRIBUTING guide.
+- PI-Desktop marketplace UI now opens a detail pane with README, changelog, and version list via `market.getDetail`.
+

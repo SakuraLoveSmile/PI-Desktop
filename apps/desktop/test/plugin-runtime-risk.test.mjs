@@ -60,3 +60,10 @@ test("plugins page can refresh the official marketplace repository", () => {
   assert.match(pageSrc, /marketRefresh|refreshMarket|refreshRemote/);
   assert.match(pageSrc, /pi-desktop-plugins|marketSource/);
 });
+
+
+test("marketplace detail pane renders readme changelog and versions", () => {
+  assert.match(pageSrc, /marketGetDetail/);
+  assert.match(pageSrc, /viewDetails|detailTitle|readmeMarkdown|versions/);
+  assert.match(pageSrc, /installVersion|selectedVersion|changelog/);
+});

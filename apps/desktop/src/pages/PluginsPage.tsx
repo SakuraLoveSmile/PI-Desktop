@@ -4,7 +4,12 @@ import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import { Button, Panel, cx } from "../components/ui";
 import { IconAt, IconX } from "../components/icons";
-import type { MarketPluginSummary, PluginSummary } from "@pi-desktop/shared";
+import { Markdown } from "../components/Markdown";
+import type {
+  MarketPluginDetail,
+  MarketPluginSummary,
+  PluginSummary,
+} from "@pi-desktop/shared";
 
 type TabId = "installed" | "market";
 
@@ -23,6 +28,25 @@ function permissionLabel(key: string, t: (k: string, o?: any) => string): string
   return t(`plugins.permissions.${key}`, { defaultValue: key });
 }
 
+function formatBytes(size?: number): string {
+  if (!size || size <= 0) return "-";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function formatDate(value?: string): string {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString();
+}
+
+function shortSha(value?: string): string {
+  if (!value) return "-";
+  return value.length > 12 ? `${value.slice(0, 12)}…` : value;
+}
+
 export function PluginsPage() {
   const { t } = useTranslation();
   const plugins = useAppStore((s) => s.plugins);
@@ -34,9 +58,18 @@ export function PluginsPage() {
   const [market, setMarket] = useState<MarketPluginSummary[]>([]);
   const [marketLoading, setMarketLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [pendingInstall, setPendingInstall] = useState<MarketPluginSummary | null>(null);
+  const [pendingInstall, setPendingInstall] = useState<{
+    id: string;
+    name: string;
+    permissions: string[];
+    version?: string;
+  } | null>(null);
   const [autoUpdate, setAutoUpdate] = useState(true);
   const [marketSource, setMarketSource] = useState<string>("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<MarketPluginDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [selectedVersion, setSelectedVersion] = useState<string>("");
 
   const refreshMarket = async (q = query, opts?: { refreshRemote?: boolean }) => {
     setMarketLoading(true);
@@ -54,17 +87,47 @@ export function PluginsPage() {
       }
       const res = await api.marketSearch(q);
       setMarket(res.plugins ?? []);
-      if (!marketSource && res.providerId) {
+      if (!marketSource) {
         setMarketSource(
           res.providerId === "official"
             ? "https://github.com/vastsa/pi-desktop-plugins"
-            : res.providerId,
+            : res.providerId || "",
         );
       }
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e), { variant: "error" });
     } finally {
       setMarketLoading(false);
+    }
+  };
+
+  const openDetail = async (id: string) => {
+    setSelectedId(id);
+    setDetailLoading(true);
+    try {
+      const res = await api.marketGetDetail(id);
+      const raw = res.plugin as MarketPluginDetail & {
+        summary?: MarketPluginSummary;
+      };
+      const plugin: MarketPluginDetail = raw.summary
+        ? {
+            ...raw.summary,
+            readmeMarkdown: raw.readmeMarkdown,
+            versions: raw.versions ?? [],
+            screenshots: raw.screenshots,
+            homepage: raw.homepage,
+            repository: raw.repository,
+            permissions: raw.permissions ?? raw.summary.permissionSummary ?? [],
+            safetyNotes: raw.safetyNotes,
+          }
+        : raw;
+      setDetail(plugin);
+      setSelectedVersion(plugin.versions?.[0]?.version || plugin.latestVersion || "");
+    } catch (e) {
+      setDetail(null);
+      showToast(e instanceof Error ? e.message : String(e), { variant: "error" });
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -78,6 +141,15 @@ export function PluginsPage() {
     for (const plugin of plugins) map.set(plugin.id, plugin);
     return map;
   }, [plugins]);
+
+  const activeVersion = useMemo(() => {
+    if (!detail?.versions?.length) return null;
+    return (
+      detail.versions.find((v) => v.version === selectedVersion) ||
+      detail.versions[0] ||
+      null
+    );
+  }, [detail, selectedVersion]);
 
   const loadDev = async () => {
     try {
@@ -125,18 +197,32 @@ export function PluginsPage() {
     }
   };
 
+  const queueInstall = (input: {
+    id: string;
+    name: string;
+    permissions: string[];
+    version?: string;
+  }) => {
+    setPendingInstall(input);
+    setAutoUpdate(true);
+  };
+
   const confirmInstall = async () => {
     if (!pendingInstall) return;
     setBusyId(pendingInstall.id);
     try {
       await api.marketInstall({
         id: pendingInstall.id,
+        version: pendingInstall.version,
         enable: true,
         autoUpdate,
-        grantedPermissions: pendingInstall.permissionSummary ?? [],
+        grantedPermissions: pendingInstall.permissions ?? [],
       });
       await refreshPlugins();
       await refreshMarket();
+      if (selectedId === pendingInstall.id) {
+        await openDetail(pendingInstall.id);
+      }
       showToast(t("plugins.installed", { name: pendingInstall.name }), {
         variant: "success",
       });
@@ -288,35 +374,17 @@ export function PluginsPage() {
                       <button
                         type="button"
                         className="plugins-action"
-                        onClick={async () => {
-                          setBusyId(plugin.id);
-                          try {
-                            await api.marketInstall({
-                              id: plugin.id,
-                              version: plugin.updateAvailable?.version,
-                              enable: true,
-                              autoUpdate: !!plugin.autoUpdate,
-                              grantedPermissions: [
-                                ...(plugin.permissions ?? []),
-                                ...(plugin.updateAvailable?.permissionDiff ?? []),
-                              ],
-                            });
-                            await refreshPlugins();
-                            showToast(
-                              t("plugins.updated", {
-                                name: plugin.name,
-                                version: plugin.updateAvailable?.version,
-                              }),
-                              { variant: "success" },
-                            );
-                          } catch (e) {
-                            showToast(e instanceof Error ? e.message : String(e), {
-                              variant: "error",
-                            });
-                          } finally {
-                            setBusyId(null);
-                          }
-                        }}
+                        onClick={() =>
+                          queueInstall({
+                            id: plugin.id,
+                            name: plugin.name,
+                            version: plugin.updateAvailable?.version,
+                            permissions: [
+                              ...(plugin.permissions ?? []),
+                              ...(plugin.updateAvailable?.permissionDiff ?? []),
+                            ],
+                          })
+                        }
                       >
                         {busyId === plugin.id
                           ? t("plugins.updating")
@@ -370,81 +438,107 @@ export function PluginsPage() {
             </div>
           )
         ) : (
-          <div className="plugins-market">
-            <div className="plugins-market-bar">
-              <input
-                className="plugins-search"
-                value={query}
-                placeholder={t("plugins.marketSearchPlaceholder")}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void refreshMarket(query);
-                }}
-              />
-              <Button variant="secondary" onClick={() => void refreshMarket(query)}>
-                {t("plugins.search")}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => void refreshMarket(query, { refreshRemote: true })}
-              >
-                {t("plugins.refreshMarket")}
-              </Button>
-            </div>
-            {marketSource ? (
-              <div className="plugins-market-source">
-                {t("plugins.marketSource", { url: marketSource })}
+          <div className={cx("plugins-market", selectedId && "with-detail")}>
+            <div className="plugins-market-main">
+              <div className="plugins-market-bar">
+                <input
+                  className="plugins-search"
+                  value={query}
+                  placeholder={t("plugins.marketSearchPlaceholder")}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void refreshMarket(query);
+                  }}
+                />
+                <Button variant="secondary" onClick={() => void refreshMarket(query)}>
+                  {t("plugins.search")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => void refreshMarket(query, { refreshRemote: true })}
+                >
+                  {t("plugins.refreshMarket")}
+                </Button>
               </div>
-            ) : null}
-            {marketLoading ? (
-              <Panel className="page-card page-empty">
-                <div className="text-md text-text-secondary">{t("plugins.marketLoading")}</div>
-              </Panel>
-            ) : market.length === 0 ? (
-              <Panel className="page-card page-empty">
-                <div className="text-base-plus font-medium">{t("plugins.marketEmpty")}</div>
-              </Panel>
-            ) : (
-              <div className="plugins-market-grid">
-                {market.map((item) => {
-                  const installed = installedById.get(item.id);
-                  return (
-                    <Panel key={item.id} className="plugins-market-card">
-                      <div className="plugins-market-card-top">
-                        <div>
-                          <div className="plugins-name">
-                            {item.name}
-                            {item.verified ? (
-                              <span className="plugins-badge">{t("plugins.verified")}</span>
-                            ) : null}
+              {marketSource ? (
+                <div className="plugins-market-source">
+                  {t("plugins.marketSource", { url: marketSource })}
+                </div>
+              ) : null}
+              {marketLoading ? (
+                <Panel className="page-card page-empty">
+                  <div className="text-md text-text-secondary">
+                    {t("plugins.marketLoading")}
+                  </div>
+                </Panel>
+              ) : market.length === 0 ? (
+                <Panel className="page-card page-empty">
+                  <div className="text-base-plus font-medium">
+                    {t("plugins.marketEmpty")}
+                  </div>
+                </Panel>
+              ) : (
+                <div className="plugins-market-grid">
+                  {market.map((item) => {
+                    const installed = installedById.get(item.id);
+                    const active = selectedId === item.id;
+                    return (
+                      <Panel
+                        key={item.id}
+                        className={cx("plugins-market-card", active && "active")}
+                      >
+                        <button
+                          type="button"
+                          className="plugins-market-card-hit"
+                          onClick={() => void openDetail(item.id)}
+                        >
+                          <div className="plugins-market-card-top">
+                            <div>
+                              <div className="plugins-name">
+                                {item.name}
+                                {item.verified ? (
+                                  <span className="plugins-badge">
+                                    {t("plugins.verified")}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="plugins-meta">
+                                {item.author} · v{item.latestVersion}
+                                {item.downloads != null
+                                  ? ` · ${t("plugins.downloads", {
+                                      count: item.downloads,
+                                    })}`
+                                  : ""}
+                              </div>
+                            </div>
                           </div>
-                          <div className="plugins-meta">
-                            {item.author} · v{item.latestVersion}
-                            {item.downloads != null
-                              ? ` · ${t("plugins.downloads", { count: item.downloads })}`
-                              : ""}
+                          <div className="plugins-market-desc">{item.description}</div>
+                          <div className="plugins-perms">
+                            {(item.permissionSummary ?? [])
+                              .map((perm) => permissionLabel(perm, t))
+                              .join(" · ")}
                           </div>
-                        </div>
-                      </div>
-                      <div className="plugins-market-desc">{item.description}</div>
-                      <div className="plugins-perms">
-                        {(item.permissionSummary ?? [])
-                          .map((perm) => permissionLabel(perm, t))
-                          .join(" · ")}
-                      </div>
-                      <div className="plugins-market-actions">
-                        {installed ? (
-                          <>
-                            <span className="plugins-meta">
-                              {t("plugins.installedVersion", {
-                                version: installed.version,
-                              })}
-                            </span>
-                            {item.updateAvailable ? (
+                        </button>
+                        <div className="plugins-market-actions">
+                          <Button
+                            variant="secondary"
+                            onClick={() => void openDetail(item.id)}
+                          >
+                            {t("plugins.viewDetails")}
+                          </Button>
+                          {installed ? (
+                            item.updateAvailable ? (
                               <Button
                                 variant="primary"
                                 disabled={busyId === item.id}
-                                onClick={() => setPendingInstall(item)}
+                                onClick={() =>
+                                  queueInstall({
+                                    id: item.id,
+                                    name: item.name,
+                                    permissions: item.permissionSummary ?? [],
+                                    version: item.latestVersion,
+                                  })
+                                }
                               >
                                 {t("plugins.updateNow")}
                               </Button>
@@ -452,23 +546,229 @@ export function PluginsPage() {
                               <Button variant="secondary" disabled>
                                 {t("plugins.installedLabel")}
                               </Button>
+                            )
+                          ) : (
+                            <Button
+                              variant="primary"
+                              disabled={busyId === item.id}
+                              onClick={() =>
+                                queueInstall({
+                                  id: item.id,
+                                  name: item.name,
+                                  permissions: item.permissionSummary ?? [],
+                                  version: item.latestVersion,
+                                })
+                              }
+                            >
+                              {t("plugins.install")}
+                            </Button>
+                          )}
+                        </div>
+                      </Panel>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {selectedId ? (
+              <aside className="plugins-detail" aria-label={t("plugins.detailTitle")}>
+                <div className="plugins-detail-header">
+                  <div>
+                    <div className="plugins-detail-kicker">{t("plugins.detailTitle")}</div>
+                    <h2 className="plugins-detail-title">
+                      {detail?.name || selectedId}
+                      {detail?.verified ? (
+                        <span className="plugins-badge">{t("plugins.verified")}</span>
+                      ) : null}
+                    </h2>
+                    <div className="plugins-meta">
+                      {detail?.id || selectedId}
+                      {detail?.author ? ` · ${detail.author}` : ""}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="plugins-detail-close"
+                    aria-label={t("plugins.closeDetail")}
+                    onClick={() => {
+                      setSelectedId(null);
+                      setDetail(null);
+                    }}
+                  >
+                    <IconX size={14} />
+                  </button>
+                </div>
+
+                {detailLoading ? (
+                  <div className="plugins-detail-empty">{t("plugins.detailLoading")}</div>
+                ) : !detail ? (
+                  <div className="plugins-detail-empty">{t("plugins.detailFailed")}</div>
+                ) : (
+                  <div className="plugins-detail-body">
+                    <p className="plugins-detail-desc">{detail.description}</p>
+
+                    <div className="plugins-detail-links">
+                      {detail.repository ? (
+                        <span>{t("plugins.repository")}: {detail.repository}</span>
+                      ) : null}
+                      {detail.homepage ? (
+                        <span>{t("plugins.homepage")}: {detail.homepage}</span>
+                      ) : null}
+                    </div>
+
+                    {detail.safetyNotes ? (
+                      <div className="plugins-detail-callout">
+                        <div className="plugins-detail-section-title">
+                          {t("plugins.safetyNotes")}
+                        </div>
+                        <p>{detail.safetyNotes}</p>
+                      </div>
+                    ) : null}
+
+                    <div className="plugins-detail-section">
+                      <div className="plugins-detail-section-title">
+                        {t("plugins.versions")}
+                      </div>
+                      <div className="plugins-version-list">
+                        {(detail.versions ?? []).map((version) => (
+                          <button
+                            key={version.version}
+                            type="button"
+                            className={cx(
+                              "plugins-version-item",
+                              selectedVersion === version.version && "active",
                             )}
-                          </>
+                            onClick={() => setSelectedVersion(version.version)}
+                          >
+                            <span className="plugins-version-main">
+                              <strong>v{version.version}</strong>
+                              <span>{formatDate(version.publishedAt)}</span>
+                            </span>
+                            <span className="plugins-version-meta">
+                              {formatBytes(version.sizeBytes)} · {shortSha(version.shasum)}
+                            </span>
+                            {version.changelog ? (
+                              <span className="plugins-version-changelog">
+                                {version.changelog}
+                              </span>
+                            ) : null}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {activeVersion ? (
+                      <div className="plugins-detail-section">
+                        <div className="plugins-detail-section-title">
+                          {t("plugins.selectedVersion")}
+                        </div>
+                        <div className="plugins-detail-facts">
+                          <div>
+                            <span>{t("plugins.version")}</span>
+                            <strong>v{activeVersion.version}</strong>
+                          </div>
+                          <div>
+                            <span>{t("plugins.publishedAt")}</span>
+                            <strong>{formatDate(activeVersion.publishedAt)}</strong>
+                          </div>
+                          <div>
+                            <span>{t("plugins.packageSize")}</span>
+                            <strong>{formatBytes(activeVersion.sizeBytes)}</strong>
+                          </div>
+                          <div>
+                            <span>{t("plugins.checksum")}</span>
+                            <strong title={activeVersion.shasum}>
+                              {shortSha(activeVersion.shasum)}
+                            </strong>
+                          </div>
+                        </div>
+                        {activeVersion.changelog ? (
+                          <div className="plugins-detail-changelog">
+                            <div className="plugins-detail-section-title">
+                              {t("plugins.changelog")}
+                            </div>
+                            <p>{activeVersion.changelog}</p>
+                          </div>
+                        ) : null}
+                        <div className="plugins-perms">
+                          {(activeVersion.permissions ?? detail.permissions ?? [])
+                            .map((perm) => permissionLabel(perm, t))
+                            .join(" · ")}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="plugins-detail-section">
+                      <div className="plugins-detail-section-title">
+                        {t("plugins.readme")}
+                      </div>
+                      {detail.readmeMarkdown ? (
+                        <div className="plugins-detail-readme">
+                          <Markdown source={detail.readmeMarkdown} />
+                        </div>
+                      ) : (
+                        <div className="plugins-detail-empty">
+                          {t("plugins.readmeEmpty")}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="plugins-detail-actions">
+                      {installedById.get(detail.id) ? (
+                        installedById.get(detail.id)?.version ===
+                        (activeVersion?.version || detail.latestVersion) ? (
+                          <Button variant="secondary" disabled>
+                            {t("plugins.installedLabel")}
+                          </Button>
                         ) : (
                           <Button
                             variant="primary"
-                            disabled={busyId === item.id}
-                            onClick={() => setPendingInstall(item)}
+                            disabled={busyId === detail.id}
+                            onClick={() =>
+                              queueInstall({
+                                id: detail.id,
+                                name: detail.name,
+                                version:
+                                  activeVersion?.version || detail.latestVersion,
+                                permissions:
+                                  activeVersion?.permissions ??
+                                  detail.permissions ??
+                                  [],
+                              })
+                            }
                           >
-                            {t("plugins.install")}
+                            {t("plugins.updateNow")}
                           </Button>
-                        )}
-                      </div>
-                    </Panel>
-                  );
-                })}
-              </div>
-            )}
+                        )
+                      ) : (
+                        <Button
+                          variant="primary"
+                          disabled={busyId === detail.id}
+                          onClick={() =>
+                            queueInstall({
+                              id: detail.id,
+                              name: detail.name,
+                              version:
+                                activeVersion?.version || detail.latestVersion,
+                              permissions:
+                                activeVersion?.permissions ??
+                                detail.permissions ??
+                                [],
+                            })
+                          }
+                        >
+                          {t("plugins.installVersion", {
+                            version:
+                              activeVersion?.version || detail.latestVersion,
+                          })}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </aside>
+            ) : null}
           </div>
         )}
       </div>
@@ -486,11 +786,20 @@ export function PluginsPage() {
             </div>
             <div className="plugins-modal-body">
               <p>{t("plugins.permissionReviewBody")}</p>
+              {pendingInstall.version ? (
+                <p className="plugins-meta">
+                  {t("plugins.installingVersion", {
+                    version: pendingInstall.version,
+                  })}
+                </p>
+              ) : null}
               <ul className="plugins-perm-list">
-                {(pendingInstall.permissionSummary ?? []).map((perm) => (
+                {(pendingInstall.permissions ?? []).map((perm) => (
                   <li key={perm}>
                     <strong>{permissionLabel(perm, t)}</strong>
-                    <span>{t(`plugins.permissionHelp.${perm}`, { defaultValue: perm })}</span>
+                    <span>
+                      {t(`plugins.permissionHelp.${perm}`, { defaultValue: perm })}
+                    </span>
                   </li>
                 ))}
               </ul>

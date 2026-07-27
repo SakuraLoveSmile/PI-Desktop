@@ -35,3 +35,11 @@ Published plugins live in [`vastsa/pi-desktop-plugins`](https://github.com/vasts
 Local examples here remain useful for development loading (`Load dev plugin`).
 Marketplace installs should come from that repository's `catalog.json` + `packages/*.piplug`.
 
+
+## Practical template
+
+Prefer the official warehouse template:
+
+- https://github.com/vastsa/pi-desktop-plugins/tree/main/plugins/demo.workspace-summary
+- Contribution guide: https://github.com/vastsa/pi-desktop-plugins/blob/main/CONTRIBUTING.md
+
