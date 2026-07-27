@@ -1151,22 +1151,28 @@ Each scenario is documented in this format:
 #### E2E-065: Native task notifications are unfocused-only and activate sessions
 
 - **Preconditions**: Native notifications are supported; sessions A and B
-  exist; the main window can be focused, unfocused, hidden, and minimized.
+  exist; the main window can be focused, unfocused, hidden, and minimized. A
+  Windows run uses the NSIS-installed app or the standard development command.
 - **Steps**: 1) Keep the app focused on A and complete a turn in A. 2) While
   still focused on A, complete a turn in B. 3) Unfocus the app while A remains
   current and complete another turn in A. 4) Click A's native notification. 5)
   Minimize the app, fail another turn, and click its native notification. 6)
   Unfocus the app and abort a turn. 7) Repeat with native delivery suppressed
-  by the OS.
+  by the OS. 8) On Windows, inspect the native notification attribution,
+  notification-settings entry, taskbar group, installed executable, and Start
+  menu shortcut.
 - **Expected**: Focused-current A creates neither inbox row nor native banner.
   Focused-background B creates an inbox row without a native banner. Unfocused
   current A and the minimized failure each create one durable row and one
   localized native notification. Clicking restores, shows, and focuses the
   main window before activating the matching session; no event opens the wrong
   currently selected session. Abort shows neither surface. OS suppression does
-  not lose the durable row or surface a misleading app error.
+  not lose the durable row or surface a misleading app error. Every inspected
+  Windows system surface identifies `PI-Desktop`; no stock Electron application
+  name or identity is exposed.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
-  `04-ux/09-interaction-patterns.md`, `08-meta/decisions-log.md` (D117)
+  `04-ux/07-ui-design-system.md`, `04-ux/09-interaction-patterns.md`,
+  `08-meta/decisions-log.md` (D117/D141)
 - **Acceptance**: C (turn completion), Quality
 - **Milestone**: M5
 - **Status**: Draft

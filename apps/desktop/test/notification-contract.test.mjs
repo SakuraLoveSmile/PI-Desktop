@@ -62,6 +62,7 @@ test("the visible chat session suppresses durable task notifications", () => {
 });
 
 test("native notifications only show for an unfocused window and navigate back", () => {
+  assert.match(mainSource, /app\.setAppUserModelId\(APP_ID\)/);
   assert.match(mainSource, /mainWindow\.isFocused\(\)/);
   assert.match(mainSource, /SystemNotification\.isSupported\(\)/);
   assert.match(mainSource, /new SystemNotification/);

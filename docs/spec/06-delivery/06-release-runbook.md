@@ -23,9 +23,14 @@ and ICNS resource are development-only PI-Desktop values, so AppKit shows
 PI-Desktop in the application menu and uses the canonical icon in the native
 About panel. The runtime also applies `build/icon_1024.png` to the Dock. Stock
 files under `node_modules` are never modified. Windows/Linux development keeps
-the normal electron-vite executable. The launcher sets `PI_DESKTOP_DEV=1` so
-runtime packaging checks keep update delivery disabled and preserve developer
-workspace defaults despite the branded executable name. Packaged lanes use
+the normal electron-vite executable. Windows Main nevertheless registers the
+same `com.pi-desktop.app` AppUserModelID used by the NSIS package before
+Electron readiness, preventing the stock host identity from owning native
+notifications or taskbar groups. The Windows package additionally pins the
+`PI-Desktop` executable and Start menu shortcut names. The launcher sets
+`PI_DESKTOP_DEV=1` so runtime packaging checks keep update delivery disabled
+and preserve developer workspace defaults despite the branded executable name.
+Packaged lanes use
 `build/icon.icns` through electron-builder, and the renderer imports the same
 PNG through `BrandLogo`. The PNG is canonical;
 `scripts/make-icon.py` derives the 512px Windows/Linux package PNG on every

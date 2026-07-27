@@ -242,7 +242,12 @@ the main window is unfocused and the platform API is supported, then
 restores/shows and focuses the window before emitting `activated`. There is no
 native notification while focused and no permission, scheduled-reminder, or
 plugin source in this contract. Native delivery is best-effort; the durable
-inbox remains authoritative when the OS suppresses a banner.
+inbox remains authoritative when the OS suppresses a banner. On Windows,
+Electron Main registers `com.pi-desktop.app` as the process AppUserModelID
+before readiness and before any window is created. The ID matches the NSIS
+package identity so notification attribution, notification settings, taskbar
+grouping, and installed shortcuts resolve to `PI-Desktop`, never the stock
+Electron host.
 
 The viewing-session hint is advisory and fail-safe: missing, stale, hidden, or
 unfocused renderer state creates the durable notification. Suppression occurs

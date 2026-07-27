@@ -1,4 +1,5 @@
 export const PROTOCOL_VERSION = 5 as const;
+export const APP_ID = "com.pi-desktop.app";
 export const APP_NAME = "PI-Desktop";
 export const APP_VERSION = "0.2.0-rc.6";
 

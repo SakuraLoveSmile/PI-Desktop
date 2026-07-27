@@ -119,6 +119,7 @@
       ]
     },
     "win": {
+      "executableName": "PI-Desktop",
       "target": [
         {
           "target": "nsis",
@@ -138,6 +139,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "shortcutName": "PI-Desktop",
       "artifactName": "PI-Desktop-Setup-${version}.${ext}"
     },
     "deb": {

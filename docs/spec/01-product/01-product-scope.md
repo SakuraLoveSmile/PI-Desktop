@@ -89,7 +89,7 @@ Install or develop local plugins for commands/panels/tools.
 
 - Product: `PI-Desktop`
 - Package: `pi-desktop`
-- Suggested appId: `com.pi.desktop`
+- Application ID: `com.pi-desktop.app`
 - Window title: `PI-Desktop`
 
 ## 9. Platform strategy
