@@ -1299,15 +1299,20 @@ Each scenario is documented in this format:
 
 - **Preconditions**: PI-Desktop is open with the expanded sidebar and a chat
   session is active.
-- **Steps**: 1) Open Plugins. 2) Inspect the topmost expanded-sidebar row. 3)
-  Confirm the PI-Desktop brand is first and Search then Collapse sidebar appear
-  at the right. 4) Activate the brand with a pointer. 5) Return to the
-  destination and activate the brand with keyboard focus and Enter/Space.
+- **Steps**: 1) Open Plugins on macOS windowed mode. 2) Confirm the traffic
+  lights occupy a dedicated row above the expanded-sidebar header. 3) Inspect
+  the next row and confirm the PI-Desktop brand is first and Search then
+  Collapse sidebar appear at the right. 4) Enter fullscreen and confirm the
+  traffic-light reservation disappears. 5) Activate the brand with a pointer.
+  6) Return to the destination and activate the brand with keyboard focus and
+  Enter/Space. 7) Confirm Windows/Linux keep the brand row at the top.
 - **Expected**: The canonical logo renders at 20px beside the 15px shell name.
   The complete brand has a localized Home accessible name, visible hover/focus
   feedback, and returns the main pane to the chat destination without clearing
   the active conversation or workspace. Search and Collapse sidebar are
   separate accessible icon buttons, with Collapse immediately after Search.
+  The macOS traffic lights never share that row in windowed mode, fullscreen
+  adds no empty replacement row, and other platforms add no macOS-only space.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`
 - **Acceptance**: Quality
@@ -1471,8 +1476,9 @@ This test plan spec is accepted when:
   current-project identity, thread titles, and composer controls must remain
   readable dark-on-light (≥4.5:1). Never white/translucent text on the light
   sidebar.
-- The topmost expanded-sidebar row keeps its brand, Search, and Collapse
-  sidebar controls readable on light chrome.
+- The first actionable expanded-sidebar row keeps its brand, Search, and
+  Collapse sidebar controls readable on light chrome; the macOS traffic-light
+  row above it uses the same sidebar surface.
 
 ### US-UI-14 Semantic chrome tokens
 - Toggle theme system → light → dark without restart.
@@ -1495,8 +1501,9 @@ This test plan spec is accepted when:
   unread badge. It replaces the former Help shortcut and opens the inbox above
   the footer; the main titlebar has no duplicate Bell.
 - Traffic lights sit at Codex `{x:16,y:16}` with a 46px toolbar; the expanded
-  sidebar places the product brand first and Search plus Collapse sidebar at
-  the right, with no back/forward buttons.
+  macOS sidebar reserves that row only for native chrome, then places the
+  product brand first and Search plus Collapse sidebar at the right in the next
+  46px row, with no back/forward buttons.
 
 ### US-UI-17 PI-Desktop home hero logo
 - On empty chat home, the canonical PI-Desktop PNG renders at 56px above the

@@ -68,7 +68,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 | Platform | Top-level chrome | Application menu |
 |---|---|---|
-| macOS | Native inset traffic lights at `{x:16,y:16}` | System menu: PI-Desktop, File, Edit, View, Window, Help |
+| macOS | Native inset traffic lights at `{x:16,y:16}` in a dedicated 46px drag row above the expanded sidebar header | System menu: PI-Desktop, File, Edit, View, Window, Help |
 | Windows | Frameless 46px titlebar; sidebar actions at left, minimize/maximize/close at right | None inside the window |
 | Linux | Frameless 46px titlebar; sidebar actions at left, minimize/maximize/close at right | None inside the window |
 
@@ -155,6 +155,7 @@ in the sidebar.
 ```text
 Expanded (~275px, D034/D070):
 +---------------------------+
+| macOS traffic lights      |  macOS windowed only
 | [π] PI-Desktop    [⌕][◧] |
 | [message+ New Chat] button |
 | Plugins                   |
@@ -269,8 +270,9 @@ Collapsed (48px):
   present; click, keyboard, and focus behavior remain unchanged.
 - The expanded sidebar brand is a localized button with a 20px logo and the
   shell name; pointer or keyboard activation navigates to the chat home. It is
-  the first item in the topmost 46px row, with Search and Collapse sidebar
-  controls ordered at the right.
+  the first item in the first actionable 46px row, with Search and Collapse
+  sidebar controls ordered at the right. On macOS windowed mode, a separate
+  46px traffic-light drag row precedes it; fullscreen removes that reservation.
 
 ### 3.7 MVP constraints
 
