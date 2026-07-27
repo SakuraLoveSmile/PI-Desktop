@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [english, chinese, brandLogo, icons, sidebar, app, composer, suggestions] =
+const [english, chinese, brandLogo, icons, sidebar, app, composer] =
   await Promise.all([
     read("../../../packages/i18n/src/locales/en/index.ts"),
     read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
@@ -13,7 +13,6 @@ const [english, chinese, brandLogo, icons, sidebar, app, composer, suggestions] 
     read("../src/components/Sidebar.tsx"),
     read("../src/App.tsx"),
     read("../src/components/Composer.tsx"),
-    read("../src/components/HomeSuggestions.tsx"),
   ]);
 
 test("renderer surfaces the PI-Desktop brand instead of the Codex shell brand", () => {
@@ -41,5 +40,4 @@ test("app chrome uses the shared brand asset, while session creation uses its ow
   assert.match(sidebar, /IconNewSession/);
   assert.match(app, /<IconNewSession\s+size=\{13\}/);
   assert.doesNotMatch(sidebar, /IconCompose|IconPiMark|IconPiHome/);
-  assert.doesNotMatch(suggestions, /id:\s*"codex-/);
 });

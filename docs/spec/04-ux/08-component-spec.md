@@ -335,7 +335,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 
 | State | Behavior |
 |---|---|
-| Empty | Hero + suggestion cards + optional onboarding checklist + home composer in one scrollable stack (D111) |
+| Empty | Hero + optional onboarding checklist + home composer in one scrollable stack; no suggestion cards (D111/D131) |
 | Streaming | Auto-scroll locked; new tokens append |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
 
@@ -1082,8 +1082,8 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 
 ### 15.3 Layout
 
-- Chat home empty: single scrollable stack (hero → cards/checklist → composer)
-  centered in MainChat; cards never absolute-portaled over the composer
+- Chat home empty: single scrollable stack (hero → optional checklist →
+  composer) centered in MainChat; the former suggestion-card row is omitted
 - Other empty surfaces: text-xl heading + text-sm description + primary action
 - Icon (48px Lucide / brand mark) above heading where applicable
 - Background: bg-primary (transparent, not a card)

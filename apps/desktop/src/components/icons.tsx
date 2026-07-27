@@ -9,7 +9,6 @@ import {
   ArrowUpRight,
   AtSign,
   Bell,
-  Bug,
   Camera,
   Check,
   CheckCheck,
@@ -21,7 +20,6 @@ import {
   CircleHelp,
   Clock,
   CloudDownload,
-  CodeXml,
   Copy,
   Dot,
   ExternalLink,
@@ -32,7 +30,6 @@ import {
   Globe2,
   GitFork,
   GitPullRequestArrow,
-  Hammer,
   Image,
   Info,
   Keyboard,
@@ -125,10 +122,7 @@ export const IconArrowUpRight = icon(ArrowUpRight);
 export const IconCloudDown = icon(CloudDownload);
 export const IconImage = icon(Image);
 export const IconCamera = icon(Camera);
-export const IconExplore = icon(CodeXml);
-export const IconBuild = icon(Hammer);
 export const IconReview = icon(RefreshCw);
-export const IconFix = icon(Bug);
 export const IconKeyboard = icon(Keyboard);
 export const IconMic = icon(Mic);
 export const IconPlug = icon(Plug);

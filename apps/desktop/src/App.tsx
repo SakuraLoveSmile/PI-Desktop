@@ -13,7 +13,6 @@ import { Sidebar } from "./components/Sidebar";
 import { WorkPanel } from "./components/workpanel/WorkPanel";
 import { ChatTranscript } from "./components/ChatTranscript";
 import { Composer } from "./components/Composer";
-import { HomeSuggestions } from "./components/HomeSuggestions";
 import { OnboardingChecklist } from "./components/OnboardingChecklist";
 import { PermissionDialog } from "./components/PermissionDialog";
 import { CommandPalette } from "./components/CommandPalette";
@@ -763,12 +762,7 @@ function AppShell() {
                         )}
                       </h1>
                     </div>
-                    {/* Suggestion cards + checklist live in normal flow so the
-                        home composer cannot cover them on short windows. */}
-                    <div className="home-suggestions-block">
-                      <HomeSuggestions />
-                      <OnboardingChecklist />
-                    </div>
+                    <OnboardingChecklist />
                     {showComposer && (
                       <div className="home-composer-wrap">
                         <Composer variant="home" />

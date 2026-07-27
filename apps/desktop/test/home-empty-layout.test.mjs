@@ -14,11 +14,12 @@ test("empty home uses a single scrollable stack instead of dual-grow portals", (
   assert.match(app, /className="home-main-content" data-testid="home-empty"/);
   assert.match(app, /className="home-scroll"/);
   assert.match(app, /className="home-stack-inner"/);
-  assert.match(app, /className="home-suggestions-block"/);
-  assert.match(app, /<HomeSuggestions \/>/);
   assert.match(app, /<OnboardingChecklist \/>/);
   assert.match(app, /home-composer-wrap/);
-  assert.doesNotMatch(app, /home-upper|home-lower|home-suggestions-portal/);
+  assert.doesNotMatch(
+    app,
+    /HomeSuggestions|home-suggestions-block|home-upper|home-lower|home-suggestions-portal/,
+  );
 
   assert.match(styles, /\.home-main-content \{[\s\S]*?overflow:\s*hidden;/);
   assert.match(styles, /\.home-scroll \{[\s\S]*?overflow-y:\s*auto;/);
@@ -33,19 +34,22 @@ test("empty home uses a single scrollable stack instead of dual-grow portals", (
     styles.match(/\.home-stack-inner \{[^}]*\}/s)?.[0] ?? "",
     /^\s*justify-content:\s*center;/m,
   );
-  assert.match(styles, /\.home-suggestions-block \{/);
-  assert.doesNotMatch(styles, /\.home-upper \{|\.home-lower \{|\.home-suggestions-portal \{/);
+  assert.doesNotMatch(
+    styles,
+    /\.home-suggestion|\.home-upper \{|\.home-lower \{|\.home-suggestions-portal \{/,
+  );
 });
 
-test("suggestion cards stay in document flow above the home composer", () => {
+test("empty home omits suggestion cards and keeps onboarding above the composer", () => {
   const emptyStart = app.indexOf("{!hasTranscript ? (");
   const emptyEnd = app.indexOf("<ChatTranscript", emptyStart);
   const emptyBlock = app.slice(emptyStart, emptyEnd);
-  const cardsAt = emptyBlock.indexOf("home-suggestions-block");
+  const onboardingAt = emptyBlock.indexOf("<OnboardingChecklist />");
   const composerAt = emptyBlock.indexOf("home-composer-wrap");
-  assert.notEqual(cardsAt, -1);
+  assert.notEqual(onboardingAt, -1);
   assert.notEqual(composerAt, -1);
-  assert.ok(cardsAt < composerAt, "cards must precede composer in markup");
+  assert.ok(onboardingAt < composerAt, "onboarding must precede composer in markup");
+  assert.doesNotMatch(emptyBlock, /HomeSuggestions|home-suggestion-card/);
 });
 
 test("short windows keep the empty stack scrollable rather than overlapping", () => {

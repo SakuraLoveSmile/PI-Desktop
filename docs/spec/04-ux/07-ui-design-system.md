@@ -429,17 +429,11 @@ Empty chat home uses a **single scrollable vertical stack** inside
 - Inner scroller (`.home-scroll`) is the only vertical overflow surface
 - Stack (`.home-stack-inner`) is `min-height: 100%`, content width
   **`min(100%, 768px)`**, and centers the column when the viewport is tall
-- Order is always: **hero → suggestion cards (+ optional onboarding checklist)
-  → home composer**. Cards and checklist live in normal document flow
-  (`.home-suggestions-block`), never absolute-portaled over the composer
+- Order is always: **hero → optional onboarding checklist → home composer**.
+  The former four suggestion cards and their prompt-prefill actions are not
+  rendered (D131); the checklist remains in normal document flow
 - Short windows (`max-height ≤ 760px`) top-align the stack and keep every
-  block reachable by scrolling; the composer must not cover suggestion cards
-- Suggestion cards: Codex auto-fit grid (`minmax(10rem,1fr)`, often **4-up
-  single row** at desktop width), `min-height: 104px` (`min-h-26`),
-  `rounded-2xl`; electron ring `0.5px` border-heavy + `shadow-md-strong`; dark
-  uses elevated-secondary wash on `#181818`
-- Card actions prefill composer with starter prompts (Explore / Build /
-  Review / Fix)
+  block reachable by scrolling; the composer must not cover the checklist
 - Composer is **not** absolute-docked on empty home; thread mode keeps the
   bottom dock + fade veil
 - Composer radius uses Codex `radius-3xl-base` (**20px** / `1.25rem`)
