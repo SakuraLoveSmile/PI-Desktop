@@ -718,21 +718,6 @@ textarea:disabled {
 }
 
 
-.sidebar-macos-drag-row {
-  display: none;
-}
-
-:root[data-platform="darwin"] .sidebar-macos-drag-row {
-  display: block;
-  height: 46px;
-  flex: 0 0 46px;
-  -webkit-app-region: drag;
-}
-
-:root[data-platform="darwin"][data-fullscreen="true"] .sidebar-macos-drag-row {
-  display: none;
-}
-
 .sidebar-header {
   display: flex;
   height: 46px;
@@ -744,11 +729,24 @@ textarea:disabled {
   -webkit-app-region: drag;
 }
 
+:root[data-platform="darwin"] .sidebar-header {
+  padding-left: 76px;
+}
+
+:root[data-platform="darwin"] .sidebar-header > .brand {
+  display: none;
+}
+
+:root[data-platform="darwin"][data-fullscreen="true"] .sidebar-header {
+  padding-left: 8px;
+}
+
 .sidebar-header-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 2px;
+  margin-left: auto;
 }
 
 .sidebar-rail-brand {
