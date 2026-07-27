@@ -81,7 +81,7 @@ context.
 
 #### Project tab lifecycle
 
-1. **Open** — selecting a project from Projects or the picker adds its
+1. **Open** — selecting a project from Settings → Project archive or the picker adds its
    normalized path to the retained set and activates it. Existing tabs remain.
 2. **Activate** — selecting a different group calls the existing `project.set`
    bridge. Its path then drives topbar identity, active workspace state, and

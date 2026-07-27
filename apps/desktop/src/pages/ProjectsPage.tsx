@@ -60,7 +60,6 @@ export function ProjectsPage() {
   const workspace = useAppStore((s) => s.workspace);
   const openProjectPaths = useAppStore((s) => s.openProjectPaths);
   const projectMeta = useAppStore((s) => s.projectMeta);
-  const sessionMeta = useAppStore((s) => s.sessionMeta);
   const openProject = useAppStore((s) => s.openProject);
   const activateProject = useAppStore((s) => s.activateProject);
   const clearProject = useAppStore((s) => s.clearProject);
@@ -68,13 +67,10 @@ export function ProjectsPage() {
   const toggleProjectPinned = useAppStore((s) => s.toggleProjectPinned);
   const archiveProject = useAppStore((s) => s.archiveProject);
   const restoreProject = useAppStore((s) => s.restoreProject);
-  const showArchived = useAppStore((s) => s.sessionView.archived);
-  const setSessionArchiveVisibility = useAppStore(
-    (s) => s.setSessionArchiveVisibility,
-  );
   const newSession = useAppStore((s) => s.newSession);
   const selectSession = useAppStore((s) => s.selectSession);
   const setPage = useAppStore((s) => s.setPage);
+  const setSettingsTab = useAppStore((s) => s.setSettingsTab);
   const showToast = useAppStore((s) => s.showToast);
   const sessions = useAppStore((s) => s.sessions);
   const [recents, setRecents] = useState<RecentProject[]>(() => loadRecentProjects());
@@ -157,15 +153,13 @@ export function ProjectsPage() {
         archived: meta.archived === true,
       };
     });
-    return merged
-      .filter((project) => showArchived || !project.archived)
-      .sort(
-        (a, b) =>
-          Number(!!b.pinned) - Number(!!a.pinned) ||
-          b.openedAt - a.openedAt ||
-          a.path.localeCompare(b.path),
-      );
-  }, [durableProjects, recents, sessions, workspace, projectMeta, showArchived]);
+    return merged.sort(
+      (a, b) =>
+        Number(!!b.pinned) - Number(!!a.pinned) ||
+        b.openedAt - a.openedAt ||
+        a.path.localeCompare(b.path),
+    );
+  }, [durableProjects, recents, sessions, workspace, projectMeta]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -245,8 +239,8 @@ export function ProjectsPage() {
         if (fallbackPath) {
           const activated = await activateProject(fallbackPath);
           if (!activated) throw new Error(t("project.none"));
-          // Project management actions should keep the Projects index visible.
-          setPage("projects");
+          // Project management actions should keep the archive visible.
+          setSettingsTab("projects");
         } else {
           await clearProject();
         }
@@ -262,7 +256,7 @@ export function ProjectsPage() {
   const closeProjectFromIndex = async (path: string) => {
     try {
       await closeProject(path);
-      setPage("projects");
+      setSettingsTab("projects");
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), {
         variant: "error",
@@ -271,10 +265,9 @@ export function ProjectsPage() {
   };
 
   return (
-    <div className="thread-scroll">
+    <div className="settings-project-archive">
       <div className="projects-index">
         <div className="projects-index-header">
-          <h1 className="projects-index-title">{t("project.title")}</h1>
           <div className="projects-index-tools">
             <div className="projects-search-wrap">
               <IconSearch size={14} />
@@ -286,14 +279,6 @@ export function ProjectsPage() {
                 aria-label={t("project.searchPlaceholder")}
               />
             </div>
-            <Button
-              variant="ghost"
-              onClick={() => setSessionArchiveVisibility(!showArchived)}
-            >
-              {showArchived
-                ? t("nav.hideArchived", { defaultValue: "Hide archived" })
-                : t("nav.showArchived", { defaultValue: "Show archived" })}
-            </Button>
             <Button
               variant="primary"
               onClick={() => void openProject().then(() => setRecents(loadRecentProjects()))}
@@ -341,11 +326,7 @@ export function ProjectsPage() {
               const color = project.color || projectColor(project.path);
               const isOpen = !!expanded[project.path];
               const related = sessions
-                .filter(
-                  (session) =>
-                    sessionMatchesProject(session, project.path) &&
-                    (showArchived || !sessionMeta[session.id]?.archived),
-                )
+                .filter((session) => sessionMatchesProject(session, project.path))
                 .slice(0, 4);
               return (
                 <div

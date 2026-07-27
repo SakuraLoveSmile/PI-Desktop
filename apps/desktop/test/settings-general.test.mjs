@@ -66,6 +66,7 @@ test("settings nav renders grouped sections with keyword search", () => {
   assert.match(settingsSearchSource, /settings\.groupPersonal/);
   assert.match(settingsSearchSource, /settings\.groupIntegrations/);
   assert.match(settingsSearchSource, /keywordKeys/);
+  assert.match(settingsSearchSource, /settings\.projectArchive/);
   assert.match(stylesSource, /\.settings-nav-group-label\s*\{/);
   assert.match(
     stylesSource,

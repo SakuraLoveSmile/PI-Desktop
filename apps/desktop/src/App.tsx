@@ -21,7 +21,6 @@ import { ToastHost } from "./components/Toast";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { WindowControls } from "./components/WindowControls";
 import { SettingsPage } from "./pages/SettingsPage";
-import { ProjectsPage } from "./pages/ProjectsPage";
 import { PullRequestsPage } from "./pages/PullRequestsPage";
 import { ScheduledPage } from "./pages/ScheduledPage";
 import { PluginsPage } from "./pages/PluginsPage";
@@ -725,9 +724,7 @@ function AppShell() {
           </div>
         )}
 
-        {page === "projects" ? (
-          <ProjectsPage />
-        ) : page === "pulls" ? (
+        {page === "pulls" ? (
           <PullRequestsPage />
         ) : page === "scheduled" ? (
           <ScheduledPage />

@@ -4285,6 +4285,16 @@ textarea:disabled {
   padding: 28px 28px 48px;
 }
 
+.settings-project-archive .projects-index {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-project-archive .projects-index-header {
+  justify-content: flex-end;
+}
+
 .projects-index-header {
   display: flex;
   align-items: center;

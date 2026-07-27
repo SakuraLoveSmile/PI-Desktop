@@ -10,9 +10,10 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   drag region; interactive controls remain explicitly non-draggable
 - A compact navigation directory with icons, in this exact order:
   1. **Basics**
-  2. **Agent**
+  2. **Model configuration**
   3. **Import**
-  4. **Info**
+  4. **Project archive**
+  5. **Info**
 - No additional settings destinations or placeholder navigation rows are shown
 - Main content pane on primary surface with large section title + elevated
   rounded cards of rows. Its content uses the full width available after the
@@ -27,7 +28,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   and bottom-panel behavior are not rendered until their host-backed settings
   schemas and runtime effects exist.
 
-### Agent
+### Model configuration (`agent` tab)
 - **Studio hero**: provider count, ready count, and current default provider/model summary
 - **Defaults** card:
   - default mode via segmented control (Agent / Chat)
@@ -45,6 +46,14 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - Source and project-path grouping behavior follows
   [08-component-spec §18](08-component-spec.md#18-sessionimportpanel)
 
+### Project archive
+- Reuses the durable Projects index as a settings-scale management surface
+- Always includes archived records and keeps archived rows visually muted
+- Supports project search, add, activate, project-session expansion, pin,
+  archive/restore, and close
+- Activating a project or project session returns to chat; archive and close
+  actions keep Project archive open even when the active workspace changes
+
 ### Info
 - app/host/protocol versions + open logs
 - Updates row with the current delivery state and one applicable action:
@@ -58,13 +67,15 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - Plugin management remains available from the app shell's independent
   **Plugins** destination, including load, enable, disable, and uninstall; it is
   not duplicated in Settings
+- Project archive is indexed by Settings search and is not duplicated as a home
+  sidebar destination or standalone global-search page
 - Back to app returns to chat shell
 
 ## 4. Acceptance
 
 1. Opening Settings hides the coding app sidebar (full-page takeover)
-2. Rail shows search + back and exactly Basics, Agent,
-   Import, and Info in that order
+2. Rail shows search + back and exactly Basics, Model configuration, Import,
+   Project archive, and Info in that order
 3. Appearance is part of Basics and has no standalone rail destination
 4. Providers is part of Agent and has no standalone rail destination
 5. Plugins has no Settings destination; the app-shell Plugins page supports
@@ -72,15 +83,17 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 6. Basics shows only the host-backed Appearance card
 7. Provider secrets never display raw key values
 8. Model configuration shows the provider studio (hero + defaults + add dialog + cards) rather than a dense always-on form dump
-8. Row descriptions use semantic secondary text and maintain at least 4.5:1
+9. Row descriptions use semantic secondary text and maintain at least 4.5:1
    contrast against their card surface in both light and dark themes
-9. Dragging the empty top band from either side of Settings moves the native
+10. Dragging the empty top band from either side of Settings moves the native
    window without blocking Back, search, or navigation controls
-10. Resizing the window expands or contracts the content cards with the
+11. Resizing the window expands or contracts the content cards with the
     available content pane; the fixed rail and pane gutters remain intact and
     the page does not gain horizontal overflow
-11. Info renders disabled, checking, up-to-date, available, downloading,
-    downloaded, and error update states without adding a fifth destination
+12. Project archive always exposes archived records and can restore them without
+    duplicating the index in the app shell
+13. Info renders disabled, checking, up-to-date, available, downloading,
+    downloaded, and error update states without adding another destination
 
 ## 5. Basics chrome metrics
 

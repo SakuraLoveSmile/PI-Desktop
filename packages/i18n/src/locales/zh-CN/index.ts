@@ -259,6 +259,7 @@ export const zhCN = {
     git: "Git",
     groupPersonal: "个人",
     import: "导入",
+    projectArchive: "项目归档",
     importTitle: "从其他工具导入",
     importScan: "扫描",
     importScanDesc:

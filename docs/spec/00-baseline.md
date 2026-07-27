@@ -1,8 +1,8 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.7`
+- Baseline Version: `0.4.8`
 - Date: `2026-07-27`
-- Status: `Frozen for implementation details (provider + runtime safety + M5 hardening + settings IA + sidebar organization + app update delivery + three-platform release)`
+- Status: `Frozen for implementation details (provider + runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -22,6 +22,8 @@
 > `0.4.7` lifts D010's macOS-only release scope through D126: tag builds
 > publish installers and electron-updater feeds for macOS arm64, Windows x64,
 > and Linux x64.
+> `0.4.8` moves the durable Projects index out of the home sidebar and into
+> Settings as the fifth **Project archive** destination through D133 / ADR 0026.
 
 ## Frozen Decisions
 
@@ -65,7 +67,9 @@
 37. Secrets backend: **safeStorage primary + encrypted file fallback**
 38. Workspace ignore: **denylist + defaults + `.pi-desktopignore`**
 39. Tool result limits: **256KB / 4000 lines with truncation markers**
-40. Settings directory: **Basics / Agent / Import / Info**;
+40. Settings directory: **Basics / Model configuration / Import / Project archive / Info**;
+    the project archive owns durable project discovery, archive, restore, and
+    reopen workflows;
     plugin management remains the app shell's independent **Plugins** destination
 41. Sidebar organization: **retained multi-project tabs with renderer-local
     project/session pin, archive, collapse, and sort metadata**

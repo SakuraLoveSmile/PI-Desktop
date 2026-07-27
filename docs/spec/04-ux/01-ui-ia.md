@@ -18,8 +18,8 @@ destination, chat as the home surface, tools and permissions inline.
 +------------------+--------------------------------+------------------+
 | Sidebar (~275px) | Main pane (active destination) | Work panel       |
 |  New task        |  chat home / transcript        |  (optional,      |
-|  Projects        |  or Projects / Plugins page    |   resizable      |
-|  Plugins         |                                |   320–720px)     |
+|  Plugins         |  or Plugins page               |   resizable      |
+|                  |                                |   320–720px)     |
 |  Projects      + |                                | App.tsx Review × |
 |   Project A      |                                | ───────────────  |
 |   Project B      |                                | Active artifact  |
@@ -28,8 +28,8 @@ destination, chat as the home surface, tools and permissions inline.
 +------------------+--------------------------------+------------------+
 ```
 
-- **Sidebar**: primary navigation — New task, destination entries
-  (Projects / Plugins), retained open-project groups under a **Projects**
+- **Sidebar**: primary navigation — New task, the Plugins destination, retained
+  open-project groups under a **Projects**
   section with a persistent new-project action, path-less conversations under
   a separate **Sessions** section with new-session and sort actions, and the
   WorkBuddy-inspired local profile footer
@@ -40,7 +40,7 @@ destination, chat as the home surface, tools and permissions inline.
   collapsed independently. Project and conversation rows expose
   non-destructive pin/archive actions, an independent conversation-branch
   command, and sortable views. Projects not retained in the sidebar remain
-  discoverable through the Projects index.
+  discoverable through Settings → Project archive.
   Collapsible to an icon rail (Cmd/Ctrl+B).
 - **Product identity**: runtime shell copy uses `PI-Desktop`; the home hero,
   sidebar, and docked composer reuse the canonical `build/icon_1024.png` logo,
@@ -88,15 +88,7 @@ destination, chat as the home surface, tools and permissions inline.
 - With transcript: message stream + tool disclosure rows (D071), docked
   composer, permission cards inline.
 
-### 3.2 Projects
-Codex index table (search, name/sources/updated columns, expand, actions;
-D066). The durable D086 `projects` table is the index source of truth, so
-imported sessions with project paths immediately materialize corresponding
-project rows without switching the current workspace. Opening/switching a
-project retains a sidebar tab and selects that project as the active workspace.
-Other retained tabs stay open.
-
-### 3.2.1 Sidebar project groups
+### 3.2 Sidebar project groups
 
 - **Sections**: the compact `Projects` heading precedes retained project groups
   and exposes the folder-picker action. A separate `Sessions` heading follows
@@ -137,14 +129,18 @@ declarations.
 
 ### 3.6 Settings (full-page takeover)
 Settings replaces the whole shell (D063): back-to-app + search + a compact
-four-destination rail in the exact order Basics / Agent /
-Import / Info (D090), with elevated content cards.
+five-destination rail in the exact order Basics / Model configuration / Import /
+Project archive / Info (D133), with elevated content cards.
 Appearance lives inside Basics; provider management lives inside
 Agent. Import scans supported local agent stores and presents
 candidates in collapsible groups. Project path is an alternate grouping
 alongside the default source grouping, and every scan or grouping change starts
-with all groups collapsed. Plugin management remains solely on the app shell's
-independent Plugins destination described in §3.5.
+with all groups collapsed. Project archive owns the durable D086 Projects index
+(search, add, expand, pin, archive/restore, close, and reopen) and always includes
+archived records. Opening or switching a project retains a sidebar tab, selects
+that project as the active workspace, and returns to chat. Other retained tabs
+stay open. Plugin management remains solely on the app shell's independent
+Plugins destination described in §3.5.
 
 ## 4. Overlays
 
@@ -159,7 +155,8 @@ independent Plugins destination described in §3.5.
 
 ## 5. Navigation model
 
-- `page` state: `chat | projects | pulls | scheduled | plugins | settings`.
+- `page` state: `chat | pulls | scheduled | plugins | settings`; the project
+  archive is the `projects` settings tab rather than a standalone page.
 - Destination history is linear; titlebar back/forward traverse it.
 - Selecting a project tab reuses `project.set` when its path differs from the
   selected host workspace and keeps the other tabs retained.

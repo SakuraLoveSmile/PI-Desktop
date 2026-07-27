@@ -372,27 +372,27 @@ Each scenario is documented in this format:
 #### E2E-037: Import creates durable project entries
 
 - **Preconditions**: Import candidates include two sessions at path A, one at path B, and one without a project path; neither project is the active workspace.
-- **Steps**: 1) Import all candidates. 2) Open Projects. 3) Inspect and expand paths A and B. 4) Return home and inspect Temporary sessions. 5) Repeat the import.
-- **Expected**: Projects contains exactly one durable row for A and one for B; the matching imported sessions appear under their exact project rows; the path-less session appears only under Temporary sessions; the active workspace does not change; repeating import duplicates neither sessions nor project rows; no missing filesystem path is created on disk.
+- **Steps**: 1) Import all candidates. 2) Open Settings → Project archive. 3) Inspect and expand paths A and B. 4) Return home and inspect Temporary sessions. 5) Repeat the import.
+- **Expected**: Project archive contains exactly one durable row for A and one for B; the matching imported sessions appear under their exact project rows; the path-less session appears only under Temporary sessions; the active workspace does not change; repeating import duplicates neither sessions nor project rows; no missing filesystem path is created on disk.
 - **Specs linked**: `03-runtime/04-data-storage.md`, `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: F (session/project persistence)
 - **Milestone**: M2
 - **Status**: Draft
 
-#### E2E-038: Settings exposes four destinations with merged sections
+#### E2E-038: Settings owns the project archive destination
 
-- **Preconditions**: App running with at least one configured provider and one supported local session store.
-- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card. 4) Open Agent and inspect the provider studio (hero, defaults, providers cards/composer). 5) Open Import and Info in order. 6) Return to the app shell and open Plugins.
-- **Expected**: The rail contains exactly Basics, Agent, Import, and Info in that order; Appearance has no standalone destination and is usable inside Basics; Providers has no standalone destination and is usable inside Agent; Import and Info each open their intended content; Plugins is absent from Settings and remains reachable as an independent app-shell destination.
+- **Preconditions**: App running with at least one configured provider, one supported local session store, one retained project, and one archived project.
+- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card. 4) Open Model configuration and inspect the provider studio. 5) Open Import, Project archive, and Info in order. 6) Search Settings for "project" or "archive". 7) Restore the archived project, then activate it. 8) Return to the app shell and open Plugins.
+- **Expected**: The rail contains exactly Basics, Model configuration, Import, Project archive, and Info in that order; Appearance and Providers remain merged into their owning destinations; Project archive shows active, closed, and archived durable rows without a visibility toggle; restore keeps the archive open and activation returns to chat with the restored project retained in the sidebar; the home sidebar and global page results have no standalone Projects destination; Settings search finds Project archive; Plugins remains an independent app-shell destination.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/01-ui-ia.md`, `03-runtime/11-provider-model-system.md`
 - **Acceptance**: B (model configuration), F (session import)
 - **Milestone**: M4
-- **Status**: Draft
+- **Status**: Unit-covered (`settings-project-archive.test.mjs`, `sidebar-navigation.test.mjs`); rendered scenario Draft
 
 #### E2E-039: Settings titlebar drag moves the window
 
 - **Preconditions**: App running windowed on macOS with Settings open.
-- **Steps**: 1) Record the window position. 2) Drag the empty 46px band above the settings rail. 3) Drag the same band above the content pane. 4) Use Back, search, and navigation controls.
+- **Steps**: 1) Record the window position. 2) Drag the empty 46px band above the settings rail. 3) Drag the same band above the content pane. 4) Use Back, search, Project archive, and navigation controls.
 - **Expected**: Either top-band drag moves the native window; Back, search, and navigation remain interactive and never initiate a window drag.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/01-ui-ia.md`
 - **Acceptance**: Quality (key operations feel polished)
@@ -402,7 +402,7 @@ Each scenario is documented in this format:
 #### E2E-043: Settings content follows window width
 
 - **Preconditions**: App running windowed on macOS with Settings open.
-- **Steps**: 1) Open Basics at the default window width and record the content-card width. 2) Expand the window to 1600px wide. 3) Open Agent and Import. 4) Shrink the window to the supported 960px minimum.
+- **Steps**: 1) Open Basics at the default window width and record the content-card width. 2) Expand the window to 1600px wide. 3) Open Model configuration, Import, and Project archive. 4) Shrink the window to the supported 960px minimum.
 - **Expected**: The right-side content cards expand and contract with the available pane at every tested width; the 275px rail and pane gutters remain stable; controls remain visible without clipping or horizontal page scrolling.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`
 - **Acceptance**: Quality (key operations feel polished)
@@ -692,12 +692,12 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Projects A and B each have at least one durable session;
   neither path is archived; a Temporary session also exists.
-- **Steps**: 1) Open project A from Projects. 2) Open project B without closing
+- **Steps**: 1) Open project A from Settings → Project archive. 2) Open project B without closing
   A. 3) Click A's directory row on its chevron, folder, label, and trailing
   disclosure hit area in turn to collapse/expand it; use B's directory row to
   activate and collapse B; verify `+` and overflow do not toggle B. 4) Select
   A's conversation. 5) Close B. 6)
-  Restart the app. 7) Reopen B from Projects.
+  Restart the app. 7) Reopen B from Settings → Project archive.
 - **Expected**: A and B render as separate exact-path sidebar groups in a
   compact continuous list with one keyboard stop per directory disclosure;
   every non-action point in A's row toggles only A, project actions appear on
@@ -1262,7 +1262,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: PI-Desktop is open with the expanded sidebar and a chat
   session is active.
-- **Steps**: 1) Open Projects or Plugins. 2) Inspect the PI-Desktop brand beside
+- **Steps**: 1) Open Plugins. 2) Inspect the PI-Desktop brand beside
   the sidebar logo. 3) Activate the brand with a pointer. 4) Return to the
   destination and activate the brand with keyboard focus and Enter/Space.
 - **Expected**: The canonical logo renders at 20px beside the 15px shell name.
@@ -1360,11 +1360,12 @@ This test plan spec is accepted when:
 - Expect centered hero copy: "What should we build" with optional project name underline when a workspace is open.
 
 ### US-UI-03 Sidebar destinations
-- Expect the expanded home sidebar to show Projects and Plugins, without Pull
-  requests or Scheduled entries.
-- Click Projects and Plugins in the left sidebar.
-- Expect each destination to replace the main pane with a dedicated page (not only a toast).
-- From Projects, open/switch/close a local folder workspace.
+- Expect the expanded home sidebar to show Plugins without a standalone Projects,
+  Pull requests, or Scheduled entry.
+- Click Plugins in the left sidebar and expect it to replace the main pane with
+  a dedicated page.
+- Open Settings → Project archive and use it to open, switch, and close a local
+  folder workspace.
 
 ### US-UI-04 Composer without workspace context
 - With a git workspace open, composer does not show project, Local, or branch
@@ -1384,7 +1385,7 @@ This test plan spec is accepted when:
   of that prompt instead of remaining "New task".
 
 ### US-UI-08 Titlebar history
-- Navigate Projects → Plugins → a current-project or temporary session.
+- Navigate Settings → Project archive → a project session → Plugins.
 - Expect back/forward controls near the traffic-light area to traverse that history.
 
 ### US-UI-09 Grouped session title backfill
@@ -1407,7 +1408,7 @@ This test plan spec is accepted when:
 ### US-UI-13 Light theme shell parity
 - Set theme to system/light on a light macOS appearance.
 - Expect sidebar `#f3f3f3`, main `#ffffff`, text `#1a1c1f`, white floating composer, and home hero with project underline.
-- Sidebar nav labels (New task / Projects / Plugins / Temporary sessions),
+- Sidebar nav labels (New task / Plugins / Projects group / Sessions group),
   current-project identity, thread titles, and composer controls must remain
   readable dark-on-light (≥4.5:1). Never white/translucent text on the light
   sidebar.
@@ -1484,11 +1485,11 @@ This test plan spec is accepted when:
 - Settings navigates to the settings page, Logs opens local logs, and Theme
   cycles the current theme after closing the menu.
 
-### US-UI-23 Projects page grid
-- Open Projects from the sidebar.
-- Expect Codex-like page title "Projects", primary "Add new project", and
+### US-UI-23 Project archive index
+- Open Settings → Project archive.
+- Expect the Settings title "Project archive", primary "Add project", and
   either an empty state or a project index with colored glyph, path, durable
-  pinned indicator where supplied by the host, and active highlight.
+  pinned indicator where supplied by the host, archived rows, and active highlight.
 - Expand a non-active project and open one of its sessions; expect the app to
   activate that project before selecting the session, so workspace tools and
   session scope use the same project.
@@ -1496,15 +1497,16 @@ This test plan spec is accepted when:
 ### US-UI-24 Settings full-page shell
 - Open Settings (footer profile → Settings).
 - Expect **full-page** Codex settings (no app sidebar/nav). Left rail has Back
-  to app, search, and exactly Basics / Agent / Import /
-  Info in that order; content pane shows section title + elevated cards.
+  to app, search, and exactly Basics / Model configuration / Import / Project
+  archive / Info in that order; content pane shows section title and the
+  destination's settings or archive content.
 - Return to the app shell and expect Plugins to remain an independent sidebar
   destination.
 - Drag the empty 46px top band over either the rail or content pane; the native
   window moves while Back, search, and navigation remain clickable.
 
 ### US-UI-27 Dark destination pages
-- Force dark theme and open Projects, Plugins, and Settings.
+- Force dark theme and open Plugins and Settings → Project archive.
 - Expect black sidebar, main `#181818`, and destination cards/rows readable on elevated dark plates (not flat same-gray).
 
 ### US-UI-28 Home empty composer association
@@ -1595,14 +1597,15 @@ This test plan spec is accepted when:
 ### US-UI-44 Settings compact directory + merged sections
 - Open Settings light theme at ~1200×690.
 - Full-page shell: rail ~260px on `#f3f3f3`, main `#fff`; Back to app; search pill; Basics active pill with icon.
-- Rail order is exactly Basics, Agent, Import, and Info;
+- Rail order is exactly Basics, Model configuration, Import, Project archive,
+  and Info;
   there are no Personal/Integrations/Coding group headings, plugin duplicate,
   or placeholder destinations.
 - Basics content: large title and an **Appearance** card with working
   system/light/dark controls. Permission defaults, file-open target, language
   override, menu-bar behavior, and bottom-panel behavior are absent until
   host-backed implementations exist.
-- Agent contains the provider studio hero, default mode/model, Enter-to-send
+- Model configuration contains the provider studio hero, default mode/model, Enter-to-send
   switch, and card-based Providers management with an add-provider dialog.
 - Plugin load/enable/disable/uninstall remains available from the app shell's
   independent Plugins destination.
@@ -1635,12 +1638,13 @@ This test plan spec is accepted when:
   separate Help → Settings Info control.
 
 ### US-UI-47 Projects index parity
-- Open Projects destination.
-- Expect large title, search pill, New button, and table columns Name / Sources / Updated.
+- Open Settings → Project archive.
+- Expect the Settings section title, search pill, Add project button, and the
+  complete durable project list including archived rows.
 - Rows expand for recent tasks; activating a project or one of its sessions
   uses `setProject` without re-picking via dialog and keeps session/workspace
   context synchronized. Sidebar pin/archive/close metadata remains local to
-  the renderer and never hides or deletes a durable Projects-index row.
+  the renderer and never hides or deletes a durable Project-archive row.
 
 
 ### US-UI-48 Home suggestion glyphs removed (D131)
@@ -1654,11 +1658,11 @@ This test plan spec is accepted when:
   overflow actions for pin/archive (not a Recents aggregate).
 - Multiple retained project groups may be visible at once; sessions remain
   under exact-path groups, while closed-project sessions remain available in
-  the Projects index.
+  Settings → Project archive.
 
 
 ### US-UI-50 Destination title scale
-- Open Projects and Plugins.
+- Open Settings → Project archive and Plugins.
 - Expect large section titles (~28px) consistent with Codex destination/index pages.
 - Dark home New task remains a ghost row (no solid selected chip) unless genuinely active.
 
@@ -1723,7 +1727,7 @@ This test plan spec is accepted when:
   and overflow actions do not toggle it; the
   active project, topbar path, and transcript switch together; the composer
   remains free of workspace identity chrome.
-- Close B and reopen it from Projects. Closing removes only the sidebar tab;
+- Close B and reopen it from Settings → Project archive. Closing removes only the sidebar tab;
   durable project/session rows remain available.
 
 ### US-UI-58 Sidebar organization actions

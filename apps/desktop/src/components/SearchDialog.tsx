@@ -17,7 +17,6 @@ import {
   IconAt,
   IconChat,
   IconClock,
-  IconFolder,
   IconNewSession,
   IconPullRequest,
   IconSearch,
@@ -26,7 +25,6 @@ import {
 
 /** Navigable pages surfaced by the global search alongside sessions. */
 const PAGE_ENTRIES = [
-  { page: "projects", labelKey: "nav.projects", icon: IconFolder },
   { page: "pulls", labelKey: "pulls.title", icon: IconPullRequest },
   { page: "scheduled", labelKey: "scheduled.title", icon: IconClock },
   { page: "plugins", labelKey: "nav.plugins", icon: IconAt },

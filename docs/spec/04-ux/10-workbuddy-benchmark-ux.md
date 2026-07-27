@@ -107,8 +107,8 @@ deferred. Regenerate is available as a quiet action chip next to Copy and rewrit
 WorkBuddy never ships a dead empty state: Automations and Projects both pair
 the empty hero with click-to-instantiate templates. **Spec**: Scheduled page
 empty state gains 4–6 developer recipes (nightly test run, dependency-update
-digest, PR review sweep, changelog draft); Projects page keeps its table but
-gains a "Start from template" row when empty.
+digest, PR review sweep, changelog draft); the Settings Project archive keeps
+its table but gains a "Start from template" row when empty.
 
 ### 3.4 Teaching placeholder in the composer
 Replace the static placeholder with a syntax-teaching one:

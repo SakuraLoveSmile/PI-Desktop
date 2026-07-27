@@ -256,6 +256,7 @@ export const en = {
     git: "Git",
     groupPersonal: "Personal",
     import: "Import",
+    projectArchive: "Project archive",
     importTitle: "Import from other tools",
     importScan: "Scan",
     importScanDesc:
