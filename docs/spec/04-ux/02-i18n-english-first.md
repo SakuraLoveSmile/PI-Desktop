@@ -72,3 +72,6 @@ Plugins may include localized display fields later, but English fields are requi
    accessible labels in English and Simplified Chinese
 7. macOS system-menu custom commands and Windows/Linux window controls expose
    localized English and Simplified Chinese labels
+8. Boot splash and renderer crash chrome use catalog keys (`app.starting`,
+   `app.shellName`, `app.tagline`, `app.uiCrashed`); empty-home hero titles are
+   translated in every shipped locale

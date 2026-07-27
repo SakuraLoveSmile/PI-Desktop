@@ -610,6 +610,8 @@ This does not prevent state changes — it makes them instant.
 | Streaming pulse | accent pulse on left border | static accent border (no pulse) |
 | Tool card expand/collapse | 200ms transition | instant toggle |
 | Hover state transition | 150ms background change | instant color change |
+| Startup splash | Brand splash + progress, min dwell then fade out | Instant static splash, no bar motion, instant reveal |
+| Dialog / search enter | overlay-in + surface-in via motion tokens | Near-zero duration enter |
 | Scroll-to-bottom button fade-in | 150ms opacity | instant appear |
 | Toast slide-in | 200ms slide | instant appear |
 | Modal/dialog enter | 300ms fade+scale | instant appear |

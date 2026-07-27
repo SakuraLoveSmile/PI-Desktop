@@ -7,6 +7,7 @@ export const zhCN = {
     shellName: "PI-Desktop",
     tagline: "本地优先的 AI 编程助手",
     starting: "正在启动 PI-Desktop…",
+    uiCrashed: "PI-Desktop 界面崩溃",
   },
   window: {
     minimize: "最小化",
@@ -71,7 +72,7 @@ export const zhCN = {
     plugins: "插件",
     recents: "最近",
     settings: "设置",
-    custom: "Custom",
+    custom: "自定义",
     localProfile: "本地配置",
     help: "帮助",
     openInPanel: "在面板中打开",
@@ -117,8 +118,8 @@ export const zhCN = {
     deleteTask: "删除",
   },
   chat: {
-    emptyTitle: "What should we build?",
-    emptyTitleInProject: "What should we build in {{project}}?",
+    emptyTitle: "今天想构建什么？",
+    emptyTitleInProject: "要在 {{project}} 中构建什么？",
     emptyHint: "配置模型提供方、打开项目，然后发送第一条消息。",
     placeholder: "向 PI-Desktop 下达任意指令",
     placeholderHome: "随心输入",
