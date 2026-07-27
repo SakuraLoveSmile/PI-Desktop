@@ -187,7 +187,24 @@ Collapsed (48px):
 +----+
 ```
 
-### 3.3 States
+### 3.3 Typography
+
+Primary left-rail chrome is one step larger than the historical Codex compact
+sidebar so the navigation no longer reads undersized next to the 14px chat body:
+
+| Surface | Token | Notes |
+|---|---|---|
+| New task / Plugins / nav items | `--text-base` (14px) | Primary actions and destinations |
+| Session / thread titles | `--text-base` (14px) | Matches body readability |
+| Project / group titles, empty copy | `--text-md` (13px) | One step quieter than primary rows |
+| Section labels (`SESSIONS`, `PROJECTS`) | `--text-sm` (12px) | Uppercase secondary labels |
+| Footer profile name + profile menu items | `--text-base` (14px) | Identity cluster matches nav body |
+| Footer status / profile menu secondary | `--text-sm` (12px) | Secondary line only |
+
+Do not render primary sidebar content at `--text-xs` / `--text-2xs`. Keep row
+heights (≈28–32px) so density stays WorkBuddy/Codex-like while glyphs scale up.
+
+### 3.4 States
 
 | State | Behavior |
 |---|---|
@@ -207,7 +224,7 @@ Collapsed (48px):
 | Footer hover/focus | Only the targeted control receives the semantic hover/focus treatment |
 | Profile menu open | Profile trigger is active; 280px menu opens 8px above the footer |
 
-### 3.4 Interactions
+### 3.5 Interactions
 
 - Click the project directory row (chevron, folder, label, or remaining
   disclosure hit area): activate its path when necessary, then toggle only
@@ -252,7 +269,7 @@ Collapsed (48px):
   Settings, Logs, and Theme
 - Click the footer bell: open or close the durable notification inbox
 
-### 3.5 Accessibility
+### 3.6 Accessibility
 
 - Projects and Sessions headings have localized names; each disclosure and
   create action has a scope-specific accessible name
@@ -271,7 +288,7 @@ Collapsed (48px):
   the badge color alone
 
 
-### 3.6 Brand and icon contract
+### 3.7 Brand and icon contract
 
 - The visible shell name is `PI-Desktop`; Codex is not used as the renderer
   identity.
@@ -289,14 +306,14 @@ Collapsed (48px):
   sidebar in the same 46px row as the native traffic lights. Fullscreen keeps
   the brand hidden while reclaiming the native-chrome padding.
 
-### 3.7 MVP constraints
+### 3.8 MVP constraints
 
 - Expanded sidebar search filters the visible session tree in place; the
   collapsed rail continues to use the global command palette
 - No drag-to-reorder contract; `manual` is a persisted compatibility value
 - Project tabs do not create another host workspace or a second main pane
 
-### 3.8 Project group contract
+### 3.9 Project group contract
 
 Each retained project is one labeled `section` keyed by normalized full path.
 The header owns project-level controls; the child list owns conversation-level
@@ -313,7 +330,7 @@ controls.
 | Active group | exactly one group reflects the selected host workspace |
 | Task state | In-progress, selected, completed, and failed indicators update by session without replacing the visible transcript; precedence is in-progress, selected, then terminal outcome |
 
-### 3.9 Local profile footer contract
+### 3.10 Local profile footer contract
 
 The expanded sidebar ends with a WorkBuddy-inspired local identity cluster.
 It borrows the compact avatar-and-actions grammar without implying a cloud

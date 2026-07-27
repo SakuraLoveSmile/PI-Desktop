@@ -1328,7 +1328,7 @@ textarea:disabled {
   padding: 6px 8px;
   min-height: 32px; /* Codex nav ~31-32px pitch */
   color: var(--ds-text-secondary);
-  font-size: var(--text-md);
+  font-size: var(--text-base); /* readable primary sidebar nav */
   text-align: left;
   transition: background 120ms ease, color 120ms ease;
 }
@@ -1354,7 +1354,7 @@ textarea:disabled {
   padding: 5px 8px;
   min-height: 30px;
   color: var(--ds-text-primary);
-  font-size: var(--text-md);
+  font-size: var(--text-base); /* match primary sidebar actions */
   font-weight: var(--font-weight-normal);
   transition: background 120ms ease;
 }
@@ -1388,7 +1388,7 @@ textarea:disabled {
 
 .thread-item-title {
   overflow: hidden;
-  font-size: var(--text-md);
+  font-size: var(--text-base); /* session titles match main chrome */
   line-height: var(--leading-row);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1438,7 +1438,7 @@ textarea:disabled {
   border-radius: var(--radius-sm);
   padding: 5px 6px;
   color: var(--ds-text-secondary);
-  font-size: var(--text-sm);
+  font-size: var(--text-md); /* project/group labels one step larger */
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-compact);
   text-align: left;
@@ -1510,7 +1510,7 @@ textarea:disabled {
 .sidebar-session-empty {
   padding: 5px 8px;
   color: var(--ds-text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-md); /* empty-state copy tracks group titles */
   line-height: var(--leading-compact);
 }
 
@@ -3502,14 +3502,14 @@ textarea:disabled {
 }
 
 .footer-profile-name {
-  font-size: var(--text-md);
+  font-size: var(--text-base); /* identity name matches sidebar body */
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-compact);
 }
 
 .footer-profile-status {
   color: var(--ds-text-muted);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm); /* status line still secondary, but readable */
   line-height: var(--leading-none);
 }
 
@@ -3852,7 +3852,7 @@ textarea:disabled {
 .profile-menu-copy strong {
   overflow: hidden;
   color: var(--ds-text-primary);
-  font-size: var(--text-md);
+  font-size: var(--text-base); /* profile menu name tracks footer */
   font-weight: var(--font-weight-semibold);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3860,7 +3860,7 @@ textarea:disabled {
 
 .profile-menu-copy small {
   color: var(--ds-text-muted);
-  font-size: var(--text-xs-plus);
+  font-size: var(--text-sm); /* secondary line readability */
 }
 
 .profile-menu-divider {
@@ -3878,7 +3878,7 @@ textarea:disabled {
   border-radius: var(--radius-md);
   padding: 7px 10px;
   color: var(--ds-text-primary);
-  font-size: var(--text-md);
+  font-size: var(--text-base); /* menu actions match sidebar body */
   text-align: left;
 }
 
@@ -5588,7 +5588,7 @@ textarea:disabled {
 
 .sidebar-list-label {
   color: var(--ds-text-muted);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm); /* section labels less micro */
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
