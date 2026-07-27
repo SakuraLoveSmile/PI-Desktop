@@ -61,12 +61,14 @@
   commands as renderer controls. Native Edit/View/Window roles retain
   platform text-editing, zoom, fullscreen, hide, and quit behavior.
 - Windows/Linux render no application menu in the window. Their frameless
-  titlebar keeps sidebar actions at the left edge and native window controls at
-  the right edge. Destination history has no visible back/forward controls and
-  remains available through the renderer shortcuts. The first transcript row
-  starts below the 46px titlebar control band so user and assistant content
-  cannot overlap the minimize, maximize/restore, or close targets. F10 and
-  Shift+F10 are not consumed by shell chrome.
+  titlebar keeps collapsed-state New task at the left edge when needed, the
+  session-pane sidebar toggle at the top-right ahead of native window controls,
+  and never parks collapse inside the sidebar navigation header. Destination
+  history has no visible back/forward controls and remains available through the
+  renderer shortcuts. The first transcript row starts below the 46px titlebar
+  control band so user and assistant content cannot overlap the minimize,
+  maximize/restore, or close targets. F10 and Shift+F10 are not consumed by
+  shell chrome.
 - Windows/Linux keep New Task, Open Project, Settings, close-window,
   zoom, fullscreen, search, command-palette, and sidebar shortcuts through
   renderer key handling. Standard editing shortcuts remain native web-content

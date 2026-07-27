@@ -90,28 +90,13 @@ function projectName(path?: string | null, name?: string | null) {
 }
 
 function CollapsedTitlebarActions({
-  onToggleSidebar,
   onNewTask,
-  sidebarToggleShortcut,
 }: {
-  onToggleSidebar: () => void;
   onNewTask: () => void;
-  sidebarToggleShortcut: string;
 }) {
   const { t } = useTranslation();
-  const toggleLabel = t("nav.expandSidebar");
   return (
     <div className="titlebar-nav no-drag">
-      <button
-        className="title-nav-btn"
-        title={`${toggleLabel} (${sidebarToggleShortcut})`}
-        aria-label={toggleLabel}
-        aria-expanded={false}
-        data-nav="toggle-sidebar"
-        onClick={onToggleSidebar}
-      >
-        <IconSidebar size={13} />
-      </button>
       <button
         className="title-nav-btn"
         title={t("nav.newTask")}
@@ -120,6 +105,35 @@ function CollapsedTitlebarActions({
         onClick={onNewTask}
       >
         <IconNewSession size={13} />
+      </button>
+    </div>
+  );
+}
+
+function SessionPaneSidebarToggle({
+  collapsed,
+  onToggleSidebar,
+  sidebarToggleShortcut,
+}: {
+  collapsed: boolean;
+  onToggleSidebar: () => void;
+  sidebarToggleShortcut: string;
+}) {
+  const { t } = useTranslation();
+  const label = collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar");
+  return (
+    <div className="session-pane-toggle no-drag">
+      <button
+        type="button"
+        className="title-nav-btn"
+        title={`${label} (${sidebarToggleShortcut})`}
+        aria-label={label}
+        aria-expanded={!collapsed}
+        data-nav="toggle-sidebar"
+        data-sidebar-state={collapsed ? "collapsed" : "expanded"}
+        onClick={onToggleSidebar}
+      >
+        <IconSidebar size={13} />
       </button>
     </div>
   );
@@ -748,11 +762,7 @@ function AppShell() {
     <div className="app-shell">
       <WindowControls />
       {!sidebarCollapsed && (
-        <Sidebar
-          onOpenSearch={() => setSearchOpen(true)}
-          onToggleSidebar={() => setSidebarCollapsed(true)}
-          sidebarToggleShortcut={sidebarToggleShortcut}
-        />
+        <Sidebar onOpenSearch={() => setSearchOpen(true)} />
       )}
 
       <section className="main-pane">
@@ -760,12 +770,17 @@ function AppShell() {
           {sidebarCollapsed && (
             <div className="main-titlebar-left no-drag">
               <CollapsedTitlebarActions
-                onToggleSidebar={() => setSidebarCollapsed(false)}
                 onNewTask={() => void runMenuCommand("newTask")}
-                sidebarToggleShortcut={sidebarToggleShortcut}
               />
             </div>
           )}
+          <div className="main-titlebar-right no-drag">
+            <SessionPaneSidebarToggle
+              collapsed={sidebarCollapsed}
+              onToggleSidebar={() => setSidebarCollapsed((value) => !value)}
+              sidebarToggleShortcut={sidebarToggleShortcut}
+            />
+          </div>
         </div>
         <UpdateBanner />
 

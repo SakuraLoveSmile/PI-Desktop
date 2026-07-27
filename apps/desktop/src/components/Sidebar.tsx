@@ -39,7 +39,6 @@ import {
   IconNewProject,
   IconPin,
   IconSearch,
-  IconSidebar,
   IconSettings,
   IconSliders,
   IconUser,
@@ -136,12 +135,8 @@ function compareOptionalDate(
 
 export function Sidebar({
   onOpenSearch,
-  onToggleSidebar,
-  sidebarToggleShortcut,
 }: {
   onOpenSearch: () => void;
-  onToggleSidebar: () => void;
-  sidebarToggleShortcut: string;
 }) {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
@@ -275,7 +270,9 @@ export function Sidebar({
 
   useEffect(() => {
     if (!profileOpen && !sortOpen && !sessionMenu && !projectMenu && !sectionMenu) return;
-    const onPointer = (e: MouseEvent) => {
+    const onPointer = (e: PointerEvent) => {
+      // Right-click must not dismiss first; contextmenu handlers reopen create menus.
+      if (e.button === 2 || (e.pointerType === "mouse" && e.buttons === 2)) return;
       const target = e.target as Node;
       if (profileRef.current?.contains(target)) return;
       if ((target as Element)?.closest?.(".sidebar-popover, .sidebar-row-menu")) return;
@@ -286,11 +283,11 @@ export function Sidebar({
       closeMenus();
     };
     const onViewportChange = () => closeMenus(false);
-    window.addEventListener("mousedown", onPointer);
+    window.addEventListener("pointerdown", onPointer);
     window.addEventListener("keydown", onKey);
     window.addEventListener("resize", onViewportChange);
     return () => {
-      window.removeEventListener("mousedown", onPointer);
+      window.removeEventListener("pointerdown", onPointer);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", onViewportChange);
     };
@@ -1135,21 +1132,10 @@ export function Sidebar({
           >
             <IconSearch size={15} />
           </button>
-          <button
-            type="button"
-            className="icon-btn"
-            title={`${t("nav.collapseSidebar")} (${sidebarToggleShortcut})`}
-            aria-label={t("nav.collapseSidebar")}
-            aria-expanded={true}
-            data-nav="toggle-sidebar"
-            onClick={onToggleSidebar}
-          >
-            <IconSidebar size={15} />
-          </button>
         </div>
       </div>
 
-      <div className="no-drag flex min-h-0 flex-1 flex-col px-2 pb-1.5">
+      <div className="sidebar-body no-drag">
 
         <button className="nav-item new-task-btn mb-1" data-nav="new-task" onClick={() => void createSession()}>
           <IconNewSession size={15} />
@@ -1175,6 +1161,10 @@ export function Sidebar({
               event.preventDefault();
               event.stopPropagation();
               openSectionMenu("sessions", event.clientX, event.clientY);
+            }}
+            onPointerDown={(event) => {
+              // Keep native drag/text selection from eating the secondary click path.
+              if (event.button === 2) event.preventDefault();
             }}
           >
             <span id="sidebar-standalone-sessions-label" className="sidebar-list-label">
@@ -1242,6 +1232,9 @@ export function Sidebar({
             event.preventDefault();
             event.stopPropagation();
             openSectionMenu("projects", event.clientX, event.clientY);
+          }}
+          onPointerDown={(event) => {
+            if (event.button === 2) event.preventDefault();
           }}
         >
           <span className="sidebar-list-label">{t("nav.projects")}</span>
