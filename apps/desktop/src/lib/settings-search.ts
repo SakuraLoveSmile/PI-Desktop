@@ -43,6 +43,9 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.shortcutAction.openSearch",
       "settings.shortcutAction.openCommandPalette",
       "settings.shortcutAction.toggleSidebar",
+      "settings.developer",
+      "settings.developerMode",
+      "settings.devTools",
     ],
   },
   {

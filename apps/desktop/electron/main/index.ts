@@ -303,10 +303,30 @@ function dispatchApplicationMenuCommand(command: AppMenuCommand) {
 
 let appliedMenuSettings: string | null = null;
 
+/**
+ * Devtools stay locked until the user opts in via settings (D-dev mode);
+ * mirrors `AppSettings.developerMode` so the IPC handler, the F12 shortcut
+ * and the macOS View menu all read one flag.
+ */
+let developerMode = false;
+
+function applyDeveloperMode(settings?: { developerMode?: unknown } | null) {
+  const next = settings?.developerMode === true;
+  if (next === developerMode) return;
+  developerMode = next;
+  // Leaving developer mode should not strand an open console.
+  if (!next && mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.webContents.isDevToolsOpened()) {
+      mainWindow.webContents.closeDevTools();
+    }
+  }
+}
+
 /** Keep native labels and accelerators aligned with persisted app settings. */
 function applyApplicationMenuSettings(settings?: {
   language?: unknown;
   keybindings?: unknown;
+  developerMode?: unknown;
 } | null) {
   const locale =
     typeof settings?.language === "string" &&
@@ -318,12 +338,14 @@ function applyApplicationMenuSettings(settings?: {
     settings?.keybindings && typeof settings.keybindings === "object"
       ? (settings.keybindings as KeybindingOverrides)
       : undefined;
-  const signature = JSON.stringify({ locale, keybindings });
+  const devMode = settings?.developerMode === true;
+  const signature = JSON.stringify({ locale, keybindings, devMode });
   if (appliedMenuSettings === signature) return;
   appliedMenuSettings = signature;
   installApplicationMenu({
     locale,
     keybindings,
+    developerMode: devMode,
     dispatch: dispatchApplicationMenuCommand,
   });
 }
@@ -525,6 +547,25 @@ async function createWindow() {
   });
   window.webContents.on("render-process-gone", () => {
     notificationViewingSessionId = null;
+  });
+
+  // Devtools shortcut, gated on developer mode. Frameless windows get no
+  // default binding, and Windows/Linux run with the application menu set to
+  // null, so F12 is wired here; macOS additionally inherits Cmd+Alt+I from
+  // the View menu role (see application-menu.ts).
+  window.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown" || !developerMode) return;
+    // `code` rather than `key`: Option+I on macOS produces a dead key.
+    const isDevToolsChord =
+      input.code === "F12" ||
+      (process.platform !== "darwin" &&
+        input.code === "KeyI" &&
+        input.control &&
+        input.shift);
+    if (!isDevToolsChord) return;
+    event.preventDefault();
+    if (window.webContents.isDevToolsOpened()) window.webContents.closeDevTools();
+    else window.webContents.openDevTools({ mode: "detach" });
   });
 
   // Fullscreen hides the macOS traffic lights; the renderer shifts its
@@ -2156,8 +2197,13 @@ function registerIpc() {
     if (!host) throw new Error("host unavailable");
     const result = await host.call("settings.set", settings);
     applyApplicationMenuSettings(
-      settings as { language?: unknown; keybindings?: unknown } | null,
+      settings as {
+        language?: unknown;
+        keybindings?: unknown;
+        developerMode?: unknown;
+      } | null,
     );
+    applyDeveloperMode(settings as { developerMode?: unknown } | null);
     return result;
   });
 
@@ -3277,6 +3323,20 @@ function registerIpc() {
     await shell.openPath(logs);
     return { ok: true, path: logs };
   });
+
+  handle(IPC.invoke.devtoolsToggle, async (input: unknown) => {
+    if (!developerMode) throw new Error("developer mode is disabled");
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      throw new Error("window unavailable");
+    }
+    const contents = mainWindow.webContents;
+    const desired = (input as { open?: unknown } | null)?.open;
+    const open =
+      typeof desired === "boolean" ? desired : !contents.isDevToolsOpened();
+    if (open) contents.openDevTools({ mode: "detach" });
+    else contents.closeDevTools();
+    return { open };
+  });
 }
 
 app.whenReady().then(async () => {
@@ -3308,8 +3368,10 @@ app.whenReady().then(async () => {
       const stored = (await host.call("settings.get")) as {
         language?: unknown;
         keybindings?: unknown;
+        developerMode?: unknown;
       } | null;
       applyApplicationMenuSettings(stored);
+      applyDeveloperMode(stored);
     } catch {
       // keep the OS-locale menu until settings can be read again
     }

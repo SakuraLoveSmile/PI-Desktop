@@ -15,6 +15,8 @@ export type ApplicationMenuOptions = {
   platform?: NodeJS.Platform;
   locale?: string;
   keybindings?: KeybindingOverrides;
+  /** Adds the devtools item to the View menu (settings.developerMode). */
+  developerMode?: boolean;
   dispatch: (command: AppMenuCommand) => void;
 };
 
@@ -35,6 +37,7 @@ export function buildApplicationMenuTemplate({
   platform = process.platform,
   locale = "en",
   keybindings,
+  developerMode = false,
   dispatch,
 }: ApplicationMenuOptions): MenuItemConstructorOptions[] {
   const isMac = platform === "darwin";
@@ -147,6 +150,14 @@ export function buildApplicationMenuTemplate({
           role: "togglefullscreen",
           accelerator: accelerator("toggleFullScreen"),
         },
+        // Only surfaced with developer mode on, so the console stays out of
+        // reach for regular users (settings.developerMode).
+        ...(developerMode
+          ? ([
+              { type: "separator" },
+              { role: "toggleDevTools", label: labels.menu.toggleDevTools },
+            ] satisfies MenuItemConstructorOptions[])
+          : []),
       ],
     },
     {

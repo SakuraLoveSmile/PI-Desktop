@@ -401,6 +401,61 @@ function ImportSection() {
 }
 
 
+/**
+ * Developer mode gate: the console stays unreachable until the toggle is on,
+ * which is also what unlocks F12 and the macOS View ▸ developer tools item
+ * (enforced in the main process, not here).
+ */
+function DeveloperSection({
+  settings,
+  saveSettings,
+}: {
+  settings: AppSettings;
+  saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const showToast = useAppStore((s) => s.showToast);
+  const enabled = settings.developerMode === true;
+
+  const openConsole = async () => {
+    try {
+      await api.toggleDevTools(true);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : String(e), { variant: "error" });
+    }
+  };
+
+  return (
+    <SettingsCard title={t("settings.developer")}>
+      <SettingsRow
+        title={t("settings.developerMode")}
+        description={t("settings.developerModeDesc")}
+      >
+        <button
+          type="button"
+          className={cx("settings-toggle", enabled && "on")}
+          role="switch"
+          aria-checked={enabled}
+          aria-label={t("settings.developerMode")}
+          onClick={() => void saveSettings({ developerMode: !enabled })}
+        >
+          <span className="settings-toggle-thumb" />
+        </button>
+      </SettingsRow>
+      <SettingsRow
+        title={t("settings.devTools")}
+        description={
+          enabled ? t("settings.devToolsDesc") : t("settings.devToolsDisabledHint")
+        }
+      >
+        <Button variant="secondary" disabled={!enabled} onClick={() => void openConsole()}>
+          {t("settings.openDevTools")}
+        </Button>
+      </SettingsRow>
+    </SettingsCard>
+  );
+}
+
 export function SettingsPage() {
   const { t } = useTranslation();
   const tab = useAppStore((s) => s.settingsTab);
@@ -700,6 +755,8 @@ export function SettingsPage() {
                 platform={platform}
                 saveSettings={saveSettings}
               />
+
+              <DeveloperSection settings={settings} saveSettings={saveSettings} />
             </div>
           )}
 
