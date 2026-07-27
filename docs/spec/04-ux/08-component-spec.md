@@ -646,9 +646,12 @@ Single message render — either user (plaintext) or assistant (markdown streami
   background or outer border. Its Sparkles/chevron trigger uses secondary text,
   and the expanded markdown is indented by a subtle theme-token left rule. It
   is never concatenated into answer markdown.
-- Hover actions: quiet action chips under the bubble (copy always; regenerate,
-  Fork, and Edit on completed assistant turns). Assistant rows do not expose a
-  Delete action. Right-aligned for user turns, left-aligned for
+- Hover actions: quiet icon-only action chips under the bubble — Copy always;
+  Fork and Regenerate on completed assistant turns; Edit and Delete on user
+  turns. Assistant rows expose neither Delete nor Edit. Chips render the glyph
+  alone: the label is carried by `aria-label` plus a themed hover/focus
+  tooltip above the chip, never as visible caption text (D137). Right-aligned
+  for user turns, left-aligned for
   assistant turns; visible on hover/focus-within. Regenerate truncates the
   durable transcript to the nearest preceding user prompt and re-runs that turn
   in place instead of appending a duplicate branch. When more than one
@@ -660,12 +663,16 @@ Single message render — either user (plaintext) or assistant (markdown streami
   part of the message action toolbar: hidden by default and revealed together
   with Copy on row hover or keyboard focus.
   Fork creates and activates an independent session whose snapshot ends at the
-  selected assistant response. Edit opens a focused inline textarea; saving
-  creates the same isolated message-scoped session first, changes only the
-  selected response in the child, and stores the original and edited branches
-  as a two-entry linear revision family. The existing pager restores either
-  response. Both actions require an idle source and leave its transcript, live
-  runtime, and provider cache state untouched (D134).
+  selected assistant response, requires an idle source, and leaves that
+  source's transcript, live runtime, and provider cache state untouched (D134).
+  Edit belongs to the user turn: it swaps the prompt bubble for a focused
+  inline textarea (Escape cancels, Cmd/Ctrl+Enter saves; slash turns seed the
+  typed `command` form so saving re-expands the template), widens the user
+  column to the assistant reading width while open, and hides the action
+  toolbar. Saving runs the Regenerate path with the new text in the same
+  session, so the replaced prompt and its whole answer tail are archived as a
+  D109 revision and the pager walks back to the original exchange. An
+  unchanged prompt closes the editor without spending a turn (D137).
 - Assistant meta: optional model badge + token-usage chip under the answer
   (collapsed summary with hover breakdown for input/output/cache/reasoning)
 - Gap: 10px vertical padding between consecutive message rows (denser than

@@ -1266,31 +1266,57 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`sessions::tests::fork_session_clones_active_transcript_and_configuration`,
   `session-fork.test.mjs`); full restart UI scenario Draft
 
-#### E2E-071: Fork and edit an assistant response without changing its source
+#### E2E-071: Fork an assistant response without changing its source
 
 - **Preconditions**: An idle conversation contains two completed user/assistant
   exchanges and the second assistant response has cache-token usage metadata.
 - **Steps**: 1) Hover the first assistant response and inspect its toolbar. 2)
   Click Fork. 3) Confirm the activated child ends at that response and append a
-  prompt. 4) Reopen the source and choose Edit on the first assistant response.
-  5) Change its text and save. 6) Use the response-version pager to switch to
-  the original and back to the edit. 7) Append a prompt, restart, and inspect
-  source and both children. 8) Repeat while the source is running.
-- **Expected**: The completed-assistant toolbar contains Copy, Fork, Edit, and
-  Regenerate but no Delete. Fork and Edit are disabled during a source turn.
-  Each successful action activates a separately titled session whose history
-  stops at the selected response; later source turns are absent. The edit child
-  shows the changed response and a `2 / 2` pager, and both original/edited
-  variants restore in place after restart. Source text, version history, token
-  metadata, later turns, runtime, and cache state remain unchanged. Continuing
-  any child affects only that child and reseeds from its own remapped transcript.
+  prompt. 4) Reopen the source and inspect it. 5) Append a prompt to the child,
+  restart, and inspect source and child. 6) Repeat while the source is running.
+- **Expected**: The completed-assistant toolbar contains Copy, Fork, and
+  Regenerate only — no Delete and no Edit (D137 moved Edit to user turns). Fork
+  is disabled during a source turn. It activates a separately titled session
+  whose history stops at the selected response; later source turns are absent.
+  Source text, version history, token metadata, later turns, runtime, and cache
+  state remain unchanged. Continuing the child affects only that child and
+  reseeds from its own remapped transcript.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/04-data-storage.md`, `03-runtime/06-host-rpc-protocol.md`,
-  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D134)
+  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D134, D137)
 - **Acceptance**: C (chat stream/sessions), F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`sessions::tests::message_scoped_fork_stops_at_selected_assistant_response`,
   `session-fork.test.mjs`, `transcript-style.test.mjs`); full restart UI scenario Draft
+
+#### E2E-073: Icon-only message toolbars and editing a user prompt
+
+- **Preconditions**: An idle conversation contains two completed user/assistant
+  exchanges; one user turn was sent as a slash-template invocation.
+- **Steps**: 1) Hover a completed assistant row and a user row, then hover and
+  keyboard-focus each action chip. 2) Choose Edit on the first user prompt. 3)
+  Press Escape, reopen Edit, save the prompt unchanged. 4) Reopen Edit, change
+  the text, and save with Cmd/Ctrl+Enter. 5) After the new answer completes,
+  use the `current / total` pager to return to the original exchange and
+  forward again. 6) Reload the session. 7) Choose Edit on the slash-command
+  turn and inspect the seeded text. 8) Try Edit while a turn is running.
+- **Expected**: Every toolbar chip shows its glyph only, with the label
+  appearing as a tooltip on hover and on keyboard focus; no chip renders
+  caption text. The assistant toolbar offers Copy, Fork, Regenerate; the user
+  toolbar offers the pager (when variants exist), Copy, Edit, Delete. Edit
+  replaces the prompt bubble with a wider inline textarea; Escape restores the
+  bubble unchanged, and an unchanged save closes the editor without starting a
+  turn. A changed save truncates the transcript from that prompt, streams a new
+  answer, and leaves a `current / total` pager on the user turn that restores
+  the original prompt with its full answer tail in place — surviving reload.
+  The slash turn seeds the typed `/command` form and re-expands the template on
+  save. Edit is disabled while a turn is running.
+- **Specs linked**: `04-ux/08-component-spec.md`,
+  `03-runtime/01-ipc-protocol.md`, `03-runtime/04-data-storage.md`,
+  `08-meta/decisions-log.md` (D137)
+- **Acceptance**: C (chat stream), F (persistence), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`transcript-style.test.mjs`); full UI scenario Draft
 
 #### E2E-069: Platform-specific sidebar header behavior
 
