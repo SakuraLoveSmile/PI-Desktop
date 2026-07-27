@@ -6,6 +6,7 @@ export type ToolAction =
   | "edit"
   | "run"
   | "fetch"
+  | "fork"
   | "use";
 
 type ToolMessageLike = {
@@ -23,6 +24,7 @@ const SUMMARY_KEYS: Record<ToolAction, string[]> = {
   edit: ["path", "file_path", "filePath"],
   run: ["command", "cmd"],
   fetch: ["url", "query"],
+  fork: ["prompt", "task", "description", "name"],
   use: [
     "command",
     "cmd",
@@ -66,6 +68,9 @@ export function getToolAction(toolName?: string): ToolAction {
   if (matches(["grep", "rg", "search", "searchfiles"])) return "search";
   if (matches(["write", "writefile", "createfile"])) return "write";
   if (matches(["edit", "editfile", "applypatch", "patch"])) return "edit";
+  if (matches(["fork", "forkagent", "forktask", "forksession"])) {
+    return "fork";
+  }
   if (
     matches(["bash", "shell", "exec", "execcommand", "runcommand", "terminal"])
   ) {

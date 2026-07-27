@@ -12,6 +12,10 @@ const transcriptSource = await readFile(
 );
 
 test("user turns keep a compact right-aligned plate", () => {
+  const userBubbleStyles = stylesSource.match(
+    /\.message-row\.user \.message-bubble \{([^}]*)\}/,
+  )?.[1];
+  assert.ok(userBubbleStyles);
   assert.match(stylesSource, /\.message-row\.user \{\s*justify-content:\s*flex-end;/);
   assert.match(
     stylesSource,
@@ -20,9 +24,14 @@ test("user turns keep a compact right-aligned plate", () => {
   // The wrap constraint lives on the column alone; the bubble fills it.
   // Stacked percentage max-widths previously wrapped prompts at ~60% width.
   assert.match(
-    stylesSource,
-    /\.message-row\.user \.message-bubble \{[\s\S]*?max-width:\s*100%;[\s\S]*?border-radius:\s*var\(--radius-lg-plus\);[\s\S]*?border:\s*1px solid/,
+    userBubbleStyles,
+    /max-width:\s*100%;[\s\S]*?background:\s*color-mix\(in oklab,\s*var\(--ds-text-primary\) 7%,\s*transparent\);[\s\S]*?border:\s*1px solid color-mix\(in oklab,\s*var\(--ds-text-primary\) 5%,\s*transparent\);/,
   );
+  assert.doesNotMatch(userBubbleStyles, /var\(--ds-accent\)/);
+});
+
+test("fork tools use the branch icon", () => {
+  assert.match(transcriptSource, /case "fork":\s*return <IconBranch/);
 });
 
 test("assistant turns stay transparent full-width prose", () => {
