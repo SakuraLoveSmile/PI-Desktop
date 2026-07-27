@@ -362,7 +362,7 @@ textarea:disabled {
   height: 72px;
   align-items: center;
   justify-content: center;
-  border-radius: 20px;
+  border-radius: var(--ds-composer-radius);
   background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
   box-shadow: var(--ds-elevation-stroke);
   animation: startup-mark-in var(--motion-duration-slow) var(--motion-ease-out) both;
