@@ -4,6 +4,7 @@ export const en = {
     shellName: "PI-Desktop",
     tagline: "Local-first AI coding agent",
     starting: "Starting PI-Desktop…",
+    uiCrashed: "PI-Desktop UI crashed",
   },
   window: {
     minimize: "Minimize",
