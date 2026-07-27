@@ -3351,12 +3351,6 @@ textarea:disabled {
   position: relative;
 }
 
-.composer-thinking-menu {
-  left: 0;
-  right: auto;
-  width: min(200px, calc(100vw - 24px));
-}
-
 /* Permission-mode chip menu (D115): anchored left above the mode chips. */
 .composer-permission {
   position: relative;
@@ -3382,6 +3376,13 @@ textarea:disabled {
   box-shadow: var(--ds-shadow-dialog);
   border: 1px solid var(--ds-border-subtle);
   color: var(--ds-text-primary);
+}
+
+.composer-model-menu.composer-thinking-menu {
+  left: 0;
+  right: auto;
+  width: max-content;
+  max-width: min(200px, calc(100vw - 24px));
 }
 
 .composer-model-heading {
@@ -3414,6 +3415,12 @@ textarea:disabled {
 .composer-thinking-list {
   display: flex;
   flex-direction: column;
+}
+
+.composer-thinking-list .composer-plus-item > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .model-chip {
