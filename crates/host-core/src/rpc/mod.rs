@@ -276,6 +276,26 @@ async fn execute_plugin_tool(
     }
 }
 
+
+fn plugin_err(err: impl ToString) -> JsonRpcError {
+    let msg = err.to_string();
+    if msg.contains("PLUGIN_INVALID") {
+        rpc_err(1009, msg, "PLUGIN_INVALID")
+    } else if msg.contains("PLUGIN_LOAD_FAILED") {
+        rpc_err(1010, msg, "PLUGIN_LOAD_FAILED")
+    } else if msg.contains("PLUGIN_INTEGRITY") {
+        rpc_err(1012, msg, "PLUGIN_INTEGRITY")
+    } else if msg.contains("PLUGIN_PERMISSION_DENIED") {
+        rpc_err(1013, msg, "PLUGIN_PERMISSION_DENIED")
+    } else if msg.contains("PLUGIN_NOT_FOUND") {
+        rpc_err(1003, msg, "NOT_FOUND")
+    } else if msg.contains("PLUGIN_NETWORK") {
+        rpc_err(1014, msg, "PLUGIN_NETWORK")
+    } else {
+        rpc_err(1000, msg, "INTERNAL")
+    }
+}
+
 async fn handle_request(
     state: Arc<Mutex<AppState>>,
     method: &str,
@@ -1429,6 +1449,187 @@ async fn handle_request(
             Ok(json!({
                 "permissions": plugin.map(|p| p.permissions).unwrap_or_default()
             }))
+        }
+        "plugins.installFromPath" => {
+            let path = params
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+            let enable = params
+                .get("enable")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            let granted = params
+                .get("grantedPermissions")
+                .cloned()
+                .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok());
+            let mut st = state.lock().await;
+            let result = st
+                .plugins
+                .install_from_path(
+                    path,
+                    crate::plugins::InstallOptions {
+                        source: "installed".into(),
+                        enable,
+                        marketplace: None,
+                        expected_shasum: None,
+                        auto_update: false,
+                        granted_permissions: granted,
+                    },
+                )
+                .map_err(|e| plugin_err(e))?;
+            Ok(json!({ "result": result }))
+        }
+        "plugins.installFromPackage" => {
+            let path = params
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?;
+            let enable = params
+                .get("enable")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            let granted = params
+                .get("grantedPermissions")
+                .cloned()
+                .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok());
+            let expected_shasum = params
+                .get("expectedShasum")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let mut st = state.lock().await;
+            let result = st
+                .plugins
+                .install_from_package(
+                    path,
+                    crate::plugins::InstallOptions {
+                        source: "installed".into(),
+                        enable,
+                        marketplace: None,
+                        expected_shasum,
+                        auto_update: false,
+                        granted_permissions: granted,
+                    },
+                )
+                .map_err(|e| plugin_err(e))?;
+            Ok(json!({ "result": result }))
+        }
+        "plugins.grantPermissions" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let permissions = params
+                .get("permissions")
+                .cloned()
+                .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok())
+                .unwrap_or_default();
+            let mut st = state.lock().await;
+            let plugin = st
+                .plugins
+                .grant_permissions(id, permissions)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "plugin": plugin }))
+        }
+        "plugins.revokePermissions" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let permissions = params
+                .get("permissions")
+                .cloned()
+                .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok())
+                .unwrap_or_default();
+            let mut st = state.lock().await;
+            let plugin = st
+                .plugins
+                .revoke_permissions(id, permissions)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "plugin": plugin }))
+        }
+        "plugins.setAutoUpdate" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let enabled = params
+                .get("enabled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let mut st = state.lock().await;
+            let plugin = st
+                .plugins
+                .set_auto_update(id, enabled)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "plugin": plugin }))
+        }
+        "market.search" => {
+            let query = params.get("query").and_then(|v| v.as_str());
+            let category = params.get("category").and_then(|v| v.as_str());
+            let st = state.lock().await;
+            let plugins = st
+                .plugins
+                .market_search(query, category)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "plugins": plugins, "providerId": "official" }))
+        }
+        "market.getDetail" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let plugin = st
+                .plugins
+                .market_get(id)
+                .map_err(|e| plugin_err(e))?;
+            Ok(json!({ "plugin": plugin }))
+        }
+        "market.install" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let version = params.get("version").and_then(|v| v.as_str());
+            let enable = params
+                .get("enable")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            let auto_update = params
+                .get("autoUpdate")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let granted = params
+                .get("grantedPermissions")
+                .cloned()
+                .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok());
+            let mut st = state.lock().await;
+            let result = st
+                .plugins
+                .install_from_market(id, version, enable, auto_update, granted)
+                .map_err(|e| plugin_err(e))?;
+            Ok(json!({ "result": result }))
+        }
+        "market.checkUpdates" => {
+            let mut st = state.lock().await;
+            let updates = st
+                .plugins
+                .check_updates()
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "updates": updates, "plugins": st.plugins.list() }))
+        }
+        "market.applyUpdates" => {
+            let only_auto = params
+                .get("onlyAuto")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            let mut st = state.lock().await;
+            let results = st
+                .plugins
+                .apply_updates(only_auto)
+                .map_err(|e| plugin_err(e))?;
+            Ok(json!({ "results": results, "plugins": st.plugins.list() }))
         }
 
         "app.getOnboarding" => {

@@ -137,3 +137,20 @@ If a malicious plugin version is discovered:
 2. An upgrade that adds permissions prompts the user
 3. The official-plugin signature policy has a configurable toggle (during development)
 4. Update-check results can be shown in the UI
+
+
+## 12. Implementation status
+
+Shipped now:
+
+- sha256 checksum verification on marketplace/package install
+- update discovery via `market.checkUpdates`
+- manual update actions in Plugins UI
+- auto-update opt-in per plugin + `market.applyUpdates`
+- permission-diff review before upgrades that add capabilities
+
+Still planned:
+
+- mandatory ed25519 signatures
+- publisher key management UI
+- yank/incident response automation

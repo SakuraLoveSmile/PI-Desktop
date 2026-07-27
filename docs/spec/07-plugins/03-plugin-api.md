@@ -165,3 +165,16 @@ Log fields:
 - The API surface is managed by `apiVersion`
 - MVP `apiVersion = 1`
 - A deprecated API is retained for at least one major version cycle
+
+
+## 9. Implementation status
+
+The desktop plugin runtime now implements the MVP host API surface used by local and marketplace plugins:
+
+- `app.*`, `plugin.*`, `commands.*`, `ui.*`, `workspace.*`
+- `fs.readText` / `fs.writeText` / `fs.glob` (workspace-bound)
+- `agent.registerTool` / `unregisterTool`
+- `clipboard.*`, `shell.openExternal`, `net.fetch`
+
+All high-risk entry points assert declared+granted permissions and emit audit log lines.
+Plugin panels no longer receive the full `pi` object; they use `window.pluginBridge.invoke`.

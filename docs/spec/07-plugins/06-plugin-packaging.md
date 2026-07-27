@@ -107,3 +107,13 @@ If a plugin needs third-party libraries:
 2. Can install from `.piplug` / `.zip` (per milestone during implementation)
 3. A bad package fails to install and leaves no residue
 4. After upgrade, the id stays the same and the new version takes effect
+
+
+## 11. Implementation status
+
+Implemented in host-core + desktop shell:
+
+1. Directory install via `plugins.installFromPath`
+2. `.piplug` / store-compressed zip install via `plugins.installFromPackage`
+3. Marketplace download installs reuse the same package installer
+4. Traversal / symlink / size / file-count guards are enforced before commit to `plugins/installed/<id>`

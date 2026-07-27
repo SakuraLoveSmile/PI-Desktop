@@ -19,6 +19,9 @@ import type {
   ModelInfo,
   OnboardingState,
   PluginSummary,
+  MarketPluginSummary,
+  MarketPluginDetail,
+  PluginInstallResult,
   ProjectRecord,
   ProjectWorkspace,
   PullRequestSummary,
@@ -242,9 +245,38 @@ export const api = {
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
   loadDevPlugin: () => invoke(IPC.invoke.pluginLoadDev),
+  installPluginFromPath: () => invoke(IPC.invoke.pluginInstallFromPath),
+  installPluginFromPackage: () => invoke(IPC.invoke.pluginInstallFromPackage),
   enablePlugin: (id: string) => invoke(IPC.invoke.pluginEnable, id),
   disablePlugin: (id: string) => invoke(IPC.invoke.pluginDisable, id),
   uninstallPlugin: (id: string) => invoke(IPC.invoke.pluginUninstall, id),
+  setPluginAutoUpdate: (id: string, enabled: boolean) =>
+    invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
+  openPluginPanel: (id: string) => invoke(IPC.invoke.pluginOpenPanel, id),
+  marketSearch: (query = "", category = "") =>
+    invoke<{ plugins: MarketPluginSummary[]; providerId: string }>(
+      IPC.invoke.marketSearch,
+      { query, category },
+    ),
+  marketGetDetail: (id: string) =>
+    invoke<{ plugin: MarketPluginDetail }>(IPC.invoke.marketGetDetail, id),
+  marketInstall: (input: {
+    id: string;
+    version?: string;
+    enable?: boolean;
+    autoUpdate?: boolean;
+    grantedPermissions?: string[];
+  }) =>
+    invoke<{ result: PluginInstallResult }>(IPC.invoke.marketInstall, input),
+  marketCheckUpdates: () =>
+    invoke<{ updates: unknown[]; plugins: PluginSummary[] }>(
+      IPC.invoke.marketCheckUpdates,
+    ),
+  marketApplyUpdates: (onlyAuto = true) =>
+    invoke<{ results: PluginInstallResult[]; plugins: PluginSummary[] }>(
+      IPC.invoke.marketApplyUpdates,
+      { onlyAuto },
+    ),
   searchCommands: (query: string) =>
     invoke<{ commands: CommandItem[] }>(
       IPC.invoke.commandPaletteSearch,

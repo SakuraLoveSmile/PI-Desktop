@@ -49,6 +49,7 @@ import {
 import { HostProcess } from "./host-process";
 import { AgentSidecar } from "./agent-sidecar";
 import { PluginRuntime } from "./plugin-runtime";
+import { PluginPanelHost } from "./plugin-panel-host";
 import { Logger } from "./logger";
 import { collectWorkspaceDiff } from "./git-diff";
 import { PtyManager } from "./terminal";
@@ -88,7 +89,63 @@ let panelWindowWidthOffset = 0;
 let host: HostProcess | null = null;
 let sidecar: AgentSidecar | null = null;
 let quitting = false;
-const plugins = new PluginRuntime();
+const pluginPanels = new PluginPanelHost(async (pluginId, channel, payload) =>
+  plugins.invokePanelBridge(pluginId, channel, payload),
+);
+const plugins = new PluginRuntime({
+  getWorkspacePath: () => {
+    // Filled after host boots; temporary stub until services rebinding.
+    return null;
+  },
+  showToast: (message) => sendToRenderer(IPC.event.toast, { message }),
+  notify: (input) =>
+    sendToRenderer(IPC.event.toast, {
+      message: `${input.title}${input.body ? `: ${input.body}` : ""}`,
+    }),
+  openExternal: async (url) => {
+    await shell.openExternal(url);
+  },
+  readClipboard: async () => {
+    const { clipboard } = await import("electron");
+    return clipboard.readText();
+  },
+  writeClipboard: async (value) => {
+    const { clipboard } = await import("electron");
+    clipboard.writeText(value);
+  },
+  openPanel: async (request) => {
+    await pluginPanels.open(request);
+  },
+  closePanel: async (pluginId) => {
+    await pluginPanels.close(pluginId);
+  },
+  fetch: async (input) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? 15000);
+    try {
+      const res = await fetch(input.url, {
+        method: input.method ?? "GET",
+        headers: input.headers,
+        body: input.body,
+        signal: controller.signal,
+      });
+      const headers: Record<string, string> = {};
+      res.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      return {
+        status: res.status,
+        headers,
+        bodyText: await res.text(),
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+  audit: (entry) => {
+    logger.app("info", "plugin.api", entry);
+  },
+});
 const ptys = new PtyManager({
   onData: (termId, data) =>
     sendToRenderer(IPC.event.terminalData, { termId, data }),
@@ -1783,13 +1840,32 @@ async function bootBackends() {
   await startHost();
   await startSidecar();
 
+  // Keep plugin host services wired to live workspace / app metadata.
+  plugins.setServices({
+    getWorkspacePath: () => {
+      try {
+        // Best-effort sync cache; refreshed on demand by callers that await host.
+        return (globalThis as any).__piWorkspacePath ?? null;
+      } catch {
+        return null;
+      }
+    },
+    getAppVersion: () => APP_VERSION,
+  });
+  try {
+    const ws = await host!.call<{ workspace: { path?: string } | null }>("workspace.get");
+    (globalThis as any).__piWorkspacePath = ws.workspace?.path ?? null;
+  } catch {
+    (globalThis as any).__piWorkspacePath = null;
+  }
+
   // Restore enabled plugins
   try {
     const listed = await host!.call<{ plugins: any[] }>("plugins.list");
     for (const p of listed.plugins ?? []) {
       if (p.enabled && p.path) {
         try {
-          await plugins.loadFromPath(p.path);
+          await plugins.loadFromPath(p.path, p.permissions ?? []);
           logger.app("info", "plugin restored", { pluginId: p.id });
         } catch (e) {
           logger.app("error", "plugin restore failed", {
@@ -2475,16 +2551,19 @@ function registerIpc() {
     const res = (await host.call("workspace.set", {
       path: result.filePaths[0],
     })) as { workspace: { path: string; name: string } | null };
+    (globalThis as any).__piWorkspacePath = res.workspace?.path ?? result.filePaths[0];
     return { workspace: await withGitBranch(res.workspace), canceled: false };
   });
   handle(IPC.invoke.projectSet, async (path: string) => {
     if (!host) throw new Error("host unavailable");
+    (globalThis as any).__piWorkspacePath = path;
     const res = (await host.call("workspace.set", { path })) as {
       workspace: { path: string; name: string } | null;
     };
     return { workspace: await withGitBranch(res.workspace) };
   });
   handle(IPC.invoke.projectClear, async () => {
+    (globalThis as any).__piWorkspacePath = null;
     if (!host) throw new Error("host unavailable");
     return host.call("workspace.clear");
   });
@@ -3270,17 +3349,72 @@ function registerIpc() {
     }
     const path = result.filePaths[0];
     const loaded = await host.call<{ plugin: any }>("plugins.loadDev", { path });
-    await plugins.loadFromPath(path);
+    await plugins.loadFromPath(path, loaded.plugin?.permissions ?? []);
     for (const toast of plugins.drainToasts()) {
       sendToRenderer(IPC.event.toast, { message: toast });
     }
     return loaded;
   });
 
+  handle(IPC.invoke.pluginInstallFromPath, async () => {
+    if (!host) throw new Error("host unavailable");
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory"],
+    });
+    if (result.canceled || !result.filePaths[0]) {
+      return { canceled: true };
+    }
+    const path = result.filePaths[0];
+    const installed = await host.call<{ result: any }>("plugins.installFromPath", {
+      path,
+      enable: true,
+    });
+    if (installed.result?.plugin?.enabled && installed.result?.plugin?.path) {
+      await plugins.loadFromPath(
+        installed.result.plugin.path,
+        installed.result.plugin.permissions ?? [],
+      );
+    }
+    for (const toast of plugins.drainToasts()) {
+      sendToRenderer(IPC.event.toast, { message: toast });
+    }
+    return installed;
+  });
+
+  handle(IPC.invoke.pluginInstallFromPackage, async () => {
+    if (!host) throw new Error("host unavailable");
+    const result = await dialog.showOpenDialog({
+      properties: ["openFile"],
+      filters: [
+        { name: "PI Plugin", extensions: ["piplug", "zip"] },
+      ],
+    });
+    if (result.canceled || !result.filePaths[0]) {
+      return { canceled: true };
+    }
+    const path = result.filePaths[0];
+    const installed = await host.call<{ result: any }>("plugins.installFromPackage", {
+      path,
+      enable: true,
+    });
+    if (installed.result?.plugin?.enabled && installed.result?.plugin?.path) {
+      await plugins.loadFromPath(
+        installed.result.plugin.path,
+        installed.result.plugin.permissions ?? [],
+      );
+    }
+    for (const toast of plugins.drainToasts()) {
+      sendToRenderer(IPC.event.toast, { message: toast });
+    }
+    return installed;
+  });
+
   handle(IPC.invoke.pluginEnable, async (id: string) => {
     if (!host) throw new Error("host unavailable");
     const res = await host.call<{ plugin: any }>("plugins.enable", { id });
-    if (res.plugin?.path) await plugins.loadFromPath(res.plugin.path);
+    if (res.plugin?.path) {
+      await plugins.loadFromPath(res.plugin.path, res.plugin.permissions ?? []);
+    }
     logger.app("info", "plugin enabled", { pluginId: id });
     return res;
   });
@@ -3297,6 +3431,85 @@ function registerIpc() {
     await plugins.unload(id);
     logger.app("info", "plugin uninstalled", { pluginId: id });
     return host.call("plugins.uninstall", { id });
+  });
+
+  handle(IPC.invoke.pluginSetAutoUpdate, async (payload: { id: string; enabled: boolean }) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("plugins.setAutoUpdate", {
+      id: payload.id,
+      enabled: payload.enabled,
+    });
+  });
+
+  handle(IPC.invoke.pluginOpenPanel, async (id: string) => {
+    const loaded = plugins.getLoaded(id);
+    if (!loaded) throw new Error("plugin not loaded");
+    const manifest = loaded.manifest;
+    if (!manifest.ui?.panel) throw new Error("plugin has no panel");
+    if (!(loaded.permissions.has("ui.panel"))) {
+      throw new Error("PERMISSION_DENIED: ui.panel");
+    }
+    await pluginPanels.open({
+      pluginId: id,
+      title: manifest.ui.title || manifest.name,
+      width: manifest.ui.width ?? 480,
+      height: manifest.ui.height ?? 360,
+      htmlPath: join(loaded.path, manifest.ui.panel),
+    });
+    return { ok: true };
+  });
+
+  handle(IPC.invoke.marketSearch, async (payload?: { query?: string; category?: string }) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("market.search", {
+      query: payload?.query ?? "",
+      category: payload?.category ?? "",
+    });
+  });
+
+  handle(IPC.invoke.marketGetDetail, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("market.getDetail", { id });
+  });
+
+  handle(IPC.invoke.marketInstall, async (payload: {
+    id: string;
+    version?: string;
+    enable?: boolean;
+    autoUpdate?: boolean;
+    grantedPermissions?: string[];
+  }) => {
+    if (!host) throw new Error("host unavailable");
+    const installed = await host.call<{ result: any }>("market.install", payload);
+    const plugin = installed.result?.plugin;
+    if (plugin?.enabled && plugin?.path) {
+      await plugins.loadFromPath(plugin.path, plugin.permissions ?? []);
+    }
+    for (const toast of plugins.drainToasts()) {
+      sendToRenderer(IPC.event.toast, { message: toast });
+    }
+    sendToRenderer(IPC.event.pluginChanged, { reason: "market.install", pluginId: payload.id });
+    return installed;
+  });
+
+  handle(IPC.invoke.marketCheckUpdates, async () => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("market.checkUpdates", {});
+  });
+
+  handle(IPC.invoke.marketApplyUpdates, async (payload?: { onlyAuto?: boolean }) => {
+    if (!host) throw new Error("host unavailable");
+    const applied = await host.call<{ results: any[]; plugins: any[] }>("market.applyUpdates", {
+      onlyAuto: payload?.onlyAuto ?? true,
+    });
+    for (const item of applied.results ?? []) {
+      const plugin = item?.plugin;
+      if (plugin?.enabled && plugin?.path) {
+        await plugins.loadFromPath(plugin.path, plugin.permissions ?? []);
+      }
+    }
+    sendToRenderer(IPC.event.pluginChanged, { reason: "market.applyUpdates" });
+    return applied;
   });
 
   handle(IPC.invoke.commandPaletteSearch, async (query: string) => {
@@ -3491,6 +3704,7 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   quitting = true;
+  void pluginPanels.closeAll();
   updater.dispose();
   logger.app("info", "app shutdown");
   ptys.disposeAll();
