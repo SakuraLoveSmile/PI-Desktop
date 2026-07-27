@@ -34,6 +34,15 @@ test("profile popover keeps its keyboard menu semantics and real actions", () =>
   assert.match(sidebarSource, /t\("nav\.profileTheme"\)/);
 });
 
+test("profile menu measures the trigger before setState", () => {
+  assert.match(sidebarSource, /const trigger = event\.currentTarget/);
+  assert.match(sidebarSource, /trigger\.getBoundingClientRect\(\)/);
+  assert.doesNotMatch(
+    sidebarSource,
+    /setProfileOpen\(\(value\) => \{[\s\S]*getBoundingClientRect/,
+  );
+});
+
 test("profile menu portals above the main pane stacking context", () => {
   assert.match(
     globalStyles,
