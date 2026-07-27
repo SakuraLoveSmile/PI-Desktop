@@ -548,6 +548,28 @@ function AppShell() {
           refreshNotifications: async () => undefined,
         });
       },
+      seedSidebarStatuses: () => {
+        if (!(window as any).__PI_CAPTURE__) return null;
+        const sessions = useAppStore.getState().sessions.slice(0, 4);
+        if (sessions.length < 4) return null;
+        const [selected, running, completed, failed] = sessions;
+        useAppStore.setState({
+          page: "chat",
+          activeSessionId: selected.id,
+          isRunning: false,
+          runningSessions: { [running.id]: true },
+          sessionOutcomes: {
+            [completed.id]: "completed",
+            [failed.id]: "failed",
+          },
+        });
+        return {
+          selected: selected.id,
+          running: running.id,
+          completed: completed.id,
+          failed: failed.id,
+        };
+      },
       ensureVisualFixtures: async () => {
         // Destructive fixture seeding is capture-rig only; the rig sets
         // __PI_CAPTURE__ before invoking (see electron/main capture suite).

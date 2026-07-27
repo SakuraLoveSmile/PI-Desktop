@@ -804,6 +804,60 @@ async function createWindow() {
             } catch {
               // fixtures optional
             }
+            // Focused sidebar-status capture: one row per D135 state, in both
+            // themes. The status-only mode exits before the broader visual
+            // suite and is intended for narrow UI verification.
+            if (process.env.PI_DESKTOP_CAPTURE_STATUS_ONLY === "1") {
+              if (process.env.PI_DESKTOP_CAPTURE_REDUCED_MOTION === "1") {
+                mainWindow!.webContents.debugger.attach("1.3");
+                await mainWindow!.webContents.debugger.sendCommand(
+                  "Emulation.setEmulatedMedia",
+                  {
+                    features: [
+                      { name: "prefers-reduced-motion", value: "reduce" },
+                    ],
+                  },
+                );
+              }
+              await mainWindow!.webContents.executeJavaScript(
+                `window.__PI_DESKTOP__?.ensureVisualFixtures?.()`,
+              );
+              await new Promise((r) => setTimeout(r, 300));
+              const statusFixture = await mainWindow!.webContents.executeJavaScript(
+                `window.__PI_DESKTOP__?.seedSidebarStatuses?.()`,
+              );
+              const probeStatuses = async (theme: "light" | "dark") => {
+                await setTheme(theme);
+                await new Promise((r) => setTimeout(r, 350));
+                const probe = await mainWindow!.webContents.executeJavaScript(`(() => ({
+                  theme: document.documentElement.dataset.theme,
+                  reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+                  rows: [...document.querySelectorAll('.thread-item-status')].map((status) => {
+                    const row = status.closest('.thread-item');
+                    const rect = status.getBoundingClientRect();
+                    const before = getComputedStyle(status, '::before');
+                    return {
+                      state: [...status.classList].find((name) => name !== 'thread-item-status'),
+                      label: status.getAttribute('aria-label'),
+                      color: getComputedStyle(status).color,
+                      fill: before.backgroundColor,
+                      animation: before.animationName,
+                      width: Math.round(rect.width),
+                      height: Math.round(rect.height),
+                      rowHeight: Math.round(row?.getBoundingClientRect().height || 0),
+                    };
+                  }),
+                }))()`);
+                console.log("SIDEBAR_STATUS_PROBE", probe);
+                await shot(`pi-sidebar-status-${theme}`);
+              };
+              console.log("SIDEBAR_STATUS_FIXTURE", statusFixture);
+              await probeStatuses("light");
+              await probeStatuses("dark");
+              console.log("CAPTURE_STATUS_DONE");
+              app.quit();
+              return;
+            }
             // Provider fixture so settings/model-picker scenes have content.
             try {
               const existing = await host?.call<{ providers?: unknown[] }>(

@@ -22,6 +22,10 @@ import { api } from "../lib/api";
 import { rememberProject, setProjectPinned } from "../lib/recent-projects";
 import { normalizeProjectPath, sessionMatchesProject } from "../lib/sidebar-session-groups";
 import {
+  latestSessionOutcomes,
+  type SidebarSessionOutcome,
+} from "../lib/sidebar-session-status";
+import {
   loadSidebarPreferences,
   projectIsArchived,
   projectIsCollapsed,
@@ -54,6 +58,12 @@ export type { WorkPanelTab } from "../lib/work-panel-tabs";
 // match against every locale's defaults (case-insensitive), not just the
 // active locale's.
 const LEGACY_DEFAULT_TITLES = new Set(["new task", "new chat", "新建任务", "新对话"]);
+
+function withoutRecordKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
 
 export type ToastVariant = "info" | "success" | "warning" | "error";
 
@@ -221,6 +231,8 @@ export type AppState = {
   isRunning: boolean;
   /** Run state per session id — sessions run independent agents. */
   runningSessions: Record<string, boolean>;
+  /** Latest terminal outcome per session for compact sidebar feedback. */
+  sessionOutcomes: Record<string, SidebarSessionOutcome>;
   providers: ProviderPublic[];
   /** Discovered model lists per provider id (composer model menu). */
   providerModels: Record<string, ModelInfo[]>;
@@ -440,6 +452,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   messages: [],
   isRunning: false,
   runningSessions: {},
+  sessionOutcomes: {},
   providers: [],
   providerModels: {},
   plugins: [],
@@ -547,6 +560,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         plugins: plugins.plugins,
         notifications: notifications.notifications,
         unreadNotificationCount: notifications.unreadCount,
+        sessionOutcomes: latestSessionOutcomes(notifications.notifications),
       });
       saveSidebarPreferences(preferencesFromState(get()));
       if (currentWorkspace?.path) {
@@ -942,6 +956,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       errorCode: null,
       errorRetriable: null,
       runningSessions: { ...s.runningSessions, [startedIn]: true },
+      sessionOutcomes: withoutRecordKey(s.sessionOutcomes, startedIn),
     }));
     try {
       const current = get().sessions.find((s) => s.id === sessionId);
@@ -963,6 +978,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         // flight; only reset the spinner if the failed session is visible.
         isRunning: s.activeSessionId === startedIn ? false : s.isRunning,
         runningSessions: { ...s.runningSessions, [startedIn]: false },
+        sessionOutcomes: { ...s.sessionOutcomes, [startedIn]: "failed" },
         ...(s.activeSessionId === startedIn
           ? { messages: [...s.messages, assistantErrorMessage(messageError)] }
           : {}),
@@ -1002,6 +1018,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       errorCode: null,
       errorRetriable: null,
       runningSessions: { ...s.runningSessions, [sessionId]: true },
+      sessionOutcomes: withoutRecordKey(s.sessionOutcomes, sessionId),
     }));
 
     try {
@@ -1021,6 +1038,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               : s.messages,
           isRunning: s.activeSessionId === sessionId ? false : s.isRunning,
           runningSessions: { ...s.runningSessions, [sessionId]: false },
+          sessionOutcomes: { ...s.sessionOutcomes, [sessionId]: "failed" },
           error: e instanceof Error ? e.message : String(e),
           errorCode: (e as { code?: string })?.code ?? null,
         }));
@@ -1028,6 +1046,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         set((s) => ({
           isRunning: s.activeSessionId === sessionId ? false : s.isRunning,
           runningSessions: { ...s.runningSessions, [sessionId]: false },
+          sessionOutcomes: { ...s.sessionOutcomes, [sessionId]: "failed" },
           error: e instanceof Error ? e.message : String(e),
           errorCode: (e as { code?: string })?.code ?? null,
         }));
@@ -1062,6 +1081,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       errorCode: null,
       errorRetriable: null,
       runningSessions: { ...s.runningSessions, [sessionId]: true },
+      sessionOutcomes: withoutRecordKey(s.sessionOutcomes, sessionId),
     }));
     try {
       await api.prompt({
@@ -1073,6 +1093,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((s) => ({
         isRunning: s.activeSessionId === sessionId ? false : s.isRunning,
         runningSessions: { ...s.runningSessions, [sessionId]: false },
+        sessionOutcomes: { ...s.sessionOutcomes, [sessionId]: "failed" },
         error: e instanceof Error ? e.message : String(e),
         errorCode: (e as { code?: string })?.code ?? null,
         errorRetriable: false,
@@ -1430,6 +1451,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       const sessions = state.sessions.filter((session) => session.id !== id);
       const runningSessions = { ...state.runningSessions };
       delete runningSessions[id];
+      const sessionOutcomes = { ...state.sessionOutcomes };
+      delete sessionOutcomes[id];
       const retainedNav = state.navStack.filter(
         (entry) => entry.sessionId !== id,
       );
@@ -1439,6 +1462,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         sessionMeta,
         sessions,
         runningSessions,
+        sessionOutcomes,
         activeSessionId:
           state.activeSessionId === id ? undefined : state.activeSessionId,
         messages: state.activeSessionId === id ? [] : state.messages,
@@ -1685,10 +1709,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   refreshNotifications: async () => {
     const result = await api.listNotifications({ limit: 200 });
-    set({
+    set((state) => ({
       notifications: result.notifications,
       unreadNotificationCount: result.unreadCount,
-    });
+      sessionOutcomes: {
+        ...state.sessionOutcomes,
+        ...latestSessionOutcomes(result.notifications),
+      },
+    }));
   },
 
   receiveNotification: (notification) => {
@@ -1699,6 +1727,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const notifications = [notification, ...withoutCurrent].slice(0, 200);
       return {
         notifications,
+        sessionOutcomes: {
+          ...state.sessionOutcomes,
+          [notification.sessionId]:
+            notification.kind === "task.failed" ? "failed" : "completed",
+        },
         unreadNotificationCount: notifications.reduce(
           (count, item) => count + (item.readAt ? 0 : 1),
           0,
@@ -1751,6 +1784,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (event.type === "agent_start" || event.type === "turn_start") {
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: true },
+        sessionOutcomes: withoutRecordKey(s.sessionOutcomes, envelope.sessionId),
       }));
     } else if (
       event.type === "agent_end" ||
@@ -1759,6 +1793,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     ) {
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: false },
+        sessionOutcomes:
+          event.type === "error" && event.error.code === "TURN_ABORTED"
+            ? withoutRecordKey(s.sessionOutcomes, envelope.sessionId)
+            : {
+                ...s.sessionOutcomes,
+                [envelope.sessionId]:
+                  event.type === "error" ||
+                  s.sessionOutcomes[envelope.sessionId] === "failed"
+                    ? "failed"
+                    : "completed",
+              },
       }));
     }
     // Any session's workspace mutation invalidates the review diff; this

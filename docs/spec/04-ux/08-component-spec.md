@@ -185,7 +185,10 @@ Collapsed (48px):
 |---|---|
 | Expanded | Full session titles visible |
 | Collapsed | Icon rail — hover shows tooltip with session title |
-| Active session | Accent background highlight on current session item |
+| Active session | Accent-blue outlined status ring plus active row background |
+| Session in progress | Orange breathing dot; static under reduced motion |
+| Session completed | Green check mark when the row is not selected |
+| Session failed | Red circled alert mark when the row is not selected |
 | Hover session | bg-tertiary background |
 | Active project | Header carries active state; topbar follows that workspace; composer exposes no workspace identity |
 | Collapsed project | Header remains visible; child conversations are hidden |
@@ -235,6 +238,8 @@ Collapsed (48px):
   create action has a scope-specific accessible name
 - Session groups use semantic `section` containers
 - Active session: `aria-current="true"`
+- Every visible session indicator has a localized accessible name and tooltip;
+  color is reinforced by ring, dot, check, or alert geometry
 - Project directory rows expose `aria-expanded` and `aria-controls`; menu
   check/radio items expose `aria-checked`
 - Collapsed state: each icon has `aria-label` with session title
@@ -283,7 +288,7 @@ controls.
 | Project close | removes retained tab only; durable project/sessions remain |
 | Session list | exact-path matches only; no basename grouping |
 | Active group | exactly one group reflects the selected host workspace |
-| Background state | running/error indicator updates by session without replacing the visible transcript |
+| Task state | In-progress, selected, completed, and failed indicators update by session without replacing the visible transcript; precedence is in-progress, selected, then terminal outcome |
 
 ### 3.9 Local profile footer contract
 
@@ -455,11 +460,12 @@ SESSIONS                                      [msg+][↕]
 
 | State | Appearance |
 |---|---|
-| Active | accent bg highlight, text-primary |
+| Active | accent-blue outlined ring, active bg highlight, text-primary |
 | Inactive | bg-secondary, text-secondary |
 | Hover (inactive) | bg-tertiary |
-| Running | accent pulse on left border |
-| Error | error dot indicator |
+| In progress | warning-orange breathing dot; no motion under reduced-motion |
+| Completed | success-green check mark |
+| Failed | error-red circled alert mark |
 | Pinned | ordered before unpinned rows within the selected sort |
 | Archived | omitted by default; shown only when archived view is enabled |
 
@@ -491,8 +497,9 @@ SESSIONS                                      [msg+][↕]
 - Scope-specific create buttons expose localized `aria-label` values.
 - Active rows expose the selected visual state and retain their full title in
   a tooltip.
-- Archived state and running/error status are announced rather than conveyed
-  by color alone.
+- Archived state and every task status are announced rather than conveyed by
+  color alone. The status slot also uses different geometry for selected, in
+  progress, completed, and failed.
 
 ### 6.6 MVP constraints
 
