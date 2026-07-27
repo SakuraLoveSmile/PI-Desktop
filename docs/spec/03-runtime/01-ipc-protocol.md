@@ -335,7 +335,9 @@ Non-sensitive config that can be returned to the UI:
 - provider list (without secret plaintext)
 - default model
 - permission policy toggles
-- UI preferences
+- UI preferences, including optional `AppSettings.keybindings` overrides keyed
+  by the shared shortcut action ids; values use portable `Mod+Shift+Key`
+  notation and contain no platform-specific native accelerator strings
 
 ### secrets
 - `secrets/set(providerId, apiKey)`

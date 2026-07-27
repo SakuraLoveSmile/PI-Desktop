@@ -1,4 +1,5 @@
 import type { AppError } from "./errors.js";
+import type { KeybindingOverrides } from "./keyboard-shortcuts.js";
 
 export type Mode = "chat" | "agent";
 export const THINKING_LEVELS = [
@@ -293,6 +294,8 @@ export type AppSettings = {
   /** UI language; `auto` (and absent) follows the OS locale. */
   language?: "auto" | "en" | "zh-CN";
   enterToSend: boolean;
+  /** User overrides for the shared application shortcut map. */
+  keybindings?: KeybindingOverrides;
   onboardingDismissed: boolean;
 };
 

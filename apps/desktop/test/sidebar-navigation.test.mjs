@@ -14,6 +14,10 @@ const appSource = await readFile(
   new URL("../src/App.tsx", import.meta.url),
   "utf8",
 );
+const shortcutSource = await readFile(
+  new URL("../../../packages/shared/src/keyboard-shortcuts.ts", import.meta.url),
+  "utf8",
+);
 test("home sidebar exposes only the supported destination entries", () => {
   assert.match(sidebarSource, /data-nav="home"/);
   assert.match(sidebarSource, /data-nav="plugins"/);
@@ -68,9 +72,11 @@ test("macOS hides sidebar branding and keeps header actions beside traffic light
 });
 
 test("destination history is available through shortcuts without titlebar buttons", () => {
-  assert.match(appSource, /commandKey && !e\.shiftKey && e\.key === "\["/);
+  assert.match(shortcutSource, /id: "navigateBack"[\s\S]*?"Mod\+BracketLeft"/);
+  assert.match(appSource, /case "navigateBack"/);
   assert.match(appSource, /useAppStore\.getState\(\)\.navBack\(\)/);
-  assert.match(appSource, /commandKey && !e\.shiftKey && e\.key === "\]"/);
+  assert.match(shortcutSource, /id: "navigateForward"[\s\S]*?"Mod\+BracketRight"/);
+  assert.match(appSource, /case "navigateForward"/);
   assert.match(appSource, /useAppStore\.getState\(\)\.navForward\(\)/);
   assert.doesNotMatch(appSource, /title=\{t\("nav\.(?:back|forward)"\)\}/);
 });

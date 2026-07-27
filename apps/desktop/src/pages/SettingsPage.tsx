@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { AppSettings, GlobalPermissionMode } from "@pi-desktop/shared";
+import type {
+  AppSettings,
+  GlobalPermissionMode,
+  ShortcutPlatform,
+} from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import type { ImportCandidate } from "../lib/api";
@@ -27,6 +31,7 @@ import {
   IconSnapshot,
 } from "../components/icons";
 import { ProvidersSection } from "../components/settings/ProvidersSection";
+import { KeyboardShortcutsSection } from "../components/settings/KeyboardShortcutsSection";
 import { ProjectsPage } from "./ProjectsPage";
 
 type SettingsTab = ReturnType<typeof useAppStore.getState>["settingsTab"];
@@ -406,6 +411,7 @@ export function SettingsPage() {
   const settings = useAppStore((s) => s.settings);
   const version = useAppStore((s) => s.version);
   const refreshProviders = useAppStore((s) => s.refreshProviders);
+  const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
 
   const [query, setQuery] = useState("");
 
@@ -688,6 +694,12 @@ export function SettingsPage() {
                   </select>
                 </SettingsRow>
               </SettingsCard>
+
+              <KeyboardShortcutsSection
+                settings={settings}
+                platform={platform}
+                saveSettings={saveSettings}
+              />
             </div>
           )}
 

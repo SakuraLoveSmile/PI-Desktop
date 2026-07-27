@@ -26,9 +26,22 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - theme system/light/dark (select + theme cards)
   - native select triggers and their opened option lists use the active theme's
     readable foreground/background pairing on macOS, Windows, and Linux
-- Permission defaults, file-open target, language override, menu-bar behavior,
-  and bottom-panel behavior are not rendered until their host-backed settings
-  schemas and runtime effects exist.
+- **Defaults** and **Permissions** cards retain the host-backed default mode,
+  Enter-to-send, and global permission-mode controls.
+- **Keyboard shortcuts** card:
+  - lists navigation, agent, and window actions from one shared shortcut map
+  - renders platform-native modifier labels (`⌘` on macOS, `Ctrl` on
+    Windows/Linux) and the platform-specific full-screen default
+  - clicking a binding records the next modifier chord or `F1`–`F12`; `Escape`
+    cancels recording
+  - duplicate application bindings and operating-system/editor-reserved chords
+    are rejected with an inline error
+  - each override can be restored independently and all overrides can be
+    restored together
+  - overrides persist in optional `AppSettings.keybindings`; macOS native-menu
+    accelerators and renderer-owned shortcuts update from the same map
+- File-open target, menu-bar behavior, and bottom-panel behavior are not
+  rendered until their host-backed settings schemas and runtime effects exist.
 
 ### Model configuration (`agent` tab)
 - **Studio hero**: provider count, ready count, and current default provider/model summary
@@ -86,7 +99,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 4. Providers is part of Agent and has no standalone rail destination
 5. Plugins has no Settings destination; the app-shell Plugins page supports
    load, enable, disable, and uninstall
-6. Basics shows only the host-backed Appearance card
+6. Basics shows host-backed Appearance, Defaults, Permissions, and Keyboard
+   shortcuts cards without adding another settings destination
 7. Provider secrets never display raw key values
 8. Model configuration shows the provider studio (hero + defaults + add dialog + cards) rather than a dense always-on form dump
 9. Row descriptions use semantic secondary text and maintain at least 4.5:1
@@ -102,6 +116,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     downloaded, and error update states without adding another destination
 14. Native select option lists remain readable in both light and dark themes,
     including when Chromium delegates the opened list surface to Windows
+15. Shortcut recording rejects modifier-free non-function keys, reserved
+    editor/OS chords, and conflicts; successful overrides immediately drive
+    app behavior and macOS menu accelerators and survive restart
 
 ## 5. Basics chrome metrics
 
