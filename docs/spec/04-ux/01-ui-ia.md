@@ -82,8 +82,9 @@ destination, chat as the home surface, tools and permissions inline.
 
 ### 3.1 Chat home (default)
 - Empty state: hero title ("What should we build?" — project name becomes a
-  dotted-underline button when a workspace is open), suggestion cards
-  (D049/D067) in document flow above the composer (D111), centered composer.
+  dotted-underline button when a workspace is open), optional first-run
+  checklist, and centered composer. The former four suggestion cards are not
+  rendered (D131).
 - With transcript: message stream + tool disclosure rows (D071), docked
   composer, permission cards inline.
 

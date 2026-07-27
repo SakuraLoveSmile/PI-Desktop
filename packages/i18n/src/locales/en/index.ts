@@ -600,18 +600,6 @@ export const en = {
     actionFailed: "Could not update notifications.",
     justNow: "Just now",
   },
-  home: {
-    suggestions: {
-      explore: "Explore and understand code",
-      explorePrompt: "Explore ",
-      create: "Build a new feature, app, or tool",
-      createPrompt: "Build ",
-      review: "Review code and suggest changes",
-      reviewPrompt: "Review ",
-      fix: "Fix issues and failures",
-      fixPrompt: "Fix ",
-    },
-  },
   errors: {
     HOST_UNAVAILABLE: "The local backend is unavailable",
     MODEL_NOT_CONFIGURED:

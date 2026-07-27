@@ -598,18 +598,6 @@ export const zhCN = {
     actionFailed: "无法更新通知。",
     justNow: "刚刚",
   },
-  home: {
-    suggestions: {
-      explore: "探索并理解代码",
-      explorePrompt: "探索",
-      create: "构建新功能、应用或工具",
-      createPrompt: "构建",
-      review: "审查代码并提出修改建议",
-      reviewPrompt: "审查",
-      fix: "修复问题和失败",
-      fixPrompt: "修复",
-    },
-  },
   errors: {
     HOST_UNAVAILABLE: "本地后端不可用",
     MODEL_NOT_CONFIGURED: "所选模型未配置，或当前提供商不提供该模型。",

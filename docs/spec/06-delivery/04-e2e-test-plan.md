@@ -1078,19 +1078,20 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`sessions::tests::save_and_activate_message_revision`, schema v4 migration); full scenario Draft
 
-#### E2E-063: Empty home stack keeps cards above composer
+#### E2E-063: Empty home omits suggestion cards without leaving a layout gap
 
 - **Preconditions**: App running on empty chat home (no transcript) in light
   and dark themes; window can be resized to ~1200×690 and ~900×640.
-- **Steps**: 1) Open empty home. 2) Inspect hero, suggestion cards, optional
-  onboarding checklist, and home composer. 3) Resize to a short height. 4)
-  Click a suggestion card. 5) Scroll if needed on the short window.
-- **Expected**: Blocks form one scrollable stack (hero → cards/checklist →
-  composer). No absolute portal places cards under the composer. Composer never
-  covers suggestion cards. Card click prefills the draft and focuses the input.
-  Short windows keep every block reachable via scroll.
+- **Steps**: 1) Open empty home. 2) Inspect the space between the hero and home
+  composer with onboarding visible. 3) Dismiss onboarding and inspect again.
+  4) Repeat in the other theme. 5) Resize to a short height and scroll if
+  needed.
+- **Expected**: No Explore / Build / Review / Fix cards render. Hero, optional
+  checklist, and composer form one scrollable stack; dismissing the checklist
+  leaves no empty spacer. The composer never covers the checklist, and short
+  windows keep every remaining block reachable via scroll.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
-  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D111)
+  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D111/D131)
 - **Acceptance**: Quality (layout integrity)
 - **Milestone**: M5
 - **Status**: Unit-covered (`home-empty-layout.test.mjs`); full UI scenario Draft
@@ -1507,9 +1508,9 @@ This test plan spec is accepted when:
 - Expect black sidebar, main `#181818`, and destination cards/rows readable on elevated dark plates (not flat same-gray).
 
 ### US-UI-28 Home empty composer association
-- On empty chat home (light + dark), expect hero, suggestion cards, and home
-  composer in one scrollable vertical stack (D111), not a large empty gap with
-  a wrongly absolute-docked box or dual-grow portal overlap.
+- On empty chat home (light + dark), expect the hero, optional onboarding
+  checklist, and home composer in one scrollable vertical stack (D111/D131),
+  with no suggestion-card row or large empty gap.
 - The composer remains a standalone plate without an attached workspace rail.
 - Starting a transcript restores the bottom-docked composer with fade veil.
 
@@ -1525,11 +1526,11 @@ This test plan spec is accepted when:
 - Placeholder ink is legible on light and dark floating plates.
 
 ### US-UI-31 Home empty vertical stack (D111)
-- Given empty chat home, when the window is ~1200×690, hero, suggestion cards,
-  and the home composer render as one centered vertical stack with clear gaps
-  (not dual-grow absolute portal regions).
-- Cards sit above the composer in document flow; no absolute overlay covers
-  suggestion cards or onboarding checklist.
+- Given empty chat home, when the window is ~1200×690, hero, optional
+  onboarding checklist, and the home composer render as one centered vertical
+  stack with clear gaps (not dual-grow absolute portal regions).
+- No suggestion cards render; no absolute overlay covers the onboarding
+  checklist.
 
 ### US-UI-32 Dark floating box elevation
 - Given dark theme empty home, when the composer shell is painted, it uses elevated-primary `#212121` on `#181818` with elevation-prominent stroke+lift identical to light (no heavier custom dark shadow).
@@ -1543,11 +1544,13 @@ This test plan spec is accepted when:
   project/session overflow menus expose pin/archive actions; nav row pitch
   remains ~32px and session row pitch ~28–31px.
 
-### US-UI-34 Home suggestion cards
-- On empty chat home (light + dark), four ambient suggestion cards render in an auto-fit row under the hero in document flow (not an absolute portal).
-- Cards use Codex electron elevated plate chrome (hairline ring + shadow-md-strong); dark cards remain visible on `#181818`.
-- Composer remains fully below the cards; no overlap at ~1200×690 or shorter heights.
-- Activating a card prefills the composer with the matching starter prompt and focuses the input.
+### US-UI-34 Home suggestion cards removed (D131)
+- On empty chat home (light + dark), no Explore / Build / Review / Fix cards
+  render between the hero and composer.
+- The removed card row leaves no blank layout block at ~1200×690 or shorter
+  heights; the optional onboarding checklist remains actionable when present.
+- Task entry starts directly in the composer; no suggestion-card prompt-prefill
+  action remains.
 
 ### US-UI-35 Empty composer plate density
 - Empty-home composer is compact and content-driven with an empty or one-line
@@ -1640,9 +1643,9 @@ This test plan spec is accepted when:
   the renderer and never hides or deletes a durable Projects-index row.
 
 
-### US-UI-48 Home suggestion glyph parity
-- On empty home, four ambient cards show Codex glyphs in order: code brackets (blue), hammer (purple), refresh (green), bug (orange).
-- Labels remain explore / create / review / fix localization keys.
+### US-UI-48 Home suggestion glyphs removed (D131)
+- On empty home, no code / hammer / refresh / bug suggestion glyphs render.
+- No explore / create / review / fix suggestion labels remain in either locale.
 
 
 ### US-UI-49 Scoped sidebar row chrome
@@ -1775,11 +1778,10 @@ This test plan spec is accepted when:
 
 ### US-UI-64 Empty home no composer overlap (D111)
 - Open empty home at ~1200×690 and at a shorter height (~900×640).
-- Expect hero, four suggestion cards, optional onboarding checklist, and home
-  composer as one scrollable stack with positive vertical gaps.
-- Suggestion cards remain fully visible without being covered by the composer;
-  short windows scroll the stack rather than stacking layers on top of cards.
-- Card click still prefills the composer and focuses the draft.
+- Expect hero, optional onboarding checklist, and home composer as one
+  scrollable stack with positive vertical gaps and no suggestion cards.
+- Short windows scroll the remaining stack rather than stacking the composer
+  over the checklist; when the checklist is absent, no empty spacer remains.
 
 
 ### US-UI-65 Durable notification inbox (D117/D130)

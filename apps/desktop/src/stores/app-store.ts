@@ -299,7 +299,6 @@ export type AppState = {
   showToast: (message: string, options?: ToastOptions) => void;
   dismissToast: (id: number) => void;
   composerPrefill: string | null;
-  prefillComposer: (text: string) => void;
   clearComposerPrefill: () => void;
   workPanelOpen: boolean;
   workPanelTabs: WorkPanelTab[];
@@ -2009,6 +2008,5 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().openWorkPanelTab(toolWorkPanelTab("terminal"));
   },
 
-  prefillComposer: (text) => set({ composerPrefill: text }),
   clearComposerPrefill: () => set({ composerPrefill: null }),
 }));
