@@ -27,18 +27,20 @@ Every user-visible or protocol-visible behavior change must add or update a scen
 
 → [04-e2e-test-plan.md](docs/spec/06-delivery/04-e2e-test-plan.md)
 
-### 4. Request branch + merge request
+### 4. Request branch + worktree + merge request
 
-Every new request must start on a dedicated branch created from an up-to-date
-`main`. After development, push the branch, open a PR/MR targeting `main`, pass
-the required checks, and merge it. Direct development or pushes on `main` are
-not allowed.
+Every new request must start in a dedicated worktree on a dedicated branch
+created from an up-to-date `main`. Reuse the primary checkout's development
+environment where safe; do not duplicate or commit local environment state.
+After development, push the branch, open a PR/MR targeting `main`, pass the
+required checks, and merge it. Direct development or pushes on `main` are not
+allowed.
 
-→ [03-ai-development-workflow.md §R4](docs/spec/06-delivery/03-ai-development-workflow.md#r4--request-branch--merge-gate)
+→ [03-ai-development-workflow.md §R4](docs/spec/06-delivery/03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate)
 
 ## Development Loop
 
-1. Sync `main` and create a request branch
+1. Sync `main` and create a request branch in a dedicated worktree
 2. Read baseline + relevant specs
 3. Plan change + list impacted specs/tests
 4. Implement
@@ -49,7 +51,7 @@ not allowed.
 8. Commit with conventional message
 9. Update BOARD if milestone-related
 10. Push the branch and open a PR/MR to `main`
-11. Pass required checks, merge, and delete the request branch
+11. Pass required checks, merge, and remove the request worktree and branch
 
 → [03-ai-development-workflow.md §2](docs/spec/06-delivery/03-ai-development-workflow.md#2-development-loop)
 
@@ -75,7 +77,8 @@ English messages only. One logical change per commit.
 Run the [change checklist](docs/spec/06-delivery/05-change-checklist.md):
 
 - [ ] Impact analysis done
-- [ ] Request branch was created from an up-to-date `main`
+- [ ] Request branch and worktree were created from an up-to-date `main`
+- [ ] Task environment reuses the primary checkout where safe
 - [ ] Specs updated per matrix
 - [ ] E2E doc updated if behavior changed
 - [ ] No secrets / local data in diff
@@ -105,4 +108,5 @@ Run the [change checklist](docs/spec/06-delivery/05-change-checklist.md):
 - Manually run or dispatch E2E without an explicit user request
 - Modify frozen baseline decisions without ADR + version bump
 - Develop or push directly on `main`
+- Develop a new request in the primary checkout or another request's worktree
 - Mark work complete before its PR/MR is merged into `main`

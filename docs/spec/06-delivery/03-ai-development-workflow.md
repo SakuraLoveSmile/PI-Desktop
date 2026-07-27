@@ -35,22 +35,33 @@ These four rules govern every change to the PI-Desktop codebase and documentatio
 - Document the scenario in `06-delivery/04-e2e-test-plan.md` — even before the automated test exists.
 - Internal-only changes (logging format, internal variable rename) do not require e2e doc updates.
 
-### R4 — Request branch + merge gate
+### R4 — Request branch + worktree + merge gate
 
-> **Every new request starts from `main` on a dedicated branch and finishes only after its PR/MR is merged into `main`.**
+> **Every new request starts from `main` in a dedicated worktree on a dedicated branch and finishes only after its PR/MR is merged into `main`.**
 
-- Before editing, preserve any existing uncommitted work, update local `main`
-  from `origin/main` with a fast-forward-only pull, and create a new request
-  branch from that commit.
+- Before editing, preserve any existing uncommitted work, fetch `origin/main`,
+  fast-forward local `main` when its worktree is clean, and create a new request
+  branch and worktree from that up-to-date commit. Existing work in the primary
+  checkout must never be moved, stashed, or overwritten merely to start a new
+  request.
 - Use one short-lived branch per request. Name it
   `<type>/<short-description>`, where `type` matches the conventional change
   type when practical, for example `feat/provider-import` or
   `docs/request-branch-workflow`.
+- Use one dedicated worktree per request. Do not implement a new request in the
+  primary checkout or reuse another request's worktree.
+- Reuse the primary checkout's development environment where safe: installed
+  toolchains, package-manager stores, build caches, and ignored local
+  environment configuration remain the canonical environment. Reference or
+  link those resources into the request worktree when required; do not copy
+  environment state into tracked files. Install or generate worktree-local
+  state only when isolation or version compatibility requires it.
 - Development commits and direct pushes on `main` are forbidden.
 - After development and local validation, push the request branch, open a
   pull/merge request targeting `main`, and complete all required remote checks
   and reviews.
-- Merge the approved PR/MR into `main` and delete the request branch. If
+- Merge the approved PR/MR into `main`, remove the request worktree, and delete
+  the request branch. If
   authentication, permissions, required checks, or required reviews prevent
   the merge, report the blocker; the request is not Done.
 
@@ -61,7 +72,7 @@ These four rules govern every change to the PI-Desktop codebase and documentatio
 Every change follows this sequence. Steps may be iterated if the implementation reveals new requirements.
 
 ```
-1. Sync main + create a request branch
+1. Sync main + create a request branch and worktree
 2. Read baseline + relevant specs
 3. Plan change + list impacted specs/tests
 4. Implement
@@ -72,14 +83,14 @@ Every change follows this sequence. Steps may be iterated if the implementation 
 8. Commit with conventional message
 9. Update BOARD if milestone-related
 10. Push branch + open PR/MR to main
-11. Pass remote gates + merge + delete branch
+11. Pass remote gates + merge + remove worktree and branch
 ```
 
 ### Step-by-step
 
 | Step | Action | Output |
 |---|---|---|
-| **1. Branch** | Preserve existing work, switch to `main`, fast-forward from `origin/main`, and create a dedicated request branch. | Cleanly isolated branch based on current `main`. |
+| **1. Branch + worktree** | Preserve existing work, update from `origin/main`, and create a dedicated request branch in a dedicated worktree. Reuse the primary checkout's environment where safe. | Isolated task files on current `main` with a consistent development environment. |
 | **2. Read** | Read `00-baseline.md` and any specs relevant to the change area. | Mental model of constraints. |
 | **3. Plan** | Describe the intended change. List every spec, ADR, and e2e scenario that will need updates. | Change plan + impact list. |
 | **4. Implement** | Write code, config, or assets. | Changed files. |
@@ -89,7 +100,7 @@ Every change follows this sequence. Steps may be iterated if the implementation 
 | **8. Commit** | Git commit with conventional message (see §4). | One or more commits. |
 | **9. BOARD** | If the change completes a milestone deliverable, update `docs/project/BOARD.md`. | Updated board. |
 | **10. Open PR/MR** | Push the request branch and open a pull/merge request targeting `main`. | Reviewable remote change with impacted specs and tests listed. |
-| **11. Merge** | Pass required checks and reviews, merge into `main`, and delete the request branch. | Change integrated into `main`; request branch removed. |
+| **11. Merge** | Pass required checks and reviews, merge into `main`, remove the request worktree, and delete the request branch. | Change integrated into `main`; task worktree and request branch removed. |
 
 ### E2E Execution Policy
 
@@ -179,32 +190,46 @@ Before committing, verify:
 
 ## 5. Branching Model
 
-The repository uses a mandatory request-branch workflow:
+The repository uses a mandatory request-branch and worktree workflow:
 
 - **`main`** is always deployable and is the protected integration target. Do
   not develop, commit, or push directly on it.
-- **Request branches** are mandatory for every new request, including docs,
-  chores, and small fixes. Create each branch from an up-to-date `main` and
-  delete it after merge.
+- **Request branches and worktrees** are mandatory for every new request,
+  including docs, chores, and small fixes. Create each branch and worktree from
+  an up-to-date `main`, then remove both after merge.
 - **Branch names** use `<type>/<short-description>` with a lowercase,
   kebab-case description. Allowed type prefixes mirror §4.1.
 - **No long-lived development branch** exists. Each request gets a new branch;
   an old request branch must not be reused for unrelated work.
+- **The primary checkout owns the default development environment.** Request
+  worktrees reuse its toolchains, package-manager stores, caches, and ignored
+  local configuration where safe. A request may create isolated local state
+  when sharing would be unsafe or incompatible, but that state stays ignored
+  and must not leak into commits.
 - **PR/MR delivery** is mandatory. Push the branch, open a PR/MR targeting
   `main`, pass required checks and reviews, then merge using a repository-
   permitted merge strategy.
 
-Typical request start:
+Typical request start (run from the primary checkout; choose a path outside it):
 
 ```bash
 git status --short
-git switch main
-git pull --ff-only origin main
-git switch -c <type>/<short-description>
+git fetch origin main
+git worktree add -b <type>/<short-description> <worktree-path> origin/main
 ```
 
-If the worktree is not clean, preserve and resolve the existing work before
-switching branches; never discard or overwrite it to satisfy this sequence.
+If `main` is checked out in a clean primary worktree, `git switch main` plus
+`git pull --ff-only origin main` should be run before `git worktree add`. If the
+primary worktree is not clean or is on another branch, leave it untouched and
+create the request worktree directly from the fetched `origin/main`. Never
+discard, stash, move, or overwrite unrelated work merely to satisfy this
+sequence.
+
+Environment reuse is resource-specific. Package-manager stores and language
+toolchains are normally shared automatically. Ignored local configuration or a
+compatible dependency tree may be referenced or linked from the primary
+checkout when a task needs it. Build outputs that can race, mutable runtime
+data, and incompatible dependency trees must remain worktree-local.
 
 Typical GitHub delivery (use the hosting platform's equivalent when needed):
 
@@ -212,7 +237,10 @@ Typical GitHub delivery (use the hosting platform's equivalent when needed):
 git push -u origin <type>/<short-description>
 gh pr create --base main --head <type>/<short-description>
 gh pr checks --watch
-gh pr merge --delete-branch
+gh pr merge --merge
+git worktree remove <worktree-path>
+git branch -d <type>/<short-description>
+git push origin --delete <type>/<short-description>
 ```
 
 ---
@@ -221,7 +249,8 @@ gh pr merge --delete-branch
 
 A change is **Done** when all of the following are true:
 
-1. A dedicated request branch was created from an up-to-date `main`.
+1. A dedicated request branch and worktree were created from an up-to-date
+   `main`.
 2. Code (or doc) implements the planned change.
 3. All impacted specs are updated.
 4. E2E scenarios are documented (or confirmed not needed per §3).
@@ -231,7 +260,7 @@ A change is **Done** when all of the following are true:
 7. BOARD is updated if a milestone deliverable completed.
 8. No secrets or local data are present in the commit.
 9. The branch was pushed and its PR/MR was reviewed and merged into `main`.
-10. The merged request branch was deleted.
+10. The request worktree was removed and the merged request branch was deleted.
 
 ---
 
@@ -245,6 +274,7 @@ A change is **Done** when all of the following are true:
 | Skipping e2e doc for user-visible changes | Violates R3; traceability gap |
 | Manually running or dispatching E2E without an explicit user request | Violates the opt-in E2E execution policy |
 | Developing, committing, or pushing directly on `main` | Violates R4; bypasses isolation and review gates |
+| Developing a new request in the primary checkout or another request's worktree | Violates R4; mixes task files and local state |
 | Reusing a request branch for unrelated work | Mixes request scope and weakens traceability |
 | Marking work Done before its PR/MR is merged | Violates R4; change is not integrated into `main` |
 | Modifying baseline frozen decisions without ADR + version bump | Baseline is frozen; changes need formal process |
@@ -261,7 +291,10 @@ This workflow spec itself is accepted when:
 - [ ] Development loop is documented and referenced by `AGENTS.md`.
 - [ ] Spec update matrix covers all change types in the baseline.
 - [ ] Git commit rules match existing repo commit style (`docs:`, `chore:`).
-- [ ] Every request is required to use a branch created from current `main`.
+- [ ] Every request is required to use a dedicated branch and worktree created
+      from current `main`.
+- [ ] Request worktrees reuse the primary checkout's environment where safe
+      without committing local environment state.
 - [ ] PR/MR creation, remote gates, merge, and branch cleanup are mandatory.
 - [ ] E2E execution is opt-in and requires an explicit user request, while E2E
       scenario documentation remains mandatory under R3.
