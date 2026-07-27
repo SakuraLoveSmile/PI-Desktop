@@ -21,7 +21,7 @@ import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
  *   regardless of block size.
  */
 
-export const THEMES = { light: "github-light", dark: "github-dark" } as const;
+export const THEMES = { light: "one-light", dark: "one-dark-pro" } as const;
 export type ThemeMode = keyof typeof THEMES;
 
 export function themeForMode(mode: ThemeMode): BundledTheme {

@@ -305,3 +305,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 
 - Light `.prose-chat` / `.code-block` surfaces were retuned for white chat paper: softer underlined links, flat gray code cards (no muddy shadow), quieter blockquotes/tables/kbd/math, and secondary thinking ink.
 - Dark markdown treatment is unchanged in spirit (inset charcoal code, light-gray links via accent-soft).
+
+## 2026-07-28 — One Dark Pro code highlighting
+
+- Chat fence highlighting switched from `github-light`/`github-dark` to `one-light`/`one-dark-pro`.
+- Code cards paint a single editor surface (`#fafafa` / `#282c34`); nested `pre`/`code`/token backgrounds are forced transparent so there is no double wash.

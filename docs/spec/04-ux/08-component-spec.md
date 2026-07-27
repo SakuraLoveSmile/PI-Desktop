@@ -788,16 +788,16 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   `remark-math` + `rehype-katex` (inline `$…$`, display `$$…$$`). Raw HTML
   stays escaped (no `rehype-raw`).
 - **Syntax highlighting**: Shiki singleton with the JavaScript regex engine
-  (no wasm), themes `github-light`/`github-dark` following `data-theme`.
+  (no wasm), themes `one-light`/`one-dark-pro` following `data-theme`.
   Languages lazy-load per fence tag with a plain-mono fallback until ready.
   Streaming code re-tokenizes only changed lines by chaining GrammarState
   (per-line cache), so per-frame cost is constant regardless of block size.
-- **Code block chrome**: `.code-block` inset card (radius-md-plus, hairline
-  border, soft inset lift; dark uses `bg-inset` mix, light uses near-white
-  gray) with `.code-block-head` — monospace lowercase language tag
-  (text-xs, muted) left, copy button right (opacity rises on hover/focus;
-  copies the raw code string). Body `pre` at text-sm-plus / leading-relaxed
-  with horizontal scroll and tab-size 2.
+- **Code block chrome**: `.code-block` single-surface card (radius-md-plus,
+  hairline border; dark `#282c34`, light `#fafafa` — matching One Dark Pro /
+  One Light editor bg). Header is transparent (language tag left, copy right);
+  body `pre`/`code`/token spans have **no nested background**, so Shiki token
+  colors sit on the one card surface. Body text at text-sm-plus /
+  leading-relaxed with horizontal scroll and tab-size 2.
 - **Prose**: calmer chat density — body at text-base / leading-prose with
   pretty wrapping; heading ramp h1 `text-xl` (hairline underline) → h2
   `text-lg-plus` → h3 `text-lg` → h4 `text-base-plus` → h5/h6 `text-base`
@@ -808,10 +808,10 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   display math sits in a subtle inset plate. Thinking prose reuses the same
   hierarchy at text-sm-plus / secondary color.
 - **Light theme**: paper-quiet surfaces — links use soft underlined ink
-  (not hard black/blue), inline code `#f2f2f2`, code cards `#f7f7f7` with
-  `#efefef` header and no drop shadow, blockquotes `#f6f6f6`, tables on
-  white with `#f3f3f3` header / `#fafafa` zebra. Dark theme keeps the inset
-  charcoal code treatment.
+  (not hard black/blue), inline code `#f2f2f2`, fenced code cards use One
+  Light `#fafafa` (no nested wash / drop shadow), blockquotes `#f6f6f6`,
+  tables on white with `#f3f3f3` header / `#fafafa` zebra. Dark fenced code
+  uses One Dark Pro `#282c34`.
 - **Links**: plain click previews in the work panel; modified click keeps
   `target="_blank"` so main routes through `shell.openExternal`; in-window
   navigation stays blocked.

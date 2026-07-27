@@ -10,6 +10,10 @@ const markdownSource = await readFile(
   new URL("../src/components/Markdown.tsx", import.meta.url),
   "utf8",
 );
+const shikiSource = await readFile(
+  new URL("../src/lib/shiki.ts", import.meta.url),
+  "utf8",
+);
 
 test("chat prose keeps a refined hierarchy and quieter chrome", () => {
   assert.match(stylesSource, /\.prose-chat\s*\{/);
@@ -31,6 +35,41 @@ test("markdown renderer still streams by memoized blocks", () => {
   assert.match(markdownSource, /className="table-wrap"/);
 });
 
+test("code blocks use one-dark-pro with a single surface background", () => {
+  assert.match(
+    shikiSource,
+    /export const THEMES = \{\s*light:\s*"one-light",\s*dark:\s*"one-dark-pro"\s*\}/,
+  );
+  assert.doesNotMatch(shikiSource, /github-light|github-dark/);
+
+  // Outer card owns the one-dark / one-light editor bg once.
+  assert.match(stylesSource, /\.code-block\s*\{[\s\S]*?--code-block-bg:\s*#282c34/);
+  assert.match(
+    stylesSource,
+    /:root\[data-theme="light"\] \.code-block\s*\{[\s\S]*?--code-block-bg:\s*#fafafa/,
+  );
+
+  // No nested wash on pre/code/token spans.
+  assert.match(
+    stylesSource,
+    /\.prose-chat \.code-block pre\s*\{[\s\S]*?background:\s*transparent !important/,
+  );
+  assert.match(
+    stylesSource,
+    /\.prose-chat \.code-block pre code\s*\{[\s\S]*?background:\s*transparent !important/,
+  );
+  assert.match(
+    stylesSource,
+    /\.code-block pre,\s*\.code-block code,[\s\S]*?background-color:\s*transparent/,
+  );
+
+  // Header is transparent (no second plate).
+  assert.match(
+    stylesSource,
+    /\.code-block-head\s*\{[\s\S]*?background:\s*transparent/,
+  );
+});
+
 test("light theme markdown uses paper-quiet surfaces", () => {
   assert.match(
     stylesSource,
@@ -42,22 +81,10 @@ test("light theme markdown uses paper-quiet surfaces", () => {
   );
   assert.match(
     stylesSource,
-    /:root\[data-theme="light"\] \.code-block\s*\{[\s\S]*?background:\s*#f7f7f7/,
-  );
-  assert.match(
-    stylesSource,
-    /:root\[data-theme="light"\] \.code-block-head\s*\{[\s\S]*?background:\s*#efefef/,
-  );
-  assert.match(
-    stylesSource,
     /:root\[data-theme="light"\] \.prose-chat blockquote\s*\{[\s\S]*?background:\s*#f6f6f6/,
   );
   assert.match(
     stylesSource,
     /:root\[data-theme="light"\] \.prose-chat \.table-wrap\s*\{[\s\S]*?background:\s*#ffffff/,
-  );
-  assert.doesNotMatch(
-    stylesSource,
-    /:root\[data-theme="light"\] \.prose-chat[\s\S]{0,500}#0285ff/i,
   );
 });
