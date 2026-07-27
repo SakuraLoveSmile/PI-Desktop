@@ -19,7 +19,7 @@ function notification(overrides) {
   };
 }
 
-test("keeps the newest completed or failed outcome for each session", () => {
+test("keeps the newest unread completed or failed outcome for each session", () => {
   const outcomes = latestSessionOutcomes([
     notification({ id: "latest", kind: "task.completed" }),
     notification({ id: "older", kind: "task.failed" }),
@@ -27,7 +27,6 @@ test("keeps the newest completed or failed outcome for each session", () => {
       id: "other",
       kind: "task.failed",
       sessionId: "session-2",
-      readAt: "2026-07-27T10:05:00.000Z",
     }),
   ]);
 
@@ -35,6 +34,15 @@ test("keeps the newest completed or failed outcome for each session", () => {
     "session-1": "completed",
     "session-2": "failed",
   });
+});
+
+test("read task notifications leave no sidebar indicator", () => {
+  const outcomes = latestSessionOutcomes([
+    notification({ id: "latest", readAt: "2026-07-27T10:05:00.000Z" }),
+    notification({ id: "older", kind: "task.failed" }),
+  ]);
+
+  assert.deepEqual(outcomes, {});
 });
 
 test("prioritizes in-progress and selected states over terminal outcomes", () => {
@@ -51,6 +59,20 @@ test("prioritizes in-progress and selected states over terminal outcomes", () =>
     "completed",
   );
   assert.equal(sidebarSessionStatus({ running: false, selected: false }), null);
+});
+
+test("opening a conversation acknowledges its outcome badge", () => {
+  const store = fs.readFileSync(
+    new URL("../src/stores/app-store.ts", import.meta.url),
+    "utf8",
+  );
+  const selectBlock = store.match(/selectSession: async[\s\S]*?\n  newSession:/)?.[0] ?? "";
+  assert.match(selectBlock, /acknowledgeSessionOutcome\(id\)/);
+
+  const ackBlock =
+    store.match(/acknowledgeSessionOutcome: async[\s\S]*?\n  handleAgentEvent:/)?.[0] ?? "";
+  assert.match(ackBlock, /withoutRecordKey\(s\.sessionOutcomes, sessionId\)/);
+  assert.match(ackBlock, /markNotificationRead\(item\.id\)/);
 });
 
 test("renders semantic, shape-distinct sidebar status indicators", () => {
