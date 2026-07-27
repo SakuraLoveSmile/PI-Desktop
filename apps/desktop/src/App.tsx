@@ -3,10 +3,12 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ErrorInfo,
   type ReactNode,
 } from "react";
+import i18n from "i18next";
 import { useTranslation } from "react-i18next";
 import {
   KEYBOARD_SHORTCUTS,
@@ -36,6 +38,8 @@ import type { ToastOptions } from "./stores/app-store";
 import { api } from "./lib/api";
 import { toolWorkPanelTab } from "./lib/work-panel-tabs";
 import { BrandLogo } from "./components/BrandLogo";
+import { StartupSplash } from "./components/StartupSplash";
+import { cx } from "./components/ui";
 import {
   IconNewSession,
   IconPanel,
@@ -66,7 +70,7 @@ class ErrorBoundary extends Component<
       return (
         <div className="flex h-full items-center justify-center bg-bg-primary p-8 text-text-primary">
           <div className="max-w-lg rounded-lg-plus border border-border-default bg-bg-secondary p-5">
-            <div className="mb-2 text-base-plus font-semibold">PI-Desktop UI crashed</div>
+            <div className="mb-2 text-base-plus font-semibold">{i18n.t("app.uiCrashed")}</div>
             <pre className="whitespace-pre-wrap text-sm-plus text-error">
               {this.state.error.message}
             </pre>
@@ -177,6 +181,12 @@ function AppShell() {
   const [backendDown, setBackendDown] = useState<
     { fatal: boolean; component?: string } | null
   >(null);
+  const [splashPhase, setSplashPhase] = useState<"loading" | "exiting" | "done">(
+    "loading",
+  );
+  const splashStartedAt = useRef(
+    typeof performance !== "undefined" ? performance.now() : 0,
+  );
 
   const runMenuCommand = useCallback(
     async (command: AppMenuCommand) => {
@@ -716,13 +726,44 @@ function AppShell() {
     };
   }, []);
 
-  if (!ready) {
-    return (
-      <div className="flex h-full items-center justify-center bg-bg-primary text-sm text-text-muted">
-        {t("app.starting")}
-      </div>
+  useEffect(() => {
+    if (!ready) return;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const minMs = reduceMotion ? 0 : 420;
+    const exitMs = reduceMotion ? 0 : 280;
+    const wait = Math.max(
+      0,
+      minMs - (performance.now() - splashStartedAt.current),
     );
-  }
+
+    let cancelled = false;
+    let endTimer: number | undefined;
+    const startTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      if (exitMs === 0) {
+        setSplashPhase("done");
+        return;
+      }
+      setSplashPhase("exiting");
+      endTimer = window.setTimeout(() => {
+        if (!cancelled) setSplashPhase("done");
+      }, exitMs);
+    }, wait);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(startTimer);
+      if (endTimer !== undefined) window.clearTimeout(endTimer);
+    };
+  }, [ready]);
+
+  const showSplash = splashPhase !== "done";
+  const splash = showSplash ? (
+    <StartupSplash exiting={splashPhase === "exiting"} />
+  ) : null;
 
   const showComposer = page === "chat";
   const hasTranscript =
@@ -749,188 +790,205 @@ function AppShell() {
       ).join(shortcutPlatform === "darwin" ? "" : "+")
     : "";
 
-  // Codex settings is a full-window page (no app sidebar / main titlebar chrome).
-  if (page === "settings") {
-    return (
-      <div className="app-shell settings-mode">
-        <WindowControls />
-        <SettingsPage />
-        <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
-        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-        <ToastHost />
-        <UpdateBanner />
-      </div>
-    );
+  let shell: ReactNode = null;
+  if (ready) {
+    if (page === "settings") {
+      shell = (
+        <>
+          <WindowControls />
+          <SettingsPage />
+          <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+          <ToastHost />
+          <UpdateBanner />
+        </>
+      );
+    } else {
+      shell = (
+        <>
+          <WindowControls />
+          {!sidebarCollapsed && (
+            <Sidebar
+              onOpenSearch={() => setSearchOpen(true)}
+              onToggleSidebar={() => setSidebarCollapsed(true)}
+              sidebarToggleShortcut={sidebarToggleShortcut}
+            />
+          )}
+
+          <section className="main-pane">
+            <div className="main-titlebar">
+              {sidebarCollapsed && (
+                <div className="main-titlebar-left no-drag">
+                  <CollapsedTitlebarActions
+                    onToggleSidebar={() => setSidebarCollapsed(false)}
+                    onNewTask={() => void runMenuCommand("newTask")}
+                    sidebarToggleShortcut={sidebarToggleShortcut}
+                  />
+                </div>
+              )}
+              {workPanelOpen && (
+                <div className="main-titlebar-right no-drag">
+                  <SessionPaneWorkPanelCollapse
+                    onCollapse={() => useAppStore.getState().collapseWorkPanel()}
+                  />
+                </div>
+              )}
+            </div>
+            <UpdateBanner />
+
+            {backendDown && (
+              <div
+                className={`backend-banner no-drag ${backendDown.fatal ? "fatal" : "warn"}`}
+                role="status"
+              >
+                <span className="backend-dot" aria-hidden />
+                <span>
+                  {backendDown.fatal ? t("status.fatal") : t("status.restarting")}
+                </span>
+                {backendDown.fatal && (
+                  <button
+                    type="button"
+                    className="backend-action"
+                    onClick={() => void api.openLogs()}
+                  >
+                    {t("status.openLogs")}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {page === "pulls" ? (
+              <PullRequestsPage />
+            ) : page === "scheduled" ? (
+              <ScheduledPage />
+            ) : page === "plugins" ? (
+              <PluginsPage />
+            ) : (
+              <>
+                {!hasTranscript ? (
+                  <div className="home-main-content" data-testid="home-empty">
+                    <div className="home-scroll">
+                      <div className="home-stack-inner">
+                        <div className="empty-hero">
+                          <div className="empty-hero-icon" data-testid="home-icon" aria-hidden>
+                            <BrandLogo size={56} />
+                          </div>
+                          <h1>
+                            {heroProject ? (
+                              <>
+                                {emptyTitleParts.before}
+                                <button
+                                  type="button"
+                                  className="project-underline"
+                                  onClick={() => void openProject()}
+                                  title={workspace?.path || t("project.open")}
+                                >
+                                  {heroProject}
+                                </button>
+                                {emptyTitleParts.after}
+                              </>
+                            ) : (
+                              t("chat.emptyTitle")
+                            )}
+                          </h1>
+                        </div>
+                        <OnboardingChecklist />
+                        {showComposer && (
+                          <div className="home-composer-wrap">
+                            <Composer variant="home" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <ChatTranscript
+                      messages={messages}
+                      isRunning={isRunning}
+                      pendingPermission={activePermission}
+                    />
+                    {showComposer && <Composer variant="docked" />}
+                  </>
+                )}
+
+                {error && (
+                  <div className="absolute inset-x-0 bottom-[150px] z-10 flex justify-center px-4">
+                    <div className="flex max-w-[820px] items-center gap-3 rounded-md-plus border border-error/30 bg-bg-secondary px-3 py-2 text-md text-error">
+                      {/* Localized text when the code is known; raw provider
+                          detail stays reachable via the tooltip. */}
+                      <span title={error ?? undefined}>
+                        {errorCode && i18nHasError(t, errorCode)
+                          ? t(`errors.${errorCode}`)
+                          : error}
+                      </span>
+                      {(errorCode === "MODEL_NOT_CONFIGURED" ||
+                        errorCode === "PROVIDER_SECRET_MISSING" ||
+                        errorCode === "PROVIDER_UNAUTHORIZED") && (
+                        <button
+                          type="button"
+                          className="flex-none rounded-md border border-border-strong px-2 py-1 text-sm-plus text-text-primary hover:bg-bg-hover"
+                          onClick={() => {
+                            useAppStore.getState().setSettingsTab("agent");
+                            useAppStore.getState().setPage("settings");
+                          }}
+                        >
+                          {t("errors.action.openSettings")}
+                        </button>
+                      )}
+                      {errorRetriable && !isRunning && (
+                        <button
+                          type="button"
+                          className="flex-none rounded-md border border-border-strong px-2 py-1 text-sm-plus text-text-primary hover:bg-bg-hover"
+                          onClick={() => {
+                            void useAppStore.getState().retryLastPrompt();
+                          }}
+                        >
+                          {t("errors.action.retry")}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={t("errors.action.dismiss")}
+                        className="flex-none rounded-md px-1.5 py-1 text-sm-plus text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+                        onClick={() => useAppStore.getState().clearError()}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          {workPanelOpen && (
+            <WorkPanel browserBlocked={paletteOpen || searchOpen} />
+          )}
+
+          <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+          <ToastHost />
+        </>
+      );
+    }
   }
 
   return (
-    <div className="app-shell">
-      <WindowControls />
-      {!sidebarCollapsed && (
-        <Sidebar
-          onOpenSearch={() => setSearchOpen(true)}
-          onToggleSidebar={() => setSidebarCollapsed(true)}
-          sidebarToggleShortcut={sidebarToggleShortcut}
-        />
+    <div
+      className={cx(
+        "app-shell",
+        !ready && "app-shell-boot",
+        page === "settings" && ready && "settings-mode",
+        showSplash && "is-booting",
       )}
-
-      <section className="main-pane">
-        <div className="main-titlebar">
-          {sidebarCollapsed && (
-            <div className="main-titlebar-left no-drag">
-              <CollapsedTitlebarActions
-                onToggleSidebar={() => setSidebarCollapsed(false)}
-                onNewTask={() => void runMenuCommand("newTask")}
-                sidebarToggleShortcut={sidebarToggleShortcut}
-              />
-            </div>
-          )}
-          {workPanelOpen && (
-            <div className="main-titlebar-right no-drag">
-              <SessionPaneWorkPanelCollapse
-                onCollapse={() => useAppStore.getState().collapseWorkPanel()}
-              />
-            </div>
-          )}
-        </div>
-        <UpdateBanner />
-
-        {backendDown && (
-          <div
-            className={`backend-banner no-drag ${backendDown.fatal ? "fatal" : "warn"}`}
-            role="status"
-          >
-            <span className="backend-dot" aria-hidden />
-            <span>
-              {backendDown.fatal ? t("status.fatal") : t("status.restarting")}
-            </span>
-            {backendDown.fatal && (
-              <button
-                type="button"
-                className="backend-action"
-                onClick={() => void api.openLogs()}
-              >
-                {t("status.openLogs")}
-              </button>
-            )}
-          </div>
-        )}
-
-        {page === "pulls" ? (
-          <PullRequestsPage />
-        ) : page === "scheduled" ? (
-          <ScheduledPage />
-        ) : page === "plugins" ? (
-          <PluginsPage />
-        ) : (
-          <>
-            {!hasTranscript ? (
-              <div className="home-main-content" data-testid="home-empty">
-                <div className="home-scroll">
-                  <div className="home-stack-inner">
-                    <div className="empty-hero">
-                      <div className="empty-hero-icon" data-testid="home-icon" aria-hidden>
-                        <BrandLogo size={56} />
-                      </div>
-                      <h1>
-                        {heroProject ? (
-                          <>
-                            {emptyTitleParts.before}
-                            <button
-                              type="button"
-                              className="project-underline"
-                              onClick={() => void openProject()}
-                              title={workspace?.path || t("project.open")}
-                            >
-                              {heroProject}
-                            </button>
-                            {emptyTitleParts.after}
-                          </>
-                        ) : (
-                          t("chat.emptyTitle")
-                        )}
-                      </h1>
-                    </div>
-                    <OnboardingChecklist />
-                    {showComposer && (
-                      <div className="home-composer-wrap">
-                        <Composer variant="home" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <>
-                <ChatTranscript
-                  messages={messages}
-                  isRunning={isRunning}
-                  pendingPermission={activePermission}
-                />
-                {showComposer && <Composer variant="docked" />}
-              </>
-            )}
-
-            {error && (
-              <div className="absolute inset-x-0 bottom-[150px] z-10 flex justify-center px-4">
-                <div className="flex max-w-[820px] items-center gap-3 rounded-md-plus border border-error/30 bg-bg-secondary px-3 py-2 text-md text-error">
-                  {/* Localized text when the code is known; raw provider
-                      detail stays reachable via the tooltip. */}
-                  <span title={error ?? undefined}>
-                    {errorCode && i18nHasError(t, errorCode)
-                      ? t(`errors.${errorCode}`)
-                      : error}
-                  </span>
-                  {(errorCode === "MODEL_NOT_CONFIGURED" ||
-                    errorCode === "PROVIDER_SECRET_MISSING" ||
-                    errorCode === "PROVIDER_UNAUTHORIZED") && (
-                    <button
-                      type="button"
-                      className="flex-none rounded-md border border-border-strong px-2 py-1 text-sm-plus text-text-primary hover:bg-bg-hover"
-                      onClick={() => {
-                        useAppStore.getState().setSettingsTab("agent");
-                        useAppStore.getState().setPage("settings");
-                      }}
-                    >
-                      {t("errors.action.openSettings")}
-                    </button>
-                  )}
-                  {errorRetriable && !isRunning && (
-                    <button
-                      type="button"
-                      className="flex-none rounded-md border border-border-strong px-2 py-1 text-sm-plus text-text-primary hover:bg-bg-hover"
-                      onClick={() => {
-                        void useAppStore.getState().retryLastPrompt();
-                      }}
-                    >
-                      {t("errors.action.retry")}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    aria-label={t("errors.action.dismiss")}
-                    className="flex-none rounded-md px-1.5 py-1 text-sm-plus text-text-secondary hover:bg-bg-hover hover:text-text-primary"
-                    onClick={() => useAppStore.getState().clearError()}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </section>
-
-      {workPanelOpen && (
-        <WorkPanel browserBlocked={paletteOpen || searchOpen} />
-      )}
-
-      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-      <ToastHost />
+    >
+      {shell}
+      {splash}
     </div>
   );
 }
+
 
 export default function App() {
   return (
