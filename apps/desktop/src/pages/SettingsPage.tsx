@@ -594,6 +594,9 @@ export function SettingsPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("settings.searchPlaceholder")}
               aria-label={t("settings.search")}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
             />
           </div>
         </div>

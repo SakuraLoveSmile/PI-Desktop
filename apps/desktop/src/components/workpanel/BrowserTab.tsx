@@ -146,6 +146,8 @@ export function BrowserTab({
             value={input}
             placeholder={t("panel.browser.urlPlaceholder")}
             spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
             onChange={(e) => setInput(e.target.value)}
             onFocus={(e) => {
               inputFocused.current = true;

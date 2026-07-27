@@ -2215,3 +2215,11 @@ This test plan spec is accepted when:
 - Confirm row pitch remains compact (≈28–32px), titles still truncate cleanly,
   and collapsed icon-rail controls stay legible without reflowing the shell.
 
+### US-UI-70 Disable text correction on editable fields (D145)
+- Open empty home, a docked transcript, Settings search, Plugins market search,
+  Projects archive search, command palette, global search, provider model combo,
+  message-edit textarea, and the work-panel browser URL bar in light and dark.
+- Expect every text `input`/`textarea` to expose `spellcheck="false"` (React
+  `spellCheck={false}`) plus `autocorrect="off"` and `autocapitalize="off"`.
+- Expect no red spelling underlines while typing code-like tokens, paths, model
+  ids, or URLs; checkboxes and non-text controls remain unchanged.

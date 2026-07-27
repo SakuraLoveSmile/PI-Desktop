@@ -189,6 +189,8 @@ export function ProviderDialog({
                 className="font-mono text-sm-plus"
                 placeholder={t("settings.searchOrEnterModel")}
                 spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
                 autoComplete="off"
                 role="combobox"
                 aria-expanded={showMenu}

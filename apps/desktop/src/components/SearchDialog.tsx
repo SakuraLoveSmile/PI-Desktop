@@ -287,6 +287,8 @@ export function SearchDialog({
             value={query}
             autoFocus
             spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape") {

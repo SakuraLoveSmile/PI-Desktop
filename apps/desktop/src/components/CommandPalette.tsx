@@ -58,6 +58,9 @@ export function CommandPalette({
           placeholder={t("palette.placeholder")}
           value={query}
           autoFocus
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape") onClose();

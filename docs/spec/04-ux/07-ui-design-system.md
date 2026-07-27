@@ -627,6 +627,7 @@ These are **token-level foundations** for common primitives. Detailed component 
 | Border | 1px border-default; focus → 2px accent ring offset-2 |
 | Background | bg-primary |
 | Radius | radius-sm |
+| Text correction (D145) | `spellCheck={false}`, `autoCorrect="off"`, `autoCapitalize="off"` on every text input/textarea |
 
 ### 11.3 Card
 
