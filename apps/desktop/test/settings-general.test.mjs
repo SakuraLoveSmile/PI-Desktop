@@ -48,6 +48,22 @@ test("language persists as part of shared app settings", () => {
   assert.match(sharedTypesSource, /language\?: "auto" \| "en" \| "zh-CN"/);
 });
 
+test("basics gates developer tools behind a persisted developer mode", () => {
+  assert.match(sharedTypesSource, /developerMode\?: boolean/);
+  assert.match(settingsPageSource, /function DeveloperSection/);
+  assert.match(settingsPageSource, /role="switch"/);
+  assert.match(settingsPageSource, /saveSettings\(\{ developerMode: !enabled \}\)/);
+  assert.match(settingsPageSource, /api\.toggleDevTools\(true\)/);
+  assert.match(settingsPageSource, /disabled=\{!enabled\}/);
+  for (const key of [
+    "settings.developer",
+    "settings.developerMode",
+    "settings.devTools",
+  ]) {
+    assert.match(settingsSearchSource, new RegExp(key.replace(".", "\\.")));
+  }
+});
+
 test("stored language drives i18n at startup and on settings change", () => {
   assert.match(languageSource, /export function initLanguageSync/);
   assert.match(languageSource, /changeLanguage/);
