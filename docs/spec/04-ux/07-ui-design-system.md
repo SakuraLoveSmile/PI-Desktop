@@ -314,10 +314,11 @@ Sidebar footer (D113): a transparent `58px`-high band with no separator. The
 left profile trigger is `44px` high and flexes to fill the available width. It
 contains a `30px` circular user glyph, a two-line identity stack (`Custom` at
 the primary text size and `Local profile` / localized equivalent as muted
-metadata), and a trailing chevron. The Help shortcut is a separate `32px`
-square icon button on the right and opens Settings → Info. Hover and active
+metadata), and a trailing chevron. The notification inbox trigger is a separate
+`32px` square Bell icon button on the right, carries the unread badge, and opens
+its popover above the footer. Hover and active
 states use semantic sidebar surfaces; neither control adds a persistent card
-fill or cloud/update badge.
+fill.
 
 The profile menu is `280px` wide, opens `8px` above the footer, and uses the
 standard opaque elevated-menu surface, subtle border, and dialog shadow. Its

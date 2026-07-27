@@ -19,6 +19,7 @@ import type {
   SessionSort,
 } from "../lib/sidebar-preferences";
 import { BrandLogo } from "./BrandLogo";
+import { NotificationCenter } from "./NotificationCenter";
 import {
   IconArchive,
   IconArchiveRestore,
@@ -29,7 +30,6 @@ import {
   IconNewSession,
   IconFolder,
   IconFileText,
-  IconHelp,
   IconMore,
   IconPanel,
   IconPin,
@@ -149,7 +149,6 @@ export function Sidebar({
   const projectSort = useAppStore((s) => s.projectSort);
   const runningSessions = useAppStore((s) => s.runningSessions);
   const setPage = useAppStore((s) => s.setPage);
-  const setSettingsTab = useAppStore((s) => s.setSettingsTab);
   const settings = useAppStore((s) => s.settings);
   const page = useAppStore((s) => s.page);
   const selectSession = useAppStore((s) => s.selectSession);
@@ -1176,9 +1175,7 @@ export function Sidebar({
             </span>
             <IconChevronDown className={`footer-profile-chevron ${profileOpen ? "open" : ""}`} size={13} aria-hidden />
           </button>
-          <button className="footer-help" title={t("nav.help")} aria-label={t("nav.help")} onClick={() => { closeMenus(false); setSettingsTab("about"); setPage("settings"); }}>
-            <IconHelp size={14} />
-          </button>
+          <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
         </div>
       </div>
       {renderFloatingMenu()}

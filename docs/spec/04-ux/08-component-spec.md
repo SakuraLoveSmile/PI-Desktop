@@ -92,12 +92,12 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ### 2.1 Purpose
 
 Global controls bar: project identity, model selection, mode indicator, abort
-button, durable notification inbox entry, and settings entry.
+button, and settings entry.
 
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [📁 Project name] [🤖 Model: provider/model] [🛡 Mode badge] [⏹ Abort] [Bell · unread] [⚙ Settings]
+[☰ Sidebar] [📁 Project name] [🤖 Model: provider/model] [🛡 Mode badge] [⏹ Abort] [⚙ Settings]
 ```
 
 (Icons described functionally; actual render uses Lucide SVGs.)
@@ -118,16 +118,12 @@ button, durable notification inbox entry, and settings entry.
 | Mode badge | "Agent" or "Chat" badge | same | same | same |
 | Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
 | Project name | workspace folder name | same | same | "No project" muted |
-| Notification bell | visible; no badge at zero unread | same; badge may update for any completed background turn | same | visible |
 
 ### 2.5 Accessibility
 
 - Every control is keyboard-reachable with Tab
 - Abort button has `aria-label="Abort active turn"`
 - Model selector announces current value via `aria-label`
-- Notification trigger has a localized accessible name containing the unread
-  count, exposes `aria-expanded`/`aria-controls`, and never relies on the badge
-  color alone
 
 ### 2.6 MVP constraints
 
@@ -142,10 +138,11 @@ button, durable notification inbox entry, and settings entry.
 
 ### 3.1 Purpose
 
-Scoped project and session navigation and management. The expanded sidebar
-shows every retained project tab as an independently collapsible group plus
-path-less Temporary sessions; the collapsed state is an icon rail. Retained
-tabs are renderer presentation state, not additional host workspaces.
+Scoped project and session navigation, management, and notification access. The
+expanded sidebar shows every retained project tab as an independently
+collapsible group plus path-less Temporary sessions; the collapsed state is an
+icon rail. Retained tabs are renderer presentation state, not additional host
+workspaces.
 The home destination controls expose Projects and Plugins only; Pull requests
 and Scheduled are not rendered in the sidebar.
 
@@ -222,7 +219,7 @@ Collapsed (48px):
 - Sidebar toggle: Topbar hamburger + keyboard shortcut
 - Click the local profile trigger: open or close the identity menu containing
   Settings, Logs, and Theme
-- Click Help: navigate directly to Settings → Info
+- Click the footer bell: open or close the durable notification inbox
 
 ### 3.5 Accessibility
 
@@ -236,8 +233,9 @@ Collapsed (48px):
 - Keyboard: arrow keys navigate session list
 - The profile trigger exposes `aria-haspopup="menu"` and its expanded state;
   the menu has a stable accessible relationship to the trigger
-- Help has a localized accessible name that identifies the Settings → Info
-  destination
+- The notification trigger has a localized accessible name containing the
+  unread count, exposes `aria-expanded`/`aria-controls`, and never relies on
+  the badge color alone
 
 
 ### 3.6 Brand and icon contract
@@ -281,7 +279,7 @@ controls.
 
 The expanded sidebar ends with a WorkBuddy-inspired local identity cluster.
 It borrows the compact avatar-and-actions grammar without implying a cloud
-account, subscription, notification feed, or collaboration backend.
+account, subscription, or collaboration backend.
 
 | Element | Contract |
 |---|---|
@@ -290,7 +288,7 @@ account, subscription, notification feed, or collaboration backend.
 | User glyph | `30px` circular local-user glyph; decorative when the text label names the control |
 | Identity copy | Primary `Custom`; secondary `Local profile` or localized `本地配置`; two lines truncate independently |
 | Chevron | Trailing disclosure indicator; reflects the menu's open state without motion when reduced motion is requested |
-| Help shortcut | Separate `32px` square icon target; navigates to Settings → Info and never acts as an inert or mislabeled settings shortcut |
+| Notification shortcut | Separate `32px` square Bell target with unread badge; opens the durable inbox above and to the right of the footer |
 | Profile menu | `280px` wide, bottom anchored `8px` above the footer; opaque elevated surface |
 | Identity header | Repeats the glyph and two-line local identity; non-interactive |
 | Menu actions | Divider, then Settings, Logs, and Theme in that order; Theme retains its current-value metadata |
@@ -1316,7 +1314,7 @@ restarts.
 ### 20.2 Anatomy
 
 ```text
-Titlebar                                               Popover (360px max)
+Sidebar footer                                        Popover (360px max)
 [Bell (12)]  ->  [Notifications]       [All | Unread] [Mark all read] [Clear]
                  ------------------------------------------------------------
                  [unread dot] [check] Task completed              2m
@@ -1326,11 +1324,13 @@ Titlebar                                               Popover (360px max)
                                       Session title · ERROR_CODE
 ```
 
-- Trigger: 32px Lucide `Bell` icon button in the right titlebar actions. A
-  compact badge renders `1`–`99` and `99+`; its accessible label retains the
-  exact count (the durable store is capped at 200).
-- Popover: width `min(360px, calc(100vw - 24px))`, no taller than the available
-  window below the 46px titlebar, with one internally scrollable row list.
+- Trigger: 32px Lucide `Bell` icon button at the right of the expanded sidebar
+  footer, replacing the former Help shortcut. The main titlebar has no
+  duplicate. A compact badge renders `1`–`99` and `99+`; its accessible label
+  retains the exact count (the durable store is capped at 200).
+- Popover: width `min(360px, calc(100vw - 24px))`, opens above and to the right
+  of the footer, and is no taller than the available window, with one internally
+  scrollable row list.
 - Header: localized title, `All` / `Unread` segmented filter, Lucide
   `CheckCheck` mark-all-read button, and Lucide `Trash2` clear button. Icon-only
   actions carry localized tooltips and accessible names.

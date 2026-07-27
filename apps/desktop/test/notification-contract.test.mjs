@@ -4,13 +4,14 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [protocolSource, mainSource, apiSource, storeSource, appSource] =
+const [protocolSource, mainSource, apiSource, storeSource, appSource, sidebarSource] =
   await Promise.all([
     read("../../../packages/shared/src/protocol.ts"),
     read("../electron/main/index.ts"),
     read("../src/lib/api.ts"),
     read("../src/stores/app-store.ts"),
     read("../src/App.tsx"),
+    read("../src/components/Sidebar.tsx"),
   ]);
 
 test("notification IPC stays behind the shared preload allowlist", () => {
@@ -40,7 +41,8 @@ test("terminal notifications flow from host completion to the renderer", () => {
   assert.match(storeSource, /receiveNotification:/);
   assert.match(storeSource, /unreadNotificationCount/);
   assert.match(appSource, /api\.onNotificationChanged/);
-  assert.match(appSource, /<NotificationCenter \/>/);
+  assert.match(sidebarSource, /<NotificationCenter onBeforeOpen=\{\(\) => closeMenus\(false\)\} \/>/);
+  assert.doesNotMatch(appSource, /<NotificationCenter \/>/);
 });
 
 test("the visible chat session suppresses durable task notifications", () => {

@@ -53,7 +53,11 @@ function formatRelativeTime(value: string, locale: string, justNow: string): str
   }
 }
 
-export function NotificationCenter() {
+export function NotificationCenter({
+  onBeforeOpen,
+}: {
+  onBeforeOpen?: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const notifications = useAppStore((state) => state.notifications);
   const unreadCount = useAppStore((state) => state.unreadNotificationCount);
@@ -184,7 +188,7 @@ export function NotificationCenter() {
       <button
         ref={triggerRef}
         type="button"
-        className={`title-nav-btn notification-trigger ${open ? "active" : ""}`}
+        className={`footer-notification notification-trigger ${open ? "active" : ""}`}
         aria-label={unreadLabel}
         title={unreadLabel}
         aria-haspopup="dialog"
@@ -192,7 +196,10 @@ export function NotificationCenter() {
         aria-expanded={open}
         onClick={() => {
           if (open) closePopover();
-          else setOpen(true);
+          else {
+            onBeforeOpen?.();
+            setOpen(true);
+          }
         }}
       >
         <IconBell size={14} aria-hidden />
