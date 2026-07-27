@@ -28,9 +28,12 @@ The host is responsible for:
 - Protocol and data model
 - Local official market provider (`plugins/market/catalog.json`)
 
-### Phase B (partial ✅)
+### Phase B ✅
 - Browse/search + download install are implemented against the official provider
-- Remote HTTP(S) package URLs are supported for `file://` and `http://` in host-core; HTTPS package transport remains provider-dependent
+- Official provider is the dedicated GitHub repo `vastsa/pi-desktop-plugins`
+- Default catalog URL: `https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/catalog.json`
+- Package URLs may be absolute `https://` / `http://` / `file://`, or relative paths resolved against the catalog URL
+- HTTPS fetch uses `curl` in host-core
 
 ### Phase C (partial ✅)
 - Auto-update policy + permission-diff gating implemented
@@ -221,3 +224,30 @@ Desktop Plugins page now includes a Marketplace tab that calls:
 - `market.applyUpdates`
 
 Installs always pass through checksum verification and permission review before enable.
+
+
+## 13. Official marketplace repository
+
+Repository: [vastsa/pi-desktop-plugins](https://github.com/vastsa/pi-desktop-plugins)
+
+```text
+catalog.json
+packages/*.piplug
+plugins/<id>/
+scripts/pack_plugin.py
+scripts/rebuild_catalog.py
+```
+
+Maintenance flow:
+
+1. Edit `plugins/<id>`
+2. `python3 scripts/pack_plugin.py plugins/<id>`
+3. `python3 scripts/rebuild_catalog.py`
+4. Commit + push to `main`
+5. PI-Desktop refreshes via `market.refresh` / marketplace UI
+
+Override catalog URL with env:
+
+```text
+PI_DESKTOP_PLUGIN_MARKET_URL=https://raw.githubusercontent.com/<owner>/<repo>/<ref>/catalog.json
+```

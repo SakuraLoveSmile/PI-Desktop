@@ -7012,6 +7012,11 @@ textarea:disabled {
   gap: 10px;
   margin-top: 18px;
 }
+.plugins-market-source {
+  margin: -4px 0 12px;
+  color: var(--text-secondary, #9aa6bf);
+  font-size: var(--text-sm);
+}
 .plugins-market-bar {
   display: flex;
   gap: 8px;

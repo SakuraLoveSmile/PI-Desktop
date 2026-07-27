@@ -265,3 +265,10 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - High-risk plugin host APIs (`fs.write`, `net.fetch`, clipboard, openExternal) are available only with explicit grants.
 - Per-plugin auto-update is supported; permission-expanding upgrades require review.
 
+## 2026-07-28 — Official plugin marketplace repository
+
+- Dedicated repo `vastsa/pi-desktop-plugins` is the official marketplace source.
+- PI-Desktop fetches `catalog.json` remotely (cached under `~/.pi-desktop/plugins/market/`).
+- Plugin maintainers pack sources with repo scripts and publish by pushing to that repository.
+- Local bundled catalog remains fallback only when remote fetch fails.
+

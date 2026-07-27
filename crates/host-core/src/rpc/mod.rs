@@ -1564,6 +1564,18 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "plugin": plugin }))
         }
+        "market.refresh" => {
+            let force = params
+                .get("force")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            let st = state.lock().await;
+            let meta = st
+                .plugins
+                .refresh_market(force)
+                .map_err(|e| plugin_err(e))?;
+            Ok(meta)
+        }
         "market.search" => {
             let query = params.get("query").and_then(|v| v.as_str());
             let category = params.get("category").and_then(|v| v.as_str());

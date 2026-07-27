@@ -3459,6 +3459,11 @@ function registerIpc() {
     return { ok: true };
   });
 
+  handle(IPC.invoke.marketRefresh, async (payload?: { force?: boolean }) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("market.refresh", { force: payload?.force ?? true });
+  });
+
   handle(IPC.invoke.marketSearch, async (payload?: { query?: string; category?: string }) => {
     if (!host) throw new Error("host unavailable");
     return host.call("market.search", {

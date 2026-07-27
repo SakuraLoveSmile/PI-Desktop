@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{Read, Write};
@@ -205,6 +205,12 @@ struct MarketCatalogEntry {
 struct MarketCatalogFile {
     #[serde(default = "default_provider_id")]
     provider_id: String,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    homepage: Option<String>,
+    #[serde(default)]
+    updated_at: Option<String>,
     #[serde(default)]
     plugins: Vec<MarketCatalogEntry>,
 }
@@ -616,17 +622,39 @@ impl PluginManager {
         Ok(None)
     }
 
+    fn market_source_url() -> String {
+        std::env::var("PI_DESKTOP_PLUGIN_MARKET_URL").unwrap_or_else(|_| {
+            "https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/catalog.json"
+                .to_string()
+        })
+    }
+
+    fn market_cache_meta_path(&self) -> PathBuf {
+        self.data_dir.join("plugins/market/cache-meta.json")
+    }
+
     fn ensure_default_catalog(&self) -> Result<()> {
         let path = self.catalog_path();
         if path.exists() {
             return Ok(());
         }
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+        // Prefer the official remote marketplace repo; fall back to bundled demos.
+        match self.refresh_catalog_from_remote(false) {
+            Ok(_) => Ok(()),
+            Err(remote_err) => {
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                let catalog = built_in_catalog();
+                fs::write(&path, serde_json::to_string_pretty(&catalog)?)?;
+                self.materialize_local_package_urls(&catalog)?;
+                let _ = remote_err;
+                Ok(())
+            }
         }
-        let catalog = built_in_catalog();
-        fs::write(path, serde_json::to_string_pretty(&catalog)?)?;
-        // Materialize package payloads referenced by file:// URLs.
+    }
+
+    fn materialize_local_package_urls(&self, catalog: &MarketCatalogFile) -> Result<()> {
         for plugin in &catalog.plugins {
             for version in &plugin.versions {
                 if let Some(local) = version.url.strip_prefix("file://") {
@@ -645,15 +673,104 @@ impl PluginManager {
         Ok(())
     }
 
-    fn load_catalog(&self) -> Result<MarketCatalogFile> {
-        self.ensure_default_catalog()?;
-        let raw = fs::read_to_string(self.catalog_path())?;
-        let mut catalog: MarketCatalogFile = serde_json::from_str(&raw)
-            .map_err(|e| anyhow!("PLUGIN_MARKET_INVALID: {e}"))?;
-        if catalog.plugins.is_empty() {
-            catalog = built_in_catalog();
+    fn resolve_package_url(catalog_url: &str, package_url: &str) -> String {
+        if package_url.starts_with("http://")
+            || package_url.starts_with("https://")
+            || package_url.starts_with("file://")
+        {
+            return package_url.to_string();
         }
+        // Relative package paths resolve against the catalog URL directory.
+        if let Some(idx) = catalog_url.rfind('/') {
+            format!("{}{}", &catalog_url[..=idx], package_url.trim_start_matches('/'))
+        } else {
+            package_url.to_string()
+        }
+    }
+
+    fn rewrite_catalog_urls(catalog_url: &str, mut catalog: MarketCatalogFile) -> MarketCatalogFile {
+        for plugin in &mut catalog.plugins {
+            for version in &mut plugin.versions {
+                version.url = Self::resolve_package_url(catalog_url, &version.url);
+            }
+        }
+        catalog
+    }
+
+    fn refresh_catalog_from_remote(&self, force: bool) -> Result<MarketCatalogFile> {
+        let catalog_url = Self::market_source_url();
+        let cache_path = self.catalog_path();
+        let meta_path = self.market_cache_meta_path();
+        if !force && cache_path.exists() {
+            if let Ok(meta_raw) = fs::read_to_string(&meta_path) {
+                if let Ok(meta) = serde_json::from_str::<Value>(&meta_raw) {
+                    let fetched_at = meta.get("fetchedAt").and_then(|v| v.as_str()).unwrap_or("");
+                    if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(fetched_at) {
+                        let age = Utc::now().signed_duration_since(ts.with_timezone(&Utc));
+                        if age.num_seconds() < 300 {
+                            // Fresh enough; use cache.
+                            let raw = fs::read_to_string(&cache_path)?;
+                            let catalog: MarketCatalogFile = serde_json::from_str(&raw)
+                                .map_err(|e| anyhow!("PLUGIN_MARKET_INVALID: {e}"))?;
+                            return Ok(catalog);
+                        }
+                    }
+                }
+            }
+        }
+
+        let bytes = download_url(&catalog_url)
+            .map_err(|e| anyhow!("PLUGIN_NETWORK: failed to fetch marketplace catalog: {e}"))?;
+        let raw = String::from_utf8(bytes)
+            .map_err(|_| anyhow!("PLUGIN_MARKET_INVALID: catalog is not utf8"))?;
+        let parsed: MarketCatalogFile = serde_json::from_str(&raw)
+            .map_err(|e| anyhow!("PLUGIN_MARKET_INVALID: {e}"))?;
+        if parsed.plugins.is_empty() {
+            bail!("PLUGIN_MARKET_INVALID: remote catalog has no plugins");
+        }
+        let catalog = Self::rewrite_catalog_urls(&catalog_url, parsed);
+        if let Some(parent) = cache_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&cache_path, serde_json::to_string_pretty(&catalog)?)?;
+        let meta = json!({
+            "sourceUrl": catalog_url,
+            "providerId": catalog.provider_id,
+            "fetchedAt": Utc::now().to_rfc3339(),
+            "pluginCount": catalog.plugins.len(),
+        });
+        fs::write(meta_path, serde_json::to_string_pretty(&meta)?)?;
         Ok(catalog)
+    }
+
+    pub fn refresh_market(&self, force: bool) -> Result<Value> {
+        let catalog = self.refresh_catalog_from_remote(force)?;
+        Ok(json!({
+            "providerId": catalog.provider_id,
+            "name": catalog.name,
+            "homepage": catalog.homepage,
+            "updatedAt": catalog.updated_at,
+            "pluginCount": catalog.plugins.len(),
+            "sourceUrl": Self::market_source_url(),
+        }))
+    }
+
+    fn load_catalog(&self) -> Result<MarketCatalogFile> {
+        // Always try a cheap refresh; on failure fall back to cache / bundled demos.
+        match self.refresh_catalog_from_remote(false) {
+            Ok(catalog) => Ok(catalog),
+            Err(_) => {
+                self.ensure_default_catalog()?;
+                let raw = fs::read_to_string(self.catalog_path())?;
+                let mut catalog: MarketCatalogFile = serde_json::from_str(&raw)
+                    .map_err(|e| anyhow!("PLUGIN_MARKET_INVALID: {e}"))?;
+                if catalog.plugins.is_empty() {
+                    catalog = built_in_catalog();
+                    self.materialize_local_package_urls(&catalog)?;
+                }
+                Ok(catalog)
+            }
+        }
     }
 
     pub fn market_search(&self, query: Option<&str>, category: Option<&str>) -> Result<Vec<MarketPluginSummary>> {
@@ -931,6 +1048,9 @@ fn built_in_catalog() -> MarketCatalogFile {
     let notes_bytes = bundled_package_bytes("demo.workspace-notes", "0.1.0").unwrap_or_default();
     MarketCatalogFile {
         provider_id: "official".into(),
+        name: Some("PI-Desktop Official Plugins (bundled fallback)".into()),
+        homepage: Some("https://github.com/vastsa/pi-desktop-plugins".into()),
+        updated_at: Some("2026-07-28T00:00:00Z".into()),
         plugins: vec![
             MarketCatalogEntry {
                 id: "demo.hello".into(),
@@ -1525,14 +1645,47 @@ fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
 }
 
 fn download_url(url: &str) -> Result<Vec<u8>> {
-    // Minimal blocking HTTP(S) client using std + system curl-less raw TCP is
-    // brittle; use ureq-less approach via std::process is undesirable.
-    // For host-core we implement a tiny HTTPS-capable fetch with reqwest-free
-    // std only for http, and for https rely on native `curl` if present is also
-    // undesirable. Use a pure-Rust fallback via `std::net` HTTP only, else error.
+    if let Some(path) = url.strip_prefix("file://") {
+        return fs::read(path).with_context(|| format!("read local url {path}"));
+    }
+
+    // Prefer curl for robust HTTPS support on developer and CI machines.
+    if let Ok(output) = std::process::Command::new("curl")
+        .args([
+            "--silent",
+            "--show-error",
+            "--location",
+            "--fail",
+            "--max-time",
+            "30",
+            "--user-agent",
+            "pi-desktop-host-core",
+            url,
+        ])
+        .output()
+    {
+        if output.status.success() {
+            if output.stdout.len() as u64 > MAX_PACKAGE_BYTES {
+                bail!("PLUGIN_INVALID: package exceeds 50MB limit");
+            }
+            return Ok(output.stdout);
+        }
+        let err = String::from_utf8_lossy(&output.stderr);
+        // Fall through to raw HTTP only for http:// URLs.
+        if url.starts_with("https://") {
+            bail!("PLUGIN_NETWORK: curl failed for {url}: {err}");
+        }
+    } else if url.starts_with("https://") {
+        bail!("PLUGIN_NETWORK: curl is required to fetch https marketplace urls");
+    }
+
     if let Some(rest) = url.strip_prefix("http://") {
         let (host_port, path) = rest.split_once('/').unwrap_or((rest, ""));
-        let path = if path.is_empty() { "/" } else { &format!("/{path}") };
+        let path = if path.is_empty() {
+            "/".to_string()
+        } else {
+            format!("/{path}")
+        };
         let host = host_port.split(':').next().unwrap_or(host_port);
         let port: u16 = host_port
             .split(':')
@@ -1559,7 +1712,8 @@ fn download_url(url: &str) -> Result<Vec<u8>> {
         }
         return Ok(body);
     }
-    bail!("PLUGIN_NETWORK: only file:// and http:// market urls are supported in host-core")
+
+    bail!("PLUGIN_NETWORK: unsupported marketplace url: {url}")
 }
 
 #[cfg(test)]
@@ -1567,25 +1721,50 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
+    fn with_local_market<T>(f: impl FnOnce() -> T) -> T {
+        // Force offline/local fallback path for deterministic unit tests.
+        // Safety: test-only process env mutation.
+        unsafe {
+            std::env::set_var(
+                "PI_DESKTOP_PLUGIN_MARKET_URL",
+                "file:///nope/does-not-exist-catalog.json",
+            );
+        }
+        let out = f();
+        unsafe {
+            std::env::remove_var("PI_DESKTOP_PLUGIN_MARKET_URL");
+        }
+        out
+    }
+
     #[test]
     fn install_market_package_and_check_update_metadata() {
-        let dir = tempdir().unwrap();
-        let mut mgr = PluginManager::new(dir.path());
-        let search = mgr.market_search(Some("hello"), None).unwrap();
-        assert!(!search.is_empty());
-        let installed = mgr
-            .install_from_market("demo.hello", None, true, true, None)
-            .unwrap();
-        assert_eq!(installed.plugin.id, "demo.hello");
-        assert!(installed.plugin.path.unwrap().contains("installed"));
-        assert_eq!(installed.plugin.source, "marketplace");
-        let listed = mgr.list();
-        assert_eq!(listed.len(), 1);
+        with_local_market(|| {
+            let dir = tempdir().unwrap();
+            unsafe {
+                std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+            }
+            let mut mgr = PluginManager::new(dir.path());
+            let search = mgr.market_search(Some("hello"), None).unwrap();
+            assert!(!search.is_empty());
+            let installed = mgr
+                .install_from_market("demo.hello", None, true, true, None)
+                .unwrap();
+            assert_eq!(installed.plugin.id, "demo.hello");
+            assert!(installed.plugin.path.unwrap().contains("installed"));
+            assert_eq!(installed.plugin.source, "marketplace");
+            let listed = mgr.list();
+            assert_eq!(listed.len(), 1);
+            unsafe {
+                std::env::remove_var("PI_DESKTOP_DATA_DIR");
+            }
+        });
     }
 
     #[test]
     fn package_path_traversal_rejected() {
         let dir = tempdir().unwrap();
+        unsafe { std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path()); }
         let bad = make_zip(&[("../evil.js", b"alert(1)")]);
         let pkg = dir.path().join("bad.piplug");
         fs::write(&pkg, bad).unwrap();
@@ -1605,11 +1784,14 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("path traversal") || err.contains("PLUGIN_INVALID"));
+        unsafe { std::env::remove_var("PI_DESKTOP_DATA_DIR"); }
     }
 
     #[test]
     fn high_risk_permissions_roundtrip_on_notes_plugin() {
+        with_local_market(|| {
         let dir = tempdir().unwrap();
+        unsafe { std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path()); }
         let mut mgr = PluginManager::new(dir.path());
         let installed = mgr
             .install_from_market("demo.workspace-notes", None, true, false, None)
@@ -1624,5 +1806,44 @@ mod tests {
             .permissions
             .iter()
             .any(|p| p == "net.fetch"));
+        unsafe { std::env::remove_var("PI_DESKTOP_DATA_DIR"); }
+        });
+    }
+
+    #[test]
+    fn resolve_relative_package_urls_against_catalog() {
+        let resolved = PluginManager::resolve_package_url(
+            "https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/catalog.json",
+            "packages/demo.hello-0.2.0.piplug",
+        );
+        assert_eq!(
+            resolved,
+            "https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/packages/demo.hello-0.2.0.piplug"
+        );
+    }
+
+    #[test]
+    fn refresh_catalog_from_official_repo_when_network_available() {
+        // Skip cleanly if offline / rate-limited.
+        let url = "https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/catalog.json";
+        if download_url(url).is_err() {
+            return;
+        }
+        let dir = tempdir().unwrap();
+        unsafe {
+            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+            std::env::set_var("PI_DESKTOP_PLUGIN_MARKET_URL", url);
+        }
+        let mgr = PluginManager::new(dir.path());
+        let meta = mgr.refresh_market(true).expect("remote catalog");
+        assert_eq!(meta["providerId"], "official");
+        assert!(meta["pluginCount"].as_u64().unwrap_or(0) >= 1);
+        assert!(meta["sourceUrl"].as_str().unwrap_or("").contains("pi-desktop-plugins"));
+        let search = mgr.market_search(Some("hello"), None).unwrap();
+        assert!(search.iter().any(|p| p.id == "demo.hello"));
+        unsafe {
+            std::env::remove_var("PI_DESKTOP_DATA_DIR");
+            std::env::remove_var("PI_DESKTOP_PLUGIN_MARKET_URL");
+        }
     }
 }
