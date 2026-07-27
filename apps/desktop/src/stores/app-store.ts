@@ -313,6 +313,8 @@ export type AppState = {
   markAllNotificationsRead: () => Promise<void>;
   clearNotifications: () => Promise<void>;
   openNotification: (id: string) => Promise<void>;
+  /** Drop a session's sidebar outcome badge and read its task notifications. */
+  acknowledgeSessionOutcome: (sessionId: string) => Promise<void>;
   handleAgentEvent: (envelope: AgentEventEnvelope) => void;
   setPage: (page: AppState["page"], opts?: { record?: boolean }) => void;
   setSettingsTab: (tab: AppState["settingsTab"]) => void;
@@ -616,6 +618,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         page: "chat",
         isRunning: s.runningSessions[id] ?? false,
       }));
+      void get().acknowledgeSessionOutcome(id);
       return;
     }
     const entry = { page: "chat" as const, sessionId: id };
@@ -633,6 +636,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         navIndex: nextStack.length - 1,
       };
     });
+    // Opening a conversation is how its result gets seen; drop the badge.
+    void get().acknowledgeSessionOutcome(id);
   },
 
   newSession: async (options) => {
@@ -1684,6 +1689,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!notification) return;
     await get().markNotificationRead(id);
     await get().selectSession(notification.sessionId);
+  },
+
+  acknowledgeSessionOutcome: async (sessionId) => {
+    // The sidebar check / cross flags an unseen result, so opening the
+    // conversation clears it. Reading the backing notifications keeps it
+    // cleared across a notification refresh or an app restart.
+    set((s) =>
+      s.sessionOutcomes[sessionId]
+        ? { sessionOutcomes: withoutRecordKey(s.sessionOutcomes, sessionId) }
+        : {},
+    );
+    const unread = get().notifications.filter(
+      (item) => item.sessionId === sessionId && !item.readAt,
+    );
+    for (const item of unread) {
+      await get().markNotificationRead(item.id);
+    }
   },
 
   handleAgentEvent: (envelope) => {

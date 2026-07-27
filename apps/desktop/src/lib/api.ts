@@ -253,6 +253,9 @@ export const api = {
   executeCommand: (commandId: string) =>
     invoke(IPC.invoke.commandPaletteExecute, commandId),
   openLogs: () => invoke(IPC.invoke.logOpenFolder),
+  /** Toggles the devtools console; rejects unless developer mode is on. */
+  toggleDevTools: (open?: boolean) =>
+    invoke<{ open: boolean }>(IPC.invoke.devtoolsToggle, { open }),
   workspaceDiff: () => invoke<WorkspaceDiff>(IPC.invoke.workspaceDiff),
   terminalCreate: (input: { cwd: string; cols?: number; rows?: number }) =>
     invoke<TerminalCreateResult>(IPC.invoke.terminalCreate, input),

@@ -296,6 +296,8 @@ export type AppSettings = {
   enterToSend: boolean;
   /** User overrides for the shared application shortcut map. */
   keybindings?: KeybindingOverrides;
+  /** Unlocks the devtools console (settings button, F12, macOS View menu). */
+  developerMode?: boolean;
   onboardingDismissed: boolean;
 };
 

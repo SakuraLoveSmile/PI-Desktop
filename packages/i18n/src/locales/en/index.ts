@@ -36,6 +36,7 @@ export const en = {
     zoomIn: "Zoom In",
     zoomOut: "Zoom Out",
     toggleFullScreen: "Toggle Full Screen",
+    toggleDevTools: "Toggle Developer Tools",
     appHelp: "PI-Desktop Help",
     openLogs: "Open Logs",
     checkForUpdates: "Check for Updates…",
@@ -406,6 +407,14 @@ export const en = {
     logs: "Logs",
     logsDesc: "Open the local logs folder for diagnostics.",
     openLogs: "Open logs",
+    developer: "Developer",
+    developerMode: "Developer mode",
+    developerModeDesc:
+      "Unlock the developer tools console and its shortcut (F12).",
+    devTools: "Developer tools",
+    devToolsDesc: "Open the console to inspect the app UI and its logs.",
+    openDevTools: "Open console",
+    devToolsDisabledHint: "Turn on developer mode first.",
 
     pets: "Pets",
     appshots: "Appshots",
