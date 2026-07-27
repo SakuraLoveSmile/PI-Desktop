@@ -1,16 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { DiffFile, WorkspaceDiff } from "@pi-desktop/shared";
+import type { DiffFile } from "@pi-desktop/shared";
+import { summarizeWorkspaceChanges } from "../../lib/workspace-review";
 import { useAppStore } from "../../stores/app-store";
-import { api } from "../../lib/api";
 import { cx } from "../ui";
 import {
   IconChevronRight,
   IconDiff,
   IconSnapshot,
 } from "../icons";
-
-const REFRESH_DEBOUNCE_MS = 500;
 
 function statusLabel(status: DiffFile["status"], t: (k: string) => string) {
   return t(`panel.review.status.${status}`);
@@ -81,49 +79,11 @@ function FileCard({ file }: { file: DiffFile }) {
 export function ReviewTab() {
   const { t } = useTranslation();
   const workspace = useAppStore((s) => s.workspace);
-  const reviewRev = useAppStore((s) => s.reviewRev);
-  const [diff, setDiff] = useState<WorkspaceDiff | null>(null);
-  const [loading, setLoading] = useState(false);
-  const fetchSeq = useRef(0);
-  const debounceTimer = useRef<number | null>(null);
-
-  const refresh = useCallback(async () => {
-    if (!workspace?.path) {
-      setDiff(null);
-      return;
-    }
-    const seq = ++fetchSeq.current;
-    setLoading(true);
-    try {
-      const next = await api.workspaceDiff();
-      if (seq === fetchSeq.current) setDiff(next);
-    } catch {
-      if (seq === fetchSeq.current) setDiff(null);
-    } finally {
-      if (seq === fetchSeq.current) setLoading(false);
-    }
-  }, [workspace?.path]);
-
-  // Initial + workspace-change fetch.
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  // Agent Write/Edit/Bash completions bump reviewRev; debounce bursts.
-  useEffect(() => {
-    if (reviewRev === 0) return;
-    if (debounceTimer.current !== null) window.clearTimeout(debounceTimer.current);
-    debounceTimer.current = window.setTimeout(() => {
-      debounceTimer.current = null;
-      void refresh();
-    }, REFRESH_DEBOUNCE_MS);
-    return () => {
-      if (debounceTimer.current !== null) {
-        window.clearTimeout(debounceTimer.current);
-        debounceTimer.current = null;
-      }
-    };
-  }, [reviewRev, refresh]);
+  const workspaceDiff = useAppStore((s) => s.workspaceDiff);
+  const workspaceDiffPath = useAppStore((s) => s.workspaceDiffPath);
+  const loading = useAppStore((s) => s.workspaceDiffLoading);
+  const refresh = useAppStore((s) => s.refreshWorkspaceDiff);
+  const diff = workspaceDiffPath === workspace?.path ? workspaceDiff : null;
 
   if (!workspace?.path) {
     return (
@@ -135,8 +95,7 @@ export function ReviewTab() {
   }
 
   const files = diff?.files ?? [];
-  const totalAdd = files.reduce((sum, f) => sum + f.additions, 0);
-  const totalDel = files.reduce((sum, f) => sum + f.deletions, 0);
+  const summary = summarizeWorkspaceChanges(diff);
 
   return (
     <div className="review-tab">
@@ -150,8 +109,8 @@ export function ReviewTab() {
         </span>
         {files.length > 0 && (
           <span className="diff-file-counts">
-            <span className="diff-count-add">+{totalAdd}</span>
-            <span className="diff-count-del">−{totalDel}</span>
+            <span className="diff-count-add">+{summary?.additions ?? 0}</span>
+            <span className="diff-count-del">−{summary?.deletions ?? 0}</span>
           </span>
         )}
         <button

@@ -1527,6 +1527,68 @@ textarea:disabled {
   background: var(--ds-bg-secondary);
 }
 
+.review-changes-entry {
+  width: min(100%, 720px);
+  margin: 8px 0;
+}
+
+.review-changes-button {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-secondary);
+  text-align: left;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.review-changes-button:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.review-changes-icon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-tertiary);
+  color: var(--ds-text-secondary);
+}
+
+.review-changes-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-changes-meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-changes-caret {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+}
+
 .permission-card.risk-high {
   border-left-color: var(--ds-error);
 }

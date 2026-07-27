@@ -336,6 +336,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 | ChatTranscript (scrollable, flex-1)  |
 |   MessageBubble (user/assistant)     |
 |   ToolCallCard                       |
+|   Review changes · 3 files  +8 −2  |
 |   PermissionCard                     |
 |   ...                                |
 +--------------------------------------+
@@ -357,12 +358,16 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 | Empty | Hero + optional onboarding checklist + home composer in one scrollable stack; no suggestion cards (D111/D131) |
 | Streaming | Auto-scroll locked; new tokens append |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
+| Dirty Git workspace | A compact Review changes command follows the transcript, outside collapsed activity groups; it shows the capped file count plus explicit addition/deletion totals and opens the singleton Review tab |
 
 ### 4.5 Accessibility
 
 - `role="log"` for transcript container
 - `aria-live="polite"` on transcript for new message announcements
 - Scroll-to-bottom button appears when user scrolls up during stream
+- Review changes is a native button with a localized accessible name that
+  includes file, addition, and deletion counts; the visible text and icon do
+  not rely on color to communicate the action
 
 ### 4.6 MVP constraints
 
@@ -403,7 +408,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 | State | Behavior |
 |---|---|
-| Closed (default) | Not rendered; no manual open control and no retained tabs after startup |
+| Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only when the current Git working tree has changes. |
 | Open | Docked flex row right of the main pane; opened by an artifact with width 320–`min(720, 60vw, viewport − visible sidebar − 360px)`. Windows keeps the native window bounds stable so its frameless window does not repaint between the panel layout and an asynchronous bounds change; other platforms may grow the window outward when space permits. |
 | Multiple artifacts | Tabs follow first-open order, scroll horizontally, keep the active tab visible, and preserve readable labels at the panel minimum |
 | Resizing | Live width follows pointer while preserving a 360px MainChat; committed (and persisted) on release |
@@ -414,7 +419,16 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 - Trigger: file/URL references, BrowserPreview, and completed-command artifacts
   create/activate their resource tab. Successful active-session workspace
-  Write/Edit artifacts create/activate Review. Repeated resources deduplicate.
+  Write/Edit artifacts create/activate Review. While the shared working-tree
+  diff is dirty, the transcript also exposes Review changes; activating it
+  creates, reopens, or activates the same singleton Review tab. Repeated
+  resources deduplicate.
+- Review truth: the renderer shares one current-workspace diff between the
+  transcript entry and Review. It refreshes on workspace activation, after a
+  500ms debounce for successful Write/Edit/Bash completion, on explicit Review
+  refresh, and when the app window regains focus. A workspace-keyed request
+  sequence discards late responses. Clean, non-Git, missing-workspace, and
+  failed-refresh states hide the transcript entry.
 - Tab close: closing an active tab selects its right neighbor, then its left;
   closing the last tab hides the panel. The panel-level collapse control hides
   the panel without deleting the runtime tab set; a later artifact reopens it.

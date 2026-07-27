@@ -163,6 +163,13 @@ export const en = {
     usageReasoning: "Reasoning {{count}}",
     scrollToBottom: "Scroll to latest",
     minimap: "Conversation minimap",
+    reviewChanges: "Review changes",
+    reviewChangedFiles: "{{count}} files",
+    reviewChangedFilesTruncated: "{{count}}+ files",
+    reviewChangesAccessible:
+      "Review changes: {{count}} files changed, {{additions}} additions, {{deletions}} deletions",
+    reviewChangesAccessibleTruncated:
+      "Review changes: at least {{count}} files changed, {{additions}} additions and {{deletions}} deletions shown",
     toolFailed: "Failed",
     toolDenied: "Denied",
     toolCompleted: "Completed",

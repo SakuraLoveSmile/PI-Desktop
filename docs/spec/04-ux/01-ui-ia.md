@@ -67,7 +67,8 @@ destination, chat as the home surface, tools and permissions inline.
   bell instead (D130/D117).
 - **Work panel**: docked right column (not an overlay) created only by file,
   URL, browser-preview, successful-command, or successful workspace-edit
-  artifacts. Its
+  artifacts, or by the contextual transcript review entry while the current
+  Git working tree is dirty. Its
   top strip contains only currently opened, closeable tabs: file paths get
   distinct tabs while Review, Terminal, and Browser deduplicate by kind. A
   successful active-session workspace Write/Edit artifact opens Review;
@@ -93,7 +94,8 @@ destination, chat as the home surface, tools and permissions inline.
   dotted-underline button when a workspace is open), optional first-run
   checklist, and centered composer. The former four suggestion cards are not
   rendered (D131).
-- With transcript: message stream + tool disclosure rows (D071), docked
+- With transcript: message stream + tool disclosure rows (D071), a contextual
+  Review changes entry while the current Git working tree is dirty, docked
   composer, and a session-scoped permission card inline. A background
   session's message, tool, and permission events never replace or cover the
   visible conversation.
