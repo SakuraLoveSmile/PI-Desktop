@@ -1191,8 +1191,9 @@ Each scenario is documented in this format:
   Check for Updates from Settings -> Info with the same status result.
   3) Close the macOS window, immediately invoke two native menu
   commands, and acknowledge renderer readiness after the replacement loads.
-  Verify one window and one delivery per command. 4) Minimize, maximize,
-  restore, and close on Windows/Linux. 5) Start
+  Verify one window and one delivery per command. 4) On Windows/Linux, click the
+  center and titlebar-facing edge of each right-side control to minimize,
+  maximize, restore, and close the window. 5) Start
   the renderer while its native window is already maximized and inspect the
   initial queried glyph/state. 6) Attempt unknown menu/window IPC actions
   while a window exists and after it closes. 7) Build each target on its
@@ -1207,7 +1208,8 @@ Each scenario is documented in this format:
   invokes the allowlisted update command from the macOS system menu and the
   Settings surface and shows the resulting up-to-date state. Replacement-window
   commands wait for renderer readiness without
-  creating duplicate windows or losing events. Window controls match native state and
+  creating duplicate windows or losing events. Window controls remain clickable
+  across their full hit targets beside the drag region, match native state, and
   have accessible names. Unknown actions fail closed. Each package contains
   the target-native host binary (`.exe` only on Windows). Passing this scenario
   on Windows/Linux proves shell readiness, not first-release qualification.
@@ -1659,6 +1661,8 @@ This test plan spec is accepted when:
   info toast from a test plugin.
 - Expect a top-center stack on an elevated plate with a tinted variant icon (green ✓ / red ! / info) and an X dismiss per card; newest enters at the top-center anchor and pushes older cards down.
 - Success/info auto-dismiss ~4s, error lingers ~8s; hovering a card pauses its countdown; X removes it immediately.
+- With the stack overlapping the frameless titlebar band, hover still pauses
+  the countdown and every X remains clickable instead of dragging the window.
 - Repeating the same action restarts the existing toast instead of stacking a duplicate; stack never exceeds 4.
 - Capture rig scenes `pi-toasts-light` / `pi-toasts-dark` show the stack in both themes.
 
