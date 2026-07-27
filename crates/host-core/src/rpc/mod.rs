@@ -1024,6 +1024,12 @@ async fn handle_request(
 
         "tools.list" => Ok(json!({ "tools": tools::builtin_tool_defs() })),
         "tools.execute" => {
+            // Segmented timing (D137): a slow tool call is almost never slow
+            // *inside* the tool — the wait is either the approval prompt or the
+            // model round trip that follows. Splitting the host's own share
+            // into approval / execution / bookkeeping is what makes the three
+            // distinguishable in host.log instead of one opaque duration.
+            let call_started = std::time::Instant::now();
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
 
@@ -1104,6 +1110,7 @@ async fn handle_request(
                 }
             };
 
+            let prompted = request_opt.is_some();
             if let Some(req) = request_opt {
                 emit_notification(
                     &tx,
@@ -1138,6 +1145,9 @@ async fn handle_request(
             } else {
                 PermissionDecision::Deny
             };
+            // Everything up to here is approval: the auto-decision path costs
+            // microseconds, the prompt path costs however long the user took.
+            let permission_wait_ms = call_started.elapsed().as_millis() as u64;
 
             if matches!(final_decision, PermissionDecision::Deny) {
                 let st = state.lock().await;
@@ -1148,8 +1158,23 @@ async fn handle_request(
                     json!({
                         "toolName": p.tool_name,
                         "toolCallId": p.tool_call_id,
-                        "mode": p.mode
+                        "mode": p.mode,
+                        "prompted": prompted,
+                        "permissionWaitMs": permission_wait_ms,
+                        "totalMs": call_started.elapsed().as_millis() as u64
                     }),
+                );
+                tracing::info!(
+                    tool = %p.tool_name,
+                    tool_call_id = %p.tool_call_id,
+                    session_id = %p.session_id,
+                    prompted,
+                    permission_wait_ms,
+                    execute_ms = 0,
+                    overhead_ms = 0,
+                    total_ms = call_started.elapsed().as_millis() as u64,
+                    outcome = "denied",
+                    "tool timing"
                 );
                 let error_code =
                     if p.mode == "chat" && !PermissionManager::chat_mode_allows(&p.tool_name) {
@@ -1217,6 +1242,13 @@ async fn handle_request(
                         artifacts::record(&st.db, &p.session_id, &abs, op, p.turn_id.as_deref());
                 }
             }
+            // `overhead_ms` is the host's own share outside approval and the
+            // tool body: workspace resolution, the state lock, artifacts and
+            // audit writes. It should stay near zero; if it does not, the
+            // bottleneck is host-core itself rather than the user or the model.
+            let total_ms = call_started.elapsed().as_millis() as u64;
+            let overhead_ms =
+                total_ms.saturating_sub(permission_wait_ms.saturating_add(result.duration_ms));
             let _ = audit::append(
                 &st.db,
                 "tool_execute",
@@ -1226,8 +1258,24 @@ async fn handle_request(
                     "toolCallId": p.tool_call_id,
                     "ok": result.ok,
                     "durationMs": result.duration_ms,
-                    "errorCode": result.error_code
+                    "errorCode": result.error_code,
+                    "prompted": prompted,
+                    "permissionWaitMs": permission_wait_ms,
+                    "overheadMs": overhead_ms,
+                    "totalMs": total_ms
                 }),
+            );
+            tracing::info!(
+                tool = %p.tool_name,
+                tool_call_id = %p.tool_call_id,
+                session_id = %p.session_id,
+                prompted,
+                permission_wait_ms,
+                execute_ms = result.duration_ms,
+                overhead_ms,
+                total_ms,
+                outcome = if result.ok { "ok" } else { "error" },
+                "tool timing"
             );
 
             serde_json::to_value(result).map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))
@@ -1497,6 +1545,82 @@ mod tests {
         assert_eq!(
             resolve_tool_workspace(&state, "legacy-missing-session").unwrap(),
             state.workspace.path
+        );
+    }
+
+    /// D137: the audit row for a tool call must carry the three segments
+    /// separately, so "the tool was slow" can be told apart from "the user
+    /// took 20s to approve it".
+    #[tokio::test]
+    async fn tool_execute_audit_records_segmented_timing() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project = data_dir.path().join("project");
+        fs::create_dir_all(&project).unwrap();
+        fs::write(project.join("note.txt"), "hello").unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Timing".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        // Read is low risk, so it auto-allows and never prompts — the run
+        // therefore has a zero approval segment by construction.
+        let result = handle_request(
+            state.clone(),
+            "tools.execute",
+            json!({
+                "sessionId": session.id,
+                "toolCallId": "tc-1",
+                "toolName": "Read",
+                "args": { "path": "note.txt" },
+                "mode": "agent"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(result["ok"], json!(true), "read succeeded: {result}");
+
+        let st = state.lock().await;
+        let payload: String = st
+            .db
+            .conn()
+            .query_row(
+                "SELECT payload_json FROM audit_log WHERE kind = 'tool_execute' ORDER BY id DESC LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let payload: serde_json::Value = serde_json::from_str(&payload).unwrap();
+        assert_eq!(payload["toolName"], json!("Read"));
+        assert_eq!(payload["prompted"], json!(false));
+        // Auto-allowed, so the approval segment is bookkeeping only: assert it
+        // is negligible rather than exactly zero, since a loaded test runner
+        // can still spend a millisecond there.
+        let permission_wait_ms = payload["permissionWaitMs"].as_u64().unwrap();
+        assert!(
+            permission_wait_ms < 100,
+            "auto-allow does not wait: {permission_wait_ms}ms"
+        );
+        let execute_ms = payload["durationMs"].as_u64().unwrap();
+        let overhead_ms = payload["overheadMs"].as_u64().unwrap();
+        let total_ms = payload["totalMs"].as_u64().unwrap();
+        assert!(
+            total_ms >= execute_ms,
+            "total {total_ms} covers execution {execute_ms}"
+        );
+        assert_eq!(
+            overhead_ms,
+            total_ms - execute_ms - permission_wait_ms,
+            "segments add up to the total"
         );
     }
 

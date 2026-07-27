@@ -93,6 +93,34 @@ Use one `traceId` per user-visible action when possible:
 
 Renderer, Electron, host, agent should propagate these IDs.
 
+## 7a. Latency segmentation (D137)
+
+A slow agent turn is almost never slow inside the tool. The wait belongs to
+one of three stages, and each stage is logged separately so they can be told
+apart without guessing:
+
+| stage | where | field |
+|---|---|---|
+| approval | host-core `tools.execute` | `permission_wait_ms` |
+| tool body | host-core tool implementation | `execute_ms` (`durationMs` in audit) |
+| host bookkeeping | host-core (workspace resolve, lock, artifacts, audit) | `overhead_ms` |
+| host round trip incl. IPC | sidecar around `tools.execute` | `hostRttMs` |
+| provider first token | sidecar, request → `message_start` | `providerWaitMs` |
+| provider streaming | sidecar, `message_start` → `message_end` | `streamMs` |
+
+- host-core emits one `tool timing` line per call on the `host` channel with
+  `prompted`, `permission_wait_ms`, `execute_ms`, `overhead_ms`, `total_ms`,
+  and `outcome` (`ok` / `error` / `denied`); the same fields are persisted on
+  the `tool_execute` / `tool_denied` audit rows.
+- the sidecar writes greppable `[timing] kind=<tool|model> key=value` lines to
+  stderr, which the Electron `Logger` wraps into the `agent` channel. Set
+  `PI_DESKTOP_TIMING=0` (or `off`/`false`) to suppress them.
+- `hostRttMs` minus the host's `total_ms` for the same `toolCallId` is the
+  stdio/IPC cost; `providerWaitMs` covers pi-ai's own retry backoff, so a
+  provider that burns its retries shows up there rather than as a slow tool.
+- failed or aborted turns still emit a `kind=model` line with the outcome, so
+  a turn that never produced tokens is still measurable.
+
 ## 8. User-facing diagnostics
 
 MVP provides:
@@ -118,3 +146,5 @@ Not in MVP:
 1. Failed tool call can be traced by toolCallId across logs
 2. secrets never appear in log files during normal flows
 3. logs folder openable from app/command palette
+4. a slow tool call can be attributed to approval, execution, or the provider
+   from the logs alone (D137)

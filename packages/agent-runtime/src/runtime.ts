@@ -31,6 +31,7 @@ import type {
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
 import { clampThinkingLevel, type PiModelConfig } from "./thinking-level.js";
+import { logTiming } from "./timing.js";
 
 
 function usageFromPi(usage: Usage | undefined | null): MessageUsage | undefined {
@@ -273,6 +274,13 @@ export class DesktopAgentRuntime {
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
   private scratchDir?: string;
+  /* Timing anchors (D137). `requestStartedAt` marks the moment the agent is
+   * free to issue the next provider request — turn start, or the last tool
+   * result coming back — so `providerWaitMs` below is the model's own latency
+   * rather than the whole turn. With parallel tool calls the last one wins,
+   * which is the correct anchor: the request goes out once all have resolved. */
+  private requestStartedAt?: number;
+  private streamStartedAt?: number;
 
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
@@ -562,6 +570,7 @@ export class DesktopAgentRuntime {
                   : { command: Type.String() },
       ),
       execute: async (toolCallId, params) => {
+        const startedAt = Date.now();
         const result = await this.host.call<{
           ok: boolean;
           content: unknown;
@@ -576,6 +585,18 @@ export class DesktopAgentRuntime {
           args: params,
           mode: this.mode,
           timeoutMs: 60_000,
+        });
+        // hostRttMs spans approval + execution + IPC. Compare it against the
+        // host's own "tool timing" line for the same toolCallId: the gap is
+        // the stdio hops, and permissionWaitMs there explains a large value.
+        logTiming("tool", {
+          tool: toolName,
+          toolCallId,
+          sessionId: this.sessionId,
+          turnId: this.turnId,
+          hostRttMs: Date.now() - startedAt,
+          ok: result.ok,
+          errorCode: result.errorCode,
         });
         const text =
           typeof result.content === "string"
@@ -628,6 +649,7 @@ export class DesktopAgentRuntime {
         break;
       case "message_start": {
         if (event.message.role === "assistant") {
+          this.streamStartedAt = Date.now();
           const content = assistantContent((event.message as any).content);
           this.currentAssistant = {
             id: randomUUID(),
@@ -732,6 +754,28 @@ export class DesktopAgentRuntime {
               : {}),
           };
           this.emit({ type: "message_end", message: this.currentAssistant });
+          const endedAt = Date.now();
+          logTiming("model", {
+            model: this.provider.modelId,
+            providerId: this.provider.id,
+            sessionId: this.sessionId,
+            turnId: this.turnId,
+            // Time from "the agent could send the request" to the first
+            // streamed message: provider queue + network + first token.
+            providerWaitMs:
+              this.requestStartedAt !== undefined &&
+              this.streamStartedAt !== undefined
+                ? this.streamStartedAt - this.requestStartedAt
+                : undefined,
+            streamMs:
+              this.streamStartedAt !== undefined
+                ? endedAt - this.streamStartedAt
+                : undefined,
+            thinkingLevel: this.thinkingLevel,
+            outcome: failed ? "error" : aborted ? "aborted" : "ok",
+            errorCode: classifiedError?.code,
+          });
+          this.streamStartedAt = undefined;
           this.currentAssistant = undefined;
           if (classifiedError) {
             this.emit({ type: "error", error: classifiedError });
@@ -755,6 +799,9 @@ export class DesktopAgentRuntime {
         });
         break;
       case "tool_execution_end":
+        // The agent issues the follow-up provider request as soon as the tool
+        // results are in, so this is the anchor for the next providerWaitMs.
+        this.requestStartedAt = Date.now();
         this.emit({
           type: "tool_end",
           toolCallId: event.toolCallId,
@@ -804,12 +851,28 @@ export class DesktopAgentRuntime {
       };
     }
     this.emit({ type: "message_end", message: this.currentAssistant });
+    // The failure path is where a slow turn matters most: a provider that
+    // burns its retries before giving up shows here as a large providerWaitMs.
+    logTiming("model", {
+      model: this.provider.modelId,
+      providerId: this.provider.id,
+      sessionId: this.sessionId,
+      turnId: this.turnId,
+      providerWaitMs:
+        this.requestStartedAt !== undefined
+          ? Date.now() - this.requestStartedAt
+          : undefined,
+      outcome: status,
+      errorCode: error?.code,
+    });
+    this.streamStartedAt = undefined;
     this.currentAssistant = undefined;
   }
 
   async prompt(content: string): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
     this.turnId = randomUUID();
+    this.requestStartedAt = Date.now();
     this.emit({
       type: "status",
       status: this.getStatus(),

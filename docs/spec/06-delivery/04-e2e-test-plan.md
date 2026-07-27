@@ -623,7 +623,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Fresh profile; provider configured; one chat turn completed.
 - **Steps**: 1) Run a prompt with a tool call. 2) Open `~/.pi-desktop/logs/`. 3) Inspect `app.log`, `host.log`, `agent.log`.
-- **Expected**: NDJSON records exist with `ts/level/channel/message`; tool start/end carry `sessionId`/`toolCallId`; no API key material appears; files rotate at 5 MB.
+- **Expected**: NDJSON records exist with `ts/level/channel/message`; tool start/end carry `sessionId`/`toolCallId`; no API key material appears; files rotate at 5 MB. Additionally (D137) `host.log` has one `tool timing` record per tool call carrying `prompted`/`permission_wait_ms`/`execute_ms`/`overhead_ms`/`total_ms`, and `agent.log` has matching `[timing] kind=tool` and `[timing] kind=model` lines, so an approval wait, a slow tool body, and a slow provider are distinguishable for the same `toolCallId`.
 - **Specs linked**: `03-runtime/09-logging-and-observability.md`
 - **Acceptance**: H (diagnostics)
 - **Milestone**: M5
