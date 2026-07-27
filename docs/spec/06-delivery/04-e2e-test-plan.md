@@ -778,9 +778,10 @@ Each scenario is documented in this format:
 - **Expected**: Reasoning models show the current Thinking level immediately to
   the right of Chat / Agent, expose only their sparse supported levels as a
   single-column list in canonical order, mark the selected row with a trailing
-  check, size the menu to its content without exceeding 200px or the available
-  viewport, truncate overlong labels, and close the menu after selection.
-  Non-reasoning models show no Thinking trigger. Custom providers may persist
+  check, expose no inherit/default row, size the menu to its content without
+  exceeding 160px or the available viewport, truncate overlong labels, and close
+  the menu after selection. Non-reasoning models show no Thinking trigger.
+  Custom providers may persist
   `supportedThinkingLevels` such as `["off","high"]` from Settings and the
   Composer must not invent graded options for those sets. The custom action
   persists `supportsReasoning` and selects the supported level nearest

@@ -3389,8 +3389,8 @@ textarea:disabled {
 .composer-model-menu.composer-thinking-menu {
   left: 0;
   right: auto;
-  width: max-content;
-  max-width: min(200px, calc(100vw - 24px));
+  width: auto;
+  max-width: min(160px, calc(100vw - 24px));
 }
 
 .composer-model-heading {
