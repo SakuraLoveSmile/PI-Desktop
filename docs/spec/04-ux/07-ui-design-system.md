@@ -142,6 +142,9 @@ Neutral gray scale only — no blue-slate surfaces. Chrome components must consu
 - `system` theme follows `prefers-color-scheme` media query
 - Transition between themes must not flash white when switching to dark on launch
 - Initial load: detect system preference before first paint (Electron preload can relay this)
+- Native controls inherit the active `color-scheme`. Opened Settings select
+  lists also set opaque semantic foreground/background colors explicitly so
+  Windows Chromium does not fall back to an unreadable system palette.
 
 ### 4.5 Tailwind CSS variable stub
 
