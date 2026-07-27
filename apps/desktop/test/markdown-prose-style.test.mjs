@@ -30,3 +30,34 @@ test("markdown renderer still streams by memoized blocks", () => {
   assert.match(markdownSource, /className="code-block"/);
   assert.match(markdownSource, /className="table-wrap"/);
 });
+
+test("light theme markdown uses paper-quiet surfaces", () => {
+  assert.match(
+    stylesSource,
+    /:root\[data-theme="light"\] \.prose-chat a\s*\{[\s\S]*?text-decoration:\s*underline/,
+  );
+  assert.match(
+    stylesSource,
+    /:root\[data-theme="light"\] \.prose-chat code\s*\{[\s\S]*?background:\s*#f2f2f2/,
+  );
+  assert.match(
+    stylesSource,
+    /:root\[data-theme="light"\] \.code-block\s*\{[\s\S]*?background:\s*#f7f7f7/,
+  );
+  assert.match(
+    stylesSource,
+    /:root\[data-theme="light"\] \.code-block-head\s*\{[\s\S]*?background:\s*#efefef/,
+  );
+  assert.match(
+    stylesSource,
+    /:root\[data-theme="light"\] \.prose-chat blockquote\s*\{[\s\S]*?background:\s*#f6f6f6/,
+  );
+  assert.match(
+    stylesSource,
+    /:root\[data-theme="light"\] \.prose-chat \.table-wrap\s*\{[\s\S]*?background:\s*#ffffff/,
+  );
+  assert.doesNotMatch(
+    stylesSource,
+    /:root\[data-theme="light"\] \.prose-chat[\s\S]{0,500}#0285ff/i,
+  );
+});

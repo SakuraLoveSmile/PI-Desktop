@@ -300,3 +300,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 
 - Marketplace/plugin chrome CSS dropped raw blue-slate fallbacks (`#4f7cff`, `#2a3144`, `#121826`, …) and now consumes only `--ds-*` tokens.
 - Tabs, actions, search, cards, permission modal, and badges adapt to light/dark via the neutral gray accent system.
+
+## 2026-07-28 — Markdown light-theme paper pass
+
+- Light `.prose-chat` / `.code-block` surfaces were retuned for white chat paper: softer underlined links, flat gray code cards (no muddy shadow), quieter blockquotes/tables/kbd/math, and secondary thinking ink.
+- Dark markdown treatment is unchanged in spirit (inset charcoal code, light-gray links via accent-soft).
