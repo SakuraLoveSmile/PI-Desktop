@@ -37,7 +37,7 @@ test("app chrome uses the shared brand asset, while session creation uses its ow
   assert.match(app, /<BrandLogo\s+size=\{56\}/);
   assert.match(composer, /<BrandLogo\s+size=\{15\}/);
   assert.doesNotMatch(composer, /infinity-mark|∞/);
-  assert.match(sidebar, /<BrandLogo\s+size=\{15\}/);
+  assert.match(sidebar, /<BrandLogo\s+size=\{20\}/);
   assert.match(sidebar, /IconNewSession/);
   assert.match(app, /<IconNewSession\s+size=\{13\}/);
   assert.doesNotMatch(sidebar, /IconCompose|IconPiMark|IconPiHome/);

@@ -60,6 +60,7 @@ export const zhCN = {
     devDisabled: "开发版本不支持自动更新。",
   },
   nav: {
+    home: "首页",
     newTask: "新建任务",
     newProject: "新建项目",
     projects: "项目",

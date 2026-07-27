@@ -57,6 +57,7 @@ export const en = {
     devDisabled: "Updates are disabled in development builds.",
   },
   nav: {
+    home: "Home",
     newTask: "New task",
     newProject: "New project",
     projects: "Projects",
