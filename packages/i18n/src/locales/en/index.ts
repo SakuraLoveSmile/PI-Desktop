@@ -164,11 +164,17 @@ export const en = {
     scrollToBottom: "Scroll to latest",
     minimap: "Conversation minimap",
     reviewChanges: "Review changes",
-    reviewChangedFiles: "{{count}} files",
-    reviewChangedFilesTruncated: "{{count}}+ files",
-    reviewChangesAccessible:
+    reviewChangedFiles_one: "1 file",
+    reviewChangedFiles_other: "{{count}} files",
+    reviewChangedFilesTruncated_one: "1+ file",
+    reviewChangedFilesTruncated_other: "{{count}}+ files",
+    reviewChangesAccessible_one:
+      "Review changes: 1 file changed, {{additions}} additions, {{deletions}} deletions",
+    reviewChangesAccessible_other:
       "Review changes: {{count}} files changed, {{additions}} additions, {{deletions}} deletions",
-    reviewChangesAccessibleTruncated:
+    reviewChangesAccessibleTruncated_one:
+      "Review changes: at least 1 file changed, {{additions}} additions and {{deletions}} deletions shown",
+    reviewChangesAccessibleTruncated_other:
       "Review changes: at least {{count}} files changed, {{additions}} additions and {{deletions}} deletions shown",
     toolFailed: "Failed",
     toolDenied: "Denied",
@@ -540,7 +546,8 @@ export const en = {
       clean: "No uncommitted changes in the workspace",
       noRepo: "This workspace is not a git repository",
       refresh: "Refresh changes",
-      filesChanged: "{{count}} file(s) changed",
+      filesChanged_one: "1 file changed",
+      filesChanged_other: "{{count}} files changed",
       truncated: "Showing the first 100 changed files only",
       binary: "Binary file",
       tooLarge: "Diff too large to display",

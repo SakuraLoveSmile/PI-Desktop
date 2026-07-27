@@ -26,7 +26,7 @@ import {
   splitChatText,
   type ChatPreviewTarget,
 } from "../lib/chat-links";
-import { summarizeWorkspaceChanges } from "../lib/workspace-review";
+import { summarizeSessionWorkspaceChanges } from "../lib/workspace-review";
 import { toolWorkPanelTab } from "../lib/work-panel-tabs";
 import {
   IconArrowDown,
@@ -54,13 +54,19 @@ import { PermissionCard } from "./PermissionCard";
 
 function WorkspaceChangesEntry() {
   const { t } = useTranslation();
+  const activeSessionId = useAppStore((state) => state.activeSessionId);
   const workspacePath = useAppStore((state) => state.workspace?.path);
   const diffPath = useAppStore((state) => state.workspaceDiffPath);
   const diff = useAppStore((state) => state.workspaceDiff);
+  const reviewSessions = useAppStore((state) => state.workspaceReviewSessions);
   const openWorkPanelTab = useAppStore((state) => state.openWorkPanelTab);
-  const summary = summarizeWorkspaceChanges(
-    workspacePath && diffPath === workspacePath ? diff : null,
-  );
+  const summary = summarizeSessionWorkspaceChanges({
+    diff,
+    diffPath,
+    workspacePath,
+    sessionId: activeSessionId,
+    reviewSessions,
+  });
 
   if (!summary) return null;
 

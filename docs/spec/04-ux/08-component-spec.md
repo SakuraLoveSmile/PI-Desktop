@@ -358,7 +358,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 | Empty | Hero + optional onboarding checklist + home composer in one scrollable stack; no suggestion cards (D111/D131) |
 | Streaming | Auto-scroll locked; new tokens append |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
-| Dirty Git workspace | A compact Review changes command follows the transcript, outside collapsed activity groups; it shows the capped file count plus explicit addition/deletion totals and opens the singleton Review tab |
+| Session-owned dirty Git workspace | After this session successfully writes or edits the workspace, a compact Review changes command follows its transcript outside collapsed activity groups; it shows the capped file count plus explicit addition/deletion totals and opens the singleton Review tab. Other sessions in the same project do not render the command. |
 
 ### 4.5 Accessibility
 
@@ -408,7 +408,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 | State | Behavior |
 |---|---|
-| Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only when the current Git working tree has changes. |
+| Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only in a session that produced a successful workspace Write/Edit while that Git working tree remains dirty. |
 | Open | Docked flex row right of the main pane; opened by an artifact with width 320–`min(720, 60vw, viewport − visible sidebar − 360px)`. Windows keeps the native window bounds stable so its frameless window does not repaint between the panel layout and an asynchronous bounds change; other platforms may grow the window outward when space permits. |
 | Multiple artifacts | Tabs follow first-open order, scroll horizontally, keep the active tab visible, and preserve readable labels at the panel minimum |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
@@ -425,15 +425,20 @@ preview), and Files (workspace browser). Codex-parity surface.
   Write/Edit artifacts create/activate Review in the originating session.
   Background artifacts may update that retained context but never reveal it,
   resize the window, or change visible selection/focus. While the shared
-  working-tree diff is dirty, the transcript also exposes Review changes;
-  activating it creates, reopens, or activates the same per-session singleton
-  Review tab. Repeated resources deduplicate within that session.
+  working-tree diff is dirty, only a session that produced a successful
+  workspace Write/Edit exposes Review changes; activating it creates, reopens,
+  or activates that session's singleton Review tab. Other sessions in the same
+  project do not inherit the entry. Repeated resources deduplicate within the
+  originating session.
 - Review truth: the renderer shares one current-workspace diff between the
   transcript entry and Review. It refreshes on workspace activation, after a
   500ms debounce for successful Write/Edit/Bash completion, on explicit Review
   refresh, and when the app window regains focus. A workspace-keyed request
-  sequence discards late responses. Clean, non-Git, missing-workspace, and
-  failed-refresh states hide the transcript entry.
+  sequence discards late responses. Clean and non-Git results clear review
+  ownership for that workspace; clean, non-Git, missing-workspace, and
+  failed-refresh states hide the transcript entry. Session ownership is
+  renderer-memory state and is discarded on relaunch with D142's work-panel
+  contexts.
 - Tab close: closing an active tab selects its right neighbor, then its left;
   closing the last tab hides the panel. The panel-level collapse control hides
   the panel without deleting the runtime tab set; a later artifact reopens it.

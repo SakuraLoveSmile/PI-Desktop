@@ -167,11 +167,17 @@ export const zhCN = {
     scrollToBottom: "回到最新",
     minimap: "会话导航",
     reviewChanges: "审阅改动",
-    reviewChangedFiles: "{{count}} 个文件",
-    reviewChangedFilesTruncated: "{{count}}+ 个文件",
-    reviewChangesAccessible:
+    reviewChangedFiles_one: "1 个文件",
+    reviewChangedFiles_other: "{{count}} 个文件",
+    reviewChangedFilesTruncated_one: "1+ 个文件",
+    reviewChangedFilesTruncated_other: "{{count}}+ 个文件",
+    reviewChangesAccessible_one:
+      "审阅改动：1 个文件，新增 {{additions}} 行，删除 {{deletions}} 行",
+    reviewChangesAccessible_other:
       "审阅改动：{{count}} 个文件，新增 {{additions}} 行，删除 {{deletions}} 行",
-    reviewChangesAccessibleTruncated:
+    reviewChangesAccessibleTruncated_one:
+      "审阅改动：至少 1 个文件，当前显示新增 {{additions}} 行、删除 {{deletions}} 行",
+    reviewChangesAccessibleTruncated_other:
       "审阅改动：至少 {{count}} 个文件，当前显示新增 {{additions}} 行、删除 {{deletions}} 行",
     toolFailed: "失败",
     toolDenied: "已拒绝",
@@ -538,7 +544,8 @@ export const zhCN = {
       clean: "工作区没有未提交的变更",
       noRepo: "当前工作区不是 git 仓库",
       refresh: "刷新变更",
-      filesChanged: "{{count}} 个文件有改动",
+      filesChanged_one: "1 个文件有改动",
+      filesChanged_other: "{{count}} 个文件有改动",
       truncated: "仅显示前 100 个变更文件",
       binary: "二进制文件",
       tooLarge: "差异过大，无法展示",

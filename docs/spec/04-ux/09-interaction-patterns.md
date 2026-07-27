@@ -238,11 +238,13 @@ may be retained while exactly one workspace supplies the visible shell context.
   originating session. Failed and scratch writes do not. Background-session
   artifacts update only their retained context and never open, activate, resize,
   or focus the visible panel.
-- When the current Git working tree has changes, a compact Review changes
-  command remains visible at the end of the transcript independently of the
-  activity disclosure state. It reports files and addition/deletion totals and
-  creates, reopens, or activates the singleton Review tab. Clean, non-Git, and
-  no-workspace states do not render the command.
+- When a session has produced a successful workspace Write/Edit and that Git
+  working tree has changes, a compact Review changes command remains visible at
+  the end of that session's transcript independently of the activity disclosure
+  state. It reports files and addition/deletion totals and creates, reopens, or
+  activates the singleton Review tab. Other sessions in the same project do not
+  inherit the command. Clean, non-Git, and no-workspace states do not render it;
+  clean and non-Git results also clear the workspace's prior session ownership.
 - The transcript and Review consume one workspace-keyed diff state. Workspace
   activation, debounced agent mutation, Review refresh, and window focus
   refresh that state; request sequencing prevents a late response from a prior

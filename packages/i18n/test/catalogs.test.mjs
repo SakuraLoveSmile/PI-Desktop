@@ -46,3 +46,26 @@ test("locale resolution maps Chinese variants and falls back to English", () => 
   assert.equal(resolveLocale("en-US"), "en");
   assert.equal(resolveLocale(), "en");
 });
+
+test("review file counts use locale-aware plural keys", () => {
+  const english = flattenCatalog(en);
+  const chinese = flattenCatalog(zhCN);
+
+  assert.equal(english["chat.reviewChangedFiles_one"], "1 file");
+  assert.equal(english["chat.reviewChangedFiles_other"], "{{count}} files");
+  assert.match(english["chat.reviewChangesAccessible_one"], /1 file changed/);
+  assert.match(
+    english["chat.reviewChangesAccessible_other"],
+    /{{count}} files changed/,
+  );
+  assert.equal(english["panel.review.filesChanged_one"], "1 file changed");
+  assert.equal(
+    english["panel.review.filesChanged_other"],
+    "{{count}} files changed",
+  );
+  assert.equal(chinese["chat.reviewChangedFiles_one"], "1 个文件");
+  assert.equal(
+    chinese["chat.reviewChangedFiles_other"],
+    "{{count}} 个文件",
+  );
+});

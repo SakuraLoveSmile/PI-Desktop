@@ -921,24 +921,28 @@ Each scenario is documented in this format:
 
 - **Preconditions**: A git workspace with a clean tree; agent configured.
 - **Steps**: 1) Ask the active agent to edit a tracked workspace file and
-  create a new one. 2) Repeat with a failed Write, a scratch Write, and a Write
-  in a background project session. 3) Collapse the activity group, then inspect
-  and activate the transcript Review changes entry. 4) Collapse the panel and
-  close the Review tab, using the transcript entry after each action. 5) Edit a
-  file outside the app, refocus the window, and press refresh after Review is
-  open. 6) Revert all changes, then inspect a non-git folder.
+  create a new one in session A. 2) Switch to session B in the same project,
+  then return to session A. 3) Repeat with a failed Write, a scratch Write, and
+  a Write in a background project session. 4) Collapse the activity group,
+  then inspect and activate the transcript Review changes entry. 5) Collapse
+  the panel and close the Review tab, using the transcript entry after each
+  action. 6) Edit a file outside the app, refocus the window, and press refresh
+  after Review is open. 7) Revert all changes, then inspect a non-git folder.
 - **Expected**: Each successful active-session workspace Write/Edit creates or
   activates one deduplicated Review tab and refreshes the diff automatically
   (debounced) with
   per-file status badges, +/− counts, and colored unified hunks (untracked
   files included). Failed/scratch/background writes do not open or steal focus;
   background invalidation remains scoped. While the real working tree is dirty,
-  one keyboard-accessible transcript entry remains visible outside the collapsed
-  activity group, reports file and +/− totals, and reopens or activates the same
-  singleton Review tab without duplication. Refocus and manual refresh pick up
-  external edits. The entry disappears after revert and stays hidden for clean,
-  non-git, no-workspace, and failed-refresh states, while Review renders its
-  existing dedicated empty copy. Binary and >200KB patches
+  one keyboard-accessible transcript entry remains visible in session A outside
+  the collapsed activity group, reports file and +/− totals, and reopens or
+  activates the same singleton Review tab without duplication. Session B does
+  not inherit session A's entry; returning to A restores it. A successful
+  background workspace Write/Edit assigns the entry only to its originating
+  session without stealing focus. Refocus and manual refresh pick up external
+  edits. The entry disappears after revert, clears prior ownership, and stays
+  hidden for clean, non-git, no-workspace, and failed-refresh states, while
+  Review renders its existing dedicated empty copy. Binary and >200KB patches
   render as capped rows without hunks; >100 changed files shows the
   truncation notice.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a, `04-ux/08-component-spec.md` §5
