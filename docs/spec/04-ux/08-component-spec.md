@@ -777,7 +777,8 @@ Single message render — either user (plaintext) or assistant (markdown streami
 
 ### 8.7 Markdown & code rendering (implemented)
 
-Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shiki.ts`.
+Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shiki.ts`
++ prose styles under `.prose-chat` / `.code-block` in `globals.css`.
 
 - **Streaming without jank**: source splits into top-level blocks via `marked`'s
   lexer; each block renders through a memoized `<ReactMarkdown>`. While
@@ -791,16 +792,24 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   Languages lazy-load per fence tag with a plain-mono fallback until ready.
   Streaming code re-tokenizes only changed lines by chaining GrammarState
   (per-line cache), so per-frame cost is constant regardless of block size.
-- **Code block chrome**: `.code-block` card (radius-md-plus, hairline border,
-  `--gray-1000` dark / `#f3f3f3` light) with `.code-block-head` — language tag
-  (text-xs, muted) left, persistent copy button right (copies the raw code
-  string). Body `pre` at text-sm-plus / leading-relaxed with horizontal
-  scroll.
-- **Prose**: heading ramp h1 `text-lg-plus` → h4+ `text-base` (semibold,
-  tracking-tight), token-based lists/task lists/blockquote/hr/kbd/img; tables
-  wrap in `.table-wrap` (rounded hairline shell, horizontal scroll).
-- **Links**: rendered with `target="_blank"` so the main process routes them
-  through `shell.openExternal`; in-window navigation stays blocked.
+- **Code block chrome**: `.code-block` inset card (radius-md-plus, hairline
+  border, soft inset lift; dark uses `bg-inset` mix, light uses near-white
+  gray) with `.code-block-head` — monospace lowercase language tag
+  (text-xs, muted) left, copy button right (opacity rises on hover/focus;
+  copies the raw code string). Body `pre` at text-sm-plus / leading-relaxed
+  with horizontal scroll and tab-size 2.
+- **Prose**: calmer chat density — body at text-base / leading-prose with
+  pretty wrapping; heading ramp h1 `text-xl` (hairline underline) → h2
+  `text-lg-plus` → h3 `text-lg` → h4 `text-base-plus` → h5/h6 `text-base`
+  secondary; blockquotes use a 3px accent-tinted rule over a soft plate;
+  hr is a faded center gradient; lists use quieter markers and flex task
+  rows; inline code gets a hairline border + soft accent tint; tables wrap
+  in `.table-wrap` (rounded shell, header row, even-row wash, hover wash);
+  display math sits in a subtle inset plate. Thinking prose reuses the same
+  hierarchy at text-sm-plus / secondary color.
+- **Links**: plain click previews in the work panel; modified click keeps
+  `target="_blank"` so main routes through `shell.openExternal`; in-window
+  navigation stays blocked.
 - **Typewriter**: rAF-driven reveal (speed scales with backlog);
   `prefers-reduced-motion` renders the buffer verbatim. `.thread-scroll` sets
   `overflow-anchor: none` (pinned-follow owns the scroll position) and

@@ -1096,6 +1096,27 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`transcript-style.test.mjs`); full visual scenario Draft
 
+#### E2E-060: Assistant markdown prose hierarchy and code chrome
+
+- **Preconditions**: A completed assistant answer containing headings, a
+  blockquote, a GFM table, a fenced code block with a language tag, inline
+  code, a task list, and a remote image link; light and dark themes available.
+- **Steps**: 1) Open the session in dark theme and scroll the answer. 2)
+  Hover the code-block copy control and the table rows. 3) Expand a thinking
+  disclosure that contains markdown. 4) Switch to light theme and re-check
+  contrast on inline code, blockquote rule, and code card.
+- **Expected**: Answer prose uses the `.prose-chat` hierarchy (h1–h6 ramp,
+  accent-tinted blockquote, hairline-bordered inline code, zebra/hover table
+  shell, inset code card with monospace language tag). Thinking prose stays
+  secondary/smaller and does not merge into the answer. Both themes keep
+  readable contrast; copy still copies raw fence text.
+- **Specs linked**: `04-ux/07-ui-design-system.md`,
+  `04-ux/08-component-spec.md` §8.7
+- **Acceptance**: C (chat stream), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`user-select.test.mjs`, `thinking-ui.test.mjs`);
+  full visual scenario Draft
+
 #### E2E-061: User message hard newlines stay visible
 
 - **Preconditions**: Provider configured; composer can accept multi-line input
@@ -2061,6 +2082,12 @@ This test plan spec is accepted when:
   prose, denser row spacing, and hover-only copy chips under each turn.
 - While an assistant answer streams, expect a thin accent left rule rather than
   a boxed frame.
+
+
+### US-UI-60b Assistant markdown prose redesign
+- Open an assistant answer with headings, table, code fence, blockquote, and task list.
+- Expect the refined `.prose-chat` hierarchy and inset code chrome in both themes.
+- Expand thinking markdown and confirm it stays visually subordinate to the answer.
 
 
 ### US-UI-61 Assistant meta chips + retry (D103)

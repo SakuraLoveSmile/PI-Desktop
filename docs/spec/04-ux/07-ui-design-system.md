@@ -285,7 +285,8 @@ Letter-spacing tokens: `--tracking-tighter` −0.03em, `--tracking-tight` −0.0
 ### 5.3 Code text sizing
 
 - Code blocks and tool output: `--text-sm`/`--text-sm-plus` with `font-mono`
-- Inline code within messages: `--text-sm-plus` `font-mono`, soft text-tint background, rounded
+- Inline code within messages: `--text-sm-plus` `font-mono`, soft text-tint background + hairline border, rounded
+- Chat prose (`.prose-chat`) uses `--text-base` / `--leading-prose` for body, with a heading ramp of `text-xl` → `text-lg-plus` → `text-lg` → `text-base-plus` → `text-base` so multi-block answers stay scannable without document-scale drama
 
 ### 5.4 Weight rules
 

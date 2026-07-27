@@ -284,3 +284,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Project/group titles step to `--text-md`; section labels stay secondary at `--text-sm`.
 - Decision D144: keep micro tokens off primary left-rail content so the rail matches body readability without changing the global type ramp.
 
+## 2026-07-28 — Chat markdown prose redesign
+
+- Assistant markdown (`.prose-chat`) was restyled for denser, calmer transcript reading: clearer heading hierarchy, accent-tinted blockquotes, quieter list markers, bordered inline code, zebra/hover tables, and inset code cards with monospace language tags.
+- Thinking prose reuses the same hierarchy at secondary color / `text-sm-plus` so reasoning stays visually subordinate to the answer.
+- Renderer behavior (streaming block split, GFM/math, Shiki) is unchanged; this is a presentation-only pass in `globals.css` + component/design specs.
