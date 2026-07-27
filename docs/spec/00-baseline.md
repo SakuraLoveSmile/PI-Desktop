@@ -1,8 +1,8 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.9`
+- Baseline Version: `0.4.10`
 - Date: `2026-07-27`
-- Status: `Frozen for implementation details (pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
+- Status: `Frozen for implementation details (session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -27,6 +27,8 @@
 > `0.4.9` makes the pinned pi-ai catalog authoritative for known-model
 > metadata and removes desktop-owned model parameter overrides through D136 /
 > ADR 0027.
+> `0.4.10` replaces destructive work-panel clearing on conversation switches
+> with runtime session-scoped contexts through D142 / ADR 0028.
 
 ## Frozen Decisions
 

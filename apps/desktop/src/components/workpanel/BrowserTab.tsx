@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { BrowserState } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
+import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
+import { useAppStore } from "../../stores/app-store";
 import { cx } from "../ui";
 import {
   IconChevronLeft,
@@ -12,15 +14,21 @@ import {
   IconSnapshot,
 } from "../icons";
 
-const LAST_URL_KEY = "pi.desktop.workPanel.browserUrl";
-
 /**
  * The preview surface itself is a main-process WebContentsView (D100);
  * this component renders the chrome, measures the placeholder rect, and
  * mirrors navigation state pushed from main. Mount/unmount plus the
  * `blocked` prop drive the view's visibility.
  */
-export function BrowserTab({ blocked = false }: { blocked?: boolean }) {
+export function BrowserTab({
+  blocked = false,
+  sessionId,
+  initialUrl,
+}: {
+  blocked?: boolean;
+  sessionId?: string;
+  initialUrl?: string;
+}) {
   const { t } = useTranslation();
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<BrowserState | null>(null);
@@ -34,30 +42,19 @@ export function BrowserTab({ blocked = false }: { blocked?: boolean }) {
       setState(next);
       setStarted(true);
       if (!inputFocused.current) setInput(next.url);
-      if (next.url) {
-        try {
-          localStorage.setItem(LAST_URL_KEY, next.url);
-        } catch {
-          // best-effort
-        }
-      }
     });
-    void api.browserGetState().then((existing) => {
-      if (existing && existing.url) {
-        setState(existing);
-        setStarted(true);
-        if (!inputFocused.current) setInput(existing.url);
-      } else {
-        try {
-          const last = localStorage.getItem(LAST_URL_KEY);
-          if (last) setInput(last);
-        } catch {
-          // best-effort
-        }
-      }
-    });
+    if (initialUrl) {
+      setStarted(true);
+      setInput(initialUrl);
+      void api.browserNavigate(initialUrl, sessionId).then(
+        (existing) => {
+          if (existing?.url) setState(existing);
+        },
+        () => {},
+      );
+    }
     return off;
-  }, []);
+  }, [initialUrl, sessionId]);
 
   // Visibility follows mount/blocked state; bounds follow the measured rect.
   useEffect(() => {
@@ -93,14 +90,18 @@ export function BrowserTab({ blocked = false }: { blocked?: boolean }) {
     };
   }, [started, blocked]);
 
-  const navigate = useCallback((raw: string) => {
-    const value = raw.trim();
-    if (!value) return;
-    setStarted(true);
-    void api.browserNavigate(value).then((next) => {
-      if (next) setState(next);
-    });
-  }, []);
+  const navigate = useCallback(
+    (raw: string) => {
+      const value = raw.trim();
+      if (!value || !sessionId) return;
+      setStarted(true);
+      useAppStore.getState().openWorkPanelTab({
+        ...toolWorkPanelTab("browser"),
+        resource: value,
+      });
+    },
+    [sessionId],
+  );
 
   return (
     <div className="work-browser">

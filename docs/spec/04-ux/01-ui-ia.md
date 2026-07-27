@@ -76,9 +76,15 @@ destination, chat as the home surface, tools and permissions inline.
   drag-resizable from 320px to
   `min(720px, 60vw, viewport − visible sidebar − 360px)`, preserving a
   readable 360px Main pane. The sole panel-level control collapses the panel;
-  changing the visible session/workspace clears runtime tabs. Startup is closed
-  with no tabs and only panel width persists across launches; temporary OS
-  window expansion is excluded from restored launch bounds.
+  each session retains its own runtime open state, tab set, active tab, and
+  Browser resource in renderer memory. Selecting another session swaps the
+  visible panel context without deleting either session's state; selecting a
+  workspace without an active conversation hides the panel rather than
+  reinterpreting relative resources. Background artifacts update only their
+  originating session's retained panel context and never open, activate, or
+  resize the visible panel. Startup is closed with no retained session
+  contexts, and only panel width persists across launches; temporary OS window
+  expansion is excluded from restored launch bounds.
   Replaces the former context-panel overlay; workspace/model/status info lives
   in the composer chips and Settings instead.
 - **Composer**: workspace-agnostic floating pill anchored to the chat
@@ -205,11 +211,12 @@ Plugins destination described in §3.5.
   workspace-required empty state. The composer never renders a workspace rail.
 - Background project session → the originating project row retains its
   running/error indicator. Selected shell state can move independently while
-  the session tool root remains bound to its durable project; its artifacts do
-  not open or activate tabs over the currently selected project. Messages,
-  tool events, and permission requests remain scoped to that session. A
-  pending permission card appears only after the user explicitly opens its
-  conversation.
+  the session tool root remains bound to its durable project; its artifacts are
+  retained in that session's work-panel context without opening or activating
+  tabs over the currently selected project. Messages, tool events, permission
+  requests, and panel resources remain scoped to that session. Explicitly
+  opening the conversation restores its retained panel context and reveals any
+  pending permission card with its original deadline.
 - Completed/failed turn not already visible → host-core appends one durable
   inbox row. A result shown in the visible, focused current chat and every
   `aborted` turn append none. Background sessions and any turn finishing while

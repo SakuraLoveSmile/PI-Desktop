@@ -11,13 +11,42 @@ export type WorkPanelTabsState = {
   activeTabId: string | null;
 };
 
+export type WorkPanelContext = WorkPanelTabsState & {
+  open: boolean;
+  fileRequest: { path: string; seq: number } | null;
+};
+
 export type ReviewArtifactEvent = {
   toolName?: string;
   isError?: boolean;
   result: unknown;
-  sessionId: string;
-  activeSessionId?: string;
 };
+
+export function emptyWorkPanelContext(): WorkPanelContext {
+  return { open: false, tabs: [], activeTabId: null, fileRequest: null };
+}
+
+export function switchWorkPanelContextState(
+  contexts: Record<string, WorkPanelContext>,
+  currentSessionId: string | undefined,
+  currentVisible: WorkPanelContext,
+  nextSessionId: string | undefined,
+): { contexts: Record<string, WorkPanelContext>; visible: WorkPanelContext } {
+  // A background artifact can update the retained context while an async
+  // session selection still renders the older projection. Retained state wins.
+  const retainedCurrent = currentSessionId
+    ? contexts[currentSessionId] ?? currentVisible
+    : currentVisible;
+  const nextContexts = currentSessionId
+    ? { ...contexts, [currentSessionId]: retainedCurrent }
+    : contexts;
+  return {
+    contexts: nextContexts,
+    visible: nextSessionId
+      ? nextContexts[nextSessionId] ?? emptyWorkPanelContext()
+      : emptyWorkPanelContext(),
+  };
+}
 
 export function toolWorkPanelTab(
   kind: Exclude<WorkPanelTabKind, "file">,
@@ -65,8 +94,7 @@ export function shouldOpenReviewArtifact(event: ReviewArtifactEvent): boolean {
   return (
     (event.toolName === "Write" || event.toolName === "Edit") &&
     event.isError !== true &&
-    toolResultRoot(event.result) === "workspace" &&
-    event.sessionId === event.activeSessionId
+    toolResultRoot(event.result) === "workspace"
   );
 }
 

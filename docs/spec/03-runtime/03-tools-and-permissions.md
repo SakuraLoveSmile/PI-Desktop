@@ -84,7 +84,10 @@ session gets a scratch directory outside the workspace:
   decision and the UI rendering explicit.
 - **Tool coverage.** `Read`/`Write`/`Edit` are dual-root. `Glob`/`Grep`
   remain workspace-only (the model lists scratch via `ls $PI_SCRATCH_DIR`).
-  `BrowserPreview` remains workspace-relative in v1.
+  `BrowserPreview` remains workspace-relative in v1. Its Main-process handler
+  resolves the root from the originating durable session, and the renderer
+  event carries `sessionId`; the selected foreground workspace is never used
+  for a background preview.
 - **Lifecycle.** Created lazily on the first `Write`/`Edit`/`Bash` of a
   session. Deleted with `session.delete`. A startup sweep removes scratch
   dirs whose session no longer exists and dirs untouched for over 7 days

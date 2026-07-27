@@ -275,8 +275,13 @@ function AppShell() {
     const offToast = api.onToast((message) => showToast(message));
     // Agent-driven HTML preview: surface the browser tab when the agent
     // opens a workspace file in the embedded browser (BrowserPreview tool).
-    const offBrowserPreview = api.onBrowserPreview(() => {
-      useAppStore.getState().openWorkPanelTab(toolWorkPanelTab("browser"));
+    const offBrowserPreview = api.onBrowserPreview((event) => {
+      useAppStore
+        .getState()
+        .openWorkPanelTabForSession(event.sessionId, {
+          ...toolWorkPanelTab("browser"),
+          resource: event.path,
+        });
     });
     const offHostStatus = api.onHostStatus((status) => {
       if (status.ok) {

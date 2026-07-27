@@ -1465,7 +1465,7 @@ async function startSidecar(): Promise<void> {
   wireSidecar(s);
   // Agent-driven work panel preview (D100): open a workspace HTML file in
   // the embedded browser; live reload keeps it current through later edits.
-  s.setLocalTool("BrowserPreview", async ({ args }) => {
+  s.setLocalTool("BrowserPreview", async ({ args, sessionId }) => {
     const raw = String((args as { path?: unknown })?.path ?? "").trim();
     if (!raw) {
       return {
@@ -1476,10 +1476,10 @@ async function startSidecar(): Promise<void> {
     }
     let root: string | null = null;
     try {
-      const res = (await host?.call("workspace.get")) as
-        | { workspace: { path: string } | null }
+      const res = (await host?.call("session.get", { id: sessionId })) as
+        | { session: { projectPath?: string } | null }
         | undefined;
-      root = res?.workspace?.path ?? null;
+      root = res?.session?.projectPath?.trim() || null;
     } catch {
       root = null;
     }
@@ -1497,10 +1497,9 @@ async function startSidecar(): Promise<void> {
         content: `BrowserPreview: "${raw}" does not resolve to an existing file inside the workspace.`,
       };
     }
-    const state = browserPane.navigate(raw, root);
     sendToRenderer(IPC.event.browserPreview, {
+      sessionId,
       path: raw,
-      url: state?.url ?? null,
     });
     return {
       ok: true,
@@ -2566,20 +2565,30 @@ function registerIpc() {
     return { ok: true };
   });
 
-  handle(IPC.invoke.browserNavigate, async (input: { url?: string } = {}) => {
-    // Workspace root gates file previews (agent-generated HTML); http(s)
-    // navigation works without a workspace.
-    let root: string | null = null;
-    try {
-      const res = (await host?.call("workspace.get")) as
-        | { workspace: { path: string } | null }
-        | undefined;
-      root = res?.workspace?.path ?? null;
-    } catch {
-      root = null;
-    }
-    return browserPane.navigate(String(input.url ?? ""), root);
-  });
+  handle(
+    IPC.invoke.browserNavigate,
+    async (input: { url?: string; sessionId?: string } = {}) => {
+      // Workspace root gates file previews (agent-generated HTML); http(s)
+      // navigation works without a workspace.
+      let root: string | null = null;
+      try {
+        if (input.sessionId) {
+          const res = (await host?.call("session.get", { id: input.sessionId })) as
+            | { session: { projectPath?: string } | null }
+            | undefined;
+          root = res?.session?.projectPath?.trim() || null;
+        } else {
+          const res = (await host?.call("workspace.get")) as
+            | { workspace: { path: string } | null }
+            | undefined;
+          root = res?.workspace?.path ?? null;
+        }
+      } catch {
+        root = null;
+      }
+      return browserPane.navigate(String(input.url ?? ""), root);
+    },
+  );
 
   handle(IPC.invoke.browserAction, async (input: { action?: string } = {}) => {
     const action = String(input.action ?? "");

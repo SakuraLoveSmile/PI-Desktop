@@ -60,6 +60,13 @@ Background requests remain pending without opening an overlay, changing the
 active page/project/session, or moving keyboard focus. Opening that session
 reveals its card with the original absolute countdown deadline.
 
+Resolving a request never initiates navigation. Any resulting tool artifact is
+recorded in the same session's retained work-panel context. If that session is
+backgrounded before completion, the artifact must not open or resize the
+visible panel; explicitly returning to the session restores its retained panel
+open state, tabs, active tab, and Browser resource without a transient panel
+open/close cycle in the intervening conversation.
+
 ## 7. Composer interaction while pending
 
 - user may continue editing text
@@ -83,4 +90,5 @@ the permission runtime.
 3. timeout becomes deny in UI + tool result
 4. allow-session suppresses repeat prompts for same toolName only
 5. concurrent session requests remain isolated and never take over the visible
-   conversation
+   conversation or its work panel; post-approval artifacts remain assigned to
+   the request's originating session

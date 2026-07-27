@@ -265,8 +265,8 @@ export const api = {
     invoke(IPC.invoke.terminalResize, { termId, cols, rows }),
   terminalDispose: (termId: string) =>
     invoke(IPC.invoke.terminalDispose, { termId }),
-  browserNavigate: (url: string) =>
-    invoke<BrowserState>(IPC.invoke.browserNavigate, { url }),
+  browserNavigate: (url: string, sessionId?: string) =>
+    invoke<BrowserState>(IPC.invoke.browserNavigate, { url, sessionId }),
   browserAction: (action: BrowserAction) =>
     invoke(IPC.invoke.browserAction, { action }),
   browserSetBounds: (bounds: {
@@ -335,11 +335,11 @@ export const api = {
     );
   },
   onBrowserPreview: (
-    listener: (event: { path: string; url: string | null }) => void,
+    listener: (event: { sessionId: string; path: string }) => void,
   ) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.browserPreview, (payload) =>
-      listener(payload as { path: string; url: string | null }),
+      listener(payload as { sessionId: string; path: string }),
     );
   },
   onAgentEvent: (listener: (event: AgentEventEnvelope) => void) => {

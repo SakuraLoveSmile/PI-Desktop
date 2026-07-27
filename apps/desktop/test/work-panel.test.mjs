@@ -81,8 +81,9 @@ test("work panel starts closed with no tabs and persists width only", () => {
   assert.match(storeSource, /workPanelTabs:\s*\[\]/);
   assert.match(storeSource, /activeWorkPanelTabId:\s*null/);
   assert.match(storeSource, /JSON\.stringify\(\{ width \}\)/);
-  assert.doesNotMatch(storeSource, /open:\s*state\.workPanelOpen/);
-  assert.doesNotMatch(storeSource, /tab:\s*state\.workPanelTab/);
+  const persistenceBlock =
+    storeSource.match(/function saveWorkPanelWidth[\s\S]*?\n\}/)?.[0] ?? "";
+  assert.doesNotMatch(persistenceBlock, /workPanelContexts|tabs|open/);
 });
 
 test("work panel resizing preserves a readable main pane", () => {
@@ -140,38 +141,92 @@ test("terminal mounts on demand and survives switches while its tab stays open",
   );
 });
 
-test("workspace artifacts auto-open review without cross-session focus theft", () => {
+test("workspace artifacts attach review to their originating session", () => {
   const bumpIndex = storeSource.indexOf("WORKSPACE_MUTATING_TOOLS.has(toolName)");
   const artifactIndex = storeSource.indexOf("shouldOpenReviewArtifact({");
-  const openReviewIndex = storeSource.indexOf(
-    'get().openWorkPanelTab(toolWorkPanelTab("review"))',
+  const openReviewMatch = storeSource.match(
+    /get\(\)\.openWorkPanelTabForSession\(\s*envelope\.sessionId,\s*toolWorkPanelTab\("review"\),?\s*\)/,
   );
+  const openReviewIndex = openReviewMatch?.index ?? -1;
   const gateIndex = storeSource.indexOf(
     "if (envelope.sessionId !== get().activeSessionId)",
   );
   assert.ok(bumpIndex > -1, "reviewRev bump exists");
   assert.ok(artifactIndex > bumpIndex, "workspace artifact gate exists");
-  assert.ok(openReviewIndex > artifactIndex, "review artifact opens its tab");
+  assert.ok(openReviewIndex > artifactIndex, "review artifact records its session tab");
   assert.ok(gateIndex > -1, "cross-session gate exists");
   assert.ok(
-    bumpIndex < gateIndex,
-    "reviewRev bump must run before the cross-session early-return",
+    openReviewIndex < gateIndex,
+    "background artifacts must be recorded before the cross-session early-return",
   );
   assert.match(
     storeSource,
-    /shouldOpenReviewArtifact\(\{[\s\S]*toolName,[\s\S]*isError:\s*event\.isError,[\s\S]*result:\s*event\.result,[\s\S]*sessionId:\s*envelope\.sessionId,[\s\S]*activeSessionId:\s*get\(\)\.activeSessionId/s,
+    /shouldOpenReviewArtifact\(\{[\s\S]*toolName,[\s\S]*isError:\s*event\.isError,[\s\S]*result:\s*event\.result/s,
+  );
+  assert.doesNotMatch(
+    storeSource.match(/shouldOpenReviewArtifact\(\{[\s\S]*?\}\)/)?.[0] ?? "",
+    /activeSessionId|sessionId/,
   );
 });
 
-test("session and workspace changes clear retained runtime tabs", () => {
+test("work panel context is retained by session instead of cleared on selection", () => {
+  assert.match(storeSource, /workPanelContexts:\s*Record<string, WorkPanelContext>/);
+  assert.match(storeSource, /openWorkPanelTabForSession:/);
+  const selectBlock =
+    storeSource.match(/selectSession: async[\s\S]*?\n  newSession:/)?.[0] ?? "";
   assert.match(
-    storeSource,
-    /if \(id !== get\(\)\.activeSessionId\) get\(\)\.resetWorkPanelContext\(\)/,
+    selectBlock,
+    /switchWorkPanelSession\([\s\S]*id/,
   );
-  assert.match(storeSource, /activateProject:[\s\S]*resetWorkPanelContext\(\)/);
-  assert.match(storeSource, /clearProject:[\s\S]*resetWorkPanelContext\(\)/);
+  assert.doesNotMatch(selectBlock, /resetWorkPanelContext\(\)/);
   assert.match(
     storeSource,
-    /resetWorkPanelContext:[\s\S]*workPanelOpen:\s*false,[\s\S]*workPanelTabs:\s*\[\],[\s\S]*activeWorkPanelTabId:\s*null/s,
+    /workPanelContexts:[\s\S]*workPanelOpen:[\s\S]*workPanelTabs:[\s\S]*activeWorkPanelTabId:[\s\S]*workPanelFileRequest:/,
+  );
+});
+
+test("file preview request ids stay unique across session contexts", () => {
+  assert.match(storeSource, /let workPanelFileRequestSeq = 0/);
+  assert.ok(
+    storeSource.match(/seq:\s*\+\+workPanelFileRequestSeq/g)?.length >= 3,
+    "open and activation paths must use the shared request sequence",
+  );
+  assert.doesNotMatch(storeSource, /seq:\s*\([^)]*fileRequest\?\.seq[^)]*\) \+ 1/);
+});
+
+test("background panel updates do not replace or resize the visible session", () => {
+  const openForSessionBlock =
+    storeSource.match(
+      /openWorkPanelTabForSession: \(sessionId, tab\) => \{[\s\S]*?\n  \},\n  activateWorkPanelTab:/,
+    )?.[0] ?? "";
+  assert.ok(openForSessionBlock, "session-scoped tab action exists");
+  assert.match(
+    openForSessionBlock,
+    /pendingSessionSelection === null && state\.activeSessionId === sessionId/,
+  );
+  assert.match(openForSessionBlock, /workPanelContexts/);
+  assert.match(openForSessionBlock, /openWorkPanelTabState/);
+  assert.match(
+    openForSessionBlock,
+    /openedVisiblePanel = affectsVisibleSession && !context\.open/,
+  );
+  assert.match(
+    openForSessionBlock,
+    /\.\.\.\(affectsVisibleSession[\s\S]*workPanelOpen:\s*true[\s\S]*:\s*\{\}\)/,
+  );
+  assert.match(
+    openForSessionBlock,
+    /if \(openedVisiblePanel\) expandWindowForPanel/,
+  );
+});
+
+test("deleting a session also removes its retained work panel context", () => {
+  const deleteBlock =
+    storeSource.match(/deleteSession: async[\s\S]*?\n  setSessionSort:/)?.[0] ?? "";
+  assert.ok(deleteBlock, "deleteSession action exists");
+  assert.match(deleteBlock, /workPanelContexts/);
+  assert.match(
+    deleteBlock,
+    /delete workPanelContexts\[id\]|withoutRecordKey\([^)]*workPanelContexts,\s*id\)/,
   );
 });

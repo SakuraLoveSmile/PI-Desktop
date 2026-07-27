@@ -53,6 +53,7 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
   const { t } = useTranslation();
   const tabs = useAppStore((s) => s.workPanelTabs);
   const activeTabId = useAppStore((s) => s.activeWorkPanelTabId);
+  const activeSessionId = useAppStore((s) => s.activeSessionId);
   const width = useAppStore((s) => s.workPanelWidth);
   const activateTab = useAppStore((s) => s.activateWorkPanelTab);
   const closeTab = useAppStore((s) => s.closeWorkPanelTab);
@@ -208,12 +209,17 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
           )}
           {activeTab?.kind === "browser" && (
             <div
+              key={`${activeSessionId ?? "none"}:${activeTab.id}`}
               id={`work-panel-surface-${activeTab.id}`}
               className="work-panel-tabpane"
               role="tabpanel"
               aria-labelledby={`work-panel-tab-${activeTab.id}`}
             >
-              <BrowserTab blocked={browserBlocked} />
+              <BrowserTab
+                blocked={browserBlocked}
+                sessionId={activeSessionId}
+                initialUrl={activeTab.resource}
+              />
             </div>
           )}
           {activeTab?.kind === "file" && (

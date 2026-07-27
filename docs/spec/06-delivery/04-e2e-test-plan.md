@@ -886,11 +886,13 @@ Each scenario is documented in this format:
   Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
   a URL preview, and a completed command artifact. 3) Close an inactive tab,
   then the active middle and edge tabs. 4) Use the sole collapse control and
-  trigger another artifact. 5) Switch sessions and projects with tabs open.
-  6) Drag the left-edge handle below 320px and beyond every upper bound at
-  960px, 1200px, and 1600px window widths. 7) On Windows, record the native
-  window bounds before opening a file artifact, collapsing the panel, and
-  closing its final tab; inspect each transition frame. 8) Relaunch.
+  trigger another artifact. 5) In session A, leave the panel open with multiple
+  tabs and a Browser resource; switch to session B, create a different tab set,
+  then switch repeatedly between A and B and select a project without an active
+  conversation. 6) Drag the left-edge handle below 320px and beyond every upper
+  bound at 960px, 1200px, and 1600px window widths. 7) On Windows, record the
+  native window bounds before opening a file artifact, collapsing the panel,
+  and closing its final tab; inspect each transition frame. 8) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one closeable top tab; file
@@ -901,12 +903,15 @@ Each scenario is documented in this format:
   tabs but hides the panel until another artifact reopens it. Width clamps to
   `320px–min(720px, 60vw, viewport − visible sidebar − 360px)`, re-clamps on
   window resize, and never squeezes MainChat below 360px in the supported shell.
-  Session/workspace changes clear tabs before relative resources can cross
-  contexts. Only `{width}` is restored after relaunch; open state and tabs
-  reset, and temporary panel expansion does not enlarge the restored base
-  window. On Windows, the native bounds stay unchanged throughout open,
-  collapse, and final-tab close transitions, with no intermediate compressed
-  or expanded frame. The former context-panel overlay no longer exists.
+  A and B independently restore their runtime open state, ordered tabs, active
+  tab, and Browser resource; selecting a project without an active conversation
+  hides the panel, and no relative resource crosses session/workspace context.
+  Only `{width}` is restored after relaunch; every session's open state, tabs,
+  active tab, and Browser resource reset, and temporary panel expansion does
+  not enlarge the restored base window. On Windows, the native bounds stay
+  unchanged throughout open, collapse, and final-tab close transitions, with no
+  intermediate compressed or expanded frame. The former context-panel overlay
+  no longer exists.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5
@@ -1449,21 +1454,28 @@ Each scenario is documented in this format:
   remains visible and continue editing its draft. 4) Trigger a permission
   request in A as well. 5) Open B explicitly, resolve only B's request, then
   return to A and resolve A's request. 6) Rapidly select A then B while session
-  details load in opposite completion order.
+  details load in opposite completion order. 7) While B is loading, resolve A's
+  Write/Edit request so its tool completion creates Review, then let B emit a
+  BrowserPreview artifact while A is visible. Switch back to each session.
 - **Expected**: B's background events update only B's row and retained state;
   they do not change A's active session/project/page, transcript, draft, scroll,
   or keyboard focus, and no global modal appears. Opening B reveals only B's
   inline card with its original countdown. Both requests remain independently
   actionable, and resolving B does not clear A. The final rapid selection stays
   on B even when A's older load finishes later. Only explicit notification or
-  session activation may navigate.
+  session activation may navigate. A's post-approval Review is retained only in
+  A without a transient open/close flash in B; B's BrowserPreview carries B's
+  session identity, updates only B's retained Browser resource, and never opens,
+  navigates, focuses, or resizes A's panel. Explicitly returning to either
+  session restores its own open state, tabs, active tab, and Browser resource.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/03-permission-ux.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`
 - **Acceptance**: C (session isolation), E (permission isolation), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`permission-inline.test.mjs` for scoped state,
-  inline rendering contract, absolute countdown, and latest-selection guard);
-  full UI scenario Draft
+  inline rendering contract, absolute countdown, and latest-selection guard;
+  `work-panel.test.mjs` and `browser-preview-tool.test.mjs` for session-scoped
+  artifact retention and routing); full UI scenario Draft
 
 ## 8. Traceability Matrix
 
@@ -2037,7 +2049,7 @@ This test plan spec is accepted when:
   return. A terminal notification marked read from the inbox likewise produces
   no sidebar terminal mark.
 
-### US-UI-68 Session-scoped inline permissions (D138)
+### US-UI-68 Session-scoped inline permissions and artifacts (D138/D142)
 - Run two sessions concurrently and keep A visible while B reaches a tool
   approval request. Inspect light/dark themes at default and narrow widths.
 - Expect no backdrop, modal, page/session switch, work-panel hide, transcript
@@ -2047,3 +2059,7 @@ This test plan spec is accepted when:
   controls. Switching away and back preserves the absolute deadline.
 - Make A and B pending together, resolve each independently, and confirm neither
   action removes or changes the other card.
+- Resolve A's Write/Edit permission and switch to B before completion. Expect no
+  transient Review panel in B and no panel/window flash; returning to A restores
+  A's resulting Review tab and prior panel selection, while B's tabs and Browser
+  resource remain unchanged.

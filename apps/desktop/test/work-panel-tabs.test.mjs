@@ -4,10 +4,12 @@ import test from "node:test";
 const {
   activateWorkPanelTabState,
   closeWorkPanelTabState,
+  emptyWorkPanelContext,
   fileWorkPanelTab,
   normalizeWorkPanelFilePath,
   openWorkPanelTabState,
   shouldOpenReviewArtifact,
+  switchWorkPanelContextState,
   toolWorkPanelTab,
 } = await import("../src/lib/work-panel-tabs.ts");
 
@@ -66,13 +68,11 @@ test("activation ignores stale tab ids", () => {
   assert.equal(activateWorkPanelTabState(state, "missing"), state);
 });
 
-test("review opens only for successful active-session workspace Write/Edit artifacts", () => {
+test("review artifacts are recognized independently of the visible session", () => {
   const base = {
     toolName: "Write",
     isError: false,
     result: { details: { root: "workspace" } },
-    sessionId: "active",
-    activeSessionId: "active",
   };
 
   assert.equal(shouldOpenReviewArtifact(base), true);
@@ -86,8 +86,86 @@ test("review opens only for successful active-session workspace Write/Edit artif
     }),
     false,
   );
-  assert.equal(
-    shouldOpenReviewArtifact({ ...base, sessionId: "background" }),
-    false,
+});
+
+test("empty work panel context has no visible or retained resource state", () => {
+  assert.deepEqual(emptyWorkPanelContext(), {
+    open: false,
+    tabs: [],
+    activeTabId: null,
+    fileRequest: null,
+  });
+});
+
+test("switching work panel contexts isolates session tabs and visible state", () => {
+  const sessionA = {
+    open: true,
+    tabs: [toolWorkPanelTab("terminal"), fileWorkPanelTab("src/App.tsx")],
+    activeTabId: "file:src/App.tsx",
+    fileRequest: { path: "src/App.tsx", seq: 4 },
+  };
+  const sessionB = {
+    open: false,
+    tabs: [toolWorkPanelTab("browser")],
+    activeTabId: "browser",
+    fileRequest: null,
+  };
+
+  const toB = switchWorkPanelContextState(
+    { "session-b": sessionB },
+    "session-a",
+    sessionA,
+    "session-b",
   );
+  assert.deepEqual(toB.contexts["session-a"], sessionA);
+  assert.deepEqual(toB.visible, sessionB);
+
+  const backToA = switchWorkPanelContextState(
+    toB.contexts,
+    "session-b",
+    toB.visible,
+    "session-a",
+  );
+  assert.deepEqual(backToA.contexts["session-b"], sessionB);
+  assert.deepEqual(backToA.visible, sessionA);
+  assert.notEqual(backToA.visible.tabs, toB.visible.tabs);
+});
+
+test("switching to a session without context returns an isolated empty state", () => {
+  const sessionA = {
+    open: true,
+    tabs: [toolWorkPanelTab("review")],
+    activeTabId: "review",
+    fileRequest: null,
+  };
+  const switched = switchWorkPanelContextState(
+    {},
+    "session-a",
+    sessionA,
+    "session-new",
+  );
+
+  assert.deepEqual(switched.contexts["session-a"], sessionA);
+  assert.deepEqual(switched.visible, emptyWorkPanelContext());
+  switched.visible.tabs.push(toolWorkPanelTab("browser"));
+  assert.deepEqual(switched.contexts["session-a"].tabs, sessionA.tabs);
+});
+
+test("a newer retained artifact is not overwritten by a stale visible projection", () => {
+  const staleVisible = emptyWorkPanelContext();
+  const retained = {
+    open: true,
+    tabs: [toolWorkPanelTab("review")],
+    activeTabId: "review",
+    fileRequest: null,
+  };
+  const switched = switchWorkPanelContextState(
+    { "session-a": retained },
+    "session-a",
+    staleVisible,
+    "session-b",
+  );
+
+  assert.deepEqual(switched.contexts["session-a"], retained);
+  assert.deepEqual(switched.visible, emptyWorkPanelContext());
 });

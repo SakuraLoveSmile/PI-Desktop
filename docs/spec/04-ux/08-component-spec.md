@@ -411,6 +411,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 | Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only when the current Git working tree has changes. |
 | Open | Docked flex row right of the main pane; opened by an artifact with width 320–`min(720, 60vw, viewport − visible sidebar − 360px)`. Windows keeps the native window bounds stable so its frameless window does not repaint between the panel layout and an asynchronous bounds change; other platforms may grow the window outward when space permits. |
 | Multiple artifacts | Tabs follow first-open order, scroll horizontally, keep the active tab visible, and preserve readable labels at the panel minimum |
+| Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | Live width follows pointer while preserving a 360px MainChat; committed (and persisted) on release |
 | No workspace | Each tab renders its own "open a project" empty state |
 | Narrow window | Width re-clamps on window resize; the 320px panel minimum wins only when the supported shell itself cannot satisfy both minima |
@@ -418,11 +419,15 @@ preview), and Files (workspace browser). Codex-parity surface.
 ### 5.4 Interactions
 
 - Trigger: file/URL references, BrowserPreview, and completed-command artifacts
-  create/activate their resource tab. Successful active-session workspace
-  Write/Edit artifacts create/activate Review. While the shared working-tree
-  diff is dirty, the transcript also exposes Review changes; activating it
-  creates, reopens, or activates the same singleton Review tab. Repeated
-  resources deduplicate.
+  create/activate their resource tab in the originating session's runtime
+  context. BrowserPreview events carry `sessionId`, and the renderer retains
+  that session's preview path/URL as its Browser resource. Successful workspace
+  Write/Edit artifacts create/activate Review in the originating session.
+  Background artifacts may update that retained context but never reveal it,
+  resize the window, or change visible selection/focus. While the shared
+  working-tree diff is dirty, the transcript also exposes Review changes;
+  activating it creates, reopens, or activates the same per-session singleton
+  Review tab. Repeated resources deduplicate within that session.
 - Review truth: the renderer shares one current-workspace diff between the
   transcript entry and Review. It refreshes on workspace activation, after a
   500ms debounce for successful Write/Edit/Bash completion, on explicit Review
@@ -434,16 +439,21 @@ preview), and Files (workspace browser). Codex-parity surface.
   the panel without deleting the runtime tab set; a later artifact reopens it.
   Terminal mounts only after its first command artifact and stays mounted while
   its tab exists so the PTY and scrollback survive switches.
-- Context change: selecting another session or workspace closes the panel and
-  drops its runtime tabs before rendering the new context. Relative file tabs
-  can therefore never be reinterpreted against a different workspace.
+- Context change: selecting another session atomically projects that session's
+  retained `{open, tabs, activeTabId, browserResource}` state. The previous
+  session's context remains in renderer memory and is restored when selected
+  again. A workspace selection with no active conversation hides the panel.
+  Every context remains bound to its originating session/workspace, so relative
+  file and Browser resources are never reinterpreted against another workspace.
 - Resize: pointer drag on the left-edge handle.
-- Persistence: only `{width}` in localStorage `pi.desktop.workPanel`; open and
-  tabs reset on app startup. Where supported, OS window-state persistence
-  excludes width added by an open work panel, so relaunch starts at the same
-  base shell width. Windows docks within the existing client bounds and does
-  not add or remove native window width when the panel opens, collapses, or
-  closes its final tab.
+- Persistence: all session contexts are renderer runtime state only. On app
+  startup, open state, tabs, active-tab selection, file requests, and Browser
+  resources reset; only `{width}` remains in localStorage
+  `pi.desktop.workPanel`. Where supported, OS window-state persistence excludes
+  width added by an open work panel, so relaunch starts at the same base shell
+  width. Windows docks within the existing client bounds and does not add or
+  remove native window width when the panel opens, collapses, or closes its
+  final tab.
 
 ### 5.5 Accessibility
 

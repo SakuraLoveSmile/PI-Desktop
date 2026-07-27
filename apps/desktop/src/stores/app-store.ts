@@ -46,10 +46,13 @@ import { formatToolValue } from "../lib/tool-display";
 import {
   activateWorkPanelTabState,
   closeWorkPanelTabState,
+  emptyWorkPanelContext,
   fileWorkPanelTab,
   openWorkPanelTabState,
   shouldOpenReviewArtifact,
+  switchWorkPanelContextState,
   toolWorkPanelTab,
+  type WorkPanelContext,
   type WorkPanelTab,
 } from "../lib/work-panel-tabs";
 import {
@@ -97,8 +100,10 @@ export const WORK_PANEL_DEFAULT_WIDTH = 420;
 // visibly repaints between the renderer layout and asynchronous bounds update.
 let panelWindowGrowth: number | null = null;
 let workspaceDiffRequestSeq = 0;
+let workPanelFileRequestSeq = 0;
 const navigationIntents = createNavigationIntentController();
 let sessionSelectionQueue: Promise<void> = Promise.resolve();
+let pendingSessionSelection: { id: string; intent: number } | null = null;
 
 type NavigationOptions = {
   /** Reuse an owning navigation's generation across nested async operations. */
@@ -363,6 +368,8 @@ export type AppState = {
   workPanelOpen: boolean;
   workPanelTabs: WorkPanelTab[];
   activeWorkPanelTabId: string | null;
+  /** Runtime-only work panel state owned by each conversation. */
+  workPanelContexts: Record<string, WorkPanelContext>;
   workPanelWidth: number;
   /** Bumped on agent Write/Edit/Bash completion; review tab refetches. */
   reviewRev: number;
@@ -373,10 +380,11 @@ export type AppState = {
   /** Chat-initiated "preview this file" request consumed by the files tab. */
   workPanelFileRequest: { path: string; seq: number } | null;
   openWorkPanelTab: (tab: WorkPanelTab) => void;
+  openWorkPanelTabForSession: (sessionId: string, tab: WorkPanelTab) => void;
   activateWorkPanelTab: (tabId: string) => void;
   closeWorkPanelTab: (tabId: string) => void;
   collapseWorkPanel: () => void;
-  /** Drop tabs when the visible session or workspace context changes. */
+  /** Hide the visible panel while retaining its session-owned context. */
   resetWorkPanelContext: () => void;
   setWorkPanelWidth: (width: number) => void;
   /** Open a workspace-relative file in the work panel files viewer. */
@@ -389,6 +397,51 @@ export type AppState = {
 
 const initialSidebarPreferences = loadSidebarPreferences();
 const initialWorkPanelWidth = loadWorkPanelWidth();
+
+function currentWorkPanelContext(state: AppState): WorkPanelContext {
+  return {
+    open: state.workPanelOpen,
+    tabs: state.workPanelTabs,
+    activeTabId: state.activeWorkPanelTabId,
+    fileRequest: state.workPanelFileRequest,
+  };
+}
+
+function switchWorkPanelSession(
+  state: AppState,
+  nextSessionId?: string,
+): Pick<
+  AppState,
+  | "workPanelContexts"
+  | "workPanelOpen"
+  | "workPanelTabs"
+  | "activeWorkPanelTabId"
+  | "workPanelFileRequest"
+> {
+  const switched = switchWorkPanelContextState(
+    state.workPanelContexts,
+    state.activeSessionId,
+    currentWorkPanelContext(state),
+    nextSessionId,
+  );
+  return {
+    workPanelContexts: switched.contexts,
+    workPanelOpen: switched.visible.open,
+    workPanelTabs: switched.visible.tabs,
+    activeWorkPanelTabId: switched.visible.activeTabId,
+    workPanelFileRequest: switched.visible.fileRequest,
+  };
+}
+
+function syncPanelWindowForVisibility(
+  previousOpen: boolean,
+  nextOpen: boolean,
+  width: number,
+) {
+  if (previousOpen === nextOpen) return;
+  if (nextOpen) expandWindowForPanel(width);
+  else shrinkWindowForPanel(width);
+}
 
 // tool_end events carry no tool name, and cross-session tool calls never
 // enter `messages`, so remember names from tool_start envelopes here.
@@ -482,6 +535,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   workPanelOpen: false,
   workPanelTabs: [],
   activeWorkPanelTabId: null,
+  workPanelContexts: {},
   workPanelWidth: initialWorkPanelWidth,
   reviewRev: 0,
   workspaceDiff: null,
@@ -629,6 +683,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   selectSession: async (id, opts) => {
     const intent = opts?.navigationIntent ?? beginNavigationIntent();
+    const selection = { id, intent };
+    pendingSessionSelection = selection;
     const selectLatest = async () => {
       if (!navigationIntentIsCurrent(intent)) return;
       const detail = await api.getSession(id);
@@ -653,15 +709,21 @@ export const useAppStore = create<AppState>((set, get) => ({
         await get().clearProject({ navigationIntent: intent });
         if (!navigationIntentIsCurrent(intent)) return;
       }
-      if (id !== get().activeSessionId) get().resetWorkPanelContext();
       const record = opts?.record !== false;
+      const panelWasOpen = get().workPanelOpen;
       if (!record) {
         set((s) => ({
+          ...switchWorkPanelSession(s, id),
           activeSessionId: id,
           messages: detail.session?.messages ?? [],
           page: "chat",
           isRunning: s.runningSessions[id] ?? false,
         }));
+        syncPanelWindowForVisibility(
+          panelWasOpen,
+          get().workPanelOpen,
+          get().workPanelWidth,
+        );
         void get().acknowledgeSessionOutcome(id);
         return;
       }
@@ -672,6 +734,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const same = last?.page === "chat" && last?.sessionId === id;
         const nextStack = same ? stack : [...stack, entry].slice(-50);
         return {
+          ...switchWorkPanelSession(s, id),
           activeSessionId: id,
           messages: detail.session?.messages ?? [],
           page: "chat" as const,
@@ -680,6 +743,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           navIndex: nextStack.length - 1,
         };
       });
+      syncPanelWindowForVisibility(
+        panelWasOpen,
+        get().workPanelOpen,
+        get().workPanelWidth,
+      );
       void get().acknowledgeSessionOutcome(id);
     };
     const queued = sessionSelectionQueue.then(selectLatest, selectLatest);
@@ -687,7 +755,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       () => undefined,
       () => undefined,
     );
-    await queued;
+    try {
+      await queued;
+    } finally {
+      if (pendingSessionSelection === selection) pendingSessionSelection = null;
+    }
   },
 
   newSession: async (options) => {
@@ -771,12 +843,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!navigationIntentIsCurrent(intent)) return;
     const detail = await api.getSession(created.session.id);
     if (!navigationIntentIsCurrent(intent)) return;
-    get().resetWorkPanelContext();
+    const panelWasOpen = get().workPanelOpen;
     const entry = { page: "chat" as const, sessionId: created.session.id };
     set((s) => {
       const stack = s.navStack.slice(0, s.navIndex + 1);
       const nextStack = [...stack, entry].slice(-50);
       return {
+        ...switchWorkPanelSession(s, created.session.id),
         activeSessionId: created.session.id,
         messages: detail.session?.messages ?? [],
         page: "chat" as const,
@@ -784,6 +857,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         navIndex: nextStack.length - 1,
       };
     });
+    syncPanelWindowForVisibility(
+      panelWasOpen,
+      get().workPanelOpen,
+      get().workPanelWidth,
+    );
   },
 
   forkSession: async (id) => {
@@ -818,7 +896,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     if (!navigationIntentIsCurrent(intent)) return;
     const { messages, ...summary } = result.session;
-    get().resetWorkPanelContext();
+    const panelWasOpen = get().workPanelOpen;
     set((current) => {
       const sessions = decorateSessions(
         [
@@ -831,6 +909,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const entry = { page: "chat" as const, sessionId: summary.id };
       const nextStack = [...stack, entry].slice(-50);
       return {
+        ...switchWorkPanelSession(current, summary.id),
         sessions,
         activeSessionId: summary.id,
         messages,
@@ -840,6 +919,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         navIndex: nextStack.length - 1,
       };
     });
+    syncPanelWindowForVisibility(
+      panelWasOpen,
+      get().workPanelOpen,
+      get().workPanelWidth,
+    );
   },
 
   forkAssistantMessage: async (messageId) => {
@@ -860,7 +944,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       if (!navigationIntentIsCurrent(intent)) return;
       const { messages, ...summary } = result.session;
-      get().resetWorkPanelContext();
+      const panelWasOpen = get().workPanelOpen;
       set((current) => {
         const sessions = decorateSessions(
           [summary, ...current.sessions.filter((session) => session.id !== summary.id)],
@@ -870,6 +954,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const entry = { page: "chat" as const, sessionId: summary.id };
         const nextStack = [...stack, entry].slice(-50);
         return {
+          ...switchWorkPanelSession(current, summary.id),
           sessions,
           activeSessionId: summary.id,
           messages,
@@ -881,6 +966,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           errorCode: null,
         };
       });
+      syncPanelWindowForVisibility(
+        panelWasOpen,
+        get().workPanelOpen,
+        get().workPanelWidth,
+      );
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : String(error),
@@ -1245,6 +1335,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   activateProject: async (path, opts) => {
     const intent = opts?.navigationIntent ?? beginNavigationIntent();
+    const preserveConversation = pendingSessionSelection?.intent === intent;
     const requestedPath = path.trim();
     if (!requestedPath) return null;
     const result = await api.setProject(requestedPath);
@@ -1253,7 +1344,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!workspace?.path) return null;
     if (
       normalizeProjectPath(get().activeProjectPath) !==
-      normalizeProjectPath(workspace.path)
+        normalizeProjectPath(workspace.path) &&
+      !preserveConversation
     ) {
       get().resetWorkPanelContext();
     }
@@ -1273,7 +1365,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         openProjectPaths,
         openProjects,
         page: "chat" as const,
-        ...(switchesVisibleProject
+        ...(switchesVisibleProject && !preserveConversation
           ? {
               activeSessionId: undefined,
               messages: [],
@@ -1376,15 +1468,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearProject: async (opts) => {
     const intent = opts?.navigationIntent ?? beginNavigationIntent();
+    const preserveConversation = pendingSessionSelection?.intent === intent;
     await api.clearProject();
     if (!navigationIntentIsCurrent(intent)) return;
-    get().resetWorkPanelContext();
+    if (!preserveConversation) get().resetWorkPanelContext();
     set({
       workspace: null,
       activeProjectPath: undefined,
-      activeSessionId: undefined,
-      messages: [],
-      isRunning: false,
+      ...(preserveConversation
+        ? {}
+        : {
+            activeSessionId: undefined,
+            messages: [],
+            isRunning: false,
+          }),
     });
     persistCurrentSidebar(get);
     const onboarding = await api.getOnboarding();
@@ -1464,6 +1561,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       delete runningSessions[id];
       const sessionOutcomes = { ...state.sessionOutcomes };
       delete sessionOutcomes[id];
+      const workPanelContexts = withoutRecordKey(state.workPanelContexts, id);
       const pendingPermissions = clearPendingPermission(
         state.pendingPermissions,
         id,
@@ -1478,6 +1576,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         sessions,
         runningSessions,
         sessionOutcomes,
+        workPanelContexts,
         activeSessionId:
           state.activeSessionId === id ? undefined : state.activeSessionId,
         messages: state.activeSessionId === id ? [] : state.messages,
@@ -1876,11 +1975,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           toolName,
           isError: event.isError,
           result: event.result,
-          sessionId: envelope.sessionId,
-          activeSessionId: get().activeSessionId,
         })
       ) {
-        get().openWorkPanelTab(toolWorkPanelTab("review"));
+        get().openWorkPanelTabForSession(envelope.sessionId, toolWorkPanelTab("review"));
       }
     }
     if (envelope.sessionId !== get().activeSessionId) {
@@ -2213,34 +2310,62 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  openWorkPanelTab: (tab) => {
-    const wasOpen = get().workPanelOpen;
+  openWorkPanelTabForSession: (sessionId, tab) => {
+    if (!sessionId) return;
+    let openedVisiblePanel = false;
     set((state) => {
+      const affectsVisibleSession =
+        pendingSessionSelection === null && state.activeSessionId === sessionId;
+      const context = affectsVisibleSession
+        ? currentWorkPanelContext(state)
+        : state.workPanelContexts[sessionId] ?? emptyWorkPanelContext();
       const next = openWorkPanelTabState(
         {
-          tabs: state.workPanelTabs,
-          activeTabId: state.activeWorkPanelTabId,
+          tabs: context.tabs,
+          activeTabId: context.activeTabId,
         },
         tab,
       );
-      return {
-        workPanelTabs: next.tabs,
-        activeWorkPanelTabId: next.activeTabId,
-        workPanelOpen: true,
-        ...(tab.kind === "file" && tab.resource
+      const fileRequest =
+        tab.kind === "file" && tab.resource
           ? {
-              workPanelFileRequest: {
-                path: tab.resource,
-                seq: (state.workPanelFileRequest?.seq ?? 0) + 1,
-              },
+              path: tab.resource,
+              seq: ++workPanelFileRequestSeq,
+            }
+          : context.fileRequest;
+      const nextContext: WorkPanelContext = {
+        open: true,
+        tabs: next.tabs,
+        activeTabId: next.activeTabId,
+        fileRequest,
+      };
+      openedVisiblePanel = affectsVisibleSession && !context.open;
+      return {
+        workPanelContexts: {
+          ...state.workPanelContexts,
+          [sessionId]: nextContext,
+        },
+        ...(affectsVisibleSession
+          ? {
+              workPanelOpen: true,
+              workPanelTabs: next.tabs,
+              activeWorkPanelTabId: next.activeTabId,
+              workPanelFileRequest: fileRequest,
             }
           : {}),
       };
     });
-    if (!wasOpen) expandWindowForPanel(get().workPanelWidth);
+    if (openedVisiblePanel) expandWindowForPanel(get().workPanelWidth);
+  },
+  openWorkPanelTab: (tab) => {
+    const sessionId = get().activeSessionId;
+    if (!sessionId) return;
+    get().openWorkPanelTabForSession(sessionId, tab);
   },
   activateWorkPanelTab: (tabId) => {
     set((state) => {
+      const sessionId = state.activeSessionId;
+      if (!sessionId) return {};
       const next = activateWorkPanelTabState(
         {
           tabs: state.workPanelTabs,
@@ -2249,16 +2374,26 @@ export const useAppStore = create<AppState>((set, get) => ({
         tabId,
       );
       const activeTab = next.tabs.find((tab) => tab.id === next.activeTabId);
+      const fileRequest =
+        activeTab?.kind === "file" && activeTab.resource
+          ? {
+              path: activeTab.resource,
+              seq: ++workPanelFileRequestSeq,
+            }
+          : state.workPanelFileRequest;
+      const nextContext: WorkPanelContext = {
+        open: state.workPanelOpen,
+        tabs: next.tabs,
+        activeTabId: next.activeTabId,
+        fileRequest,
+      };
       return {
         activeWorkPanelTabId: next.activeTabId,
-        ...(activeTab?.kind === "file" && activeTab.resource
-          ? {
-              workPanelFileRequest: {
-                path: activeTab.resource,
-                seq: (state.workPanelFileRequest?.seq ?? 0) + 1,
-              },
-            }
-          : {}),
+        workPanelFileRequest: fileRequest,
+        workPanelContexts: {
+          ...state.workPanelContexts,
+          [sessionId]: nextContext,
+        },
       };
     });
   },
@@ -2266,6 +2401,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const wasOpen = get().workPanelOpen;
     let closePanel = false;
     set((state) => {
+      const sessionId = state.activeSessionId;
+      if (!sessionId) return {};
       const next = closeWorkPanelTabState(
         {
           tabs: state.workPanelTabs,
@@ -2275,36 +2412,49 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       const activeTab = next.tabs.find((tab) => tab.id === next.activeTabId);
       closePanel = next.activeTabId === null;
+      const fileRequest =
+        activeTab?.kind === "file" && activeTab.resource
+          ? {
+              path: activeTab.resource,
+              seq: ++workPanelFileRequestSeq,
+            }
+          : state.workPanelFileRequest;
+      const nextContext: WorkPanelContext = {
+        open: closePanel ? false : state.workPanelOpen,
+        tabs: next.tabs,
+        activeTabId: next.activeTabId,
+        fileRequest,
+      };
       return {
         workPanelTabs: next.tabs,
         activeWorkPanelTabId: next.activeTabId,
         workPanelOpen: closePanel ? false : state.workPanelOpen,
-        ...(activeTab?.kind === "file" && activeTab.resource
-          ? {
-              workPanelFileRequest: {
-                path: activeTab.resource,
-                seq: (state.workPanelFileRequest?.seq ?? 0) + 1,
-              },
-            }
-          : {}),
+        workPanelFileRequest: fileRequest,
+        workPanelContexts: {
+          ...state.workPanelContexts,
+          [sessionId]: nextContext,
+        },
       };
     });
     if (wasOpen && closePanel) shrinkWindowForPanel(get().workPanelWidth);
   },
   collapseWorkPanel: () => {
-    if (!get().workPanelOpen) return;
-    set({ workPanelOpen: false });
+    const state = get();
+    const sessionId = state.activeSessionId;
+    if (!sessionId || !state.workPanelOpen) return;
+    set({
+      workPanelOpen: false,
+      workPanelContexts: {
+        ...state.workPanelContexts,
+        [sessionId]: { ...currentWorkPanelContext(state), open: false },
+      },
+    });
     shrinkWindowForPanel(get().workPanelWidth);
   },
   resetWorkPanelContext: () => {
     const wasOpen = get().workPanelOpen;
-    set({
-      workPanelOpen: false,
-      workPanelTabs: [],
-      activeWorkPanelTabId: null,
-      workPanelFileRequest: null,
-    });
-    if (wasOpen) shrinkWindowForPanel(get().workPanelWidth);
+    set((state) => switchWorkPanelSession(state));
+    syncPanelWindowForVisibility(wasOpen, false, get().workPanelWidth);
   },
   setWorkPanelWidth: (width) => {
     const prev = get().workPanelWidth;
@@ -2328,10 +2478,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().openWorkPanelTab(fileWorkPanelTab(path));
   },
   openUrlInWorkPanel: (url) => {
-    get().openWorkPanelTab(toolWorkPanelTab("browser"));
-    // The browser view lives in main; it pushes navigation state back to
-    // whichever BrowserTab is (or becomes) mounted.
-    void api.browserNavigate(url).catch(() => {});
+    get().openWorkPanelTab({ ...toolWorkPanelTab("browser"), resource: url });
   },
   openTerminalInWorkPanel: () => {
     get().openWorkPanelTab(toolWorkPanelTab("terminal"));

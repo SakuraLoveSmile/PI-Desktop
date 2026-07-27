@@ -460,9 +460,11 @@ Command sources:
 
 ## 13a. Work Panel APIs
 
-Work panel channels are Electron-main implementations (no host-core hop);
-all of them resolve the workspace root from `workspace.get` and fail closed
-without one.
+Work panel channels are Electron-main implementations. User-driven workspace
+operations resolve the visible root from `workspace.get` and fail closed
+without one. Agent-driven BrowserPreview routing resolves the originating
+conversation through `session.get`, so a background preview never inherits the
+visible session's workspace.
 
 ### workspace
 
@@ -482,12 +484,18 @@ without one.
 
 ### browser (D100)
 
-- `browser/navigate({url})` (scheme-normalized, http/https only),
+- `browser/navigate({url, sessionId?})` (scheme-normalized; http/https work
+  without a workspace, while a local path requires the supplied session's
+  durable project root or the visible workspace for legacy calls),
   `browser/action({action: back|forward|reload|stop})`,
   `browser/setBounds({x,y,width,height})` (renderer-measured content rect),
   `browser/setVisible({visible})`, `browser/openExternal()`,
   `browser/getState()`
 - event: `browser/event/state {url, title, isLoading, canGoBack, canGoForward}`
+- agent preview event: `browser/event/preview {sessionId, path}`. Electron Main
+  validates `path` inside that session's project before emitting; the renderer
+  records it in the matching runtime panel context and navigates only when that
+  conversation is visible.
 
 ### fs (read-only)
 

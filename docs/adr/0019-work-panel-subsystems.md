@@ -3,7 +3,11 @@
 - Status: Accepted
 - Date: 2026-07-26
 - Deciders: PI-Desktop maintainers
-- Related: [01-ui-ia](../spec/04-ux/01-ui-ia.md) · [08-component-spec §5](../spec/04-ux/08-component-spec.md) · [01-ipc-protocol §13a](../spec/03-runtime/01-ipc-protocol.md) · decisions D097–D100, D128
+- Related: [01-ui-ia](../spec/04-ux/01-ui-ia.md) ·
+  [08-component-spec §5](../spec/04-ux/08-component-spec.md) ·
+  [01-ipc-protocol §13a](../spec/03-runtime/01-ipc-protocol.md) ·
+  decisions D097–D100, D128, D142 ·
+  [ADR 0028](0028-session-scoped-work-panel-contexts.md)
 
 ## Context
 

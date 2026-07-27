@@ -141,7 +141,10 @@ may be retained while exactly one workspace supplies the visible shell context.
   A project/tab switch does not abort a background turn or copy its events into
   the visible transcript. Background message, tool, completion, and permission
   events never activate their session, change the visible project/page, or move
-  focus. Only an explicit session/notification activation navigates.
+  focus. Their work-panel artifacts and Browser resource update only the
+  originating session's retained renderer context and do not reveal or resize
+  the visible panel. Only an explicit session/notification activation navigates
+  and projects the destination session's retained panel context.
 - Every tool call resolves `workspaceRoot` from the originating durable
   session, not from the currently selected project tab. Background completion
   refreshes the matching row without redirecting the active conversation.
@@ -218,7 +221,7 @@ may be retained while exactly one workspace supplies the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
-### 1.8 Artifact-driven work panel tabs (D128, D140)
+### 1.8 Artifact-driven work panel tabs (D128, D140, D142)
 
 - The shell exposes no empty or unconditional work-panel launcher,
   application-menu command, or global shortcut. An artifact trigger atomically
@@ -231,9 +234,10 @@ may be retained while exactly one workspace supplies the visible shell context.
 - On Windows, opening or hiding the panel keeps the native window bounds
   unchanged. The docked renderer layout updates in one pass, avoiding the
   intermediate frameless-window repaint caused by a later native resize.
-- A successful active-session workspace Write/Edit opens Review. Failed and
-  scratch writes do not; background-session artifacts stay rooted in their
-  session and never take focus from the current project.
+- A successful workspace Write/Edit creates or activates Review in its
+  originating session. Failed and scratch writes do not. Background-session
+  artifacts update only their retained context and never open, activate, resize,
+  or focus the visible panel.
 - When the current Git working tree has changes, a compact Review changes
   command remains visible at the end of the transcript independently of the
   activity disclosure state. It reports files and addition/deletion totals and
@@ -245,10 +249,14 @@ may be retained while exactly one workspace supplies the visible shell context.
   workspace from changing the visible entry.
 - Terminal mounts only after a command artifact opens it and remains mounted
   across tab switches while that tab exists.
-- Selecting another session or workspace closes the panel and clears retained
-  tabs, preventing workspace-relative resources from crossing context
-  boundaries. Window-state persistence records the base shell width without
-  any temporary panel expansion.
+- Each session retains `{open, tabs, activeTabId, browserResource}` in renderer
+  memory. Selecting another session swaps the visible context atomically and
+  switching back restores it; selecting a workspace without an active
+  conversation hides the panel. Session/workspace identity remains attached to
+  every relative resource, preventing cross-context reinterpretation.
+- Relaunch discards every session context, including Browser resources; only
+  panel width persists. Window-state persistence records the base shell width
+  without any temporary panel expansion.
 
 ### 1.9 Application updates (D120)
 
@@ -612,7 +620,9 @@ This does not prevent state changes — it makes them instant.
 8. Focus returns to composer after session switch, message send, permission resolution, and abort
 9. Background message, tool, completion, and permission events never change
    the active session/project/page or keyboard focus; concurrent permission
-   requests remain independently actionable in their originating transcripts
+   requests remain independently actionable in their originating transcripts,
+   and background artifacts update only their session's retained work-panel
+   context
 10. Focus rings visible on `focus-visible` only, 2px accent offset 2px
 11. Command palette traps focus; Escape returns to previous focus
 12. All animations respect `prefers-reduced-motion: reduce` — state changes are instant, no decorative motion
