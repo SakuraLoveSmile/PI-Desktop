@@ -46,6 +46,8 @@ import {
   IconWrench,
 } from "./icons";
 import { useAppStore } from "../stores/app-store";
+import type { PendingPermission } from "../lib/pending-permissions";
+import { PermissionCard } from "./PermissionCard";
 
 /**
  * Copy chip. Message toolbars are glyph-only (`icon`) with the label in a
@@ -984,9 +986,11 @@ const MessageRow = memo(function MessageRow({
 export function ChatTranscript({
   messages,
   isRunning,
+  pendingPermission,
 }: {
   messages: UiMessage[];
   isRunning: boolean;
+  pendingPermission?: PendingPermission;
 }) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1012,7 +1016,7 @@ export function ChatTranscript({
 
   useEffect(() => {
     if (pinnedRef.current) scrollToBottom();
-  }, [messages, isRunning, scrollToBottom]);
+  }, [messages, isRunning, pendingPermission?.requestId, scrollToBottom]);
 
   // The typewriter reveal grows message height without changing `messages`,
   // so follow content resizes too while pinned to the bottom.
@@ -1091,7 +1095,7 @@ export function ChatTranscript({
     lastEntry.message.status === "streaming" &&
     Boolean((lastEntry.message.content || "").trim());
   const showWorking =
-    isRunning && !activeToolGroup && !assistantIsAnswering;
+    isRunning && !pendingPermission && !activeToolGroup && !assistantIsAnswering;
 
   return (
     <div className="thread-wrap">
@@ -1120,6 +1124,12 @@ export function ChatTranscript({
               />
             ),
           )}
+          {pendingPermission ? (
+            <PermissionCard
+              key={pendingPermission.requestId}
+              permission={pendingPermission}
+            />
+          ) : null}
           {showWorking ? <WorkingIndicator /> : null}
         </div>
       </div>

@@ -554,7 +554,7 @@ The composer renders only controls connected to the active pi session:
 | `z-sticky` | 10 | Sticky headers, topbar |
 | `z-dropdown` | 20 | Dropdown menus, select popovers |
 | `z-overlay` | 30 | Tooltips |
-| `z-dialog` | 40 | Dialogs, permission modal |
+| `z-dialog` | 40 | Settings and confirmation dialogs |
 | `z-toast` | 50 | Toast notifications |
 | `z-command-palette` | 60 | Command palette overlay |
 | `z-devtools` | 100 | DevTools overlay (non-production) |

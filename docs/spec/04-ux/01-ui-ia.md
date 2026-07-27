@@ -94,7 +94,9 @@ destination, chat as the home surface, tools and permissions inline.
   checklist, and centered composer. The former four suggestion cards are not
   rendered (D131).
 - With transcript: message stream + tool disclosure rows (D071), docked
-  composer, permission cards inline.
+  composer, and a session-scoped permission card inline. A background
+  session's message, tool, and permission events never replace or cover the
+  visible conversation.
 
 ### 3.2 Sidebar project groups
 
@@ -122,7 +124,9 @@ destination, chat as the home surface, tools and permissions inline.
   section and never inherit the last active project's workspace.
 - **Concurrency**: the shell selects one visible project at a time, while
   agent run state remains keyed by session. Switching project tabs does not
-  cancel a background turn.
+  cancel a background turn. Background events update only their originating
+  session and never change the active session, page, project, or keyboard
+  focus.
 
 ### 3.3 Pull requests
 Segmented Open/Draft/All filters with counts; rows carry icon plate, number,
@@ -157,7 +161,6 @@ Plugins destination described in §3.5.
 | Overlay | Trigger | Notes |
 |---|---|---|
 | Command palette | Cmd/Ctrl+K (also Cmd/Ctrl+Shift+P per D014) | builtin + plugin commands |
-| Permission dialog | tool permission request | risk copy, args preview, allow-once / allow-session / deny, 120s countdown → deny |
 | Model menu | composer model chip | configured provider/model choices + settings entry (D091) |
 | Profile menu | sidebar footer | Settings / Logs / Theme cycle (D041) |
 | Notification inbox | sidebar footer bell | All/Unread views, task completion/failure rows, mark-all-read and clear actions (D130/D117) |
@@ -201,7 +204,10 @@ Plugins destination described in §3.5.
 - Background project session → the originating project row retains its
   running/error indicator. Selected shell state can move independently while
   the session tool root remains bound to its durable project; its artifacts do
-  not open or activate tabs over the currently selected project.
+  not open or activate tabs over the currently selected project. Messages,
+  tool events, and permission requests remain scoped to that session. A
+  pending permission card appears only after the user explicitly opens its
+  conversation.
 - Completed/failed turn not already visible → host-core appends one durable
   inbox row. A result shown in the visible, focused current chat and every
   `aborted` turn append none. Background sessions and any turn finishing while
@@ -210,7 +216,8 @@ Plugins destination described in §3.5.
   project/session.
   Electron additionally presents a native system notification only when the
   app window is unfocused, and clicking it focuses the window before activating
-  the same session (D117).
+  the same session (D117). Receiving either the durable or native notification
+  event never navigates by itself; only explicit activation does.
 - Backend degraded → status capsule (restarting) or fatal banner with Open
   logs (D080); composer submits are rejected with readable errors while down.
 

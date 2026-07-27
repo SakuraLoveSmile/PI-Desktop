@@ -30,6 +30,13 @@ pending → denied
 pending → timeout_denied
 ```
 
+- A request is keyed by both `sessionId` and `requestId`.
+- Each session has at most one pending request because its agent loop is
+  paused, while different sessions may wait for independent approvals at the
+  same time.
+- Replacing or resolving one request never removes another session's request
+  or a newer request in the same session.
+
 ## 5. Timeout
 
 - Default timeout: **120 seconds**
@@ -48,11 +55,19 @@ Must show:
 5. workspace context
 6. actions: Allow once / Allow for session / Deny
 
+The card is rendered inline only in its originating session's transcript.
+Background requests remain pending without opening an overlay, changing the
+active page/project/session, or moving keyboard focus. Opening that session
+reveals its card with the original absolute countdown deadline.
+
 ## 7. Composer interaction while pending
 
 - user may continue editing text
 - sending another prompt in same session is blocked while turn waits on permission
-- Abort cancels turn and pending permission request
+- Abort concurrently cancels the turn and explicitly denies the matching host
+  permission request; late cleanup cannot clear a replacement request
+- another session remains independently editable/runnable and its own pending
+  request is unaffected
 
 ## 8. Session grants surface
 
@@ -67,3 +82,5 @@ the permission runtime.
 2. Agent mode prompts for high-risk tools
 3. timeout becomes deny in UI + tool result
 4. allow-session suppresses repeat prompts for same toolName only
+5. concurrent session requests remain isolated and never take over the visible
+   conversation

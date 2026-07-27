@@ -69,6 +69,33 @@ describe("keyboard shortcut mapping", () => {
     ).toBe(true);
   });
 
+  it("never treats a modifier-only event as a shortcut", () => {
+    for (const event of [
+      { key: "Control", code: "ControlLeft", ctrlKey: true },
+      { key: "Meta", code: "MetaLeft", metaKey: true },
+      { key: "Shift", code: "ShiftLeft", shiftKey: true },
+      { key: "Alt", code: "AltLeft", altKey: true },
+      { key: "[", code: "ControlLeft", ctrlKey: true },
+    ]) {
+      expect(keybindingFromEvent(event, "win32")).toBeNull();
+      expect(keybindingMatchesEvent("Mod+BracketLeft", event, "win32")).toBe(false);
+    }
+    expect(
+      keybindingMatchesEvent(
+        "Mod+BracketLeft",
+        { key: "Unidentified", code: "", ctrlKey: true },
+        "win32",
+      ),
+    ).toBe(false);
+    expect(
+      keybindingMatchesEvent(
+        "not-a-binding",
+        { key: "Unidentified", code: "" },
+        "win32",
+      ),
+    ).toBe(false);
+  });
+
   it("requires a modifier except for function keys", () => {
     expect(isAllowedKeybinding("K")).toBe(false);
     expect(isAllowedKeybinding("Mod+K")).toBe(true);

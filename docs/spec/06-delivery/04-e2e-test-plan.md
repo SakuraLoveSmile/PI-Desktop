@@ -36,7 +36,7 @@
 |---|---|---|---|
 | **Unit** | Single module, no IPC | Many | Vitest / Rust #[test] |
 | **Integration** | IPC contract, host↔renderer, host↔sidecar | Moderate | Vitest + IPC mocks or live Electron |
-| **E2E** | Full user journey through the desktop app | ~65 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
+| **E2E** | Full user journey through the desktop app | ~74 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
 
 **Strategy**: document all E2E scenarios now; write unit/integration tests alongside code; automate E2E after M5.
 
@@ -251,7 +251,9 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Agent mode; project open.
 - **Steps**: 1) Ask agent to write a file. 2) Observe permission card.
-- **Expected**: Permission card appears with tool name, arguments preview, and allow/deny options.
+- **Expected**: Permission card appears inline in the originating transcript
+  with tool name, workspace, arguments preview, countdown, and allow/deny
+  options. It creates no backdrop or modal and does not cover another session.
 - **Specs linked**: `04-ux/03-permission-ux.md`, `03-runtime/03-tools-and-permissions.md`
 - **Acceptance**: E (Write/Edit/Bash trigger confirmation)
 - **Milestone**: M3
@@ -957,15 +959,16 @@ Each scenario is documented in this format:
 - **Steps**: 1) Activate the artifact, enter `localhost:<port>` without a scheme, and submit.
   2) Navigate site links; use back/forward/reload/stop. 3) Trigger a
   `window.open` popup and a permission-requesting page (e.g. notification
-  prompt). 4) Open the command palette, then a tool permission dialog, then
-  Settings. 5) Switch to another panel tab and back; close the panel.
-  6) Use open-external.
+  prompt). 4) Open the command palette, Search, then Settings. Return to chat
+  and trigger an inline tool permission card. 5) Switch to another panel tab
+  and back; close the panel. 6) Use open-external.
 - **Expected**: Scheme-less input normalizes to http; nav state (URL bar,
   back/forward enablement, load spinner) mirrors the page. Popups open in
   the default browser (never in-app); permission requests are denied;
   non-http(s) navigation is blocked. The preview hides under every blocking
-  overlay and while unmounted, reappearing with correct bounds afterwards;
-  resize/drag keeps the view aligned with the placeholder rect.
+  overlay and while unmounted, reappearing with correct bounds afterwards. An
+  inline permission card does not hide or remount the preview; resize/drag
+  keeps the view aligned with the placeholder rect.
   Open-external launches the current URL in the default browser. The view
   uses an isolated persist partition (no session bleed from the app shell).
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a, ADR 0019
@@ -1378,14 +1381,17 @@ Each scenario is documented in this format:
   letter and a reserved editing chord. 6) Restart the app and invoke the custom
   Search chord again. 7) Restore Search, then choose Restore defaults. 8) On
   macOS inspect the corresponding native application-menu accelerator after
-  each save/reset.
+  each save/reset. 9) Press and release Ctrl/Command alone, confirm an IME
+  candidate, and hold the back/forward chord long enough to generate repeats.
 - **Expected**: Actions are grouped as Navigation, Agent, and Window with
   platform-native key labels; recording has visible focus and `Escape` cancels;
   the custom Search chord takes effect immediately, replaces the old chord,
   survives restart, and updates the macOS menu; duplicate, modifier-free, and
   reserved assignments show an inline error without changing either action;
   individual and global reset restore the shared defaults; the five-item
-  Settings rail remains unchanged and has no Keyboard destination.
+  Settings rail remains unchanged and has no Keyboard destination. Modifier-only
+  and IME keydowns dispatch nothing, and a held history chord traverses only
+  once per physical press.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
   `03-runtime/01-ipc-protocol.md`
 - **Acceptance**: F (settings persistence), Quality (keyboard accessibility)
@@ -1420,6 +1426,31 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`settings-general.test.mjs`,
   `window-menu.test.mjs`); native interaction scenario Draft
 
+#### E2E-074: Concurrent session events and permissions never steal focus
+
+- **Preconditions**: Sessions A and B exist in Agent mode and can run
+  concurrently; A is visible with a draft in its composer.
+- **Steps**: 1) Start turns in A and B, then return to A. 2) Let B emit streamed
+  messages, tool activity, completion, and a permission request. 3) Confirm A
+  remains visible and continue editing its draft. 4) Trigger a permission
+  request in A as well. 5) Open B explicitly, resolve only B's request, then
+  return to A and resolve A's request. 6) Rapidly select A then B while session
+  details load in opposite completion order.
+- **Expected**: B's background events update only B's row and retained state;
+  they do not change A's active session/project/page, transcript, draft, scroll,
+  or keyboard focus, and no global modal appears. Opening B reveals only B's
+  inline card with its original countdown. Both requests remain independently
+  actionable, and resolving B does not clear A. The final rapid selection stays
+  on B even when A's older load finishes later. Only explicit notification or
+  session activation may navigate.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/03-permission-ux.md`,
+  `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`
+- **Acceptance**: C (session isolation), E (permission isolation), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`permission-inline.test.mjs` for scoped state,
+  inline rendering contract, absolute countdown, and latest-selection guard);
+  full UI scenario Draft
+
 ## 8. Traceability Matrix
 
 
@@ -1430,14 +1461,14 @@ Each scenario is documented in this format:
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066 |
-| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071 |
+| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074 |
 | D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068 |
-| E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049 |
+| E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049, E2E-074 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073 |
 | G — Plugins | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -1445,7 +1476,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073 (+ packaging scenarios in release runbook) |
+| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074 (+ packaging scenarios in release runbook) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -1991,3 +2022,14 @@ This test plan spec is accepted when:
   Refresh notifications and restart the app; the acknowledged mark must not
   return. A terminal notification marked read from the inbox likewise produces
   no sidebar terminal mark.
+
+### US-UI-68 Session-scoped inline permissions (D138)
+- Run two sessions concurrently and keep A visible while B reaches a tool
+  approval request. Inspect light/dark themes at default and narrow widths.
+- Expect no backdrop, modal, page/session switch, work-panel hide, transcript
+  replacement, or composer-focus change in A. B retains its pending state.
+- Open B explicitly and expect one inline permission card after B's latest
+  activity, with readable risk, args, workspace, countdown, and wrapping action
+  controls. Switching away and back preserves the absolute deadline.
+- Make A and B pending together, resolve each independently, and confirm neither
+  action removes or changes the other card.

@@ -65,6 +65,16 @@ test("shared shortcut map drives renderer dispatch and native menu accelerators"
   assert.match(mainSource, /keybindings\?:\s*unknown/);
 });
 
+test("global shortcut dispatch ignores incomplete keyboard events", () => {
+  assert.match(appSource, /modifierOnly/);
+  assert.match(appSource, /e\.isComposing/);
+  assert.match(appSource, /e\.keyCode === 229/);
+  assert.match(
+    appSource,
+    /e\.repeat[\s\S]*shortcut\.id === "navigateBack"[\s\S]*shortcut\.id === "navigateForward"/,
+  );
+});
+
 test("Basics exposes editable, conflict-safe, resettable shortcut mappings", () => {
   assert.match(sharedTypesSource, /keybindings\?: KeybindingOverrides/);
   assert.match(settingsSource, /<KeyboardShortcutsSection/);

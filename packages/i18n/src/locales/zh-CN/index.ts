@@ -513,6 +513,8 @@ export const zhCN = {
     riskMedium: "中风险",
     riskLow: "低风险",
     risk: { high: "高风险", medium: "中风险", low: "低风险" },
+    workspace: "工作区：{{workspace}}",
+    temporarySession: "临时会话",
     countdown: "无响应将在 {{seconds}} 秒后自动拒绝",
   },
   panel: {

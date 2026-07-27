@@ -59,6 +59,7 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
 
 const MODIFIER_ORDER = ["Mod", "Ctrl", "Alt", "Shift"] as const;
 const MODIFIERS = new Set<string>(MODIFIER_ORDER);
+const MODIFIER_KEY_VALUES = new Set(["Alt", "AltGraph", "Control", "Meta", "Shift"]);
 const NAMED_KEYS = new Set([
   "Enter",
   "Space",
@@ -145,12 +146,11 @@ export function keybindingMatchesEvent(
 ): boolean {
   const normalized = normalizeKeybinding(binding);
   const eventBinding = keybindingFromEvent(event, platform);
+  if (!normalized || !eventBinding) return false;
   if (normalized === eventBinding) return true;
   // The physical Equal key produces either "=" or "+" depending on Shift.
   // Preserve the conventional zoom-in behavior for an unshifted Equal binding.
-  return Boolean(
-    normalized && shiftedEqualVariant(normalized) === eventBinding,
-  );
+  return shiftedEqualVariant(normalized) === eventBinding;
 }
 
 export function keybindingsConflict(left: string, right: string): boolean {
@@ -245,6 +245,12 @@ function shiftedEqualVariant(binding: string): string | null {
 
 function keyFromEvent(event: KeyboardEventLike): string | null {
   const code = event.code ?? "";
+  if (
+    MODIFIER_KEY_VALUES.has(event.key) ||
+    /^(?:Alt|Control|Meta|Shift)(?:Left|Right)$/.test(code)
+  ) {
+    return null;
+  }
   if (/^Key[A-Z]$/.test(code)) return code.slice(3);
   if (/^Digit[0-9]$/.test(code)) return code.slice(5);
   if (/^F(?:[1-9]|1[0-2])$/.test(code)) return code;

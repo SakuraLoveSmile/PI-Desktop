@@ -515,6 +515,8 @@ export const en = {
     riskMedium: "Medium risk",
     riskLow: "Low risk",
     risk: { high: "High risk", medium: "Medium risk", low: "Low risk" },
+    workspace: "Workspace: {{workspace}}",
+    temporarySession: "Temporary session",
     countdown: "Auto-denies in {{seconds}}s if no response",
   },
   panel: {

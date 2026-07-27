@@ -14,11 +14,11 @@ import type {
   ProviderPublic,
   SessionSummary,
   ThinkingLevel,
-  ToolPermissionRequest,
   UiMessage,
 } from "@pi-desktop/shared";
 import { PROTOCOL_VERSION } from "@pi-desktop/shared";
 import { api } from "../lib/api";
+import { createNavigationIntentController } from "../lib/navigation-intent";
 import { rememberProject, setProjectPinned } from "../lib/recent-projects";
 import { normalizeProjectPath, sessionMatchesProject } from "../lib/sidebar-session-groups";
 import {
@@ -51,6 +51,11 @@ import {
   toolWorkPanelTab,
   type WorkPanelTab,
 } from "../lib/work-panel-tabs";
+import {
+  clearPendingPermission,
+  setPendingPermission,
+  type PendingPermission,
+} from "../lib/pending-permissions";
 
 export type { WorkPanelTab } from "../lib/work-panel-tabs";
 
@@ -90,6 +95,21 @@ export const WORK_PANEL_DEFAULT_WIDTH = 420;
 // Windows keeps the native bounds stable because a frameless BrowserWindow
 // visibly repaints between the renderer layout and asynchronous bounds update.
 let panelWindowGrowth: number | null = null;
+const navigationIntents = createNavigationIntentController();
+let sessionSelectionQueue: Promise<void> = Promise.resolve();
+
+type NavigationOptions = {
+  /** Reuse an owning navigation's generation across nested async operations. */
+  navigationIntent?: number;
+};
+
+function beginNavigationIntent() {
+  return navigationIntents.begin();
+}
+
+function navigationIntentIsCurrent(intent: number) {
+  return navigationIntents.isCurrent(intent);
+}
 
 function canResizeWindowForPanel() {
   return window.piDesktop?.platform !== "win32";
@@ -239,7 +259,7 @@ export type AppState = {
   workspace?: ProjectWorkspace | null;
   onboarding?: OnboardingState;
   plugins: PluginSummary[];
-  permission?: ToolPermissionRequest | null;
+  pendingPermissions: Record<string, PendingPermission>;
   toasts: ToastItem[];
   notifications: AppNotification[];
   unreadNotificationCount: number;
@@ -255,7 +275,10 @@ export type AppState = {
   errorRetriable?: boolean | null;
   bootstrap: () => Promise<void>;
   refreshSessions: () => Promise<void>;
-  selectSession: (id: string, opts?: { record?: boolean }) => Promise<void>;
+  selectSession: (
+    id: string,
+    opts?: { record?: boolean } & NavigationOptions,
+  ) => Promise<void>;
   newSession: (options?: { projectPath?: string | null }) => Promise<void>;
   forkSession: (id: string) => Promise<void>;
   forkAssistantMessage: (messageId: string) => Promise<void>;
@@ -276,11 +299,14 @@ export type AppState = {
   deleteMessage: (messageId: string) => Promise<void>;
   abort: () => Promise<void>;
   openProject: () => Promise<void>;
-  activateProject: (path: string) => Promise<ProjectWorkspace | null>;
+  activateProject: (
+    path: string,
+    opts?: NavigationOptions,
+  ) => Promise<ProjectWorkspace | null>;
   openProjectPath: (path: string) => Promise<ProjectWorkspace | null>;
   switchProjectPath: (path: string) => Promise<ProjectWorkspace | null>;
   closeProjectPath: (path: string) => Promise<void>;
-  clearProject: () => Promise<void>;
+  clearProject: (opts?: NavigationOptions) => Promise<void>;
   toggleSessionPinned: (id: string) => void;
   toggleSessionArchived: (id: string) => void;
   archiveSession: (id: string) => void;
@@ -324,6 +350,8 @@ export type AppState = {
   canNavBack: () => boolean;
   canNavForward: () => boolean;
   resolvePermission: (
+    sessionId: string,
+    requestId: string,
     decision: "allow-once" | "allow-session" | "deny",
   ) => Promise<void>;
   showToast: (message: string, options?: ToastOptions) => void;
@@ -459,7 +487,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   providers: [],
   providerModels: {},
   plugins: [],
-  permission: null,
+  pendingPermissions: {},
   page: "chat",
   settingsTab: "general",
   settingsAnchor: null,
@@ -591,56 +619,70 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   selectSession: async (id, opts) => {
-    const detail = await api.getSession(id);
-    if (id !== get().activeSessionId) get().resetWorkPanelContext();
-    const sessionProjectPath = detail.session?.projectPath;
-    // Selecting a conversation also selects its project tab. This is what
-    // makes several open projects behave like independent sidebar scopes.
-    if (sessionProjectPath) {
-      if (
-        !sessionMatchesProject(
-          { projectPath: get().activeProjectPath },
-          sessionProjectPath,
-        )
-      ) {
-        const workspace = await get().activateProject(sessionProjectPath);
-        if (!workspace) throw new Error("Unable to activate project workspace");
+    const intent = opts?.navigationIntent ?? beginNavigationIntent();
+    const selectLatest = async () => {
+      if (!navigationIntentIsCurrent(intent)) return;
+      const detail = await api.getSession(id);
+      if (!navigationIntentIsCurrent(intent)) return;
+      const sessionProjectPath = detail.session?.projectPath;
+      // Serialize project activation with transcript selection. A slower,
+      // superseded request must never commit after the latest user choice.
+      if (sessionProjectPath) {
+        if (
+          !sessionMatchesProject(
+            { projectPath: get().activeProjectPath },
+            sessionProjectPath,
+          )
+        ) {
+          const workspace = await get().activateProject(sessionProjectPath, {
+            navigationIntent: intent,
+          });
+          if (!navigationIntentIsCurrent(intent)) return;
+          if (!workspace) throw new Error("Unable to activate project workspace");
+        }
+      } else if (get().workspace) {
+        await get().clearProject({ navigationIntent: intent });
+        if (!navigationIntentIsCurrent(intent)) return;
       }
-    } else if (get().workspace) {
-      // Temporary conversations have no workspace context.
-      await get().clearProject();
-    }
-    const record = opts?.record !== false;
-    if (!record) {
-      set((s) => ({
-        activeSessionId: id,
-        messages: detail.session?.messages ?? [],
-        page: "chat",
-        isRunning: s.runningSessions[id] ?? false,
-      }));
+      if (id !== get().activeSessionId) get().resetWorkPanelContext();
+      const record = opts?.record !== false;
+      if (!record) {
+        set((s) => ({
+          activeSessionId: id,
+          messages: detail.session?.messages ?? [],
+          page: "chat",
+          isRunning: s.runningSessions[id] ?? false,
+        }));
+        void get().acknowledgeSessionOutcome(id);
+        return;
+      }
+      const entry = { page: "chat" as const, sessionId: id };
+      set((s) => {
+        const stack = s.navStack.slice(0, s.navIndex + 1);
+        const last = stack[stack.length - 1];
+        const same = last?.page === "chat" && last?.sessionId === id;
+        const nextStack = same ? stack : [...stack, entry].slice(-50);
+        return {
+          activeSessionId: id,
+          messages: detail.session?.messages ?? [],
+          page: "chat" as const,
+          isRunning: s.runningSessions[id] ?? false,
+          navStack: nextStack,
+          navIndex: nextStack.length - 1,
+        };
+      });
       void get().acknowledgeSessionOutcome(id);
-      return;
-    }
-    const entry = { page: "chat" as const, sessionId: id };
-    set((s) => {
-      const stack = s.navStack.slice(0, s.navIndex + 1);
-      const last = stack[stack.length - 1];
-      const same = last?.page === "chat" && last?.sessionId === id;
-      const nextStack = same ? stack : [...stack, entry].slice(-50);
-      return {
-        activeSessionId: id,
-        messages: detail.session?.messages ?? [],
-        page: "chat" as const,
-        isRunning: s.runningSessions[id] ?? false,
-        navStack: nextStack,
-        navIndex: nextStack.length - 1,
-      };
-    });
-    // Opening a conversation is how its result gets seen; drop the badge.
-    void get().acknowledgeSessionOutcome(id);
+    };
+    const queued = sessionSelectionQueue.then(selectLatest, selectLatest);
+    sessionSelectionQueue = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    await queued;
   },
 
   newSession: async (options) => {
+    const intent = beginNavigationIntent();
     const requestedProjectPath =
       options && "projectPath" in options
         ? options.projectPath ?? null
@@ -652,7 +694,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         requestedProjectPath,
       )
     ) {
-      const workspace = await get().activateProject(requestedProjectPath);
+      const workspace = await get().activateProject(requestedProjectPath, {
+        navigationIntent: intent,
+      });
+      if (!navigationIntentIsCurrent(intent)) return;
       if (!workspace) throw new Error("Unable to activate project workspace");
     }
 
@@ -668,21 +713,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       let messages: UiMessage[];
       try {
         const detail = await api.getSession(session.id);
+        if (!navigationIntentIsCurrent(intent)) return;
         messages = detail.session?.messages ?? [];
       } catch {
+        if (!navigationIntentIsCurrent(intent)) return;
         // A stale summary must not prevent creating a replacement draft.
         continue;
       }
       if (messages.length === 0) {
         if (requestedProjectPath === null && get().workspace) {
-          await get().clearProject();
+          await get().clearProject({ navigationIntent: intent });
+          if (!navigationIntentIsCurrent(intent)) return;
         }
-        await get().selectSession(session.id);
+        await get().selectSession(session.id, { navigationIntent: intent });
         return;
       }
     }
     if (requestedProjectPath === null && get().workspace) {
-      await get().clearProject();
+      await get().clearProject({ navigationIntent: intent });
+      if (!navigationIntentIsCurrent(intent)) return;
     }
     const settings = get().settings;
     const defaultProvider = get().providers.find(
@@ -708,8 +757,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       thinkingLevel: defaultThinkingLevel,
       projectPath: requestedProjectPath ?? undefined,
     });
+    if (!navigationIntentIsCurrent(intent)) return;
     await get().refreshSessions();
+    if (!navigationIntentIsCurrent(intent)) return;
     const detail = await api.getSession(created.session.id);
+    if (!navigationIntentIsCurrent(intent)) return;
     get().resetWorkPanelContext();
     const entry = { page: "chat" as const, sessionId: created.session.id };
     set((s) => {
@@ -726,6 +778,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   forkSession: async (id) => {
+    const intent = beginNavigationIntent();
     const state = get();
     if (!id || state.runningSessions[id]) return;
     const source = state.sessions.find((session) => session.id === id);
@@ -738,11 +791,15 @@ export const useAppStore = create<AppState>((set, get) => ({
           source.projectPath,
         )
       ) {
-        const workspace = await get().activateProject(source.projectPath);
+        const workspace = await get().activateProject(source.projectPath, {
+          navigationIntent: intent,
+        });
+        if (!navigationIntentIsCurrent(intent)) return;
         if (!workspace) throw new Error("Unable to activate project workspace");
       }
     } else if (state.workspace) {
-      await get().clearProject();
+      await get().clearProject({ navigationIntent: intent });
+      if (!navigationIntentIsCurrent(intent)) return;
     }
 
     const sourceTitle = source.title.trim() || i18n.t("chat.untitledTask");
@@ -750,6 +807,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       id,
       i18n.t("nav.branchTitle", { title: sourceTitle }),
     );
+    if (!navigationIntentIsCurrent(intent)) return;
     const { messages, ...summary } = result.session;
     get().resetWorkPanelContext();
     set((current) => {
@@ -776,6 +834,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   forkAssistantMessage: async (messageId) => {
+    const intent = beginNavigationIntent();
     const state = get();
     const sessionId = state.activeSessionId;
     if (!sessionId || state.runningSessions[sessionId]) return;
@@ -790,6 +849,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         i18n.t("nav.branchTitle", { title: sourceTitle }),
         messageId,
       );
+      if (!navigationIntentIsCurrent(intent)) return;
       const { messages, ...summary } = result.session;
       get().resetWorkPanelContext();
       set((current) => {
@@ -1081,13 +1141,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   abort: async () => {
-    const sessionId = get().activeSessionId;
+    const stateBeforeAbort = get();
+    const sessionId = stateBeforeAbort.activeSessionId;
     if (!sessionId) return;
-    try {
-      await api.abort(sessionId);
-    } catch {
-      // The run may have already ended host-side; still settle the UI below.
-    }
+    const pendingPermission = stateBeforeAbort.pendingPermissions[sessionId];
+    await Promise.allSettled([
+      api.abort(sessionId),
+      ...(pendingPermission
+        ? [
+            api.resolvePermission({
+              requestId: pendingPermission.requestId,
+              decision: "deny",
+            }),
+          ]
+        : []),
+    ]);
+    set((state) => ({
+      pendingPermissions: clearPendingPermission(
+        state.pendingPermissions,
+        sessionId,
+        pendingPermission?.requestId,
+      ),
+    }));
     const state = get();
     if (state.activeSessionId !== sessionId) {
       set((s) => ({
@@ -1159,10 +1234,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  activateProject: async (path) => {
+  activateProject: async (path, opts) => {
+    const intent = opts?.navigationIntent ?? beginNavigationIntent();
     const requestedPath = path.trim();
     if (!requestedPath) return null;
     const result = await api.setProject(requestedPath);
+    if (!navigationIntentIsCurrent(intent)) return null;
     const workspace = result.workspace;
     if (!workspace?.path) return null;
     if (
@@ -1209,6 +1286,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   switchProjectPath: async (path) => get().activateProject(path),
 
   closeProjectPath: async (path) => {
+    const intent = beginNavigationIntent();
     const key = normalizeProjectPath(path);
     if (!key) return;
     const state = get();
@@ -1217,8 +1295,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (isActive) {
       const fallbackPath = nextPaths[nextPaths.length - 1];
       try {
-        if (fallbackPath) await get().activateProject(fallbackPath);
-        else await get().clearProject();
+        if (fallbackPath) {
+          await get().activateProject(fallbackPath, { navigationIntent: intent });
+        } else {
+          await get().clearProject({ navigationIntent: intent });
+        }
+        if (!navigationIntentIsCurrent(intent)) return;
       } catch (error) {
         // Keep the current workspace/tab intact when the fallback fails.
         throw error;
@@ -1235,7 +1317,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeProject: async (path) => get().closeProjectPath(path),
 
   openProject: async () => {
+    const intent = beginNavigationIntent();
     const result = await api.openProject();
+    if (!navigationIntentIsCurrent(intent)) return;
     if (!result.canceled && result.workspace) {
       const workspace = result.workspace;
       if (
@@ -1276,12 +1360,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       persistCurrentSidebar(get);
       const onboarding = await api.getOnboarding();
+      if (!navigationIntentIsCurrent(intent)) return;
       set({ onboarding, page: "chat" });
     }
   },
 
-  clearProject: async () => {
+  clearProject: async (opts) => {
+    const intent = opts?.navigationIntent ?? beginNavigationIntent();
     await api.clearProject();
+    if (!navigationIntentIsCurrent(intent)) return;
     get().resetWorkPanelContext();
     set({
       workspace: null,
@@ -1292,6 +1379,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
     persistCurrentSidebar(get);
     const onboarding = await api.getOnboarding();
+    if (!navigationIntentIsCurrent(intent)) return;
     set({ onboarding });
   },
 
@@ -1367,6 +1455,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       delete runningSessions[id];
       const sessionOutcomes = { ...state.sessionOutcomes };
       delete sessionOutcomes[id];
+      const pendingPermissions = clearPendingPermission(
+        state.pendingPermissions,
+        id,
+      );
       const retainedNav = state.navStack.filter(
         (entry) => entry.sessionId !== id,
       );
@@ -1381,8 +1473,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           state.activeSessionId === id ? undefined : state.activeSessionId,
         messages: state.activeSessionId === id ? [] : state.messages,
         isRunning: state.activeSessionId === id ? false : state.isRunning,
-        permission:
-          state.permission?.sessionId === id ? null : state.permission,
+        pendingPermissions,
         navStack,
         navIndex: Math.min(state.navIndex, navStack.length - 1),
       };
@@ -1685,10 +1776,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openNotification: async (id) => {
+    const intent = beginNavigationIntent();
     const notification = get().notifications.find((item) => item.id === id);
     if (!notification) return;
     await get().markNotificationRead(id);
-    await get().selectSession(notification.sessionId);
+    if (!navigationIntentIsCurrent(intent)) return;
+    await get().selectSession(notification.sessionId, {
+      navigationIntent: intent,
+    });
   },
 
   acknowledgeSessionOutcome: async (sessionId) => {
@@ -1724,6 +1819,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     ) {
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: false },
+        pendingPermissions: clearPendingPermission(
+          s.pendingPermissions,
+          envelope.sessionId,
+        ),
         sessionOutcomes:
           event.type === "error" && event.error.code === "TURN_ABORTED"
             ? withoutRecordKey(s.sessionOutcomes, envelope.sessionId)
@@ -1748,6 +1847,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     } else if (event.type === "tool_end") {
       const toolName = toolNamesByCallId.get(event.toolCallId);
       toolNamesByCallId.delete(event.toolCallId);
+      set((state) => {
+        const pending = state.pendingPermissions[envelope.sessionId];
+        return pending?.toolCallId === event.toolCallId
+          ? {
+              pendingPermissions: clearPendingPermission(
+                state.pendingPermissions,
+                envelope.sessionId,
+                pending.requestId,
+              ),
+            }
+          : {};
+      });
       if (toolName && WORKSPACE_MUTATING_TOOLS.has(toolName) && !event.isError) {
         set((s) => ({ reviewRev: s.reviewRev + 1 }));
       }
@@ -1764,11 +1875,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
     if (envelope.sessionId !== get().activeSessionId) {
-      // Cross-session events must not bleed into the visible transcript.
-      // Only global concerns pass: permission prompts (dialog is global)
-      // and finished turns refreshing the scoped sidebar session groups.
+      // Cross-session events update only their scoped state. They never
+      // replace the visible transcript, page, project, or focus.
       if (event.type === "tool_permission_request") {
-        set({ permission: event.request });
+        set((state) => ({
+          pendingPermissions: setPendingPermission(state.pendingPermissions, {
+            ...event.request,
+            receivedAt: envelope.ts,
+          }),
+        }));
       } else if (event.type === "agent_end" || event.type === "turn_end") {
         void get().refreshSessions();
       }
@@ -1895,7 +2010,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         }));
         break;
       case "tool_permission_request":
-        set({ permission: event.request });
+        set((state) => ({
+          pendingPermissions: setPendingPermission(state.pendingPermissions, {
+            ...event.request,
+            receivedAt: envelope.ts,
+          }),
+        }));
         break;
       case "error": {
         // A user-initiated stop is not an error; just settle the run state.
@@ -1952,6 +2072,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setPage: (page, opts) => {
+    beginNavigationIntent();
     const record = opts?.record !== false;
     set((s) => {
       if (!record) return { page };
@@ -1979,39 +2100,52 @@ export const useAppStore = create<AppState>((set, get) => ({
   canNavBack: () => get().navIndex > 0,
   canNavForward: () => get().navIndex < get().navStack.length - 1,
   navBack: () => {
+    const intent = beginNavigationIntent();
     const s = get();
     if (s.navIndex <= 0) return;
     const idx = s.navIndex - 1;
     const entry = s.navStack[idx];
     set({ navIndex: idx, page: entry.page });
     if (entry.page === "chat" && entry.sessionId) {
-      void get().selectSession(entry.sessionId, { record: false });
+      void get().selectSession(entry.sessionId, {
+        record: false,
+        navigationIntent: intent,
+      });
       set({ navIndex: idx });
     }
   },
   navForward: () => {
+    const intent = beginNavigationIntent();
     const s = get();
     if (s.navIndex >= s.navStack.length - 1) return;
     const idx = s.navIndex + 1;
     const entry = s.navStack[idx];
     set({ navIndex: idx, page: entry.page });
     if (entry.page === "chat" && entry.sessionId) {
-      void get().selectSession(entry.sessionId, { record: false });
+      void get().selectSession(entry.sessionId, {
+        record: false,
+        navigationIntent: intent,
+      });
       set({ navIndex: idx });
     }
   },
-  resolvePermission: async (decision) => {
-    const permission = get().permission;
-    if (!permission) return;
+  resolvePermission: async (sessionId, requestId, decision) => {
+    const permission = get().pendingPermissions[sessionId];
+    if (!permission || permission.requestId !== requestId) return;
     try {
       await api.resolvePermission({
-        requestId: permission.requestId,
+        requestId,
         decision,
       });
     } finally {
-      // Even if the host already auto-denied (timeout → NOT_FOUND), the
-      // dialog must close.
-      set({ permission: null });
+      // A late response for an expired request must not clear its replacement.
+      set((state) => ({
+        pendingPermissions: clearPendingPermission(
+          state.pendingPermissions,
+          sessionId,
+          requestId,
+        ),
+      }));
     }
   },
   showToast: (message, options) => {
