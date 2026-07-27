@@ -62,7 +62,7 @@ Codex as a visual reference. The identity contract is deliberately small:
   name, version, and canonical icon; no stock Electron name or icon is visible.
   Development launches use a generated branded host bundle because AppKit
   reads this identity from the host bundle rather than Electron runtime APIs.
-- The home hero logo is 56px. Expanded/collapsed sidebar logos are 15px/18px,
+- The home hero logo is 56px. Expanded/collapsed sidebar logos are 20px/18px,
   and the docked composer logo is 15px. The image keeps its native colors in
   both themes and is not replaced by a theme-tinted vector approximation.
 - New-session controls use the dedicated message-plus icon at 15–16px. The

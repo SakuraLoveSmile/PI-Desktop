@@ -751,10 +751,18 @@ textarea:disabled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  height: 32px;
+  min-width: 0;
+  padding: 0 6px 0 4px;
+  border-radius: var(--radius-token-row);
   font-size: var(--text-base-plus);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-tight);
   color: var(--ds-text-primary);
+}
+
+.brand:hover {
+  background: var(--ds-bg-hover);
 }
 
 .brand-logo {

@@ -203,6 +203,8 @@ Collapsed (48px):
 - Click session: activate its bound project when necessary, switch the active
   session, and scroll to the last message
 - Click the message-plus New Chat control: create/reuse a draft in the current workspace scope
+- Click the PI-Desktop brand: return the main pane to the chat home while
+  preserving the active conversation and workspace
 - Click the `Projects` heading folder-plus action: open the project picker and
   retain the selected project
 - Click project `+`: activate that project and create/reuse a session bound to
@@ -249,12 +251,14 @@ Collapsed (48px):
   identity.
 - `BrandLogo` imports canonical `build/icon_1024.png` through Vite. The
   empty-home hero renders it at 56px, the expanded/collapsed sidebar at
-  15px/18px, and the docked composer at 15px.
+  20px/18px, and the docked composer at 15px.
 - The expanded/collapsed New task control and project/Temporary session
   creation controls render the dedicated message-plus session icon. Generic
   `IconPlus` remains reserved for adding non-session entities.
 - Icons are decorative when a localized text label or accessible name is
   present; click, keyboard, and focus behavior remain unchanged.
+- The expanded sidebar brand is a localized button with a 20px logo and the
+  shell name; pointer or keyboard activation navigates to the chat home.
 
 ### 3.7 MVP constraints
 

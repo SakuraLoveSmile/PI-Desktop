@@ -44,8 +44,10 @@ destination, chat as the home surface, tools and permissions inline.
   Collapsible to an icon rail (Cmd/Ctrl+B).
 - **Product identity**: runtime shell copy uses `PI-Desktop`; the home hero,
   sidebar, and docked composer reuse the canonical `build/icon_1024.png` logo,
-  while New task/session controls use a dedicated message-plus icon. `Codex`
-  remains only an external import source or a design-reference term.
+  while New task/session controls use a dedicated message-plus icon. The
+  expanded sidebar brand is a keyboard-accessible Home control that returns
+  the main pane to the chat destination. `Codex` remains only an external
+  import source or a design-reference term.
 - **Main pane**: exactly one destination at a time; destinations replace the
   pane (they are pages, not modals).
 - **Titlebar**: platform-native desktop chrome (D118). macOS uses

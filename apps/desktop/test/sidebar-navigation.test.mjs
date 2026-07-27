@@ -8,11 +8,24 @@ const sidebarSource = await readFile(
 );
 
 test("home sidebar exposes only the supported destination entries", () => {
+  assert.match(sidebarSource, /data-nav="home"/);
   assert.match(sidebarSource, /data-nav="projects"/);
   assert.match(sidebarSource, /data-nav="plugins"/);
   assert.doesNotMatch(sidebarSource, /data-nav="pulls"/);
   assert.doesNotMatch(sidebarSource, /data-nav="scheduled"/);
   assert.doesNotMatch(sidebarSource, /t\("nav\.(?:pullRequests|scheduled)"\)/);
+});
+
+test("sidebar brand returns to the chat home", () => {
+  const brandButton = sidebarSource.match(
+    /<button\s+type="button"\s+className="brand"[\s\S]*?<\/button>/,
+  )?.[0] ?? "";
+
+  assert.match(brandButton, /data-nav="home"/);
+  assert.match(brandButton, /aria-label=\{t\("nav\.home"\)\}/);
+  assert.match(brandButton, /onClick=\{\(\) => setPage\("chat"\)\}/);
+  assert.match(brandButton, /<BrandLogo size=\{20\}/);
+  assert.match(brandButton, /t\("app\.shellName"\)/);
 });
 
 test("sidebar separates retained projects from standalone sessions", () => {

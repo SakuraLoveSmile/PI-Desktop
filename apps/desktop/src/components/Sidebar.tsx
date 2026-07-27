@@ -1020,10 +1020,17 @@ export function Sidebar({
       <div className="sidebar-drag">{titlebarNav}</div>
       <div className="no-drag flex min-h-0 flex-1 flex-col px-2 pb-1.5">
         <div className="sidebar-header">
-          <div className="brand">
-            <BrandLogo size={15} />
+          <button
+            type="button"
+            className="brand"
+            data-nav="home"
+            title={t("nav.home")}
+            aria-label={t("nav.home")}
+            onClick={() => setPage("chat")}
+          >
+            <BrandLogo size={20} />
             <span>{t("app.shellName")}</span>
-          </div>
+          </button>
           <button
             className="icon-btn"
             title={t("nav.search")}
