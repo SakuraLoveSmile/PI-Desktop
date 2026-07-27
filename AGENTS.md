@@ -7,7 +7,7 @@ Concise, mandatory rules for any AI agent working in this repository.
 - **English only** for commits, specs, code identifiers, and comments.
 - Match the repo's existing English-first policy ([baseline](docs/spec/00-baseline.md)).
 
-## Three Immutable Rules
+## Four Immutable Rules
 
 ### 1. Spec-sync
 
@@ -27,16 +27,28 @@ Every user-visible or protocol-visible behavior change must add or update a scen
 
 → [04-e2e-test-plan.md](docs/spec/06-delivery/04-e2e-test-plan.md)
 
+### 4. Request branch + merge request
+
+Every new request must start on a dedicated branch created from an up-to-date
+`main`. After development, push the branch, open a PR/MR targeting `main`, pass
+the required checks, and merge it. Direct development or pushes on `main` are
+not allowed.
+
+→ [03-ai-development-workflow.md §R4](docs/spec/06-delivery/03-ai-development-workflow.md#r4--request-branch--merge-gate)
+
 ## Development Loop
 
-1. Read baseline + relevant specs
-2. Plan change + list impacted specs/tests
-3. Implement
-4. Update specs / ADR / decisions-log
-5. Update or add e2e scenarios
-6. Run checks (lint, typecheck, tests)
-7. Commit with conventional message
-8. Update BOARD if milestone-related
+1. Sync `main` and create a request branch
+2. Read baseline + relevant specs
+3. Plan change + list impacted specs/tests
+4. Implement
+5. Update specs / ADR / decisions-log
+6. Update or add e2e scenarios
+7. Run checks (lint, typecheck, tests)
+8. Commit with conventional message
+9. Update BOARD if milestone-related
+10. Push the branch and open a PR/MR to `main`
+11. Pass required checks, merge, and delete the request branch
 
 → [03-ai-development-workflow.md §2](docs/spec/06-delivery/03-ai-development-workflow.md#2-development-loop)
 
@@ -57,11 +69,13 @@ English messages only. One logical change per commit.
 Run the [change checklist](docs/spec/06-delivery/05-change-checklist.md):
 
 - [ ] Impact analysis done
+- [ ] Request branch was created from an up-to-date `main`
 - [ ] Specs updated per matrix
 - [ ] E2E doc updated if behavior changed
 - [ ] No secrets / local data in diff
 - [ ] Conventional commit message
 - [ ] All Definition-of-Done gates pass
+- [ ] PR/MR passed required checks and was merged into `main`
 
 ## Key References
 
@@ -83,3 +97,5 @@ Run the [change checklist](docs/spec/06-delivery/05-change-checklist.md):
 - Change behavior without updating specs
 - Skip e2e doc for user-visible changes
 - Modify frozen baseline decisions without ADR + version bump
+- Develop or push directly on `main`
+- Mark work complete before its PR/MR is merged into `main`

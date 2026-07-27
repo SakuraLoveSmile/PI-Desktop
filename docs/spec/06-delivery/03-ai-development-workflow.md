@@ -8,7 +8,7 @@
 
 ## 1. Core Immutable Rules
 
-These three rules govern every change to the PI-Desktop codebase and documentation. They cannot be relaxed by an agent without explicit human override.
+These four rules govern every change to the PI-Desktop codebase and documentation. They cannot be relaxed by an agent without explicit human override.
 
 ### R1 — Spec-first / Spec-sync
 
@@ -35,6 +35,25 @@ These three rules govern every change to the PI-Desktop codebase and documentati
 - Document the scenario in `06-delivery/04-e2e-test-plan.md` — even before the automated test exists.
 - Internal-only changes (logging format, internal variable rename) do not require e2e doc updates.
 
+### R4 — Request branch + merge gate
+
+> **Every new request starts from `main` on a dedicated branch and finishes only after its PR/MR is merged into `main`.**
+
+- Before editing, preserve any existing uncommitted work, update local `main`
+  from `origin/main` with a fast-forward-only pull, and create a new request
+  branch from that commit.
+- Use one short-lived branch per request. Name it
+  `<type>/<short-description>`, where `type` matches the conventional change
+  type when practical, for example `feat/provider-import` or
+  `docs/request-branch-workflow`.
+- Development commits and direct pushes on `main` are forbidden.
+- After development and local validation, push the request branch, open a
+  pull/merge request targeting `main`, and complete all required remote checks
+  and reviews.
+- Merge the approved PR/MR into `main` and delete the request branch. If
+  authentication, permissions, required checks, or required reviews prevent
+  the merge, report the blocker; the request is not Done.
+
 ---
 
 ## 2. Development Loop
@@ -42,28 +61,34 @@ These three rules govern every change to the PI-Desktop codebase and documentati
 Every change follows this sequence. Steps may be iterated if the implementation reveals new requirements.
 
 ```
-1. Read baseline + relevant specs
-2. Plan change + list impacted specs/tests
-3. Implement
-4. Update specs / ADR / decisions-log if needed
-5. Update or add e2e scenarios
-6. Run checks (lint, typecheck, tests — when code exists)
-7. Commit with conventional message
-8. Update BOARD if milestone-related
+1. Sync main + create a request branch
+2. Read baseline + relevant specs
+3. Plan change + list impacted specs/tests
+4. Implement
+5. Update specs / ADR / decisions-log if needed
+6. Update or add e2e scenarios
+7. Run checks (lint, typecheck, tests — when code exists)
+8. Commit with conventional message
+9. Update BOARD if milestone-related
+10. Push branch + open PR/MR to main
+11. Pass remote gates + merge + delete branch
 ```
 
 ### Step-by-step
 
 | Step | Action | Output |
 |---|---|---|
-| **1. Read** | Read `00-baseline.md` and any specs relevant to the change area. | Mental model of constraints. |
-| **2. Plan** | Describe the intended change. List every spec, ADR, and e2e scenario that will need updates. | Change plan + impact list. |
-| **3. Implement** | Write code, config, or assets. | Changed files. |
-| **4. Spec-sync** | Update specs per the impact list. Add ADR if architectural. Update `decisions-log.md` if an implementation default changes. | Updated docs/spec/\* and/or docs/adr/\*. |
-| **5. E2E doc** | Add or update scenario entries in `04-e2e-test-plan.md`. Link to acceptance criteria IDs (A–H). | Updated e2e test plan. |
-| **6. Run checks** | Lint, typecheck, unit tests, build. Skip if only docs changed. | Passing CI (or known skip reason). |
-| **7. Commit** | Git commit with conventional message (see §4). | One or more commits. |
-| **8. BOARD** | If the change completes a milestone deliverable, update `docs/project/BOARD.md`. | Updated board. |
+| **1. Branch** | Preserve existing work, switch to `main`, fast-forward from `origin/main`, and create a dedicated request branch. | Cleanly isolated branch based on current `main`. |
+| **2. Read** | Read `00-baseline.md` and any specs relevant to the change area. | Mental model of constraints. |
+| **3. Plan** | Describe the intended change. List every spec, ADR, and e2e scenario that will need updates. | Change plan + impact list. |
+| **4. Implement** | Write code, config, or assets. | Changed files. |
+| **5. Spec-sync** | Update specs per the impact list. Add ADR if architectural. Update `decisions-log.md` if an implementation default changes. | Updated docs/spec/\* and/or docs/adr/\*. |
+| **6. E2E doc** | Add or update scenario entries in `04-e2e-test-plan.md`. Link to acceptance criteria IDs (A–H). | Updated e2e test plan. |
+| **7. Run checks** | Lint, typecheck, unit tests, build. Skip if only docs changed. | Passing CI (or known skip reason). |
+| **8. Commit** | Git commit with conventional message (see §4). | One or more commits. |
+| **9. BOARD** | If the change completes a milestone deliverable, update `docs/project/BOARD.md`. | Updated board. |
+| **10. Open PR/MR** | Push the request branch and open a pull/merge request targeting `main`. | Reviewable remote change with impacted specs and tests listed. |
+| **11. Merge** | Pass required checks and reviews, merge into `main`, and delete the request branch. | Change integrated into `main`; request branch removed. |
 
 ---
 
@@ -140,14 +165,41 @@ Before committing, verify:
 
 ## 5. Branching Model
 
-Lightweight, appropriate for solo / small-team MVP phase.
+The repository uses a mandatory request-branch workflow:
 
-- **`main`** — always deployable; all completed work merges here.
-- **Topic branches** — optional short-lived branches for larger features. Name: `topic/<scope>-<short-description>`. Delete after merge.
-- **No long-lived dev branch** — main is the integration target.
-- **Rebase or merge** — either is acceptable; prefer merge for traceability.
+- **`main`** is always deployable and is the protected integration target. Do
+  not develop, commit, or push directly on it.
+- **Request branches** are mandatory for every new request, including docs,
+  chores, and small fixes. Create each branch from an up-to-date `main` and
+  delete it after merge.
+- **Branch names** use `<type>/<short-description>` with a lowercase,
+  kebab-case description. Allowed type prefixes mirror §4.1.
+- **No long-lived development branch** exists. Each request gets a new branch;
+  an old request branch must not be reused for unrelated work.
+- **PR/MR delivery** is mandatory. Push the branch, open a PR/MR targeting
+  `main`, pass required checks and reviews, then merge using a repository-
+  permitted merge strategy.
 
-When the team grows, adopt a more structured model (trunk-based development with PR reviews).
+Typical request start:
+
+```bash
+git status --short
+git switch main
+git pull --ff-only origin main
+git switch -c <type>/<short-description>
+```
+
+If the worktree is not clean, preserve and resolve the existing work before
+switching branches; never discard or overwrite it to satisfy this sequence.
+
+Typical GitHub delivery (use the hosting platform's equivalent when needed):
+
+```bash
+git push -u origin <type>/<short-description>
+gh pr create --base main --head <type>/<short-description>
+gh pr checks --watch
+gh pr merge --delete-branch
+```
 
 ---
 
@@ -155,13 +207,16 @@ When the team grows, adopt a more structured model (trunk-based development with
 
 A change is **Done** when all of the following are true:
 
-1. Code (or doc) implements the planned change.
-2. All impacted specs are updated.
-3. E2E scenarios are documented (or confirmed not needed per §3).
-4. Checks pass (lint, typecheck, tests) — or skip is justified.
-5. Change is committed with a conventional message.
-6. BOARD updated if milestone deliverable completed.
-7. No secrets or local data in the commit.
+1. A dedicated request branch was created from an up-to-date `main`.
+2. Code (or doc) implements the planned change.
+3. All impacted specs are updated.
+4. E2E scenarios are documented (or confirmed not needed per §3).
+5. Local and required remote checks pass, or an allowed skip is documented.
+6. Change is committed with a conventional message.
+7. BOARD is updated if a milestone deliverable completed.
+8. No secrets or local data are present in the commit.
+9. The branch was pushed and its PR/MR was reviewed and merged into `main`.
+10. The merged request branch was deleted.
 
 ---
 
@@ -173,6 +228,9 @@ A change is **Done** when all of the following are true:
 | Large uncommitted diffs | Violates R2; loss of granularity |
 | Changing behavior without spec update | Violates R1; specs become unreliable |
 | Skipping e2e doc for user-visible changes | Violates R3; traceability gap |
+| Developing, committing, or pushing directly on `main` | Violates R4; bypasses isolation and review gates |
+| Reusing a request branch for unrelated work | Mixes request scope and weakens traceability |
+| Marking work Done before its PR/MR is merged | Violates R4; change is not integrated into `main` |
 | Modifying baseline frozen decisions without ADR + version bump | Baseline is frozen; changes need formal process |
 | Committing generated artifacts that CI should rebuild | Repo bloat, merge conflicts |
 | Mixing multiple logical changes in one commit without clear message | Loss of history granularity |
@@ -183,11 +241,12 @@ A change is **Done** when all of the following are true:
 
 This workflow spec itself is accepted when:
 
-- [ ] R1/R2/R3 are stated clearly and cross-linked to relevant specs.
+- [ ] R1/R2/R3/R4 are stated clearly and cross-linked to relevant specs.
 - [ ] Development loop is documented and referenced by `AGENTS.md`.
 - [ ] Spec update matrix covers all change types in the baseline.
 - [ ] Git commit rules match existing repo commit style (`docs:`, `chore:`).
-- [ ] Branching model is lightweight and appropriate for solo MVP.
+- [ ] Every request is required to use a branch created from current `main`.
+- [ ] PR/MR creation, remote gates, merge, and branch cleanup are mandatory.
 - [ ] Definition of Done is complete and actionable.
 - [ ] Forbidden practices list covers known risk areas.
 - [ ] `AGENTS.md` points to this doc, `04-e2e-test-plan.md`, and `05-change-checklist.md`.

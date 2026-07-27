@@ -5,7 +5,19 @@
 
 ---
 
-## 1. Impact Analysis
+## 1. Request Start Checklist
+
+Before editing any file for a new request:
+
+- [ ] Existing uncommitted work is identified and preserved.
+- [ ] Local `main` is fast-forwarded from `origin/main`.
+- [ ] A dedicated `<type>/<short-description>` request branch is created from
+  that updated `main` commit.
+- [ ] The current branch is not `main` before implementation begins.
+
+---
+
+## 2. Impact Analysis
 
 Before starting implementation, answer these questions:
 
@@ -19,7 +31,7 @@ Reference the [spec update matrix](03-ai-development-workflow.md#3-spec-update-m
 
 ---
 
-## 2. Spec Sync Checklist
+## 3. Spec Sync Checklist
 
 After implementation (or alongside it):
 
@@ -31,7 +43,7 @@ After implementation (or alongside it):
 
 ---
 
-## 3. E2E / Test Doc Checklist
+## 4. E2E / Test Doc Checklist
 
 - [ ] If user-visible or protocol-visible behavior changed: new or updated scenario in [04-e2e-test-plan.md](04-e2e-test-plan.md).
 - [ ] Scenario follows template (ID, title, preconditions, steps, expected, specs, acceptance, milestone, status).
@@ -41,7 +53,7 @@ After implementation (or alongside it):
 
 ---
 
-## 4. Git Commit Checklist
+## 5. Git Commit Checklist
 
 - [ ] Change is one logical unit (or split into focused commits).
 - [ ] No secrets, tokens, or local data in the diff.
@@ -52,28 +64,36 @@ After implementation (or alongside it):
 
 ---
 
-## 5. PR / Issue Notes (Optional)
+## 6. Pull/Merge Request Checklist
 
-When working with GitHub Issues or PRs:
+Before marking the request complete:
 
-- [ ] Issue reference in commit body (e.g. `Refs #12` or `Closes #12`).
+- [ ] Request branch is pushed to the remote.
+- [ ] PR/MR targets `main` and contains only the request's logical changes.
 - [ ] PR description lists impacted specs and e2e scenarios.
 - [ ] PR self-review checklist completed.
+- [ ] Required remote checks and reviews pass.
+- [ ] PR/MR is merged into `main` using a permitted merge strategy.
+- [ ] Remote request branch is deleted after merge.
+- [ ] Issue reference is included when applicable (e.g. `Refs #12` or
+  `Closes #12`).
 
 ---
 
-## 6. Final Definition-of-Done Gate
+## 7. Final Definition-of-Done Gate
 
 Before marking work complete, verify **all** of the following:
 
 | # | Gate | Source |
 |---|---|---|
-| 1 | Code/doc implements the planned change | Step 3 of [development loop](03-ai-development-workflow.md#2-development-loop) |
-| 2 | All impacted specs updated | [R1 — Spec-sync](03-ai-development-workflow.md#r1--spec-first--spec-sync) |
-| 3 | E2E scenarios documented (or confirmed not needed) | [R3 — E2E coverage doc](03-ai-development-workflow.md#r3--e2e-coverage-doc) |
-| 4 | Checks pass (lint, typecheck, tests) or skip justified | Step 6 of development loop |
-| 5 | Change committed with conventional message | [R2 — Commit-per-change](03-ai-development-workflow.md#r2--commit-per-change) |
-| 6 | BOARD updated if milestone deliverable completed | Step 8 of development loop |
-| 7 | No secrets or local data in commit | [§4.4 Never commit](03-ai-development-workflow.md#44-never-commit) |
+| 1 | Request branch created from an up-to-date `main` | [R4 — Request branch + merge gate](03-ai-development-workflow.md#r4--request-branch--merge-gate) |
+| 2 | Code/doc implements the planned change | Step 4 of [development loop](03-ai-development-workflow.md#2-development-loop) |
+| 3 | All impacted specs updated | [R1 — Spec-sync](03-ai-development-workflow.md#r1--spec-first--spec-sync) |
+| 4 | E2E scenarios documented (or confirmed not needed) | [R3 — E2E coverage doc](03-ai-development-workflow.md#r3--e2e-coverage-doc) |
+| 5 | Local and required remote checks pass or skip is justified | Steps 7 and 11 of development loop |
+| 6 | Change committed with conventional message | [R2 — Commit-per-change](03-ai-development-workflow.md#r2--commit-per-change) |
+| 7 | BOARD updated if milestone deliverable completed | Step 9 of development loop |
+| 8 | No secrets or local data in commit | [§4.4 Never commit](03-ai-development-workflow.md#44-never-commit) |
+| 9 | PR/MR merged into `main` and request branch deleted | [R4 — Request branch + merge gate](03-ai-development-workflow.md#r4--request-branch--merge-gate) |
 
 If any gate fails, the change is **not Done**.
