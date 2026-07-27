@@ -137,6 +137,27 @@ describe("DesktopAgentRuntime thinking configuration", () => {
     await runtime.dispose();
   });
 
+  it("clamps off and omits the disabled dialect for adaptive models", async () => {
+    const adaptive: RuntimeProviderConfig = {
+      ...provider,
+      apiStyle: "anthropic_messages",
+      modelId: "claude-opus-4-6",
+      supportedThinkingLevels: ["minimal", "low", "medium", "high", "max"],
+      modelCompat: {
+        compat: { forceAdaptiveThinking: true },
+        thinkingLevelMap: { off: null, max: "max" },
+      },
+    };
+    const runtime = createRuntime({ provider: adaptive, thinkingLevel: "off" });
+    const agent = (runtime as any).agent;
+
+    expect(agent.state.thinkingLevel).toBe("minimal");
+    expect(agent.state.model.compat.forceAdaptiveThinking).toBe(true);
+    expect(agent.state.model.thinkingLevelMap.off).toBeNull();
+
+    await runtime.dispose();
+  });
+
   it("recreates the runtime when wire compat changes", async () => {
     const mimo: RuntimeProviderConfig = {
       ...provider,

@@ -272,7 +272,10 @@ When starting a turn with `(providerId, modelId)`:
    - otherwise accept raw modelId if provider allows free-form ids
 5. resolve reasoning capability from the explicit provider override or pi
    catalog for the exact model; clamp the session thinking level upward first,
-   then downward, or to `off` when unsupported
+   then downward, or to `off` when unsupported. Adaptive-only Anthropic models
+   exclude `off`; stale/default `off` values clamp upward and the runtime
+   preserves the catalog's adaptive-thinking flag plus a null `off` mapping so
+   compatible gateways never receive unsupported `thinking.type=disabled`
 6. build runtime provider adapter request for pi-ai (merge baseUrl/headers/auth)
 7. execute stream with abort handle and separate answer/thinking events
 8. translate vendor errors into shared `AppError` codes (§15)

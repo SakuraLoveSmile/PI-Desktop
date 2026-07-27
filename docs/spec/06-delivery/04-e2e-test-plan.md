@@ -787,7 +787,8 @@ Each scenario is documented in this format:
   persists `supportsReasoning` and selects the supported level nearest
   `medium`; explicit `false` removes stale reasoning tags and resets the
   effective level to `off`; known non-reasoning and legacy providers remain
-  unavailable without a crash.
+  unavailable without a crash. Catalogued adaptive-only Anthropic models omit
+  `off` and clamp a stale/default `off` selection upward to the nearest level.
 - **Specs linked**: `03-runtime/11-provider-model-system.md`,
   `03-runtime/12-provider-config-schema.md`,
   `03-runtime/13-model-catalog-and-selection.md`, ADR 0018
@@ -819,6 +820,9 @@ Each scenario is documented in this format:
 - **Expected**: Main resolves capability using the session's actual model id;
   Composer, main, sidecar, and pi use the same upward-first/downward-second
   clamp; pi receives the effective level; disabled reasoning receives `off`.
+  For an adaptive-only Anthropic model behind a compatible gateway, repeat with
+  a stored `off`: the request must use adaptive thinking at the clamped level
+  and must not contain `thinking.type=disabled`.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/13-model-catalog-and-selection.md`, ADR 0018
 - **Acceptance**: B (model config), C (chat and stream)

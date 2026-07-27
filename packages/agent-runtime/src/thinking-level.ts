@@ -20,6 +20,8 @@ export type ModelWireCompat = {
     thinkingFormat?: string;
     requiresReasoningContentOnAssistantMessages?: boolean;
     supportsReasoningEffort?: boolean;
+    /** Adaptive-only Anthropic models reject thinking.type = "disabled". */
+    forceAdaptiveThinking?: boolean;
     chatTemplateKwargs?: Record<string, unknown>;
   };
   /** Catalog level mapping, e.g. off -> "none" for gpt-5.1-style endpoints. */
@@ -59,4 +61,3 @@ export function clampThinkingLevel(
   }
   return "off";
 }
-
