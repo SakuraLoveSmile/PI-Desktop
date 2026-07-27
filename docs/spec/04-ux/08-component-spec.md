@@ -887,9 +887,9 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - For a reasoning-capable active model, a separate Thinking trigger appears
   immediately to the right of Chat / Agent and before the Agent permission
   control. It shows the current level and opens only the exact model's supported
-  levels in a compact grid and canonical order. Selecting a level persists the
-  complete session config and closes the menu. Non-reasoning models render no
-  Thinking trigger.
+  levels in a compact single-column list and canonical order; the selected row
+  carries a trailing check. Selecting a level persists the complete session
+  config and closes the menu. Non-reasoning models render no Thinking trigger.
 - Unknown Custom/OpenAI-compatible models can enable an explicit reasoning
   override from the model menu. The provider refreshes, the session selects the
   supported level nearest `medium`, and the toolbar trigger appears; known

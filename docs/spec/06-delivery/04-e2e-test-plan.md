@@ -776,9 +776,10 @@ Each scenario is documented in this format:
   supported levels. 4) Use Enable thinking from the model menu on the unknown
   custom provider. 5) Disable its override in Agent and refresh model data.
 - **Expected**: Reasoning models show the current Thinking level immediately to
-  the right of Chat / Agent, expose only their sparse supported levels in
-  canonical order, and close the menu after selection. Non-reasoning models
-  show no Thinking trigger. Custom providers may persist
+  the right of Chat / Agent, expose only their sparse supported levels as a
+  single-column list in canonical order, mark the selected row with a trailing
+  check, and close the menu after selection. Non-reasoning models show no
+  Thinking trigger. Custom providers may persist
   `supportedThinkingLevels` such as `["off","high"]` from Settings and the
   Composer must not invent graded options for those sets. The custom action
   persists `supportsReasoning` and selects the supported level nearest
