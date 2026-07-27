@@ -23,12 +23,12 @@ import {
 } from "../lib/settings-search";
 import {
   IconArchive,
+  IconBot,
   IconChevronLeft,
-  IconConfig,
+  IconDownload,
   IconInfo,
   IconSearch,
-  IconSettings,
-  IconSnapshot,
+  IconSliders,
 } from "../components/icons";
 import { ProvidersSection } from "../components/settings/ProvidersSection";
 import { KeyboardShortcutsSection } from "../components/settings/KeyboardShortcutsSection";
@@ -522,9 +522,10 @@ export function SettingsPage() {
   // are view-level.
   const navGroups: NavGroup[] = useMemo(() => {
     const iconFor: Record<SettingsTab, ReactNode> = {
-      general: <IconSettings size={14} />,
-      agent: <IconConfig size={14} />,
-      import: <IconSnapshot size={14} />,
+      // Semantic Lucide glyphs for the five-destination rail.
+      general: <IconSliders size={14} />,
+      agent: <IconBot size={14} />,
+      import: <IconDownload size={14} />,
       projects: <IconArchive size={14} />,
       about: <IconInfo size={14} />,
     };

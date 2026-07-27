@@ -9,11 +9,13 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - The 46px top band across both the rail and content pane is a native window
   drag region; interactive controls remain explicitly non-draggable
 - A compact navigation directory with icons, in this exact order:
-  1. **Basics**
-  2. **Model configuration**
-  3. **Import**
-  4. **Project archive**
-  5. **Info**
+  1. **Basics** — Lucide `SlidersHorizontal` (appearance, defaults, shortcuts)
+  2. **Model configuration** — Lucide `Bot` (providers and default model)
+  3. **Import** — Lucide `Download` (bring sessions in from other tools)
+  4. **Project archive** — Lucide `Archive` (durable project index)
+  5. **Info** — Lucide `Info` (versions, logs, updates)
+  Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
+  with the rail label; do not reuse refresh/rotate glyphs here.
 - No additional settings destinations or placeholder navigation rows are shown
 - Main content pane on primary surface with large section title + elevated
   rounded cards of rows. Its content uses the full width available after the
