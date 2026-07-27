@@ -10,9 +10,14 @@
 Before editing any file for a new request:
 
 - [ ] Existing uncommitted work is identified and preserved.
-- [ ] Local `main` is fast-forwarded from `origin/main`.
-- [ ] A dedicated `<type>/<short-description>` request branch is created from
-  that updated `main` commit.
+- [ ] `origin/main` is fetched and local `main` is fast-forwarded when its
+  worktree is clean.
+- [ ] A dedicated `<type>/<short-description>` request branch and worktree are
+  created from that updated `main` commit.
+- [ ] The request worktree reuses the primary checkout's toolchains, package
+  stores, caches, and ignored local configuration where safe.
+- [ ] Mutable, incompatible, or concurrency-sensitive environment state stays
+  worktree-local and ignored.
 - [ ] The current branch is not `main` before implementation begins.
 
 ---
@@ -80,6 +85,7 @@ Before marking the request complete:
 - [ ] PR self-review checklist completed.
 - [ ] Required remote checks and reviews pass.
 - [ ] PR/MR is merged into `main` using a permitted merge strategy.
+- [ ] Request worktree is removed after merge.
 - [ ] Remote request branch is deleted after merge.
 - [ ] Issue reference is included when applicable (e.g. `Refs #12` or
   `Closes #12`).
@@ -92,7 +98,7 @@ Before marking work complete, verify **all** of the following:
 
 | # | Gate | Source |
 |---|---|---|
-| 1 | Request branch created from an up-to-date `main` | [R4 — Request branch + merge gate](03-ai-development-workflow.md#r4--request-branch--merge-gate) |
+| 1 | Request branch and worktree created from an up-to-date `main`; primary environment reused where safe | [R4 — Request branch + worktree + merge gate](03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate) |
 | 2 | Code/doc implements the planned change | Step 4 of [development loop](03-ai-development-workflow.md#2-development-loop) |
 | 3 | All impacted specs updated | [R1 — Spec-sync](03-ai-development-workflow.md#r1--spec-first--spec-sync) |
 | 4 | E2E scenarios documented (or confirmed not needed) | [R3 — E2E coverage doc](03-ai-development-workflow.md#r3--e2e-coverage-doc) |
@@ -100,6 +106,6 @@ Before marking work complete, verify **all** of the following:
 | 6 | Change committed with conventional message | [R2 — Commit-per-change](03-ai-development-workflow.md#r2--commit-per-change) |
 | 7 | BOARD updated if milestone deliverable completed | Step 9 of development loop |
 | 8 | No secrets or local data in commit | [§4.4 Never commit](03-ai-development-workflow.md#44-never-commit) |
-| 9 | PR/MR merged into `main` and request branch deleted | [R4 — Request branch + merge gate](03-ai-development-workflow.md#r4--request-branch--merge-gate) |
+| 9 | PR/MR merged into `main`; request worktree and branch removed | [R4 — Request branch + worktree + merge gate](03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate) |
 
 If any gate fails, the change is **not Done**.
