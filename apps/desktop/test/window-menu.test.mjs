@@ -140,6 +140,10 @@ test("Windows and Linux use menu-free frameless chrome with window controls", ()
   );
   assert.match(
     stylesSource,
+    /:root\[data-platform="win32"\] \.thread-content,[\s\S]*:root\[data-platform="linux"\] \.thread-content\s*\{[^}]*padding-top:\s*46px;/,
+  );
+  assert.match(
+    stylesSource,
     /\.toast\s*\{[^}]*-webkit-app-region:\s*no-drag;[^}]*pointer-events:\s*auto;/s,
   );
   assert.match(mainSource, /window\.on\("maximize", sendMaximized\)/);

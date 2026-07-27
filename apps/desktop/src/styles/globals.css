@@ -874,6 +874,13 @@ textarea:disabled {
   padding: 20px 28px 228px;
 }
 
+/* Frameless Windows/Linux controls occupy the 46px titlebar band. Keep the
+ * first transcript row below that fixed hit target instead of painting under it. */
+:root[data-platform="win32"] .thread-content,
+:root[data-platform="linux"] .thread-content {
+  padding-top: 46px;
+}
+
 /* Conversation minimap: packed stack of dashes on the thread's left edge,
  * vertically centered, ending above the docked composer overlay. Dashes grow
  * horizontally with a Dock-style falloff driven by --magnify (set from JS),
