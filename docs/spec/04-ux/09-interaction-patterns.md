@@ -234,6 +234,8 @@ may be retained while exactly one workspace supplies the visible shell context.
   neighbor, then the left; closing the final tab hides the panel. The separate
   panel collapse control in the session pane top-right hides the panel without
   deleting tabs.
+- Right-click empty work-panel header chrome opens Review/Terminal/Browser; tab
+  rows keep select/close only.
 - On Windows, opening or hiding the panel keeps the native window bounds
   unchanged. The docked renderer layout updates in one pass, avoiding the
   intermediate frameless-window repaint caused by a later native resize.
