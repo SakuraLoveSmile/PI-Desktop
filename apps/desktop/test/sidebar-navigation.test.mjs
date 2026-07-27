@@ -6,6 +6,10 @@ const sidebarSource = await readFile(
   new URL("../src/components/Sidebar.tsx", import.meta.url),
   "utf8",
 );
+const appSource = await readFile(
+  new URL("../src/App.tsx", import.meta.url),
+  "utf8",
+);
 
 test("home sidebar exposes only the supported destination entries", () => {
   assert.match(sidebarSource, /data-nav="home"/);
@@ -18,7 +22,7 @@ test("home sidebar exposes only the supported destination entries", () => {
 
 test("sidebar brand returns to the chat home", () => {
   const brandButton = sidebarSource.match(
-    /<button\s+type="button"\s+className="brand"[\s\S]*?<\/button>/,
+    /<button\s+type="button"\s+className="brand no-drag"[\s\S]*?<\/button>/,
   )?.[0] ?? "";
 
   assert.match(brandButton, /data-nav="home"/);
@@ -26,6 +30,26 @@ test("sidebar brand returns to the chat home", () => {
   assert.match(brandButton, /onClick=\{\(\) => setPage\("chat"\)\}/);
   assert.match(brandButton, /<BrandLogo size=\{20\}/);
   assert.match(brandButton, /t\("app\.shellName"\)/);
+});
+
+test("sidebar header leads with branding and keeps collapse beside search", () => {
+  const header = sidebarSource.match(
+    /<div className="sidebar-header">[\s\S]*?<\/div>\s*<\/div>/,
+  )?.[0] ?? "";
+
+  assert.match(header, /className="brand no-drag"/);
+  assert.match(header, /className="sidebar-header-actions no-drag"/);
+  assert.ok(header.indexOf("<IconSearch") < header.indexOf("<IconSidebar"));
+  assert.match(header, /data-nav="toggle-sidebar"/);
+  assert.doesNotMatch(appSource, /IconChevronLeft|IconChevronRight/);
+});
+
+test("destination history is available through shortcuts without titlebar buttons", () => {
+  assert.match(appSource, /commandKey && !e\.shiftKey && e\.key === "\["/);
+  assert.match(appSource, /useAppStore\.getState\(\)\.navBack\(\)/);
+  assert.match(appSource, /commandKey && !e\.shiftKey && e\.key === "\]"/);
+  assert.match(appSource, /useAppStore\.getState\(\)\.navForward\(\)/);
+  assert.doesNotMatch(appSource, /title=\{t\("nav\.(?:back|forward)"\)\}/);
 });
 
 test("sidebar separates retained projects from standalone sessions", () => {

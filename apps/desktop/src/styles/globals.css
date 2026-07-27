@@ -330,25 +330,14 @@ textarea:disabled {
 }
 
 
-.sidebar-drag {
-  height: 46px; /* Codex --height-toolbar */
-  -webkit-app-region: drag;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 0 8px 0 76px; /* trafficLight x=16 + lights + gap */
-}
-
 .traffic-nav {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-/* Codex-style titlebar cluster: sidebar toggle + history nav. Lives in
- * normal flow inside a drag band (sidebar-drag when expanded, main-titlebar
- * when collapsed) so window-drag hit testing never swallows clicks. */
+/* Collapsed-sidebar controls stay in normal flow inside the main drag band so
+ * Electron window-drag hit testing never swallows clicks. */
 .titlebar-nav {
   display: flex;
   align-items: center;
@@ -369,7 +358,7 @@ textarea:disabled {
 }
 
 /* macOS fullscreen hides the traffic lights: reclaim the reserved space. */
-:root[data-platform="darwin"][data-fullscreen="true"] .sidebar-drag {
+:root[data-platform="darwin"][data-fullscreen="true"] .sidebar-header {
   padding-left: 8px;
 }
 
@@ -679,13 +668,6 @@ textarea:disabled {
   }
 }
 
-/* Windows/Linux window chrome: no traffic lights on the left; our own
- * Codex-style controls pinned top-right (see WindowControls.tsx). */
-:root[data-platform="win32"] .sidebar-drag,
-:root[data-platform="linux"] .sidebar-drag {
-  padding-left: 8px;
-}
-
 .window-controls {
   -webkit-app-region: no-drag;
   app-region: no-drag;
@@ -743,9 +725,25 @@ textarea:disabled {
 
 .sidebar-header {
   display: flex;
+  height: 46px;
+  flex: 0 0 46px;
   align-items: center;
   justify-content: space-between;
-  padding: 0 4px 8px;
+  gap: 4px;
+  padding: 0 8px 0 76px;
+  -webkit-app-region: drag;
+}
+
+:root[data-platform="win32"] .sidebar-header,
+:root[data-platform="linux"] .sidebar-header {
+  padding-left: 8px;
+}
+
+.sidebar-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
 }
 
 .sidebar-rail-brand {
@@ -767,7 +765,7 @@ textarea:disabled {
   border-radius: var(--radius-token-row);
   font-size: var(--text-base-plus);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--tracking-tight);
+  letter-spacing: 0;
   color: var(--ds-text-primary);
 }
 

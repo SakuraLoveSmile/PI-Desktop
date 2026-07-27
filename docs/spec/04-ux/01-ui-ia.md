@@ -14,7 +14,7 @@ destination, chat as the home surface, tools and permissions inline.
 
 ```text
 +----------------------------------------------------------------------+
-| Titlebar row (46px): traffic lights · back/forward · actions         |
+| Titlebar row (46px): traffic lights · product identity · actions    |
 +------------------+--------------------------------+------------------+
 | Sidebar (~275px) | Main pane (active destination) | Work panel       |
 |  New task        |  chat home / transcript        |  (optional,      |
@@ -45,18 +45,20 @@ destination, chat as the home surface, tools and permissions inline.
 - **Product identity**: runtime shell copy uses `PI-Desktop`; the home hero,
   sidebar, and docked composer reuse the canonical `build/icon_1024.png` logo,
   while New task/session controls use a dedicated message-plus icon. The
-  expanded sidebar brand is a keyboard-accessible Home control that returns
-  the main pane to the chat destination. `Codex` remains only an external
-  import source or a design-reference term.
+  expanded sidebar's topmost titlebar row begins with a keyboard-accessible
+  Home brand, followed on the right by Search and Collapse sidebar controls.
+  Activating the brand returns the main pane to the chat destination. `Codex`
+  remains only an external import source or a design-reference term.
 - **Main pane**: exactly one destination at a time; destinations replace the
   pane (they are pages, not modals).
 - **Titlebar**: platform-native desktop chrome (D118). macOS uses
   `hiddenInset` traffic lights and the system application menu.
   Windows/Linux use a menu-free frameless 46px row with navigation on the
   left and accessible minimize / maximize-or-restore / close controls on the
-  right (D129). Back/forward controls traverse destination history. The main
-  titlebar has no notification action; the durable local inbox opens from the
-  sidebar footer bell instead (D130/D117).
+  right (D129). Destination history is shortcut-only (`Cmd/Ctrl+[` and
+  `Cmd/Ctrl+]`); no back/forward buttons are rendered. The main titlebar has no
+  notification action; the durable local inbox opens from the sidebar footer
+  bell instead (D130/D117).
 - **Work panel**: docked right column (not an overlay) created only by file,
   URL, browser-preview, successful-command, or successful workspace-edit
   artifacts. Its
@@ -157,7 +159,8 @@ Plugins destination described in §3.5.
 
 - `page` state: `chat | pulls | scheduled | plugins | settings`; the project
   archive is the `projects` settings tab rather than a standalone page.
-- Destination history is linear; titlebar back/forward traverse it.
+- Destination history is linear; `Cmd/Ctrl+[` and `Cmd/Ctrl+]` traverse it
+  without persistent back/forward chrome.
 - Selecting a project tab reuses `project.set` when its path differs from the
   selected host workspace and keeps the other tabs retained.
 - Selecting a project-scoped thread activates its project before switching to
@@ -172,6 +175,8 @@ Plugins destination described in §3.5.
 |---|---|
 | Cmd/Ctrl+K, Cmd/Ctrl+Shift+P | command palette |
 | Cmd/Ctrl+B | toggle sidebar |
+| Cmd/Ctrl+[ | previous destination |
+| Cmd/Ctrl+] | next destination |
 | Cmd/Ctrl+N | new task |
 | Cmd/Ctrl+O | open project |
 | Cmd/Ctrl+, | settings |

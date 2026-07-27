@@ -1299,13 +1299,15 @@ Each scenario is documented in this format:
 
 - **Preconditions**: PI-Desktop is open with the expanded sidebar and a chat
   session is active.
-- **Steps**: 1) Open Plugins. 2) Inspect the PI-Desktop brand beside
-  the sidebar logo. 3) Activate the brand with a pointer. 4) Return to the
+- **Steps**: 1) Open Plugins. 2) Inspect the topmost expanded-sidebar row. 3)
+  Confirm the PI-Desktop brand is first and Search then Collapse sidebar appear
+  at the right. 4) Activate the brand with a pointer. 5) Return to the
   destination and activate the brand with keyboard focus and Enter/Space.
 - **Expected**: The canonical logo renders at 20px beside the 15px shell name.
   The complete brand has a localized Home accessible name, visible hover/focus
   feedback, and returns the main pane to the chat destination without clearing
-  the active conversation or workspace.
+  the active conversation or workspace. Search and Collapse sidebar are
+  separate accessible icon buttons, with Collapse immediately after Search.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`
 - **Acceptance**: Quality
@@ -1440,9 +1442,10 @@ This test plan spec is accepted when:
 - Expect its project or temporary session row title to become a truncated form
   of that prompt instead of remaining "New task".
 
-### US-UI-08 Titlebar history
+### US-UI-08 Shortcut-only destination history
 - Navigate Settings → Project archive → a project session → Plugins.
-- Expect back/forward controls near the traffic-light area to traverse that history.
+- Expect no back/forward buttons in the expanded sidebar or main titlebar.
+- Press `Cmd/Ctrl+[` and `Cmd/Ctrl+]`; expect them to traverse that history.
 
 ### US-UI-09 Grouped session title backfill
 - Open an older session that previously showed "New task"/"New chat" but has a first user message.
@@ -1468,7 +1471,8 @@ This test plan spec is accepted when:
   current-project identity, thread titles, and composer controls must remain
   readable dark-on-light (≥4.5:1). Never white/translucent text on the light
   sidebar.
-- Titlebar back/forward controls use dark ink on light chrome.
+- The topmost expanded-sidebar row keeps its brand, Search, and Collapse
+  sidebar controls readable on light chrome.
 
 ### US-UI-14 Semantic chrome tokens
 - Toggle theme system → light → dark without restart.
@@ -1490,7 +1494,9 @@ This test plan spec is accepted when:
 - A separate 32px notification Bell remains visible at the right with its
   unread badge. It replaces the former Help shortcut and opens the inbox above
   the footer; the main titlebar has no duplicate Bell.
-- Traffic lights sit at Codex `{x:16,y:16}` with 46px toolbar; back/forward nav lives in the drag row after lights.
+- Traffic lights sit at Codex `{x:16,y:16}` with a 46px toolbar; the expanded
+  sidebar places the product brand first and Search plus Collapse sidebar at
+  the right, with no back/forward buttons.
 
 ### US-UI-17 PI-Desktop home hero logo
 - On empty chat home, the canonical PI-Desktop PNG renders at 56px above the
