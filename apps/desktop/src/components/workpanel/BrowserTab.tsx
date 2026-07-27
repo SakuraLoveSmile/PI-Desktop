@@ -82,7 +82,7 @@ export function BrowserTab({ blocked = false }: { blocked?: boolean }) {
     report();
     // Attach only after the first navigation (an idle view is a blank
     // rectangle over the empty-state hint) and never while a blocking
-    // overlay (palette / permission dialog) is open — the view always
+    // A blocking overlay (palette or search) is open — the view always
     // composites above renderer content.
     void api.browserSetVisible(started && !blocked);
     return () => {

@@ -22,7 +22,6 @@ import { WorkPanel } from "./components/workpanel/WorkPanel";
 import { ChatTranscript } from "./components/ChatTranscript";
 import { Composer } from "./components/Composer";
 import { OnboardingChecklist } from "./components/OnboardingChecklist";
-import { PermissionDialog } from "./components/PermissionDialog";
 import { CommandPalette } from "./components/CommandPalette";
 import { SearchDialog } from "./components/SearchDialog";
 import { ToastHost } from "./components/Toast";
@@ -41,6 +40,14 @@ import {
   IconNewSession,
   IconSidebar,
 } from "./components/icons";
+
+const MODIFIER_ONLY_KEYS = new Set([
+  "Alt",
+  "AltGraph",
+  "Control",
+  "Meta",
+  "Shift",
+]);
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -137,7 +144,11 @@ function AppShell() {
   const workspace = useAppStore((s) => s.workspace);
   const openProject = useAppStore((s) => s.openProject);
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
-  const permission = useAppStore((s) => s.permission);
+  const activePermission = useAppStore((state) =>
+    state.activeSessionId
+      ? state.pendingPermissions[state.activeSessionId]
+      : undefined,
+  );
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -299,6 +310,8 @@ function AppShell() {
         );
     });
     const onKey = (e: KeyboardEvent) => {
+      const modifierOnly = MODIFIER_ONLY_KEYS.has(e.key);
+      if (modifierOnly || e.isComposing || e.keyCode === 229) return;
       const shortcut = KEYBOARD_SHORTCUTS.find((candidate) =>
         keybindingMatchesEvent(
           resolveKeybinding(
@@ -311,6 +324,12 @@ function AppShell() {
         ),
       );
       if (!shortcut) return;
+      if (
+        e.repeat &&
+        (shortcut.id === "navigateBack" || shortcut.id === "navigateForward")
+      ) {
+        return;
+      }
       e.preventDefault();
 
       const runShortcut = (id: KeyboardShortcutId) => {
@@ -664,13 +683,15 @@ function AppShell() {
   }
 
   const showComposer = page === "chat";
-  const hasTranscript = messages.some((m) => {
-    const hasContent = Boolean((m.content || "").trim());
-    const hasThinking =
-      typeof m.thinking === "string" && Boolean(m.thinking.trim());
-    if (m.role === "assistant") return hasContent || hasThinking;
-    return hasContent || m.role === "tool";
-  });
+  const hasTranscript =
+    Boolean(activePermission) ||
+    messages.some((m) => {
+      const hasContent = Boolean((m.content || "").trim());
+      const hasThinking =
+        typeof m.thinking === "string" && Boolean(m.thinking.trim());
+      if (m.role === "assistant") return hasContent || hasThinking;
+      return hasContent || m.role === "tool";
+    });
   const shortcutPlatform = platform as ShortcutPlatform;
   const toggleSidebarShortcut = KEYBOARD_SHORTCUTS.find(
     (shortcut) => shortcut.id === "toggleSidebar",
@@ -692,7 +713,6 @@ function AppShell() {
       <div className="app-shell settings-mode">
         <WindowControls />
         <SettingsPage />
-        <PermissionDialog />
         <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
         <ToastHost />
@@ -793,7 +813,11 @@ function AppShell() {
               </div>
             ) : (
               <>
-                <ChatTranscript messages={messages} isRunning={isRunning} />
+                <ChatTranscript
+                  messages={messages}
+                  isRunning={isRunning}
+                  pendingPermission={activePermission}
+                />
                 {showComposer && <Composer variant="docked" />}
               </>
             )}
@@ -849,12 +873,9 @@ function AppShell() {
       </section>
 
       {workPanelOpen && (
-        <WorkPanel
-          browserBlocked={paletteOpen || searchOpen || Boolean(permission)}
-        />
+        <WorkPanel browserBlocked={paletteOpen || searchOpen} />
       )}
 
-      <PermissionDialog />
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ToastHost />

@@ -821,11 +821,12 @@ activity rows and their nested input/output disclosures.
 
 ---
 
-## 10. PermissionCard / PermissionDialog
+## 10. PermissionCard
 
 ### 10.1 Purpose
 
-Inline card or modal dialog requesting user approval for a high-risk tool call. See [03-permission-ux.md](03-permission-ux.md) for full policy.
+Inline transcript card requesting user approval for a high-risk tool call. See
+[03-permission-ux.md](03-permission-ux.md) for full policy.
 
 ### 10.2 Anatomy (inline card)
 
@@ -843,15 +844,24 @@ Inline card or modal dialog requesting user approval for a high-risk tool call. 
 +----------------------------------------------+
 ```
 
-### 10.3 Anatomy (dialog overlay)
+### 10.3 Session scope
 
-Same content but rendered as a centered dialog at `z-dialog` when inline card would be insufficient (e.g., overlapping permission requests). MVP default: **inline card** within transcript.
+- The card renders after the originating session's latest activity group.
+- Only the active session's pending request is mounted. Background requests
+  stay in session-keyed renderer state without inserting content into the
+  visible transcript or covering another destination.
+- Different sessions may each hold one pending request. Resolution, timeout,
+  abort, tool completion, and session deletion clear only the matching
+  request.
+- Countdown uses the request's absolute receipt time and does not restart when
+  the user switches away and back.
 
 ### 10.4 States
 
 | State | Appearance | Actions |
 |---|---|---|
 | Pending | warning accent, countdown visible | Allow once / Allow session / Deny buttons active |
+| Resolving | pending appearance retained | All three buttons disabled until the request settles |
 | Allowed once | success border, "Allowed (once)" label | No actions |
 | Allowed session | success border, "Allowed (session)" label | No actions |
 | Denied | error border, "Denied" label | No actions |
@@ -861,18 +871,23 @@ Same content but rendered as a centered dialog at `z-dialog` when inline card wo
 
 - Buttons: primary (Allow once), secondary (Allow session), danger (Deny)
 - Countdown: visible timer decrementing from 120s
-- Composer blocked during pending permission (per [03-permission-ux.md](03-permission-ux.md) §7)
+- The first action locks all buttons. Resolution errors use an error toast;
+  successful or failed completion returns focus to the current composer.
+- The originating session's composer cannot send during pending permission,
+  while text remains editable (per [03-permission-ux.md](03-permission-ux.md) §7)
 - Abort cancels pending permission
 
 ### 10.6 Accessibility
 
-- `role="alertdialog"` when rendered as dialog; `role="region"` when inline
-- Buttons clearly labeled; focus trapped in dialog mode
+- `role="region"` with a localized accessible name; the static title supplies
+  the polite live announcement so the per-second timer is not re-announced
+- Buttons clearly labeled and reachable in normal transcript tab order; the
+  card never traps or forcibly moves focus
 - Countdown announced periodically (every 30s) or on request
 
 ### 10.7 MVP constraints
 
-- Inline card only (no dialog overlay mode in MVP, unless overlap case forces it)
+- Inline card only; no modal or backdrop fallback
 - No "allow always" option (per [03-permission-ux.md](03-permission-ux.md))
 - No risk-level customization
 
@@ -1239,7 +1254,7 @@ dismissToast(id: number); // ToastHost internal / tests
 | Errors always toast as `error` | `showToast(e instanceof Error ? e.message : String(e), { variant: "error" })` — never the default variant |
 | No caller timers | Auto-dismiss is owned by the toast system; callers must not `setTimeout`-clear |
 | i18n | Messages come from the i18n catalog (D073); raw host/provider error strings pass through unchanged |
-| Not for blocking flows | Anything needing a decision uses PermissionDialog / dialog surfaces, not a toast |
+| Not for blocking flows | A tool decision uses the inline PermissionCard, not a toast |
 | Not for inline validation | Field-level errors render next to the field; message-bound provider failures render as assistant error messages in the transcript |
 | Host-pushed toasts | Plugin/main-process toasts arrive via `api.onToast` and render as `info` |
 

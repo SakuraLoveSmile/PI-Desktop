@@ -49,6 +49,9 @@
 - Shortcuts must not conflict with macOS system shortcuts or common browser shortcuts
 - Never override `Cmd/Ctrl + C`, `Cmd/Ctrl + V`, `Cmd/Ctrl + A`, `Cmd/Ctrl + S`
 - Shortcuts are consistent across macOS (Cmd) and Windows/Linux (Ctrl)
+- A modifier-only keydown and an IME composition/229 keydown never dispatch a
+  command. Repeated keydown events do not repeatedly traverse destination
+  history; each back/forward chord advances at most once per physical press.
 - Command-only shortcut changes require updating the command palette metadata;
   native roles and visible application-menu accelerators remain menu-owned
 
@@ -136,7 +139,9 @@ may be retained while exactly one workspace supplies the visible shell context.
   workspace.
 - Run state, permission grants, and streamed events are keyed by session id.
   A project/tab switch does not abort a background turn or copy its events into
-  the visible transcript.
+  the visible transcript. Background message, tool, completion, and permission
+  events never activate their session, change the visible project/page, or move
+  focus. Only an explicit session/notification activation navigates.
 - Every tool call resolves `workspaceRoot` from the originating durable
   session, not from the currently selected project tab. Background completion
   refreshes the matching row without redirecting the active conversation.
@@ -354,13 +359,16 @@ Agent calls high-risk tool
 
 ### 5.2 Multiple pending permissions
 
-- Only one permission card is active at a time (agent loop is paused)
-- If abort is triggered: all pending permissions are cancelled
-- If timeout (120s): auto-deny, card transitions to "Denied (timeout)"
+- Each session has at most one active permission card because that agent loop
+  is paused; multiple sessions may wait independently.
+- Abort cancels only the active session's pending permission.
+- Timeout (120s from original receipt) auto-denies only the matching request;
+  switching sessions never resets the deadline.
 
 ### 5.3 Focus management during permission
 
-- Permission card receives focus when inserted (`aria-live` announcement)
+- A visible permission card is announced through `aria-live` without forcing
+  focus. A background session's card is not mounted and cannot move focus.
 - Action buttons are tab-reachable within the card
 - After resolution: focus returns to composer
 - Full spec: [03-permission-ux.md](03-permission-ux.md)
@@ -425,7 +433,6 @@ Agent calls high-risk tool
 ### 7.3 Focus trap
 
 - Command palette: focus trapped within palette while open
-- Permission dialog (if rendered as dialog): focus trapped
 - Settings modals: focus trapped
 - Escape always closes the trapped surface and returns focus
 
@@ -592,20 +599,23 @@ This does not prevent state changes — it makes them instant.
 6. Permission interrupt inserts inline card, disables composer, shows countdown, and re-enables after resolution
 7. Toasts used for transient background operations; inline errors used for context-specific failures
 8. Focus returns to composer after session switch, message send, permission resolution, and abort
-9. Focus rings visible on `focus-visible` only, 2px accent offset 2px
-10. Command palette traps focus; Escape returns to previous focus
-11. All animations respect `prefers-reduced-motion: reduce` — state changes are instant, no decorative motion
-12. Project/session rows support non-destructive pin/archive, independent
+9. Background message, tool, completion, and permission events never change
+   the active session/project/page or keyboard focus; concurrent permission
+   requests remain independently actionable in their originating transcripts
+10. Focus rings visible on `focus-visible` only, 2px accent offset 2px
+11. Command palette traps focus; Escape returns to previous focus
+12. All animations respect `prefers-reduced-motion: reduce` — state changes are instant, no decorative motion
+13. Project/session rows support non-destructive pin/archive, independent
     project collapse, and the documented user-facing sort modes
-13. Shell chrome does not create accidental text selections, while editable
+14. Shell chrome does not create accidental text selections, while editable
     controls and transcript/code/tool content remain selectable and copyable
-14. Retained project tabs survive restart; activating one changes the selected
+15. Retained project tabs survive restart; activating one changes the selected
     shell workspace without redirecting background session tool roots
-15. Drag/manual reorder is not implemented; `manual` remains a compatibility
+16. Drag/manual reorder is not implemented; `manual` remains a compatibility
     value and future drag patterns follow §8
-16. Completed and failed turns appear exactly once in the durable inbox;
+17. Completed and failed turns appear exactly once in the durable inbox;
     aborted turns never appear
-17. All/Unread, mark-all-read, clear, row activation, Escape/focus restore, and
+18. All/Unread, mark-all-read, clear, row activation, Escape/focus restore, and
     arrow/Home/End keyboard navigation behave as documented in §1.7
-18. Native notifications appear only while the main window is unfocused and
+19. Native notifications appear only while the main window is unfocused and
     their activation focuses the window and opens the corresponding session

@@ -22,7 +22,7 @@ test("project activation separates visible transcript state from background run 
     activationBlock,
     /runningSessions:\s*\{\}/,
   );
-  assert.doesNotMatch(activationBlock, /permission:\s*null/);
+  assert.doesNotMatch(activationBlock, /pendingPermissions:\s*\{\}/);
 });
 
 test("closed projects are not recreated from historical sidebar sessions", () => {

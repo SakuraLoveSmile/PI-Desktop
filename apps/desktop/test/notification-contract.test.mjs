@@ -43,6 +43,11 @@ test("terminal notifications flow from host completion to the renderer", () => {
   assert.match(appSource, /api\.onNotificationChanged/);
   assert.match(sidebarSource, /<NotificationCenter onBeforeOpen=\{\(\) => closeMenus\(false\)\} \/>/);
   assert.doesNotMatch(appSource, /<NotificationCenter \/>/);
+  const changedHandler = appSource.match(
+    /api\.onNotificationChanged[\s\S]*?\n\s*\}\);/,
+  )?.[0] ?? "";
+  assert.match(changedHandler, /receiveNotification/);
+  assert.doesNotMatch(changedHandler, /selectSession|openNotification/);
 });
 
 test("the visible chat session suppresses durable task notifications", () => {
@@ -64,5 +69,8 @@ test("native notifications only show for an unfocused window and navigate back",
   assert.match(mainSource, /mainWindow\.restore\(\)/);
   assert.match(appSource, /showNativeNotification/);
   assert.match(appSource, /openNotification\(id\)/);
-  assert.match(storeSource, /await get\(\)\.selectSession\(notification\.sessionId\)/);
+  assert.match(
+    storeSource,
+    /await get\(\)\.selectSession\(notification\.sessionId,\s*\{\s*navigationIntent: intent/,
+  );
 });

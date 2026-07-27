@@ -46,7 +46,9 @@ MVP passes when:
 - [x] Chat mode cannot run Write/Edit/Bash — manual:M3 (D004)
 - [x] Permission timeout (120s) becomes deny — manual:M3 (D005)
 - [x] Read/Glob/Grep work inside the project — auto:`test:e2e` (glob tool)
-- [x] Write/Edit/Bash trigger a confirmation card — manual:M3
+- [x] Write/Edit/Bash trigger an inline, session-scoped confirmation card — manual:M3
+- [x] Background events and permission requests never activate or cover another
+  session — unit:desktop permission contracts; full UI manual:M5
 - [x] Deny prevents execution — manual:M3
 - [x] Allow returns the result to model and UI — manual:M3
 - [x] Paths outside the workspace are rejected — auto:host-core tests (`blocks_escape`)
