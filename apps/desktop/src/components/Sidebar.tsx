@@ -12,6 +12,10 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import { normalizeProjectPath } from "../lib/sidebar-session-groups";
+import {
+  sidebarSessionStatus,
+  type SidebarSessionStatus,
+} from "../lib/sidebar-session-status";
 import type { ProjectWorkspace, SessionSummary } from "@pi-desktop/shared";
 import type {
   ProjectMeta,
@@ -26,7 +30,9 @@ import {
   IconArrowUpDown,
   IconAt,
   IconBranch,
+  IconCheck,
   IconChevronDown,
+  IconCircleAlert,
   IconNewSession,
   IconFolder,
   IconFileText,
@@ -148,6 +154,7 @@ export function Sidebar({
   const sessionView = useAppStore((s) => s.sessionView);
   const projectSort = useAppStore((s) => s.projectSort);
   const runningSessions = useAppStore((s) => s.runningSessions);
+  const sessionOutcomes = useAppStore((s) => s.sessionOutcomes);
   const setPage = useAppStore((s) => s.setPage);
   const settings = useAppStore((s) => s.settings);
   const page = useAppStore((s) => s.page);
@@ -464,6 +471,31 @@ export function Sidebar({
       .sort(compareSessions),
     [filtered, compareSessions],
   );
+  const renderSessionStatus = (status: SidebarSessionStatus) => {
+    const labelKey =
+      status === "running"
+        ? "nav.sessionRunning"
+        : status === "selected"
+          ? "nav.sessionSelected"
+          : status === "completed"
+            ? "nav.sessionCompleted"
+            : "nav.sessionFailed";
+    const fallback =
+      status === "running"
+        ? "In progress"
+        : status === "selected"
+          ? "Selected"
+          : status === "completed"
+            ? "Completed"
+            : "Failed";
+    const label = t(labelKey, { defaultValue: fallback });
+    return (
+      <span className={`thread-item-status ${status}`} aria-label={label} title={label}>
+        {status === "completed" ? <IconCheck size={10} aria-hidden /> : null}
+        {status === "failed" ? <IconCircleAlert size={11} aria-hidden /> : null}
+      </span>
+    );
+  };
 
   const reportError = useCallback(
     (error: unknown) => {
@@ -704,6 +736,11 @@ export function Sidebar({
     const active = page === "chat" && activeSessionId === session.id;
     const archived = sessionArchived(session, meta);
     const running = Boolean(runningSessions[session.id]);
+    const status = sidebarSessionStatus({
+      running,
+      selected: active,
+      outcome: sessionOutcomes[session.id],
+    });
     return (
       <div
         key={session.id}
@@ -728,7 +765,7 @@ export function Sidebar({
           title={taskTitle(session.title)}
           aria-current={active ? "page" : undefined}
         >
-          {running ? <span className="thread-item-status running" aria-label={t("nav.sessionRunning", { defaultValue: "Running" })} /> : null}
+          {status ? renderSessionStatus(status) : null}
           {sessionPinned(session, meta) ? (
             <IconPin size={11} className="thread-item-pin" aria-hidden />
           ) : null}

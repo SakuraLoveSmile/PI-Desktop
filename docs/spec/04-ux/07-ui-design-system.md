@@ -146,7 +146,25 @@ Neutral gray scale only — no blue-slate surfaces. Chrome components must consu
   lists also set opaque semantic foreground/background colors explicitly so
   Windows Chromium does not fall back to an unreadable system palette.
 
-### 4.5 Tailwind CSS variable stub
+### 4.5 Sidebar task status semantics
+
+Compact task rows reserve one `12px` leading status slot. State is never
+communicated by color alone, and each status consumes an existing semantic
+token rather than introducing a decorative palette:
+
+| State | Semantic color | Shape / motion | Meaning |
+|---|---|---|---|
+| Selected | accent blue | static outlined ring | current conversation |
+| In progress | warning orange | filled dot with a restrained breathing pulse | agent is producing or executing |
+| Completed | success green | check mark | latest task turn completed |
+| Failed | error red | circled alert mark | latest task turn failed |
+
+Precedence is `in progress → selected → completed/failed`. Starting another
+turn clears the prior terminal outcome; abort clears the live indicator without
+creating a failure. Reduced-motion mode disables the breathing animation while
+retaining its orange fill and localized accessible name.
+
+### 4.6 Tailwind CSS variable stub
 
 The following CSS custom properties stub is the canonical bridge between spec tokens and Tailwind classes. It is **not an app source file** — it documents the intended mapping for implementation.
 

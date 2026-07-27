@@ -146,6 +146,11 @@ area), while `+` and overflow actions appear on hover/focus. The active project
 is still the only selected host workspace; retained groups do not create
 parallel workspace singletons. This supersedes D088's one-current-project
 sidebar limitation while preserving its exact-path and Temporary boundaries.
+**Refined in D135**: each conversation row uses a fixed leading status slot
+with distinct color and geometry: accent-blue selection ring, warning-orange
+breathing in-progress dot, success-green check, and error-red alert. In-progress
+outranks selection, selection outranks the latest terminal outcome, and reduced
+motion keeps the in-progress dot static.
 
 ## 3.9 Transcript density and user-plate alignment
 WorkBuddy's task transcript keeps user turns as compact right-side plates and
