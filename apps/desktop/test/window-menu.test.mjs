@@ -119,6 +119,18 @@ test("Windows and Linux use menu-free frameless chrome with window controls", ()
   );
   assert.match(
     stylesSource,
+    /\.window-controls\s*\{[^}]*-webkit-app-region:\s*no-drag;[^}]*pointer-events:\s*auto;[^}]*width:\s*112px;/s,
+  );
+  assert.match(
+    stylesSource,
+    /:root\[data-platform="win32"\] \.main-titlebar,[\s\S]*:root\[data-platform="linux"\] \.settings-titlebar\s*\{[^}]*right:\s*112px;/,
+  );
+  assert.match(
+    stylesSource,
+    /:root\[data-platform="win32"\] \.work-panel-header,[\s\S]*:root\[data-platform="linux"\] \.work-panel-header\s*\{[^}]*margin-right:\s*112px;/,
+  );
+  assert.match(
+    stylesSource,
     /\.toast\s*\{[^}]*-webkit-app-region:\s*no-drag;[^}]*pointer-events:\s*auto;/s,
   );
   assert.match(mainSource, /window\.on\("maximize", sendMaximized\)/);
