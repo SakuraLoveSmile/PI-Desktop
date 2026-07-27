@@ -6,6 +6,10 @@ const sidebarSource = await readFile(
   new URL("../src/components/Sidebar.tsx", import.meta.url),
   "utf8",
 );
+const globalStyles = await readFile(
+  new URL("../src/styles/globals.css", import.meta.url),
+  "utf8",
+);
 
 test("sidebar footer presents a local profile with the notification entry", () => {
   assert.match(sidebarSource, /className="footer-profile-avatar"/);
@@ -19,13 +23,20 @@ test("sidebar footer presents a local profile with the notification entry", () =
 });
 
 test("profile popover keeps its keyboard menu semantics and real actions", () => {
-  assert.match(
-    sidebarSource,
-    /id="sidebar-profile-menu" className="profile-menu" role="menu"/,
-  );
+  assert.match(sidebarSource, /id="sidebar-profile-menu"/);
+  assert.match(sidebarSource, /className="profile-menu profile-menu-portaled"/);
+  assert.match(sidebarSource, /createPortal\(/);
+  assert.match(sidebarSource, /profileMenuPos/);
   assert.match(sidebarSource, /role="menuitem" data-nav="settings"/);
   assert.match(sidebarSource, /api\.openLogs\(\)/);
   assert.match(sidebarSource, /<IconFileText size=\{15\}/);
   assert.doesNotMatch(sidebarSource, /IconCloudDown/);
   assert.match(sidebarSource, /t\("nav\.profileTheme"\)/);
+});
+
+test("profile menu portals above the main pane stacking context", () => {
+  assert.match(
+    globalStyles,
+    /\.profile-menu-portaled\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*60;/s,
+  );
 });

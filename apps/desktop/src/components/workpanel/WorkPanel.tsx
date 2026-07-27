@@ -209,11 +209,11 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
             className="sidebar-row-menu sidebar-floating-menu work-panel-tools-menu"
             role="menu"
             data-work-panel-tools-menu=""
-            aria-label={t("panel.openTool")}
+            aria-label={t("panel.openTool", { defaultValue: "Open tool" })}
             onKeyDown={onMenuKeyDown}
             style={{ top: toolsMenu.top, right: toolsMenu.right }}
           >
-            <div className="sidebar-popover-title">{t("panel.openTool")}</div>
+            <div className="sidebar-popover-title">{t("panel.openTool", { defaultValue: "Open tool" })}</div>
             {HEADER_TOOLS.map(({ kind, Icon }, index) => (
               <button
                 key={kind}
@@ -227,7 +227,7 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
                 }}
               >
                 <Icon size={14} />
-                <span>{t(`panel.tabs.${kind}`)}</span>
+                <span>{t(`panel.tabs.${kind}`, { defaultValue: kind })}</span>
               </button>
             ))}
           </div>,

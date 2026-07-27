@@ -463,6 +463,13 @@ textarea:disabled {
   box-shadow: var(--ds-shadow-dialog);
 }
 
+/* Portaled to document.body so the main pane cannot paint over the dialog. */
+.notification-popover-portaled {
+  position: fixed;
+  right: auto;
+  z-index: 60;
+}
+
 .notification-header {
   display: flex;
   min-height: 46px;
@@ -3828,6 +3835,13 @@ textarea:disabled {
   border: 1px solid var(--ds-border-subtle);
 }
 
+/* Portaled to document.body so chat content cannot cover the menu. */
+.profile-menu-portaled {
+  position: fixed;
+  right: auto;
+  z-index: 60;
+}
+
 .sidebar-footer {
   position: relative;
 }
@@ -5536,6 +5550,7 @@ textarea:disabled {
   position: fixed;
   top: auto;
   right: auto;
+  z-index: 60; /* z-command-palette: body-level overlays above pane stacking */
   min-width: 184px;
 }
 
@@ -5885,6 +5900,7 @@ textarea:disabled {
 }
 
 .work-panel-tools-menu {
+  z-index: 60;
   min-width: 176px;
 }
 

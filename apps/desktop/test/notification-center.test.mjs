@@ -50,6 +50,9 @@ test("notification popover preserves keyboard and focus behavior", () => {
   assert.match(componentSource, /Math\.min\(buttons\.length - 1,/);
   assert.match(componentSource, /triggerRef\.current\?\.focus\(\)/);
   assert.match(componentSource, /rootRef\.current\?\.contains/);
+  assert.match(componentSource, /popoverRef\.current\?\.contains/);
+  assert.match(componentSource, /createPortal/);
+  assert.match(componentSource, /notification-popover-portaled/);
   assert.match(componentSource, /\.notification-item\.unread, \.notification-item/);
   assert.match(componentSource, /\.notification-filter\.active/);
   assert.match(componentSource, /aria-live="polite"/);
@@ -72,6 +75,10 @@ test("notification popover has bounded desktop and mobile layouts", () => {
   assert.match(
     globalStyles,
     /\.notification-popover\s*\{[^}]*bottom:\s*calc\(100% \+ 8px\);[^}]*left:\s*0;/s,
+  );
+  assert.match(
+    globalStyles,
+    /\.notification-popover-portaled\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*60;/s,
   );
   assert.match(globalStyles, /\.notification-badge\s*\{[^}]*var\(--ds-bg-sidebar\)/s);
   assert.match(globalStyles, /\.notification-list\s*\{[^}]*overflow-y:\s*auto;/s);

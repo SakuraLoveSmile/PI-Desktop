@@ -182,6 +182,7 @@ export function Sidebar({
   const showToast = useAppStore((s) => s.showToast);
 
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileMenuPos, setProfileMenuPos] = useState<{ bottom: number; left: number } | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
@@ -209,6 +210,7 @@ export function Sidebar({
   const closeMenus = useCallback((restoreFocus = true) => {
     const trigger = menuTriggerRef.current;
     setProfileOpen(false);
+    setProfileMenuPos(null);
     setSortOpen(false);
     setSessionMenu(null);
     setProjectMenu(null);
@@ -280,7 +282,9 @@ export function Sidebar({
       if (e.button === 2 || (e.pointerType === "mouse" && e.buttons === 2)) return;
       const target = e.target as Node;
       if (profileRef.current?.contains(target)) return;
-      if ((target as Element)?.closest?.(".sidebar-popover, .sidebar-row-menu")) return;
+      if ((target as Element)?.closest?.(
+        ".sidebar-popover, .sidebar-row-menu, .profile-menu-portaled, .notification-popover-portaled",
+      )) return;
       closeMenus(false);
     };
     const onKey = (e: KeyboardEvent) => {
@@ -1297,8 +1301,15 @@ export function Sidebar({
         </div>
 
         <div className="sidebar-footer no-drag" ref={profileRef}>
-          {profileOpen ? (
-            <div id="sidebar-profile-menu" className="profile-menu" role="menu" onKeyDown={onMenuKeyDown}>
+          {profileOpen && profileMenuPos && typeof document !== "undefined"
+            ? createPortal(
+                <div
+                  id="sidebar-profile-menu"
+                  className="profile-menu profile-menu-portaled"
+                  role="menu"
+                  onKeyDown={onMenuKeyDown}
+                  style={{ bottom: profileMenuPos.bottom, left: profileMenuPos.left }}
+                >
               <div className="profile-menu-identity" role="presentation">
                 <span className="profile-menu-avatar" aria-hidden>
                   <IconUser size={15} />
@@ -1333,9 +1344,28 @@ export function Sidebar({
                 <span>{t("nav.profileTheme")}</span>
                 <span className="meta">{settings?.theme || "system"}</span>
               </button>
-            </div>
-          ) : null}
-          <button className={`footer-profile ${profileOpen ? "active" : ""}`} data-nav="profile" aria-haspopup="menu" aria-controls="sidebar-profile-menu" aria-expanded={profileOpen} onClick={(event) => { menuTriggerRef.current = event.currentTarget; setProfileOpen((value) => !value); }} title={t("nav.openProfileMenu")}>
+                </div>,
+                document.body,
+              )
+            : null}
+
+          <button className={`footer-profile ${profileOpen ? "active" : ""}`} data-nav="profile" aria-haspopup="menu" aria-controls="sidebar-profile-menu" aria-expanded={profileOpen} onClick={(event) => {
+              menuTriggerRef.current = event.currentTarget;
+              setProfileOpen((value) => {
+                const next = !value;
+                if (!next) {
+                  setProfileMenuPos(null);
+                  return false;
+                }
+                const rect = event.currentTarget.getBoundingClientRect();
+                const width = Math.min(280, window.innerWidth - 16);
+                setProfileMenuPos({
+                  bottom: Math.max(12, window.innerHeight - rect.top + 8),
+                  left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+                });
+                return true;
+              });
+            }} title={t("nav.openProfileMenu")}>
             <span className="footer-profile-avatar" aria-hidden>
               <IconUser size={14} />
             </span>

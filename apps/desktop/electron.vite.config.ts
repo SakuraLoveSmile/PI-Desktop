@@ -62,6 +62,8 @@ export default defineConfig({
     resolve: {
       alias: {
         "@renderer": resolve("src"),
+        // Always read locale source so new keys work without a stale packages/*/dist.
+        "@pi-desktop/i18n": resolve(__dirname, "../../packages/i18n/src/index.ts"),
       },
     },
   },
