@@ -7,16 +7,14 @@ const sidebarSource = await readFile(
   "utf8",
 );
 
-test("sidebar footer presents a local profile with a real help destination", () => {
+test("sidebar footer presents a local profile with the notification entry", () => {
   assert.match(sidebarSource, /className="footer-profile-avatar"/);
   assert.match(sidebarSource, /t\("nav\.localProfile"\)/);
   assert.match(sidebarSource, /aria-haspopup="menu"/);
   assert.match(sidebarSource, /aria-controls="sidebar-profile-menu"/);
   assert.match(sidebarSource, /aria-expanded=\{profileOpen\}/);
-  assert.match(
-    sidebarSource,
-    /closeMenus\(false\);\s*setSettingsTab\("about"\);\s*setPage\("settings"\)/,
-  );
+  assert.match(sidebarSource, /<NotificationCenter onBeforeOpen=\{\(\) => closeMenus\(false\)\} \/>/);
+  assert.doesNotMatch(sidebarSource, /IconHelp/);
   assert.doesNotMatch(sidebarSource, /<IconGear size=\{15\}/);
 });
 

@@ -418,15 +418,9 @@ textarea:disabled {
   -webkit-app-region: drag;
 }
 
-.main-titlebar-right {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .notification-center {
   position: relative;
+  flex: 0 0 auto;
 }
 
 .notification-trigger {
@@ -444,7 +438,7 @@ textarea:disabled {
   height: 16px;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--ds-bg-primary);
+  border: 2px solid var(--ds-bg-sidebar);
   border-radius: var(--radius-full);
   background: var(--ds-error);
   color: var(--gray-0);
@@ -455,8 +449,8 @@ textarea:disabled {
 
 .notification-popover {
   position: absolute;
-  top: calc(100% + 7px);
-  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
   z-index: 60;
   display: flex;
   width: min(360px, calc(100vw - 24px));
@@ -677,11 +671,11 @@ textarea:disabled {
 @media (max-width: 480px) {
   .notification-popover {
     position: fixed;
-    top: 48px;
+    bottom: 8px;
     right: 8px;
     left: 8px;
     width: auto;
-    max-height: calc(100vh - 56px);
+    max-height: calc(100vh - 16px);
   }
 }
 
@@ -3103,7 +3097,7 @@ textarea:disabled {
 }
 
 
-.footer-help {
+.footer-notification {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3117,8 +3111,13 @@ textarea:disabled {
     color 120ms ease;
 }
 
-.footer-help:hover {
+.footer-notification:hover {
   background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.footer-notification.active {
+  background: var(--ds-bg-active);
   color: var(--ds-text-primary);
 }
 
