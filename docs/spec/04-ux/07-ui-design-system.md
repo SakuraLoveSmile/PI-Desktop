@@ -427,20 +427,60 @@ shadow-lg:  0 8px 24px rgba(0,0,0,0.12)
 
 ### 8.1 Duration scale
 
-| Token | Duration | Usage |
-|---|---|---|
-| `duration-fast` | 150ms | Hover transitions, color changes |
-| `duration-normal` | 200ms | Expand/collapse, slide-in |
-| `duration-slow` | 300ms | Panel transitions, dialog enter |
+CSS custom properties on `:root` (D146):
+
+| Token | CSS variable | Duration | Usage |
+|---|---|---|---|
+| `duration-fast` | `--motion-duration-fast` | 150ms | Hover transitions, color changes |
+| `duration-normal` | `--motion-duration-normal` | 200ms | Expand/collapse, slide-in, toast/dialog enter |
+| `duration-slow` | `--motion-duration-slow` | 300ms | Panel transitions, boot splash enter |
+
+Interactive surfaces should reference these variables instead of hard-coded
+millisecond literals when practical.
 
 ### 8.2 Easing
 
-- Default: `ease-out` (Tailwind default)
+CSS custom properties on `:root` (D146):
+
+| Token | CSS variable | Curve | Usage |
+|---|---|---|---|
+| `ease-out` | `--motion-ease-out` | `cubic-bezier(0.22, 1, 0.36, 1)` | Default enter / hover / fill transitions |
+| `ease-in` | `--motion-ease-in` | `cubic-bezier(0.4, 0, 1, 1)` | Exit animations (toast out, splash out) |
+| `ease-standard` | `--motion-ease-standard` | `cubic-bezier(0.2, 0, 0, 1)` | Continuous progress indicators (boot bar) |
+
 - Enter animations: `ease-out`
 - Exit animations: `ease-in`
 - Spring-like for drag/releases: **not in MVP** (use `ease-out`)
 
-### 8.3 Reduced motion
+### 8.3 Startup splash (boot feedback)
+
+While Electron bootstrap is not yet ready, the renderer paints a full-window
+**startup splash** (`StartupSplash`, `data-testid="startup-splash"`) instead of
+plain status text:
+
+- Brand mark (`BrandLogo` 64px), shell name, and tagline from the active catalog
+- Accessible status copy via `app.starting` (screen-reader only) with
+  `role="status"` / `aria-live="polite"`
+- Soft indeterminate progress bar as loading feedback (≤1.1s loop)
+- Minimum visible time ~420ms on normal motion to avoid a flash on fast boots
+- Exit: 280ms opacity fade (`startup-splash-out`) once `ready` is true, revealing
+  the already-mounted shell underneath
+- Reduced motion: near-zero enter/exit and a static full-width bar
+
+This is boot-state feedback, not decorative chrome.
+
+### 8.4 Overlay / floating surface enter
+
+Dialogs, search spotlight, and modal backdrops use shared enter keyframes:
+
+- Scrim: `overlay-in` (opacity, `--motion-duration-normal` / `--motion-ease-out`)
+- Centered surface: `surface-in` (fade + 8px rise + slight scale)
+- Top-anchored surface (search): `surface-in-top`
+
+Toast enter/exit keep the existing removal contract (`animationend` on
+`toast-out`) while using the motion tokens and a slightly softer scale.
+
+### 8.5 Reduced motion
 
 All motion tokens must respect `prefers-reduced-motion: reduce`:
 
@@ -453,14 +493,18 @@ All motion tokens must respect `prefers-reduced-motion: reduce`:
 }
 ```
 
+Boot splash, overlay/dialog enters, streaming pulse, and continuous bars are
+also explicitly suppressed or collapsed to a static state.
+
 > See also [09-interaction-patterns.md](09-interaction-patterns.md) §10.
 
-### 8.4 Prohibited motion
+### 8.6 Prohibited motion
 
 - No parallax
 - No continuous background animations (particles, waves)
 - No shimmer/skeleton animations longer than 1s loop — use simple fade-in for loading states
 - No bounce effects
+- No multi-second boot theatrical sequences; splash exits as soon as ready (+ min dwell)
 
 ## 8.0 Home empty stack (scrollable flow, D111)
 
@@ -777,6 +821,7 @@ Full component contract and usage rules: [08-component-spec.md §17](08-componen
 5. Base font size is 14px; no component defaults to 16px body text
 6. All interactive elements have visible `focus-visible` rings using accent color
 7. All motion respects `prefers-reduced-motion: reduce`
+7b. Boot shows the branded startup splash until ready, then exits smoothly
 8. No raw hex color values in React component source (only token references)
 9. Z-index usage confined to defined layers (no arbitrary values)
 10. Layout shell metrics (topbar, sidebar, composer) match spec values in CSS
