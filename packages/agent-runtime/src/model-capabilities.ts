@@ -11,6 +11,7 @@ import type { ModelWireCompat } from "./thinking-level.js";
 export type ModelCapabilityInput = {
   vendorKey: string;
   modelId: string;
+  apiStyle?: string;
   supportsReasoning?: boolean;
   /**
    * Optional sparse override for custom/compatible providers.
@@ -101,15 +102,31 @@ export function resolveThinkingCapabilities(
   }
 
   if (model?.reasoning) {
+    const levels = getSupportedThinkingLevels(model) as ThinkingLevel[];
     return {
       supportsReasoning: model.reasoning,
-      supportedThinkingLevels: [
-        ...getSupportedThinkingLevels(model),
-      ] as ThinkingLevel[],
+      supportedThinkingLevels:
+        ((model.compat ?? {}) as Record<string, unknown>)
+          .forceAdaptiveThinking === true
+          ? levels.filter((level) => level !== "off")
+          : [...levels],
     };
   }
 
   if (input.supportsReasoning === true) {
+    const compatibleModel = findReasoningCatalogModel(input);
+    if (
+      compatibleModel &&
+      ((compatibleModel?.compat ?? {}) as Record<string, unknown>)
+        .forceAdaptiveThinking === true
+    ) {
+      return {
+        supportsReasoning: true,
+        supportedThinkingLevels: (
+          getSupportedThinkingLevels(compatibleModel) as ThinkingLevel[]
+        ).filter((level) => level !== "off"),
+      };
+    }
     return {
       supportsReasoning: true,
       supportedThinkingLevels: [...DEFAULT_REASONING_LEVELS],
@@ -146,16 +163,56 @@ type CatalogModel = ReturnType<
 >[number];
 
 /** Rank same-id catalog entries: prefer the canonical vendor entry, which
- * states a thinking dialect and/or an expressible off value, over aggregator
- * mirrors (opencode-go, cloudflare-ai-gateway, …) that only carry host
- * quirks and would resolve to "no thinking info". */
+ * states an adaptive mode, thinking dialect, and/or expressible off value,
+ * over aggregator mirrors that only carry host quirks and would resolve to
+ * incomplete thinking information. */
 function wireInfoScore(model: CatalogModel): number {
   const compat = (model.compat ?? {}) as Record<string, unknown>;
   let score = 0;
+  if (compat.forceAdaptiveThinking === true) score += 8;
   if (typeof compat.thinkingFormat === "string") score += 4;
   if (typeof model.thinkingLevelMap?.off === "string") score += 2;
   if (model.thinkingLevelMap) score += 1;
   return score;
+}
+
+function findReasoningCatalogModel(input: {
+  vendorKey: string;
+  modelId: string;
+  apiStyle?: string;
+}): CatalogModel | undefined {
+  const api = wireApiForStyle(input.apiStyle);
+  const requestedId = input.modelId.trim().toLowerCase();
+  if (!requestedId) return undefined;
+
+  const catalog = getBuiltinCatalog();
+  const vendorModel = catalog.getModel(input.vendorKey, input.modelId);
+  if (vendorModel && vendorModel.api === api && vendorModel.reasoning) {
+    return vendorModel;
+  }
+
+  const candidates = catalog
+    .getModels()
+    .filter((model) => model.api === api && model.reasoning);
+  const exact = candidates
+    .filter((model) => model.id.toLowerCase() === requestedId)
+    .sort((a, b) => wireInfoScore(b) - wireInfoScore(a));
+  return (
+    exact[0] ??
+    candidates
+      .filter((model) => {
+        const id = model.id.toLowerCase();
+        return (
+          requestedId.length > id.length &&
+          requestedId.startsWith(id) &&
+          MODEL_ID_BOUNDARY.has(requestedId.charAt(id.length))
+        );
+      })
+      .sort(
+        (a, b) =>
+          b.id.length - a.id.length || wireInfoScore(b) - wireInfoScore(a),
+      )[0]
+  );
 }
 
 /**
@@ -172,39 +229,7 @@ export function resolveModelWireCompat(input: {
   modelId: string;
   apiStyle?: string;
 }): ModelWireCompat | undefined {
-  const api = wireApiForStyle(input.apiStyle);
-  const requestedId = input.modelId.trim().toLowerCase();
-  if (!requestedId) return undefined;
-
-  const catalog = getBuiltinCatalog();
-  const vendorModel = catalog.getModel(input.vendorKey, input.modelId);
-  let match =
-    vendorModel && vendorModel.api === api && vendorModel.reasoning
-      ? vendorModel
-      : undefined;
-  if (!match) {
-    const candidates = catalog
-      .getModels()
-      .filter((model) => model.api === api && model.reasoning);
-    const exact = candidates
-      .filter((model) => model.id.toLowerCase() === requestedId)
-      .sort((a, b) => wireInfoScore(b) - wireInfoScore(a));
-    match =
-      exact[0] ??
-      candidates
-        .filter((model) => {
-          const id = model.id.toLowerCase();
-          return (
-            requestedId.length > id.length &&
-            requestedId.startsWith(id) &&
-            MODEL_ID_BOUNDARY.has(requestedId.charAt(id.length))
-          );
-        })
-        .sort(
-          (a, b) =>
-            b.id.length - a.id.length || wireInfoScore(b) - wireInfoScore(a),
-        )[0];
-  }
+  const match = findReasoningCatalogModel(input);
   if (!match) return undefined;
 
   const source = (match.compat ?? {}) as Record<string, unknown>;
@@ -219,6 +244,9 @@ export function resolveModelWireCompat(input: {
   if (typeof source.supportsReasoningEffort === "boolean") {
     compat.supportsReasoningEffort = source.supportsReasoningEffort;
   }
+  if (typeof source.forceAdaptiveThinking === "boolean") {
+    compat.forceAdaptiveThinking = source.forceAdaptiveThinking;
+  }
   if (
     source.chatTemplateKwargs &&
     typeof source.chatTemplateKwargs === "object"
@@ -228,11 +256,14 @@ export function resolveModelWireCompat(input: {
     };
   }
 
-  const thinkingLevelMap = match.thinkingLevelMap
+  let thinkingLevelMap = match.thinkingLevelMap
     ? ({ ...match.thinkingLevelMap } as NonNullable<
         ModelWireCompat["thinkingLevelMap"]
       >)
     : undefined;
+  if (compat.forceAdaptiveThinking === true) {
+    (thinkingLevelMap ??= {}).off = null;
+  }
 
   const hasCompat = Object.keys(compat).length > 0;
   if (!hasCompat && !thinkingLevelMap) return undefined;

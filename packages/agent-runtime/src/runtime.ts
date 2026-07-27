@@ -80,7 +80,7 @@ export type RuntimeProviderConfig = {
   temperature?: number;
   /** Wire-dialect hints resolved from the pi-ai catalog by the main process
    * (the sidecar never loads the catalog). Controls how thinking on/off is
-   * expressed on custom OpenAI-compatible endpoints. */
+   * expressed on compatible endpoints. */
   modelCompat?: ModelWireCompat;
 };
 

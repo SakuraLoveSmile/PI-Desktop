@@ -149,6 +149,7 @@ function enrichProvider<T extends RuntimeProvider>(
   const capabilities = resolveThinkingCapabilities({
     vendorKey: provider.vendorKey || "custom",
     modelId,
+    apiStyle: provider.apiStyle,
     supportsReasoning: provider.supportsReasoning,
     supportedThinkingLevels: provider.supportedThinkingLevels,
   });
@@ -187,6 +188,7 @@ function enrichSession<T extends RuntimeSession>(
   const capabilities = resolveThinkingCapabilities({
     vendorKey: provider.vendorKey || "custom",
     modelId: session.modelId,
+    apiStyle: provider.apiStyle,
     supportsReasoning: provider.supportsReasoning,
     supportedThinkingLevels: provider.supportedThinkingLevels,
   });
@@ -2213,6 +2215,7 @@ function registerIpc() {
         const thinking = resolveThinkingCapabilities({
           vendorKey: provider?.vendorKey || "custom",
           modelId: model.modelId,
+          apiStyle,
           supportsReasoning: provider?.supportsReasoning,
           supportedThinkingLevels: provider?.supportedThinkingLevels,
         });

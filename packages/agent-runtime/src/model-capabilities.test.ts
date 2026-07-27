@@ -36,6 +36,20 @@ describe("resolveThinkingCapabilities", () => {
     });
   });
 
+  it("removes off for adaptive-only Anthropic-compatible models", () => {
+    expect(
+      resolveThinkingCapabilities({
+        vendorKey: "custom",
+        modelId: "claude-opus-4-6",
+        apiStyle: "anthropic_messages",
+        supportsReasoning: true,
+      }),
+    ).toEqual({
+      supportsReasoning: true,
+      supportedThinkingLevels: ["minimal", "low", "medium", "high", "max"],
+    });
+  });
+
   it("defaults unknown models to no reasoning", () => {
     expect(
       resolveThinkingCapabilities({
@@ -133,6 +147,17 @@ describe("resolveModelWireCompat", () => {
     });
 
     expect(wire?.thinkingLevelMap?.off).toBe("none");
+  });
+
+  it("preserves adaptive thinking and marks off unsupported", () => {
+    const wire = resolveModelWireCompat({
+      vendorKey: "custom",
+      modelId: "claude-opus-4-6",
+      apiStyle: "anthropic_messages",
+    });
+
+    expect(wire?.compat?.forceAdaptiveThinking).toBe(true);
+    expect(wire?.thinkingLevelMap?.off).toBeNull();
   });
 
   it("requires a separator boundary for prefix matches", () => {
