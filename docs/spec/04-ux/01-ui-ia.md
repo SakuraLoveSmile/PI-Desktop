@@ -47,23 +47,23 @@ destination, chat as the home surface, tools and permissions inline.
   sidebar, and docked composer reuse the canonical `build/icon_1024.png` logo,
   while New task/session controls use a dedicated message-plus icon. On
   Windows/Linux, the expanded sidebar begins with a keyboard-accessible Home
-  brand and Search at the right; activating the brand returns the main pane to
-  chat. The macOS expanded sidebar omits the logo/title brand and places only
-  Search at the right of the traffic-light row. Sidebar collapse/expand lives in
-  the session pane top-right so navigation chrome stays free. `Codex` remains
-  only an external import source or a design-reference term.
+  brand and Search plus Collapse sidebar controls at the right; activating the
+  brand returns the main pane to chat. The macOS expanded sidebar omits the
+  logo/title brand and places only Search and Collapse sidebar at the right of
+  the traffic-light row. `Codex` remains only an external import source or a
+  design-reference term.
 - **Main pane**: exactly one destination at a time; destinations replace the
   pane (they are pages, not modals).
 - **Titlebar**: platform-native desktop chrome (D118). macOS uses
   `hiddenInset` traffic lights and the system application menu. The expanded
-  sidebar keeps Search in the same 46px row, aligned to the right outside the
-  traffic-light safety area; no logo/title is rendered there, including in
-  fullscreen. The session pane titlebar hosts the sidebar collapse/expand
-  control at its top-right.
-  Windows/Linux use a menu-free frameless 46px row with sidebar Search on the
-  left header and accessible minimize / maximize-or-restore / close controls on
-  the right (D129), with the session-pane sidebar toggle just before those
-  window controls. Destination history is shortcut-only (`Cmd/Ctrl+[` and
+  sidebar keeps Search and Collapse sidebar in the same 46px row, aligned to
+  the right outside the traffic-light safety area; no logo/title is rendered
+  there, including in fullscreen. While the work panel is open, the session
+  pane titlebar hosts its collapse control at the top-right so the panel tab
+  strip is tabs-only.
+  Windows/Linux use a menu-free frameless 46px row with sidebar actions on the
+  left and accessible minimize / maximize-or-restore / close controls on the
+  right (D129). Destination history is shortcut-only (`Cmd/Ctrl+[` and
   `Cmd/Ctrl+]`); no back/forward buttons are rendered. The main titlebar has no
   notification action; the durable local inbox opens from the sidebar footer
   bell instead (D130/D117).

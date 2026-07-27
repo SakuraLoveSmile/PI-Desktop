@@ -932,8 +932,9 @@ Each scenario is documented in this format:
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one closeable top tab; file
-  tabs are path-keyed, repeated resources deduplicate, and tabs scroll without
-  colliding with the collapse control while keeping the active tab visible.
+  tabs are path-keyed, repeated resources deduplicate, and tabs scroll across
+  the full work-panel header while keeping the active tab visible. The sole
+  collapse control sits in the session pane top-right rather than the tab strip.
   Active close selects the right neighbor then left; closing the last tab hides
   the panel. Collapse retains runtime
   tabs but hides the panel until another artifact reopens it. Width clamps to
@@ -1999,9 +2000,10 @@ This test plan spec is accepted when:
 - Right-click the `Projects` heading or empty project-list chrome and expect a
   one-item create menu that opens the same project picker as the folder-plus
   action.
-- Expect the sidebar collapse/expand control in the session pane top-right, not
-  in the sidebar header beside Search; project and session lists scroll inside
-  the sidebar body without clipping behind the footer.
+- Expect project and session lists to scroll inside the sidebar body without
+  clipping behind the footer; sidebar Search/Collapse remain in the sidebar
+  header. When the work panel is open, expect its sole collapse control in the
+  session pane top-right rather than the work-panel tab strip.
 - Collapse A by clicking its directory label, expand it from the chevron area,
   then activate B and return to A. Only A's child rows collapse; project `+`
   and overflow actions do not toggle it; the

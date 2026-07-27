@@ -14,6 +14,10 @@ const appSource = await readFile(
   new URL("../src/App.tsx", import.meta.url),
   "utf8",
 );
+const panelSource = await readFile(
+  new URL("../src/components/workpanel/WorkPanel.tsx", import.meta.url),
+  "utf8",
+);
 const shortcutSource = await readFile(
   new URL("../../../packages/shared/src/keyboard-shortcuts.ts", import.meta.url),
   "utf8",
@@ -39,24 +43,26 @@ test("sidebar brand returns to the chat home", () => {
   assert.match(brandButton, /t\("app\.shellName"\)/);
 });
 
-test("sidebar header retains non-mac branding and keeps search without collapse", () => {
+test("sidebar header retains non-mac branding and keeps collapse beside search", () => {
   const header = sidebarSource.match(
     /<div className="sidebar-header">[\s\S]*?<\/div>\s*<\/div>/,
   )?.[0] ?? "";
 
   assert.match(header, /className="brand no-drag"/);
   assert.match(header, /className="sidebar-header-actions no-drag"/);
-  assert.match(header, /<IconSearch/);
-  assert.doesNotMatch(header, /data-nav="toggle-sidebar"/);
-  assert.doesNotMatch(header, /IconSidebar/);
+  assert.ok(header.indexOf("<IconSearch") < header.indexOf("<IconSidebar"));
+  assert.match(header, /data-nav="toggle-sidebar"/);
   assert.doesNotMatch(appSource, /IconChevronLeft|IconChevronRight/);
 });
 
-test("session pane hosts the sidebar collapse control at the top-right", () => {
+test("session pane hosts the work panel collapse control at the top-right", () => {
+  assert.match(appSource, /function SessionPaneWorkPanelCollapse/);
   assert.match(appSource, /className="main-titlebar-right no-drag"/);
-  assert.match(appSource, /function SessionPaneSidebarToggle/);
-  assert.match(appSource, /data-nav="toggle-sidebar"/);
-  assert.match(appSource, /data-sidebar-state=\{collapsed \? "collapsed" : "expanded"\}/);
+  assert.match(appSource, /data-action="collapse-work-panel"/);
+  assert.match(appSource, /workPanelOpen && \(/);
+  assert.match(appSource, /collapseWorkPanel\(\)/);
+  assert.doesNotMatch(panelSource, /work-panel-collapse/);
+  assert.doesNotMatch(panelSource, /collapsePanel/);
   assert.match(
     globalStyles,
     /\.session-pane-toggle\s*\{[^}]*display:\s*inline-flex;/s,

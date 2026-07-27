@@ -64,7 +64,10 @@ test("work panel renders only dynamic artifact tabs with close controls", () => 
   assert.match(panelSource, /role="tabpanel"/);
   assert.match(panelSource, /className="work-panel-tab-close"/);
   assert.match(panelSource, /closeTab\(tab\.id\)/);
-  assert.match(panelSource, /collapsePanel/);
+  assert.doesNotMatch(panelSource, /collapsePanel/);
+  assert.doesNotMatch(panelSource, /work-panel-collapse/);
+  assert.match(appSource, /data-action="collapse-work-panel"/);
+  assert.match(appSource, /SessionPaneWorkPanelCollapse/);
   assert.match(panelSource, /activeTabRef\.current\?\.scrollIntoView/);
   assert.match(panelSource, /inline:\s*"nearest"/);
   assert.doesNotMatch(panelSource, /work-panel-rail/);
