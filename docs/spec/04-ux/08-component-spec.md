@@ -12,8 +12,8 @@
 > (D034+), the decision log wins — it tracks the live gold captures. Known
 > updated values: sidebar ~275px (not 240px), toolbar 46px (not 44px),
 > composer placeholder per D094/D066, home empty stack per D111,
-> Projects index table per D066, settings full-page shell per D063 with the
-> compact four-destination directory from D090, and retained path-keyed
+> Projects index table per D066/D133, settings full-page shell per D063 with the
+> compact five-destination directory from D090/D133, and retained path-keyed
 > project groups per D093 (which preserves D088's Temporary/exact-path boundary
 > while restoring scoped project and conversation organization actions), and
 > product branding/icon contract per D094.
@@ -145,8 +145,9 @@ expanded sidebar shows retained project tabs under a `Projects` heading and
 path-less conversations under a separate `Sessions` heading; the collapsed
 state is an icon rail. Retained tabs are renderer presentation state, not
 additional host workspaces.
-The home destination controls expose Projects and Plugins only; Pull requests
-and Scheduled are not rendered in the sidebar.
+The home destination controls expose Plugins only; Projects is managed through
+Settings → Project archive, while Pull requests and Scheduled are not rendered
+in the sidebar.
 
 ### 3.2 Anatomy
 
@@ -155,7 +156,7 @@ Expanded (~275px, D034/D070):
 +---------------------------+
 | [π] PI-Desktop            |
 | [message+ New Chat] button |
-| Projects / Plugins        |
+| Plugins                   |
 | PROJECTS            [dir+]|
 | [v] project-A      [+] … |
 |   • Project session      |
@@ -465,7 +466,8 @@ SESSIONS                                      [msg+][↕]
 - Project matching uses the normalized full project path, never only the folder
   basename.
 - Sessions for retained paths appear beneath their corresponding project
-  group. Sessions for closed paths remain discoverable from the Projects index.
+  group. Sessions for closed paths remain discoverable from Settings → Project
+  archive.
 - Selecting a temporary session clears the active workspace so session and
   tool context do not imply project access.
 - Pin/archive actions update renderer presentation metadata; delete remains

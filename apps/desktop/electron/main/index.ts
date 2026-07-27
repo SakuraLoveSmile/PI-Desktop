@@ -764,6 +764,11 @@ async function createWindow() {
                 `window.__PI_DESKTOP__?.setPage?.(${JSON.stringify(page)})`,
               );
             };
+            const setSettingsTab = async (tab: string) => {
+              await mainWindow!.webContents.executeJavaScript(
+                `window.__PI_DESKTOP__?.setSettingsTab?.(${JSON.stringify(tab)})`,
+              );
+            };
             const setTheme = async (theme: "light" | "dark") => {
               await mainWindow!.webContents.executeJavaScript(
                 `window.__PI_DESKTOP__?.setThemeAttr?.(${JSON.stringify(theme)})`,
@@ -1051,9 +1056,9 @@ async function createWindow() {
             await setPage("chat");
             await new Promise((r) => setTimeout(r, 250));
             await shot("pi-dark-home");
-            await setPage("projects");
+            await setSettingsTab("projects");
             await new Promise((r) => setTimeout(r, 300));
-            await shot("pi-dark-projects");
+            await shot("pi-dark-project-archive");
             await setPage("pulls");
             await new Promise((r) => setTimeout(r, 300));
             await shot("pi-dark-pulls");
@@ -1064,9 +1069,9 @@ async function createWindow() {
             await setPage("pulls");
             await new Promise((r) => setTimeout(r, 450));
             await shot("pi-pulls-live");
-            await setPage("projects");
+            await setSettingsTab("projects");
             await new Promise((r) => setTimeout(r, 350));
-            await shot("pi-projects-live");
+            await shot("pi-project-archive-live");
             await setPage("scheduled");
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-scheduled-live");

@@ -218,8 +218,8 @@ export type AppState = {
   toasts: ToastItem[];
   notifications: AppNotification[];
   unreadNotificationCount: number;
-  page: "chat" | "projects" | "pulls" | "scheduled" | "plugins" | "settings";
-  settingsTab: "general" | "agent" | "import" | "about";
+  page: "chat" | "pulls" | "scheduled" | "plugins" | "settings";
+  settingsTab: "general" | "agent" | "import" | "projects" | "about";
   /** Pending row anchor (i18n key) to flash after landing on a settings tab. */
   settingsAnchor: string | null;
   navStack: Array<{ page: AppState["page"]; sessionId?: string }>;

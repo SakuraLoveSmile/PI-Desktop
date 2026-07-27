@@ -18,6 +18,7 @@ import {
   type SettingsNavGroupId,
 } from "../lib/settings-search";
 import {
+  IconArchive,
   IconChevronLeft,
   IconConfig,
   IconInfo,
@@ -26,6 +27,7 @@ import {
   IconSnapshot,
 } from "../components/icons";
 import { ProvidersSection } from "../components/settings/ProvidersSection";
+import { ProjectsPage } from "./ProjectsPage";
 
 type SettingsTab = ReturnType<typeof useAppStore.getState>["settingsTab"];
 
@@ -462,6 +464,7 @@ export function SettingsPage() {
       general: <IconSettings size={14} />,
       agent: <IconConfig size={14} />,
       import: <IconSnapshot size={14} />,
+      projects: <IconArchive size={14} />,
       about: <IconInfo size={14} />,
     };
     const groups = new Map<SettingsNavGroupId, NavGroup>();
@@ -691,6 +694,8 @@ export function SettingsPage() {
           {tab === "agent" && <ProvidersSection />}
 
           {tab === "import" && <ImportSection />}
+
+          {tab === "projects" && <ProjectsPage />}
 
           {tab === "about" && (
             <SettingsCard>

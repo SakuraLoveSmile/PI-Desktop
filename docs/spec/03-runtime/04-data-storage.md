@@ -184,8 +184,9 @@ type SidebarPreferences = {
 
 ### 4.2 projects — places work happens
 
-Replaces the v1 `workspace` singleton. Feeds the Projects index page (D066),
-sidebar group-by-project (benchmark §3.8), and future per-project defaults.
+Replaces the v1 `workspace` singleton. Feeds the Settings Project archive index
+(D066/D133), sidebar group-by-project (benchmark §3.8), and future per-project
+defaults.
 
 ```sql
 CREATE TABLE projects (
@@ -203,9 +204,9 @@ CREATE TABLE projects (
 - Project paths are trimmed, separators are normalized to `/`, and trailing
   separators are removed before the unique-path upsert. Imports therefore
   materialize one durable logical project directory per distinct path.
-- `projects.list` is the Projects index source of truth. Renderer preferences
-  may hide an archived project from the default sidebar, but cannot remove or
-  hide its durable Projects-index row.
+- `projects.list` is the Project archive index source of truth. Renderer
+  preferences may hide an archived project from the default sidebar, but cannot
+  remove or hide its durable Projects-index row.
 - A project row is a logical index entry. Import never creates an operating
   system directory: historical paths may be missing, remote, or read-only.
 - The *current* visible workspace is `kv(app, currentProjectId)` — no singleton

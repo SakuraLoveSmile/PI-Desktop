@@ -5,7 +5,7 @@
  * like "主题" or "theme" can surface the tab that owns the row.
  */
 
-export type SettingsTabId = "general" | "agent" | "import" | "about";
+export type SettingsTabId = "general" | "agent" | "import" | "projects" | "about";
 
 export type SettingsNavGroupId = "personal" | "integrations" | "system";
 
@@ -63,6 +63,17 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.importSourceClaudeCode",
       "settings.importSourceOpenCode",
       "settings.importSourceCodex",
+    ],
+  },
+  {
+    id: "projects",
+    labelKey: "settings.projectArchive",
+    groupId: "system",
+    keywordKeys: [
+      "project.title",
+      "project.searchPlaceholder",
+      "project.archive",
+      "project.restore",
     ],
   },
   {

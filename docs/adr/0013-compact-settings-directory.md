@@ -1,6 +1,6 @@
 # ADR 0013: Consolidate settings navigation into four destinations
 
-- Status: Accepted
+- Status: Superseded in part by ADR 0026
 - Date: 2026-07-26
 
 ## Context

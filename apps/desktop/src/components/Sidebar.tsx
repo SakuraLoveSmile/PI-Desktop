@@ -1047,10 +1047,6 @@ export function Sidebar({
         </button>
 
         <nav className="mb-0.5 space-y-0 px-0.5">
-          <button className={`nav-item ${page === "projects" ? "active" : ""}`} data-nav="projects" onClick={() => setPage("projects")}>
-            <IconFolder size={15} />
-            <span>{t("nav.projects")}</span>
-          </button>
           <button className={`nav-item ${page === "plugins" ? "active" : ""}`} data-nav="plugins" onClick={() => setPage("plugins")}>
             <IconAt size={15} />
             <span>{t("nav.plugins")}</span>
