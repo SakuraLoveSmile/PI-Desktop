@@ -282,10 +282,12 @@ type SessionDetail = SessionSummary & {
 };
 ```
 
-Electron main enriches session list/get/create/fork/configure results with effective
-reasoning capability for that session's exact `(providerId, modelId)`. Missing
-provider/model metadata yields `supportsReasoning: false` and `off`; the Rust
-host remains authoritative only for the durable `thinkingLevel`.
+Electron main enriches session list/get/create/fork/configure results with
+effective reasoning capability from pi-ai's model record for that session's
+exact `(providerId, modelId)`. Missing pi model metadata yields
+`supportsReasoning: false` and `off`; cached discovery and legacy provider
+overrides do not replace pi semantics. The Rust host remains authoritative only
+for the durable `thinkingLevel`.
 
 Minimal interface:
 

@@ -5,27 +5,31 @@ export type ThinkingCapabilitySet = {
   supportedThinkingLevels: readonly ThinkingLevel[];
 };
 
-/**
- * Wire-dialect hints for a custom/compatible endpoint, resolved from the
- * pi-ai catalog in the main process. The sidecar runtime path applies them
- * verbatim; it never loads the catalog itself (see clampThinkingLevel).
- *
- * Without these, "off" on an OpenAI-compatible endpoint emits no request
- * parameter at all, so server-side default-on reasoners (e.g. MiMo *-think)
- * keep thinking despite the selected level.
- */
-export type ModelWireCompat = {
-  compat?: {
-    /** pi-ai thinking dialect, e.g. "deepseek" -> thinking: {type: "disabled"}. */
-    thinkingFormat?: string;
-    requiresReasoningContentOnAssistantMessages?: boolean;
-    supportsReasoningEffort?: boolean;
-    /** Adaptive-only Anthropic models reject thinking.type = "disabled". */
-    forceAdaptiveThinking?: boolean;
-    chatTemplateKwargs?: Record<string, unknown>;
-  };
-  /** Catalog level mapping, e.g. off -> "none" for gpt-5.1-style endpoints. */
+/** Serializable pi-ai model metadata resolved in Electron main. */
+export type PiModelConfig = {
+  source: "pi";
+  name: string;
+  baseUrl: string;
+  reasoning: boolean;
   thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>;
+  input: Array<"text" | "image">;
+  cost: {
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+    tiers?: Array<{
+      inputTokensAbove: number;
+      input: number;
+      output: number;
+      cacheRead: number;
+      cacheWrite: number;
+    }>;
+  };
+  contextWindow: number;
+  maxTokens: number;
+  headers?: Record<string, string>;
+  compat?: Record<string, unknown>;
 };
 
 const THINKING_LEVELS: ThinkingLevel[] = [

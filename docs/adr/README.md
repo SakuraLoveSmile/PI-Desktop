@@ -42,3 +42,4 @@ Each ADR includes:
 | 0024 | Composer slash commands and @ file references | Accepted |
 | 0025 | Keep application menus out of Windows/Linux windows | Accepted |
 | 0026 | Move the Projects index into Settings as an archive | Accepted |
+| 0027 | Make pi-ai authoritative for model metadata | Accepted |

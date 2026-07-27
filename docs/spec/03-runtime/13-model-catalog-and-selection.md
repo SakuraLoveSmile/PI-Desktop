@@ -155,21 +155,19 @@ Warnings are non-blocking unless execution is impossible.
 
 ### 11.1 Reasoning capability resolution
 
-1. An explicit provider `supportsReasoning: false` is authoritative and
-   yields only `off`, including when cached model capabilities say reasoning.
-2. An explicit non-empty `supportedThinkingLevels` override is authoritative
-   for custom/compatible providers and wins over catalog level sets, including
-   boolean-like sets such as `["off","high"]`.
-3. An explicit `true` without levels enables the conservative custom-provider
-   graded set when the model is absent from pi's catalog.
-4. Without those overrides, resolve pi catalog metadata for the exact
-   `(vendorKey, modelId)`.
-5. The Composer renders the selector only when the effective model supports
+1. Resolve pi catalog metadata for the exact `(vendorKey, modelId)` or a
+   separator-bounded compatible-gateway alias.
+2. The complete pi model record is authoritative; cached/discovered model
+   capabilities and legacy provider overrides cannot replace its reasoning
+   flag or thinking-level map.
+3. A free-form id absent from pi is an unknown generic model and exposes only
+   `off`; the UI cannot promote it to reasoning-capable.
+4. The Composer renders the selector only when the resolved pi model supports
    reasoning and lists only the resolved `supportedThinkingLevels`.
-6. If a stored/requested level is unavailable, choose the nearest supported
+5. If a stored/requested level is unavailable, choose the nearest supported
    level by scanning upward first and then downward. Non-reasoning models
    always resolve to `off`.
-7. Changing to a non-reasoning provider persists `off`; no unsupported level
+6. Changing to a non-reasoning provider persists `off`; no unsupported level
    leaks into the next request.
 
 ## 12. Refresh strategy
@@ -196,6 +194,7 @@ Warnings are non-blocking unless execution is impossible.
       refresh keeps the cached picker populated
 - [ ] capability badges visible
 - [ ] session model change applies to next turn only
-- [ ] reasoning selector is capability-gated and sparse level sets clamp the
-      same way in Composer, Electron main, and the pi sidecar
-- [ ] explicit reasoning disable removes stale catalog capability
+- [ ] reasoning selector is capability-gated and pi-published sparse level
+      sets clamp the same way in Composer, Electron main, and the pi sidecar
+- [ ] provider settings and cached discovery cannot override a known pi model
+- [ ] unknown free-form models remain runnable without invented capabilities

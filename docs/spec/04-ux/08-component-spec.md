@@ -1302,14 +1302,16 @@ groups, select candidates, and start an explicit import.
 ## 19. ProviderStudio (Settings → Agent)
 
 ### 19.1 Purpose
-Modern model-configuration surface for adding OpenAI-compatible providers, reviewing readiness, and managing default/thinking behavior without a dense form dump.
+Modern model-configuration surface for adding OpenAI-compatible providers,
+reviewing readiness, and managing connection/default behavior without a dense
+form dump. Model parameters remain owned by pi-ai.
 
 ### 19.2 Anatomy
 1. **Hero summary** — kicker, title, short description, stats for provider count / ready count / default pair
 2. **Defaults card** — segmented default mode, default model id, Enter-to-send switch
 3. **Providers head** — section title + primary Add provider toggle
-4. **Composer** — dialog with 2-column form (name, base URL, model id, API key, thinking presets, optional custom levels)
-5. **Provider cards** — avatar initials, badges (default / secret state), host + model + thinking meta, thinking select, Test / Make default / Delete
+4. **Composer** — dialog with connection fields (name, base URL, model id, API style, API key); no reasoning, thinking-level, context, output, temperature, or compatibility controls
+5. **Provider cards** — avatar initials, badges (default / secret state), host + model, Test / Make default / Delete
 
 ### 19.3 States
 | State | Presentation |

@@ -58,8 +58,9 @@ interface AgentRuntime {
 1. load the durable session and reject a missing session
 2. resolve that session's mode/provider/model and project binding (app/current
    workspace defaults are legacy fallback only)
-3. resolve reasoning capability for that exact provider/model and clamp the
-   durable session thinking level to the nearest supported value
+3. resolve the complete pi-ai model record for that exact provider/model and
+   clamp the durable session thinking level to pi's nearest supported value;
+   an unknown free-form id uses the explicit generic fallback
 4. validate model/secret availability
 5. reject if session busy
 6. persist user message
@@ -91,9 +92,12 @@ interface AgentRuntime {
 
 - Canonical levels are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`,
   and `max`.
-- An explicit provider `supportsReasoning` override wins over pi's generated
-  model catalog. Otherwise capability is resolved from the exact selected
-  `(vendorKey, modelId)`.
+- Pi's generated model catalog is authoritative for reasoning support,
+  thinking-level mapping, limits, input modes, pricing, headers, and adapter
+  compatibility for every resolved known model.
+- Provider configuration cannot override known-model semantics. Unknown
+  free-form ids remain runnable through a generic text-only, non-reasoning
+  model and therefore expose only `off`.
 - Unsupported requested levels use pi's nearest-supported-level rule: scan
   upward first, then downward. A non-reasoning provider always resolves to
   `off`.
@@ -141,7 +145,10 @@ MVP UI always includes at least:
 
 Runtime responsibilities:
 - resolve `(providerId, modelId)`
-- resolve model reasoning capability and effective thinking level
+- resolve and serialize the complete pi-ai model record, or label the model as
+  an unknown generic fallback
+- resolve model reasoning capability and effective thinking level from that
+  same record
 - fetch secrets via host (never cache raw secrets in logs)
 - translate vendor failures into provider AppError codes
 - stream tokens/events to orchestrator
