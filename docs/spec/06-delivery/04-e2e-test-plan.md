@@ -1687,9 +1687,11 @@ This test plan spec is accepted when:
 
 ### US-UI-57 Multi-project sidebar groups
 - Open projects A and B without closing either.
-- Expect one path-keyed group per retained project, an active-state marker on
-  exactly one group, and a separate Temporary sessions group. Adjacent groups
-  read as a compact continuous tree without detached card spacing.
+- Expect a `Projects` heading with a new-project folder action, one path-keyed
+  group per retained project, and an active-state marker on exactly one group.
+  Below those groups, expect a separate `Sessions` heading containing path-less
+  conversations plus new-session and sort actions. Adjacent project groups read
+  as a compact continuous tree without detached card spacing.
 - Collapse A by clicking its directory label, expand it from the chevron area,
   then activate B and return to A. Only A's child rows collapse; project `+`
   and overflow actions do not toggle it; the
@@ -1702,8 +1704,9 @@ This test plan spec is accepted when:
 - Open a project and conversation overflow menu.
 - Expect localized Pin/Unpin, Archive/Restore, and (for conversations) Delete
   actions with keyboard-reachable menu semantics.
-- Pin one project/session and choose each user-facing sort mode (Recently
-  updated, Created date, Oldest first, Name). Pinned rows remain first.
+- Open the sort menu from the standalone `Sessions` heading, pin one
+  project/session, and choose each user-facing sort mode (Recently updated,
+  Created date, Oldest first, Name). Pinned rows remain first.
 - Archive a row, verify it is absent by default, enable Show archived, and
   restore it. The transcript and project binding remain unchanged.
 - A legacy `manual` preference loads without presenting a drag-reorder

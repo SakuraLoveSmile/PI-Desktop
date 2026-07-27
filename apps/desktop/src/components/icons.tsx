@@ -28,6 +28,7 @@ import {
   FileDiff,
   FileText,
   Folder,
+  FolderPlus,
   Globe2,
   GitFork,
   GitPullRequestArrow,
@@ -91,6 +92,7 @@ export const IconChat = icon(MessageSquare);
 /** Session creation affordance. Keep it distinct from generic add actions. */
 export const IconNewSession = icon(MessageSquarePlus);
 export const IconFolder = icon(Folder);
+export const IconNewProject = icon(FolderPlus);
 export const IconFileText = icon(FileText);
 export const IconGlobe = icon(Globe2);
 export const IconBranch = icon(GitFork);

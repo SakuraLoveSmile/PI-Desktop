@@ -61,6 +61,7 @@ export const zhCN = {
   },
   nav: {
     newTask: "新建任务",
+    newProject: "新建项目",
     projects: "项目",
     plugins: "插件",
     recents: "最近",

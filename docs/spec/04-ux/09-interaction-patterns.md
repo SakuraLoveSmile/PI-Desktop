@@ -73,8 +73,11 @@
 ### 1.6 Sidebar project and conversation organization
 
 The sidebar is a path-keyed presentation of host-owned projects and sessions.
-Several project groups may be retained while exactly one workspace supplies
-the visible shell context.
+The `Projects` section heading exposes the project picker above retained
+project groups. The `Sessions` heading appears below those groups and contains
+path-less conversations plus their create and sort controls. Several project
+groups may be retained while exactly one workspace supplies the visible shell
+context.
 
 #### Project tab lifecycle
 
@@ -130,9 +133,10 @@ the visible shell context.
 
 #### Focus and semantics
 
-- Project and Temporary directory rows expose `aria-expanded` and
-  `aria-controls`; sort/archive menu choices expose
-  their checked state. Active session rows retain `aria-current`.
+- Project directory rows expose `aria-expanded` and `aria-controls`;
+  new-project/new-session controls have scope-specific accessible names, and
+  sort/archive menu choices expose their checked state. Active session rows
+  retain `aria-current`.
 - Toggling disclosure or a menu action keeps focus on its control. Selecting a
   project/session returns focus to the composer after loading.
 - Sort, archive, restore, pin, Create branch, and close actions remain
@@ -511,9 +515,8 @@ When drag/drop is implemented, these patterns should apply:
 
 ### 9.2 Sidebar scrolling
 
-- All retained project groups and the Temporary session group share one
-  scrollable sidebar region independent from the footer and primary
-  navigation.
+- All retained project groups and the standalone Sessions section share one
+  scrollable sidebar region independent from the footer and primary navigation.
 - No horizontal scroll in sidebar
 - Scroll indicator: subtle fade at top/bottom edges (gradient mask, not scrollbar thumb)
 
