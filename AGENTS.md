@@ -44,13 +44,19 @@ not allowed.
 4. Implement
 5. Update specs / ADR / decisions-log
 6. Update or add e2e scenarios
-7. Run checks (lint, typecheck, tests)
+7. Run non-E2E checks (lint, typecheck, unit/integration tests, build); run E2E
+   only when the user explicitly requests it
 8. Commit with conventional message
 9. Update BOARD if milestone-related
 10. Push the branch and open a PR/MR to `main`
 11. Pass required checks, merge, and delete the request branch
 
 → [03-ai-development-workflow.md §2](docs/spec/06-delivery/03-ai-development-workflow.md#2-development-loop)
+
+E2E scenario documentation remains mandatory under Rule 3. Agents must not
+proactively run local E2E commands or manually dispatch/rerun remote E2E jobs
+unless the user explicitly requests E2E validation. Automatically triggered
+required remote checks remain part of the merge gate.
 
 ## Commit Format
 
@@ -96,6 +102,7 @@ Run the [change checklist](docs/spec/06-delivery/05-change-checklist.md):
 - Leave large uncommitted diffs at session end
 - Change behavior without updating specs
 - Skip e2e doc for user-visible changes
+- Manually run or dispatch E2E without an explicit user request
 - Modify frozen baseline decisions without ADR + version bump
 - Develop or push directly on `main`
 - Mark work complete before its PR/MR is merged into `main`

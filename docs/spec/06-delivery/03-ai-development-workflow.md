@@ -67,7 +67,8 @@ Every change follows this sequence. Steps may be iterated if the implementation 
 4. Implement
 5. Update specs / ADR / decisions-log if needed
 6. Update or add e2e scenarios
-7. Run checks (lint, typecheck, tests — when code exists)
+7. Run non-E2E checks (lint, typecheck, unit/integration tests, build — when code exists)
+   and run E2E only when explicitly requested by the user
 8. Commit with conventional message
 9. Update BOARD if milestone-related
 10. Push branch + open PR/MR to main
@@ -84,11 +85,24 @@ Every change follows this sequence. Steps may be iterated if the implementation 
 | **4. Implement** | Write code, config, or assets. | Changed files. |
 | **5. Spec-sync** | Update specs per the impact list. Add ADR if architectural. Update `decisions-log.md` if an implementation default changes. | Updated docs/spec/\* and/or docs/adr/\*. |
 | **6. E2E doc** | Add or update scenario entries in `04-e2e-test-plan.md`. Link to acceptance criteria IDs (A–H). | Updated e2e test plan. |
-| **7. Run checks** | Lint, typecheck, unit tests, build. Skip if only docs changed. | Passing CI (or known skip reason). |
+| **7. Run checks** | Run appropriate non-E2E checks: lint, typecheck, unit/integration tests, and build. Skip if only docs changed. Run E2E only when the user explicitly requests E2E validation. | Passing checks (or known skip reason). |
 | **8. Commit** | Git commit with conventional message (see §4). | One or more commits. |
 | **9. BOARD** | If the change completes a milestone deliverable, update `docs/project/BOARD.md`. | Updated board. |
 | **10. Open PR/MR** | Push the request branch and open a pull/merge request targeting `main`. | Reviewable remote change with impacted specs and tests listed. |
 | **11. Merge** | Pass required checks and reviews, merge into `main`, and delete the request branch. | Change integrated into `main`; request branch removed. |
+
+### E2E Execution Policy
+
+- E2E scenario documentation and E2E execution are separate concerns. R3 still
+  requires scenario updates for user-visible or protocol-visible behavior.
+- Agents must not proactively run E2E suites or commands, including
+  `pnpm test:e2e*`, Playwright suites, Electron probes, or live-agent E2E
+  scripts. Run them only when the user explicitly requests E2E validation.
+- A generic instruction to run checks or tests means the non-E2E checks listed
+  in Step 7; it does not authorize E2E execution.
+- Required E2E jobs that the hosting platform starts automatically after a
+  push or PR remain merge gates. Observe and report their result, but do not
+  manually dispatch or rerun them unless the user explicitly requests it.
 
 ---
 
@@ -211,7 +225,8 @@ A change is **Done** when all of the following are true:
 2. Code (or doc) implements the planned change.
 3. All impacted specs are updated.
 4. E2E scenarios are documented (or confirmed not needed per §3).
-5. Local and required remote checks pass, or an allowed skip is documented.
+5. Required non-E2E local checks and automatically triggered remote gates pass,
+   or an allowed skip is documented; E2E is run only when explicitly requested.
 6. Change is committed with a conventional message.
 7. BOARD is updated if a milestone deliverable completed.
 8. No secrets or local data are present in the commit.
@@ -228,6 +243,7 @@ A change is **Done** when all of the following are true:
 | Large uncommitted diffs | Violates R2; loss of granularity |
 | Changing behavior without spec update | Violates R1; specs become unreliable |
 | Skipping e2e doc for user-visible changes | Violates R3; traceability gap |
+| Manually running or dispatching E2E without an explicit user request | Violates the opt-in E2E execution policy |
 | Developing, committing, or pushing directly on `main` | Violates R4; bypasses isolation and review gates |
 | Reusing a request branch for unrelated work | Mixes request scope and weakens traceability |
 | Marking work Done before its PR/MR is merged | Violates R4; change is not integrated into `main` |
@@ -247,6 +263,8 @@ This workflow spec itself is accepted when:
 - [ ] Git commit rules match existing repo commit style (`docs:`, `chore:`).
 - [ ] Every request is required to use a branch created from current `main`.
 - [ ] PR/MR creation, remote gates, merge, and branch cleanup are mandatory.
+- [ ] E2E execution is opt-in and requires an explicit user request, while E2E
+      scenario documentation remains mandatory under R3.
 - [ ] Definition of Done is complete and actionable.
 - [ ] Forbidden practices list covers known risk areas.
 - [ ] `AGENTS.md` points to this doc, `04-e2e-test-plan.md`, and `05-change-checklist.md`.

@@ -50,6 +50,12 @@ After implementation (or alongside it):
 - [ ] Traceability matrix in §8 updated with new scenario.
 - [ ] Unit tests added or updated for the changed module (when code exists).
 - [ ] Integration tests added or updated for IPC/RPC contract changes (when code exists).
+- [ ] No E2E suite or command was run unless the user explicitly requested E2E
+  validation.
+- [ ] If the user requested E2E validation, the requested suite and its result
+  are documented in the handoff.
+- [ ] Automatically triggered remote E2E jobs are treated as merge gates, but
+  are not manually dispatched or rerun without an explicit user request.
 
 ---
 
@@ -90,7 +96,7 @@ Before marking work complete, verify **all** of the following:
 | 2 | Code/doc implements the planned change | Step 4 of [development loop](03-ai-development-workflow.md#2-development-loop) |
 | 3 | All impacted specs updated | [R1 — Spec-sync](03-ai-development-workflow.md#r1--spec-first--spec-sync) |
 | 4 | E2E scenarios documented (or confirmed not needed) | [R3 — E2E coverage doc](03-ai-development-workflow.md#r3--e2e-coverage-doc) |
-| 5 | Local and required remote checks pass or skip is justified | Steps 7 and 11 of development loop |
+| 5 | Required non-E2E local checks and automatically triggered remote gates pass or skip is justified; E2E ran only if explicitly requested | Steps 7 and 11 of development loop |
 | 6 | Change committed with conventional message | [R2 — Commit-per-change](03-ai-development-workflow.md#r2--commit-per-change) |
 | 7 | BOARD updated if milestone deliverable completed | Step 9 of development loop |
 | 8 | No secrets or local data in commit | [§4.4 Never commit](03-ai-development-workflow.md#44-never-commit) |
