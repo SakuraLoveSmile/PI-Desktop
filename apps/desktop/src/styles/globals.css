@@ -3258,9 +3258,9 @@ textarea:disabled {
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  background: color-mix(in oklab, var(--ds-accent) 14%, var(--ds-bg-elevated));
-  color: var(--ds-accent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ds-accent) 16%, transparent);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-secondary);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ds-text-primary) 10%, transparent);
 }
 
 .footer-profile-avatar {
