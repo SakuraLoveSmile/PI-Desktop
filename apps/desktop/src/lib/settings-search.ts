@@ -39,6 +39,10 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.enterToSend",
       "settings.permissions",
       "settings.permissionMode",
+      "settings.keyboard",
+      "settings.shortcutAction.openSearch",
+      "settings.shortcutAction.openCommandPalette",
+      "settings.shortcutAction.toggleSidebar",
     ],
   },
   {

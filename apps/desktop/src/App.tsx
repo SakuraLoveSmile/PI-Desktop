@@ -8,7 +8,15 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type { AppMenuCommand } from "@pi-desktop/shared";
+import {
+  KEYBOARD_SHORTCUTS,
+  keybindingDisplayParts,
+  keybindingMatchesEvent,
+  resolveKeybinding,
+  type AppMenuCommand,
+  type KeyboardShortcutId,
+  type ShortcutPlatform,
+} from "@pi-desktop/shared";
 import { Sidebar } from "./components/Sidebar";
 import { WorkPanel } from "./components/workpanel/WorkPanel";
 import { ChatTranscript } from "./components/ChatTranscript";
@@ -33,12 +41,6 @@ import {
   IconNewSession,
   IconSidebar,
 } from "./components/icons";
-
-const sidebarToggleShortcut =
-  typeof navigator !== "undefined" && /Mac/i.test(navigator.platform)
-    ? "⌘B"
-    : "Ctrl+B";
-
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -83,9 +85,11 @@ function projectName(path?: string | null, name?: string | null) {
 function CollapsedTitlebarActions({
   onToggleSidebar,
   onNewTask,
+  sidebarToggleShortcut,
 }: {
   onToggleSidebar: () => void;
   onNewTask: () => void;
+  sidebarToggleShortcut: string;
 }) {
   const { t } = useTranslation();
   const toggleLabel = t("nav.expandSidebar");
@@ -295,66 +299,57 @@ function AppShell() {
         );
     });
     const onKey = (e: KeyboardEvent) => {
-      const commandKey = e.metaKey || e.ctrlKey;
-      // Codex-style global search on ⌘K; the command palette stays on ⌘⇧P.
-      if (commandKey && !e.shiftKey && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setSearchOpen(true);
-      }
-      if (commandKey && e.shiftKey && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        setPaletteOpen(true);
-      }
-      if (commandKey && e.key === ".") {
-        e.preventDefault();
-        void abort();
-      }
-      if (commandKey && e.key.toLowerCase() === "b") {
-        e.preventDefault();
-        setSidebarCollapsed((v) => !v);
-      }
-      if (commandKey && !e.shiftKey && e.key === "[") {
-        e.preventDefault();
-        useAppStore.getState().navBack();
-      }
-      if (commandKey && !e.shiftKey && e.key === "]") {
-        e.preventDefault();
-        useAppStore.getState().navForward();
-      }
+      const shortcut = KEYBOARD_SHORTCUTS.find((candidate) =>
+        keybindingMatchesEvent(
+          resolveKeybinding(
+            candidate,
+            settings?.keybindings,
+            platform as ShortcutPlatform,
+          ),
+          e,
+          platform as ShortcutPlatform,
+        ),
+      );
+      if (!shortcut) return;
+      e.preventDefault();
 
-      if (platform === "darwin") return;
-      if (commandKey && !e.shiftKey && e.key.toLowerCase() === "n") {
-        e.preventDefault();
-        void runMenuCommand("newTask");
-      }
-      if (commandKey && !e.shiftKey && e.key.toLowerCase() === "o") {
-        e.preventDefault();
-        void runMenuCommand("openProject");
-      }
-      if (commandKey && !e.shiftKey && e.key === ",") {
-        e.preventDefault();
-        void runMenuCommand("openSettings");
-      }
-      if (commandKey && !e.shiftKey && e.key.toLowerCase() === "w") {
-        e.preventDefault();
-        void api.windowControl("close");
-      }
-      if (commandKey && !e.shiftKey && e.key === "0") {
-        e.preventDefault();
-        void api.nativeMenuAction("resetZoom");
-      }
-      if (commandKey && !e.shiftKey && (e.key === "+" || e.key === "=")) {
-        e.preventDefault();
-        void api.nativeMenuAction("zoomIn");
-      }
-      if (commandKey && !e.shiftKey && e.key === "-") {
-        e.preventDefault();
-        void api.nativeMenuAction("zoomOut");
-      }
-      if (!commandKey && !e.altKey && !e.shiftKey && e.key === "F11") {
-        e.preventDefault();
-        void api.nativeMenuAction("toggleFullScreen");
-      }
+      const runShortcut = (id: KeyboardShortcutId) => {
+        switch (id) {
+          case "navigateBack":
+            useAppStore.getState().navBack();
+            break;
+          case "navigateForward":
+            useAppStore.getState().navForward();
+            break;
+          case "newTask":
+          case "openProject":
+          case "openSettings":
+            void runMenuCommand(id);
+            break;
+          case "openSearch":
+            setSearchOpen(true);
+            break;
+          case "openCommandPalette":
+            setPaletteOpen(true);
+            break;
+          case "toggleSidebar":
+            setSidebarCollapsed((value) => !value);
+            break;
+          case "abort":
+            void abort();
+            break;
+          case "closeWindow":
+            void api.windowControl("close");
+            break;
+          case "resetZoom":
+          case "zoomIn":
+          case "zoomOut":
+          case "toggleFullScreen":
+            void api.nativeMenuAction(id);
+            break;
+        }
+      };
+      runShortcut(shortcut.id);
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -366,7 +361,16 @@ function AppShell() {
       offNotificationActivated();
       window.removeEventListener("keydown", onKey);
     };
-  }, [bootstrap, handleAgentEvent, showToast, abort, t, platform, runMenuCommand]);
+  }, [
+    bootstrap,
+    handleAgentEvent,
+    showToast,
+    abort,
+    t,
+    platform,
+    runMenuCommand,
+    settings?.keybindings,
+  ]);
 
   const heroProject = useMemo(
     () => projectName(workspace?.path, workspace?.name),
@@ -667,6 +671,20 @@ function AppShell() {
     if (m.role === "assistant") return hasContent || hasThinking;
     return hasContent || m.role === "tool";
   });
+  const shortcutPlatform = platform as ShortcutPlatform;
+  const toggleSidebarShortcut = KEYBOARD_SHORTCUTS.find(
+    (shortcut) => shortcut.id === "toggleSidebar",
+  );
+  const sidebarToggleShortcut = toggleSidebarShortcut
+    ? keybindingDisplayParts(
+        resolveKeybinding(
+          toggleSidebarShortcut,
+          settings?.keybindings,
+          shortcutPlatform,
+        ),
+        shortcutPlatform,
+      ).join(shortcutPlatform === "darwin" ? "" : "+")
+    : "";
 
   // Codex settings is a full-window page (no app sidebar / main titlebar chrome).
   if (page === "settings") {
@@ -701,6 +719,7 @@ function AppShell() {
               <CollapsedTitlebarActions
                 onToggleSidebar={() => setSidebarCollapsed(false)}
                 onNewTask={() => void runMenuCommand("newTask")}
+                sidebarToggleShortcut={sidebarToggleShortcut}
               />
             </div>
           )}

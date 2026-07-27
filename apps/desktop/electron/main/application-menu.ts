@@ -1,10 +1,20 @@
 import { Menu, type MenuItemConstructorOptions } from "electron";
-import { APP_NAME, type AppMenuCommand } from "@pi-desktop/shared";
+import {
+  APP_NAME,
+  KEYBOARD_SHORTCUTS,
+  keybindingToElectronAccelerator,
+  resolveKeybinding,
+  type AppMenuCommand,
+  type KeybindingOverrides,
+  type KeyboardShortcutId,
+  type ShortcutPlatform,
+} from "@pi-desktop/shared";
 import { en, resolveLocale, zhCN } from "@pi-desktop/i18n";
 
 export type ApplicationMenuOptions = {
   platform?: NodeJS.Platform;
   locale?: string;
+  keybindings?: KeybindingOverrides;
   dispatch: (command: AppMenuCommand) => void;
 };
 
@@ -24,11 +34,22 @@ function appCommand(
 export function buildApplicationMenuTemplate({
   platform = process.platform,
   locale = "en",
+  keybindings,
   dispatch,
 }: ApplicationMenuOptions): MenuItemConstructorOptions[] {
   const isMac = platform === "darwin";
+  const shortcutPlatform = platform as ShortcutPlatform;
   const labels = resolveLocale(locale) === "zh-CN" ? zhCN : en;
   const template: MenuItemConstructorOptions[] = [];
+  const accelerator = (id: KeyboardShortcutId) => {
+    const shortcut = KEYBOARD_SHORTCUTS.find((candidate) => candidate.id === id);
+    return shortcut
+      ? keybindingToElectronAccelerator(
+          resolveKeybinding(shortcut, keybindings, shortcutPlatform),
+          shortcutPlatform,
+        )
+      : undefined;
+  };
 
   if (isMac) {
     template.push({
@@ -41,7 +62,7 @@ export function buildApplicationMenuTemplate({
           labels.menu.settings,
           "openSettings",
           dispatch,
-          "CmdOrCtrl+,",
+          accelerator("openSettings"),
         ),
         { type: "separator" },
         { role: "services" },
@@ -59,12 +80,12 @@ export function buildApplicationMenuTemplate({
     {
       label: labels.menu.file,
       submenu: [
-        appCommand(labels.menu.newTask, "newTask", dispatch, "CmdOrCtrl+N"),
+        appCommand(labels.menu.newTask, "newTask", dispatch, accelerator("newTask")),
         appCommand(
           labels.menu.openProject,
           "openProject",
           dispatch,
-          "CmdOrCtrl+O",
+          accelerator("openProject"),
         ),
         ...(!isMac
           ? ([
@@ -73,12 +94,12 @@ export function buildApplicationMenuTemplate({
                 labels.menu.settings,
                 "openSettings",
                 dispatch,
-                "CmdOrCtrl+,",
+                accelerator("openSettings"),
               ),
             ] satisfies MenuItemConstructorOptions[])
           : []),
         { type: "separator" },
-        { role: "close", accelerator: "CmdOrCtrl+W" },
+        { role: "close", accelerator: accelerator("closeWindow") },
       ],
     },
     {
@@ -102,29 +123,29 @@ export function buildApplicationMenuTemplate({
     {
       label: labels.menu.view,
       submenu: [
-        appCommand(labels.menu.search, "openSearch", dispatch, "CmdOrCtrl+K"),
+        appCommand(labels.menu.search, "openSearch", dispatch, accelerator("openSearch")),
         appCommand(
           labels.menu.commandPalette,
           "openCommandPalette",
           dispatch,
-          "CmdOrCtrl+Shift+P",
+          accelerator("openCommandPalette"),
         ),
         appCommand(
           labels.menu.toggleSidebar,
           "toggleSidebar",
           dispatch,
-          "CmdOrCtrl+B",
+          accelerator("toggleSidebar"),
         ),
         { type: "separator" },
         { role: "reload" },
         { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
+        { role: "resetZoom", accelerator: accelerator("resetZoom") },
+        { role: "zoomIn", accelerator: accelerator("zoomIn") },
+        { role: "zoomOut", accelerator: accelerator("zoomOut") },
         { type: "separator" },
         {
           role: "togglefullscreen",
-          ...(isMac ? {} : { accelerator: "F11" }),
+          accelerator: accelerator("toggleFullScreen"),
         },
       ],
     },

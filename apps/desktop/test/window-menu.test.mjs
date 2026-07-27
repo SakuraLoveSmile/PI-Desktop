@@ -10,6 +10,10 @@ const menuSource = await readFile(
   new URL("../electron/main/application-menu.ts", import.meta.url),
   "utf8",
 );
+const shortcutSource = await readFile(
+  new URL("../../../packages/shared/src/keyboard-shortcuts.ts", import.meta.url),
+  "utf8",
+);
 const appSource = await readFile(
   new URL("../src/App.tsx", import.meta.url),
   "utf8",
@@ -67,14 +71,15 @@ test("macOS installs a standard application menu before window creation", () => 
 });
 
 test("macOS application menu routes shell commands and preserves native roles", () => {
-  for (const accelerator of [
-    "CmdOrCtrl+,",
-    "CmdOrCtrl+N",
-    "CmdOrCtrl+O",
-    "CmdOrCtrl+K",
-    "CmdOrCtrl+B",
+  for (const [id, binding] of [
+    ["openSettings", "Mod+Comma"],
+    ["newTask", "Mod+N"],
+    ["openProject", "Mod+O"],
+    ["openSearch", "Mod+K"],
+    ["toggleSidebar", "Mod+B"],
   ]) {
-    assert.match(menuSource, new RegExp(accelerator.replace("+", "\\+")));
+    assert.match(menuSource, new RegExp(`accelerator\\(\"${id}\"\\)`));
+    assert.match(shortcutSource, new RegExp(`defaultBinding: \"${binding.replace("+", "\\+")}\"`));
   }
   for (const role of [
     "undo",
@@ -104,12 +109,16 @@ test("Windows and Linux use menu-free frameless chrome with window controls", ()
   );
   assert.doesNotMatch(appSource, /DesktopMenuBar/);
   assert.doesNotMatch(stylesSource, /\.desktop-menu-/);
-  assert.match(appSource, /platform === "darwin"/);
-  assert.match(appSource, /runMenuCommand\("newTask"\)/);
-  assert.match(appSource, /runMenuCommand\("openProject"\)/);
-  assert.match(appSource, /runMenuCommand\("openSettings"\)/);
-  assert.match(appSource, /nativeMenuAction\("resetZoom"\)/);
-  assert.match(appSource, /nativeMenuAction\("toggleFullScreen"\)/);
+  assert.match(appSource, /platform as ShortcutPlatform/);
+  assert.match(appSource, /resolveKeybinding/);
+  for (const id of ["newTask", "openProject", "openSettings"]) {
+    assert.match(appSource, new RegExp(`case "${id}"`));
+  }
+  assert.match(appSource, /runMenuCommand\(id\)/);
+  for (const id of ["resetZoom", "toggleFullScreen"]) {
+    assert.match(appSource, new RegExp(`case "${id}"`));
+  }
+  assert.match(appSource, /nativeMenuAction\(id\)/);
   assert.match(controlsSource, /windowControl\("getState"\)/);
   assert.match(controlsSource, /aria-label=\{t\("window\.minimize"/);
   assert.match(controlsSource, /aria-label=\{t\("window\.close"/);

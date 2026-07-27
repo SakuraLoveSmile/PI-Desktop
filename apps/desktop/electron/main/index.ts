@@ -30,6 +30,7 @@ import {
   type AgentEventEnvelope,
   type AppMenuCommand,
   type AppNotification,
+  type KeybindingOverrides,
   type NativeMenuAction,
   type Result,
   type ThinkingLevel,
@@ -311,18 +312,29 @@ function dispatchApplicationMenuCommand(command: AppMenuCommand) {
   });
 }
 
-let appliedMenuLocale: string | null = null;
+let appliedMenuSettings: string | null = null;
 
-/** (Re)install the native menu; a saved non-auto language overrides the OS locale. */
-function applyApplicationMenuLanguage(language?: unknown) {
+/** Keep native labels and accelerators aligned with persisted app settings. */
+function applyApplicationMenuSettings(settings?: {
+  language?: unknown;
+  keybindings?: unknown;
+} | null) {
   const locale =
-    typeof language === "string" && language && language !== "auto"
-      ? language
+    typeof settings?.language === "string" &&
+    settings.language &&
+    settings.language !== "auto"
+      ? settings.language
       : app.getLocale();
-  if (appliedMenuLocale === locale) return;
-  appliedMenuLocale = locale;
+  const keybindings =
+    settings?.keybindings && typeof settings.keybindings === "object"
+      ? (settings.keybindings as KeybindingOverrides)
+      : undefined;
+  const signature = JSON.stringify({ locale, keybindings });
+  if (appliedMenuSettings === signature) return;
+  appliedMenuSettings = signature;
   installApplicationMenu({
     locale,
+    keybindings,
     dispatch: dispatchApplicationMenuCommand,
   });
 }
@@ -2155,8 +2167,8 @@ function registerIpc() {
   handle(IPC.invoke.settingsSet, async (settings: unknown) => {
     if (!host) throw new Error("host unavailable");
     const result = await host.call("settings.set", settings);
-    applyApplicationMenuLanguage(
-      (settings as { language?: unknown } | null)?.language,
+    applyApplicationMenuSettings(
+      settings as { language?: unknown; keybindings?: unknown } | null,
     );
     return result;
   });
@@ -3316,8 +3328,9 @@ app.whenReady().then(async () => {
     try {
       const stored = (await host.call("settings.get")) as {
         language?: unknown;
+        keybindings?: unknown;
       } | null;
-      applyApplicationMenuLanguage(stored?.language);
+      applyApplicationMenuSettings(stored);
     } catch {
       // keep the OS-locale menu until settings can be read again
     }
