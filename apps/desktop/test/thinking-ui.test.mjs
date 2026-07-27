@@ -46,6 +46,25 @@ test("composer exposes the runtime thinking level order and provider filtering",
   assert.match(composerSource, /availableThinkingLevels/);
 });
 
+test("reasoning-capable models show thinking immediately after the mode control", () => {
+  const leftToolbar = composerSource.slice(
+    composerSource.indexOf('<div className="composer-left">'),
+    composerSource.indexOf('<div className="composer-right">'),
+  );
+  const modeControl = leftToolbar.indexOf('className="icon-btn mode-chip"');
+  const thinkingControl = leftToolbar.indexOf('className="composer-thinking"');
+  const permissionControl = leftToolbar.indexOf('className="composer-permission"');
+
+  assert.ok(modeControl >= 0);
+  assert.ok(thinkingControl > modeControl);
+  assert.ok(permissionControl > thinkingControl);
+  assert.match(
+    leftToolbar,
+    /thinkingProvider\?\.supportsReasoning\s*&&\s*availableThinkingLevels\.length/,
+  );
+  assert.match(leftToolbar, /composer-thinking-menu/);
+});
+
 test("compatible providers can enable thinking from the model menu", () => {
   assert.match(composerSource, /canEnableThinkingOverride/);
   assert.match(composerSource, /supportsReasoning:\s*true/);

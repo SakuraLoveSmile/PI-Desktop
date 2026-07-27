@@ -771,13 +771,14 @@ Each scenario is documented in this format:
 
 - **Preconditions**: One catalogued reasoning model, one non-reasoning model,
   and a custom provider with an explicit reasoning override.
-- **Steps**: 1) Select each provider/model in turn. 2) Open the model menu and
-  inspect its Thinking section. 3) Choose multiple supported levels without
-  reopening the menu. 4) Use Enable thinking on the unknown custom provider.
-  5) Disable its override in Agent and refresh model data.
-- **Expected**: The menu always shows the current Thinking state; reasoning
-  models expose only their sparse supported levels in canonical order and keep
-  the menu open after selection. Custom providers may persist
+- **Steps**: 1) Select each provider/model in turn. 2) Inspect the composer
+  controls beside Chat / Agent. 3) Open the Thinking trigger and choose multiple
+  supported levels. 4) Use Enable thinking from the model menu on the unknown
+  custom provider. 5) Disable its override in Agent and refresh model data.
+- **Expected**: Reasoning models show the current Thinking level immediately to
+  the right of Chat / Agent, expose only their sparse supported levels in
+  canonical order, and close the menu after selection. Non-reasoning models
+  show no Thinking trigger. Custom providers may persist
   `supportedThinkingLevels` such as `["off","high"]` from Settings and the
   Composer must not invent graded options for those sets. The custom action
   persists `supportsReasoning` and selects the supported level nearest
@@ -1417,10 +1418,10 @@ This test plan spec is accepted when:
 ### US-UI-18 Composer has no inert actions
 - On chat home and a docked thread, inspect every composer control.
 - Expect no file, photo, or appshot controls while those payloads are
-  unsupported by the pi runtime. The model menu always identifies the current
-  Thinking state; exact reasoning-capable models expose their supported levels,
-  unknown compatible models can explicitly enable thinking, and changes update
-  the durable session.
+  unsupported by the pi runtime. Exact reasoning-capable models expose the
+  current Thinking level immediately to the right of Chat / Agent; unsupported
+  models show no trigger. Unknown compatible models can explicitly enable
+  thinking from the model menu, and changes update the durable session.
 - Expect no project, Local, or branch context labels in the composer.
 - Every visible composer control changes the active session, opens its menu, or
   submits/aborts the current turn.
@@ -1437,8 +1438,9 @@ This test plan spec is accepted when:
 
 ### US-UI-21 Composer model menu configures pi
 - Create a session with provider A/model A, then open the composer model menu.
-- Expect enabled, runnable provider/default-model pairs and an Agent
-  entry; no decorative effort levels.
+- Expect enabled, runnable provider/default-model pairs and an Agent entry. The
+  model trigger shows only the model ID; a capability-gated Thinking trigger is
+  placed beside Chat / Agent instead of being nested in the model menu.
 - Select provider B/model B, send a prompt, and expect the main-to-sidecar
   `agent.prompt` payload and pi runtime to use B for that session.
 - Switch away and back; expect B to remain selected. While a turn runs, expect
