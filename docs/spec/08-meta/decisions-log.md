@@ -231,6 +231,12 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 The full open list lives in [open-questions.md](open-questions.md); this
 section mirrors only marketplace/catalog items still blocking nothing.
 
+## U. Settings rail iconography
+
+| ID | Topic | Decision | Rationale |
+|---|---|---|---|
+| D143 | Settings directory rail icons | **The five settings destinations use fixed Lucide glyphs: Basics=`SlidersHorizontal`, Model configuration=`Bot`, Import=`Download`, Project archive=`Archive`, Info=`Info`. Refresh/rotate glyphs are not used on this rail.** | Prior mapping reused Settings/RefreshCcw/RotateCw, which read as generic gear/reload rather than the destination semantics; monochrome Lucide keeps the compact directory scannable. |
+
 ## R. Decision rules going forward
 
 - Architecture-boundary changes require a new ADR

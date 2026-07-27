@@ -77,6 +77,18 @@ test("model configuration keeps model defaults; basics owns app behavior", () =>
   assert.doesNotMatch(providersSource, /settings\.modeAgent/);
 });
 
+
+test("settings nav icons map each destination to a semantic lucide glyph", () => {
+  assert.match(settingsPageSource, /general: <IconSliders/);
+  assert.match(settingsPageSource, /agent: <IconBot/);
+  assert.match(settingsPageSource, /import: <IconDownload/);
+  assert.match(settingsPageSource, /projects: <IconArchive/);
+  assert.match(settingsPageSource, /about: <IconInfo/);
+  assert.doesNotMatch(settingsPageSource, /general: <IconSettings/);
+  assert.doesNotMatch(settingsPageSource, /agent: <IconConfig/);
+  assert.doesNotMatch(settingsPageSource, /import: <IconSnapshot/);
+});
+
 test("settings nav renders grouped sections with keyword search", () => {
   assert.match(settingsPageSource, /settings-nav-group-label/);
   assert.match(settingsSearchSource, /settings\.groupPersonal/);

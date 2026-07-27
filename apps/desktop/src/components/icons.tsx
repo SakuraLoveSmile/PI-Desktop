@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   AtSign,
   Bell,
+  Bot,
   Camera,
   Check,
   CheckCheck,
@@ -20,6 +21,7 @@ import {
   CircleHelp,
   Clock,
   CloudDownload,
+  Download,
   Copy,
   Dot,
   ExternalLink,
@@ -109,6 +111,7 @@ export const IconArrowDown = icon(ArrowDown);
 export const IconCopy = icon(Copy);
 export const IconCheck = icon(Check);
 export const IconBell = icon(Bell);
+export const IconBot = icon(Bot);
 export const IconCheckCheck = icon(CheckCheck);
 export const IconShield = icon(Shield);
 export const IconChevronDown = icon(ChevronDown);
@@ -120,6 +123,7 @@ export const IconChevronRight = icon(ChevronRight);
 export const IconExternal = icon(ExternalLink);
 export const IconArrowUpRight = icon(ArrowUpRight);
 export const IconCloudDown = icon(CloudDownload);
+export const IconDownload = icon(Download);
 export const IconImage = icon(Image);
 export const IconCamera = icon(Camera);
 export const IconReview = icon(RefreshCw);
