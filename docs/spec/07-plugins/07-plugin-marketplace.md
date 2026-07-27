@@ -251,3 +251,19 @@ Override catalog URL with env:
 ```text
 PI_DESKTOP_PLUGIN_MARKET_URL=https://raw.githubusercontent.com/<owner>/<repo>/<ref>/catalog.json
 ```
+
+
+## 14. Marketplace detail UX
+
+The Plugins page marketplace supports a detail pane that loads `market.getDetail` and shows:
+
+- README markdown
+- safety notes
+- version list with changelog / size / checksum
+- install or update for the selected version
+
+Contribution docs live in the official warehouse:
+
+- https://github.com/vastsa/pi-desktop-plugins/blob/main/CONTRIBUTING.md
+- Practical template: `plugins/demo.workspace-summary`
+
