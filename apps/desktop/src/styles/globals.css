@@ -3632,9 +3632,19 @@ textarea:disabled {
 }
 
 .composer-permission-menu {
+  position: absolute;
   left: 0;
-  right: auto;
+  bottom: calc(100% + 8px);
+  z-index: 40;
   width: min(120px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 92px));
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-dialog);
+  border: 1px solid var(--ds-border-subtle);
+  color: var(--ds-text-primary);
 }
 
 .composer-model-menu {

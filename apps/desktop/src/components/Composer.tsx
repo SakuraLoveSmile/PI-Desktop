@@ -673,7 +673,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                     <IconChevronDown size={12} />
                   </button>
                   {permissionOpen && (
-                    <div className="composer-model-menu composer-permission-menu" role="menu">
+                    <div className="composer-permission-menu" role="menu">
                       {(["ask", "accept-edits", "auto"] as const).map(
                         (candidate) => (
                           <button
