@@ -45,20 +45,20 @@ destination, chat as the home surface, tools and permissions inline.
   Collapsible to an icon rail (Cmd/Ctrl+B).
 - **Product identity**: runtime shell copy uses `PI-Desktop`; the home hero,
   sidebar, and docked composer reuse the canonical `build/icon_1024.png` logo,
-  while New task/session controls use a dedicated message-plus icon. The
-  expanded sidebar's first actionable row begins with a keyboard-accessible
-  Home brand, followed on the right by Search and Collapse sidebar controls.
-  On macOS this row sits below the dedicated traffic-light drag row; on
-  Windows/Linux it remains the topmost sidebar row. Activating the brand
-  returns the main pane to the chat destination. `Codex` remains only an
-  external import source or a design-reference term.
+  while New task/session controls use a dedicated message-plus icon. On
+  Windows/Linux, the expanded sidebar begins with a keyboard-accessible Home
+  brand and Search plus Collapse sidebar controls at the right; activating the
+  brand returns the main pane to chat. The macOS expanded sidebar omits the
+  logo/title brand and places only Search and Collapse sidebar at the right of
+  the traffic-light row. `Codex` remains only an external import source or a
+  design-reference term.
 - **Main pane**: exactly one destination at a time; destinations replace the
   pane (they are pages, not modals).
 - **Titlebar**: platform-native desktop chrome (D118). macOS uses
-  `hiddenInset` traffic lights and the system application menu. In the expanded
-  sidebar, the traffic lights occupy their own 46px drag row above the product
-  identity; fullscreen hides that empty reservation together with the native
-  lights.
+  `hiddenInset` traffic lights and the system application menu. The expanded
+  sidebar keeps Search and Collapse sidebar in the same 46px row, aligned to
+  the right outside the traffic-light safety area; no logo/title is rendered
+  there, including in fullscreen.
   Windows/Linux use a menu-free frameless 46px row with sidebar actions on the
   left and accessible minimize / maximize-or-restore / close controls on the
   right (D129). Destination history is shortcut-only (`Cmd/Ctrl+[` and

@@ -1295,24 +1295,23 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`sessions::tests::message_scoped_fork_stops_at_selected_assistant_response`,
   `session-fork.test.mjs`, `transcript-style.test.mjs`); full restart UI scenario Draft
 
-#### E2E-069: Sidebar brand returns to chat home
+#### E2E-069: Platform-specific sidebar header behavior
 
 - **Preconditions**: PI-Desktop is open with the expanded sidebar and a chat
   session is active.
-- **Steps**: 1) Open Plugins on macOS windowed mode. 2) Confirm the traffic
-  lights occupy a dedicated row above the expanded-sidebar header. 3) Inspect
-  the next row and confirm the PI-Desktop brand is first and Search then
-  Collapse sidebar appear at the right. 4) Enter fullscreen and confirm the
-  traffic-light reservation disappears. 5) Activate the brand with a pointer.
-  6) Return to the destination and activate the brand with keyboard focus and
-  Enter/Space. 7) Confirm Windows/Linux keep the brand row at the top.
-- **Expected**: The canonical logo renders at 20px beside the 15px shell name.
-  The complete brand has a localized Home accessible name, visible hover/focus
-  feedback, and returns the main pane to the chat destination without clearing
-  the active conversation or workspace. Search and Collapse sidebar are
-  separate accessible icon buttons, with Collapse immediately after Search.
-  The macOS traffic lights never share that row in windowed mode, fullscreen
-  adds no empty replacement row, and other platforms add no macOS-only space.
+- **Steps**: 1) Open Plugins on macOS windowed mode. 2) Inspect the expanded
+  sidebar titlebar. 3) Confirm no PI-Desktop logo/title is visible and Search
+  then Collapse sidebar appear at the right of the traffic lights. 4) Enter
+  fullscreen and inspect the same row. 5) On Windows/Linux, confirm the brand
+  remains visible; activate it with a pointer, then with keyboard focus and
+  Enter/Space.
+- **Expected**: macOS uses one 46px row with native lights at left, a usable
+  drag region, and separate accessible Search and Collapse buttons at right;
+  the Logo/Home brand is absent in both windowed and fullscreen modes.
+  Windows/Linux render the canonical 20px logo beside the 15px shell name; the
+  complete brand has a localized Home accessible name, visible hover/focus
+  feedback, and returns the main pane to chat without clearing the active
+  conversation or workspace. Collapse remains immediately after Search.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`
 - **Acceptance**: Quality
@@ -1476,9 +1475,8 @@ This test plan spec is accepted when:
   current-project identity, thread titles, and composer controls must remain
   readable dark-on-light (≥4.5:1). Never white/translucent text on the light
   sidebar.
-- The first actionable expanded-sidebar row keeps its brand, Search, and
-  Collapse sidebar controls readable on light chrome; the macOS traffic-light
-  row above it uses the same sidebar surface.
+- The macOS traffic-light row keeps Search and Collapse sidebar readable at the
+  right on light chrome without rendering the Logo/Home brand.
 
 ### US-UI-14 Semantic chrome tokens
 - Toggle theme system → light → dark without restart.
@@ -1501,9 +1499,8 @@ This test plan spec is accepted when:
   unread badge. It replaces the former Help shortcut and opens the inbox above
   the footer; the main titlebar has no duplicate Bell.
 - Traffic lights sit at Codex `{x:16,y:16}` with a 46px toolbar; the expanded
-  macOS sidebar reserves that row only for native chrome, then places the
-  product brand first and Search plus Collapse sidebar at the right in the next
-  46px row, with no back/forward buttons.
+  macOS sidebar places Search plus Collapse sidebar at the right in that same
+  row, with no Logo/Home brand or back/forward buttons.
 
 ### US-UI-17 PI-Desktop home hero logo
 - On empty chat home, the canonical PI-Desktop PNG renders at 56px above the

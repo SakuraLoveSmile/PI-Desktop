@@ -68,7 +68,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 | Platform | Top-level chrome | Application menu |
 |---|---|---|
-| macOS | Native inset traffic lights at `{x:16,y:16}` in a dedicated 46px drag row above the expanded sidebar header | System menu: PI-Desktop, File, Edit, View, Window, Help |
+| macOS | Native inset traffic lights at `{x:16,y:16}`; expanded sidebar Search and Collapse controls share the row at right, with no logo/title | System menu: PI-Desktop, File, Edit, View, Window, Help |
 | Windows | Frameless 46px titlebar; sidebar actions at left, minimize/maximize/close at right | None inside the window |
 | Linux | Frameless 46px titlebar; sidebar actions at left, minimize/maximize/close at right | None inside the window |
 
@@ -155,8 +155,8 @@ in the sidebar.
 ```text
 Expanded (~275px, D034/D070):
 +---------------------------+
-| macOS traffic lights      |  macOS windowed only
-| [π] PI-Desktop    [⌕][◧] |
+| [lights]          [⌕][◧] |  macOS
+| [π] PI-Desktop    [⌕][◧] |  Windows/Linux
 | [message+ New Chat] button |
 | Plugins                   |
 | SESSIONS         [msg+][↕]|
@@ -209,9 +209,10 @@ Collapsed (48px):
 - Click session: activate its bound project when necessary, switch the active
   session, and scroll to the last message
 - Click the message-plus New Chat control: create/reuse a draft in the current workspace scope
-- Click the PI-Desktop brand: return the main pane to the chat home while
-  preserving the active conversation and workspace
-- Click Search or Collapse sidebar at the right of the topmost brand row to
+- On Windows/Linux, click the PI-Desktop brand to return the main pane to the
+  chat home while preserving the active conversation and workspace; macOS
+  intentionally omits this brand control from the sidebar header
+- Click Search or Collapse sidebar at the right of the header row to
   open global search or collapse the sidebar respectively
 - Click the `Projects` heading folder-plus action: open the project picker and
   retain the selected project
@@ -269,10 +270,10 @@ Collapsed (48px):
 - Icons are decorative when a localized text label or accessible name is
   present; click, keyboard, and focus behavior remain unchanged.
 - The expanded sidebar brand is a localized button with a 20px logo and the
-  shell name; pointer or keyboard activation navigates to the chat home. It is
-  the first item in the first actionable 46px row, with Search and Collapse
-  sidebar controls ordered at the right. On macOS windowed mode, a separate
-  46px traffic-light drag row precedes it; fullscreen removes that reservation.
+  shell name on Windows/Linux; pointer or keyboard activation navigates to the
+  chat home. macOS hides this brand and right-aligns Search then Collapse
+  sidebar in the same 46px row as the native traffic lights. Fullscreen keeps
+  the brand hidden while reclaiming the native-chrome padding.
 
 ### 3.7 MVP constraints
 

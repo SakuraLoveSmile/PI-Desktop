@@ -346,12 +346,13 @@ standard opaque elevated-menu surface, subtle border, and dialog shadow. Its
 first block repeats the local identity with the same glyph and two-line text,
 followed by a divider and compact Settings / Logs / Theme rows.
 
-Toolbar rows are 46px. macOS places traffic lights at `{x:16,y:16}` in a
-dedicated drag row above the expanded sidebar's product-identity row; entering
-fullscreen removes that first row together with the hidden traffic lights.
-Windows/Linux keep the identity and sidebar actions in their first row and
-reserve the rightmost 112px for three frameless-window controls. Each control
-owns its full share of the 46px-high reserved band. Main, Settings, and
+Toolbar rows are 46px. macOS places traffic lights at `{x:16,y:16}` and keeps
+the expanded sidebar's Search and Collapse sidebar icon buttons right-aligned
+in that same row. The macOS row omits the sidebar logo/title, reserves `76px`
+on the left for native chrome in windowed mode, and reclaims that padding in
+fullscreen. Windows/Linux keep the identity and sidebar actions in their first
+row and reserve the rightmost 112px for three frameless-window controls. Each
+control owns its full share of the 46px-high reserved band. Main, Settings, and
 work-panel drag regions must terminate before this reservation rather than
 overlap it and rely only on descendant `no-drag`, so every visible control
 pixel remains clickable. No application menu is rendered inside the window.
