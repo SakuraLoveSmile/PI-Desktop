@@ -699,6 +699,8 @@ textarea:disabled {
 }
 
 .window-control-btn {
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
   display: inline-flex;
   height: 26px;
   width: 32px;
@@ -2782,6 +2784,7 @@ textarea:disabled {
 }
 
 .toast {
+  -webkit-app-region: no-drag;
   pointer-events: auto;
   display: flex;
   align-items: flex-start;

@@ -78,7 +78,9 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   Settings -> Info.
 - Window buttons have localized tooltips and accessible names. The maximize
   glyph reflects the initial native state plus later maximize/unmaximize
-  events.
+  events. Each Windows/Linux button is an explicit non-drag pointer target so
+  the surrounding titlebar drag region cannot consume minimize, maximize,
+  restore, or close clicks.
 - Windows/Linux do not render File/Edit/View/Window/Help in the titlebar and
   do not reserve left-side space for an application menubar. F10 and
   Shift+F10 remain available to focused content.
@@ -1196,7 +1198,11 @@ dismissToast(id: number); // ToastHost internal / tests
 - Auto-dismiss 4s (error 8s, `duration: 0` sticky); hovering a card pauses its timer, leaving resumes with remaining time
 - Stack caps at 4 — oldest drops first; re-raising an identical message+variant restarts the existing toast instead of stacking a twin
 - Newest toast enters at the top-center anchor (slide-down 200ms ease-out) pushing older cards down; exit is a 150ms ease-in fade
-- Dismiss X always available; reduced motion keeps animations near-zero-duration so removal (bound to `animationend`) still fires
+- Dismiss X always available; every card is an explicit non-drag pointer target
+  so hover pause and dismissal remain interactive where the top-center stack
+  overlaps frameless titlebar drag chrome
+- Reduced motion keeps animations near-zero-duration so removal (bound to
+  `animationend`) still fires
 
 ### 17.6 Accessibility
 

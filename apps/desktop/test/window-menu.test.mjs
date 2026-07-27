@@ -113,6 +113,14 @@ test("Windows and Linux use menu-free frameless chrome with window controls", ()
   assert.match(controlsSource, /windowControl\("getState"\)/);
   assert.match(controlsSource, /aria-label=\{t\("window\.minimize"/);
   assert.match(controlsSource, /aria-label=\{t\("window\.close"/);
+  assert.match(
+    stylesSource,
+    /\.window-control-btn\s*\{[^}]*-webkit-app-region:\s*no-drag;[^}]*pointer-events:\s*auto;/s,
+  );
+  assert.match(
+    stylesSource,
+    /\.toast\s*\{[^}]*-webkit-app-region:\s*no-drag;[^}]*pointer-events:\s*auto;/s,
+  );
   assert.match(mainSource, /window\.on\("maximize", sendMaximized\)/);
   assert.match(mainSource, /window\.on\("unmaximize", sendMaximized\)/);
   assert.match(mainSource, /window\.webContents\.isDestroyed\(\)/);
