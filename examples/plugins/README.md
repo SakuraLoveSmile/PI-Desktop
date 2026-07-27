@@ -27,3 +27,11 @@ Related specs:
 - `agent-tool-basic`
 - `skill-pack`
 - `marketplace-mock-publisher`
+
+## Official marketplace repository
+
+Published plugins live in [`vastsa/pi-desktop-plugins`](https://github.com/vastsa/pi-desktop-plugins).
+
+Local examples here remain useful for development loading (`Load dev plugin`).
+Marketplace installs should come from that repository's `catalog.json` + `packages/*.piplug`.
+

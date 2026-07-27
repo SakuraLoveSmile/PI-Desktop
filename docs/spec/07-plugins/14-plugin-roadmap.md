@@ -31,8 +31,8 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
 - dev hot reload (still planned)
 
 ### R4 — Marketplace Read-only ✅
-- market provider abstraction (official local catalog provider)
-- Official-source browse/search
+- market provider abstraction (official remote GitHub catalog provider)
+- Official-source browse/search from `vastsa/pi-desktop-plugins`
 - Download + checksum install
 - updates list (manual update)
 

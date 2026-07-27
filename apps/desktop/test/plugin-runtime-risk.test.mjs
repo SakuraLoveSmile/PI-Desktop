@@ -47,9 +47,16 @@ test("shared protocol declares marketplace and package install IPC", () => {
     "marketInstall",
     "marketCheckUpdates",
     "marketApplyUpdates",
+    "marketRefresh",
     "pluginOpenPanel",
     "pluginSetAutoUpdate",
   ]) {
     assert.match(protocolSrc, new RegExp(channel));
   }
+});
+
+
+test("plugins page can refresh the official marketplace repository", () => {
+  assert.match(pageSrc, /marketRefresh|refreshMarket|refreshRemote/);
+  assert.match(pageSrc, /pi-desktop-plugins|marketSource/);
 });

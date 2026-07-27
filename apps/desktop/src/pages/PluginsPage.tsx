@@ -36,12 +36,31 @@ export function PluginsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingInstall, setPendingInstall] = useState<MarketPluginSummary | null>(null);
   const [autoUpdate, setAutoUpdate] = useState(true);
+  const [marketSource, setMarketSource] = useState<string>("");
 
-  const refreshMarket = async (q = query) => {
+  const refreshMarket = async (q = query, opts?: { refreshRemote?: boolean }) => {
     setMarketLoading(true);
     try {
+      if (opts?.refreshRemote) {
+        const meta = await api.marketRefresh(true);
+        setMarketSource(meta.sourceUrl || meta.homepage || "");
+        showToast(
+          t("plugins.marketRefreshed", {
+            count: meta.pluginCount,
+            defaultValue: `Marketplace refreshed (${meta.pluginCount} plugins)`,
+          }),
+          { variant: "success" },
+        );
+      }
       const res = await api.marketSearch(q);
       setMarket(res.plugins ?? []);
+      if (!marketSource && res.providerId) {
+        setMarketSource(
+          res.providerId === "official"
+            ? "https://github.com/vastsa/pi-desktop-plugins"
+            : res.providerId,
+        );
+      }
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e), { variant: "error" });
     } finally {
@@ -365,7 +384,18 @@ export function PluginsPage() {
               <Button variant="secondary" onClick={() => void refreshMarket(query)}>
                 {t("plugins.search")}
               </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void refreshMarket(query, { refreshRemote: true })}
+              >
+                {t("plugins.refreshMarket")}
+              </Button>
             </div>
+            {marketSource ? (
+              <div className="plugins-market-source">
+                {t("plugins.marketSource", { url: marketSource })}
+              </div>
+            ) : null}
             {marketLoading ? (
               <Panel className="page-card page-empty">
                 <div className="text-md text-text-secondary">{t("plugins.marketLoading")}</div>

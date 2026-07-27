@@ -253,6 +253,15 @@ export const api = {
   setPluginAutoUpdate: (id: string, enabled: boolean) =>
     invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
   openPluginPanel: (id: string) => invoke(IPC.invoke.pluginOpenPanel, id),
+  marketRefresh: (force = true) =>
+    invoke<{
+      providerId: string;
+      name?: string;
+      homepage?: string;
+      updatedAt?: string;
+      pluginCount: number;
+      sourceUrl: string;
+    }>(IPC.invoke.marketRefresh, { force }),
   marketSearch: (query = "", category = "") =>
     invoke<{ plugins: MarketPluginSummary[]; providerId: string }>(
       IPC.invoke.marketSearch,
