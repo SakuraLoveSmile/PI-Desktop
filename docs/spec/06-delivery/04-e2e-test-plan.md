@@ -1112,9 +1112,10 @@ Each scenario is documented in this format:
   window and complete another turn in A. 4) Abort a fourth turn. 5) Repeat each
   terminal RPC. 6) Confirm the main titlebar has no bell, then open the bell in
   the expanded sidebar footer and switch between All and Unread. 7) Mark one
-  row read, close/reopen the popover, and restart the app. 8) Select the other
-  row. 9) Generate a host fixture with 205 eligible terminal turns. 10) Use
-  Mark all read, then Clear.
+  row read and confirm its session has no terminal sidebar mark, then
+  close/reopen the popover and restart the app. 8) Select the other session
+  from its terminal-marked sidebar row. 9) Generate a host fixture with 205
+  eligible terminal turns. 10) Use Mark all read, then Clear.
 - **Expected**: A's visible-current completion creates no row. Exactly two rows
   exist, newest first: the unfocused A completion and background B failure,
   with localized labels, snapshotted session titles, and B's stable code.
@@ -1124,11 +1125,14 @@ Each scenario is documented in this format:
   reading rows. Read state and both
   records survive restart. Row selection marks it read and activates its bound
   project/session. The fixture retains exactly the newest 200 rows. Mark all
-  preserves rows with zero unread; Clear empties only the inbox and leaves
+  preserves rows with zero unread. Selecting the other session clears its
+  terminal sidebar mark and marks its task notification read; neither mark
+  returns after refresh or restart. Clear empties only the inbox and leaves
   sessions, turns, and transcripts intact.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, `03-runtime/01-ipc-protocol.md`,
-  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D117/D130)
+  `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
+  `08-meta/decisions-log.md` (D117/D130)
 - **Acceptance**: C (turn completion), F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Draft
@@ -1389,6 +1393,33 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`keyboard-shortcuts.test.ts`,
   `settings-keyboard-shortcuts.test.mjs`); rendered scenario Draft
 
+#### E2E-073: Developer mode gates the developer-tools console
+
+- **Preconditions**: App running on macOS and on one Windows/Linux target;
+  developer mode is absent or false in persisted settings and Settings ->
+  Basics is open.
+- **Steps**: 1) Find the Developer card through Settings search. 2) Confirm the
+  Open console action is disabled and invoke F12 plus the platform secondary
+  shortcut. 3) Enable developer mode and open the console from Settings.
+  4) Close it and reopen it with F12; on Windows/Linux repeat with
+  Ctrl+Shift+I, and on macOS inspect and invoke the View-menu developer-tools
+  item. 5) Restart the app and invoke an enabled entry point. 6) Disable
+  developer mode while the console is open. 7) Attempt the console IPC directly
+  while disabled.
+- **Expected**: No disabled entry point opens developer tools, and macOS omits
+  the View-menu item. Enabling the persisted switch unlocks the localized
+  Settings action and applicable platform shortcuts; each toggles the same
+  window console after restart. Disabling the switch closes the console,
+  disables the Settings action, removes the macOS menu item, and makes direct
+  IPC requests fail closed.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`
+- **Acceptance**: F (settings persistence), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`settings-general.test.mjs`,
+  `window-menu.test.mjs`); native interaction scenario Draft
+
 ## 8. Traceability Matrix
 
 
@@ -1402,11 +1433,11 @@ Each scenario is documented in this format:
 | C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071 |
 | D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068 |
 | E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073 |
 | G — Plugins | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -1414,7 +1445,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072 (+ packaging scenarios in release runbook) |
+| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073 (+ packaging scenarios in release runbook) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -1955,3 +1986,8 @@ This test plan spec is accepted when:
   text through its accessible name and tooltip. Reduced motion makes the orange
   dot static without changing its color or meaning. Row height, title truncation,
   pin icon, hover actions, and focus ring remain stable in both themes.
+- Open a conversation with a completed or failed mark and expect that terminal
+  mark to clear immediately while its durable task notification becomes read.
+  Refresh notifications and restart the app; the acknowledged mark must not
+  return. A terminal notification marked read from the inbox likewise produces
+  no sidebar terminal mark.

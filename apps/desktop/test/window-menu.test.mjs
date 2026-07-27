@@ -102,6 +102,34 @@ test("macOS application menu routes shell commands and preserves native roles", 
   assert.doesNotMatch(protocolSource, /"toggleWorkPanel"/);
 });
 
+test("developer mode gates every devtools entry point in the main process", () => {
+  assert.match(menuSource, /developerMode = false/);
+  assert.match(
+    menuSource,
+    /\.\.\.\(developerMode[\s\S]*role: "toggleDevTools"/,
+  );
+  assert.match(mainSource, /let developerMode = false/);
+  assert.match(mainSource, /function applyDeveloperMode/);
+  assert.match(
+    mainSource,
+    /if \(!next[\s\S]*isDevToolsOpened\(\)[\s\S]*closeDevTools\(\)/,
+  );
+  assert.match(
+    mainSource,
+    /before-input-event[\s\S]*!developerMode[\s\S]*input\.code === "F12"/,
+  );
+  assert.match(
+    mainSource,
+    /process\.platform !== "darwin"[\s\S]*input\.control[\s\S]*input\.shift/,
+  );
+  assert.match(protocolSource, /devtoolsToggle:\s*"pi-desktop\/devtools\/toggle"/);
+  const handler = mainSource.slice(mainSource.indexOf("IPC.invoke.devtoolsToggle"));
+  assert.ok(
+    handler.indexOf("!developerMode") < handler.indexOf("openDevTools"),
+    "the IPC gate must run before opening devtools",
+  );
+});
+
 test("Windows and Linux use menu-free frameless chrome with window controls", () => {
   assert.match(
     mainSource,
