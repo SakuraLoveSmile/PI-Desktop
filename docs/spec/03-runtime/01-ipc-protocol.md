@@ -338,6 +338,8 @@ Non-sensitive config that can be returned to the UI:
 - UI preferences, including optional `AppSettings.keybindings` overrides keyed
   by the shared shortcut action ids; values use portable `Mod+Shift+Key`
   notation and contain no platform-specific native accelerator strings
+- optional `AppSettings.developerMode`; absent and `false` both keep developer
+  tools disabled
 
 ### secrets
 - `secrets/set(providerId, apiKey)`
@@ -531,6 +533,18 @@ type NativeMenuAction =
 menu/nativeAction({ action: NativeMenuAction })
   -> { maximized: boolean; fullScreen: boolean }
 ```
+
+Developer tools use a dedicated Main-owned gate rather than a generic native
+menu action:
+
+```ts
+devtools/toggle({ open?: boolean }) -> { open: boolean }
+```
+
+Main rejects the request while `AppSettings.developerMode` is not `true` or no
+live window exists. The same stored flag gates F12 on all platforms,
+Ctrl+Shift+I on Windows/Linux, and the macOS View-menu role. Disabling the flag
+closes an already-open developer-tools window.
 
 `window/control` accepts the exported `WINDOW_CONTROL_ACTIONS` tuple:
 

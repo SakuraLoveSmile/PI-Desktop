@@ -77,6 +77,10 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   Check for Updates actions. Windows/Linux expose equivalent product actions
   through in-app controls and keyboard shortcuts, with update checks in
   Settings -> Info.
+- When Settings -> Basics -> Developer mode is enabled, the macOS View menu
+  additionally exposes the native developer-tools role. All platforms expose
+  F12, and Windows/Linux also expose Ctrl+Shift+I; the commands and Settings
+  Open console action are unavailable while the mode is disabled.
 - Window buttons have localized tooltips and accessible names. The maximize
   glyph reflects the initial native state plus later maximize/unmaximize
   events. Each Windows/Linux button is an explicit non-drag pointer target so

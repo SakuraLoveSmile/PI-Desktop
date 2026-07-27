@@ -40,6 +40,15 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     restored together
   - overrides persist in optional `AppSettings.keybindings`; macOS native-menu
     accelerators and renderer-owned shortcuts update from the same map
+- **Developer** card:
+  - developer mode is off unless the optional persisted
+    `AppSettings.developerMode` value is `true`
+  - the developer mode switch unlocks the Open console button, F12 on every
+    platform, Ctrl+Shift+I on Windows/Linux, and the macOS View-menu developer
+    tools item
+  - disabling developer mode closes an open console and disables or removes
+    every entry point; Settings search indexes the card, switch, and console
+    action
 - File-open target, menu-bar behavior, and bottom-panel behavior are not
   rendered until their host-backed settings schemas and runtime effects exist.
 
@@ -119,6 +128,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 15. Shortcut recording rejects modifier-free non-function keys, reserved
     editor/OS chords, and conflicts; successful overrides immediately drive
     app behavior and macOS menu accelerators and survive restart
+16. Developer tools remain unavailable by default; enabling developer mode
+    unlocks the localized Settings action and platform shortcuts, persists
+    across restart, and disabling it closes an open console
 
 ## 5. Basics chrome metrics
 
