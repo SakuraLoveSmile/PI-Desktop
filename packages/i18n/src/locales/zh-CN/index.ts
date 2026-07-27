@@ -166,6 +166,13 @@ export const zhCN = {
     usageReasoning: "推理 {{count}}",
     scrollToBottom: "回到最新",
     minimap: "会话导航",
+    reviewChanges: "审阅改动",
+    reviewChangedFiles: "{{count}} 个文件",
+    reviewChangedFilesTruncated: "{{count}}+ 个文件",
+    reviewChangesAccessible:
+      "审阅改动：{{count}} 个文件，新增 {{additions}} 行，删除 {{deletions}} 行",
+    reviewChangesAccessibleTruncated:
+      "审阅改动：至少 {{count}} 个文件，当前显示新增 {{additions}} 行、删除 {{deletions}} 行",
     toolFailed: "失败",
     toolDenied: "已拒绝",
     toolCompleted: "已完成",

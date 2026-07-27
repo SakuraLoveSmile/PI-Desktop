@@ -26,6 +26,8 @@ import {
   splitChatText,
   type ChatPreviewTarget,
 } from "../lib/chat-links";
+import { summarizeWorkspaceChanges } from "../lib/workspace-review";
+import { toolWorkPanelTab } from "../lib/work-panel-tabs";
 import {
   IconArrowDown,
   IconBranch,
@@ -34,6 +36,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconCopy,
+  IconDiff,
   IconFileText,
   IconFolder,
   IconGlobe,
@@ -48,6 +51,60 @@ import {
 import { useAppStore } from "../stores/app-store";
 import type { PendingPermission } from "../lib/pending-permissions";
 import { PermissionCard } from "./PermissionCard";
+
+function WorkspaceChangesEntry() {
+  const { t } = useTranslation();
+  const workspacePath = useAppStore((state) => state.workspace?.path);
+  const diffPath = useAppStore((state) => state.workspaceDiffPath);
+  const diff = useAppStore((state) => state.workspaceDiff);
+  const openWorkPanelTab = useAppStore((state) => state.openWorkPanelTab);
+  const summary = summarizeWorkspaceChanges(
+    workspacePath && diffPath === workspacePath ? diff : null,
+  );
+
+  if (!summary) return null;
+
+  const countLabel = t(
+    summary.truncated
+      ? "chat.reviewChangedFilesTruncated"
+      : "chat.reviewChangedFiles",
+    { count: summary.fileCount },
+  );
+  const accessibleLabel = t(
+    summary.truncated
+      ? "chat.reviewChangesAccessibleTruncated"
+      : "chat.reviewChangesAccessible",
+    {
+      count: summary.fileCount,
+      additions: summary.additions,
+      deletions: summary.deletions,
+    },
+  );
+
+  return (
+    <div className="review-changes-entry">
+      <button
+        type="button"
+        className="review-changes-button"
+        aria-label={accessibleLabel}
+        onClick={() => openWorkPanelTab(toolWorkPanelTab("review"))}
+      >
+        <span className="review-changes-icon" aria-hidden>
+          <IconDiff size={15} />
+        </span>
+        <span className="review-changes-title">{t("chat.reviewChanges")}</span>
+        <span className="review-changes-meta">{countLabel}</span>
+        <span className="diff-file-counts" aria-hidden>
+          <span className="diff-count-add">+{summary.additions}</span>
+          <span className="diff-count-del">−{summary.deletions}</span>
+        </span>
+        <span className="review-changes-caret" aria-hidden>
+          <IconChevronRight size={13} />
+        </span>
+      </button>
+    </div>
+  );
+}
 
 /**
  * Copy chip. Message toolbars are glyph-only (`icon`) with the label in a
@@ -1124,6 +1181,7 @@ export function ChatTranscript({
               />
             ),
           )}
+          <WorkspaceChangesEntry />
           {pendingPermission ? (
             <PermissionCard
               key={pendingPermission.requestId}

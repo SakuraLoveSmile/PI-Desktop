@@ -142,6 +142,8 @@ function AppShell() {
   const abort = useAppStore((s) => s.abort);
   const settings = useAppStore((s) => s.settings);
   const workspace = useAppStore((s) => s.workspace);
+  const reviewRev = useAppStore((s) => s.reviewRev);
+  const refreshWorkspaceDiff = useAppStore((s) => s.refreshWorkspaceDiff);
   const openProject = useAppStore((s) => s.openProject);
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
   const activePermission = useAppStore((state) =>
@@ -249,6 +251,22 @@ function AppShell() {
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, [settings?.theme]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const timer = window.setTimeout(
+      () => void refreshWorkspaceDiff(),
+      reviewRev === 0 ? 0 : 500,
+    );
+    return () => window.clearTimeout(timer);
+  }, [ready, workspace?.path, reviewRev, refreshWorkspaceDiff]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const refreshOnFocus = () => void refreshWorkspaceDiff();
+    window.addEventListener("focus", refreshOnFocus);
+    return () => window.removeEventListener("focus", refreshOnFocus);
+  }, [ready, refreshWorkspaceDiff]);
 
   useEffect(() => {
     void bootstrap();

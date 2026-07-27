@@ -216,11 +216,11 @@ may be retained while exactly one workspace supplies the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
-### 1.8 Artifact-driven work panel tabs (D128)
+### 1.8 Artifact-driven work panel tabs (D128, D140)
 
-- The shell exposes no empty work-panel launcher, application-menu command, or
-  global shortcut. An artifact trigger atomically creates or reuses its tab,
-  activates it, and opens the panel.
+- The shell exposes no empty or unconditional work-panel launcher,
+  application-menu command, or global shortcut. An artifact trigger atomically
+  creates or reuses its tab, activates it, and opens the panel.
 - File tabs use normalized paths as identity. Review, Terminal, and Browser are
   singletons; repeated triggers preserve tab order and activate the existing tab.
 - Every tab has its own close control. Closing the active tab selects the right
@@ -232,6 +232,15 @@ may be retained while exactly one workspace supplies the visible shell context.
 - A successful active-session workspace Write/Edit opens Review. Failed and
   scratch writes do not; background-session artifacts stay rooted in their
   session and never take focus from the current project.
+- When the current Git working tree has changes, a compact Review changes
+  command remains visible at the end of the transcript independently of the
+  activity disclosure state. It reports files and addition/deletion totals and
+  creates, reopens, or activates the singleton Review tab. Clean, non-Git, and
+  no-workspace states do not render the command.
+- The transcript and Review consume one workspace-keyed diff state. Workspace
+  activation, debounced agent mutation, Review refresh, and window focus
+  refresh that state; request sequencing prevents a late response from a prior
+  workspace from changing the visible entry.
 - Terminal mounts only after a command artifact opens it and remains mounted
   across tab switches while that tab exists.
 - Selecting another session or workspace closes the panel and clears retained

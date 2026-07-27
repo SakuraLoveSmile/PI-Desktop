@@ -15,6 +15,7 @@ import type {
   SessionSummary,
   ThinkingLevel,
   UiMessage,
+  WorkspaceDiff,
 } from "@pi-desktop/shared";
 import { PROTOCOL_VERSION } from "@pi-desktop/shared";
 import { api } from "../lib/api";
@@ -95,6 +96,7 @@ export const WORK_PANEL_DEFAULT_WIDTH = 420;
 // Windows keeps the native bounds stable because a frameless BrowserWindow
 // visibly repaints between the renderer layout and asynchronous bounds update.
 let panelWindowGrowth: number | null = null;
+let workspaceDiffRequestSeq = 0;
 const navigationIntents = createNavigationIntentController();
 let sessionSelectionQueue: Promise<void> = Promise.resolve();
 
@@ -364,6 +366,10 @@ export type AppState = {
   workPanelWidth: number;
   /** Bumped on agent Write/Edit/Bash completion; review tab refetches. */
   reviewRev: number;
+  workspaceDiff: WorkspaceDiff | null;
+  workspaceDiffPath: string | null;
+  workspaceDiffLoading: boolean;
+  refreshWorkspaceDiff: () => Promise<void>;
   /** Chat-initiated "preview this file" request consumed by the files tab. */
   workPanelFileRequest: { path: string; seq: number } | null;
   openWorkPanelTab: (tab: WorkPanelTab) => void;
@@ -478,6 +484,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeWorkPanelTabId: null,
   workPanelWidth: initialWorkPanelWidth,
   reviewRev: 0,
+  workspaceDiff: null,
+  workspaceDiffPath: null,
+  workspaceDiffLoading: false,
   workPanelFileRequest: null,
   projectSort: initialSidebarPreferences.projectSort,
   messages: [],
@@ -2164,6 +2173,45 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   dismissToast: (id) =>
     set((state) => ({ toasts: state.toasts.filter((item) => item.id !== id) })),
+
+  refreshWorkspaceDiff: async () => {
+    const workspacePath = get().workspace?.path ?? null;
+    const requestSeq = ++workspaceDiffRequestSeq;
+    if (!workspacePath) {
+      set({
+        workspaceDiff: null,
+        workspaceDiffPath: null,
+        workspaceDiffLoading: false,
+      });
+      return;
+    }
+
+    set((state) => ({
+      workspaceDiffLoading: true,
+      workspaceDiffPath: workspacePath,
+      ...(state.workspaceDiffPath === workspacePath ? {} : { workspaceDiff: null }),
+    }));
+    try {
+      const workspaceDiff = await api.workspaceDiff();
+      if (
+        requestSeq === workspaceDiffRequestSeq &&
+        get().workspace?.path === workspacePath
+      ) {
+        set({ workspaceDiff, workspaceDiffPath: workspacePath });
+      }
+    } catch {
+      if (
+        requestSeq === workspaceDiffRequestSeq &&
+        get().workspace?.path === workspacePath
+      ) {
+        set({ workspaceDiff: null, workspaceDiffPath: workspacePath });
+      }
+    } finally {
+      if (requestSeq === workspaceDiffRequestSeq) {
+        set({ workspaceDiffLoading: false });
+      }
+    }
+  },
 
   openWorkPanelTab: (tab) => {
     const wasOpen = get().workPanelOpen;
