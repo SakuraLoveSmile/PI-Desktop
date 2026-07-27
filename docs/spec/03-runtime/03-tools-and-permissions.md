@@ -145,7 +145,7 @@ May be added later:
 - `allow-always-for-tool`
 - `allow-always-for-command-pattern`
 
-### Permission Modes (D115)
+### Permission Modes (D115/D132)
 
 How high-risk tool calls get approved is governed by a **permission mode**:
 
@@ -173,8 +173,11 @@ Rules:
   session; under `accept-edits`/`auto` they are simply never needed.
 - Scratch-directory writes (D114) stay prompt-free in every mode.
 - UI: Settings → segmented global default; composer shows a per-session chip
-  (agent mode only) whose menu offers inherit-default plus the three
-  overrides. The chip displays the effective mode.
+  (agent mode only) whose menu offers the three effective modes without a
+  separate global-default/inherit entry. The chip and selected menu item
+  display the effective mode; choosing an item stores that explicit session
+  override. Existing inherited sessions continue to resolve through the
+  global setting until the user chooses a mode.
 - Enforcement lives in host-core only; the sidecar/model is never told the
   mode and cannot influence it.
 

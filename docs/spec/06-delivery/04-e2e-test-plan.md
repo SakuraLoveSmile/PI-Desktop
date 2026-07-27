@@ -327,15 +327,15 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Automated (host-core unit tests)
 
-#### E2E-019c: Permission modes govern high-risk approval (D115)
+#### E2E-019c: Permission modes govern high-risk approval (D115/D132)
 
 - **Preconditions**: Agent mode; project open; global default `ask`.
-- **Steps**: 1) With the session on inherit, ask the agent to write a workspace file — expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Set the global default to Accept edits in Settings and reset the session to inherit — expect Write/Edit auto-allowed. 5) Switch the session to Chat mode with Auto set — expect Write denied (`WRITE_DISABLED_IN_CHAT`).
-- **Expected**: Effective mode = session override → global default → ask; chat-mode hard deny outranks every mode; the composer chip always displays the effective mode.
-- **Specs linked**: `03-runtime/03-tools-and-permissions.md §6`, `03-runtime/04-data-storage.md`
+- **Steps**: 1) With a newly inherited session and global default Ask every time, open the composer menu — expect Ask every time to be selected with no global-default/inherit label — then ask the agent to write a workspace file and expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Create another inherited session after setting the global default to Accept edits in Settings — expect the composer chip and menu selection to display Accept edits directly and Write/Edit to be auto-allowed. 5) Switch the session to Chat mode with Auto set — expect Write denied (`WRITE_DISABLED_IN_CHAT`).
+- **Expected**: Effective mode = session override → global default → ask; chat-mode hard deny outranks every mode; the composer chip and menu always display the effective mode without default/inherit provenance.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md §6`, `03-runtime/04-data-storage.md`, `08-meta/decisions-log.md` (D115/D132)
 - **Acceptance**: E (permission modes resolve and enforce host-side)
 - **Milestone**: M5
-- **Status**: Partially automated (host-core unit tests: evaluate matrix, chat-deny precedence, session grants under ask)
+- **Status**: Partially automated (host-core unit tests: evaluate matrix, chat-deny precedence, session grants under ask; renderer source test: effective-only composer options and selection)
 
 ### Session Persistence
 

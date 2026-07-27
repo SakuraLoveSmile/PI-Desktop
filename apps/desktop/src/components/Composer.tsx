@@ -262,9 +262,8 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
   const mode = activeSession?.mode ?? settings?.defaultMode ?? "agent";
-  // Permission mode (D115): the chip shows the effective mode — session
-  // override, else the global default. `inherit` renders as the global value
-  // with an "(default)" marker in the menu.
+  // Permission mode (D115/D132): inherited sessions still resolve through the
+  // global setting, but the composer presents only the effective mode.
   const globalPermissionMode: PermissionMode =
     settings?.defaultPermissionMode ?? "ask";
   const sessionPermissionMode: PermissionMode = isPermissionMode(
@@ -708,15 +707,15 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                   </button>
                   {permissionOpen && (
                     <div className="composer-model-menu composer-permission-menu" role="menu">
-                      {(["inherit", "ask", "accept-edits", "auto"] as const).map(
+                      {(["ask", "accept-edits", "auto"] as const).map(
                         (candidate) => (
                           <button
                             key={candidate}
                             type="button"
                             role="menuitemradio"
-                            aria-checked={sessionPermissionMode === candidate}
+                            aria-checked={effectivePermissionMode === candidate}
                             className={`composer-plus-item ${
-                              sessionPermissionMode === candidate ? "active" : ""
+                              effectivePermissionMode === candidate ? "active" : ""
                             }`}
                             onClick={async () => {
                               setPermissionOpen(false);
@@ -737,13 +736,9 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                             }}
                           >
                             <span className="flex-1 text-left">
-                              {candidate === "inherit"
-                                ? `${t(PERMISSION_MODE_I18N_KEYS[globalPermissionMode])} · ${t(
-                                    "chat.permissionInherit",
-                                  )}`
-                                : t(PERMISSION_MODE_I18N_KEYS[candidate])}
+                              {t(PERMISSION_MODE_I18N_KEYS[candidate])}
                             </span>
-                            {sessionPermissionMode === candidate ? (
+                            {effectivePermissionMode === candidate ? (
                               <IconCheck size={13} />
                             ) : null}
                           </button>
