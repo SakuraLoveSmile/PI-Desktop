@@ -687,26 +687,30 @@ textarea:disabled {
 }
 
 .window-controls {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  pointer-events: auto;
   position: fixed;
   top: 0;
   right: 0;
   z-index: 200; /* above titlebar (10) and work panel chrome */
   display: flex;
   align-items: center;
+  width: 112px;
   height: 46px; /* matches .main-titlebar band */
-  padding-right: 6px;
-  gap: 2px;
 }
 
 .window-control-btn {
   -webkit-app-region: no-drag;
+  app-region: no-drag;
   pointer-events: auto;
   display: inline-flex;
-  height: 26px;
-  width: 32px;
+  height: 100%;
+  min-width: 0;
+  flex: 1 1 0;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-2xs);
+  border-radius: 0;
   color: color-mix(in oklab, var(--ds-text-primary) 55%, transparent);
   background: transparent;
   transition: background 120ms ease, color 120ms ease;
@@ -722,12 +726,18 @@ textarea:disabled {
   background: var(--ds-error);
 }
 
-/* Keep titlebar action buttons clear of the control cluster. */
+/* End every native drag rectangle before the window-control hit targets.
+ * Visual padding alone does not exclude an Electron draggable region. */
 :root[data-platform="win32"] .main-titlebar,
 :root[data-platform="linux"] .main-titlebar,
+:root[data-platform="win32"] .settings-titlebar,
+:root[data-platform="linux"] .settings-titlebar {
+  right: 112px;
+}
+
 :root[data-platform="win32"] .work-panel-header,
 :root[data-platform="linux"] .work-panel-header {
-  padding-right: 112px;
+  margin-right: 112px;
 }
 
 
