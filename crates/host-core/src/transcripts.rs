@@ -49,6 +49,30 @@ pub struct MessageRecord {
     pub created_at: String,
 }
 
+/// Durable model-context checkpoint. The visible message transcript remains
+/// untouched; this record only changes the context reconstructed for a model.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompactionRecord {
+    pub id: String,
+    pub summary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_kept_message_id: Option<String>,
+    pub through_message_id: String,
+    pub tokens_before: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retained_tail: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_id: Option<String>,
+    pub created_at: String,
+}
+
 /// One archived regenerate branch rooted at a user turn.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -156,6 +180,22 @@ pub fn append_message(
     .with_context(|| format!("append transcript {}", path.display()))
 }
 
+/// Append a model-context checkpoint without rewriting visible messages.
+pub fn append_compaction(
+    data_dir: &Path,
+    session_id: &str,
+    session_created_at: &str,
+    record: &CompactionRecord,
+) -> Result<()> {
+    let path = transcript_path(data_dir, session_id)?;
+    append_line(
+        &path,
+        Some(header_line(session_id, session_created_at)?),
+        tagged("compaction", record)?,
+    )
+    .with_context(|| format!("append compaction {}", path.display()))
+}
+
 /// Load the live transcript. A missing file is an empty transcript; unknown
 /// line types and a torn trailing line are skipped, not errors.
 pub fn read_transcript(data_dir: &Path, session_id: &str) -> Result<Vec<MessageRecord>> {
@@ -188,6 +228,36 @@ pub fn read_transcript(data_dir: &Path, session_id: &str) -> Result<Vec<MessageR
     Ok(out)
 }
 
+/// Return the newest valid compaction checkpoint. Unknown/torn records are
+/// ignored using the same forward-compatible policy as message reads.
+pub fn read_latest_compaction(
+    data_dir: &Path,
+    session_id: &str,
+) -> Result<Option<CompactionRecord>> {
+    let path = transcript_path(data_dir, session_id)?;
+    let raw = match fs::read_to_string(&path) {
+        Ok(raw) => raw,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e).with_context(|| format!("read {}", path.display())),
+    };
+    let mut latest = None;
+    for line in raw.lines() {
+        let Ok(value) = serde_json::from_str::<Value>(line.trim()) else {
+            continue;
+        };
+        if value.get("type").and_then(Value::as_str) != Some("compaction") {
+            continue;
+        }
+        match serde_json::from_value::<CompactionRecord>(value) {
+            Ok(record) => latest = Some(record),
+            Err(error) => {
+                tracing::warn!(path = %path.display(), %error, "skipping invalid compaction line");
+            }
+        }
+    }
+    Ok(latest)
+}
+
 /// Atomically replace the live transcript (compaction, revision switch,
 /// import): write a sibling temp file, fsync, rename over the target.
 pub fn write_transcript(
@@ -195,6 +265,18 @@ pub fn write_transcript(
     session_id: &str,
     session_created_at: &str,
     records: &[MessageRecord],
+) -> Result<()> {
+    write_transcript_with_compaction(data_dir, session_id, session_created_at, records, None)
+}
+
+/// Atomically replace visible messages and optionally retain one current
+/// context checkpoint. Rewrites intentionally collapse older checkpoints.
+pub fn write_transcript_with_compaction(
+    data_dir: &Path,
+    session_id: &str,
+    session_created_at: &str,
+    records: &[MessageRecord],
+    compaction: Option<&CompactionRecord>,
 ) -> Result<()> {
     let path = transcript_path(data_dir, session_id)?;
     if let Some(parent) = path.parent() {
@@ -208,6 +290,10 @@ pub fn write_transcript(
         writer.write_all(b"\n")?;
         for record in records {
             writer.write_all(tagged("message", record)?.as_bytes())?;
+            writer.write_all(b"\n")?;
+        }
+        if let Some(record) = compaction {
+            writer.write_all(tagged("compaction", record)?.as_bytes())?;
             writer.write_all(b"\n")?;
         }
         writer.flush()?;
@@ -304,6 +390,22 @@ mod tests {
         }
     }
 
+    fn compaction() -> CompactionRecord {
+        CompactionRecord {
+            id: "compact-1".into(),
+            summary: "summary".into(),
+            first_kept_message_id: Some("m1".into()),
+            through_message_id: "m2".into(),
+            tokens_before: 42_000,
+            usage: Some(json!({ "input": 100, "output": 20 })),
+            retained_tail: Some(json!([{ "role": "user", "content": "again", "timestamp": 1 }])),
+            details: None,
+            provider_id: Some("provider-1".into()),
+            model_id: Some("model-1".into()),
+            created_at: "2026-07-26T00:00:02Z".into(),
+        }
+    }
+
     #[test]
     fn rejects_unsafe_session_ids() {
         let dir = tempdir().unwrap();
@@ -349,6 +451,32 @@ mod tests {
     }
 
     #[test]
+    fn compaction_roundtrips_without_hiding_messages() {
+        let dir = tempdir().unwrap();
+        append_message(
+            dir.path(),
+            "s1",
+            "2026-07-26T00:00:00Z",
+            &record("m1", "hi"),
+        )
+        .unwrap();
+        append_message(
+            dir.path(),
+            "s1",
+            "2026-07-26T00:00:00Z",
+            &record("m2", "again"),
+        )
+        .unwrap();
+        append_compaction(dir.path(), "s1", "2026-07-26T00:00:00Z", &compaction()).unwrap();
+
+        assert_eq!(read_transcript(dir.path(), "s1").unwrap().len(), 2);
+        let restored = read_latest_compaction(dir.path(), "s1").unwrap().unwrap();
+        assert_eq!(restored.id, "compact-1");
+        assert_eq!(restored.through_message_id, "m2");
+        assert_eq!(restored.tokens_before, 42_000);
+    }
+
+    #[test]
     fn missing_file_is_empty_transcript() {
         let dir = tempdir().unwrap();
         assert!(read_transcript(dir.path(), "nope").unwrap().is_empty());
@@ -379,6 +507,28 @@ mod tests {
             .unwrap()
             .with_extension("jsonl.tmp")
             .exists());
+    }
+
+    #[test]
+    fn rewrite_can_preserve_only_the_latest_compaction() {
+        let dir = tempdir().unwrap();
+        write_transcript_with_compaction(
+            dir.path(),
+            "s1",
+            "2026-07-26T00:00:00Z",
+            &[record("m1", "one"), record("m2", "two")],
+            Some(&compaction()),
+        )
+        .unwrap();
+
+        assert_eq!(read_transcript(dir.path(), "s1").unwrap().len(), 2);
+        assert_eq!(
+            read_latest_compaction(dir.path(), "s1")
+                .unwrap()
+                .unwrap()
+                .summary,
+            "summary"
+        );
     }
 
     #[test]

@@ -78,7 +78,7 @@ Params:
 
 ```ts
 type HandshakeParams = {
-  protocolVersion: 5
+  protocolVersion: 6
   client: "electron-main"
   clientVersion: string
   locale: string // default "en"
@@ -89,7 +89,7 @@ Result:
 
 ```ts
 type HandshakeResult = {
-  protocolVersion: 5
+  protocolVersion: 6
   host: "rust-host-core"
   hostVersion: string
   features: string[]
@@ -105,6 +105,9 @@ Rules:
    notification-bearing `session.endTurn` result.
 5. Version 5 requires the host-owned `session.fork` snapshot operation; a
    version 4 host must be rejected before chat becomes interactive (ADR 0023).
+6. Version 6 adds durable model-context checkpoints through
+   `session.appendCompaction`; a version 5 host must be rejected before the
+   runtime claims automatic context protection (ADR 0030).
 
 ## 4. Method catalog (MVP)
 
@@ -155,8 +158,14 @@ Rules:
   `thinkingLevel` preserves the current value; invalid modes or levels return
   `INVALID_PARAMS`
 - `session.appendMessage`
+- `session.appendCompaction` — sidecar-only append of the newest typed
+  model-context checkpoint. It requires non-empty checkpoint/summary/boundary
+  ids and non-negative `tokensBefore`; it does not insert a message/search row
+  or change the visible transcript projection
 - `session.replaceMessages` — atomic transcript rewrite (temp-file rename +
-  one index transaction, D119) used by regenerate/edit flows
+  one index transaction, D119) used by regenerate/edit flows; it preserves the
+  newest checkpoint only while both its boundary and optional first-kept id
+  remain valid in the rewritten prefix
 - `session.saveRevision` — archive a regenerate branch under
   `(sessionId, rootUserId)`
 - `session.listRevisions` — list linear variants for a root user family

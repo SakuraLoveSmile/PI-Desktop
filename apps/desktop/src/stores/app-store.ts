@@ -306,6 +306,7 @@ export type AppState = {
     permissionMode?: PermissionMode;
   }) => Promise<void>;
   sendPrompt: (content: string) => Promise<void>;
+  compactContext: () => Promise<void>;
   retryAssistantMessage: (messageId: string) => Promise<void>;
   /** Replace a user prompt and regenerate from it; the old branch stays in the revision pager. */
   editUserMessage: (messageId: string, content: string) => Promise<boolean>;
@@ -1051,6 +1052,42 @@ export const useAppStore = create<AppState>((set, get) => ({
           ? { messages: [...s.messages, assistantErrorMessage(messageError)] }
           : {}),
       }));
+    }
+  },
+
+  compactContext: async () => {
+    const state = get();
+    const sessionId = state.activeSessionId;
+    if (!sessionId || state.isRunning) return;
+    set((current) => ({
+      isRunning: true,
+      runningSessions: {
+        ...current.runningSessions,
+        [sessionId]: true,
+      },
+    }));
+    try {
+      await api.compact({ sessionId });
+    } catch (error) {
+      set((current) => ({
+        isRunning:
+          current.activeSessionId === sessionId ? false : current.isRunning,
+        runningSessions: {
+          ...current.runningSessions,
+          [sessionId]: false,
+        },
+      }));
+      // A started compaction reports its own failure through compaction_end.
+      // Keep this fallback for launch/configuration failures that occur before
+      // the runtime can emit lifecycle events.
+      if ((error as { code?: string })?.code !== "CONTEXT_COMPACTION_FAILED") {
+        get().showToast(
+          error instanceof Error
+            ? error.message
+            : i18n.t("contextCompaction.failed"),
+          { variant: "error" },
+        );
+      }
     }
   },
 
@@ -1937,14 +1974,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     const event = envelope.event;
     // Per-session run state: agents run independently per session, so track
     // running/finished for every envelope, visible session or not.
-    if (event.type === "agent_start" || event.type === "turn_start") {
+    if (
+      event.type === "agent_start" ||
+      event.type === "turn_start" ||
+      event.type === "compaction_start"
+    ) {
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: true },
         sessionOutcomes: withoutRecordKey(s.sessionOutcomes, envelope.sessionId),
       }));
+    } else if (event.type === "compaction_end" && event.reason === "manual") {
+      set((s) => ({
+        runningSessions: { ...s.runningSessions, [envelope.sessionId]: false },
+      }));
     } else if (
       event.type === "agent_end" ||
-      event.type === "turn_end" ||
       event.type === "error"
     ) {
       set((s) => ({
@@ -2029,7 +2073,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             receivedAt: envelope.ts,
           }),
         }));
-      } else if (event.type === "agent_end" || event.type === "turn_end") {
+      } else if (event.type === "agent_end") {
         void get().refreshSessions();
       }
       return;
@@ -2039,10 +2083,32 @@ export const useAppStore = create<AppState>((set, get) => ({
       case "turn_start":
         set({ isRunning: true });
         break;
+      case "compaction_start":
+        set({ isRunning: true });
+        break;
+      case "compaction_end":
+        if (event.reason === "manual") set({ isRunning: false });
+        if (event.ok) {
+          get().showToast(
+            i18n.t(
+              event.reason === "overflow"
+                ? "contextCompaction.retrying"
+                : "contextCompaction.completed",
+            ),
+            { variant: event.reason === "overflow" ? "warning" : "info" },
+          );
+        } else if (event.reason === "manual") {
+          get().showToast(
+            event.error?.message || i18n.t("contextCompaction.failed"),
+            { variant: "error" },
+          );
+        }
+        break;
       case "agent_end":
-      case "turn_end":
         set({ isRunning: false });
         void get().refreshSessions();
+        break;
+      case "turn_end":
         break;
       case "message_start":
         set((s) => {

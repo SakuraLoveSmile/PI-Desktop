@@ -1,4 +1,4 @@
-export const PROTOCOL_VERSION = 5 as const;
+export const PROTOCOL_VERSION = 6 as const;
 export const APP_ID = "com.pi-desktop.app";
 export const APP_NAME = "PI-Desktop";
 export const APP_VERSION = "0.2.5";
@@ -63,6 +63,7 @@ export const IPC = {
     notificationShowNative: "pi-desktop/notification/showNative",
     notificationSetViewingSession: "pi-desktop/notification/setViewingSession",
     agentPrompt: "pi-desktop/agent/prompt",
+    agentCompact: "pi-desktop/agent/compact",
     agentAbort: "pi-desktop/agent/abort",
     agentGetStatus: "pi-desktop/agent/getStatus",
     sessionList: "pi-desktop/session/list",

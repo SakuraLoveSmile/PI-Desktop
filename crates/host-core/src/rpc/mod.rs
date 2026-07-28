@@ -17,6 +17,7 @@ use crate::scratch;
 use crate::sessions::{self, UiMessage};
 use crate::state::{AppState, HOST_VERSION, PROTOCOL_VERSION};
 use crate::tools::{self, ToolsExecuteParams};
+use crate::transcripts::CompactionRecord;
 use crate::workspace;
 
 #[derive(Debug, Deserialize)]
@@ -409,6 +410,11 @@ async fn handle_request(
                     "defaultMode": "chat",
                     "theme": "dark",
                     "enterToSend": true,
+                    "contextCompaction": {
+                        "enabled": true,
+                        "reserveTokens": 16384,
+                        "keepRecentTokens": 20000
+                    },
                     "onboardingDismissed": false
                 })
             }))
@@ -697,6 +703,23 @@ async fn handle_request(
                 .map(str::to_string);
             let st = state.lock().await;
             sessions::append_message(&st.db, session_id, &message, turn_id.as_deref())
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": true }))
+        }
+        "session.appendCompaction" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let compaction: CompactionRecord = serde_json::from_value(
+                params
+                    .get("compaction")
+                    .cloned()
+                    .ok_or_else(|| rpc_err(1002, "compaction required", "INVALID_PARAMS"))?,
+            )
+            .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            sessions::append_compaction(&st.db, session_id, &compaction)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "ok": true }))
         }

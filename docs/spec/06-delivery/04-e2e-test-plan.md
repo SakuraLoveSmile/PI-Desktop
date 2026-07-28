@@ -36,7 +36,7 @@
 |---|---|---|---|
 | **Unit** | Single module, no IPC | Many | Vitest / Rust #[test] |
 | **Integration** | IPC contract, host↔renderer, host↔sidecar | Moderate | Vitest + IPC mocks or live Electron |
-| **E2E** | Full user journey through the desktop app | ~74 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
+| **E2E** | Full user journey through the desktop app | ~84 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
 
 **Strategy**: document all E2E scenarios now; write unit/integration tests alongside code; automate E2E after M5.
 
@@ -122,12 +122,13 @@ Each scenario is documented in this format:
 #### E2E-003: Rust host healthcheck responds
 
 - **Preconditions**: App is running; Rust host-core sidecar started.
-- **Steps**: 1) Electron handshakes with protocol version 5. 2) Call the host
-  healthcheck RPC. 3) Repeat boot with version 4 and version 3 host fixtures.
-- **Expected**: The version 5 host returns `ok` and the handshake is logged.
-  The stale version 4 and version 3 hosts are rejected before chat becomes
-  interactive, so notification records cannot be silently lost at turn
-  completion.
+- **Steps**: 1) Electron handshakes with protocol version 6. 2) Call the host
+  healthcheck RPC. 3) Repeat boot with version 5, version 4, and version 3 host
+  fixtures.
+- **Expected**: The version 6 host returns `ok` and the handshake is logged.
+  Stale version 5 and older hosts are rejected before chat becomes interactive,
+  so context checkpoints and earlier protocol-visible records cannot be
+  silently lost.
 - **Specs linked**: `03-runtime/05-host-core-rust.md`, `03-runtime/06-host-rpc-protocol.md`
 - **Acceptance**: A (bridge normal)
 - **Milestone**: M1
@@ -1868,6 +1869,78 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`interaction-performance.test.mjs`); rendered
   streaming scenario Draft
 
+#### E2E-084: Long tool loop compacts before the provider context limit
+
+- **Preconditions**: Provider configured with known pi-ai context/output
+  limits; automatic context compaction enabled; a fixture can produce repeated
+  tool turns and large capped tool results without finishing the agent run.
+- **Steps**:
+  1. Start one agent task whose tool loop grows past the soft context boundary.
+  2. Let at least three `turn_end` events occur before `agent_end`; observe the
+     composer/session controls and processing rows.
+  3. Continue until the hard boundary forces a checkpoint, then allow the task
+     to finish.
+  4. Restart the app, reopen the session, and send a follow-up that depends on
+     both summarized old work and the retained recent tail.
+  5. Repeat with a provider fixture that returns Bedrock's
+     `prompt is too long: N tokens > M maximum` once.
+  6. Disable automatic compaction and invoke `/compact` manually while idle.
+- **Expected**:
+  - Each `turn_end` is evaluated before another provider request and never
+    marks the overall task idle; composer/config controls remain blocked until
+    `agent_end`, `error`, or manual-only `compaction_end`.
+  - Soft guidance is transient and deduplicated. A model-issued
+    `CompactContext` call appears once as normal tool activity; the hidden
+    instruction never appears in the transcript or durable system prompt.
+  - At the hard boundary a durable checkpoint is created before the next model
+    request. The complete visible transcript is unchanged, and the continued
+    task stays below the model-aware safe budget, including when the last
+    retained tool result is larger than the configured recent-tail target.
+  - Restart restores summary + retained tail. A regenerate/fork before the
+    checkpoint boundary drops it; a later boundary preserves/remaps it.
+  - The exact provider overflow removes only the failed assistant from model
+    context, retries once after compaction, and does not loop on a second
+    overflow.
+  - Disabling automatic protection removes soft/hard/overflow recovery and the
+    model tool, but idle `/compact` still succeeds. Compaction failures surface
+    once through `CONTEXT_COMPACTION_FAILED` without duplicate error toasts.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/02-agent-runtime.md`, `03-runtime/04-data-storage.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `04-ux/09-interaction-patterns.md`,
+  ADR 0030, D158
+- **Acceptance**: C (chat/stream), F (persistence), Quality
+- **Milestone**: M5
+- **Status**: Partially automated (`runtime.test.ts`,
+  `context-compaction.test.mjs`, host-core transcript/session unit tests); full
+  provider/UI journey Draft
+
+#### E2E-085: Expanded sidebar typography follows the global body scale
+
+- **Preconditions**: The expanded sidebar contains at least one standalone
+  session, one retained project with a session, and one empty project group;
+  light and dark themes are available.
+- **Steps**:
+  1. Open the app at the default window width and inspect New task, Plugins,
+     session titles, project/group titles, empty-state copy, section labels,
+     and the profile footer.
+  2. Switch between light and dark themes, then narrow the window to the
+     minimum supported expanded-sidebar width.
+  3. Compare the sidebar hierarchy with 14px chat body text and inspect long
+     session/project names.
+- **Expected**:
+  - Session titles, New task, Plugins, and the footer identity use
+    `--text-base` (14px), matching the global body scale.
+  - Project/group titles and empty-state copy use `--text-md` (13px); section
+    labels and secondary metadata remain at `--text-sm` (12px).
+  - The hierarchy remains readable in both themes, row pitch stays compact at
+    approximately 28–32px, and long labels truncate without shell reflow.
+- **Specs linked**: `04-ux/07-ui-design-system.md`,
+  `04-ux/08-component-spec.md`, D159
+- **Acceptance**: Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`sidebar-navigation.test.mjs`); rendered visual
+  scenario Draft
+
 ## 8. Traceability Matrix
 
 
@@ -1878,14 +1951,14 @@ Each scenario is documented in this format:
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
-| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075, E2E-081, E2E-083 |
+| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084 |
 | D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
 | E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049, E2E-074 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084 |
 | G — Plugins | E2E-022, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -1893,7 +1966,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083 (+ packaging scenarios in release runbook) |
+| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085 (+ packaging scenarios in release runbook) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -2015,7 +2088,8 @@ This test plan spec is accepted when:
   hard-coded white (`gray-0`) text on light surfaces.
 
 ### US-UI-15 Codex density + elevation
-- Sidebar nav rows use ~32px height / 13px type with 8px horizontal padding (Codex `radius-token-row` 10px).
+- Sidebar rows use a compact ~28–32px pitch with the 12–14px hierarchy from
+  US-UI-69 and 8px horizontal padding (Codex `radius-token-row` 10px).
 - Floating composer uses Codex elevation-prominent: 0.5px stroke + soft 3px/20px shadow (not heavy 10–30px drop).
 - Empty hero title is 28px / 34px line-height, weight 400.
 - Window restores ≥1000×700 (target 1200×800) if Stage Manager collapses it.
@@ -2476,16 +2550,15 @@ This test plan spec is accepted when:
   A's resulting Review tab and prior panel selection, while B's tabs and Browser
   resource remain unchanged.
 
-### US-UI-69 Sidebar type balance (D144/D155)
+### US-UI-69 Sidebar type balance (D144/D159)
 - Open the expanded sidebar in light and dark themes at default and minimum
   supported widths with at least one session, one project group, and the local
   profile footer visible.
-- Expect New task, Plugins, footer profile name, and profile menu actions to
-  render at the body chrome size (`--text-base` / 14px).
-- Expect session / thread titles one step quieter (`--text-md` / 13px).
-- Expect project/group titles, empty-state copy, and uppercase section labels
-  (`SESSIONS` / `PROJECTS`) at `--text-sm` / 12px — never micro `--text-xs` for
-  primary left-rail list content.
+- Expect New task, Plugins, session/thread titles, footer profile name, and
+  profile menu actions to render at the body chrome size (`--text-base` / 14px).
+- Expect project/group titles and empty-state copy one step quieter
+  (`--text-md` / 13px), with uppercase section labels (`SESSIONS` / `PROJECTS`)
+  at `--text-sm` / 12px — never below `--text-md` for primary list content.
 - Confirm row pitch remains compact (≈28–32px), titles still truncate cleanly,
   and collapsed icon-rail controls stay legible without reflowing the shell.
 

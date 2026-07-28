@@ -1,7 +1,7 @@
 # Decisions Log
 
-> Baseline delta: `0.3.0` → `0.4.8`
-> Date: `2026-07-27`
+> Baseline delta: `0.3.0` → `0.4.11`
+> Date: `2026-07-28`
 > Status: Accepted for implementation
 
 This log freezes previously open questions into concrete decisions.
@@ -166,7 +166,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D142 | Session-scoped work-panel runtime contexts | **Each conversation owns an in-memory work-panel context containing open state, ordered tabs, active tab, and Browser resource. Session selection atomically projects that context, switching away never deletes it, and switching back restores it. File/URL/BrowserPreview/command/Review artifacts are recorded against their originating `sessionId`; BrowserPreview renderer events therefore carry `sessionId`. Background artifacts may update their retained context but never open, activate, resize, navigate, or focus the visible panel. A workspace selection without an active conversation hides the panel, and relative resources remain bound to their session/workspace. Relaunch discards every context and Browser resource; only panel width persists. This supersedes only D128's requirement to close and clear tabs when the visible session or workspace changes; D128's artifact triggers, deduplication, close/collapse behavior, and no-launcher rule remain unchanged. No process ownership boundary changes.** | Permission-gated tools can finish while another conversation is loading or visible. A global destructive tab set either flashes open before being cleared or loses the originating conversation's tools; session-keyed renderer state preserves continuity without allowing background work to steal focus or making transient resources durable. |
 | D154 | Work-panel activity rail and resource switcher | **Once an artifact has opened the work panel, a 44px activity rail exposes Review, Terminal, and Browser as one-click 32px tool buttons; opening a missing tool still uses D128's `openWorkPanelTab` path. The 46px content header shows and closes the active resource and exposes a bounded keyboard-operable switcher for every open tool/file resource. The panel minimum becomes 364px so the rail preserves the previous 320px content floor. This replaces the horizontally scrolling top tabs and hidden empty-header context menu while preserving D128's artifact-driven panel entry, resource deduplication/order, close-neighbor behavior, and session-scoped runtime ownership.** | High-frequency tools should be visible and spatially stable, while long or numerous file names need a labeled overflow surface rather than compressing every action into one titlebar row. |
 | D157 | One visual assistant turn per user turn | **Provider-level assistant messages separated by thinking/tool activity remain distinct canonical transcript records, but ChatTranscript composes all records after one user message and before the next into one `role=article` assistant turn. Ordered markdown fragments and activity disclosures remain visible; only the composed turn owns the trailing aggregate model/usage row and Copy/Fork/Retry toolbar. Copy joins all contentful fragments with paragraph breaks; Fork and Retry use the last contentful assistant record as their durable boundary.** | Tool-capable providers close and reopen assistant messages around every tool call. Rendering those transport boundaries as separate responses duplicated action toolbars and made one agent run look like many AI replies. |
-| D158 | Latest-wins cached session switching | **The renderer marks the newest selected row immediately, coalesces session-detail prefetch/load work, retains an LRU-style five-transcript memory cache, and starts the newest transcript read without waiting for superseded reads. Workspace alignment may overlap transcript IO; navigation generations gate the atomic visible commit. ChatSurface keeps the previous complete view non-interactive while React defers a changed session tree, then paints the destination at its final record. Cached snapshots are always revalidated.** | The former global selection promise queue made every click wait behind obsolete full-transcript JSONL reads, while one synchronous long Markdown commit delayed visible feedback. Latest-wins IO plus a stable deferred frame matches Codex-style navigation without weakening session/workspace isolation. |
+| D160 | Latest-wins cached session switching | **The renderer marks the newest selected row immediately, coalesces session-detail prefetch/load work, retains an LRU-style five-transcript memory cache, and starts the newest transcript read without waiting for superseded reads. Workspace alignment may overlap transcript IO; navigation generations gate the atomic visible commit. ChatSurface keeps the previous complete view non-interactive while React defers a changed session tree, then paints the destination at its final record. Cached snapshots are always revalidated.** | The former global selection promise queue made every click wait behind obsolete full-transcript JSONL reads, while one synchronous long Markdown commit delayed visible feedback. Latest-wins IO plus a stable deferred frame matches Codex-style navigation without weakening session/workspace isolation. |
 | D156 | Independent native-window and work-panel resize ownership | **Electron Main exclusively owns BrowserWindow bounds at a 1040x700 minimum, while the renderer owns a persisted preferred work-panel width and derives its effective clamped width from current layout space. Native window edges resize only the shell; panel open/collapse/close never moves outer bounds; the divider changes only internal columns with anchored, frame-coalesced preview and commit-on-release. Escape, pointer cancellation, and lost capture roll back. This supersedes D083's restore minimum and D128's temporary OS-window expansion clause, preserves D112's dynamic width limits, and removes the `window/resizeBy` IPC channel and resize-attribution heuristic.** | Circular ownership made divider release resize the OS window a second time, introduced async races and platform differences, moved windows near display edges, and rewrote a panel preference during unrelated native resize. |
 
 ## L. Transcript presentation decisions
@@ -197,6 +197,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D127 | Context-preserving reseed + transport retry | **Reseeding a recreated pi runtime from the persisted transcript restores tool call/result pairs (from tool rows' `toolCallId`/`toolArgs`/`toolResult`) in addition to user/assistant text and thinking. Interrupted tool rows restore as errored results; orphaned tool rows get a synthesized call-only assistant carrier so pairs stay adjacent and well-formed. Failed assistant turns stay transcript-only. Separately, each model request runs with pi-ai `maxRetries: 2` interruptible-backoff retry covering request timeouts, dropped connections, and 429/5xx.** | Text-only reseed collapsed a session's context after any runtime recreation (regenerate/edit, config change, restart): the model lost every tool result it had gathered and — seeing its own history answer without visible tool use — stopped calling tools, degrading agent sessions into bare chat. The incident trigger was a single un-retried provider timeout that forced the user into regenerate. D127 corrects the initially duplicated D120 identifier; D120 remains the earlier application-update decision frozen by baseline 0.4.6. |
 | D136 | pi-ai owns known-model metadata | **For every model resolved from the pinned pi-ai catalog, Electron main passes the complete pi model snapshot to the sidecar and PI-Desktop replaces only connection identity. Provider Settings and the model menu do not override reasoning support, thinking levels, context/output limits, temperature, or compatibility. Unknown free-form ids remain usable through an explicit generic text-only, non-reasoning fallback. This supersedes D102 and the provider-override clauses of D096/D107.** | A second desktop-owned model matrix discarded pi metadata, drifted from adapter behavior, and made model semantics depend on conflicting configurations; fixes for known models now belong in pi-ai or a pi-ai upgrade. |
 | D137 | Segmented tool and model latency logs | **Every `tools.execute` call is timed in segments instead of one opaque duration: host-core emits a `tool timing` line on the `host` channel and persists `prompted`, `permissionWaitMs`, `overheadMs`, and `totalMs` next to the existing `durationMs` on `tool_execute` / `tool_denied` audit rows; the sidecar writes greppable `[timing] kind=tool …` (`hostRttMs`) and `[timing] kind=model …` (`providerWaitMs`, `streamMs`, including failed/aborted turns) lines to the `agent` channel, suppressible with `PI_DESKTOP_TIMING=0`. No timing is surfaced in the UI and no protocol shape changes.** | "Executing a command is slow" was undiagnosable from the logs: approval waiting, the tool body, and the provider round trip were indistinguishable, so a 45s gap between two audit rows with 0ms durations gave no clue whether it was the user, the model, or the host. Splitting the stages makes the answer readable without reproducing the run. |
+| D158 | Turn-boundary context checkpoint compaction | **PI-Desktop reuses pi-agent-core's context estimation, session-context, and compaction primitives but owns the orchestration and durability. After every `turn_end`, before any next provider request, the runtime evaluates model-aware soft/hard budgets. A transient deduplicated instruction can ask the model to call the internal `CompactContext` tool; the tool's normal activity row is visible/durable, while the instruction is not. Crossing the hard budget forces checkpoint generation and blocks the request on failure. Exact provider overflow removes the failed assistant from model context, creates one checkpoint, and retries once. Host protocol v6 appends checkpoint records beside the untouched visible JSONL transcript; restart, late truncation, and included-boundary forks preserve the newest valid checkpoint. Disabling automatic compaction removes the tool and all automatic threshold/overflow recovery, while `/compact` remains available. OpenCode DCP is an AGPL-3.0 behavioral reference only and is neither linked nor copied (ADR 0030).** | pi's end-of-run-only behavior cannot protect long tool loops, and a model reminder alone cannot guarantee provider safety. Reusing pi's tested compaction format while adding a deterministic `turn_end` gate prevents another provider request from crossing the known window, retains user-visible history, and avoids importing an incompatible plugin/runtime and license boundary. |
 
 ## N. Notification decisions
 
@@ -411,7 +412,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Session titles use `--text-md` (13px); project/group titles and empty-state
   copy use `--text-sm` (12px). Primary chrome (New task, Plugins, footer) stays
   at `--text-base`.
-- Decision D155.
+- Decision D155; superseded by D159 for the expanded sidebar's primary list
+  content.
 
 ## 2026-07-28 — Independent window and work-panel resizing
 
@@ -434,6 +436,27 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Copy joins all contentful assistant fragments; Fork and Retry target the last
   contentful assistant record. Decision D157.
 
+## 2026-07-28 — Turn-boundary context checkpoint compaction
+
+- PI-Desktop now evaluates context after every `turn_end`, before the next
+  provider request, with a transient soft reminder and a deterministic hard
+  checkpoint guard.
+- Durable checkpoint records rebuild model context without deleting or hiding
+  visible transcript messages; exact provider overflow receives one compacted
+  retry.
+- The implementation reuses pi-agent-core primitives. OpenCode DCP remains an
+  AGPL-3.0 behavioral reference, not a dependency or copied implementation.
+- Decision D158; ADR 0030.
+
+## 2026-07-28 — Sidebar typography aligned with the global body scale
+
+- Expanded-sidebar session titles return to `--text-base` (14px), matching the
+  app body and primary sidebar chrome; project/group titles and empty-state copy
+  return to the adjacent `--text-md` (13px) tier.
+- Section labels and secondary metadata remain at `--text-sm` (12px), and the
+  existing compact row pitch, truncation, and sidebar dimensions are unchanged.
+- Decision D159; supersedes D155 and restores D144's primary-list hierarchy.
+
 ## 2026-07-28 — Smooth latest-wins session switching
 
 - Session rows now acknowledge the newest selection immediately, prefetch on
@@ -444,4 +467,4 @@ section mirrors only marketplace/catalog items still blocking nothing.
   navigation generation still owns the only visible commit.
 - The previous complete transcript remains as a dimmed, non-interactive frame
   while React prepares a changed session's Markdown tree; reduced motion uses a
-  static progress track. Decision D158.
+  static progress track. Decision D160.

@@ -214,22 +214,23 @@ Collapsed (48px):
 
 ### 3.3 Typography
 
-Primary left-rail chrome stays body-sized so destinations remain readable next
-to the 14px chat body, while project/session list rows step one token quieter
-for denser scanning:
+Primary left-rail chrome and session titles stay body-sized so the expanded
+sidebar remains readable next to the 14px chat body. Project/group labels step
+one token quieter to preserve hierarchy without making the list feel detached
+from the global type scale:
 
 | Surface | Token | Notes |
 |---|---|---|
 | New task / Plugins / nav items | `--text-base` (14px) | Primary actions and destinations |
-| Session / thread titles | `--text-md` (13px) | One step quieter than primary chrome |
-| Project / group titles, empty copy | `--text-sm` (12px) | One step quieter than session rows |
+| Session / thread titles | `--text-base` (14px) | Matches global body readability |
+| Project / group titles, empty copy | `--text-md` (13px) | One step quieter than session rows |
 | Section labels (`SESSIONS`, `PROJECTS`) | `--text-sm` (12px) | Uppercase secondary labels |
 | Footer profile name + profile menu items | `--text-base` (14px) | Identity cluster matches nav body |
 | Footer status / profile menu secondary | `--text-sm` (12px) | Secondary line only |
 
-Do not render primary sidebar list content at `--text-xs` / `--text-2xs`. Keep
-row heights (≈28–32px) so density stays WorkBuddy/Codex-like while list glyphs
-stay slightly quieter than primary chrome.
+Do not render primary sidebar list content below `--text-md`. Keep row heights
+(≈28–32px) so density stays WorkBuddy/Codex-like while session glyphs remain
+coordinated with the global body size.
 
 ### 3.4 States
 
@@ -701,6 +702,7 @@ storage but compose into one assistant turn until the next user message.
 | Thinking-only streaming | Transcript opens; disclosure stays open; no empty answer bubble or duplicate Working row |
 | Idle | Scrollable; no auto-scroll |
 | Permission pending | PermissionCard inserted inline; transcript continues after resolution |
+| Context checkpoint | Existing transcript remains visible; `CompactContext` appears as a normal tool activity row when model-requested, and no synthetic system instruction appears |
 | Error | Error MessageBubble with actionable retry link |
 
 ### 7.4 Interactions
@@ -734,6 +736,9 @@ storage but compose into one assistant turn until the next user message.
 - Minimap content resize checks only overflow. Message-position measurement is
   reserved for scrolling, marker identity changes, and viewport resize, so a
   streamed content height update does not scan every message twice.
+- Context compaction never removes, collapses, or replaces visible message
+  rows. A model-issued `CompactContext` call stays in the normal processing
+  group; only its transient prompting instruction is hidden from transcript UI.
 
 ### 7.5 Accessibility
 
@@ -1131,6 +1136,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | Idle (ready) | textarea active, send button enabled | Send active |
 | New session (reasoning model) | Thinking trigger shows the model's highest published level | User may select any published level, including Off when supported |
 | Running | textarea disabled, abort button visible | Abort active, Send hidden |
+| Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
 
@@ -1140,6 +1146,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Shift+Enter: newline in textarea
 - Escape: when textarea focused, clears input or blurs (not abort)
 - Abort: stops running turn and cancels pending permission
+- `turn_end` is not an idle signal. The composer, model/mode controls, and
+  session actions remain blocked through subsequent tool turns and automatic
+  checkpoint generation until `agent_end` or `error`. A manual-only checkpoint
+  becomes idle on its matching `compaction_end`.
 - Auto-grow: textarea measures wrapped visual lines, starts at one visible
   line, expands through seven lines, then scrolls internally; deleting content
   shrinks it back to one line
@@ -1709,3 +1719,5 @@ Sidebar footer                                        Popover (360px max)
 18. Native window edges, panel visibility, and the work-panel divider have
     independent resize ownership; cancelled divider gestures restore the prior
     width and responsive clamping never overwrites the persisted preference
+19. Expanded sidebar session titles match the 14px global body token while
+    project/group titles and empty-state copy remain one adjacent step smaller
