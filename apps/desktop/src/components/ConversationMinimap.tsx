@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type RefObject,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -225,6 +226,7 @@ export const ConversationMinimap = memo(function ConversationMinimap({
       className="minimap-rail"
       ref={railRef}
       aria-label={t("chat.minimap")}
+      style={{ "--minimap-marker-count": markers.length } as CSSProperties}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >

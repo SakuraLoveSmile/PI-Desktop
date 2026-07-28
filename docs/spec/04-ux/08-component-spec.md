@@ -692,6 +692,10 @@ responses, lightweight tool activity rows, and permission cards for a session.
   near the upper third of the viewport
 - Show the minimap rail only while the transcript overflows one page; if
   content fits the viewport, hide the rail even when two or more markers exist
+- Center the minimap stack inside the unobstructed vertical span below the
+  46px titlebar and above the docked composer. As marker count grows, compress
+  marker pitch and spacing so every marker remains inside that span rather
+  than entering the native window drag region
 - Follow-scroll requests from stream events and content resize are coalesced to
   at most one pending animation frame. A new token cannot cancel and recreate
   already scheduled follow work.
