@@ -38,7 +38,9 @@
 | **Integration** | IPC contract, host↔renderer, host↔sidecar | Moderate | Vitest + IPC mocks or live Electron |
 | **E2E** | Full user journey through the desktop app | ~84 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
 
-**Strategy**: document all E2E scenarios now; write unit/integration tests alongside code; automate E2E after M5.
+**Strategy**: document all E2E scenarios now; add or update unit/integration
+tests alongside code when change risk makes them necessary; automate E2E after
+M5.
 
 ---
 
