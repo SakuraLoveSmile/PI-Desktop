@@ -103,14 +103,20 @@ export type ToastOptions = {
 };
 
 const WORK_PANEL_STORAGE_KEY = "pi.desktop.workPanel";
+const SESSION_TRANSCRIPT_CACHE_LIMIT = 5;
 // Preserve the original 320px tool-content minimum beside the 44px activity rail.
 export { WORK_PANEL_DEFAULT_WIDTH, WORK_PANEL_MIN_WIDTH };
 
 let workspaceDiffRequestSeq = 0;
 let workPanelFileRequestSeq = 0;
 const navigationIntents = createNavigationIntentController();
-let sessionSelectionQueue: Promise<void> = Promise.resolve();
 let pendingSessionSelection: { id: string; intent: number } | null = null;
+let sessionWorkspaceQueue: Promise<void> = Promise.resolve();
+const sessionTranscriptCache = new Map<string, UiMessage[]>();
+const sessionDetailLoads = new Map<
+  string,
+  ReturnType<typeof api.getSession>
+>();
 
 type NavigationOptions = {
   /** Reuse an owning navigation's generation across nested async operations. */
@@ -123,6 +129,31 @@ function beginNavigationIntent() {
 
 function navigationIntentIsCurrent(intent: number) {
   return navigationIntents.isCurrent(intent);
+}
+
+function cacheSessionTranscript(id: string, messages: UiMessage[]) {
+  sessionTranscriptCache.delete(id);
+  sessionTranscriptCache.set(id, messages);
+  while (sessionTranscriptCache.size > SESSION_TRANSCRIPT_CACHE_LIMIT) {
+    const oldestId = sessionTranscriptCache.keys().next().value;
+    if (typeof oldestId !== "string") break;
+    sessionTranscriptCache.delete(oldestId);
+  }
+}
+
+function loadSessionDetail(id: string) {
+  const active = sessionDetailLoads.get(id);
+  if (active) return active;
+  const request = api.getSession(id).then((detail) => {
+    if (detail.session) cacheSessionTranscript(id, detail.session.messages ?? []);
+    return detail;
+  });
+  sessionDetailLoads.set(id, request);
+  const clear = () => {
+    if (sessionDetailLoads.get(id) === request) sessionDetailLoads.delete(id);
+  };
+  void request.then(clear, clear);
+  return request;
 }
 
 function messageErrorFromUnknown(error: unknown): AppError {
@@ -229,6 +260,8 @@ export type AppState = {
   projectCollapsed: Record<string, boolean>;
   projectSort: ProjectSort;
   activeSessionId?: string;
+  /** Latest user-selected session while its transcript/workspace is resolving. */
+  selectingSessionId?: string;
   messages: UiMessage[];
   isRunning: boolean;
   /** Run state per session id — sessions run independent agents. */
@@ -257,6 +290,7 @@ export type AppState = {
   errorRetriable?: boolean | null;
   bootstrap: () => Promise<void>;
   refreshSessions: () => Promise<void>;
+  prefetchSession: (id: string) => Promise<void>;
   selectSession: (
     id: string,
     opts?: { record?: boolean } & NavigationOptions,
@@ -650,44 +684,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ sessions: decorateSessions(sessions.sessions, get().sessionMeta) });
   },
 
+  prefetchSession: async (id) => {
+    if (!id || sessionTranscriptCache.has(id)) return;
+    await loadSessionDetail(id);
+  },
+
   selectSession: async (id, opts) => {
     const intent = opts?.navigationIntent ?? beginNavigationIntent();
     const selection = { id, intent };
     pendingSessionSelection = selection;
-    const selectLatest = async () => {
-      if (!navigationIntentIsCurrent(intent)) return;
-      const detail = await api.getSession(id);
-      if (!navigationIntentIsCurrent(intent)) return;
-      const sessionProjectPath = detail.session?.projectPath;
-      // Serialize project activation with transcript selection. A slower,
-      // superseded request must never commit after the latest user choice.
-      if (sessionProjectPath) {
-        if (
-          !sessionMatchesProject(
-            { projectPath: get().activeProjectPath },
-            sessionProjectPath,
-          )
-        ) {
-          const workspace = await get().activateProject(sessionProjectPath, {
-            navigationIntent: intent,
-          });
-          if (!navigationIntentIsCurrent(intent)) return;
-          if (!workspace) throw new Error("Unable to activate project workspace");
-        }
-      } else if (get().workspace) {
-        await get().clearProject({ navigationIntent: intent });
-        if (!navigationIntentIsCurrent(intent)) return;
-      }
+    const stateAtStart = get();
+    if (stateAtStart.activeSessionId) {
+      cacheSessionTranscript(stateAtStart.activeSessionId, stateAtStart.messages);
+    }
+    set({ selectingSessionId: id, page: "chat" });
+
+    const commitSelection = (messages: UiMessage[], revalidating: boolean) => {
       const record = opts?.record !== false;
       if (!record) {
         set((s) => ({
-          ...switchWorkPanelSession(s, id),
+          ...(s.activeSessionId === id ? {} : switchWorkPanelSession(s, id)),
           activeSessionId: id,
-          messages: detail.session?.messages ?? [],
+          selectingSessionId: revalidating ? id : undefined,
+          messages,
           page: "chat",
           isRunning: s.runningSessions[id] ?? false,
         }));
-        void get().acknowledgeSessionOutcome(id);
         return;
       }
       const entry = { page: "chat" as const, sessionId: id };
@@ -697,26 +719,85 @@ export const useAppStore = create<AppState>((set, get) => ({
         const same = last?.page === "chat" && last?.sessionId === id;
         const nextStack = same ? stack : [...stack, entry].slice(-50);
         return {
-          ...switchWorkPanelSession(s, id),
+          ...(s.activeSessionId === id ? {} : switchWorkPanelSession(s, id)),
           activeSessionId: id,
-          messages: detail.session?.messages ?? [],
+          selectingSessionId: revalidating ? id : undefined,
+          messages,
           page: "chat" as const,
           isRunning: s.runningSessions[id] ?? false,
           navStack: nextStack,
           navIndex: nextStack.length - 1,
         };
       });
-      void get().acknowledgeSessionOutcome(id);
     };
-    const queued = sessionSelectionQueue.then(selectLatest, selectLatest);
-    sessionSelectionQueue = queued.then(
-      () => undefined,
-      () => undefined,
-    );
+
+    const alignWorkspace = async (projectPath?: string | null) => {
+      if (projectPath) {
+        if (
+          !sessionMatchesProject(
+            { projectPath: get().activeProjectPath },
+            projectPath,
+          )
+        ) {
+          const workspace = await get().activateProject(projectPath, {
+            navigationIntent: intent,
+          });
+          if (!navigationIntentIsCurrent(intent)) return false;
+          if (!workspace) throw new Error("Unable to activate project workspace");
+        }
+      } else if (get().workspace) {
+        await get().clearProject({ navigationIntent: intent });
+        if (!navigationIntentIsCurrent(intent)) return false;
+      }
+      return navigationIntentIsCurrent(intent);
+    };
+
+    const alignWorkspaceLatest = (projectPath?: string | null) => {
+      const task = sessionWorkspaceQueue.then(
+        () => alignWorkspace(projectPath),
+        () => alignWorkspace(projectPath),
+      );
+      sessionWorkspaceQueue = task.then(
+        () => undefined,
+        () => undefined,
+      );
+      return task;
+    };
+
     try {
-      await queued;
+      if (!navigationIntentIsCurrent(intent)) return;
+      const summary = get().sessions.find((session) => session.id === id);
+      // Start transcript IO immediately. When summary metadata is available,
+      // workspace alignment runs beside it instead of adding another round trip.
+      const detailPromise = loadSessionDetail(id);
+      let detail: Awaited<typeof detailPromise> | undefined;
+      if (summary) {
+        if (!(await alignWorkspaceLatest(summary.projectPath))) return;
+      } else {
+        detail = await detailPromise;
+        if (!navigationIntentIsCurrent(intent)) return;
+        if (!(await alignWorkspaceLatest(detail.session?.projectPath))) return;
+      }
+
+      const cachedMessages = sessionTranscriptCache.get(id);
+      if (cachedMessages && navigationIntentIsCurrent(intent)) {
+        cacheSessionTranscript(id, cachedMessages);
+        commitSelection(cachedMessages, true);
+      }
+
+      detail ??= await detailPromise;
+      if (!navigationIntentIsCurrent(intent)) return;
+      commitSelection(detail.session?.messages ?? [], false);
+      void get().acknowledgeSessionOutcome(id);
     } finally {
-      if (pendingSessionSelection === selection) pendingSessionSelection = null;
+      if (pendingSessionSelection === selection) {
+        pendingSessionSelection = null;
+        set((state) =>
+          state.selectingSessionId === id
+            ? { selectingSessionId: undefined }
+            : {},
+        );
+      }
     }
   },
 
@@ -1522,6 +1603,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteSession: async (id) => {
     if (!id) return;
     await api.deleteSession(id);
+    sessionTranscriptCache.delete(id);
     if (get().activeSessionId === id) get().resetWorkPanelContext();
     set((state) => {
       const sessionMeta = { ...state.sessionMeta };
@@ -1553,6 +1635,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         workPanelContexts,
         activeSessionId:
           state.activeSessionId === id ? undefined : state.activeSessionId,
+        selectingSessionId:
+          state.selectingSessionId === id ? undefined : state.selectingSessionId,
         messages: state.activeSessionId === id ? [] : state.messages,
         isRunning: state.activeSessionId === id ? false : state.isRunning,
         pendingPermissions,

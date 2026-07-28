@@ -75,6 +75,16 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   `messages`, active-turn rendering, inline chat errors, and active permission
   projection are subscribed inside a memoized `ChatSurface`, so a token update
   cannot rerender Sidebar, WorkPanel, window chrome, global dialogs, or toasts.
+- Session selection exposes the destination row immediately, coalesces hover/
+  focus prefetches, and keeps at most five recently visited transcripts in
+  renderer memory. Transcript IO and required workspace alignment may run in
+  parallel; navigation generations ensure that only the newest selection can
+  project session, workspace, messages, and work-panel context.
+- While a destination transcript is resolving or React is preparing its heavy
+  Markdown tree, `ChatSurface` retains the previous complete transcript as a
+  non-interactive stable frame, exposes `aria-busy`, and shows a 2px progress
+  track. The destination transcript replaces it atomically at the bottom; a
+  stale transcript is never relabeled with the destination session id.
 - Settings, Plugins, Pull requests, and Scheduled are route-level lazy modules.
   Chat and shell chrome stay in the initial renderer bundle; first entry to a
   secondary destination shows a compact localized status indicator until its
@@ -228,6 +238,7 @@ visually distinct from list content.
 | Expanded | Full session titles visible |
 | Collapsed | Icon rail — hover shows tooltip with session title |
 | Active session | Accent-blue outlined status ring plus active row background |
+| Selecting session | Destination row receives the active treatment immediately while transcript/workspace resolution continues |
 | Session in progress | Orange breathing dot; static under reduced motion |
 | Session completed | Green check mark when the row is not selected |
 | Session failed | Red circled alert mark when the row is not selected |
@@ -251,6 +262,10 @@ visually distinct from list content.
   activation resets any manual-scroll state inherited from the previous
   transcript and must not flash the new transcript's top or an old scroll
   position before settling at the bottom.
+- Hovering a session row for 120ms or keyboard-focusing it starts one coalesced
+  transcript prefetch. Selection reuses an in-flight or recent cached result,
+  revalidates it in the background, and never waits for an older superseded
+  session read before starting the latest read.
 - Click the message-plus New Chat control: create/reuse a draft in the current workspace scope
 - On Windows/Linux, click the PI-Desktop brand to return the main pane to the
   chat home while preserving the active conversation and workspace; macOS
@@ -683,6 +698,7 @@ storage but compose into one assistant turn until the next user message.
 | State | Behavior |
 |---|---|
 | Session activation | Re-pin and position at the last record during layout, before the transcript's first painted frame |
+| Session transition | Previous complete view remains stable and non-interactive until the deferred destination tree is ready; current stream updates are not deferred |
 | Streaming | New tokens append; auto-scroll only while pinned to bottom |
 | Turn start | Send / retry / regenerate re-pins follow mode and jumps to bottom |
 | Thinking-only streaming | Transcript opens; disclosure stays open; no empty answer bubble or duplicate Working row |
