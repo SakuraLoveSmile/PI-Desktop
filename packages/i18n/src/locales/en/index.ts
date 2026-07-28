@@ -351,6 +351,13 @@ export const en = {
     noResults: "No matching settings",
     enterToSend: "Enter to send",
     enterToSendDesc: "When off, press ⌘/Ctrl+Enter to send.",
+    contextCompaction: "Context management",
+    contextCompactionEnabled: "Automatic compaction",
+    contextCompactionEnabledDesc: "Summarize older context before the model limit is reached.",
+    contextCompactionReserve: "Reserved tokens",
+    contextCompactionReserveDesc: "Space reserved for generating the checkpoint summary.",
+    contextCompactionRecent: "Recent tokens to keep",
+    contextCompactionRecentDesc: "Approximate recent context retained verbatim after compaction.",
     modeDesc: "Default mode for new chats.",
     modeAgent: "Agent",
     modeChat: "Chat",
@@ -707,6 +714,11 @@ export const en = {
   toast: {
     dismiss: "Dismiss notification",
   },
+  contextCompaction: {
+    completed: "Conversation context compacted",
+    retrying: "Context compacted; retrying the model request",
+    failed: "Context compaction failed",
+  },
   notifications: {
     title: "Notifications",
     open: "Open notifications",
@@ -739,7 +751,8 @@ export const en = {
     NETWORK_ERROR: "Can't reach the AI provider. Check your network or base URL.",
     TIMEOUT: "The request to the AI provider timed out.",
     STREAM_FAILED: "The reply was interrupted.",
-    CONTEXT_TOO_LARGE: "This chat is too long for the model. Start a new chat or shorten your message.",
+    CONTEXT_TOO_LARGE: "This chat is still too long after context recovery. Shorten your message or start a new chat.",
+    CONTEXT_COMPACTION_FAILED: "Couldn't compact this conversation's model context.",
     AGENT_BUSY: "This chat is already working. Wait for it to finish, or stop it first.",
     TURN_ABORTED: "Stopped.",
     action: {

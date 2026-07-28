@@ -353,6 +353,13 @@ export const zhCN = {
     noResults: "没有匹配的设置项",
     enterToSend: "回车发送",
     enterToSendDesc: "关闭后，使用 ⌘/Ctrl+Enter 发送。",
+    contextCompaction: "上下文管理",
+    contextCompactionEnabled: "自动压缩",
+    contextCompactionEnabledDesc: "在达到模型上限前，对较早的上下文生成摘要。",
+    contextCompactionReserve: "预留 token",
+    contextCompactionReserveDesc: "为生成上下文摘要预留的空间。",
+    contextCompactionRecent: "保留近期 token",
+    contextCompactionRecentDesc: "压缩后按原文保留的近期上下文估算量。",
     modeDesc: "新建对话时的默认模式。",
     modeAgent: "智能体",
     modeChat: "对话",
@@ -709,6 +716,11 @@ export const zhCN = {
   toast: {
     dismiss: "关闭通知",
   },
+  contextCompaction: {
+    completed: "对话上下文已压缩",
+    retrying: "上下文已压缩，正在重试模型请求",
+    failed: "上下文压缩失败",
+  },
   notifications: {
     title: "通知",
     open: "打开通知中心",
@@ -741,7 +753,8 @@ export const zhCN = {
     NETWORK_ERROR: "无法连接 AI 服务，请检查网络或接口地址。",
     TIMEOUT: "请求 AI 服务超时。",
     STREAM_FAILED: "回复中断了。",
-    CONTEXT_TOO_LARGE: "当前对话对模型来说太长了。请新开对话，或缩短消息内容。",
+    CONTEXT_TOO_LARGE: "上下文恢复后对话仍然过长。请缩短消息内容或新开对话。",
+    CONTEXT_COMPACTION_FAILED: "无法压缩当前对话的模型上下文。",
     AGENT_BUSY: "此对话正在处理中。请等待完成，或先停止当前任务。",
     TURN_ABORTED: "已停止。",
     action: {

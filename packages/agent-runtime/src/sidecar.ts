@@ -7,14 +7,19 @@ import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { ParentHostProxy } from "./parent-host-proxy.js";
 import { classifyAgentError } from "./agent-errors.js";
-import { DesktopAgentRuntime } from "./runtime.js";
+import {
+  DesktopAgentRuntime,
+  type PluginToolDef,
+  type RuntimeProviderConfig,
+} from "./runtime.js";
 import {
   normalizeSupportedThinkingLevels,
   normalizeThinkingLevel,
 } from "./sidecar-config.js";
-import type { PiModelConfig } from "./thinking-level.js";
 import type {
   AgentEventEnvelope,
+  ContextCompactionRecord,
+  ContextCompactionSettings,
   Mode,
   ThinkingLevel,
   UiMessage,
@@ -24,6 +29,16 @@ type RuntimeMap = Map<string, DesktopAgentRuntime>;
 
 const runtimes: RuntimeMap = new Map();
 const hostProxy = new ParentHostProxy();
+
+type RuntimeParams = {
+  sessionId: string;
+  mode?: Mode;
+  thinkingLevel?: ThinkingLevel;
+  provider: RuntimeProviderConfig;
+  pluginTools?: PluginToolDef[];
+  scratchDir?: string;
+  compactionSettings?: ContextCompactionSettings;
+};
 
 function write(msg: unknown) {
   process.stdout.write(JSON.stringify(msg) + "\n");
@@ -36,6 +51,107 @@ function notify(method: string, params: unknown) {
 function respond(id: string | number, result?: unknown, error?: unknown) {
   if (error) write({ jsonrpc: "2.0", id, error });
   else write({ jsonrpc: "2.0", id, result });
+}
+
+async function runtimeFor(
+  params: RuntimeParams,
+  currentPrompt?: string,
+): Promise<DesktopAgentRuntime> {
+  const sessionId = String(params.sessionId);
+  const mode = params.mode || "agent";
+  const providerInput = params.provider;
+  const provider = {
+    ...providerInput,
+    supportsReasoning: providerInput?.supportsReasoning === true,
+    supportedThinkingLevels: normalizeSupportedThinkingLevels(
+      providerInput?.supportedThinkingLevels,
+      providerInput?.supportsReasoning === true,
+    ),
+  };
+  const thinkingLevel = normalizeThinkingLevel(params.thinkingLevel);
+  const pluginTools = params.pluginTools ?? [];
+  const pluginToolNames = pluginTools.map((tool) => tool.name);
+  if (!provider?.modelId || (!provider.apiKey && provider.authKind !== "none")) {
+    throw Object.assign(new Error("model/provider not configured"), {
+      rpcCode: -32000,
+      errorCode: "MODEL_NOT_CONFIGURED",
+    });
+  }
+
+  const existing = runtimes.get(sessionId);
+  if (existing?.getStatus().isRunning) {
+    throw Object.assign(new Error("session already has an active turn"), {
+      rpcCode: -32000,
+      errorCode: "AGENT_BUSY",
+    });
+  }
+  const reusable = existing?.matches(
+    mode,
+    provider,
+    thinkingLevel,
+    pluginToolNames,
+  )
+    ? existing
+    : undefined;
+  if (existing && !reusable) {
+    await existing.dispose();
+    runtimes.delete(sessionId);
+  }
+  if (reusable) {
+    reusable.setCompactionSettings(params.compactionSettings);
+    return reusable;
+  }
+
+  let history: UiMessage[] = [];
+  let compaction: ContextCompactionRecord | undefined;
+  try {
+    const detail = await hostProxy.call<{
+      session?: {
+        messages?: UiMessage[];
+        compaction?: ContextCompactionRecord;
+      } | null;
+    }>("session.get", { id: sessionId });
+    history = detail?.session?.messages ?? [];
+    compaction = detail?.session?.compaction;
+  } catch {
+    // History restore is best-effort; a prompt can still start cleanly.
+  }
+  if (currentPrompt !== undefined) {
+    const last = history.at(-1);
+    if (last?.role === "user" && last.content === currentPrompt) {
+      history = history.slice(0, -1);
+    }
+  }
+  const runtime = new DesktopAgentRuntime({
+    host: hostProxy as any,
+    sessionId,
+    mode,
+    provider,
+    thinkingLevel,
+    history,
+    compaction,
+    compactionSettings: params.compactionSettings,
+    pluginTools,
+    scratchDir:
+      typeof params.scratchDir === "string" && params.scratchDir
+        ? params.scratchDir
+        : undefined,
+    onEvent: (envelope: AgentEventEnvelope) => notify("agent.event", envelope),
+  });
+  runtimes.set(sessionId, runtime);
+  return runtime;
+}
+
+function classifiedRuntimeError(err: unknown) {
+  const errorCode = (err as { errorCode?: unknown })?.errorCode;
+  if (typeof errorCode === "string") {
+    return {
+      code: errorCode,
+      message: err instanceof Error ? err.message : String(err),
+      retriable: false,
+    };
+  }
+  return classifyAgentError(err);
 }
 
 // Host notifications (permissions.request never reaches us — main forwards
@@ -53,104 +169,13 @@ async function handle(method: string, params: any): Promise<unknown> {
     case "agent.prompt": {
       const sessionId = String(params.sessionId);
       const content = String(params.content ?? "");
-      const mode = (params.mode as Mode) || "agent";
-      const providerInput = params.provider as {
-        id: string;
-        name: string;
-        baseUrl?: string;
-        modelId: string;
-        apiKey: string;
-        authKind?: string;
-        apiStyle?: string;
-        supportsReasoning: boolean;
-        supportedThinkingLevels: ThinkingLevel[];
-        /** Complete pi-ai model metadata resolved by main; passed through verbatim. */
-        modelConfig?: PiModelConfig;
-      };
-      const provider = {
-        ...providerInput,
-        supportsReasoning: providerInput?.supportsReasoning === true,
-        supportedThinkingLevels: normalizeSupportedThinkingLevels(
-          providerInput?.supportedThinkingLevels,
-          providerInput?.supportsReasoning === true,
-        ),
-      };
-      const thinkingLevel = normalizeThinkingLevel(params.thinkingLevel);
-      const pluginTools = (params.pluginTools ?? []) as Array<{
-        name: string;
-        description?: string;
-        parameters?: unknown;
-      }>;
-      const pluginToolNames = pluginTools.map((t) => t.name);
-      if (
-        !provider?.modelId ||
-        (!provider.apiKey && provider.authKind !== "none")
-      ) {
-        throw Object.assign(new Error("model/provider not configured"), {
-          rpcCode: -32000,
-          errorCode: "MODEL_NOT_CONFIGURED",
-        });
-      }
-      // A session runs one turn at a time (AGENT_BUSY, spec 02-agent-runtime).
-      // Session isolation: one persistent pi-agent per session — reuse the
-      // idle runtime so the session keeps its own context, and recreate only
-      // when provider/model/mode changed (seeding from the persisted
-      // transcript so no context is lost, and none leaks across sessions).
-      const existing = runtimes.get(sessionId);
-      if (existing?.getStatus().isRunning) {
-        throw Object.assign(new Error("session already has an active turn"), {
-          rpcCode: -32000,
-          errorCode: "AGENT_BUSY",
-        });
-      }
-      let runtime = existing?.matches(
-        mode,
-        provider,
-        thinkingLevel,
-        pluginToolNames,
-      )
-        ? existing
-        : undefined;
-      if (existing && !runtime) {
-        await existing.dispose();
-        runtimes.delete(sessionId);
-      }
       const turnId = randomUUID();
-      if (!runtime) {
-        let history: UiMessage[] = [];
-        try {
-          const detail = await hostProxy.call<{
-            session?: { messages?: UiMessage[] } | null;
-          }>("session.get", { id: sessionId });
-          history = detail?.session?.messages ?? [];
-        } catch {
-          // history restore is best-effort
-        }
-        // Main persists the current user message before calling us; drop it
-        // from the seed so prompt() doesn't add it to the context twice.
-        const last = history[history.length - 1];
-        if (last?.role === "user" && last.content === content) {
-          history = history.slice(0, -1);
-        }
-        runtime = new DesktopAgentRuntime({
-          host: hostProxy as any,
-          sessionId,
-          mode,
-          provider,
-          thinkingLevel,
-          history,
-          pluginTools,
-          scratchDir:
-            typeof params.scratchDir === "string" && params.scratchDir
-              ? params.scratchDir
-              : undefined,
-          onEvent: (envelope: AgentEventEnvelope) => {
-            notify("agent.event", envelope);
-          },
-        });
-        runtimes.set(sessionId, runtime);
-      }
-      void runtime.prompt(content).catch((err) => {
+      const runtime = await runtimeFor(params, content);
+      const userMessageId =
+        typeof params.userMessageId === "string" && params.userMessageId
+          ? params.userMessageId
+          : undefined;
+      void runtime.prompt(content, userMessageId).catch((err) => {
         // Rejected-prompt path (pre-flight/transport failures). Streamed
         // provider errors surface via stopReason "error" and are classified
         // and emitted by the runtime itself.
@@ -160,11 +185,16 @@ async function handle(method: string, params: any): Promise<unknown> {
           ts: Date.now(),
           event: {
             type: "error",
-            error: classifyAgentError(err),
+            error: classifiedRuntimeError(err),
           },
         });
       });
       return { accepted: true, turnId };
+    }
+    case "agent.compact": {
+      const runtime = await runtimeFor(params);
+      await runtime.compactManually();
+      return { accepted: true };
     }
     case "agent.abort": {
       const sessionId = String(params.sessionId);

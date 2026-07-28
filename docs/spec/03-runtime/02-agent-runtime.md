@@ -2,7 +2,7 @@
 
 ## 1. Goal
 
-Applied decisions: **D002/D003/D008**.
+Applied decisions: **D002/D003/D008/D158**.
 
 
 Wrap pi into a product runtime that desktop layers can consume safely.
@@ -78,6 +78,70 @@ interface AgentRuntime {
     visible assistant error message
 11. finalize and persist successful answer/thinking blocks independently
 
+### 5.1 Context checkpoint protection (D158, ADR 0030)
+
+The complete visible transcript and the model context are separate views of
+the same session. A durable checkpoint summarizes older model context while
+the renderer continues to show every original user, assistant, and tool row.
+
+PI-Desktop reuses pi-agent-core's `buildSessionContext`, `convertToLlm`,
+`estimateContextTokens`, `prepareCompaction`, and `compact` primitives. The
+desktop runtime owns when they run and how the result crosses the Rust storage
+boundary; OpenCode DCP is an AGPL-3.0 behavioral reference only, not a linked or
+copied dependency.
+
+For every pi loop turn:
+
+1. pi emits and awaits `turn_end` after the assistant message and all tool
+   results for that turn are complete
+2. PI-Desktop rebuilds the context from the full transcript plus the newest
+   valid checkpoint and estimates the next request budget
+3. below the soft boundary, the next turn proceeds unchanged
+4. at the soft boundary after a tool turn, the next request receives one
+   transient `<context_management>` instruction; it is not persisted or added
+   to the runtime's base system prompt, and repeats no more than once every
+   three qualifying turns
+5. the instruction asks the model to call `CompactContext` with a short active
+   focus; the internal tool queues summary generation for the end of its
+   current tool turn, bypasses workspace permissions, and otherwise emits and
+   persists a normal visible tool call/result row
+6. at or above the hard boundary, summary generation is mandatory; failure
+   raises `CONTEXT_COMPACTION_FAILED` and pi cannot issue another provider
+   request
+7. successful generation first appends the checkpoint through host-core, then
+   installs its summary + retained tail as the runtime context for the next
+   provider request; a hard-boundary checkpoint is re-estimated before it is
+   persisted and again before continuation, and cannot authorize the next
+   request unless it is below the hard budget
+
+pi's cut point keeps provider-valid tool call/result pairs together. When the
+final tool-result batch alone exceeds the configured recent-tail target,
+PI-Desktop raises the effective target just enough for pi's reverse scan to
+reach the batch's assistant carrier, bounded by half the hard budget. A larger
+atomic batch may stop the run with `CONTEXT_COMPACTION_FAILED`, but it can never
+pass the next-request guard unchanged.
+
+The hard boundary is the model context window minus request headroom.
+Headroom is the maximum of the configured reserve, model maximum output capped
+at 25% of the context window, and a 5% safety margin. A configured reserve is
+capped at half the window. The effective retained-tail target is capped at half
+the hard budget so small-context models can still shed meaningful history. The
+soft boundary precedes the hard boundary by a model-aware recent-context gap.
+
+The incoming user prompt participates in budgeting before the first provider
+request. If a checkpoint cannot make it fit, the user row and an assistant
+error remain durable but no provider request starts. Provider-reported context
+overflow is the last recovery layer: omit the failed assistant from model
+context, compact once, and retry once. A second overflow or failed checkpoint
+is terminal. Bedrock's `prompt is too long: N tokens > M maximum` form maps to
+this path.
+
+Automatic protection is enabled by default. Disabling it removes
+`CompactContext` and bypasses soft, hard, and overflow recovery; manual
+`/compact` remains available while the session is idle. Manual and automatic
+checkpoint generation are abortable and count as running state until durable
+persistence completes.
+
 ## 5b. Mode defaults
 
 - Default product mode: **Agent**
@@ -117,6 +181,12 @@ interface AgentRuntime {
   well-formed for every provider API.
 - Failed assistant messages remain durable diagnostic transcript entries but
   are never restored into pi model context on a later turn.
+- Restored checkpoints clear provider usage from retained assistant messages
+  for budgeting. That usage measured the pre-compacted request and must not
+  make the summary + tail appear as large as the discarded context.
+- Runtime recreation and model changes restore the newest valid checkpoint.
+  Truncation keeps it only when its boundary remains in the live transcript;
+  a fork copies/remaps it only when the child includes that boundary.
 - A forked session receives a new session id and no shared runtime. Its first
   prompt creates a fresh pi runtime and restores context only from the child
   transcript, including the remapped tool call/result pairs.

@@ -252,6 +252,86 @@ function enrichSession<T extends RuntimeSession>(
   };
 }
 
+async function resolveAgentRuntimeLaunch(
+  sessionId: string,
+  session: any,
+  settings: any,
+) {
+  if (!host) throw new Error("host unavailable");
+  const providers = await host.call<{ providers: RuntimeProvider[] }>(
+    "providers.list",
+    { includeDisabled: false },
+  );
+  const provider =
+    providers.providers.find((item) => item.id === session.providerId) ||
+    providers.providers.find((item) => item.id === settings.defaultProviderId) ||
+    providers.providers.find((item) => item.hasSecret) ||
+    providers.providers[0];
+  if (!provider) {
+    throw Object.assign(new Error("No provider configured"), {
+      errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
+    });
+  }
+  const secret = await host.call<{ value?: string }>("providers.getSecret", {
+    id: provider.id,
+  });
+  if (!secret.value && provider.authKind !== "none") {
+    throw Object.assign(new Error("Provider API key missing"), {
+      errorCode: ErrorCodes.PROVIDER_SECRET_MISSING,
+    });
+  }
+  const modelId =
+    (provider.id === session.providerId ? session.modelId : undefined) ||
+    (provider.id === settings.defaultProviderId
+      ? settings.defaultModelId
+      : undefined) ||
+    provider.defaultModelId;
+  if (!modelId) {
+    throw Object.assign(new Error("No model selected for provider"), {
+      errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
+    });
+  }
+  const thinkingCapabilities = enrichProvider(provider, modelId);
+  const thinkingLevel = clampThinkingLevel(
+    thinkingCapabilities,
+    normalizeThinkingLevel(session.thinkingLevel),
+  );
+  const modelConfig = resolvePiModelConfig({
+    vendorKey: provider.vendorKey || "custom",
+    modelId,
+    apiStyle: provider.apiStyle,
+  });
+  return {
+    providerId: provider.id,
+    modelId,
+    sidecarParams: {
+      sessionId,
+      mode: session.mode || settings.defaultMode || "agent",
+      thinkingLevel,
+      scratchDir: join(dataDir, "scratch", sessionId),
+      compactionSettings: settings.contextCompaction,
+      provider: {
+        id: provider.id,
+        name: provider.name,
+        vendorKey: provider.vendorKey,
+        baseUrl: provider.baseUrl,
+        modelId,
+        apiKey: secret.value || "",
+        authKind: provider.authKind,
+        apiStyle: provider.apiStyle,
+        supportsReasoning: thinkingCapabilities.supportsReasoning,
+        supportedThinkingLevels: thinkingCapabilities.supportedThinkingLevels,
+        ...(modelConfig ? { modelConfig } : {}),
+      },
+      pluginTools: plugins.getTools().map((tool) => ({
+        name: tool.fullName,
+        description: tool.description,
+        parameters: tool.schema ?? { type: "object", properties: {} },
+      })),
+    },
+  };
+}
+
 async function listRuntimeProviders(includeDisabled = true) {
   if (!host) throw new Error("host unavailable");
   const result = await host.call<{ providers: RuntimeProvider[] }>(
@@ -1761,7 +1841,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
       .call("session.appendMessage", {
         sessionId: envelope.sessionId,
         message: {
-          id: crypto.randomUUID(),
+          id: event.toolCallId,
           role: "tool",
           content:
             typeof event.result === "string"
@@ -3108,59 +3188,18 @@ function registerIpc() {
       });
       session = refreshed.session ?? { ...session, messages: kept };
     }
-    const providers = await host.call<{ providers: RuntimeProvider[] }>(
-      "providers.list",
-      { includeDisabled: false },
+    const launch = await resolveAgentRuntimeLaunch(
+      req.sessionId,
+      session,
+      settings,
     );
-    const provider =
-      providers.providers.find((p) => p.id === session.providerId) ||
-      providers.providers.find((p) => p.id === settings.defaultProviderId) ||
-      providers.providers.find((p) => p.hasSecret) ||
-      providers.providers[0];
-    if (!provider) {
-      throw Object.assign(new Error("No provider configured"), {
-        errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
-      });
-    }
-    const secret = await host.call<{ value?: string }>("providers.getSecret", {
-      id: provider.id,
-    });
-    if (!secret.value && provider.authKind !== "none") {
-      throw Object.assign(new Error("Provider API key missing"), {
-        errorCode: ErrorCodes.PROVIDER_SECRET_MISSING,
-      });
-    }
-    const modelId =
-      (provider.id === session.providerId ? session.modelId : undefined) ||
-      (provider.id === settings.defaultProviderId
-        ? settings.defaultModelId
-        : undefined) ||
-      provider.defaultModelId;
-    if (!modelId) {
-      throw Object.assign(new Error("No model selected for provider"), {
-        errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
-      });
-    }
-    const thinkingCapabilities = enrichProvider(provider, modelId);
-    const thinkingLevel = clampThinkingLevel(
-      thinkingCapabilities,
-      normalizeThinkingLevel(session.thinkingLevel),
-    );
-    // Keep the sidecar catalog-free: main serializes pi-ai's complete model
-    // record and the runtime only replaces connection identity. Unknown
-    // free-form ids intentionally use the generic runtime fallback.
-    const modelConfig = resolvePiModelConfig({
-      vendorKey: provider.vendorKey || "custom",
-      modelId,
-      apiStyle: provider.apiStyle,
-    });
 
     // Open a durable turn row, then persist the user message under it.
     const turn = await host
       .call<{ turnId: string }>("session.beginTurn", {
         sessionId: req.sessionId,
-        providerId: provider.id,
-        modelId,
+        providerId: launch.providerId,
+        modelId: launch.modelId,
       })
       .catch(() => null);
     if (turn) activeTurns.set(req.sessionId, turn.turnId);
@@ -3233,35 +3272,9 @@ function registerIpc() {
       result = await sidecar.call<{ accepted: boolean; turnId: string }>(
         "agent.prompt",
         {
-          sessionId: req.sessionId,
+          ...launch.sidecarParams,
           content: promptContent,
-          mode: session.mode || settings.defaultMode || "agent",
-          thinkingLevel,
-          // Per-session scratch dir for temp files (D114). Same layout as
-          // host-core computes from its data dir; host-core is the enforcing
-          // side, this only tells the model where scratch lives.
-          scratchDir: join(dataDir, "scratch", req.sessionId),
-          provider: {
-            id: provider.id,
-            name: provider.name,
-            vendorKey: provider.vendorKey,
-            baseUrl: provider.baseUrl,
-            modelId,
-            apiKey: secret.value || "",
-            authKind: provider.authKind,
-            apiStyle: provider.apiStyle,
-            supportsReasoning: thinkingCapabilities.supportsReasoning,
-            supportedThinkingLevels:
-              thinkingCapabilities.supportedThinkingLevels,
-            ...(modelConfig ? { modelConfig } : {}),
-          },
-          // Registered plugin agent tools join the model's toolset; execution
-          // round-trips host -> main (plugins.execute) -> plugin JS.
-          pluginTools: plugins.getTools().map((t) => ({
-            name: t.fullName,
-            description: t.description,
-            parameters: t.schema ?? { type: "object", properties: {} },
-          })),
+          userMessageId: userMessage.id,
         },
       );
     } catch (e) {
@@ -3271,7 +3284,36 @@ function registerIpc() {
     logger.app("info", "prompt accepted", {
       sessionId: req.sessionId,
       turnId: result.turnId,
-      data: { providerId: provider.id, modelId },
+      data: { providerId: launch.providerId, modelId: launch.modelId },
+    });
+    return result;
+  });
+
+  handle(IPC.invoke.agentCompact, async (req: { sessionId: string }) => {
+    if (!host || !sidecar) throw new Error("backend unavailable");
+    if (activeTurns.has(req.sessionId)) {
+      throw Object.assign(new Error("Session already has an active turn"), {
+        errorCode: ErrorCodes.AGENT_BUSY,
+      });
+    }
+    const settings = await host.call<any>("settings.get");
+    const detail = await host.call<{ session?: any }>("session.get", {
+      id: req.sessionId,
+    });
+    if (!detail.session) {
+      throw Object.assign(new Error("Session not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    const launch = await resolveAgentRuntimeLaunch(
+      req.sessionId,
+      detail.session,
+      settings,
+    );
+    const result = await sidecar.call("agent.compact", launch.sidecarParams);
+    logger.app("info", "context compacted manually", {
+      sessionId: req.sessionId,
+      data: { providerId: launch.providerId, modelId: launch.modelId },
     });
     return result;
   });

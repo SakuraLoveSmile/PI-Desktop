@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { DesktopAgentRuntime, type RuntimeProviderConfig } from "./runtime.js";
-import type { ThinkingLevel, UiMessage } from "@pi-desktop/shared";
+import type {
+  ContextCompactionRecord,
+  ContextCompactionSettings,
+  ThinkingLevel,
+  UiMessage,
+} from "@pi-desktop/shared";
 
 const provider: RuntimeProviderConfig = {
   id: "local",
@@ -29,16 +34,21 @@ function createRuntime(
     provider: RuntimeProviderConfig;
     thinkingLevel: ThinkingLevel;
     history: UiMessage[];
+    compaction: ContextCompactionRecord;
+    compactionSettings: ContextCompactionSettings;
+    host: { call: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
 ) {
   return new DesktopAgentRuntime({
-    host: { call: vi.fn() } as never,
+    host: (overrides.host ?? { call: vi.fn() }) as never,
     sessionId: "session-1",
     mode: "agent",
     provider: overrides.provider ?? provider,
     thinkingLevel: overrides.thinkingLevel ?? "medium",
     history: overrides.history,
+    compaction: overrides.compaction,
+    compactionSettings: overrides.compactionSettings,
     onEvent: overrides.onEvent ?? vi.fn(),
   });
 }
@@ -467,6 +477,114 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await runtime.dispose();
   });
 
+  it("recognizes the Bedrock prompt-too-long response and defers the terminal error", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+
+    await handleAgentEvent({
+      type: "message_start",
+      message: { role: "assistant", content: [] },
+    });
+    await handleAgentEvent({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        stopReason: "error",
+        errorMessage:
+          "400: prompt is too long: 1077172 tokens > 1000000 maximum (Service: BedrockRuntime)",
+      },
+    });
+    await handleAgentEvent({ type: "turn_end" });
+    await handleAgentEvent({ type: "agent_end", messages: [] });
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({
+          status: "error",
+          error: expect.objectContaining({ code: "CONTEXT_TOO_LARGE" }),
+        }),
+      }),
+    );
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(events.some((event) => event.type === "agent_end")).toBe(false);
+    expect((runtime as any).pendingOverflow).toBe(true);
+
+    await runtime.dispose();
+  });
+
+  it("does not recover provider overflow when automatic compaction is disabled", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({
+      onEvent,
+      compactionSettings: {
+        enabled: false,
+        reserveTokens: 16_384,
+        keepRecentTokens: 20_000,
+      },
+    });
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+
+    await handleAgentEvent({
+      type: "message_start",
+      message: { role: "assistant", content: [] },
+    });
+    await handleAgentEvent({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        stopReason: "error",
+        errorMessage:
+          "400: prompt is too long: 1077172 tokens > 1000000 maximum",
+      },
+    });
+
+    expect((runtime as any).pendingOverflow).toBe(false);
+    expect(onEvent.mock.calls.map(([envelope]) => (envelope as any).event)).toContainEqual(
+      expect.objectContaining({
+        type: "error",
+        error: expect.objectContaining({ code: "CONTEXT_TOO_LARGE" }),
+      }),
+    );
+    await runtime.dispose();
+  });
+
+  it("removes the failed overflow assistant before compacting and retries once", async () => {
+    const runtime = createRuntime();
+    const agent = (runtime as any).agent;
+    const user = { role: "user", content: "hello", timestamp: 1 };
+    const failed = {
+      role: "assistant",
+      content: [],
+      stopReason: "error",
+      timestamp: 2,
+    };
+    agent.prompt = vi.fn(async () => {
+      agent.state.messages = [user, failed];
+      (runtime as any).pendingOverflow = true;
+      (runtime as any).suppressOverflowRunEnd = true;
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    agent.continue = vi.fn(async () => undefined);
+    (runtime as any).automaticCompactionNeeded = vi.fn(() => false);
+    (runtime as any).runCompaction = vi.fn(async () => {
+      expect(agent.state.messages).toEqual([user]);
+      return true;
+    });
+
+    await runtime.prompt("hello", "user-1");
+
+    expect((runtime as any).runCompaction).toHaveBeenCalledOnce();
+    expect((runtime as any).runCompaction).toHaveBeenCalledWith("overflow", true);
+    expect(agent.continue).toHaveBeenCalledOnce();
+    expect((runtime as any).overflowRecoveryAttempted).toBe(true);
+    await runtime.dispose();
+  });
+
   it("turns a provider model failure into an error message and event", async () => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
@@ -556,6 +674,417 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
       type: "message_end",
       message: { role: "assistant", status: "error", error },
     });
+    await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime compaction restore", () => {
+  it("restores summary plus retained tail while keeping the full transcript", async () => {
+    const retained = { role: "user" as const, content: "recent", timestamp: 2 };
+    const runtime = createRuntime({
+      history: [
+        {
+          id: "user-1",
+          role: "user",
+          content: "old",
+          createdAt: "2026-07-28T00:00:00Z",
+          status: "complete",
+        },
+        {
+          id: "user-2",
+          role: "user",
+          content: "recent",
+          createdAt: "2026-07-28T00:00:01Z",
+          status: "complete",
+        },
+      ],
+      compaction: {
+        id: "compact-1",
+        summary: "Older work was summarized.",
+        firstKeptMessageId: "user-2",
+        throughMessageId: "user-2",
+        tokensBefore: 200_000,
+        retainedTail: [retained],
+        createdAt: "2026-07-28T00:00:02Z",
+      },
+    });
+
+    const agentMessages = (runtime as any).agent.state.messages;
+    expect(agentMessages.map((message: any) => message.role)).toEqual([
+      "compactionSummary",
+      "user",
+    ]);
+    expect(agentMessages[0].summary).toBe("Older work was summarized.");
+    expect((runtime as any).fullEntries).toHaveLength(2);
+    await runtime.dispose();
+  });
+
+  it("does not reuse pre-compaction provider usage for the retained tail budget", async () => {
+    const runtime = createRuntime({
+      history: [
+        {
+          id: "user-1",
+          role: "user",
+          content: "old",
+          createdAt: "2026-07-28T00:00:00Z",
+          status: "complete",
+        },
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "recent answer",
+          createdAt: "2026-07-28T00:00:01Z",
+          status: "complete",
+        },
+      ],
+      compaction: {
+        id: "compact-1",
+        summary: "Older work was summarized.",
+        firstKeptMessageId: "assistant-1",
+        throughMessageId: "assistant-1",
+        tokensBefore: 250_000,
+        retainedTail: [
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "recent answer" }],
+            api: "openai-completions",
+            provider: "local",
+            model: "local-model",
+            stopReason: "stop",
+            timestamp: 2,
+            usage: {
+              input: 249_000,
+              output: 1_000,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 250_000,
+              cost: {
+                input: 0,
+                output: 0,
+                cacheRead: 0,
+                cacheWrite: 0,
+                total: 0,
+              },
+            },
+          },
+        ],
+        createdAt: "2026-07-28T00:00:02Z",
+      },
+    });
+
+    const budget = (runtime as any).contextBudget(
+      (runtime as any).agent.state.messages,
+    );
+    expect(budget.tokens).toBeLessThan(1_000);
+    expect(budget.tokens).not.toBe(250_000);
+    await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime per-turn context protection", () => {
+  const toolResult = {
+    role: "toolResult" as const,
+    toolCallId: "tool-call-1",
+    toolName: "Read",
+    content: [{ type: "text" as const, text: "large result" }],
+    isError: false,
+    timestamp: 2,
+  };
+  const assistant = {
+    role: "assistant" as const,
+    content: [],
+    api: "openai-completions" as const,
+    provider: "local",
+    model: "local-model",
+    usage: {
+      input: 1,
+      output: 1,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 2,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: "toolUse" as const,
+    timestamp: 1,
+  };
+  const nextTurn = {
+    message: assistant,
+    toolResults: [toolResult],
+    context: { systemPrompt: "base", messages: [], tools: [] },
+    newMessages: [assistant, toolResult],
+  };
+
+  it("derives soft and hard limits with provider-request headroom", async () => {
+    const runtime = createRuntime();
+
+    expect((runtime as any).contextBudget([])).toMatchObject({
+      tokens: 0,
+      softLimit: 204_000,
+      hardLimit: 224_000,
+      requestHeadroom: 32_000,
+    });
+
+    await runtime.dispose();
+  });
+
+  it("clamps the retained tail for a small model context window", async () => {
+    const runtime = createRuntime({
+      provider: {
+        ...provider,
+        modelConfig: {
+          ...provider.modelConfig!,
+          contextWindow: 32_000,
+          maxTokens: 8_000,
+        },
+      },
+    });
+
+    expect((runtime as any).contextBudget([])).toMatchObject({
+      softLimit: 12_000,
+      hardLimit: 16_000,
+      requestHeadroom: 16_000,
+      keepRecentTokens: 8_000,
+    });
+
+    await runtime.dispose();
+  });
+
+  it("nudges a long tool loop, deduplicates reminders, then compacts before agent_end", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const prepareNextTurn = (runtime as any).prepareNextTurn.bind(runtime);
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    vi.spyOn(runtime as any, "contextBudget")
+      .mockReturnValueOnce({
+        tokens: 205_000,
+        softLimit: 204_000,
+        hardLimit: 224_000,
+        requestHeadroom: 32_000,
+      })
+      .mockReturnValueOnce({
+        tokens: 210_000,
+        softLimit: 204_000,
+        hardLimit: 224_000,
+        requestHeadroom: 32_000,
+      })
+      .mockReturnValueOnce({
+        tokens: 225_000,
+        softLimit: 204_000,
+        hardLimit: 224_000,
+        requestHeadroom: 32_000,
+      });
+    const runCompaction = vi
+      .spyOn(runtime as any, "runCompaction")
+      .mockResolvedValue(true);
+
+    await handleAgentEvent({ type: "turn_end", message: assistant, toolResults: [toolResult] });
+    const soft = await prepareNextTurn(nextTurn);
+    await handleAgentEvent({ type: "turn_end", message: assistant, toolResults: [toolResult] });
+    const deduplicated = await prepareNextTurn(nextTurn);
+    await handleAgentEvent({ type: "turn_end", message: assistant, toolResults: [toolResult] });
+    const hard = await prepareNextTurn(nextTurn);
+
+    expect(soft.context.systemPrompt).toContain("<context_management>");
+    expect(deduplicated.context.systemPrompt).not.toContain("<context_management>");
+    expect(hard.context.systemPrompt).not.toContain("<context_management>");
+    expect((runtime as any).agent.state.systemPrompt).not.toContain(
+      "<context_management>",
+    );
+    expect(runCompaction).toHaveBeenCalledOnce();
+    expect(runCompaction).toHaveBeenCalledWith("threshold", false, undefined);
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(events.filter((event) => event.type === "turn_end")).toHaveLength(3);
+    expect(events.some((event) => event.type === "agent_end")).toBe(false);
+
+    await runtime.dispose();
+  });
+
+  it("lets the model request one checkpoint with an active-task focus", async () => {
+    const runtime = createRuntime();
+    const agent = (runtime as any).agent;
+    const compactTool = agent.state.tools.find(
+      (tool: any) => tool.name === "CompactContext",
+    );
+    expect(compactTool).toBeDefined();
+    await compactTool.execute("compact-call", {
+      focus: "Keep the migration plan and files already changed.",
+    });
+    vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
+      tokens: 100_000,
+      softLimit: 204_000,
+      hardLimit: 224_000,
+      requestHeadroom: 32_000,
+    });
+    const runCompaction = vi
+      .spyOn(runtime as any, "runCompaction")
+      .mockResolvedValue(true);
+
+    await (runtime as any).prepareNextTurn(nextTurn);
+
+    expect(runCompaction).toHaveBeenCalledWith(
+      "threshold",
+      false,
+      "Preserve this active focus with high fidelity: Keep the migration plan and files already changed.",
+    );
+    expect((runtime as any).pendingModelCompaction).toBeUndefined();
+    await runtime.dispose();
+  });
+
+  it("keeps an oversized trailing tool result with its assistant carrier", async () => {
+    const runtime = createRuntime();
+    const toolAssistant = {
+      ...assistant,
+      content: [
+        {
+          type: "toolCall" as const,
+          id: "large-tool-call",
+          name: "Read",
+          arguments: { path: "large.log" },
+        },
+      ],
+      stopReason: "toolUse" as const,
+    };
+    const largeToolResult = {
+      ...toolResult,
+      toolCallId: "large-tool-call",
+      content: [{ type: "text" as const, text: "x".repeat(80_001) }],
+    };
+    (runtime as any).fullEntries = [
+      {
+        type: "message",
+        id: "old-user",
+        parentId: null,
+        timestamp: "2026-07-28T00:00:00Z",
+        message: { role: "user", content: "old context", timestamp: 1 },
+      },
+      {
+        type: "message",
+        id: "current-user",
+        parentId: "old-user",
+        timestamp: "2026-07-28T00:00:01Z",
+        message: { role: "user", content: "inspect the log", timestamp: 2 },
+      },
+      {
+        type: "message",
+        id: "tool-assistant",
+        parentId: "current-user",
+        timestamp: "2026-07-28T00:00:02Z",
+        message: toolAssistant,
+      },
+      {
+        type: "message",
+        id: "large-tool-call",
+        parentId: "tool-assistant",
+        timestamp: "2026-07-28T00:00:03Z",
+        message: largeToolResult,
+      },
+    ];
+
+    const entries = (runtime as any).entriesWithCompaction();
+    const budget = (runtime as any).contextBudget(
+      entries.map((entry: any) => entry.message),
+    );
+    const preparation = (runtime as any).prepareCompactionInput(entries, budget);
+
+    expect(preparation.ok).toBe(true);
+    expect(preparation.value.firstKeptEntryId).toBe("tool-assistant");
+    expect(preparation.value.retainedTail.map((message: any) => message.role)).toEqual([
+      "assistant",
+      "toolResult",
+    ]);
+    await runtime.dispose();
+  });
+
+  it("rechecks the hard budget after a reported successful compaction", async () => {
+    const runtime = createRuntime();
+    vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
+      tokens: 225_000,
+      softLimit: 204_000,
+      hardLimit: 224_000,
+      requestHeadroom: 32_000,
+      keepRecentTokens: 20_000,
+    });
+    vi.spyOn(runtime as any, "runCompaction").mockResolvedValue(true);
+
+    await expect((runtime as any).prepareNextTurn(nextTurn)).rejects.toThrow(
+      "checkpoint remained above the safe model context budget",
+    );
+    await runtime.dispose();
+  });
+
+  it("does not issue another model turn when hard-limit compaction fails", async () => {
+    const runtime = createRuntime();
+    vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
+      tokens: 225_000,
+      softLimit: 204_000,
+      hardLimit: 224_000,
+      requestHeadroom: 32_000,
+    });
+    vi.spyOn(runtime as any, "runCompaction").mockResolvedValue(false);
+
+    await expect((runtime as any).prepareNextTurn(nextTurn)).rejects.toThrow(
+      "CONTEXT_COMPACTION_FAILED",
+    );
+    await runtime.dispose();
+  });
+
+  it("removes the model compaction tool when automatic protection is disabled", async () => {
+    const runtime = createRuntime();
+
+    runtime.setCompactionSettings({
+      enabled: false,
+      reserveTokens: 16_384,
+      keepRecentTokens: 20_000,
+    });
+
+    expect(
+      (runtime as any).agent.state.tools.some(
+        (tool: any) => tool.name === "CompactContext",
+      ),
+    ).toBe(false);
+    await runtime.dispose();
+  });
+
+  it("keeps a preflight-rejected user message in reusable runtime context", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    agent.prompt = vi.fn();
+    vi.spyOn(runtime as any, "automaticCompactionNeeded").mockReturnValue(true);
+    vi.spyOn(runtime as any, "runCompaction").mockResolvedValue(false);
+
+    await runtime.prompt("oversized request", "user-preflight");
+
+    expect(agent.prompt).not.toHaveBeenCalled();
+    expect((runtime as any).fullEntries).toEqual([
+      expect.objectContaining({
+        id: "user-preflight",
+        message: expect.objectContaining({
+          role: "user",
+          content: "oversized request",
+        }),
+      }),
+    ]);
+    expect(agent.state.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "oversized request" }),
+    ]);
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({
+          role: "assistant",
+          status: "error",
+          error: expect.objectContaining({ code: "CONTEXT_COMPACTION_FAILED" }),
+        }),
+      }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "error",
+        error: expect.objectContaining({ code: "CONTEXT_COMPACTION_FAILED" }),
+      }),
+    );
     await runtime.dispose();
   });
 });
