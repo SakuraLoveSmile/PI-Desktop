@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  MAIN_PANE_MIN_WIDTH,
   WORK_PANEL_MAX_WIDTH,
   WORK_PANEL_MIN_WIDTH,
   clampWorkPanelWidth,
@@ -10,58 +9,32 @@ import {
   workPanelWidthLimits,
 } from "../src/lib/work-panel-resize.ts";
 
-test("clamps the work panel against its cap and the readable main pane", () => {
-  assert.deepEqual(
-    workPanelWidthLimits({ viewportWidth: 1200, sidebarWidth: 240 }),
-    { min: WORK_PANEL_MIN_WIDTH, max: 600 },
-  );
-  assert.equal(
-    clampWorkPanelWidth(900, { viewportWidth: 1600, sidebarWidth: 240 }),
-    WORK_PANEL_MAX_WIDTH,
-  );
-  assert.equal(
-    clampWorkPanelWidth(500, {
-      viewportWidth: 1100,
-      sidebarWidth: 320,
-    }),
-    1100 - 320 - MAIN_PANE_MIN_WIDTH,
-  );
-  assert.equal(
-    clampWorkPanelWidth(500, {
-      viewportWidth: 1000,
-      sidebarWidth: 320,
-    }),
-    WORK_PANEL_MIN_WIDTH,
-  );
+test("clamps the work panel to its fixed width range", () => {
+  assert.deepEqual(workPanelWidthLimits(), {
+    min: WORK_PANEL_MIN_WIDTH,
+    max: WORK_PANEL_MAX_WIDTH,
+  });
+  assert.equal(clampWorkPanelWidth(900), WORK_PANEL_MAX_WIDTH);
+  assert.equal(clampWorkPanelWidth(500), 500);
+  assert.equal(clampWorkPanelWidth(200), WORK_PANEL_MIN_WIDTH);
 });
 
 test("anchors pointer resizing to the width at gesture start", () => {
   const gesture = { startClientX: 800, startWidth: 420 };
-  const context = { viewportWidth: 1600, sidebarWidth: 240 };
 
-  assert.equal(workPanelWidthFromPointer(gesture, 800, context), 420);
-  assert.equal(workPanelWidthFromPointer(gesture, 720, context), 500);
+  assert.equal(workPanelWidthFromPointer(gesture, 800), 420);
+  assert.equal(workPanelWidthFromPointer(gesture, 720), 500);
   assert.equal(
-    workPanelWidthFromPointer(gesture, 900, context),
+    workPanelWidthFromPointer(gesture, 900),
     WORK_PANEL_MIN_WIDTH,
   );
 });
 
-test("pointer resizing respects the current layout limits", () => {
+test("pointer resizing respects the fixed panel limits", () => {
   const gesture = { startClientX: 800, startWidth: 420 };
-  const context = { viewportWidth: 1200, sidebarWidth: 240 };
 
-  assert.equal(workPanelWidthFromPointer(gesture, 500, context), 600);
-  assert.equal(workPanelWidthFromPointer(gesture, 900, context), 364);
-});
-
-test("temporary viewport clamping does not overwrite the preferred width", () => {
-  const preferredWidth = 700;
-  const narrow = { viewportWidth: 1000, sidebarWidth: 320 };
-  const restored = { viewportWidth: 1600, sidebarWidth: 240 };
-
-  assert.equal(clampWorkPanelWidth(preferredWidth, narrow), WORK_PANEL_MIN_WIDTH);
-  assert.equal(clampWorkPanelWidth(preferredWidth, restored), preferredWidth);
+  assert.equal(workPanelWidthFromPointer(gesture, 300), WORK_PANEL_MAX_WIDTH);
+  assert.equal(workPanelWidthFromPointer(gesture, 900), WORK_PANEL_MIN_WIDTH);
 });
 
 test("commits only a changed preview after a completed gesture", () => {

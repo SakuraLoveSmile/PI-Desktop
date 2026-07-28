@@ -992,15 +992,24 @@ Each scenario is documented in this format:
   trigger another artifact. 6) In session A, leave the panel open with multiple
   tabs and a Browser resource; switch to session B, create a different tab set,
   then switch repeatedly between A and B and select a project without an active
-  conversation. 7) Drag the left-edge handle below 364px and beyond every upper
-  bound at 1040px, 1200px, and 1600px window widths; verify pointer-down does not
-  jump the divider, cancel one gesture with Escape, then focus the handle and
-  exercise Arrow/Shift+Arrow/Home/End. 8) Record the committed panel width,
-  shrink the native window from its left and right edges until the effective
-  panel width clamps, then widen it again. 9) On each platform, record native
-  bounds before opening a file artifact, dragging the divider with Browser
-  active, collapsing the panel, and closing its final tab; inspect every
-  transition frame. 10) Relaunch.
+  conversation. Generate a background artifact in the non-visible session.
+  7) Drag the left-edge handle below 364px and above 720px; verify pointer-down
+  does not jump the divider, cancel one gesture with Escape, then focus the
+  handle and exercise Arrow/Shift+Arrow/Home/End. Commit a different width with
+  Browser active. 8) On a display with enough work area, record MainChat width,
+  native bounds, and `window/setWorkPanelReservation` results while opening,
+  repeating the same open target, committing a divider width, collapsing,
+  reopening, and closing the final resource. 9) With the panel open, resize the
+  native window from both left and right edges; repeat after toggling the
+  sidebar. 10) Repeat open/resize/collapse on a work area too narrow to supply
+  the complete reservation. 11) Open or collapse while maximized and fullscreen,
+  then return to normal. 12) Move the normal window between displays with
+  different work areas, change the active display's work-area geometry, and
+  perform ordinary moves within one unchanged work area; include a transition
+  where the window manager compresses and relocates the outer window before the
+  display-change callback. 13) Inject one rejected reservation while opening
+  and one while collapsing, then retry each action. 14) Send string, boolean,
+  null, fractional, and out-of-range reservation payloads. 15) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one resource; file resources
@@ -1016,31 +1025,49 @@ Each scenario is documented in this format:
   Active close selects the right neighbor then left; closing the last tab hides
   the panel. Collapse retains runtime
   tabs but hides the panel until another artifact reopens it. Width clamps to
-  `364px–min(720px, 60vw, viewport − visible sidebar − 360px)`, exposes its
-  current/minimum/maximum width to assistive technology, supports the documented
-  keyboard steps, and keeps MainChat's 360px reserve whenever both column
-  minima fit. Pointer-down preserves the starting width, movement follows the
-  pointer continuously, and release commits once only when the effective width
-  changed. A zero-movement release, Escape, or cancellation preserves the prior
-  preferred width. Browser preview does not intercept an active divider drag.
-  Native left/right edge drag changes only the shell: narrowing may temporarily
-  clamp the effective panel width, widening restores the committed preference,
-  and neither direction rewrites that preference.
+  the fixed `364px–720px` range, exposes those current/minimum/maximum values to
+  assistive technology, and supports the documented keyboard steps.
+  Pointer-down preserves the starting width, movement follows the pointer
+  continuously, and release commits once only when the width changed. A
+  zero-movement release, Escape, or cancellation preserves both the prior
+  preferred width and native reservation. Browser preview does not intercept an
+  active divider drag.
   A and B independently restore their runtime open state, ordered tabs, active
   tab, and Browser resource; selecting a project without an active conversation
   hides the panel, and no relative resource crosses session/workspace context.
+  Background artifacts update only their retained context and never change the
+  visible reservation.
   Only `{width}` is restored after relaunch; every session's open state, tabs,
-  active tab, and Browser resource reset. Temporary responsive clamping is not
-  persisted. On every platform, native bounds stay unchanged throughout panel
-  open, divider drag, collapse, and final-tab close transitions, with no second
-  resize or position drift. The normal native window bounds persist separately.
+  active tab, and Browser resource reset. The open panel remains exactly at its
+  committed width through native-edge and sidebar changes; those gestures resize
+  MainChat only and never rewrite the preference. In normal state, open returns
+  `{requested: committedWidth, reserved: committedWidth}` and grows/shifts the
+  native window inside the work area so MainChat width stays unchanged. Repeating
+  the target is a no-op. Divider commit updates the target once. Collapse and
+  final close return `{requested: 0, reserved: 0}` and symmetrically restore the
+  base bounds and x position. On a constrained work area, `reserved` reports all
+  available added width below `requested`; the panel remains fixed and only
+  MainChat absorbs the shortfall. Maximized/fullscreen calls retain the latest
+  requested target without changing geometry, then reconcile once on return to
+  normal. Display/work-area changes reconcile the same target against current
+  available width and update the native minimum; ordinary movement within one
+  unchanged work area does not reapply geometry. System compression or
+  relocation during a display transition does not overwrite the confirmed base
+  bounds, and returning to a roomier display restores the prior chat width.
+  Relaunch restores base bounds without reservation width or induced x shift.
+  Malformed reservation payloads fail with `INVALID_ARGUMENT` and never coerce.
+  A rejected reservation keeps
+  the last confirmed panel presentation until a later successful request; a
+  superseded success cannot commit stale presentation. No transition produces
+  a second resize or position drift.
   The former context-panel overlay no longer exists.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`, `04-ux/01-ui-ia.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
-  `04-ux/09-interaction-patterns.md`, ADR 0029
+  `04-ux/09-interaction-patterns.md`, ADR 0032, D163
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`work-panel-resize.test.mjs`,
+  `work-panel-window.test.mjs`, `work-panel-presentation.test.mjs`,
   `work-panel.test.mjs`); full UI scenario Draft
 
 #### E2E-057: Review tab reflects the git working tree

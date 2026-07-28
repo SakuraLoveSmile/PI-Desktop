@@ -1,11 +1,16 @@
 # ADR 0029: Separate native-window and work-panel resize ownership
 
-- Status: Accepted
+- Status: Superseded in part by ADR 0032
 - Date: 2026-07-28
 - Related: [01-ui-ia](../spec/04-ux/01-ui-ia.md) ·
   [08-component-spec §5](../spec/04-ux/08-component-spec.md) ·
   [09-interaction-patterns §8](../spec/04-ux/09-interaction-patterns.md) ·
   [01-ipc-protocol](../spec/03-runtime/01-ipc-protocol.md) · decision D156
+
+> ADR 0032 supersedes the clauses that responsively clamp the panel inside the
+> existing client area and prohibit all panel-driven native geometry changes.
+> Main ownership of BrowserWindow geometry, renderer ownership of committed
+> panel width, and the divider gesture/commit rules remain in force.
 
 ## Context
 

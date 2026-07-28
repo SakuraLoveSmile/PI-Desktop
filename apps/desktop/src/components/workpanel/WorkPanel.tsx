@@ -29,7 +29,6 @@ import {
   committedWorkPanelWidth,
   workPanelWidthFromPointer,
   workPanelWidthLimits,
-  type WorkPanelWidthContext,
 } from "../../lib/work-panel-resize";
 
 const TAB_ICONS = {
@@ -53,16 +52,8 @@ function headerToolTab(kind: HeaderToolKind): WorkPanelTab {
   return toolWorkPanelTab(kind);
 }
 
-function workPanelWidthContext() {
-  const sidebar = document.querySelector<HTMLElement>(".sidebar, .sidebar-rail");
-  return {
-    viewportWidth: window.innerWidth,
-    sidebarWidth: sidebar?.getBoundingClientRect().width ?? 0,
-  };
-}
-
 function clampWidth(width: number) {
-  return clampWorkPanelWidth(width, workPanelWidthContext());
+  return clampWorkPanelWidth(width);
 }
 
 function tabLabel(tab: WorkPanelTab, t: (key: string) => string) {
@@ -91,7 +82,6 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
     startWidth: number;
     width: number;
     frame: number;
-    context: WorkPanelWidthContext;
   } | null>(null);
   const switcherRef = useRef<HTMLDivElement | null>(null);
   const switcherButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -182,7 +172,6 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
         startWidth,
         width: startWidth,
         frame: 0,
-        context: workPanelWidthContext(),
       };
       e.currentTarget.setPointerCapture(e.pointerId);
       document.documentElement.setAttribute("data-work-panel-resizing", "true");
@@ -197,7 +186,6 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
     drag.width = workPanelWidthFromPointer(
       drag,
       e.clientX,
-      drag.context,
     );
     if (drag.frame) return;
     drag.frame = requestAnimationFrame(() => {
@@ -230,15 +218,8 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
     [],
   );
 
-  const [, bumpViewport] = useState(0);
   const renderWidth = clampWidth(dragWidth ?? width);
-  const widthLimits = workPanelWidthLimits(workPanelWidthContext());
-
-  useEffect(() => {
-    const onWindowResize = () => bumpViewport((value) => value + 1);
-    window.addEventListener("resize", onWindowResize);
-    return () => window.removeEventListener("resize", onWindowResize);
-  }, []);
+  const widthLimits = workPanelWidthLimits();
   const onResizeKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       const drag = dragState.current;

@@ -83,9 +83,9 @@ destination, chat as the home surface, tools and permissions inline.
   manual panel entry point. A
   successful active-session workspace Write/Edit artifact opens Review;
   scratch, failed, and background-session writes never steal focus. Width is
-  drag-resizable from 364px (44px rail + 320px content) to
-  `min(720px, 60vw, viewport − visible sidebar − 360px)`, preserving a
-  readable 360px Main pane. The sole panel-level control collapses the panel;
+  drag-resizable from 364px (44px rail + 320px content) to 720px and remains at
+  its fixed committed width while open. The sole panel-level control collapses
+  the panel;
   each session retains its own runtime open state, tab set, active tab, and
   Browser resource in renderer memory. Selecting another session swaps the
   visible panel context without deleting either session's state; selecting a
@@ -93,11 +93,18 @@ destination, chat as the home surface, tools and permissions inline.
   reinterpreting relative resources. Background artifacts update only their
   originating session's retained panel context and never open, activate, or
   resize the visible panel. Startup is closed with no retained session
-  contexts, and only the preferred panel width persists across launches. The
-  effective panel width temporarily re-clamps when the window or sidebar
-  changes, then restores the preference when room returns. Opening, resizing,
-  collapsing, or closing the panel never changes the native window bounds;
-  native window-edge resize never rewrites the panel preference (D156).
+  contexts, and only the preferred panel width persists across launches.
+  Opening the visible panel reserves that committed width in the normal native
+  window; collapse and final-resource close reclaim it symmetrically, and a
+  divider commit updates the reservation. Chat width therefore remains stable
+  when the display work area can supply the full reservation. On constrained
+  displays, Main reserves the available width, the panel stays fixed, and chat
+  absorbs only the unavoidable shortfall. Native window edges resize chat and
+  never the panel. Maximized/fullscreen geometry is deferred until normal;
+  moving between displays or changing a display work area reconciles the target
+  against the new available width. Persisted base bounds exclude reservation
+  width and its x shift. Background artifacts never change the visible
+  reservation (D163, ADR 0032).
   Replaces the former context-panel overlay; workspace/model/status info lives
   in the composer chips and Settings instead.
 - **Composer**: workspace-agnostic floating pill anchored to the chat

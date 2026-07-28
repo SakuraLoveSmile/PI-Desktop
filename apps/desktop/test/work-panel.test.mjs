@@ -3,6 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   MAIN_PANE_MIN_WIDTH,
+  WORK_PANEL_MAX_WIDTH,
   WORK_PANEL_MIN_WIDTH,
 } from "../src/lib/work-panel-resize.ts";
 
@@ -12,6 +13,14 @@ const appSource = await readFile(
 );
 const mainSource = await readFile(
   new URL("../electron/main/index.ts", import.meta.url),
+  "utf8",
+);
+const apiSource = await readFile(
+  new URL("../src/lib/api.ts", import.meta.url),
+  "utf8",
+);
+const protocolSource = await readFile(
+  new URL("../../../packages/shared/src/protocol.ts", import.meta.url),
   "utf8",
 );
 const panelSource = await readFile(
@@ -42,10 +51,30 @@ test("work panel replaces the context panel overlay", async () => {
   assert.doesNotMatch(appSource, /key\.toLowerCase\(\) === "j"/);
 });
 
-test("work panel docks as an app-shell column, not a main-pane overlay", () => {
-  // Rendered after the main pane closes, as a shell sibling.
-  assert.match(appSource, /<\/section>\s*\{workPanelOpen && \(?\s*<WorkPanel/);
-  // Docked column participates in flex layout instead of overlaying.
+test("work panel reserves native window space before it is presented", () => {
+  assert.match(appSource, /presentedWorkPanelOpen/);
+  assert.match(appSource, /setPresentedWorkPanelOpen/);
+  assert.match(
+    appSource,
+    /requestedWidth\s*=\s*[^;]*workPanelWidth[^;]*:\s*0/,
+  );
+  assert.match(appSource, /setWorkPanelReservation\(requestedWidth\)/);
+  assert.ok(
+    appSource.indexOf("setWorkPanelReservation(requestedWidth)") <
+      appSource.indexOf("setPresentedWorkPanelOpen(shouldPresent)"),
+    "the native reservation must settle before presentation changes",
+  );
+  assert.match(appSource, /commitWorkPanelPresentation/);
+  assert.doesNotMatch(appSource, /\.finally\(\(\) => \{[\s\S]*setPresentedWorkPanelOpen/);
+  assert.match(
+    appSource,
+    /<\/section>\s*\{presentedWorkPanelOpen && \(?\s*<WorkPanel/,
+  );
+  assert.doesNotMatch(
+    appSource,
+    /<\/section>\s*\{workPanelOpen && \(?\s*<WorkPanel/,
+  );
+  // The panel remains a fixed-width shell sibling after the native window grows.
   assert.match(globalStyles, /\.work-panel \{[^}]*flex: 0 0 auto/s);
   assert.doesNotMatch(
     globalStyles.match(/\.work-panel \{[^}]*\}/s)?.[0] ?? "",
@@ -107,17 +136,46 @@ test("work panel starts closed with no tabs and persists width only", () => {
   assert.match(storeSource, /workPanelTabs:\s*\[\]/);
   assert.match(storeSource, /activeWorkPanelTabId:\s*null/);
   assert.match(storeSource, /JSON\.stringify\(\{ width \}\)/);
+  assert.match(storeSource, /const committedWidth = Math\.round\(width\)/);
   const persistenceBlock =
     storeSource.match(/function saveWorkPanelWidth[\s\S]*?\n\}/)?.[0] ?? "";
   assert.doesNotMatch(persistenceBlock, /workPanelContexts|tabs|open/);
 });
 
-test("work panel resizing preserves a readable main pane", () => {
+test("work panel resizing is independent from the chat viewport", () => {
   assert.equal(MAIN_PANE_MIN_WIDTH, 360);
   assert.equal(WORK_PANEL_MIN_WIDTH, 364);
-  assert.match(panelSource, /clampWorkPanelWidth\(width, workPanelWidthContext\(\)\)/);
-  assert.match(panelSource, /\.sidebar, \.sidebar-rail/);
-  assert.match(globalStyles, /\.main-pane \{[^}]*min-width:\s*360px;/s);
+  assert.equal(WORK_PANEL_MAX_WIDTH, 720);
+  assert.match(panelSource, /clampWorkPanelWidth\(width\)/);
+  assert.match(panelSource, /workPanelWidthLimits\(\)/);
+  assert.doesNotMatch(panelSource, /workPanelWidthContext|viewportWidth|sidebarWidth/);
+  assert.doesNotMatch(panelSource, /\.sidebar, \.sidebar-rail/);
+  assert.match(globalStyles, /\.main-pane \{[^}]*min-width:\s*0;/s);
+  assert.match(mainSource, /displayWorkAreaKey/);
+  assert.match(mainSource, /window\.on\("move", reconcileWorkPanelDisplay\)/);
+  for (const event of [
+    "display-metrics-changed",
+    "display-added",
+    "display-removed",
+  ]) {
+    assert.match(mainSource, new RegExp(`screen\\.on\\("${event}"`));
+    assert.match(mainSource, new RegExp(`screen\\.removeListener\\("${event}"`));
+  }
+  assert.match(mainSource, /if \(nextDisplayKey === workPanelDisplayKey\) return/);
+  assert.match(mainSource, /if \(isLiveWindow\(\)\) applyWorkPanelReservation\(\)/);
+});
+
+test("work panel reservation has a complete renderer-to-main IPC path", () => {
+  assert.match(
+    protocolSource,
+    /windowSetWorkPanelReservation:\s*"pi-desktop\/window\/setWorkPanelReservation"/,
+  );
+  assert.match(
+    apiSource,
+    /setWorkPanelReservation:\s*\(width: number\)[\s\S]*IPC\.invoke\.windowSetWorkPanelReservation/,
+  );
+  assert.match(mainSource, /IPC\.invoke\.windowSetWorkPanelReservation/);
+  assert.match(mainSource, /planWorkPanelReservation/);
 });
 
 test("native window and work panel resizing have independent owners", () => {
@@ -127,7 +185,19 @@ test("native window and work panel resizing have independent owners", () => {
     /windowResizeBy|panelWindowGrowth|expandWindowForPanel|shrinkWindowForPanel/,
   );
   assert.doesNotMatch(mainSource, /windowResizeBy|panelWindowWidthOffset/);
+  assert.doesNotMatch(mainSource, /rightWindowEdge|rightEdgeDelta|ResizeAttributor/);
+  assert.match(mainSource, /baseWindowBounds/);
+  assert.match(mainSource, /workPanelReservation/);
   assert.match(mainSource, /window\.getNormalBounds\(\)/);
+  const persistenceBlock =
+    mainSource.match(
+      /const persistNormalWindowState = \(\) => \{[\s\S]*?\n  \};/,
+    )?.[0] ?? "";
+  assert.match(
+    persistenceBlock,
+    /baseWindowBounds\([\s\S]*window\.getNormalBounds\(\)[\s\S]*workPanelReservation/,
+  );
+  assert.match(persistenceBlock, /writeWindowState\(bounds\)/);
   assert.match(mainSource, /window\.on\("close", \(\) =>/);
   assert.match(mainSource, /persistNormalWindowState\(\)/);
 });
