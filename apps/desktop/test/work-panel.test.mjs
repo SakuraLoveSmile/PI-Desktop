@@ -86,7 +86,10 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
   assert.match(panelSource, /data-work-panel-section="current"/);
   assert.match(panelSource, /panel\.openTool/);
   assert.match(panelSource, /panel\.openItems/);
-  assert.match(panelSource, /blocked=\{browserBlocked \|\| switcherOpen\}/);
+  assert.match(
+    panelSource,
+    /blocked=\{browserBlocked \|\| switcherOpen \|\| dragWidth !== null\}/,
+  );
   assert.doesNotMatch(panelSource, /onContextMenu|createPortal|work-panel-tools-menu/);
   assert.match(
     globalStyles,
@@ -117,14 +120,16 @@ test("work panel resizing preserves a readable main pane", () => {
   assert.match(globalStyles, /\.main-pane \{[^}]*min-width:\s*360px;/s);
 });
 
-test("native right-edge resize belongs to the open work panel", () => {
-  assert.match(panelSource, /rightWindowEdgeDelta\(previous, next\)/);
-  assert.match(panelSource, /workPanelWindowResizeAttributor\.consume\(viewportDelta\)/);
-  assert.match(
-    panelSource,
-    /setWidth\(nextPanelWidth, \{ resizeWindow: false, persist: false \}\)/,
+test("native window and work panel resizing have independent owners", () => {
+  assert.doesNotMatch(panelSource, /screenX|rightWindowEdgeDelta|ResizeAttributor/);
+  assert.doesNotMatch(
+    storeSource,
+    /windowResizeBy|panelWindowGrowth|expandWindowForPanel|shrinkWindowForPanel/,
   );
-  assert.match(panelSource, /skipWindowResizeUntil/);
+  assert.doesNotMatch(mainSource, /windowResizeBy|panelWindowWidthOffset/);
+  assert.match(mainSource, /window\.getNormalBounds\(\)/);
+  assert.match(mainSource, /window\.on\("close", \(\) =>/);
+  assert.match(mainSource, /persistNormalWindowState\(\)/);
 });
 
 test("work panel separator exposes pointer and keyboard resizing", () => {
@@ -133,41 +138,27 @@ test("work panel separator exposes pointer and keyboard resizing", () => {
   assert.match(panelSource, /aria-valuemax=\{widthLimits\.max\}/);
   assert.match(panelSource, /aria-valuenow=\{Math\.round\(renderWidth\)\}/);
   assert.match(panelSource, /tabIndex=\{0\}/);
+  assert.match(panelSource, /startClientX:\s*e\.clientX/);
+  assert.match(panelSource, /startWidth/);
+  assert.match(panelSource, /workPanelWidthFromPointer/);
+  assert.match(panelSource, /requestAnimationFrame/);
   assert.match(panelSource, /event\.key === "ArrowLeft"/);
   assert.match(panelSource, /event\.key === "ArrowRight"/);
-  assert.match(panelSource, /onLostPointerCapture=\{onResizeEnd\}/);
+  assert.match(panelSource, /event\.key === "Escape" && drag/);
+  assert.match(panelSource, /onPointerUp=\{onResizeCommit\}/);
+  assert.match(panelSource, /onPointerCancel=\{onResizeCancel\}/);
+  assert.match(panelSource, /onLostPointerCapture=\{onResizeCancel\}/);
+  assert.match(panelSource, /data-work-panel-resizing/);
+  assert.match(globalStyles, /\.work-panel-resize \{[^}]*width:\s*10px;/s);
+  assert.match(globalStyles, /touch-action:\s*none/);
   assert.match(globalStyles, /\.work-panel-resize:focus-visible/);
 });
 
-test("work panel window growth is excluded from persisted launch bounds", () => {
-  assert.match(mainSource, /let panelWindowWidthOffset = 0;/);
-  assert.match(
-    mainSource,
-    /width:\s*bounds\.width - panelWindowWidthOffset/,
-  );
-  assert.match(
-    mainSource,
-    /panelWindowWidthOffset = Math\.max\(0, panelWindowWidthOffset \+ applied\)/,
-  );
-});
-
-test("Windows work panel toggles without resizing the frameless window", () => {
-  assert.match(
-    storeSource,
-    /function canResizeWindowForPanel\(\) \{\s*return window\.piDesktop\?\.platform !== "win32";/,
-  );
-  assert.match(
-    storeSource,
-    /function expandWindowForPanel\(width: number\) \{\s*if \(!canResizeWindowForPanel\(\)\) \{\s*panelWindowGrowth = 0;\s*return;/,
-  );
-  assert.match(
-    storeSource,
-    /function shrinkWindowForPanel\(width: number\) \{\s*if \(!canResizeWindowForPanel\(\)\) \{\s*panelWindowGrowth = null;\s*return;/,
-  );
-  assert.match(
-    storeSource,
-    /if \(canResizeWindowForPanel\(\) && get\(\)\.workPanelOpen && next !== prev\)/,
-  );
+test("Electron enforces the responsive shell minimum", () => {
+  assert.match(mainSource, /const WINDOW_MIN_WIDTH = 1040/);
+  assert.match(mainSource, /const WINDOW_MIN_HEIGHT = 700/);
+  assert.match(mainSource, /minWidth:\s*WINDOW_MIN_WIDTH/);
+  assert.match(mainSource, /minHeight:\s*WINDOW_MIN_HEIGHT/);
 });
 
 test("terminal mounts on demand and survives switches while its tab stays open", () => {
@@ -254,15 +245,11 @@ test("background panel updates do not replace or resize the visible session", ()
   assert.match(openForSessionBlock, /openWorkPanelTabState/);
   assert.match(
     openForSessionBlock,
-    /openedVisiblePanel = affectsVisibleSession && !context\.open/,
-  );
-  assert.match(
-    openForSessionBlock,
     /\.\.\.\(affectsVisibleSession[\s\S]*workPanelOpen:\s*true[\s\S]*:\s*\{\}\)/,
   );
-  assert.match(
+  assert.doesNotMatch(
     openForSessionBlock,
-    /if \(openedVisiblePanel\) expandWindowForPanel/,
+    /setWorkPanelWidth|expandWindowForPanel|windowResizeBy/,
   );
 });
 

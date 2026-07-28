@@ -92,8 +92,11 @@ destination, chat as the home surface, tools and permissions inline.
   reinterpreting relative resources. Background artifacts update only their
   originating session's retained panel context and never open, activate, or
   resize the visible panel. Startup is closed with no retained session
-  contexts, and only panel width persists across launches; temporary OS window
-  expansion is excluded from restored launch bounds.
+  contexts, and only the preferred panel width persists across launches. The
+  effective panel width temporarily re-clamps when the window or sidebar
+  changes, then restores the preference when room returns. Opening, resizing,
+  collapsing, or closing the panel never changes the native window bounds;
+  native window-edge resize never rewrites the panel preference (D156).
   Replaces the former context-panel overlay; workspace/model/status info lives
   in the composer chips and Settings instead.
 - **Composer**: workspace-agnostic floating pill anchored to the chat

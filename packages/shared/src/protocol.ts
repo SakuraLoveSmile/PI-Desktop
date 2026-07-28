@@ -139,7 +139,6 @@ export const IPC = {
     fsRead: "pi-desktop/fs/read",
     fsReveal: "pi-desktop/fs/reveal",
     fsIndex: "pi-desktop/fs/index",
-    windowResizeBy: "pi-desktop/window/resizeBy",
     windowControl: "pi-desktop/window/control",
     menuRendererReady: "pi-desktop/menu/rendererReady",
     nativeMenuAction: "pi-desktop/menu/nativeAction",

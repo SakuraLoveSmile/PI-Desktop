@@ -71,7 +71,6 @@ import {
   WORK_PANEL_DEFAULT_WIDTH,
   WORK_PANEL_MAX_WIDTH,
   WORK_PANEL_MIN_WIDTH,
-  workPanelWindowResizeAttributor,
 } from "../lib/work-panel-resize";
 
 export type { WorkPanelTab } from "../lib/work-panel-tabs";
@@ -107,11 +106,6 @@ const WORK_PANEL_STORAGE_KEY = "pi.desktop.workPanel";
 // Preserve the original 320px tool-content minimum beside the 44px activity rail.
 export { WORK_PANEL_DEFAULT_WIDTH, WORK_PANEL_MIN_WIDTH };
 
-// Opening the panel grows the OS window outward so the chat column keeps its
-// width; closing shrinks it back by whatever the expansion actually achieved.
-// Windows keeps the native bounds stable because a frameless BrowserWindow
-// visibly repaints between the renderer layout and asynchronous bounds update.
-let panelWindowGrowth: number | null = null;
 let workspaceDiffRequestSeq = 0;
 let workPanelFileRequestSeq = 0;
 const navigationIntents = createNavigationIntentController();
@@ -129,52 +123,6 @@ function beginNavigationIntent() {
 
 function navigationIntentIsCurrent(intent: number) {
   return navigationIntents.isCurrent(intent);
-}
-
-function canResizeWindowForPanel() {
-  return window.piDesktop?.platform !== "win32";
-}
-
-function resizeWindowForPanel(deltaWidth: number) {
-  const ticket = workPanelWindowResizeAttributor.begin(deltaWidth);
-  return api.windowResizeBy(deltaWidth).then(
-    (result) => {
-      workPanelWindowResizeAttributor.settle(ticket, result.applied);
-      return result;
-    },
-    (error) => {
-      workPanelWindowResizeAttributor.settle(ticket, 0);
-      throw error;
-    },
-  );
-}
-
-function expandWindowForPanel(width: number) {
-  if (!canResizeWindowForPanel()) {
-    panelWindowGrowth = 0;
-    return;
-  }
-  panelWindowGrowth = null;
-  resizeWindowForPanel(width).then(
-    (r) => {
-      panelWindowGrowth = r.applied;
-    },
-    () => {
-      panelWindowGrowth = 0;
-    },
-  );
-}
-
-function shrinkWindowForPanel(width: number) {
-  if (!canResizeWindowForPanel()) {
-    panelWindowGrowth = null;
-    return;
-  }
-  // After a restart the growth is unknown, but the persisted window bounds
-  // already include it — shrinking by the panel width restores the chat size.
-  const growth = panelWindowGrowth ?? width;
-  panelWindowGrowth = null;
-  if (growth !== 0) void resizeWindowForPanel(-growth).catch(() => {});
 }
 
 function messageErrorFromUnknown(error: unknown): AppError {
@@ -415,10 +363,7 @@ export type AppState = {
   collapseWorkPanel: () => void;
   /** Hide the visible panel while retaining its session-owned context. */
   resetWorkPanelContext: () => void;
-  setWorkPanelWidth: (
-    width: number,
-    options?: { resizeWindow?: boolean; persist?: boolean },
-  ) => void;
+  setWorkPanelWidth: (width: number) => void;
   /** Open a workspace-relative file in the work panel files viewer. */
   openFileInWorkPanel: (path: string) => void;
   /** Open a URL in the work panel browser tab. */
@@ -463,16 +408,6 @@ function switchWorkPanelSession(
     activeWorkPanelTabId: switched.visible.activeTabId,
     workPanelFileRequest: switched.visible.fileRequest,
   };
-}
-
-function syncPanelWindowForVisibility(
-  previousOpen: boolean,
-  nextOpen: boolean,
-  width: number,
-) {
-  if (previousOpen === nextOpen) return;
-  if (nextOpen) expandWindowForPanel(width);
-  else shrinkWindowForPanel(width);
 }
 
 // tool_end events carry no tool name, and cross-session tool calls never
@@ -743,7 +678,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (!navigationIntentIsCurrent(intent)) return;
       }
       const record = opts?.record !== false;
-      const panelWasOpen = get().workPanelOpen;
       if (!record) {
         set((s) => ({
           ...switchWorkPanelSession(s, id),
@@ -752,11 +686,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           page: "chat",
           isRunning: s.runningSessions[id] ?? false,
         }));
-        syncPanelWindowForVisibility(
-          panelWasOpen,
-          get().workPanelOpen,
-          get().workPanelWidth,
-        );
         void get().acknowledgeSessionOutcome(id);
         return;
       }
@@ -776,11 +705,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           navIndex: nextStack.length - 1,
         };
       });
-      syncPanelWindowForVisibility(
-        panelWasOpen,
-        get().workPanelOpen,
-        get().workPanelWidth,
-      );
       void get().acknowledgeSessionOutcome(id);
     };
     const queued = sessionSelectionQueue.then(selectLatest, selectLatest);
@@ -870,7 +794,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!navigationIntentIsCurrent(intent)) return;
     const detail = await api.getSession(created.session.id);
     if (!navigationIntentIsCurrent(intent)) return;
-    const panelWasOpen = get().workPanelOpen;
     const entry = { page: "chat" as const, sessionId: created.session.id };
     set((s) => {
       const stack = s.navStack.slice(0, s.navIndex + 1);
@@ -884,11 +807,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         navIndex: nextStack.length - 1,
       };
     });
-    syncPanelWindowForVisibility(
-      panelWasOpen,
-      get().workPanelOpen,
-      get().workPanelWidth,
-    );
   },
 
   forkSession: async (id) => {
@@ -923,7 +841,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     if (!navigationIntentIsCurrent(intent)) return;
     const { messages, ...summary } = result.session;
-    const panelWasOpen = get().workPanelOpen;
     set((current) => {
       const sessions = decorateSessions(
         [
@@ -946,11 +863,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         navIndex: nextStack.length - 1,
       };
     });
-    syncPanelWindowForVisibility(
-      panelWasOpen,
-      get().workPanelOpen,
-      get().workPanelWidth,
-    );
   },
 
   forkAssistantMessage: async (messageId) => {
@@ -971,7 +883,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       if (!navigationIntentIsCurrent(intent)) return;
       const { messages, ...summary } = result.session;
-      const panelWasOpen = get().workPanelOpen;
       set((current) => {
         const sessions = decorateSessions(
           [summary, ...current.sessions.filter((session) => session.id !== summary.id)],
@@ -993,11 +904,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           errorCode: null,
         };
       });
-      syncPanelWindowForVisibility(
-        panelWasOpen,
-        get().workPanelOpen,
-        get().workPanelWidth,
-      );
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : String(error),
@@ -2372,7 +2278,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   openWorkPanelTabForSession: (sessionId, tab) => {
     if (!sessionId) return;
-    let openedVisiblePanel = false;
     set((state) => {
       const affectsVisibleSession =
         pendingSessionSelection === null && state.activeSessionId === sessionId;
@@ -2399,7 +2304,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeTabId: next.activeTabId,
         fileRequest,
       };
-      openedVisiblePanel = affectsVisibleSession && !context.open;
       return {
         workPanelContexts: {
           ...state.workPanelContexts,
@@ -2415,7 +2319,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           : {}),
       };
     });
-    if (openedVisiblePanel) expandWindowForPanel(get().workPanelWidth);
   },
   openWorkPanelTab: (tab) => {
     const sessionId = get().activeSessionId;
@@ -2458,7 +2361,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
   closeWorkPanelTab: (tabId) => {
-    const wasOpen = get().workPanelOpen;
     let closePanel = false;
     set((state) => {
       const sessionId = state.activeSessionId;
@@ -2496,7 +2398,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         },
       };
     });
-    if (wasOpen && closePanel) shrinkWindowForPanel(get().workPanelWidth);
   },
   collapseWorkPanel: () => {
     const state = get();
@@ -2509,33 +2410,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         [sessionId]: { ...currentWorkPanelContext(state), open: false },
       },
     });
-    shrinkWindowForPanel(get().workPanelWidth);
   },
   resetWorkPanelContext: () => {
-    const wasOpen = get().workPanelOpen;
     set((state) => switchWorkPanelSession(state));
-    syncPanelWindowForVisibility(wasOpen, false, get().workPanelWidth);
   },
-  setWorkPanelWidth: (width, options) => {
-    const prev = get().workPanelWidth;
+  setWorkPanelWidth: (width) => {
     set({
       workPanelWidth: Math.max(
         WORK_PANEL_MIN_WIDTH,
         Math.min(WORK_PANEL_MAX_WIDTH, width),
       ),
     });
-    if (options?.persist !== false) saveWorkPanelWidth(get().workPanelWidth);
-    // Committed drag-resize also extends the window instead of the chat.
-    const next = get().workPanelWidth;
-    if (canResizeWindowForPanel() && get().workPanelOpen && next !== prev) {
-      if (options?.resizeWindow === false) return;
-      resizeWindowForPanel(next - prev).then(
-        (r) => {
-          if (panelWindowGrowth !== null) panelWindowGrowth += r.applied;
-        },
-        () => {},
-      );
-    }
+    saveWorkPanelWidth(get().workPanelWidth);
   },
 
   openFileInWorkPanel: (path) => {

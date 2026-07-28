@@ -5,9 +5,8 @@ import {
   WORK_PANEL_MAX_WIDTH,
   WORK_PANEL_MIN_WIDTH,
   clampWorkPanelWidth,
-  createProgrammaticWindowResizeAttributor,
-  rightWindowEdgeDelta,
-  userRightEdgeDelta,
+  committedWorkPanelWidth,
+  workPanelWidthFromPointer,
   workPanelWidthLimits,
 } from "../src/lib/work-panel-resize.ts";
 
@@ -36,41 +35,42 @@ test("clamps the work panel against its cap and the readable main pane", () => {
   );
 });
 
-test("attributes only right-edge movement to the right work panel", () => {
-  const initial = { x: 100, width: 1200 };
-  const rightExpanded = { x: 100, width: 1320 };
-  const leftExpanded = { x: -20, width: 1320 };
+test("anchors pointer resizing to the width at gesture start", () => {
+  const gesture = { startClientX: 800, startWidth: 420 };
+  const context = { viewportWidth: 1600, sidebarWidth: 240 };
 
-  assert.equal(rightWindowEdgeDelta(initial, rightExpanded), 120);
-  assert.equal(rightWindowEdgeDelta(initial, leftExpanded), 0);
-  assert.equal(userRightEdgeDelta(120, 120, 120), 120);
-  assert.equal(userRightEdgeDelta(120, 0, 120), 0);
+  assert.equal(workPanelWidthFromPointer(gesture, 800, context), 420);
+  assert.equal(workPanelWidthFromPointer(gesture, 720, context), 500);
+  assert.equal(
+    workPanelWidthFromPointer(gesture, 900, context),
+    WORK_PANEL_MIN_WIDTH,
+  );
 });
 
-test("removes programmatic window growth before allocating user drag delta", () => {
-  const attribution = createProgrammaticWindowResizeAttributor();
-  const ticket = attribution.begin(100);
-  attribution.settle(ticket, 100);
+test("pointer resizing respects the current layout limits", () => {
+  const gesture = { startClientX: 800, startWidth: 420 };
+  const context = { viewportWidth: 1200, sidebarWidth: 240 };
 
-  const userDelta = attribution.consume(140);
-  assert.equal(userDelta, 40);
-  assert.equal(userRightEdgeDelta(140, 140, userDelta), 40);
+  assert.equal(workPanelWidthFromPointer(gesture, 500, context), 600);
+  assert.equal(workPanelWidthFromPointer(gesture, 900, context), 364);
 });
 
-test("handles resize events that arrive before the IPC result", () => {
-  const attribution = createProgrammaticWindowResizeAttributor();
-  const ticket = attribution.begin(120);
+test("temporary viewport clamping does not overwrite the preferred width", () => {
+  const preferredWidth = 700;
+  const narrow = { viewportWidth: 1000, sidebarWidth: 320 };
+  const restored = { viewportWidth: 1600, sidebarWidth: 240 };
 
-  assert.equal(attribution.consume(80), 0);
-  attribution.settle(ticket, 80);
-  assert.equal(attribution.consume(20), 20);
+  assert.equal(clampWorkPanelWidth(preferredWidth, narrow), WORK_PANEL_MIN_WIDTH);
+  assert.equal(clampWorkPanelWidth(preferredWidth, restored), preferredWidth);
 });
 
-test("attributes programmatic window shrink in the negative direction", () => {
-  const attribution = createProgrammaticWindowResizeAttributor();
-  const ticket = attribution.begin(-100);
-  attribution.settle(ticket, -60);
+test("commits only a changed preview after a completed gesture", () => {
+  const gesture = { startClientX: 800, startWidth: WORK_PANEL_MIN_WIDTH };
 
-  assert.equal(attribution.consume(-60), 0);
-  assert.equal(attribution.consume(-20), -20);
+  assert.equal(
+    committedWorkPanelWidth(gesture, WORK_PANEL_MIN_WIDTH, true),
+    null,
+  );
+  assert.equal(committedWorkPanelWidth(gesture, 500, false), null);
+  assert.equal(committedWorkPanelWidth(gesture, 500, true), 500);
 });
