@@ -22,10 +22,17 @@ test("clamps the work panel against its cap and the readable main pane", () => {
   );
   assert.equal(
     clampWorkPanelWidth(500, {
+      viewportWidth: 1100,
+      sidebarWidth: 320,
+    }),
+    1100 - 320 - MAIN_PANE_MIN_WIDTH,
+  );
+  assert.equal(
+    clampWorkPanelWidth(500, {
       viewportWidth: 1000,
       sidebarWidth: 320,
     }),
-    1000 - 320 - MAIN_PANE_MIN_WIDTH,
+    WORK_PANEL_MIN_WIDTH,
   );
 });
 

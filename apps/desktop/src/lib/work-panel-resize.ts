@@ -1,4 +1,5 @@
-export const WORK_PANEL_MIN_WIDTH = 320;
+// Preserve the original 320px tool-content minimum beside the 44px activity rail.
+export const WORK_PANEL_MIN_WIDTH = 364;
 export const WORK_PANEL_DEFAULT_WIDTH = 420;
 export const WORK_PANEL_MAX_WIDTH = 720;
 export const WORK_PANEL_MAX_WIDTH_RATIO = 0.6;

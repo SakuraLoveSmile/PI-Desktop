@@ -29,7 +29,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ```text
 +------------------+------------------------------+------------------+
 | Sidebar          | MainChat                     | WorkPanel        |
-| (275px / 48px)   | (flex-1)                     | (320–720px /     |
+| (275px / 48px)   | (flex-1)                     | (364–720px /     |
 |                  |                              |  hidden)         |
 +------------------+------------------------------+------------------+
 | Titlebar row: 46px, traffic lights at {x:16,y:16} (D034/D070)      |
@@ -51,7 +51,8 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   sidebar header; the button moves to the main titlebar while collapsed
 - Work panel collapse: sole control lives in the session pane titlebar top-right
   while the panel is open, with its outer edge flush against the divider
-  between the session pane and work panel so the tab strip is not occupied. On
+  between the session pane and work panel so the work-panel content header is
+  not occupied. On
   Windows/Linux, opening the work panel removes the main titlebar's native
   window-control clearance because those controls occupy the work-panel header
   at the outer window edge.
@@ -428,18 +429,16 @@ preview), and Files (workspace browser). Codex-parity surface.
 ### 5.2 Anatomy
 
 ```text
-+--------------------------------------+
-| App.tsx [×] | Review [×]              |  dynamic tabs only, 46px
-| (session pane top-right hosts [◧] while open) |
-+--------------------------------------+
-| Active tab body                      |
-|  Review: file cards + unified diff   |
-|  Terminal: xterm host                |
-|  Browser: URL bar + preview surface  |
-|  Files: tree + file viewer            |
-|                                      |
-|                                      |
-+--------------------------------------+
++----+---------------------------------+
+| ◫  | App.tsx                  [⌄][×] |  current resource, 46px
+| >  +---------------------------------+
+| ◎  | Active resource body            |
+|    |  Review: file cards + diff      |
+|    |  Terminal: xterm host           |
+|    |  Browser: URL bar + preview     |
+|    |  Files: tree + file viewer      |
++----+---------------------------------+
+ 44px activity rail
 ^ 6px resize handle on the left edge
 ```
 
@@ -447,6 +446,8 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 - Panel body uses quiet inset paper (`#fafafa`); the 46px header band and tool
   chrome (review toolbar, browser chrome, file viewer header) stay white
+- The 44px activity rail uses a slightly deeper neutral surface with a subtle
+  divider; selected state uses an edge marker plus fill, never color alone
 - Active tabs, file-tree rows, diff headers, and the resize handle ease hover
   fills with `--motion-duration-fast` / `--motion-ease-out`
 - Browser URL and empty-tool chrome share the light inset field treatment used
@@ -457,12 +458,12 @@ preview), and Files (workspace browser). Codex-parity surface.
 | State | Behavior |
 |---|---|
 | Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only in a session that produced a successful workspace Write/Edit while that Git working tree remains dirty. |
-| Open | Docked flex row right of the main pane; opened by an artifact with width 320–`min(720, 60vw, viewport − visible sidebar − 360px)`. Windows keeps the native window bounds stable so its frameless window does not repaint between the panel layout and an asynchronous bounds change; other platforms may grow the window outward when space permits. |
-| Multiple artifacts | Tabs follow first-open order, scroll horizontally, keep the active tab visible, and preserve readable labels at the panel minimum |
+| Open | Docked flex row right of the main pane; opened by an artifact with width 364–`min(720, 60vw, viewport − visible sidebar − 360px)`, preserving 320px of content beside the rail. Windows keeps the native window bounds stable so its frameless window does not repaint between the panel layout and an asynchronous bounds change; other platforms may grow the window outward when space permits. |
+| Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded switcher lists resources in first-open order with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows pointer or keyboard input while preserving a 360px MainChat; pointer changes commit on release. Native right-window-edge drag first resizes the open work panel, then passes any delta beyond the panel's dynamic limits to MainChat. With no work panel, MainChat receives the window delta directly. |
 | No workspace | Each tab renders its own "open a project" empty state |
-| Narrow window | Width re-clamps on window resize; the 320px panel minimum wins only when the supported shell itself cannot satisfy both minima |
+| Narrow window | Width re-clamps on window resize; the 364px panel minimum wins only when the supported shell itself cannot satisfy both minima |
 
 ### 5.4 Interactions
 
@@ -487,16 +488,25 @@ preview), and Files (workspace browser). Codex-parity surface.
   failed-refresh states hide the transcript entry. Session ownership is
   renderer-memory state and is discarded on relaunch with D142's work-panel
   contexts.
+- Tool activity rail: while the panel is visible, Review, Terminal, and Browser
+  are stable 32px icon buttons inside a 44px rail. Activating a closed tool
+  creates it through `openWorkPanelTab`; activating an open tool selects its
+  singleton tab. Selected state combines a neutral fill with a 2px edge marker,
+  and open inactive tools show a small status dot. The rail disappears with the
+  panel and therefore does not replace D128's artifact-driven entry point.
+- Resource switcher: the 46px header shows the active resource icon and
+  ellipsized label. Its chevron opens a bounded menu containing every current
+  session resource in first-open order; rows select resources, expose full
+  paths in tooltips, and retain per-resource close controls. The header's
+  trailing close button closes the current resource directly. Arrow keys,
+  Home, End, and Escape operate the menu; opening the switcher hides the native
+  Browser preview until it closes.
 - Tab close: closing an active tab selects its right neighbor, then its left;
   closing the last tab hides the panel. The panel-level collapse control lives
-  in the session pane top-right (not the work-panel tab strip) and hides the
+  in the session pane top-right (not the work-panel content header) and hides the
   panel without deleting the runtime tab set; a later artifact reopens it.
   Terminal mounts only after its first command artifact and stays mounted while
   its tab exists so the PTY and scrollback survive switches.
-- Header context menu: right-click the work-panel top strip or empty tab-list
-  chrome (not an existing tab) opens a one-shot tools menu that creates/activates
-  Review, Terminal, or Browser via the same `openWorkPanelTab` path as artifacts.
-  Existing tab rows keep their select/close behavior and do not open the menu.
 - Context change: selecting another session atomically projects that session's
   retained `{open, tabs, activeTabId, browserResource}` state. The previous
   session's context remains in renderer memory and is restored when selected
@@ -508,7 +518,7 @@ preview), and Files (workspace browser). Codex-parity surface.
   dynamic limits, and double-click restores the default width. Dragging the
   native right window edge resizes the work panel while it is the outermost
   visible column. The panel consumes the delta only between
-  `320px–min(720px, 60vw, viewport − visible sidebar − 360px)`; remaining
+  `364px–min(720px, 60vw, viewport − visible sidebar − 360px)`; remaining
   growth or shrinkage changes MainChat. Programmatic window changes used by
   panel open, collapse, or divider commit are excluded from this allocation.
 - Persistence: all session contexts are renderer runtime state only. On app
@@ -522,14 +532,16 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 ### 5.5 Accessibility
 
-- `<aside>` landmark; the top strip uses `nav`, `role="tablist"`, and a
-  localized `aria-label`; each resource uses `role="tab"`, `aria-selected`,
-  `aria-controls`, and a corresponding `role="tabpanel"`
+- `<aside>` landmark; the activity rail uses a localized `<nav>` label and
+  pressed state on each tool button. The current-resource control exposes
+  `aria-haspopup="menu"` / `aria-expanded`; switcher rows use
+  `menuitemradio` / `aria-checked`, and each resource body remains a
+  `role="tabpanel"`
 - Resize handle: focusable `role="separator"` with
   `aria-orientation="vertical"`, a localized label, dynamic
   `aria-valuemin` / `aria-valuemax` / `aria-valuenow`, visible focus, and
   Arrow/Home/End keyboard control
-- Every tab close and the sole session-pane panel collapse button expose
+- Every resource close and the sole session-pane panel collapse button expose
   localized names
 
 ### 5.6 MVP constraints
@@ -1050,6 +1062,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 |---|---|---|
 | Idle (no model) | textarea active, send button disabled + tooltip "Configure a model first" | Agent link remains available in model menu |
 | Idle (ready) | textarea active, send button enabled | Send active |
+| New session (reasoning model) | Thinking trigger shows the model's highest published level | User may select any published level, including Off when supported |
 | Running | textarea disabled, abort button visible | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
@@ -1071,6 +1084,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   `leading-none` under overflow; the model trigger still ellipsizes long IDs.
 - Chat / Agent and provider/model changes update the active session, not the
   app default. They are disabled while a turn runs.
+- A new session whose inherited default model supports reasoning starts with
+  Thinking enabled at that model's highest published level. Non-reasoning
+  models and missing capability metadata start at `off`; reopening or reusing
+  an existing session preserves its durable selection.
 - The model menu lists only enabled, runnable providers with a default model.
 - For a reasoning-capable active model, a separate Thinking trigger appears
   immediately to the right of Chat / Agent and before the Agent permission

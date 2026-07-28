@@ -5,7 +5,6 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../stores/app-store";
 import type { WorkPanelTab } from "../../stores/app-store";
@@ -13,6 +12,7 @@ import { api } from "../../lib/api";
 import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { cx } from "../ui";
 import {
+  IconChevronDown,
   IconClose,
   IconDiff,
   IconFileText,
@@ -81,52 +81,29 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
   // only sees the committed value on pointer-up.
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const dragState = useRef<{ pointerId: number; width: number } | null>(null);
-  const activeTabRef = useRef<HTMLDivElement | null>(null);
-  const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
+  const switcherRef = useRef<HTMLDivElement | null>(null);
+  const switcherButtonRef = useRef<HTMLButtonElement | null>(null);
+  const switcherFirstItemRef = useRef<HTMLButtonElement | null>(null);
   const resizeCommitTimer = useRef(0);
   const skipWindowResizeUntil = useRef(0);
   const viewportGeometry = useRef<WindowHorizontalGeometry>({
     x: window.screenX,
     width: window.innerWidth,
   });
-  const [toolsMenu, setToolsMenu] = useState<{ top: number; right: number } | null>(
-    null,
-  );
-
-  const closeToolsMenu = useCallback(() => setToolsMenu(null), []);
-
-  const openToolsMenuAt = useCallback((x: number, y: number) => {
-    setToolsMenu({
-      top: Math.max(8, Math.min(y + 4, window.innerHeight - 220)),
-      right: Math.min(
-        Math.max(8, window.innerWidth - x),
-        Math.max(8, window.innerWidth - 192),
-      ),
-    });
-  }, []);
-
-  const onHeaderContextMenu = useCallback(
-    (event: React.MouseEvent) => {
-      if ((event.target as Element).closest?.("[data-work-panel-tab]")) return;
-      event.preventDefault();
-      event.stopPropagation();
-      openToolsMenuAt(event.clientX, event.clientY);
-    },
-    [openToolsMenuAt],
-  );
+  const [switcherOpen, setSwitcherOpen] = useState(false);
 
   useEffect(() => {
-    if (!toolsMenu) return;
+    if (!switcherOpen) return;
     const onPointer = (e: PointerEvent) => {
-      if (e.button === 2 || (e.pointerType === "mouse" && e.buttons === 2)) return;
-      const target = e.target as Element | null;
-      if (target?.closest?.(".work-panel-tools-menu")) return;
-      closeToolsMenu();
+      if (switcherRef.current?.contains(e.target as Node)) return;
+      setSwitcherOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeToolsMenu();
+      if (e.key !== "Escape") return;
+      setSwitcherOpen(false);
+      switcherButtonRef.current?.focus();
     };
-    const onViewportChange = () => closeToolsMenu();
+    const onViewportChange = () => setSwitcherOpen(false);
     window.addEventListener("pointerdown", onPointer);
     window.addEventListener("keydown", onKey);
     window.addEventListener("resize", onViewportChange);
@@ -135,23 +112,26 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", onViewportChange);
     };
-  }, [toolsMenu, closeToolsMenu]);
+  }, [switcherOpen]);
 
   useEffect(() => {
-    if (!toolsMenu) return;
-    requestAnimationFrame(() => menuFirstItemRef.current?.focus());
-  }, [toolsMenu]);
+    if (!switcherOpen) return;
+    requestAnimationFrame(() => switcherFirstItemRef.current?.focus());
+  }, [switcherOpen]);
 
-  const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+  useEffect(() => setSwitcherOpen(false), [activeTabId]);
+
+  const onSwitcherKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      closeToolsMenu();
+      setSwitcherOpen(false);
+      switcherButtonRef.current?.focus();
       return;
     }
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
     const items = Array.from(
       event.currentTarget.querySelectorAll<HTMLButtonElement>(
-        '[role="menuitem"]:not(:disabled)',
+        '[data-work-panel-menu-item]:not(:disabled)',
       ),
     );
     if (!items.length) return;
@@ -261,12 +241,6 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
       });
     };
   }, [setWidth]);
-  useEffect(() => {
-    activeTabRef.current?.scrollIntoView({
-      block: "nearest",
-      inline: "nearest",
-    });
-  }, [activeTabId]);
   const onResizeKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       const step = event.shiftKey ? 32 : 16;
@@ -281,39 +255,8 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
     },
     [renderWidth, setWidth, widthLimits.max, widthLimits.min],
   );
-
-  const toolsMenuPortal =
-    toolsMenu && typeof document !== "undefined"
-      ? createPortal(
-          <div
-            className="sidebar-row-menu sidebar-floating-menu work-panel-tools-menu"
-            role="menu"
-            data-work-panel-tools-menu=""
-            aria-label={t("panel.openTool", { defaultValue: "Open tool" })}
-            onKeyDown={onMenuKeyDown}
-            style={{ top: toolsMenu.top, right: toolsMenu.right }}
-          >
-            <div className="sidebar-popover-title">{t("panel.openTool", { defaultValue: "Open tool" })}</div>
-            {HEADER_TOOLS.map(({ kind, Icon }, index) => (
-              <button
-                key={kind}
-                ref={index === 0 ? menuFirstItemRef : undefined}
-                type="button"
-                role="menuitem"
-                data-action={`open-work-panel-${kind}`}
-                onClick={() => {
-                  closeToolsMenu();
-                  openWorkPanelTab(toolWorkPanelTab(kind));
-                }}
-              >
-                <Icon size={14} />
-                <span>{t(`panel.tabs.${kind}`, { defaultValue: kind })}</span>
-              </button>
-            ))}
-          </div>,
-          document.body,
-        )
-      : null;
+  const activeLabel = activeTab ? tabLabel(activeTab, t) : t("panel.title");
+  const ActiveIcon = activeTab ? TAB_ICONS[activeTab.kind] : IconDiff;
 
   return (
     <aside
@@ -338,60 +281,128 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
         onKeyDown={onResizeKeyDown}
         onDoubleClick={() => setWidth(clampWidth(WORK_PANEL_DEFAULT_WIDTH))}
       />
+      <nav
+        className="work-panel-rail no-drag"
+        aria-label={t("panel.openTool")}
+      >
+        {HEADER_TOOLS.map(({ kind, Icon }) => {
+          const selected = activeTab?.kind === kind;
+          const open = tabs.some((tab) => tab.kind === kind);
+          const label = t(`panel.tabs.${kind}`, { defaultValue: kind });
+          return (
+            <button
+              key={kind}
+              type="button"
+              className={cx(
+                "work-panel-rail-button",
+                selected && "active",
+                open && "is-open",
+              )}
+              data-action={`open-work-panel-${kind}`}
+              title={label}
+              aria-label={label}
+              aria-pressed={selected}
+              onClick={() => openWorkPanelTab(toolWorkPanelTab(kind))}
+            >
+              <Icon size={16} />
+              {open && !selected && <span className="work-panel-open-dot" aria-hidden />}
+            </button>
+          );
+        })}
+      </nav>
       <div className="work-panel-main">
-        <header
-          className="work-panel-header"
-          data-work-panel-section="tools"
-          onContextMenu={onHeaderContextMenu}
-          onPointerDown={(event) => {
-            if (event.button === 2) event.preventDefault();
-          }}
-        >
-          <nav
-            className="work-panel-tabs no-drag"
-            role="tablist"
-            aria-label={t("panel.title")}
-            onContextMenu={onHeaderContextMenu}
-          >
-            {tabs.map((tab) => {
-              const label = tabLabel(tab, t);
-              const Icon = TAB_ICONS[tab.kind];
-              const selected = tab.id === activeTabId;
-              return (
-                <div
-                  ref={selected ? activeTabRef : undefined}
-                  key={tab.id}
-                  className={cx("work-panel-tab", selected && "active")}
-                  data-work-panel-tab={tab.id}
-                >
-                  <button
-                    type="button"
-                    id={`work-panel-tab-${tab.id}`}
-                    role="tab"
-                    aria-selected={selected}
-                    aria-controls={`work-panel-surface-${tab.id}`}
-                    className="work-panel-tab-trigger"
-                    title={label}
-                    onClick={() => activateTab(tab.id)}
-                  >
-                    <span className="work-panel-tab-icon" aria-hidden>
-                      <Icon size={14} />
-                    </span>
-                    <span className="work-panel-tab-label">{label}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="work-panel-tab-close"
-                    title={t("panel.closeTab", { name: label })}
-                    aria-label={t("panel.closeTab", { name: label })}
-                    onClick={() => closeTab(tab.id)}
-                  >
-                    <IconClose size={12} />
-                  </button>
+        <header className="work-panel-header" data-work-panel-section="current">
+          <div className="work-panel-switcher-wrap no-drag" ref={switcherRef}>
+            <button
+              ref={switcherButtonRef}
+              type="button"
+              className="work-panel-switcher-trigger"
+              aria-label={t("panel.openItems")}
+              aria-haspopup="menu"
+              aria-expanded={switcherOpen}
+              title={activeTab?.resource ?? activeLabel}
+              onClick={() => setSwitcherOpen((open) => !open)}
+            >
+              <span className="work-panel-current-icon" aria-hidden>
+                <ActiveIcon size={15} />
+              </span>
+              <span
+                id={activeTab ? `work-panel-title-${activeTab.id}` : undefined}
+                className="work-panel-current-label"
+              >
+                {activeLabel}
+              </span>
+              <IconChevronDown
+                size={13}
+                className={cx("work-panel-switcher-chevron", switcherOpen && "open")}
+              />
+            </button>
+            {switcherOpen && (
+              <div
+                className="work-panel-switcher-menu"
+                role="menu"
+                aria-label={t("panel.openItems")}
+                onKeyDown={onSwitcherKeyDown}
+              >
+                <div className="work-panel-switcher-title">{t("panel.openItems")}</div>
+                <div className="work-panel-switcher-list">
+                  {tabs.map((tab, index) => {
+                    const label = tabLabel(tab, t);
+                    const Icon = TAB_ICONS[tab.kind];
+                    const selected = tab.id === activeTabId;
+                    return (
+                      <div
+                        key={tab.id}
+                        className={cx("work-panel-switcher-row", selected && "active")}
+                        data-work-panel-tab={tab.id}
+                      >
+                        <button
+                          ref={index === 0 ? switcherFirstItemRef : undefined}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={selected}
+                          data-work-panel-switch-item=""
+                          data-work-panel-menu-item=""
+                          className="work-panel-switcher-item"
+                          title={tab.resource ?? label}
+                          onClick={() => {
+                            activateTab(tab.id);
+                            setSwitcherOpen(false);
+                            requestAnimationFrame(() => switcherButtonRef.current?.focus());
+                          }}
+                        >
+                          <Icon size={14} />
+                          <span>{label}</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          data-work-panel-menu-item=""
+                          className="work-panel-switcher-close"
+                          title={t("panel.closeTab", { name: label })}
+                          aria-label={t("panel.closeTab", { name: label })}
+                          onClick={() => closeTab(tab.id)}
+                        >
+                          <IconClose size={12} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </nav>
+              </div>
+            )}
+          </div>
+          {activeTab && (
+            <button
+              type="button"
+              className="work-panel-current-close no-drag"
+              title={t("panel.closeTab", { name: activeLabel })}
+              aria-label={t("panel.closeTab", { name: activeLabel })}
+              onClick={() => closeTab(activeTab.id)}
+            >
+              <IconClose size={13} />
+            </button>
+          )}
         </header>
         <div className="work-panel-body">
           {activeTab?.kind === "review" && (
@@ -399,7 +410,7 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
               id={`work-panel-surface-${activeTab.id}`}
               className="work-panel-tabpane"
               role="tabpanel"
-              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+              aria-labelledby={`work-panel-title-${activeTab.id}`}
             >
               <ReviewTab />
             </div>
@@ -414,7 +425,7 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
                 activeTab?.kind !== "terminal" && "is-hidden",
               )}
               role="tabpanel"
-              aria-labelledby="work-panel-tab-terminal"
+              aria-labelledby="work-panel-title-terminal"
             >
               <TerminalTab active={activeTab?.kind === "terminal"} />
             </div>
@@ -425,10 +436,10 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
               id={`work-panel-surface-${activeTab.id}`}
               className="work-panel-tabpane"
               role="tabpanel"
-              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+              aria-labelledby={`work-panel-title-${activeTab.id}`}
             >
               <BrowserTab
-                blocked={browserBlocked}
+                blocked={browserBlocked || switcherOpen}
                 sessionId={activeSessionId}
                 initialUrl={activeTab.resource}
               />
@@ -440,14 +451,13 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
               id={`work-panel-surface-${activeTab.id}`}
               className="work-panel-tabpane"
               role="tabpanel"
-              aria-labelledby={`work-panel-tab-${activeTab.id}`}
+              aria-labelledby={`work-panel-title-${activeTab.id}`}
             >
               <FilesTab />
             </div>
           )}
         </div>
       </div>
-      {toolsMenuPortal}
     </aside>
   );
 }

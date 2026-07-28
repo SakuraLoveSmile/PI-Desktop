@@ -53,41 +53,48 @@ test("work panel docks as an app-shell column, not a main-pane overlay", () => {
   );
 });
 
-test("work panel renders only dynamic artifact tabs with close controls", () => {
+test("work panel activity rail exposes tools and keeps resources in a switcher", () => {
   const headerIndex = panelSource.indexOf('className="work-panel-header"');
-  const tabsIndex = panelSource.indexOf('className="work-panel-tabs no-drag"');
+  const railIndex = panelSource.indexOf('className="work-panel-rail no-drag"');
+  const switcherIndex = panelSource.indexOf('className="work-panel-switcher-trigger"');
   const bodyIndex = panelSource.indexOf('<div className="work-panel-body">');
 
-  assert.ok(headerIndex > -1 && tabsIndex > headerIndex && bodyIndex > headerIndex);
-  assert.match(panelSource, /tabs\.map\(\(tab\) =>/);
-  assert.doesNotMatch(panelSource, /TOOL_TABS\.map|WelcomePane|work-welcome/);
-  assert.match(panelSource, /role="tablist"/);
-  assert.match(panelSource, /role="tab"/);
-  assert.match(panelSource, /aria-selected=\{selected\}/);
-  assert.match(panelSource, /aria-controls=\{`work-panel-surface-\$\{tab\.id\}`\}/);
+  assert.ok(railIndex > -1 && headerIndex > railIndex && switcherIndex > headerIndex);
+  assert.ok(bodyIndex > headerIndex);
+  assert.match(panelSource, /HEADER_TOOLS\.map\(\(\{ kind, Icon \}\) =>/);
+  assert.match(panelSource, /"work-panel-rail-button"/);
+  assert.match(panelSource, /aria-pressed=\{selected\}/);
+  assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
+  assert.match(panelSource, /openWorkPanelTab\(toolWorkPanelTab\(kind\)\)/);
+  assert.match(panelSource, /tabs\.map\(\(tab, index\) =>/);
+  assert.match(panelSource, /className="work-panel-switcher-menu"/);
+  assert.match(panelSource, /id=\{activeTab \? `work-panel-title-\$\{activeTab\.id\}`/);
+  assert.match(panelSource, /role="menuitemradio"/);
+  assert.match(panelSource, /aria-checked=\{selected\}/);
+  assert.match(panelSource, /data-work-panel-switch-item/);
+  assert.match(panelSource, /data-work-panel-menu-item/);
   assert.match(panelSource, /role="tabpanel"/);
-  assert.match(panelSource, /className="work-panel-tab-close"/);
+  assert.match(panelSource, /className="work-panel-current-close no-drag"/);
+  assert.match(panelSource, /className="work-panel-switcher-close"/);
   assert.match(panelSource, /closeTab\(tab\.id\)/);
   assert.doesNotMatch(panelSource, /collapsePanel/);
   assert.doesNotMatch(panelSource, /work-panel-collapse/);
   assert.match(appSource, /data-action="collapse-work-panel"/);
   assert.match(appSource, /SessionPaneWorkPanelCollapse/);
-  assert.match(panelSource, /data-work-panel-section="tools"/);
-  assert.match(panelSource, /onContextMenu=\{onHeaderContextMenu\}/);
-  assert.match(panelSource, /data-work-panel-tools-menu/);
+  assert.match(panelSource, /data-work-panel-section="current"/);
   assert.match(panelSource, /panel\.openTool/);
-  assert.match(panelSource, /defaultValue:\s*"Open tool"/);
-  assert.match(panelSource, /openWorkPanelTab\(toolWorkPanelTab\(kind\)\)/);
-  assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
-  assert.match(panelSource, /activeTabRef\.current\?\.scrollIntoView/);
-  assert.match(panelSource, /inline:\s*"nearest"/);
-  assert.doesNotMatch(panelSource, /work-panel-rail/);
+  assert.match(panelSource, /panel\.openItems/);
+  assert.match(panelSource, /blocked=\{browserBlocked \|\| switcherOpen\}/);
+  assert.doesNotMatch(panelSource, /onContextMenu|createPortal|work-panel-tools-menu/);
   assert.match(
     globalStyles,
-    /\.work-panel-tabs \{[^}]*display:\s*flex;[^}]*overflow-x:\s*auto;/s,
+    /\.work-panel-rail \{[^}]*width:\s*44px;[^}]*flex-direction:\s*column;/s,
   );
-  assert.match(globalStyles, /\.work-panel-tab-close \{[^}]*opacity:\s*0;/s);
-  assert.doesNotMatch(globalStyles, /\.work-panel-rail(?:-btn)?\s*\{/);
+  assert.match(
+    globalStyles,
+    /\.work-panel-switcher-menu \{[^}]*position:\s*absolute;[^}]*max-height:/s,
+  );
+  assert.doesNotMatch(globalStyles, /\.work-panel-tabs\s*\{/);
 });
 
 test("work panel starts closed with no tabs and persists width only", () => {
@@ -102,7 +109,7 @@ test("work panel starts closed with no tabs and persists width only", () => {
 
 test("work panel resizing preserves a readable main pane", () => {
   assert.equal(MAIN_PANE_MIN_WIDTH, 360);
-  assert.equal(WORK_PANEL_MIN_WIDTH, 320);
+  assert.equal(WORK_PANEL_MIN_WIDTH, 364);
   assert.match(panelSource, /clampWorkPanelWidth\(width, workPanelWidthContext\(\)\)/);
   assert.match(panelSource, /\.sidebar, \.sidebar-rail/);
   assert.match(globalStyles, /\.main-pane \{[^}]*min-width:\s*360px;/s);

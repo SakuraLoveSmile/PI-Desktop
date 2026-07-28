@@ -951,14 +951,16 @@ Each scenario is documented in this format:
 - **Preconditions**: App running with any workspace state.
 - **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
   Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
-  a URL preview, and a completed command artifact. 3) Right-click empty
-  work-panel header chrome to open Review/Terminal/Browser; confirm existing
-  tab rows do not open that menu. 4) Close an inactive tab, then the active
-  middle and edge tabs. 5) Use the sole session-pane collapse control and
+  a URL preview, and a completed command artifact. 3) Use the work-panel
+  activity rail to open/select Review, Terminal, and Browser; verify active and
+  open-inactive states. Open the current-resource switcher, select file and tool
+  resources with pointer and keyboard, close an inactive item inside it, then
+  close the active item from the header. 4) Close active middle and edge items
+  and verify neighbor selection. 5) Use the sole session-pane collapse control and
   trigger another artifact. 6) In session A, leave the panel open with multiple
   tabs and a Browser resource; switch to session B, create a different tab set,
   then switch repeatedly between A and B and select a project without an active
-  conversation. 7) Drag the left-edge handle below 320px and beyond every upper
+  conversation. 7) Drag the left-edge handle below 364px and beyond every upper
   bound at 960px, 1200px, and 1600px window widths; focus it and exercise
   Arrow/Shift+Arrow/Home/End. 8) With the panel open, drag the native right
   window edge outward and inward through the panel limits, then drag the left
@@ -968,20 +970,26 @@ Each scenario is documented in this format:
   10) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
-  the docked third column and creates or activates one closeable top tab; file
-  tabs are path-keyed, repeated resources deduplicate, and tabs scroll across
-  the full work-panel header while keeping the active tab visible. Right-click
-  empty header chrome opens Review/Terminal/Browser; tab rows do not. The sole
-  collapse control sits in the session pane top-right rather than the tab strip.
+  the docked third column and creates or activates one resource; file resources
+  are path-keyed and repeated resources deduplicate. Once the panel is open, a
+  44px activity rail exposes one-click Review/Terminal/Browser actions with a
+  fill plus edge marker for the active tool and a dot for open inactive tools.
+  The 46px content header keeps the active label readable, closes it directly,
+  and opens a bounded ordered resource switcher with full-path tooltips and
+  per-item close controls. The switcher supports Arrow keys, Home, End, and
+  Escape, restores focus to its trigger, and temporarily hides the native
+  Browser preview so the menu is never occluded. The sole
+  collapse control sits in the session pane top-right rather than the content header.
   Active close selects the right neighbor then left; closing the last tab hides
   the panel. Collapse retains runtime
   tabs but hides the panel until another artifact reopens it. Width clamps to
-  `320px–min(720px, 60vw, viewport − visible sidebar − 360px)`, exposes its
+  `364px–min(720px, 60vw, viewport − visible sidebar − 360px)`, exposes its
   current/minimum/maximum width to assistive technology, supports the documented
-  keyboard steps, and never squeezes MainChat below 360px in the supported
-  shell. Native right-edge drag changes the open work panel first and changes
-  MainChat only after a panel bound is reached; left-edge drag changes the shell
-  without resizing the right panel. With the panel closed, right-edge drag
+  keyboard steps, re-clamps on window resize, and never squeezes MainChat below
+  360px in the supported shell. Native right-edge drag changes the open work
+  panel first and changes MainChat only after a panel bound is reached;
+  left-edge drag changes the shell without resizing the right panel. With the
+  panel closed, right-edge drag
   changes MainChat directly, and programmatic open/collapse growth is never
   double-counted as panel width.
   A and B independently restore their runtime open state, ordered tabs, active
@@ -1079,7 +1087,8 @@ Each scenario is documented in this format:
 - **Preconditions**: Workspace with file artifacts for nested source, large
   (>512KB), image, and binary files.
 - **Steps**: 1) Activate each file artifact and verify a distinct path-keyed
-  top tab; browse the tree, expanding nested folders. 2) Open a source
+  resource in the header switcher; browse the tree, expanding nested folders.
+  2) Open a source
   file, the image, the binary, and the large file. 3) Use reveal-in-Finder.
   4) Attempt a traversal read (`../outside`) via devtools IPC. 5) Switch
   workspaces.
@@ -1772,6 +1781,30 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Draft
 
+#### E2E-082: New reasoning session defaults to maximum thinking
+
+- **Preconditions**: The app default provider/model resolves through pi-ai as
+  reasoning-capable and publishes a sparse thinking-level set; a second default
+  model is non-reasoning.
+- **Steps**:
+  1. Set the reasoning-capable model as the app default and create a new session.
+  2. Inspect the Thinking trigger and the session configuration sent to the host.
+  3. Select a lower level or Off, leave the session, and reopen it.
+  4. Set the non-reasoning model as default and create another new session.
+- **Expected**:
+  - The first new session persists and displays the highest canonical level
+    published for the inherited reasoning model, even when the provider returns
+    its sparse levels out of order.
+  - Reopening the first session preserves the user's later explicit selection.
+  - The non-reasoning session starts at `off` and renders no Thinking trigger;
+    missing capability metadata also falls back to `off`.
+- **Specs linked**: `03-runtime/13-model-catalog-and-selection.md`,
+  `04-ux/08-component-spec.md`, ADR 0018, D153
+- **Acceptance**: B (model config), F (persistence), Quality
+- **Milestone**: M5
+- **Status**: Partially automated (`thinking-levels.test.ts`,
+  `thinking-ui.test.mjs`); full UI scenario Draft
+
 ## 8. Traceability Matrix
 
 
@@ -1781,15 +1814,15 @@ Each scenario is documented in this format:
 | Acceptance | Scenarios |
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079 |
-| B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080 |
+| B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
 | C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075, E2E-081 |
 | D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
 | E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049, E2E-074 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082 |
 | G — Plugins | E2E-022, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -1797,7 +1830,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081 (+ packaging scenarios in release runbook) |
+| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082 (+ packaging scenarios in release runbook) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -2236,7 +2269,7 @@ This test plan spec is accepted when:
 - Expect project and session lists to scroll inside the sidebar body without
   clipping behind the footer; sidebar Search/Collapse remain in the sidebar
   header. When the work panel is open, expect its sole collapse control in the
-  session pane top-right rather than the work-panel tab strip, flush against
+  session pane top-right rather than the work-panel content header, flush against
   the divider at the main pane's right edge.
 - Collapse A by clicking its directory label, expand it from the chevron area,
   then activate B and return to A. Only A's child rows collapse; project `+`
