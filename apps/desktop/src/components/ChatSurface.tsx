@@ -23,6 +23,7 @@ function projectName(path?: string | null, name?: string | null) {
 
 export const ChatSurface = memo(function ChatSurface() {
   const { t } = useTranslation();
+  const activeSessionId = useAppStore((state) => state.activeSessionId);
   const messages = useAppStore((state) => state.messages);
   const isRunning = useAppStore((state) => state.isRunning);
   const workspace = useAppStore((state) => state.workspace);
@@ -95,6 +96,7 @@ export const ChatSurface = memo(function ChatSurface() {
       ) : (
         <>
           <ChatTranscript
+            sessionId={activeSessionId}
             messages={messages}
             isRunning={isRunning}
             pendingPermission={activePermission}

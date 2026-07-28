@@ -247,7 +247,10 @@ stay slightly quieter than primary chrome.
   disclosure hit area): activate its path when necessary, then toggle only
   that project's conversation group; retain the other project groups
 - Click session: activate its bound project when necessary, switch the active
-  session, and scroll to the last message
+  session, and show the last message on the first painted frame. Session
+  activation resets any manual-scroll state inherited from the previous
+  transcript and must not flash the new transcript's top or an old scroll
+  position before settling at the bottom.
 - Click the message-plus New Chat control: create/reuse a draft in the current workspace scope
 - On Windows/Linux, click the PI-Desktop brand to return the main pane to the
   chat home while preserving the active conversation and workspace; macOS
@@ -672,6 +675,7 @@ responses, lightweight tool activity rows, and permission cards for a session.
 
 | State | Behavior |
 |---|---|
+| Session activation | Re-pin and position at the last record during layout, before the transcript's first painted frame |
 | Streaming | New tokens append; auto-scroll only while pinned to bottom |
 | Turn start | Send / retry / regenerate re-pins follow mode and jumps to bottom |
 | Thinking-only streaming | Transcript opens; disclosure stays open; no empty answer bubble or duplicate Working row |
