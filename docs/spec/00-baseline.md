@@ -32,7 +32,7 @@
 > `0.4.11` adopts turn-boundary model-context checkpoint compaction through
 > D158 / ADR 0030 while preserving the complete visible transcript.
 > `0.4.12` standardizes home and thread-docked composer prompt rows without a
-> leading brand mark through D159 / ADR 0031 while preserving shell branding
+> leading brand mark through D160 / ADR 0031 while preserving shell branding
 > elsewhere.
 
 ## Frozen Decisions

@@ -81,7 +81,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D051 | Sidebar nav density | *(session-list IA superseded by D088; row density retained)* **Nav rows ~32px pitch, recents rows ~28–31px, section label `最近`/`Recents`** | Close light-home sidebar residual vs cx-home-clean |
 | D052 | Home vertical + night box polish | *(workspace-chip surface superseded by D095; remaining guidance retained)* **Upper pb ~62px (hero first-ink ~y305); light chips `#f3f3f3`; light composer elevation stronger; dark home composer solid `#212121`; toolbar controls 28px** | Close residual heat at hero y≈300 and composer band; night plate must not flatten into `#181818` |
 | D053 | Stage Manager CG detection | **CG bounds helper matches any window layer by pid; missing-CG needs streak≥3 before shelf recovery; avoid permanent alwaysOnTop** | alwaysOnTop floating layer broke layer-0 helpers and caused restore thrash |
-| D054 | Empty draft row + infinity cue | *(∞ cue superseded by D094; leading brand cue superseded by D159)* **Composer auto-resize must never collapse empty textarea height (<28px); keep a visible brand cue left of draft; solid disabled send (`#bdbdbd` light); denser placeholder ink; night plate solid `#212121`** | Empty `height:0` auto-resize hid placeholder and read as broken night/light box; gold draft row needs visible mark + ink density |
+| D054 | Empty draft row + infinity cue | *(∞ cue superseded by D094; leading brand cue superseded by D160)* **Composer auto-resize must never collapse empty textarea height (<28px); keep a visible brand cue left of draft; solid disabled send (`#bdbdbd` light); denser placeholder ink; night plate solid `#212121`** | Empty `height:0` auto-resize hid placeholder and read as broken night/light box; gold draft row needs visible mark + ink density |
 | D055 | Empty plate draft Y | *(plate-height guidance superseded by D061; workspace-chip density superseded by D095)* Home empty shell min-height ~148px (bottom-aligned) so draft densest ink ≈y556 vs gold; chips compact 28px | 112px plate left draft ~30px low; grow plate upward without moving toolbar footing |
 | D056 | Empty-home workspace chips | *(superseded by D095)* **Hide project/Local/branch capsule on empty home always; show only in thread-docked composer** | cx-home-clean empty gold has no capsule band above the plate even with project title |
 | D057 | Home mark + hero title optical | *(home mark superseded by D094; title guidance retained)* **Empty-home Codex mark uses denser stroke; short workspace basenames display as `PI-Desktop` for gold title span** | Hero residual was thin mark + short project label under-inking title vs Codex gold |
@@ -135,7 +135,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | ID | Topic | Decision | Rationale |
 |---|---|---|---|
 | D093 | Sidebar organization, retained project tabs, and session workspace isolation | **The renderer retains normalized open-project paths and local project/session presentation metadata for pin, archive, collapse, sort, and optional compatibility order. The sidebar renders one independently collapsible group per retained path plus Temporary sessions. User-facing sort modes are recent, created, oldest, and name; `manual` remains a persisted compatibility value without a new reorder gesture. Activating a group reuses `project.set`, so the shell still has one selected host workspace. Tool execution resolves its root from the durable session project, and per-session turns/grants remain independent when another tab becomes active. Archive and close are non-destructive.** | Preserve a multi-repository working set and make long conversation lists manageable without creating multiple host workspace singletons or allowing an active-tab switch to redirect a background session's tools |
-| D094 | Renderer product branding | *(docked composer logo superseded by D159)* **All user-visible shell identity uses `PI-Desktop`: the sidebar shell name, composer placeholder, and settings copy. `BrandLogo` imports canonical `build/icon_1024.png` through Vite for the home hero, expanded/collapsed sidebar, and docked composer; new-session controls use a dedicated message-plus icon. `Codex` remains only where it identifies an external import source or a design reference.** | Remove accidental third-party branding and vector approximations from the product surface while preserving import compatibility and the Codex-derived layout system |
+| D094 | Renderer product branding | *(docked composer logo superseded by D160)* **All user-visible shell identity uses `PI-Desktop`: the sidebar shell name, composer placeholder, and settings copy. `BrandLogo` imports canonical `build/icon_1024.png` through Vite for the home hero, expanded/collapsed sidebar, and docked composer; new-session controls use a dedicated message-plus icon. `Codex` remains only where it identifies an external import source or a design reference.** | Remove accidental third-party branding and vector approximations from the product surface while preserving import compatibility and the Codex-derived layout system |
 | D135 | Distinct sidebar task status indicators | **Conversation rows reserve one compact leading status slot with semantic, shape-distinct states: neutral-accent outlined ring for selected, warning-orange breathing dot for in progress, success-green check for completed, and error-red circled alert for failed. Precedence is in progress, selected, then latest terminal outcome. Starting a new turn clears the prior outcome; abort produces no failure. Every state has localized accessible text and reduced motion makes the in-progress dot static.** | The prior running dot reused the accent token and disappeared when idle, making selected, active work, completion, and failure difficult to scan or distinguish by more than row background |
 
 ## H. Baseline 0.4.4 composer decisions
@@ -411,7 +411,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Session titles use `--text-md` (13px); project/group titles and empty-state
   copy use `--text-sm` (12px). Primary chrome (New task, Plugins, footer) stays
   at `--text-base`.
-- Decision D155.
+- Decision D155; superseded by D159 for the expanded sidebar's primary list
+  content.
 
 ## 2026-07-28 — Independent window and work-panel resizing
 
@@ -446,10 +447,19 @@ section mirrors only marketplace/catalog items still blocking nothing.
   AGPL-3.0 behavioral reference, not a dependency or copied implementation.
 - Decision D158; ADR 0030.
 
+## 2026-07-28 — Sidebar typography aligned with the global body scale
+
+- Expanded-sidebar session titles return to `--text-base` (14px), matching the
+  app body and primary sidebar chrome; project/group titles and empty-state copy
+  return to the adjacent `--text-md` (13px) tier.
+- Section labels and secondary metadata remain at `--text-sm` (12px), and the
+  existing compact row pitch, truncation, and sidebar dimensions are unchanged.
+- Decision D159; supersedes D155 and restores D144's primary-list hierarchy.
+
 ## 2026-07-28 — Icon-free composer prompt row
 
 - Home and thread-docked composer prompt rows render no leading brand icon;
   draft text and placeholder ink align directly with the input gutter.
 - The canonical logo remains in the home hero, sidebar, native application
   identity, startup splash, and About surfaces. Session-creation controls keep
-  their dedicated message-plus icon. Decision D159; ADR 0031.
+  their dedicated message-plus icon. Decision D160; ADR 0031.
