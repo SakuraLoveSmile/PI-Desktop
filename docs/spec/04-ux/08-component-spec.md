@@ -650,8 +650,9 @@ responses, lightweight tool activity rows, and permission cards for a session.
   final answer; streaming reopens it while reasoning is arriving
 - Hover code block: copy button appears
 - Hover or focus a minimap marker: show the localized sender and a bounded
-  plaintext preview; nearby markers magnify horizontally without reflowing the
-  rail
+  plaintext preview; multiple assistant fragments produced within one user
+  turn are combined into one AI-response marker and preview; nearby markers
+  magnify horizontally without reflowing the rail
 - Click a minimap marker: smoothly scroll its message near the top of the
   transcript viewport
 - Scroll the transcript: update the active minimap marker against an anchor
@@ -678,10 +679,12 @@ responses, lightweight tool activity rows, and permission cards for a session.
 - No inline message branching tree; regenerate variants remain linear per user
   root turn. Session-level Create branch produces an independent conversation
   row instead of adding tree chrome inside the transcript.
-- The minimap renders only when at least two visible user or assistant messages
-  exist **and** the transcript content overflows one viewport (scrollHeight >
-  clientHeight); tool-only rows do not create markers and a one-page transcript
-  never shows the rail
+- The minimap renders only when at least two eligible turn markers exist **and**
+  the transcript content overflows one viewport (scrollHeight > clientHeight).
+  Each visible user message creates one marker; all contentful assistant
+  fragments until the next user message create one AI-response marker anchored
+  to the first contentful fragment. Tool-only rows do not create markers or
+  split an AI response, and a one-page transcript never shows the rail.
 - Marker previews are capped at 280 source characters and are display-only
 
 ---
@@ -797,13 +800,16 @@ Single message render — either user (plaintext) or assistant (markdown streami
 Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shiki.ts`
 + prose styles under `.prose-chat` / `.code-block` in `globals.css`.
 
-- **Streaming without jank**: source splits into top-level blocks via `marked`'s
-  lexer; each block renders through a memoized `<ReactMarkdown>`. While
-  streaming only the tail block re-parses (incremental re-lex from the last
-  block boundary), so cost stays linear in message length.
+- **Streaming without jank**: runtime content chunks render directly, without a
+  second renderer-side typewriter or animation-frame state loop. Source splits
+  into top-level blocks via `marked`'s lexer; each block renders through a
+  memoized `<ReactMarkdown>`. While streaming only the tail block re-parses
+  (incremental re-lex from the last block boundary), so cost stays linear in
+  message length.
 - **Plugins**: `remark-gfm` (tables, task lists, strikethrough, autolinks),
   `remark-math` + `rehype-katex` (inline `$…$`, display `$$…$$`). Raw HTML
-  stays escaped (no `rehype-raw`).
+  stays escaped (no `rehype-raw`). KaTeX's Vite-inlined WOFF2 fonts are allowed
+  by the renderer's `font-src 'self' data:` CSP directive.
 - **Syntax highlighting**: Shiki singleton with the JavaScript regex engine
   (no wasm), themes `one-light`/`one-dark-pro` following `data-theme`.
   Languages lazy-load per fence tag with a plain-mono fallback until ready.

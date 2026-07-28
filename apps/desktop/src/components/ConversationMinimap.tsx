@@ -7,20 +7,17 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { UiMessage } from "@pi-desktop/shared";
+import {
+  buildConversationMinimapMarkers,
+  type ConversationMinimapMarker,
+} from "../lib/conversation-minimap";
 
 /* Codex-style conversation minimap: a packed stack of dashes on the left edge
- * of the thread, one per message. Moving the cursor along the rail magnifies
- * nearby dashes with a macOS-Dock cosine falloff, the nearest message shows a
- * preview popover, and clicking jumps to that message. Dashes grow
- * horizontally only, so magnification never shifts the stack layout. */
+ * of the thread, one per user turn or assistant response. Moving the cursor
+ * along the rail magnifies nearby dashes with a macOS-Dock cosine falloff, the
+ * nearest turn shows a preview popover, and clicking jumps to that turn. Dashes
+ * grow horizontally only, so magnification never shifts the stack layout. */
 
-type Marker = {
-  id: string;
-  role: "user" | "assistant";
-  preview: string;
-};
-
-const PREVIEW_MAX_CHARS = 280;
 /* Dock magnification: reach of the falloff and peak growth factor. */
 const MAGNIFY_RADIUS = 46;
 const MAGNIFY_BOOST = 1.3;
@@ -39,19 +36,16 @@ export function ConversationMinimap({
 }) {
   const { t } = useTranslation();
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<{ marker: Marker; top: number } | null>(
-    null,
-  );
+  const [hovered, setHovered] = useState<{
+    marker: ConversationMinimapMarker;
+    top: number;
+  } | null>(null);
   const [overflows, setOverflows] = useState(false);
   const railRef = useRef<HTMLElement>(null);
   const markerEls = useRef(new Map<string, HTMLButtonElement>());
   const moveRaf = useRef(0);
 
-  const markers: Marker[] = messages.map((message) => ({
-    id: message.id,
-    role: message.role === "user" ? "user" : "assistant",
-    preview: (message.content || "").trim().slice(0, PREVIEW_MAX_CHARS),
-  }));
+  const markers = buildConversationMinimapMarkers(messages);
   const markersRef = useRef(markers);
   markersRef.current = markers;
 
@@ -60,10 +54,13 @@ export function ConversationMinimap({
     const el = scrollRef.current;
     if (!el) return [];
     const baseTop = el.getBoundingClientRect().top;
+    const markerIds = new Set(markersRef.current.map((marker) => marker.id));
     const out: { id: string; offset: number }[] = [];
     el.querySelectorAll<HTMLElement>("[data-minimap-id]").forEach((node) => {
+      const id = node.dataset.minimapId || "";
+      if (!markerIds.has(id)) return;
       out.push({
-        id: node.dataset.minimapId || "",
+        id,
         offset: node.getBoundingClientRect().top - baseTop + el.scrollTop,
       });
     });
@@ -199,7 +196,7 @@ export function ConversationMinimap({
 
   if (markers.length < 2 || !overflows) return null;
 
-  const roleLabel = (role: Marker["role"]) =>
+  const roleLabel = (role: ConversationMinimapMarker["role"]) =>
     role === "user" ? t("chat.userMessage") : t("chat.assistantMessage");
 
   return (

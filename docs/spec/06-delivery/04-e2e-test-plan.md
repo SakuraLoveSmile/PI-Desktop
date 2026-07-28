@@ -192,12 +192,21 @@ Each scenario is documented in this format:
 #### E2E-009: Streamed tokens visible in UI
 
 - **Preconditions**: Session active; message sent.
-- **Steps**: 1) Observe assistant response as it streams.
-- **Expected**: Tokens appear progressively in chat UI; final response complete.
-- **Specs linked**: `03-runtime/02-agent-runtime.md`
-- **Acceptance**: C (streamed output)
+- **Steps**: 1) Request a long answer containing Markdown and inline/display
+  math. 2) Observe the assistant response as it streams. 3) Let the answer
+  complete and inspect the renderer console.
+- **Expected**: Runtime chunks appear progressively through the incremental
+  Markdown renderer and the final response is complete. The renderer does not
+  start a second animation-frame typewriter loop, raise React error 185, or
+  reject Vite-inlined KaTeX fonts under CSP.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`,
+  `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
+  `05-security/01-security.md`
+- **Acceptance**: C (streamed output), Quality
 - **Milestone**: M2
-- **Status**: Automated (protocol smoke, live-model lane; requires PI_DESKTOP_TEST_API_KEY)
+- **Status**: Partially automated (protocol live-model stream plus renderer
+  source regression in `renderer-stream-safety.test.mjs`; full UI observation
+  remains Draft)
 
 #### E2E-010: Abort generation
 
@@ -435,23 +444,26 @@ Each scenario is documented in this format:
 
 #### E2E-041: Conversation minimap navigates long transcripts
 
-- **Preconditions**: A session contains enough user and assistant messages to
-  scroll beyond one viewport, including tool activity between messages; a second
-  session has at least two eligible messages that still fit in one viewport.
+- **Preconditions**: A session contains enough user and assistant turns to
+  scroll beyond one viewport, including one AI response emitted as multiple
+  assistant fragments around tool activity; a second session has at least two
+  eligible turn markers that still fit in one viewport.
 - **Steps**: 1) Open the long session. 2) Scroll through the transcript and
   observe the active minimap marker. 3) Hover a marker and inspect its preview.
   4) Use keyboard focus to reach another marker. 5) Activate a marker. 6) Open a
-  session with fewer than two visible user or assistant messages. 7) Open the
+  session with fewer than two eligible turn markers. 7) Open the
   multi-message session that still fits one viewport. 8) Resize the long session
   window taller until content no longer overflows, then shorter again.
-- **Expected**: The rail contains one marker per visible user or assistant
-  message and no marker for tool-only rows; the marker near the upper-third
-  reading anchor exposes `aria-current`; hover and focus show the same
-  localized sender and bounded plaintext preview; nearby markers magnify
-  horizontally without shifting the stack; activation smoothly scrolls to the
-  corresponding message; the rail is absent when fewer than two eligible
-  messages exist **or** when content does not overflow one viewport; the rail
-  reappears once overflow returns after a resize.
+- **Expected**: The rail contains one marker per visible user turn and one per
+  AI response. Multiple assistant fragments between two user messages share a
+  single marker and combined bounded preview, while tool-only rows create no
+  marker and do not split the response. The marker near the upper-third reading
+  anchor exposes `aria-current`; hover and focus show the same localized sender
+  and preview; nearby markers magnify horizontally without shifting the stack;
+  activation smoothly scrolls to the first contentful message in that response;
+  the rail is absent when fewer than two eligible markers exist **or** when
+  content does not overflow one viewport; the rail reappears once overflow
+  returns after a resize.
 - **Specs linked**: `04-ux/08-component-spec.md`
 - **Acceptance**: C (chat stream), Quality (keyboard and long-thread navigation)
 - **Milestone**: M3
@@ -1768,7 +1780,7 @@ Each scenario is documented in this format:
   - The non-reasoning session starts at `off` and renders no Thinking trigger;
     missing capability metadata also falls back to `off`.
 - **Specs linked**: `03-runtime/13-model-catalog-and-selection.md`,
-  `04-ux/08-component-spec.md`, ADR 0018, D152
+  `04-ux/08-component-spec.md`, ADR 0018, D153
 - **Acceptance**: B (model config), F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Partially automated (`thinking-levels.test.ts`,
