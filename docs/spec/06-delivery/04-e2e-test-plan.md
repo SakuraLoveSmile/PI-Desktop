@@ -1001,7 +1001,9 @@ Each scenario is documented in this format:
   the complete reservation. 11) Open or collapse while maximized and fullscreen,
   then return to normal. 12) Move the normal window between displays with
   different work areas, change the active display's work-area geometry, and
-  perform ordinary moves within one unchanged work area. 13) Relaunch.
+  perform ordinary moves within one unchanged work area. 13) Inject one rejected
+  reservation while opening and one while collapsing, then retry each action.
+  14) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one resource; file resources
@@ -1044,8 +1046,10 @@ Each scenario is documented in this format:
   normal. Display/work-area changes reconcile the same target against current
   available width and update the native minimum; ordinary movement within one
   unchanged work area does not reapply geometry. Relaunch restores base bounds
-  without reservation width or induced x shift. No transition produces a
-  second resize or position drift.
+  without reservation width or induced x shift. A rejected reservation keeps
+  the last confirmed panel presentation until a later successful request; a
+  superseded success cannot commit stale presentation. No transition produces
+  a second resize or position drift.
   The former context-panel overlay no longer exists.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`, `04-ux/01-ui-ia.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
@@ -1053,7 +1057,8 @@ Each scenario is documented in this format:
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`work-panel-resize.test.mjs`,
-  `work-panel.test.mjs`); full UI scenario Draft
+  `work-panel-presentation.test.mjs`, `work-panel.test.mjs`); full UI scenario
+  Draft
 
 #### E2E-057: Review tab reflects the git working tree
 

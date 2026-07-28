@@ -64,6 +64,8 @@ test("work panel reserves native window space before it is presented", () => {
       appSource.indexOf("setPresentedWorkPanelOpen(shouldPresent)"),
     "the native reservation must settle before presentation changes",
   );
+  assert.match(appSource, /commitWorkPanelPresentation/);
+  assert.doesNotMatch(appSource, /\.finally\(\(\) => \{[\s\S]*setPresentedWorkPanelOpen/);
   assert.match(
     appSource,
     /<\/section>\s*\{presentedWorkPanelOpen && \(?\s*<WorkPanel/,

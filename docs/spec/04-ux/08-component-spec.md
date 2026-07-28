@@ -570,7 +570,10 @@ preview), and Files (workspace browser). Codex-parity surface.
   reserves available width while the panel stays fixed and MainChat absorbs the
   shortfall. Maximized/fullscreen geometry waits until normal. Electron persists
   base bounds excluding the reservation and its induced x shift. Background
-  session artifacts never update the visible reservation (D163, ADR 0032).
+  session artifacts never update the visible reservation. The renderer changes
+  panel presentation only after the latest reservation request succeeds; a
+  rejected or superseded request keeps the last confirmed presentation state
+  (D163, ADR 0032).
 
 ### 5.5 Accessibility
 

@@ -31,6 +31,7 @@ import { WindowControls } from "./components/WindowControls";
 import { useAppStore } from "./stores/app-store";
 import type { ToastOptions } from "./stores/app-store";
 import { api } from "./lib/api";
+import { commitWorkPanelPresentation } from "./lib/work-panel-presentation";
 import { toolWorkPanelTab } from "./lib/work-panel-tabs";
 import { StartupSplash } from "./components/StartupSplash";
 import { cx } from "./components/ui";
@@ -178,14 +179,11 @@ function AppShell() {
     const requestedWidth = shouldPresent ? Math.round(workPanelWidth) : 0;
     const request = ++workPanelReservationRequest.current;
 
-    void api
-      .setWorkPanelReservation(requestedWidth)
-      .catch(() => undefined)
-      .finally(() => {
-        if (request === workPanelReservationRequest.current) {
-          setPresentedWorkPanelOpen(shouldPresent);
-        }
-      });
+    void commitWorkPanelPresentation({
+      reservation: api.setWorkPanelReservation(requestedWidth),
+      isCurrent: () => request === workPanelReservationRequest.current,
+      commit: () => setPresentedWorkPanelOpen(shouldPresent),
+    });
   }, [page, ready, workPanelOpen, workPanelWidth]);
 
   const runMenuCommand = useCallback(
