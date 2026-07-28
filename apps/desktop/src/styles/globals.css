@@ -1065,6 +1065,44 @@ html {
   flex-direction: column;
 }
 
+.chat-surface > .thread-wrap,
+.chat-surface > .home-main-content,
+.chat-surface > .composer-dock {
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.chat-surface.session-switching > .thread-wrap,
+.chat-surface.session-switching > .home-main-content,
+.chat-surface.session-switching > .composer-dock {
+  pointer-events: none;
+  opacity: 0.82;
+}
+
+.session-switch-progress {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 30;
+  height: 2px;
+  overflow: hidden;
+  background: var(--ds-border-subtle);
+  pointer-events: none;
+}
+
+.session-switch-progress > span {
+  display: block;
+  width: 28%;
+  height: 100%;
+  background: var(--ds-accent);
+  animation: session-switch-progress 720ms var(--motion-ease-standard) infinite;
+  transform: translateX(-110%);
+}
+
+@keyframes session-switch-progress {
+  to {
+    transform: translateX(460%);
+  }
+}
+
 .route-pending {
   display: flex;
   min-width: 0;
@@ -8488,6 +8526,13 @@ html {
   .route-pending-indicator {
     animation: none;
     border-color: var(--ds-text-muted);
+  }
+
+  .session-switch-progress > span {
+    width: 100%;
+    animation: none;
+    opacity: 0.55;
+    transform: none;
   }
 
   .composer-shell,

@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { BrandLogo } from "./BrandLogo";
 import { ChatTranscript } from "./ChatTranscript";
@@ -24,6 +24,7 @@ function projectName(path?: string | null, name?: string | null) {
 export const ChatSurface = memo(function ChatSurface() {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((state) => state.activeSessionId);
+  const selectingSessionId = useAppStore((state) => state.selectingSessionId);
   const messages = useAppStore((state) => state.messages);
   const isRunning = useAppStore((state) => state.isRunning);
   const workspace = useAppStore((state) => state.workspace);
@@ -47,9 +48,34 @@ export const ChatSurface = memo(function ChatSurface() {
     const [before = "", after = ""] = template.split(marker);
     return { before, after };
   }, [t]);
+
+  const currentTranscriptView = useMemo(
+    () => ({
+      sessionId: activeSessionId,
+      messages,
+      isRunning,
+      pendingPermission: activePermission,
+    }),
+    [activePermission, activeSessionId, isRunning, messages],
+  );
+  const deferredSessionId = useDeferredValue(activeSessionId);
+  const previousTranscriptViewRef = useRef(currentTranscriptView);
+  const transcriptView =
+    deferredSessionId === activeSessionId
+      ? currentTranscriptView
+      : previousTranscriptViewRef.current;
+  const sessionSwitching =
+    Boolean(selectingSessionId) || transcriptView.sessionId !== activeSessionId;
+
+  useEffect(() => {
+    if (deferredSessionId === activeSessionId) {
+      previousTranscriptViewRef.current = currentTranscriptView;
+    }
+  }, [activeSessionId, currentTranscriptView, deferredSessionId]);
+
   const hasTranscript =
-    Boolean(activePermission) ||
-    messages.some((message) => {
+    Boolean(transcriptView.pendingPermission) ||
+    transcriptView.messages.some((message) => {
       const hasContent = Boolean((message.content || "").trim());
       const hasThinking =
         typeof message.thinking === "string" && Boolean(message.thinking.trim());
@@ -58,7 +84,15 @@ export const ChatSurface = memo(function ChatSurface() {
     });
 
   return (
-    <div className="chat-surface route-surface">
+    <div
+      className={`chat-surface route-surface${sessionSwitching ? " session-switching" : ""}`}
+      aria-busy={sessionSwitching}
+    >
+      {sessionSwitching ? (
+        <div className="session-switch-progress" aria-hidden>
+          <span />
+        </div>
+      ) : null}
       {!hasTranscript ? (
         <div className="home-main-content" data-testid="home-empty">
           <div className="home-scroll">
@@ -96,10 +130,10 @@ export const ChatSurface = memo(function ChatSurface() {
       ) : (
         <>
           <ChatTranscript
-            sessionId={activeSessionId}
-            messages={messages}
-            isRunning={isRunning}
-            pendingPermission={activePermission}
+            sessionId={transcriptView.sessionId}
+            messages={transcriptView.messages}
+            isRunning={transcriptView.isRunning}
+            pendingPermission={transcriptView.pendingPermission}
           />
           <StableComposer variant="docked" />
         </>

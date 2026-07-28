@@ -226,15 +226,23 @@ Each scenario is documented in this format:
 - **Steps**: 1) Open the project session from its exact-path sidebar group. 2)
   Scroll to an earlier record and confirm the jump-to-latest control appears.
   3) Open the Temporary session and observe its first painted frame. 4) Switch
-  back to the project session, then open Temporary again with reduced motion
-  enabled. 5) Observe chat content and workspace chrome.
+  rapidly project → Temporary → project while the first two transcript reads
+  are delayed, and observe which row responds and which destination commits. 5)
+  Hover/focus Temporary, switch to it again to exercise the warm cache, then
+  repeat with reduced motion enabled. 6) Observe chat content and workspace
+  chrome.
 - **Expected**: The sidebar contains no Recents aggregate; retained projects
   have scoped groups and path-less sessions remain under Temporary; each
   transcript loads correctly; selecting Temporary clears project context and
   inherits no workspace access; both sessions remain persisted. Every session
   activation paints its distinct final record at the transcript bottom without
   first exposing the transcript top, the previous session's scroll position,
-  or a stale jump-to-latest control. Reduced motion preserves the same stable
+  or a stale jump-to-latest control. The latest clicked row responds immediately
+  and its transcript request does not wait for superseded reads; only the final
+  project/session/work-panel tuple commits. During cold/deferred loading the
+  previous complete view is dimmed and non-interactive under a thin busy
+  indicator; a warm revisit reuses the bounded cache and revalidates. Reduced
+  motion renders a static progress track and preserves the same stable
   destination without an animated traversal through history.
 - **Specs linked**: `03-runtime/10-session-state-machine.md`,
   `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,

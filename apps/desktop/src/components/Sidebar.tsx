@@ -146,6 +146,7 @@ export function Sidebar({
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const selectingSessionId = useAppStore((s) => s.selectingSessionId);
   const workspace = useAppStore((s) => s.workspace);
   const openProjects = useAppStore((s) => s.openProjects);
   const openProjectPathsState = useAppStore((s) => s.openProjectPaths);
@@ -161,6 +162,7 @@ export function Sidebar({
   const setPage = useAppStore((s) => s.setPage);
   const settings = useAppStore((s) => s.settings);
   const page = useAppStore((s) => s.page);
+  const prefetchSession = useAppStore((s) => s.prefetchSession);
   const selectSession = useAppStore((s) => s.selectSession);
   const newSession = useAppStore((s) => s.newSession);
   const forkSessionAction = useAppStore((s) => s.forkSession);
@@ -191,6 +193,7 @@ export function Sidebar({
   const profileRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
+  const sessionPrefetchTimerRef = useRef<number | undefined>(undefined);
 
   const showArchived = sessionView.archived;
   const sessionSort = sessionView.sort;
@@ -199,6 +202,7 @@ export function Sidebar({
   const displayProjectSort: Exclude<SessionSort, "manual"> =
     projectSort === "manual" ? "recent" : projectSort;
   const activeProjectPath = normalizeProjectPath(activeProjectPathState ?? workspace?.path);
+  const selectedSessionId = selectingSessionId ?? activeSessionId;
   const openProjectPaths = useMemo(
     () =>
       openProjectPathsState
@@ -352,7 +356,7 @@ export function Sidebar({
         continue;
       }
       const scope = normalizeProjectPath(session.projectPath) ?? "(temporary)";
-      if (session.id === activeSessionId && page === "chat") {
+      if (session.id === selectedSessionId && page === "chat") {
         if (!keptEmptyScopes.has(scope)) cleaned.push(session);
         keptEmptyScopes.add(scope);
         continue;
@@ -364,7 +368,7 @@ export function Sidebar({
     return cleaned;
   }, [
     sessions,
-    activeSessionId,
+    selectedSessionId,
     page,
     showArchived,
     sessionMeta,
@@ -555,21 +559,38 @@ export function Sidebar({
   };
 
   const selectProjectSession = async (session: SessionSummary): Promise<boolean> => {
-    if (session.projectPath && !(await selectProject(session.projectPath))) return false;
-    await selectSession(session.id);
-    focusComposer();
-    return true;
+    try {
+      await selectSession(session.id);
+      focusComposer();
+      return true;
+    } catch (error) {
+      reportError(error);
+      return false;
+    }
   };
 
   const selectTemporarySession = async (sessionId: string) => {
     try {
-      if (workspace) await clearProject();
       await selectSession(sessionId);
       focusComposer();
     } catch (error) {
       reportError(error);
     }
   };
+
+  const scheduleSessionPrefetch = (sessionId: string) => {
+    window.clearTimeout(sessionPrefetchTimerRef.current);
+    sessionPrefetchTimerRef.current = window.setTimeout(() => {
+      void prefetchSession(sessionId).catch(() => undefined);
+    }, 120);
+  };
+
+  const cancelSessionPrefetch = () => {
+    window.clearTimeout(sessionPrefetchTimerRef.current);
+    sessionPrefetchTimerRef.current = undefined;
+  };
+
+  useEffect(() => cancelSessionPrefetch, []);
 
   const setCollapsed = (path: string, value: boolean) => {
     const normalized = normalizeProjectPath(path) || path;
@@ -763,7 +784,7 @@ export function Sidebar({
     options?: { temporary?: boolean; projectPath?: string },
   ) => items.map((session) => {
     const meta = sessionMeta[session.id] ?? {};
-    const active = page === "chat" && activeSessionId === session.id;
+    const active = page === "chat" && selectedSessionId === session.id;
     const archived = sessionArchived(session, meta);
     const running = Boolean(runningSessions[session.id]);
     const hasPendingPermission = Boolean(pendingPermissions[session.id]);
@@ -793,7 +814,15 @@ export function Sidebar({
         <button
           type="button"
           className="thread-item-main"
-          onClick={() => void (options?.temporary ? selectTemporarySession(session.id) : selectProjectSession(session))}
+          onPointerEnter={() => scheduleSessionPrefetch(session.id)}
+          onPointerLeave={cancelSessionPrefetch}
+          onFocus={() => void prefetchSession(session.id).catch(() => undefined)}
+          onClick={() => {
+            cancelSessionPrefetch();
+            void (options?.temporary
+              ? selectTemporarySession(session.id)
+              : selectProjectSession(session));
+          }}
           title={taskTitle(session.title)}
           aria-current={active ? "page" : undefined}
         >
