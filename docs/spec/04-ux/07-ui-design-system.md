@@ -694,16 +694,19 @@ Codex parity decisions (D034/D070) supersede any older value here.
 | Composer shell minimum | ~80px | One-line draft + toolbar padding |
 | Composer draft height | 1–7 text lines | Auto-grow; internal scroll beyond line 7 |
 | Chat message max width | 720px assistant / 560px user plate | Prevent eye-span over-stretch; user turns stay compact |
-| Window min width | 960px | Enforced by Electron |
-| Window min height | 640px | Enforced by Electron |
+| Window min width | 1040px | Enforced by Electron; fits all three column minima |
+| Window min height | 700px | Enforced by Electron |
 
 ### 10.1 Responsive collapse
 
-- Work-panel width re-clamps whenever the native window or visible sidebar
-  width changes.
-- At the supported 960px minimum with the expanded sidebar, the 364px panel
-  minimum and 360px Main pane reserve both remain satisfiable.
-- Width < 960px or height < 640px is unsupported and prevented by Electron.
+- Work-panel effective width re-clamps whenever the native window or visible
+  sidebar width changes. This temporary clamp does not overwrite the persisted
+  preferred width; widening the shell restores that preference.
+- At the supported 1040px minimum, the expanded sidebar, 364px panel floor,
+  and 360px Main pane reserve remain satisfiable.
+- Native window edges resize the shell only. The work-panel divider resizes the
+  internal columns only, and panel open/collapse never moves an outer edge.
+- Width < 1040px or height < 700px is unsupported and prevented by Electron.
 
 ## 11. Component foundations
 

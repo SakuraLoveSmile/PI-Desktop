@@ -572,6 +572,9 @@ window/control({ action: WindowControlAction })
 Maximize/unmaximize changes also emit
 `window/event/maximized`. Unknown actions fail. These Electron-only channels
 do not cross into host-core and do not change the host RPC protocol version.
+The preload intentionally exposes no arbitrary BrowserWindow resize channel:
+native window edges own outer bounds, while the renderer-local work-panel
+divider owns only the internal column width (ADR 0029).
 
 ## 13c. Composer input APIs (D123/D124, ADR 0024)
 

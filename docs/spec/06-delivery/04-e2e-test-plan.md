@@ -414,7 +414,7 @@ Each scenario is documented in this format:
 #### E2E-043: Settings content follows window width
 
 - **Preconditions**: App running windowed on macOS with Settings open.
-- **Steps**: 1) Open Basics at the default window width and record the content-card width. 2) Expand the window to 1600px wide. 3) Open Model configuration, Import, and Project archive. 4) Shrink the window to the supported 960px minimum.
+- **Steps**: 1) Open Basics at the default window width and record the content-card width. 2) Expand the window to 1600px wide. 3) Open Model configuration, Import, and Project archive. 4) Shrink the window to the supported 1040px minimum.
 - **Expected**: The right-side content cards expand and contract with the available pane at every tested width; the 275px rail and pane gutters remain stable; controls remain visible without clipping or horizontal page scrolling.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`
 - **Acceptance**: Quality (key operations feel polished)
@@ -686,8 +686,8 @@ Each scenario is documented in this format:
 #### E2E-033: Window bounds persist across restart
 
 - **Preconditions**: App running with default window size.
-- **Steps**: 1) Resize/move the window to a distinct valid size (≥960×640). 2) Quit. 3) Relaunch.
-- **Expected**: Window restores at the saved bounds; invalid/tiny saved bounds fall back to the 1200×800 default.
+- **Steps**: 1) Resize/move the window to distinct normal bounds A (≥1040×700), maximize before the 600ms save debounce ends, quit, and relaunch. 2) Restore, resize/move to distinct bounds B, quit before the debounce ends, and relaunch again.
+- **Expected**: Each relaunch restores the latest normal bounds (A, then B), including when quit occurs while maximized or with a pending save. Maximized/fullscreen geometry is never stored as normal bounds; invalid/tiny saved bounds fall back to the 1200×800 default.
 - **Specs linked**: `04-ux/09-interaction-patterns.md`
 - **Acceptance**: Quality (key operations feel polished)
 - **Milestone**: M5
@@ -966,13 +966,14 @@ Each scenario is documented in this format:
   tabs and a Browser resource; switch to session B, create a different tab set,
   then switch repeatedly between A and B and select a project without an active
   conversation. 7) Drag the left-edge handle below 364px and beyond every upper
-  bound at 960px, 1200px, and 1600px window widths; focus it and exercise
-  Arrow/Shift+Arrow/Home/End. 8) With the panel open, drag the native right
-  window edge outward and inward through the panel limits, then drag the left
-  edge; collapse the panel and repeat the right-edge drag. 9) On Windows,
-  record the native window bounds before opening a file artifact, collapsing
-  the panel, and closing its final tab; inspect each transition frame.
-  10) Relaunch.
+  bound at 1040px, 1200px, and 1600px window widths; verify pointer-down does not
+  jump the divider, cancel one gesture with Escape, then focus the handle and
+  exercise Arrow/Shift+Arrow/Home/End. 8) Record the committed panel width,
+  shrink the native window from its left and right edges until the effective
+  panel width clamps, then widen it again. 9) On each platform, record native
+  bounds before opening a file artifact, dragging the divider with Browser
+  active, collapsing the panel, and closing its final tab; inspect every
+  transition frame. 10) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one resource; file resources
@@ -990,26 +991,30 @@ Each scenario is documented in this format:
   tabs but hides the panel until another artifact reopens it. Width clamps to
   `364px–min(720px, 60vw, viewport − visible sidebar − 360px)`, exposes its
   current/minimum/maximum width to assistive technology, supports the documented
-  keyboard steps, re-clamps on window resize, and never squeezes MainChat below
-  360px in the supported shell. Native right-edge drag changes the open work
-  panel first and changes MainChat only after a panel bound is reached;
-  left-edge drag changes the shell without resizing the right panel. With the
-  panel closed, right-edge drag
-  changes MainChat directly, and programmatic open/collapse growth is never
-  double-counted as panel width.
+  keyboard steps, and keeps MainChat's 360px reserve whenever both column
+  minima fit. Pointer-down preserves the starting width, movement follows the
+  pointer continuously, and release commits once only when the effective width
+  changed. A zero-movement release, Escape, or cancellation preserves the prior
+  preferred width. Browser preview does not intercept an active divider drag.
+  Native left/right edge drag changes only the shell: narrowing may temporarily
+  clamp the effective panel width, widening restores the committed preference,
+  and neither direction rewrites that preference.
   A and B independently restore their runtime open state, ordered tabs, active
   tab, and Browser resource; selecting a project without an active conversation
   hides the panel, and no relative resource crosses session/workspace context.
   Only `{width}` is restored after relaunch; every session's open state, tabs,
-  active tab, and Browser resource reset, and temporary panel expansion does
-  not enlarge the restored base window. On Windows, the native bounds stay
-  unchanged throughout open, collapse, and final-tab close transitions, with no
-  intermediate compressed or expanded frame. The former context-panel overlay
-  no longer exists.
-- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`
+  active tab, and Browser resource reset. Temporary responsive clamping is not
+  persisted. On every platform, native bounds stay unchanged throughout panel
+  open, divider drag, collapse, and final-tab close transitions, with no second
+  resize or position drift. The normal native window bounds persist separately.
+  The former context-panel overlay no longer exists.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`, `04-ux/01-ui-ia.md`,
+  `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`, ADR 0029
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`work-panel.test.mjs` source invariants); full UI scenario Draft
+- **Status**: Unit-covered (`work-panel-resize.test.mjs`,
+  `work-panel.test.mjs`); full UI scenario Draft
 
 #### E2E-057: Review tab reflects the git working tree
 
@@ -2030,8 +2035,8 @@ This test plan spec is accepted when:
 
 
 ### US-UI-19 Permanent Stage Manager bounds restore
-- On macOS with Stage Manager, shrink or unfocus the PI window until width < 960 or height < 640.
-- Expect the shell to re-assert a Codex-like footprint (~1200×800, min 960×640) and keep restoring while still collapsed (not only during the first 20s after launch).
+- On macOS with Stage Manager, shrink or unfocus the PI window until width < 1040 or height < 700.
+- Expect the shell to re-assert a Codex-like footprint (~1200×800, min 1040×700) and keep restoring while still collapsed (not only during the first 20s after launch).
 
 ### US-UI-20 Dark floating composer box
 - Switch to dark theme on chat home.
@@ -2245,7 +2250,7 @@ This test plan spec is accepted when:
 - Expect the working theme selector without inert toggle or open-target rows.
 - Expect Permissions + Basics + Appearance elevated cards; Agent,
   Import, and Info remain the only other destinations.
-- Resize between 960px, 1200px, and 1600px widths; the content cards fill the
+- Resize between 1040px, 1200px, and 1600px widths; the content cards fill the
   available right pane at each size without changing the rail or introducing
   horizontal scrolling.
 

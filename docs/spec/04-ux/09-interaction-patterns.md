@@ -239,14 +239,9 @@ may be retained while exactly one workspace supplies the visible shell context.
   neighbor, then the left; closing the final tab hides the panel. The separate
   panel collapse control in the session pane top-right hides the panel without
   deleting tabs.
-- On Windows, opening or hiding the panel keeps the native window bounds
-  unchanged. The docked renderer layout updates in one pass, avoiding the
-  intermediate frameless-window repaint caused by a later native resize.
-- Native right-window-edge drag follows outermost-column ownership: an open
-  work panel absorbs horizontal delta until its 364px/dynamic maximum bounds,
-  then MainChat receives the remainder; without the panel, MainChat resizes
-  directly. Left-edge window drag continues to resize the shell/MainChat, and
-  programmatic panel window growth is never counted as user edge drag.
+- On every platform, opening, hiding, or internally resizing the panel keeps
+  native window bounds unchanged. Native window-edge drag resizes only the
+  shell and does not rewrite the panel's preferred width (D156, ADR 0029).
 - A successful workspace Write/Edit creates or activates Review in its
   originating session. Failed and scratch writes do not. Background-session
   artifacts update only their retained context and never open, activate, resize,
@@ -270,8 +265,10 @@ may be retained while exactly one workspace supplies the visible shell context.
   conversation hides the panel. Session/workspace identity remains attached to
   every relative resource, preventing cross-context reinterpretation.
 - Relaunch discards every session context, including Browser resources; only
-  panel width persists. Window-state persistence records the base shell width
-  without any temporary panel expansion.
+  the committed preferred panel width persists. Native window state is stored
+  independently from normal bounds, including when the app closes while
+  maximized or before a pending bounds-save debounce completes. Temporary
+  responsive panel clamping is not persisted.
 
 ### 1.9 Application updates (D120)
 
@@ -504,11 +501,18 @@ Agent calls high-risk tool
 
 Work-panel width resizing is implemented in MVP:
 
-- The left-edge separator follows the pointer during the drag.
+- The 10px left-edge separator anchors to the press position and starting
+  width, then follows pointer delta without jumping.
 - The width clamps to
   `364px–min(720px, 60vw, viewport − visible sidebar − 360px)`.
-- Pointer release persists the committed width; window resize re-clamps it.
-- The MainChat surface never shrinks below 360px in the supported shell.
+- Pointer movement is frame-coalesced. Pointer release persists one committed
+  preferred width; Escape, pointer cancellation, and lost capture roll back.
+- Native window or sidebar resize changes only the effective clamp. When room
+  returns, the persisted preferred width is restored.
+- Panel open, collapse, close, and divider resize never modify native window
+  bounds. Native window-edge resize never modifies the panel preference.
+- The MainChat surface keeps its 360px reserve throughout supported window
+  geometry.
 
 The following gestures remain reserved for future milestones:
 
@@ -677,3 +681,6 @@ This does not prevent state changes — it makes them instant.
 20. Streamed message updates stay within the chat render boundary; shell
     navigation, composer, completed rows, and work-panel content do not rerender
     solely because the current assistant message appended content
+21. Native window-edge resize and work-panel divider resize remain independent;
+    divider cancellation rolls back, and responsive clamping does not replace
+    the persisted panel preference

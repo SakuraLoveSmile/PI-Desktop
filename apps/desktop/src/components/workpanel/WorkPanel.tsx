@@ -8,7 +8,6 @@ import {
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../stores/app-store";
 import type { WorkPanelTab } from "../../stores/app-store";
-import { api } from "../../lib/api";
 import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { cx } from "../ui";
 import {
@@ -27,11 +26,10 @@ import { FilesTab } from "./FilesTab";
 import {
   WORK_PANEL_DEFAULT_WIDTH,
   clampWorkPanelWidth,
-  rightWindowEdgeDelta,
-  userRightEdgeDelta,
+  committedWorkPanelWidth,
+  workPanelWidthFromPointer,
   workPanelWidthLimits,
-  workPanelWindowResizeAttributor,
-  type WindowHorizontalGeometry,
+  type WorkPanelWidthContext,
 } from "../../lib/work-panel-resize";
 
 const TAB_ICONS = {
@@ -86,19 +84,18 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
   const terminalOpen = tabs.some((tab) => tab.kind === "terminal");
 
-  // Live width during a drag stays local; the store (and localStorage)
-  // only sees the committed value on pointer-up.
   const [dragWidth, setDragWidth] = useState<number | null>(null);
-  const dragState = useRef<{ pointerId: number; width: number } | null>(null);
+  const dragState = useRef<{
+    pointerId: number;
+    startClientX: number;
+    startWidth: number;
+    width: number;
+    frame: number;
+    context: WorkPanelWidthContext;
+  } | null>(null);
   const switcherRef = useRef<HTMLDivElement | null>(null);
   const switcherButtonRef = useRef<HTMLButtonElement | null>(null);
   const switcherFirstItemRef = useRef<HTMLButtonElement | null>(null);
-  const resizeCommitTimer = useRef(0);
-  const skipWindowResizeUntil = useRef(0);
-  const viewportGeometry = useRef<WindowHorizontalGeometry>({
-    x: window.screenX,
-    width: window.innerWidth,
-  });
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
   useEffect(() => {
@@ -156,102 +153,100 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
     items[next]?.focus();
   };
 
-  const onResizeStart = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      const nextWidth = clampWidth(window.innerWidth - e.clientX);
-      dragState.current = { pointerId: e.pointerId, width: nextWidth };
-      e.currentTarget.setPointerCapture(e.pointerId);
-      setDragWidth(nextWidth);
-    },
-    [],
-  );
-
-  const onResizeMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (dragState.current?.pointerId !== e.pointerId) return;
-    const nextWidth = clampWidth(window.innerWidth - e.clientX);
-    dragState.current.width = nextWidth;
-    setDragWidth(nextWidth);
-  }, []);
-
-  const onResizeEnd = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (dragState.current?.pointerId !== e.pointerId) return;
-      const nextWidth = dragState.current.width;
+  const finishResize = useCallback(
+    (target: HTMLDivElement, pointerId: number, commit: boolean) => {
+      const drag = dragState.current;
+      if (drag?.pointerId !== pointerId) return;
       dragState.current = null;
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId);
+      if (drag.frame) cancelAnimationFrame(drag.frame);
+      document.documentElement.removeAttribute("data-work-panel-resizing");
+      if (target.hasPointerCapture(pointerId)) {
+        target.releasePointerCapture(pointerId);
       }
-      setWidth(nextWidth);
+      const committedWidth = committedWorkPanelWidth(drag, drag.width, commit);
+      if (committedWidth !== null) setWidth(committedWidth);
       setDragWidth(null);
     },
     [setWidth],
   );
 
+  const onResizeStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.currentTarget.focus({ preventScroll: true });
+      const startWidth = clampWidth(width);
+      dragState.current = {
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startWidth,
+        width: startWidth,
+        frame: 0,
+        context: workPanelWidthContext(),
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+      document.documentElement.setAttribute("data-work-panel-resizing", "true");
+      setDragWidth(startWidth);
+    },
+    [width],
+  );
+
+  const onResizeMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragState.current;
+    if (drag?.pointerId !== e.pointerId) return;
+    drag.width = workPanelWidthFromPointer(
+      drag,
+      e.clientX,
+      drag.context,
+    );
+    if (drag.frame) return;
+    drag.frame = requestAnimationFrame(() => {
+      if (dragState.current !== drag) return;
+      drag.frame = 0;
+      setDragWidth(drag.width);
+    });
+  }, []);
+
+  const onResizeCommit = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      finishResize(e.currentTarget, e.pointerId, true);
+    },
+    [finishResize],
+  );
+
+  const onResizeCancel = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      finishResize(e.currentTarget, e.pointerId, false);
+    },
+    [finishResize],
+  );
+
+  useEffect(
+    () => () => {
+      const drag = dragState.current;
+      if (drag?.frame) cancelAnimationFrame(drag.frame);
+      document.documentElement.removeAttribute("data-work-panel-resizing");
+    },
+    [],
+  );
+
   const [, bumpViewport] = useState(0);
   const renderWidth = clampWidth(dragWidth ?? width);
-  const renderWidthRef = useRef(renderWidth);
-  renderWidthRef.current = renderWidth;
   const widthLimits = workPanelWidthLimits(workPanelWidthContext());
 
-  // Native right-edge resizing belongs to the outermost visible column. The
-  // work panel absorbs that delta first; opening/collapse and divider commits
-  // are attributed separately so their programmatic resize is not counted twice.
   useEffect(() => {
-    const offMaximized = api.onWindowMaximized(() => {
-      skipWindowResizeUntil.current = Date.now() + 300;
-    });
-    const offFullScreen = api.onWindowFullScreen(() => {
-      skipWindowResizeUntil.current = Date.now() + 300;
-    });
-    const persistWidthSoon = () => {
-      window.clearTimeout(resizeCommitTimer.current);
-      resizeCommitTimer.current = window.setTimeout(() => {
-        setWidth(useAppStore.getState().workPanelWidth, {
-          resizeWindow: false,
-        });
-      }, 160);
-    };
-    const onWindowResize = () => {
-      const previous = viewportGeometry.current;
-      const next = { x: window.screenX, width: window.innerWidth };
-      viewportGeometry.current = next;
-      if (Date.now() <= skipWindowResizeUntil.current) {
-        bumpViewport((value) => value + 1);
-        return;
-      }
-      const viewportDelta = next.width - previous.width;
-      const unattributedDelta =
-        workPanelWindowResizeAttributor.consume(viewportDelta);
-      const outerDelta = userRightEdgeDelta(
-        viewportDelta,
-        rightWindowEdgeDelta(previous, next),
-        unattributedDelta,
-      );
-      if (outerDelta !== 0) {
-        const nextPanelWidth = clampWidth(renderWidthRef.current + outerDelta);
-        if (nextPanelWidth !== renderWidthRef.current) {
-          renderWidthRef.current = nextPanelWidth;
-          setWidth(nextPanelWidth, { resizeWindow: false, persist: false });
-          persistWidthSoon();
-        }
-      }
-      bumpViewport((value) => value + 1);
-    };
+    const onWindowResize = () => bumpViewport((value) => value + 1);
     window.addEventListener("resize", onWindowResize);
-    return () => {
-      window.removeEventListener("resize", onWindowResize);
-      offMaximized();
-      offFullScreen();
-      window.clearTimeout(resizeCommitTimer.current);
-      setWidth(useAppStore.getState().workPanelWidth, {
-        resizeWindow: false,
-      });
-    };
-  }, [setWidth]);
+    return () => window.removeEventListener("resize", onWindowResize);
+  }, []);
   const onResizeKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const drag = dragState.current;
+      if (event.key === "Escape" && drag) {
+        event.preventDefault();
+        finishResize(event.currentTarget, drag.pointerId, false);
+        return;
+      }
       const step = event.shiftKey ? 32 : 16;
       let nextWidth: number | null = null;
       if (event.key === "ArrowLeft") nextWidth = renderWidth + step;
@@ -262,7 +257,7 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
       event.preventDefault();
       setWidth(clampWidth(nextWidth));
     },
-    [renderWidth, setWidth, widthLimits.max, widthLimits.min],
+    [finishResize, renderWidth, setWidth, widthLimits.max, widthLimits.min],
   );
   const activeLabel = activeTab ? tabLabel(activeTab, t) : t("panel.title");
   const ActiveIcon = activeTab ? TAB_ICONS[activeTab.kind] : IconDiff;
@@ -272,6 +267,7 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
       className="work-panel"
       style={{ width: renderWidth }}
       data-testid="work-panel"
+      data-resizing={dragWidth === null ? undefined : "true"}
     >
       <div
         className="work-panel-resize no-drag"
@@ -284,9 +280,9 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
         tabIndex={0}
         onPointerDown={onResizeStart}
         onPointerMove={onResizeMove}
-        onPointerUp={onResizeEnd}
-        onPointerCancel={onResizeEnd}
-        onLostPointerCapture={onResizeEnd}
+        onPointerUp={onResizeCommit}
+        onPointerCancel={onResizeCancel}
+        onLostPointerCapture={onResizeCancel}
         onKeyDown={onResizeKeyDown}
         onDoubleClick={() => setWidth(clampWidth(WORK_PANEL_DEFAULT_WIDTH))}
       />
@@ -461,7 +457,7 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
               aria-labelledby={`work-panel-title-${activeTab.id}`}
             >
               <BrowserTab
-                blocked={browserBlocked || switcherOpen}
+                blocked={browserBlocked || switcherOpen || dragWidth !== null}
                 sessionId={activeSessionId}
                 initialUrl={activeTab.resource}
               />

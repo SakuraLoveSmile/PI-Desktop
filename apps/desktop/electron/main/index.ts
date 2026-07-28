@@ -7,13 +7,12 @@ import {
   nativeImage,
   nativeTheme,
   Notification as SystemNotification,
-  screen,
   shell,
 } from "electron";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import {
   APP_ID,
   APP_NAME,
@@ -72,6 +71,9 @@ if (process.platform === "win32") {
   app.setAppUserModelId(APP_ID);
 }
 
+const WINDOW_MIN_WIDTH = 1040;
+const WINDOW_MIN_HEIGHT = 700;
+
 let mainWindow: BrowserWindow | null = null;
 let windowCreationPromise: Promise<void> | null = null;
 let applicationBooted = false;
@@ -85,7 +87,6 @@ type MenuRendererReadyGate = {
   resolve: () => void;
 };
 let menuRendererReadyGate: MenuRendererReadyGate | null = null;
-let panelWindowWidthOffset = 0;
 let host: HostProcess | null = null;
 let sidecar: AgentSidecar | null = null;
 let quitting = false;
@@ -545,7 +546,7 @@ async function readWindowState(): Promise<WindowState | null> {
       height: Number(raw.height),
     };
     if (![s.x, s.y, s.width, s.height].every(Number.isFinite)) return null;
-    if (s.width < 1040 || s.height < 700) return null;
+    if (s.width < WINDOW_MIN_WIDTH || s.height < WINDOW_MIN_HEIGHT) return null;
     return s;
   } catch {
     return null;
@@ -553,27 +554,21 @@ async function readWindowState(): Promise<WindowState | null> {
 }
 
 function writeWindowState(state: WindowState) {
-  void (async () => {
-    const { writeFile } = await import("node:fs/promises");
-    try {
-      mkdirSync(dataDir, { recursive: true });
-      await writeFile(windowStatePath(), JSON.stringify(state), "utf8");
-    } catch {
-      // best-effort persistence
-    }
-  })();
+  try {
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(windowStatePath(), JSON.stringify(state), "utf8");
+  } catch {
+    // best-effort persistence
+  }
 }
 
 async function createWindow() {
-  panelWindowWidthOffset = 0;
   notificationViewingSessionId = null;
   const savedState = await readWindowState();
   mainWindow = new BrowserWindow({
     ...(savedState ?? { width: 1200, height: 800 }),
-    // Fits the full three-column layout at comfortable widths without
-    // squishing: sidebar (240) + chat (≥400) + work panel (default 420).
-    minWidth: 1040,
-    minHeight: 700,
+    minWidth: WINDOW_MIN_WIDTH,
+    minHeight: WINDOW_MIN_HEIGHT,
     title: APP_NAME,
     backgroundColor: nativeTheme.shouldUseDarkColors ? "#181818" : "#ffffff",
     show: false,
@@ -738,7 +733,7 @@ async function createWindow() {
     boundsGuard = true;
     try {
       if (window.isMinimized()) window.restore();
-      window.setMinimumSize(1040, 700);
+      window.setMinimumSize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT);
       // Prefer normal layer so CG helpers and Stage Manager stay stable.
       window.setAlwaysOnTop(false);
       window.show();
@@ -789,23 +784,29 @@ async function createWindow() {
 
   // Persist last good user bounds so relaunch restores them.
   let saveTimer: NodeJS.Timeout | null = null;
+  const persistNormalWindowState = () => {
+    if (!isLiveWindow() || boundsGuard) return;
+    const bounds = window.getNormalBounds();
+    if (bounds.width >= WINDOW_MIN_WIDTH && bounds.height >= WINDOW_MIN_HEIGHT) {
+      writeWindowState(bounds);
+    }
+  };
   const scheduleStateSave = () => {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      if (!isLiveWindow() || boundsGuard) return;
-      if (window.isMinimized() || window.isFullScreen()) return;
-      const bounds = window.getBounds();
-      const persistedBounds = {
-        ...bounds,
-        width: bounds.width - panelWindowWidthOffset,
-      };
-      if (persistedBounds.width >= 1040 && persistedBounds.height >= 700) {
-        writeWindowState(persistedBounds);
-      }
+      saveTimer = null;
+      persistNormalWindowState();
     }, 600);
   };
   window.on("resize", scheduleStateSave);
   window.on("move", scheduleStateSave);
+  window.on("close", () => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    persistNormalWindowState();
+  });
 
   const boundsWatchdog = setInterval(() => {
     if (!isLiveWindow()) {
@@ -1207,7 +1208,7 @@ async function createWindow() {
               `);
             } finally {
               mainWindow!.setSize(CODEX_BOUNDS.width, CODEX_BOUNDS.height, false);
-              mainWindow!.setMinimumSize(1040, 700);
+              mainWindow!.setMinimumSize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT);
               captureViewportOverride = false;
             }
             await new Promise((r) => setTimeout(r, 300));
@@ -2814,41 +2815,6 @@ function registerIpc() {
     }
     return { commands: [...merged.values()] };
   });
-
-  // Grow/shrink the window horizontally, keeping the left edge anchored so
-  // the chat column keeps its width when the work panel opens. Returns the
-  // delta actually applied (0 when maximized/fullscreen or out of room).
-  handle(
-    IPC.invoke.windowResizeBy,
-    async (input: { deltaWidth?: number } = {}) => {
-      const delta = Math.trunc(Number(input.deltaWidth ?? 0));
-      if (
-        !mainWindow ||
-        mainWindow.isDestroyed() ||
-        !Number.isFinite(delta) ||
-        delta === 0 ||
-        mainWindow.isFullScreen() ||
-        mainWindow.isMaximized()
-      ) {
-        return { applied: 0 };
-      }
-      const bounds = mainWindow.getBounds();
-      const workArea = screen.getDisplayMatching(bounds).workArea;
-      const [minWidth] = mainWindow.getMinimumSize();
-      let width = Math.max(minWidth || 1040, bounds.width + delta);
-      let x = bounds.x;
-      const workRight = workArea.x + workArea.width;
-      if (x + width > workRight) {
-        x = Math.max(workArea.x, workRight - width);
-        width = Math.min(width, workRight - x);
-      }
-      mainWindow.setBounds({ x, y: bounds.y, width, height: bounds.height }, false);
-      const applied = width - bounds.width;
-      panelWindowWidthOffset = Math.max(0, panelWindowWidthOffset + applied);
-      return { applied };
-    },
-  );
-
 
   // Custom window-chrome buttons on Windows/Linux (renderer-drawn).
   handle(

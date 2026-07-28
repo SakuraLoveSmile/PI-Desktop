@@ -6610,11 +6610,9 @@ html {
 @keyframes work-panel-in {
   from {
     opacity: 0;
-    transform: translateX(8px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -6635,22 +6633,42 @@ html {
 .work-panel-resize {
   position: absolute;
   inset-block: 0;
-  left: -3px;
-  width: 6px;
+  left: -5px;
+  width: 10px;
   z-index: 30;
   cursor: col-resize;
-  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+  touch-action: none;
 }
 
-.work-panel-resize:hover,
-.work-panel-resize:active,
-.work-panel-resize:focus-visible {
-  background: color-mix(in oklab, var(--ds-accent) 28%, transparent);
+.work-panel-resize::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 50%;
+  width: 1px;
+  background: transparent;
+  transform: translateX(-50%);
+  transition:
+    width var(--motion-duration-fast) var(--motion-ease-out),
+    background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.work-panel-resize:hover::after,
+.work-panel-resize:active::after,
+.work-panel-resize:focus-visible::after,
+.work-panel[data-resizing="true"] .work-panel-resize::after {
+  width: 2px;
+  background: var(--ds-focus);
 }
 
 .work-panel-resize:focus-visible {
-  outline: 1px solid var(--ds-focus);
-  outline-offset: -1px;
+  outline: none;
+}
+
+:root[data-work-panel-resizing="true"],
+:root[data-work-panel-resizing="true"] * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .work-panel-header {

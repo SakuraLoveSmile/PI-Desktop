@@ -328,8 +328,6 @@ export const api = {
   fsIndex: () => invoke<FsIndexResult>(IPC.invoke.fsIndex),
   composerCommands: () =>
     invoke<{ commands: ComposerCommand[] }>(IPC.invoke.composerCommands),
-  windowResizeBy: (deltaWidth: number) =>
-    invoke<{ applied: number }>(IPC.invoke.windowResizeBy, { deltaWidth }),
   windowControl: (action: WindowControlAction) =>
     invoke<{ maximized: boolean }>(IPC.invoke.windowControl, { action }),
   menuRendererReady: () =>
