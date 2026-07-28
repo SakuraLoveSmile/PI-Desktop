@@ -38,7 +38,9 @@
 | **Integration** | IPC contract, host↔renderer, host↔sidecar | Moderate | Vitest + IPC mocks or live Electron |
 | **E2E** | Full user journey through the desktop app | ~84 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
 
-**Strategy**: document all E2E scenarios now; write unit/integration tests alongside code; automate E2E after M5.
+**Strategy**: document all E2E scenarios now; add or update unit/integration
+tests alongside code when change risk makes them necessary; automate E2E after
+M5.
 
 ---
 
@@ -1799,18 +1801,27 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Long transcript that overflows one viewport; provider configured.
 - **Steps**:
-  1. Scroll up so earlier messages are visible and the jump-to-latest control appears.
+  1. Start at the pinned bottom and use a trackpad to scroll upward with a
+     small initial movement; observe the first movement and the
+     jump-to-latest control.
   2. Type a new prompt in the composer and send it.
   3. Observe transcript position while the turn starts and streams.
-  4. Optionally scroll up again mid-stream, then click jump-to-latest.
+  4. Scroll upward again with a small trackpad movement while streaming, wait
+     for more content, then click jump-to-latest.
 - **Expected**:
+  - The first upward movement immediately releases follow mode and remains
+    stable; it does not snap back, reverse direction, or oscillate while a
+    pending stream or resize follow frame completes.
+  - New streamed content does not move the manually positioned viewport, and
+    jump-to-latest appears as soon as follow mode is released.
   - On send, the transcript re-pins, hides jump-to-latest, and jumps to the bottom so the new user message (and following stream) is visible.
   - Streaming continues to follow while pinned.
   - Manual scroll mid-stream pauses follow and shows jump-to-latest again; clicking it resumes follow.
 - **Specs linked**: `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`
 - **Acceptance**: C (chat stream), Quality / D151
 - **Milestone**: M5
-- **Status**: Draft
+- **Status**: Partially automated (`apps/desktop/test/transcript-scroll.test.mjs`);
+  full trackpad interaction remains Draft
 
 #### E2E-082: New reasoning session defaults to maximum thinking
 

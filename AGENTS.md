@@ -33,8 +33,9 @@ Every new request must start in a dedicated worktree on a dedicated branch
 created from an up-to-date `main`. Reuse the primary checkout's development
 environment where safe; do not duplicate or commit local environment state.
 After development, push the branch, open a PR/MR targeting `main`, pass the
-required checks, and merge it. Direct development or pushes on `main` are not
-allowed.
+required remote checks, and merge it. Local validation is risk-based and may be
+skipped when it is not necessary. Direct development or pushes on `main` are
+not allowed.
 
 → [03-ai-development-workflow.md §R4](docs/spec/06-delivery/03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate)
 
@@ -42,23 +43,25 @@ allowed.
 
 1. Sync `main` and create a request branch in a dedicated worktree
 2. Read baseline + relevant specs
-3. Plan change + list impacted specs/tests
+3. Plan change + list impacted specs and necessary validation
 4. Implement
 5. Update specs / ADR / decisions-log
-6. Update or add e2e scenarios
-7. Run non-E2E checks (lint, typecheck, unit/integration tests, build); run E2E
+6. Update or add e2e scenarios when Rule 3 applies
+7. Run only the targeted local checks justified by the change's risk; when no
+   local validation is necessary, skip it and continue to delivery. Run E2E
    only when the user explicitly requests it
 8. Commit with conventional message
 9. Update BOARD if milestone-related
 10. Push the branch and open a PR/MR to `main`
-11. Pass required checks, merge, and remove the request worktree and branch
+11. Pass required remote checks, merge, and remove the request worktree and branch
 
 → [03-ai-development-workflow.md §2](docs/spec/06-delivery/03-ai-development-workflow.md#2-development-loop)
 
 E2E scenario documentation remains mandatory under Rule 3. Agents must not
 proactively run local E2E commands or manually dispatch/rerun remote E2E jobs
 unless the user explicitly requests E2E validation. Automatically triggered
-required remote checks remain part of the merge gate.
+required remote checks remain part of the merge gate. Skipping unnecessary
+local validation does not block commit, push, or PR/MR creation.
 
 ## Commit Format
 
@@ -81,10 +84,11 @@ Run the [change checklist](docs/spec/06-delivery/05-change-checklist.md):
 - [ ] Task environment reuses the primary checkout where safe
 - [ ] Specs updated per matrix
 - [ ] E2E doc updated if behavior changed
+- [ ] Necessary local validation completed, or confirmed unnecessary
 - [ ] No secrets / local data in diff
 - [ ] Conventional commit message
 - [ ] All Definition-of-Done gates pass
-- [ ] PR/MR passed required checks and was merged into `main`
+- [ ] PR/MR passed required remote checks and was merged into `main`
 
 ## Key References
 
