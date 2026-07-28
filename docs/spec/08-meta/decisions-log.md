@@ -258,6 +258,7 @@ section mirrors only marketplace/catalog items still blocking nothing.
 | D150 | Composer runtime chip descenders | **Composer toolbar chips (Chat/Agent, Thinking, permission mode, model ID) keep labels fully inked inside the 28px capsule: chip and label line-height is `--leading-compact`, chips do not clip with `overflow: hidden` on the control, and the model label uses horizontal ellipsis without `leading-none`. Descenders on `g`/`y`/`p`/`q`/`j` must remain visible in light and dark.** | `leading-none` plus truncate overflow crushed glyph descenders on model IDs and labels such as Agent / Accept edits, making the bottom toolbar look cut off. |
 | D151 | Send re-pins transcript follow | **Starting a turn via send, retry, or regenerate always re-pins transcript follow mode, hides the jump-to-latest pill, and scrolls to the bottom before new content arrives. Manual scroll during a turn still pauses follow; the jump control remains the only non-turn way to resume. This refines D071 without restoring forced scroll on every token.** | Users who scroll up to inspect history still expect the next prompt they send to land at the latest exchange; leaving follow paused after send hid the new turn behind the jump pill. |
 | D152 | Direct runtime stream rendering | **Assistant content renders each runtime stream chunk directly through the incremental Markdown block cache. The renderer does not add a requestAnimationFrame typewriter state loop. KaTeX's Vite-inlined fonts remain local-only assets and are admitted by the narrow `font-src 'self' data:` CSP directive.** | The duplicate animation loop could trip React's nested-update guard during sustained streams, while the previous CSP blocked bundled math fonts and produced console errors. |
+| D153 | Reasoning sessions default to maximum thinking | **A newly created session whose inherited default model supports reasoning starts at the highest canonical entry in that model's pi-published `supportedThinkingLevels`. Non-reasoning models and missing capability metadata start at `off`; existing sessions retain their durable choice. This refines D096 without adding a provider override.** | Reasoning-capable models should use their strongest available effort by default while preserving explicit per-session choices and pi-ai's model authority. |
 
 
 ## T. Release delivery decisions
@@ -380,3 +381,11 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Renderer CSP admits only local and Vite-inlined data fonts, allowing bundled
   KaTeX glyphs without opening a remote font origin.
 - Decision D152.
+
+## 2026-07-28 — Reasoning sessions default to maximum thinking
+
+- New sessions inherit the app's default model and select its highest
+  pi-published thinking level when that model supports reasoning.
+- Non-reasoning or unresolved models remain `off`, while existing sessions keep
+  their stored thinking preference.
+- Decision D153.
