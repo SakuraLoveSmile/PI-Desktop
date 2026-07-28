@@ -4144,6 +4144,15 @@ html {
   gap: 6px !important;
   border-radius: var(--radius-full) !important;
   color: var(--ds-text-secondary) !important;
+  /* Keep labels fully inked; tight line-height under overflow clips descenders. */
+  line-height: var(--leading-compact);
+  overflow: visible;
+}
+
+.mode-chip > span,
+.model-chip > span,
+.model-chip-label {
+  line-height: var(--leading-compact);
 }
 
 .mode-chip:hover {
@@ -4356,6 +4365,18 @@ html {
   gap: 4px !important;
   border-radius: var(--radius-full) !important;
   color: var(--ds-text-secondary) !important;
+  line-height: var(--leading-compact);
+  overflow: visible;
+}
+
+/* Horizontal ellipsis only; line-height above preserves glyph descenders. */
+.model-chip-label {
+  display: inline-block;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .model-chip:hover {

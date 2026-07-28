@@ -2329,3 +2329,14 @@ This test plan spec is accepted when:
   `spellCheck={false}`) plus `autocorrect="off"` and `autocapitalize="off"`.
 - Expect no red spelling underlines while typing code-like tokens, paths, model
   ids, or URLs; checkboxes and non-text controls remain unchanged.
+
+### US-UI-71 Composer runtime chip descenders (D150)
+- Open empty home and a docked thread with a model ID that contains descenders
+  (for example `gpt`, `gemini`, or any id with `g`/`y`/`p`/`q`/`j`).
+- Inspect Chat/Agent, Thinking (when present), permission mode (Agent), and the
+  model chip in light and dark.
+- Expect every chip label to show full glyph ink — bottoms of `g`/`y`/`p` are not
+  clipped by the 28px capsule — while long model IDs still ellipsize horizontally.
+- **Specs linked**: `04-ux/07-ui-design-system.md` §8.2, `04-ux/08-component-spec.md` §11.5, decisions-log D150
+- **Milestone**: M5
+- **Status**: Partially automated (renderer source test: chip line-height + no leading-none)

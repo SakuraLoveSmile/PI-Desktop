@@ -612,6 +612,11 @@ The composer renders only controls connected to the active pi session:
   session value before the next turn.
 - Local and branch context are non-interactive status labels; the project name
   remains an action because it opens the project picker.
+- Runtime chip labels (Chat/Agent, Thinking, permission mode, model ID) use
+  `--text-sm` with `--leading-compact` inside the 28px hit target. They must not
+  use `leading-none` with overflow clipping: descenders on glyphs such as
+  `g`/`y`/`p` stay fully visible. Long model IDs still truncate horizontally via
+  ellipsis without crushing the line box (D150).
 
 ## 8.3 Thinking disclosure
 

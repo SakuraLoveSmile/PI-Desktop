@@ -1043,6 +1043,9 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Text correction off (D145): composer textarea sets `spellCheck={false}`,
   `autoCorrect="off"`, and `autoCapitalize="off"` so browser/OS spelling and
   autocorrect never rewrite coding prompts
+- Runtime chips keep descenders fully visible (D150): mode, thinking,
+  permission, and model triggers use compact line-height rather than
+  `leading-none` under overflow; the model trigger still ellipsizes long IDs.
 - Chat / Agent and provider/model changes update the active session, not the
   app default. They are disabled while a turn runs.
 - The model menu lists only enabled, runnable providers with a default model.

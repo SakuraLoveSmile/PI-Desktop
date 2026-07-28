@@ -743,7 +743,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                     useAppStore.getState().setPage("settings");
                   }}
                 >
-                  <span className="max-w-[190px] truncate text-sm leading-none">
+                  <span className="model-chip-label text-sm">
                     {modelLabel}
                   </span>
                   <IconChevronDown size={12} />
