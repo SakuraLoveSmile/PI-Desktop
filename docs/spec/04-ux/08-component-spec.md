@@ -203,20 +203,22 @@ Collapsed (48px):
 
 ### 3.3 Typography
 
-Primary left-rail chrome is one step larger than the historical Codex compact
-sidebar so the navigation no longer reads undersized next to the 14px chat body:
+Primary left-rail chrome stays body-sized so destinations remain readable next
+to the 14px chat body, while project/session list rows step one token quieter
+for denser scanning:
 
 | Surface | Token | Notes |
 |---|---|---|
 | New task / Plugins / nav items | `--text-base` (14px) | Primary actions and destinations |
-| Session / thread titles | `--text-base` (14px) | Matches body readability |
-| Project / group titles, empty copy | `--text-md` (13px) | One step quieter than primary rows |
+| Session / thread titles | `--text-md` (13px) | One step quieter than primary chrome |
+| Project / group titles, empty copy | `--text-sm` (12px) | One step quieter than session rows |
 | Section labels (`SESSIONS`, `PROJECTS`) | `--text-sm` (12px) | Uppercase secondary labels |
 | Footer profile name + profile menu items | `--text-base` (14px) | Identity cluster matches nav body |
 | Footer status / profile menu secondary | `--text-sm` (12px) | Secondary line only |
 
-Do not render primary sidebar content at `--text-xs` / `--text-2xs`. Keep row
-heights (≈28–32px) so density stays WorkBuddy/Codex-like while glyphs scale up.
+Do not render primary sidebar list content at `--text-xs` / `--text-2xs`. Keep
+row heights (≈28–32px) so density stays WorkBuddy/Codex-like while list glyphs
+stay slightly quieter than primary chrome.
 
 ### 3.4 States
 

@@ -287,9 +287,9 @@ All font sizes come from the `--text-*` ramp defined in the `@theme` block of `g
 | `--text-3xs` | 10.5px | Smallest chrome (kbd hints) |
 | `--text-xs` (alias `--text-2xs`) | 11px | Timestamps, badges, tool status |
 | `--text-xs-plus` | 11.5px | Muted metadata, menu subtitles |
-| `--text-sm` | 12px | Secondary labels, tool rows, sidebar section labels |
+| `--text-sm` | 12px | Secondary labels, tool rows, sidebar project/group titles, empty-state copy, section labels |
 | `--text-sm-plus` | 12.5px | Chips, working indicator, code text |
-| `--text-md` | 13px | Project/group labels, empty states, compact chrome |
+| `--text-md` | 13px | Sidebar session titles, compact chrome |
 | `--text-md-plus` | 13.5px | Composer labels, list rows |
 | `--text-base` | 14px | Body text, chat messages, input, primary sidebar chrome |
 | `--text-base-plus` | 15px | Brand, prominent labels |
@@ -304,10 +304,11 @@ Letter-spacing tokens: `--tracking-tighter` −0.03em, `--tracking-tight` −0.0
 
 > Note: 14px base is intentional for developer-density. Do not bump to 16px default.
 >
-> Sidebar primary chrome (nav items, New task, session titles, footer identity,
-> profile menu actions) uses `--text-base` so the left rail matches main body
-> readability. Secondary sidebar labels step down only one token (`--text-md` /
-> `--text-sm`), never into the micro `--text-xs` band for primary content.
+> Sidebar primary chrome (nav items, New task, footer identity, profile menu
+> actions) uses `--text-base` so the left rail matches main body readability.
+> Project/session list content steps down for denser scanning: session titles at
+> `--text-md`, project/group titles and empty-state copy at `--text-sm`. Never
+> use the micro `--text-xs` band for primary list content.
 
 ### 5.3 Code text sizing
 

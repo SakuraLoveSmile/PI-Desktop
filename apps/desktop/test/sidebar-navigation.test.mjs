@@ -128,6 +128,21 @@ test("sidebar shows a bounded standalone session list before retained projects",
   assert.doesNotMatch(sidebarSource, /data-sidebar-project-group="temporary"/);
 });
 
+test("sidebar project and session lists use compact type tokens", () => {
+  assert.match(
+    globalStyles,
+    /\.thread-item-title\s*\{[^}]*font-size:\s*var\(--text-md\);/s,
+  );
+  assert.match(
+    globalStyles,
+    /\.sidebar-session-group-title\s*\{[^}]*font-size:\s*var\(--text-sm\);/s,
+  );
+  assert.match(
+    globalStyles,
+    /\.sidebar-session-empty\s*\{[^}]*font-size:\s*var\(--text-sm\);/s,
+  );
+});
+
 test("sidebar section toolbars open create actions from context menus", () => {
   assert.match(sidebarSource, /data-sidebar-section=\"sessions\"/);
   assert.match(sidebarSource, /data-sidebar-section=\"projects\"/);

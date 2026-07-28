@@ -400,3 +400,12 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - The former horizontally scrolling tabs and hidden header context menu are
   removed; artifact-driven panel opening and session ownership are unchanged.
 - Decision D154.
+
+## 2026-07-28 — Sidebar project/session list type density
+
+- Sidebar project group titles and session/thread titles step one token quieter
+  than the previous body-chrome sizing so dense lists scan more cleanly.
+- Session titles use `--text-md` (13px); project/group titles and empty-state
+  copy use `--text-sm` (12px). Primary chrome (New task, Plugins, footer) stays
+  at `--text-base`.
+- Decision D155.
