@@ -28,6 +28,7 @@ import {
 } from "../lib/chat-links";
 import { summarizeSessionWorkspaceChanges } from "../lib/workspace-review";
 import { toolWorkPanelTab } from "../lib/work-panel-tabs";
+import { reduceTranscriptScroll } from "../lib/transcript-scroll";
 import {
   assistantTurnContent,
   assistantTurnMessages,
@@ -1107,6 +1108,7 @@ export const ChatTranscript = memo(function ChatTranscript({
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
   const wasRunningRef = useRef(isRunning);
   const followFrameRef = useRef(0);
   const [showJump, setShowJump] = useState(false);
@@ -1115,18 +1117,23 @@ export const ChatTranscript = memo(function ChatTranscript({
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior });
+    lastScrollTopRef.current = el.scrollTop;
+  }, []);
+
+  const cancelFollowScroll = useCallback(() => {
+    cancelAnimationFrame(followFrameRef.current);
+    followFrameRef.current = 0;
   }, []);
 
   // A newly activated session must paint at its latest record. Reset any
   // manual-scroll state inherited from the previous session and position the
   // updated DOM during layout so no top-of-transcript frame can flash first.
   useLayoutEffect(() => {
-    cancelAnimationFrame(followFrameRef.current);
-    followFrameRef.current = 0;
+    cancelFollowScroll();
     pinnedRef.current = true;
     setShowJump(false);
     scrollToBottom();
-  }, [sessionId, scrollToBottom]);
+  }, [cancelFollowScroll, sessionId, scrollToBottom]);
 
   const scheduleFollowScroll = useCallback(() => {
     if (!pinnedRef.current || followFrameRef.current !== 0) return;
@@ -1136,20 +1143,25 @@ export const ChatTranscript = memo(function ChatTranscript({
     });
   }, [scrollToBottom]);
 
-  useEffect(
-    () => () => cancelAnimationFrame(followFrameRef.current),
-    [],
-  );
+  useEffect(() => cancelFollowScroll, [cancelFollowScroll]);
 
   // Follow the stream only while the user is pinned to the bottom; a manual
   // scroll up pauses following and surfaces the jump-to-latest pill.
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
-    pinnedRef.current = atBottom;
-    setShowJump(!atBottom);
-  }, []);
+    const transition = reduceTranscriptScroll({
+      previousScrollTop: lastScrollTopRef.current,
+      scrollTop: el.scrollTop,
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+      wasPinned: pinnedRef.current,
+    });
+    lastScrollTopRef.current = el.scrollTop;
+    if (transition.releasedFollow) cancelFollowScroll();
+    pinnedRef.current = transition.pinned;
+    setShowJump(transition.showJump);
+  }, [cancelFollowScroll]);
 
   // Send / retry / regenerate always re-pins follow mode so the new prompt and
   // its stream stay in view, even if the user had scrolled up through history.

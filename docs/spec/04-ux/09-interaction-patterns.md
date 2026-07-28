@@ -316,9 +316,12 @@ may be retained while exactly one workspace supplies the visible shell context.
   does not animate through history or expose the top or previous session's
   scroll position.
 - Auto-scroll to bottom on each new token group (throttled: check every 100ms, not every token)
-- User manual scroll up: pause auto-scroll
+- The first upward manual scroll movement pauses auto-scroll immediately and
+  cancels any pending follow frame; small trackpad deltas must not snap back to
+  the bottom
 - Sending a new prompt, retrying, or regenerating always re-pins follow mode and jumps to the bottom before the turn continues, even if the user had scrolled up
-- "Scroll to bottom" floating button appears when user is >200px from bottom during stream
+- "Scroll to bottom" floating button appears as soon as manual upward scrolling
+  releases follow mode
 - Click "Scroll to bottom" button: resumes auto-scroll and snaps to bottom
 - Stream completion: if user was auto-scrolling, keep at bottom; if manual, stay at position
 
@@ -601,10 +604,12 @@ When drag/drop is implemented, these patterns should apply:
 ### 9.1 Transcript scrolling
 
 - Default: auto-scroll to bottom on new content during stream while pinned
-- User scroll up: pauses auto-scroll, shows "↓ Scroll to bottom" button
+- The first upward scroll movement pauses auto-scroll and shows the
+  "↓ Scroll to bottom" button; queued stream or resize follow work must not
+  reverse that movement
 - User send / retry / regenerate: re-pins, hides the jump control, and jumps to the latest content so the new turn is visible
 - Scroll-to-bottom button: position fixed at bottom-right of transcript area, offset 12px
-- Button appears when viewport bottom is >200px from transcript bottom
+- Button appears as soon as upward scrolling releases follow mode
 - Click button: scrolls to bottom, resumes auto-scroll
 - Button disappears when at bottom
 
@@ -670,6 +675,10 @@ This does not prevent state changes — it makes them instant.
   has not requested reduced motion.
 - Pinned stream following is frame-coalesced and uses instant scroll updates;
   it does not start overlapping smooth-scroll animations for token groups.
+- Manual upward movement cancels a queued pinned-follow frame before it can
+  restore the previous bottom position. Follow remains released across content
+  growth until the viewport is scrolled down within 48px of the bottom or an
+  explicit turn-start / jump-to-latest action re-pins it.
 - Resize observers schedule work and never synchronously measure every
   transcript row from their callback.
 
