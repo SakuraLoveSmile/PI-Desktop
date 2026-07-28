@@ -381,14 +381,15 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 
 - Background: bg-primary
 - Max content width: 720px (messages), centered
-- Scroll behavior: auto-scroll to bottom on new message; manual scroll pauses auto-scroll
+- Scroll behavior: auto-scroll to bottom on new message while pinned; manual scroll pauses auto-scroll; send / retry / regenerate re-pins and jumps to bottom
 
 ### 4.4 States
 
 | State | Behavior |
 |---|---|
 | Empty | Hero + optional onboarding checklist + home composer in one scrollable stack; no suggestion cards (D111/D131) |
-| Streaming | Auto-scroll locked; new tokens append |
+| Streaming | Auto-scroll follows while pinned; new tokens append |
+| Turn start (send / retry / regenerate) | Re-pins and jumps to bottom even if the user had scrolled up |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
 | Session-owned dirty Git workspace | After this session successfully writes or edits the workspace, a compact Review changes command follows its transcript outside collapsed activity groups; it shows the capped file count plus explicit addition/deletion totals and opens the singleton Review tab. Other sessions in the same project do not render the command. |
 
@@ -631,6 +632,7 @@ responses, lightweight tool activity rows, and permission cards for a session.
 | State | Behavior |
 |---|---|
 | Streaming | New tokens append; auto-scroll only while pinned to bottom |
+| Turn start | Send / retry / regenerate re-pins follow mode and jumps to bottom |
 | Thinking-only streaming | Transcript opens; disclosure stays open; no empty answer bubble or duplicate Working row |
 | Idle | Scrollable; no auto-scroll |
 | Permission pending | PermissionCard inserted inline; transcript continues after resolution |
@@ -638,7 +640,7 @@ responses, lightweight tool activity rows, and permission cards for a session.
 
 ### 7.4 Interactions
 
-- Scroll: user scroll pauses auto-scroll; "scroll to bottom" floating button appears
+- Scroll: user scroll pauses auto-scroll; "scroll to bottom" floating button appears; send / retry / regenerate re-pins and jumps to bottom
 - Hover message: copy action appears
 - Toggle Thinking disclosure: expand/collapse reasoning independently from the
   final answer; streaming reopens it while reasoning is arriving

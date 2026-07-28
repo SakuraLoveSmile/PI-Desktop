@@ -1062,6 +1062,7 @@ export function ChatTranscript({
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
+  const wasRunningRef = useRef(isRunning);
   const [showJump, setShowJump] = useState(false);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
@@ -1079,6 +1080,19 @@ export function ChatTranscript({
     pinnedRef.current = atBottom;
     setShowJump(!atBottom);
   }, []);
+
+  // Send / retry / regenerate always re-pins follow mode so the new prompt and
+  // its stream stay in view, even if the user had scrolled up through history.
+  useEffect(() => {
+    const turnStarted = isRunning && !wasRunningRef.current;
+    wasRunningRef.current = isRunning;
+    if (!turnStarted) return;
+    pinnedRef.current = true;
+    setShowJump(false);
+    scrollToBottom();
+    const frame = requestAnimationFrame(() => scrollToBottom());
+    return () => cancelAnimationFrame(frame);
+  }, [isRunning, scrollToBottom]);
 
   useEffect(() => {
     if (pinnedRef.current) scrollToBottom();
