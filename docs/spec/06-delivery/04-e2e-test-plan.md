@@ -1622,6 +1622,28 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 
 
+
+#### E2E-077: Theme-aware selection and CJK section labels
+
+- **Status**: Partially automated (`user-select.test.mjs`, `interaction-polish.test.mjs`)
+- **Priority**: P2
+- **Covers**: A, Quality / US-UI shell polish
+- **Preconditions**: App running with at least one selectable transcript or input; language can be switched to `zh-CN`.
+- **Steps**:
+  1. Select text inside a transcript message or the composer.
+  2. Inspect sidebar Sessions/Projects section labels in English.
+  3. Switch the app language to `zh-CN` and re-check the same labels.
+  4. Hover jump-latest (when visible), stop, search rows, and profile menu items.
+- **Expected**:
+  - Selection highlight uses a neutral text-primary wash (not browser-default blue).
+  - Caret/form accent colors stay on the monochrome token ramp.
+  - English section labels may use uppercase + wide tracking; `zh-CN` labels use normal tracking without forced uppercase.
+  - Listed chrome controls ease background/color changes via shared motion tokens.
+- **Specs linked**: `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`
+- **Acceptance**: D147
+- **Milestone**: M5
+- **Status detail**: Source-level coverage for CSS contracts; visual selection paint remains manual.
+
 ## 8. Traceability Matrix
 
 

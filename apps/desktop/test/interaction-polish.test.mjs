@@ -1,0 +1,39 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const styles = await readFile(
+  new URL("../src/styles/globals.css", import.meta.url),
+  "utf8",
+);
+
+test("high-traffic chrome uses shared motion tokens on hover fills", () => {
+  for (const selector of [
+    ".jump-latest-btn",
+    ".stop-btn",
+    ".composer-plus-item",
+    ".search-item",
+    ".profile-menu-item",
+    ".notification-item",
+    ".work-panel-tab-close",
+  ]) {
+    const re = new RegExp(
+      `${selector.replace(/\./g, "\\.")}\\s*\\{[\\s\\S]*?transition:[^;]*var\\(--motion-duration-fast\\)`,
+    );
+    assert.match(styles, re, `${selector} should transition with motion tokens`);
+  }
+});
+
+test("empty-home stack gap stays within the 24px workstation ceiling", () => {
+  const block = styles.match(/\.home-stack-inner\s*\{[^}]+\}/)?.[0] ?? "";
+  assert.match(block, /gap:\s*24px/);
+  assert.doesNotMatch(block, /gap:\s*2[5-9]px|gap:\s*[3-9]\dpx/);
+});
+
+test("scrollbars expose a hover-strengthened thumb", () => {
+  assert.match(styles, /::-webkit-scrollbar-thumb:hover/);
+  assert.match(
+    styles,
+    /::-webkit-scrollbar\s*\{[\s\S]*?width:\s*8px;[\s\S]*?height:\s*8px;/,
+  );
+});

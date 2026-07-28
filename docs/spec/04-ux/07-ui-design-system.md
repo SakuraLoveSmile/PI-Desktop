@@ -45,8 +45,27 @@ selection is suppressed for chrome by default. The selection contract is:
   an equivalent explicit `user-select: text` rule).
 - The Electron renderer sets both `user-select` and `-webkit-user-select`;
   selection rules must not remove focus-visible rings or window drag regions.
+- Copyable selection paint uses the monochrome accent contract via
+  `::selection` (`color-mix` of `--ds-text-primary` at ~18% over the surface,
+  text remains `--ds-text-primary`). Browser-default blue highlights are not
+  allowed on shell surfaces.
+- `caret-color` and `accent-color` resolve to `--ds-text-primary` /
+  `--ds-accent` so native carets and form accents stay on-theme.
+- Focus-visible rings use `color-mix(in oklab, var(--ds-accent) 80%, transparent)`
+  (no white wash that drifts off the neutral ramp).
 
-### 3.2 Product identity and marks
+### 3.2 Locale-aware chrome labels
+
+Section labels that use Latin micro-style (`text-transform: uppercase` +
+`letter-spacing: wide`) must relax under `:lang(zh-CN)`:
+
+- `letter-spacing` returns to `--tracking-normal`
+- `text-transform` is `none` (CJK has no case and wide tracking splits glyphs)
+
+Applies to sidebar section labels, settings rail group labels, destination
+section labels, and keyboard-shortcut group labels.
+
+### 3.3 Product identity and marks
 
 The visible product identity is **PI-Desktop**, even where the shell borrows
 Codex as a visual reference. The identity contract is deliberately small:
@@ -516,7 +535,8 @@ Empty chat home uses a **single scrollable vertical stack** inside
 - Column `flex: 1; min-height: 0; overflow: hidden`
 - Inner scroller (`.home-scroll`) is the only vertical overflow surface
 - Stack (`.home-stack-inner`) is `min-height: 100%`, content width
-  **`min(100%, 768px)`**, and centers the column when the viewport is tall
+  **`min(100%, 768px)`**, **`gap: 24px`** (workstation ceiling), and centers
+  the column when the viewport is tall
 - Order is always: **hero → optional onboarding checklist → home composer**.
   The former four suggestion cards and their prompt-prefill actions are not
   rendered (D131); the checklist remains in normal document flow
