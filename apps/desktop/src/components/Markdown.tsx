@@ -16,6 +16,8 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { lexer } from "marked";
 import { useTranslation } from "react-i18next";
 import type { ThemedToken } from "shiki";
@@ -342,16 +344,65 @@ function Table({
   );
 }
 
+/** Inline audio player for audio URLs in markdown. */
+function AudioBlock({
+  node: _node,
+  src,
+  ...rest
+}: ComponentProps<"audio"> & { node?: unknown }) {
+  const source = typeof src === "string" ? src : "";
+  return (
+    <div className="chat-audio">
+      <audio controls preload="metadata" src={source} {...rest} />
+    </div>
+  );
+}
+
+/** Inline video player for video URLs in markdown. */
+function VideoBlock({
+  node: _node,
+  src,
+  ...rest
+}: ComponentProps<"video"> & { node?: unknown }) {
+  const source = typeof src === "string" ? src : "";
+  return (
+    <div className="chat-video">
+      <video controls preload="metadata" src={source} {...rest} />
+    </div>
+  );
+}
+
 const markdownComponents: Components = {
   pre: PreBlock,
   code: InlineCode,
   a: Anchor,
   img: MarkdownImage,
+  audio: AudioBlock,
+  video: VideoBlock,
   table: Table,
 };
 
 const remarkPlugins = [remarkGfm, remarkMath];
-const rehypePlugins = [rehypeKatex];
+
+// 自定义 sanitize schema：只允许安全的媒体标签
+const sanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    img: [...(defaultSchema.attributes?.img || []), "src", "alt", "title", "className"],
+    audio: ["src", "controls", "preload", "className"],
+    video: ["src", "controls", "preload", "className", "poster"],
+    source: ["src", "type"],
+  },
+  tagNames: [
+    ...(defaultSchema.tagNames || []),
+    "audio",
+    "video",
+    "source",
+  ],
+};
+
+const rehypePlugins = [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex];
 
 /* ---------- block splitting ---------- */
 
