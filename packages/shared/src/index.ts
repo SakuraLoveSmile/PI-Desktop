@@ -4,3 +4,4 @@ export * from "./types.js";
 export * from "./composer-trigger.js";
 export * from "./fuzzy.js";
 export * from "./keyboard-shortcuts.js";
+export * from "./thinking-levels.js";

@@ -17,7 +17,10 @@ import type {
   UiMessage,
   WorkspaceDiff,
 } from "@pi-desktop/shared";
-import { PROTOCOL_VERSION } from "@pi-desktop/shared";
+import {
+  highestSupportedThinkingLevel,
+  PROTOCOL_VERSION,
+} from "@pi-desktop/shared";
 import { api } from "../lib/api";
 import { createNavigationIntentController } from "../lib/navigation-intent";
 import { rememberProject, setProjectPinned } from "../lib/recent-projects";
@@ -825,17 +828,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const defaultProvider = get().providers.find(
       (provider) => provider.id === settings?.defaultProviderId,
     );
-    // Older hosts may omit capability metadata; treat those providers as
-    // non-reasoning instead of dereferencing an absent levels array.
-    const defaultThinkingLevels = Array.isArray(
-      defaultProvider?.supportedThinkingLevels,
-    )
-      ? defaultProvider.supportedThinkingLevels
-      : (["off"] as ThinkingLevel[]);
-    const defaultThinkingLevel =
-      defaultThinkingLevels.includes("off")
-        ? "off"
-        : defaultThinkingLevels[0] ?? "off";
+    // New reasoning sessions start at the strongest level published by pi.
+    // Missing capability metadata remains the conservative off fallback.
+    const defaultThinkingLevel = defaultProvider?.supportsReasoning
+      ? highestSupportedThinkingLevel(defaultProvider.supportedThinkingLevels)
+      : "off";
     // No providerId/modelId here: sessions without an explicit pick resolve
     // them at prompt time, so later default-model changes apply everywhere.
     // The Composer pins both onto the session when the user chooses a model.

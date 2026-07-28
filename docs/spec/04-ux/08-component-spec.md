@@ -1033,6 +1033,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 |---|---|---|
 | Idle (no model) | textarea active, send button disabled + tooltip "Configure a model first" | Agent link remains available in model menu |
 | Idle (ready) | textarea active, send button enabled | Send active |
+| New session (reasoning model) | Thinking trigger shows the model's highest published level | User may select any published level, including Off when supported |
 | Running | textarea disabled, abort button visible | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
@@ -1054,6 +1055,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   `leading-none` under overflow; the model trigger still ellipsizes long IDs.
 - Chat / Agent and provider/model changes update the active session, not the
   app default. They are disabled while a turn runs.
+- A new session whose inherited default model supports reasoning starts with
+  Thinking enabled at that model's highest published level. Non-reasoning
+  models and missing capability metadata start at `off`; reopening or reusing
+  an existing session preserves its durable selection.
 - The model menu lists only enabled, runnable providers with a default model.
 - For a reasoning-capable active model, a separate Thinking trigger appears
   immediately to the right of Chat / Agent and before the Agent permission

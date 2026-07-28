@@ -18,6 +18,10 @@ const mainSource = await readFile(
   new URL("../electron/main/index.ts", import.meta.url),
   "utf8",
 );
+const storeSource = await readFile(
+  new URL("../src/stores/app-store.ts", import.meta.url),
+  "utf8",
+);
 // Provider thinking config lives in the provider settings components, not the
 // settings page shell.
 const settingsSource = (
@@ -88,6 +92,14 @@ test("switching to a provider without reasoning resets the session level", () =>
     /if\s*\(!provider\?\.supportsReasoning\)\s*return\s*"off"/,
   );
   assert.match(composerSource, /thinkingLevel:\s*thinkingLevelForProvider\(/);
+});
+
+test("new sessions default to the strongest level of a reasoning model", () => {
+  const newSessionSource =
+    storeSource.match(/newSession: async[\s\S]*?\n  forkSession:/)?.[0] ?? "";
+  assert.match(newSessionSource, /defaultProvider\?\.supportsReasoning/);
+  assert.match(newSessionSource, /highestSupportedThinkingLevel\(/);
+  assert.match(newSessionSource, /thinkingLevel:\s*defaultThinkingLevel/);
 });
 
 test("main resolves reasoning from each session's exact selected model", () => {
