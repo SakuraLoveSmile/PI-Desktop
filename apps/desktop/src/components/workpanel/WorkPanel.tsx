@@ -317,7 +317,13 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
               title={label}
               aria-label={label}
               aria-pressed={selected}
-              onClick={() => openWorkPanelTab(toolWorkPanelTab(kind))}
+              onClick={() =>
+                openWorkPanelTab(
+                  kind === "file"
+                    ? { id: "file", kind }
+                    : toolWorkPanelTab(kind),
+                )
+              }
             >
               <Icon size={16} />
               {open && !selected && <span className="work-panel-open-dot" aria-hidden />}
