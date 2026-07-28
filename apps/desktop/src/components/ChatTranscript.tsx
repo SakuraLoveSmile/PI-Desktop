@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -1009,10 +1010,12 @@ const MessageRow = memo(function MessageRow({
 
 
 export const ChatTranscript = memo(function ChatTranscript({
+  sessionId,
   messages,
   isRunning,
   pendingPermission,
 }: {
+  sessionId: string | undefined;
   messages: UiMessage[];
   isRunning: boolean;
   pendingPermission?: PendingPermission;
@@ -1030,6 +1033,17 @@ export const ChatTranscript = memo(function ChatTranscript({
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior });
   }, []);
+
+  // A newly activated session must paint at its latest record. Reset any
+  // manual-scroll state inherited from the previous session and position the
+  // updated DOM during layout so no top-of-transcript frame can flash first.
+  useLayoutEffect(() => {
+    cancelAnimationFrame(followFrameRef.current);
+    followFrameRef.current = 0;
+    pinnedRef.current = true;
+    setShowJump(false);
+    scrollToBottom();
+  }, [sessionId, scrollToBottom]);
 
   const scheduleFollowScroll = useCallback(() => {
     if (!pinnedRef.current || followFrameRef.current !== 0) return;

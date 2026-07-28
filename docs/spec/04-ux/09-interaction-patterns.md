@@ -314,6 +314,10 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 ### 2.2 Auto-scroll
 
+- Opening a session resets follow mode and positions the transcript at its last
+  record before the browser paints the activated transcript. The activation
+  does not animate through history or expose the top or previous session's
+  scroll position.
 - Auto-scroll to bottom on each new token group (throttled: check every 100ms, not every token)
 - User manual scroll up: pause auto-scroll
 - Sending a new prompt, retrying, or regenerating always re-pins follow mode and jumps to the bottom before the turn continues, even if the user had scrolled up
@@ -635,6 +639,8 @@ This does not prevent state changes — it makes them instant.
 
 ### 10.4 Programmatic scrolling
 
+- Session activation uses an immediate layout-phase bottom position so the
+  first visible frame is already stable at the latest record.
 - Jump-to-latest and minimap navigation use smooth scrolling only when the OS
   has not requested reduced motion.
 - Pinned stream following is frame-coalesced and uses instant scroll updates;

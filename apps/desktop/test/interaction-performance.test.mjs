@@ -43,6 +43,27 @@ test("stream rendering avoids duplicate frame state and coalesces following", ()
   assert.match(transcript, /activityGroupPropsEqual/);
 });
 
+test("session activation pins the latest record before the first paint", () => {
+  assert.match(
+    chatSurface,
+    /const activeSessionId = useAppStore\(\(state\) => state\.activeSessionId\);/,
+  );
+  assert.match(
+    chatSurface,
+    /<ChatTranscript[\s\S]*?sessionId=\{activeSessionId\}/,
+  );
+
+  const activationEffect = transcript.match(
+    /useLayoutEffect\(\(\) => \{([\s\S]*?)\n  \}, \[sessionId, scrollToBottom\]\);/,
+  )?.[1];
+  assert.ok(activationEffect);
+  assert.match(activationEffect, /cancelAnimationFrame\(followFrameRef\.current\)/);
+  assert.match(activationEffect, /pinnedRef\.current = true/);
+  assert.match(activationEffect, /setShowJump\(false\)/);
+  assert.match(activationEffect, /scrollToBottom\(\)/);
+  assert.doesNotMatch(activationEffect, /smooth/);
+});
+
 test("minimap separates resize checks from message-position measurement", () => {
   assert.match(minimap, /buildConversationMinimapMarkers\(messages\)/);
   assert.match(minimap, /const markerIdentity = useMemo/);

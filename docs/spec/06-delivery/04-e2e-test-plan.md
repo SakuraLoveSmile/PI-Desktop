@@ -221,17 +221,27 @@ Each scenario is documented in this format:
 #### E2E-011: Switch between project and temporary sessions
 
 - **Preconditions**: One retained project session and one path-less Temporary
-  session exist.
+  session exist. Both transcripts exceed one viewport and have distinct final
+  records.
 - **Steps**: 1) Open the project session from its exact-path sidebar group. 2)
-  Open the Temporary session. 3) Observe chat content and workspace chrome.
+  Scroll to an earlier record and confirm the jump-to-latest control appears.
+  3) Open the Temporary session and observe its first painted frame. 4) Switch
+  back to the project session, then open Temporary again with reduced motion
+  enabled. 5) Observe chat content and workspace chrome.
 - **Expected**: The sidebar contains no Recents aggregate; retained projects
   have scoped groups and path-less sessions remain under Temporary; each
   transcript loads correctly; selecting Temporary clears project context and
-  inherits no workspace access; both sessions remain persisted.
-- **Specs linked**: `03-runtime/10-session-state-machine.md`, `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`
+  inherits no workspace access; both sessions remain persisted. Every session
+  activation paints its distinct final record at the transcript bottom without
+  first exposing the transcript top, the previous session's scroll position,
+  or a stale jump-to-latest control. Reduced motion preserves the same stable
+  destination without an animated traversal through history.
+- **Specs linked**: `03-runtime/10-session-state-machine.md`,
+  `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`
 - **Acceptance**: C (switch sessions)
 - **Milestone**: M2
-- **Status**: Draft
+- **Status**: Source-level regression covered; full visual scenario Draft
 
 ### Workspace Open
 
