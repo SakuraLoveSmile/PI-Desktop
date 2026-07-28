@@ -1351,11 +1351,13 @@ Each scenario is documented in this format:
   3) Close the macOS window, immediately invoke two native menu
   commands, and acknowledge renderer readiness after the replacement loads.
   Verify one window and one delivery per command. 4) On Windows/Linux, repeat
-  from the main chat, Settings, and an open work panel. In the main chat, send a
-  first user message and confirm its full bubble starts below the 46px titlebar
-  control band. Click the center plus the top, bottom, and titlebar-facing edges
-  of each right-side control to minimize, maximize, restore, and close the
-  window. 5) Start
+  from the main chat, Settings, and an open work panel. With the work panel
+  open, confirm the panel collapse button is flush with the main-pane right
+  divider and does not retain the 112px outer-window control clearance. In the
+  main chat, send a first user message and confirm its full bubble starts below
+  the 46px titlebar control band. Click the center plus the top, bottom, and
+  titlebar-facing edges of each right-side control to minimize, maximize,
+  restore, and close the window. 5) Start
   the renderer while its native window is already maximized and inspect the
   initial queried glyph/state. 6) Attempt unknown menu/window IPC actions
   while a window exists and after it closes. 7) Build each target on its
@@ -1366,7 +1368,9 @@ Each scenario is documented in this format:
   macOS follows native menu conventions and accelerators.
   Windows/Linux show no application menu inside the window; navigation and
   right-side controls do not collide with drag regions, keyboard shortcuts
-  remain operational, and no work-panel launcher is present. Check for Updates
+  remain operational, and no work-panel launcher is present. The open-panel
+  collapse button touches the main-pane right divider without an inset or a
+  duplicate native-control gap. Check for Updates
   invokes the allowlisted update command from the macOS system menu and the
   Settings surface and shows the resulting up-to-date state. Replacement-window
   commands wait for renderer readiness without
@@ -2210,7 +2214,8 @@ This test plan spec is accepted when:
 - Expect project and session lists to scroll inside the sidebar body without
   clipping behind the footer; sidebar Search/Collapse remain in the sidebar
   header. When the work panel is open, expect its sole collapse control in the
-  session pane top-right rather than the work-panel tab strip.
+  session pane top-right rather than the work-panel tab strip, flush against
+  the divider at the main pane's right edge.
 - Collapse A by clicking its directory label, expand it from the chevron area,
   then activate B and return to A. Only A's child rows collapse; project `+`
   and overflow actions do not toggle it; the
