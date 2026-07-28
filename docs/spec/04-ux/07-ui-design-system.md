@@ -86,9 +86,10 @@ Codex as a visual reference. The identity contract is deliberately small:
   and NSIS shortcut identity stay aligned so native notifications,
   notification settings, and taskbar groups identify the app as `PI-Desktop`
   rather than Electron.
-- The home hero logo is 56px. Expanded/collapsed sidebar logos are 20px/18px,
-  and the docked composer logo is 15px. The image keeps its native colors in
-  both themes and is not replaced by a theme-tinted vector approximation.
+- The home hero logo is 56px. Expanded/collapsed sidebar logos are 20px/18px.
+  Composer prompt rows do not render a leading brand icon in either home or
+  thread-docked mode. The image keeps its native colors in both themes and is
+  not replaced by a theme-tinted vector approximation.
 - New-session controls use the dedicated message-plus icon at 15–16px. The
   generic plus icon remains reserved for non-session additions such as adding
   a project.
@@ -589,8 +590,8 @@ Empty chat home uses a **single scrollable vertical stack** inside
 - Empty draft row keeps **one visible line / 28px optical minimum** so the
   placeholder remains visible; it auto-grows to seven visual lines and
   scrolls internally from line eight onward
-- Docked threads keep the **15px shared brand logo** beside the draft; home
-  empty draft stays clean without the mark. Light placeholder ~`#525355`
+- Home and thread-docked prompt rows stay free of leading brand icons so the
+  draft aligns directly with the input gutter. Light placeholder ~`#525355`
 - Disabled send is a **solid gray chip** (`#8e8e90` light, white arrow), not
   opacity-only fade
 - Floating composer plates use one solid semantic surface with no internal

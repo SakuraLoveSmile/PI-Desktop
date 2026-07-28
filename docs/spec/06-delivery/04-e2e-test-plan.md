@@ -752,22 +752,24 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`user-select.test.mjs`); scenario Documented
 
-#### E2E-046: PI-Desktop renderer branding and session creation icon
+#### E2E-046: PI-Desktop renderer branding and composer icon boundary
 
 - **Preconditions**: App running in both English and zh-CN locales, with an
   empty home and a docked transcript available.
 - **Steps**: 1) Inspect the expanded and collapsed sidebar. 2) Inspect the
   empty-home hero and docked composer. 3) Focus the New task control and each
   project/Temporary create control. 4) Open Settings and the composer input.
-- **Expected**: Visible shell identity reads `PI-Desktop`; the home hero,
-  expanded/collapsed sidebar, and docked composer all render the canonical
-  `build/icon_1024.png` asset through `BrandLogo`; every session-creation
-  control uses the dedicated message-plus icon with localized labels and
-  accessible names. `Codex` remains visible only as the external import-source
-  label or in non-runtime design-reference text.
+- **Expected**: Visible shell identity reads `PI-Desktop`; the home hero and
+  expanded/collapsed sidebar render the canonical `build/icon_1024.png` asset
+  through `BrandLogo`, while the docked composer prompt row has no leading
+  brand icon or reserved icon slot and its text aligns directly with the input
+  gutter. Every session-creation control uses the dedicated message-plus icon
+  with localized labels and accessible names. `Codex` remains visible only as
+  the external import-source label or in non-runtime design-reference text.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
-  `08-meta/decisions-log.md` (D094)
+  `08-meta/decisions-log.md` (D094/D158),
+  `../../adr/0030-icon-free-composer-prompt-row.md`
 - **Acceptance**: Quality (brand consistency and key operations feel polished)
 - **Milestone**: M5
 - **Status**: Unit-covered (`renderer-branding.test.mjs`); scenario Documented
@@ -2205,9 +2207,9 @@ This test plan spec is accepted when:
 - Workspace identity remains visible through the home hero or sidebar rather
   than being duplicated above the prompt.
 
-### US-UI-37 Empty draft brand logo + resize
-- Empty composer shows the 15px shared brand logo and visible placeholder ink
-  (not a blank white/night hole).
+### US-UI-37 Empty draft row + resize
+- Empty composer prompt rows show no leading brand icon and retain visible
+  placeholder ink (not a blank white/night hole).
 - Auto-resize never collapses empty textarea below ~28px.
 - Disabled send control is a solid gray chip on light (`#8e8e90`), full opacity with white arrow.
 - Dark night plate remains elevated-primary `#212121f5` with readable elevation-prominent on `#181818`.

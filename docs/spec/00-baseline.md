@@ -1,8 +1,8 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.10`
-- Date: `2026-07-27`
-- Status: `Frozen for implementation details (session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
+- Baseline Version: `0.4.11`
+- Date: `2026-07-28`
+- Status: `Frozen for implementation details (session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release + icon-free composer prompt row)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -29,6 +29,9 @@
 > ADR 0027.
 > `0.4.10` replaces destructive work-panel clearing on conversation switches
 > with runtime session-scoped contexts through D142 / ADR 0028.
+> `0.4.11` standardizes home and thread-docked composer prompt rows without a
+> leading brand mark through D158 / ADR 0030 while preserving shell branding
+> elsewhere.
 
 ## Frozen Decisions
 
