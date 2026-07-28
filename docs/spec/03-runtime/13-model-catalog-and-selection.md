@@ -56,6 +56,12 @@ Changing model or thinking level mid-session affects subsequent turns only.
 The stored thinking preference survives restart; the effective request level
 is capability-clamped for the selected model at execution time.
 
+For a newly created session, the renderer resolves the app default provider's
+current default-model capability. A reasoning-capable model starts at the
+highest canonical level in its published `supportedThinkingLevels`; a
+non-reasoning model or missing capability metadata starts at `off`. This is a
+creation default only and never rewrites an existing session's stored choice.
+
 ## 5. Capability warnings
 
 If user selects model tagged without tools while in Agent mode:
@@ -140,6 +146,8 @@ App-level default:
 
 Session-level:
 - inherits app default at creation
+- initializes thinking to the highest level published by the inherited model
+  when it supports reasoning, otherwise `off`
 - can override independently
 
 ## 11. Capability gating
@@ -194,6 +202,8 @@ Warnings are non-blocking unless execution is impossible.
       refresh keeps the cached picker populated
 - [ ] capability badges visible
 - [ ] session model change applies to next turn only
+- [ ] a new session defaults a reasoning-capable inherited model to its highest
+      published thinking level and otherwise defaults to `off`
 - [ ] reasoning selector is capability-gated and pi-published sparse level
       sets clamp the same way in Composer, Electron main, and the pi sidecar
 - [ ] provider settings and cached discovery cannot override a known pi model

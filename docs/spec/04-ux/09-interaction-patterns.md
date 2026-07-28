@@ -223,7 +223,7 @@ may be retained while exactly one workspace supplies the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
-### 1.8 Artifact-driven work panel resources (D128, D140, D142, D153)
+### 1.8 Artifact-driven work panel resources (D128, D140, D142, D154)
 
 - The shell exposes no empty or unconditional work-panel launcher,
   application-menu command, or global shortcut. An artifact trigger atomically
