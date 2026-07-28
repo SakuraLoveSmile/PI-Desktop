@@ -45,6 +45,16 @@ test("stream rendering avoids duplicate frame state and coalesces following", ()
   assert.match(transcript, /assistantTurnPropsEqual/);
 });
 
+test("manual upward scrolling cancels pending transcript follow work", () => {
+  assert.match(transcript, /reduceTranscriptScroll/);
+  assert.match(
+    transcript,
+    /if \(transition\.releasedFollow\) cancelFollowScroll\(\)/,
+  );
+  assert.match(transcript, /pinnedRef\.current = transition\.pinned/);
+  assert.match(transcript, /setShowJump\(transition\.showJump\)/);
+});
+
 test("session activation pins the latest record before the first paint", () => {
   assert.match(
     chatSurface,
@@ -56,10 +66,10 @@ test("session activation pins the latest record before the first paint", () => {
   );
 
   const activationEffect = transcript.match(
-    /useLayoutEffect\(\(\) => \{([\s\S]*?)\n  \}, \[sessionId, scrollToBottom\]\);/,
+    /useLayoutEffect\(\(\) => \{([\s\S]*?)\n  \}, \[cancelFollowScroll, sessionId, scrollToBottom\]\);/,
   )?.[1];
   assert.ok(activationEffect);
-  assert.match(activationEffect, /cancelAnimationFrame\(followFrameRef\.current\)/);
+  assert.match(activationEffect, /cancelFollowScroll\(\)/);
   assert.match(activationEffect, /pinnedRef\.current = true/);
   assert.match(activationEffect, /setShowJump\(false\)/);
   assert.match(activationEffect, /scrollToBottom\(\)/);

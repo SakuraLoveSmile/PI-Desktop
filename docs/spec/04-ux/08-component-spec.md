@@ -402,7 +402,9 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 
 - Background: bg-primary
 - Max content width: 720px (messages), centered
-- Scroll behavior: auto-scroll to bottom on new message while pinned; manual scroll pauses auto-scroll; send / retry / regenerate re-pins and jumps to bottom
+- Scroll behavior: auto-scroll to bottom on new message while pinned; the first
+  upward manual movement pauses auto-scroll without a snap-back; send / retry /
+  regenerate re-pins and jumps to bottom
 - Destination entry uses one short opacity/translate transition. Streaming
   updates occur inside the mounted surface and never replay this transition.
 
@@ -691,7 +693,10 @@ storage but compose into one assistant turn until the next user message.
 
 ### 7.4 Interactions
 
-- Scroll: user scroll pauses auto-scroll; "scroll to bottom" floating button appears; send / retry / regenerate re-pins and jumps to bottom
+- Scroll: the first upward scroll movement immediately pauses auto-scroll,
+  cancels pending follow work, and shows the "scroll to bottom" floating button;
+  stream or resize updates cannot pull the viewport back down; send / retry /
+  regenerate re-pins and jumps to bottom
 - Hover message: copy action appears
 - Assistant fragments emitted before and after tool calls compose into one
   `role="article"` turn. The turn exposes one trailing meta row and one action
@@ -717,6 +722,9 @@ storage but compose into one assistant turn until the next user message.
 - Follow-scroll requests from stream events and content resize are coalesced to
   at most one pending animation frame. A new token cannot cancel and recreate
   already scheduled follow work.
+- An upward manual scroll takes priority over a pending follow frame, including
+  sub-threshold trackpad movement that remains close to the bottom. Downward
+  scrolling re-pins only after the viewport returns within 48px of the bottom.
 - Minimap content resize checks only overflow. Message-position measurement is
   reserved for scrolling, marker identity changes, and viewport resize, so a
   streamed content height update does not scan every message twice.
