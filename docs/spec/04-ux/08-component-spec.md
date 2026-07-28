@@ -800,13 +800,16 @@ Single message render — either user (plaintext) or assistant (markdown streami
 Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shiki.ts`
 + prose styles under `.prose-chat` / `.code-block` in `globals.css`.
 
-- **Streaming without jank**: source splits into top-level blocks via `marked`'s
-  lexer; each block renders through a memoized `<ReactMarkdown>`. While
-  streaming only the tail block re-parses (incremental re-lex from the last
-  block boundary), so cost stays linear in message length.
+- **Streaming without jank**: runtime content chunks render directly, without a
+  second renderer-side typewriter or animation-frame state loop. Source splits
+  into top-level blocks via `marked`'s lexer; each block renders through a
+  memoized `<ReactMarkdown>`. While streaming only the tail block re-parses
+  (incremental re-lex from the last block boundary), so cost stays linear in
+  message length.
 - **Plugins**: `remark-gfm` (tables, task lists, strikethrough, autolinks),
   `remark-math` + `rehype-katex` (inline `$…$`, display `$$…$$`). Raw HTML
-  stays escaped (no `rehype-raw`).
+  stays escaped (no `rehype-raw`). KaTeX's Vite-inlined WOFF2 fonts are allowed
+  by the renderer's `font-src 'self' data:` CSP directive.
 - **Syntax highlighting**: Shiki singleton with the JavaScript regex engine
   (no wasm), themes `one-light`/`one-dark-pro` following `data-theme`.
   Languages lazy-load per fence tag with a plain-mono fallback until ready.
