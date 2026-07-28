@@ -592,6 +592,10 @@ html {
   -webkit-app-region: drag;
 }
 
+.main-titlebar.work-panel-open {
+  padding-right: 0;
+}
+
 .main-titlebar-right {
   pointer-events: auto;
   display: flex;
@@ -920,6 +924,11 @@ html {
 :root[data-platform="win32"] .settings-titlebar,
 :root[data-platform="linux"] .settings-titlebar {
   right: 112px;
+}
+
+:root[data-platform="win32"] .main-titlebar.work-panel-open,
+:root[data-platform="linux"] .main-titlebar.work-panel-open {
+  right: 0;
 }
 
 :root[data-platform="win32"] .work-panel-header,

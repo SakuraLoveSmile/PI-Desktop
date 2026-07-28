@@ -50,7 +50,11 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 - Sidebar toggle: keyboard shortcut + icon button beside Search in the expanded
   sidebar header; the button moves to the main titlebar while collapsed
 - Work panel collapse: sole control lives in the session pane titlebar top-right
-  while the panel is open, so the work-panel tab strip is not occupied
+  while the panel is open, with its outer edge flush against the divider
+  between the session pane and work panel so the tab strip is not occupied. On
+  Windows/Linux, opening the work panel removes the main titlebar's native
+  window-control clearance because those controls occupy the work-panel header
+  at the outer window edge.
 - Work panel resize: left-edge drag handle (§5.4)
 - Window resize: responsive collapse per [07-ui-design-system.md](07-ui-design-system.md) §10.1
 

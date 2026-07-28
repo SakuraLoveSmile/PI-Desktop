@@ -816,7 +816,12 @@ function AppShell() {
           )}
 
           <section className="main-pane">
-            <div className="main-titlebar">
+            <div
+              className={cx(
+                "main-titlebar",
+                workPanelOpen && "work-panel-open",
+              )}
+            >
               {sidebarCollapsed && (
                 <div className="main-titlebar-left no-drag">
                   <CollapsedTitlebarActions

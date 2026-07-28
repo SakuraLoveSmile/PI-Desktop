@@ -58,6 +58,10 @@ test("sidebar header retains non-mac branding and keeps collapse beside search",
 test("session pane hosts the work panel collapse control at the top-right", () => {
   assert.match(appSource, /function SessionPaneWorkPanelCollapse/);
   assert.match(appSource, /className="main-titlebar-right no-drag"/);
+  assert.match(
+    appSource,
+    /className=\{cx\(\s*"main-titlebar",\s*workPanelOpen && "work-panel-open",\s*\)\}/s,
+  );
   assert.match(appSource, /data-action="collapse-work-panel"/);
   assert.match(appSource, /workPanelOpen && \(/);
   assert.match(appSource, /collapseWorkPanel\(\)/);
@@ -66,6 +70,14 @@ test("session pane hosts the work panel collapse control at the top-right", () =
   assert.match(
     globalStyles,
     /\.session-pane-toggle\s*\{[^}]*display:\s*inline-flex;/s,
+  );
+  assert.match(
+    globalStyles,
+    /\.main-titlebar\.work-panel-open\s*\{[^}]*padding-right:\s*0;/s,
+  );
+  assert.match(
+    globalStyles,
+    /:root\[data-platform="win32"\] \.main-titlebar\.work-panel-open,[\s\S]*:root\[data-platform="linux"\] \.main-titlebar\.work-panel-open\s*\{[^}]*right:\s*0;/,
   );
   assert.match(
     globalStyles,
