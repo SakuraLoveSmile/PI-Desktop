@@ -5,6 +5,7 @@ import type {
   GlobalPermissionMode,
   ShortcutPlatform,
 } from "@pi-desktop/shared";
+import { DEFAULT_CONTEXT_COMPACTION_SETTINGS } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import type { ImportCandidate } from "../lib/api";
@@ -516,6 +517,10 @@ export function SettingsPage() {
     await api.setSettings({ ...settings, ...patch });
     await refreshProviders();
   };
+  const contextCompaction = {
+    ...DEFAULT_CONTEXT_COMPACTION_SETTINGS,
+    ...settings?.contextCompaction,
+  };
 
   // Nav structure comes from the shared settings index (lib/settings-search)
   // so the global search dialog and this page stay in sync; only the icons
@@ -751,6 +756,85 @@ export function SettingsPage() {
                     </option>
                     <option value="auto">{t("settings.permissionModeAuto")}</option>
                   </select>
+                </SettingsRow>
+              </SettingsCard>
+
+              <SettingsCard title={t("settings.contextCompaction")}>
+                <SettingsRow
+                  title={t("settings.contextCompactionEnabled")}
+                  description={t("settings.contextCompactionEnabledDesc")}
+                >
+                  <button
+                    type="button"
+                    className={cx(
+                      "settings-toggle",
+                      contextCompaction.enabled && "on",
+                    )}
+                    role="switch"
+                    aria-checked={contextCompaction.enabled}
+                    aria-label={t("settings.contextCompactionEnabled")}
+                    onClick={() =>
+                      void saveSettings({
+                        contextCompaction: {
+                          ...contextCompaction,
+                          enabled: !contextCompaction.enabled,
+                        },
+                      })
+                    }
+                  >
+                    <span className="settings-toggle-thumb" />
+                  </button>
+                </SettingsRow>
+                <SettingsRow
+                  title={t("settings.contextCompactionReserve")}
+                  description={t("settings.contextCompactionReserveDesc")}
+                >
+                  <input
+                    className="field-input"
+                    type="number"
+                    min={1024}
+                    step={1024}
+                    value={contextCompaction.reserveTokens}
+                    aria-label={t("settings.contextCompactionReserve")}
+                    onChange={(event) => {
+                      const reserveTokens = Number(event.target.value);
+                      if (Number.isFinite(reserveTokens) && reserveTokens >= 1024) {
+                        void saveSettings({
+                          contextCompaction: {
+                            ...contextCompaction,
+                            reserveTokens: Math.round(reserveTokens),
+                          },
+                        });
+                      }
+                    }}
+                  />
+                </SettingsRow>
+                <SettingsRow
+                  title={t("settings.contextCompactionRecent")}
+                  description={t("settings.contextCompactionRecentDesc")}
+                >
+                  <input
+                    className="field-input"
+                    type="number"
+                    min={1024}
+                    step={1024}
+                    value={contextCompaction.keepRecentTokens}
+                    aria-label={t("settings.contextCompactionRecent")}
+                    onChange={(event) => {
+                      const keepRecentTokens = Number(event.target.value);
+                      if (
+                        Number.isFinite(keepRecentTokens) &&
+                        keepRecentTokens >= 1024
+                      ) {
+                        void saveSettings({
+                          contextCompaction: {
+                            ...contextCompaction,
+                            keepRecentTokens: Math.round(keepRecentTokens),
+                          },
+                        });
+                      }
+                    }}
+                  />
                 </SettingsRow>
               </SettingsCard>
 

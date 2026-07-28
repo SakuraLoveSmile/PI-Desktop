@@ -685,6 +685,7 @@ storage but compose into one assistant turn until the next user message.
 | Thinking-only streaming | Transcript opens; disclosure stays open; no empty answer bubble or duplicate Working row |
 | Idle | Scrollable; no auto-scroll |
 | Permission pending | PermissionCard inserted inline; transcript continues after resolution |
+| Context checkpoint | Existing transcript remains visible; `CompactContext` appears as a normal tool activity row when model-requested, and no synthetic system instruction appears |
 | Error | Error MessageBubble with actionable retry link |
 
 ### 7.4 Interactions
@@ -718,6 +719,9 @@ storage but compose into one assistant turn until the next user message.
 - Minimap content resize checks only overflow. Message-position measurement is
   reserved for scrolling, marker identity changes, and viewport resize, so a
   streamed content height update does not scan every message twice.
+- Context compaction never removes, collapses, or replaces visible message
+  rows. A model-issued `CompactContext` call stays in the normal processing
+  group; only its transient prompting instruction is hidden from transcript UI.
 
 ### 7.5 Accessibility
 
@@ -1115,6 +1119,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | Idle (ready) | textarea active, send button enabled | Send active |
 | New session (reasoning model) | Thinking trigger shows the model's highest published level | User may select any published level, including Off when supported |
 | Running | textarea disabled, abort button visible | Abort active, Send hidden |
+| Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
 
@@ -1124,6 +1129,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Shift+Enter: newline in textarea
 - Escape: when textarea focused, clears input or blurs (not abort)
 - Abort: stops running turn and cancels pending permission
+- `turn_end` is not an idle signal. The composer, model/mode controls, and
+  session actions remain blocked through subsequent tool turns and automatic
+  checkpoint generation until `agent_end` or `error`. A manual-only checkpoint
+  becomes idle on its matching `compaction_end`.
 - Auto-grow: textarea measures wrapped visual lines, starts at one visible
   line, expands through seven lines, then scrolls internally; deleting content
   shrinks it back to one line

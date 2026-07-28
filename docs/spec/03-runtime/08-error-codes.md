@@ -61,7 +61,8 @@ Rules:
 | `PROVIDER_ERROR` | yes | upstream provider failure |
 | `PROVIDER_UNAUTHORIZED` | no | bad/missing provider credentials |
 | `PROVIDER_RATE_LIMITED` | yes | provider rate limited |
-| `CONTEXT_TOO_LARGE` | no | prompt/context exceeds limit |
+| `CONTEXT_TOO_LARGE` | no | prompt/context still exceeds the safe model budget after recovery, the second provider overflow occurred, or automatic recovery is disabled |
+| `CONTEXT_COMPACTION_FAILED` | no | checkpoint summary generation or durable checkpoint append failed; the guarded next provider request does not start |
 | `STREAM_FAILED` | yes | stream interrupted unexpectedly |
 
 ### 3.3 Workspace / tools / permissions

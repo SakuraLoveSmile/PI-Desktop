@@ -62,6 +62,7 @@ per message; `seq` is implied by line order:
 {"type":"message","id":"m1","role":"user","createdAt":"…","blocks":[{"type":"text","text":"…"}]}
 {"type":"message","id":"m2","role":"tool","toolName":"Write","blocks":[{"type":"tool_call","callId":"c1","args":{},"result":{},"status":"success"}]}
 {"type":"message","id":"m3","role":"assistant","createdAt":"…","blocks":[{"type":"thinking","text":"…"},{"type":"text","text":"…"}],"meta":{"usage":{},"modelId":"…"}}
+{"type":"compaction","id":"cp1","summary":"…","firstKeptMessageId":"m2","throughMessageId":"m3","tokensBefore":917000,"retainedTail":[…],"providerId":"…","modelId":"…","createdAt":"…"}
 ```
 
 `sessions/<sessionId>.revisions.jsonl` — append-only, one line per archived
@@ -81,9 +82,15 @@ Rules:
   keeps integer ms.
 - Readers skip unknown `type` lines and a torn trailing line: new line kinds
   need no migration, and a crash mid-append cannot poison the file.
+- `compaction` is a model-context checkpoint, not a visible message. Readers
+  return every message unchanged and separately select the newest valid
+  checkpoint. `throughMessageId` is its durable transcript boundary;
+  `firstKeptMessageId` and `retainedTail` reproduce pi's summary + recent-tail
+  context after restart.
 - Writers append with flush + fsync (message durability ≈ WAL
-  `synchronous=NORMAL`); full rewrites (compaction, revision switch, import)
-  go through a sibling temp file + atomic rename.
+  `synchronous=NORMAL`); full transcript rewrites (regenerate/edit, revision
+  switch, import) go through a sibling temp file + atomic rename. A normal
+  context checkpoint is one appended line and never rewrites visible messages.
 - Ordering: the file is written **before** the DB index transaction. A crash
   between the two costs one derived index row — never content — and the next
   full rewrite self-heals; transcript reads dedupe repeated message ids
@@ -629,10 +636,11 @@ is the source of truth, the index is derived and self-healing.
 |---|---|---|
 | prompt accepted | append user message line | `last_seq` alloc (RETURNING) + index row + touch `sessions.updated_at`; then insert `turns(running)` |
 | assistant/tool message end | append message line | index row + touch session |
+| context checkpoint (`session.appendCompaction`) | append typed checkpoint line after its referenced message boundary | — (checkpoint is not searchable transcript content) |
 | tool succeeded (Write/Edit) | — | upsert `artifacts` + `audit_log` row, same tx as result persistence |
 | turn terminal via `session.endTurn` | — | update `turns`; for completed/error insert one notification and prune to 200 in the same tx; aborted inserts none |
-| compaction / edit (`session.replaceMessages`) | atomic transcript rewrite (temp + rename) | single tx: delete index rows, bulk reinsert, reset `last_seq` |
-| session fork (`session.fork`) | write a new transcript with remapped message/tool-call ids | single tx: clone session configuration, insert child index rows, set `last_seq`; remove child file on failure |
+| transcript truncate / edit (`session.replaceMessages`) | atomic transcript rewrite (temp + rename); preserve only a checkpoint whose boundary remains | single tx: delete index rows, bulk reinsert, reset `last_seq` |
+| session fork (`session.fork`) | write a new transcript with remapped message/tool-call ids; copy/remap the checkpoint only when its boundary is included | single tx: clone session configuration, insert child index rows, set `last_seq`; remove child file on failure |
 | regenerate branch save | append revision line | index row with `message_count` (+ `is_active` flip) |
 | revision switch | read branch, atomic transcript rewrite | flip `is_active`, rebuild index rows, reset `last_seq` |
 | import | write transcript file | one tx per session: session row + index rows; on failure the file is removed |
@@ -641,6 +649,9 @@ is the source of truth, the index is derived and self-healing.
 Rules: user message durable (fsync'd file line) before the turn starts;
 assistant/tool lines durable at their end events; a crash mid-turn loses at
 most the in-flight turn's tail, and the boot sweep marks that turn `aborted`.
+A checkpoint is installed into the live runtime only after its append succeeds;
+therefore a failed/crashed checkpoint write leaves the previous full context or
+previous checkpoint authoritative rather than creating a memory-only state.
 A crash between file append and index commit leaves the message readable
 (transcript loads from the file) with only its search row missing until the
 next rewrite; transcript reads dedupe repeated ids keep-last.

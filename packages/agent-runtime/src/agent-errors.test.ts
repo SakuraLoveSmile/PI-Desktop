@@ -38,6 +38,17 @@ describe("classifyAgentError", () => {
       .toMatchObject({ code: "CONTEXT_TOO_LARGE" });
   });
 
+  it("keeps context checkpoint failures distinct from provider failures", () => {
+    expect(
+      classifyAgentError(
+        "CONTEXT_COMPACTION_FAILED: unable to create a checkpoint before the next model request",
+      ),
+    ).toMatchObject({
+      code: "CONTEXT_COMPACTION_FAILED",
+      retriable: false,
+    });
+  });
+
   it("classifies network failures via the cause chain", () => {
     const err = new Error("fetch failed");
     (err as any).cause = Object.assign(new Error("connect ECONNREFUSED"), {

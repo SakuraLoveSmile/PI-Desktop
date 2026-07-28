@@ -88,7 +88,37 @@ export type SessionSummary = {
 
 export type SessionDetail = SessionSummary & {
   messages: UiMessage[];
+  /** Latest durable model-context checkpoint; never rendered as a chat row. */
+  compaction?: ContextCompactionRecord;
 };
+
+export type ContextCompactionSettings = {
+  enabled: boolean;
+  reserveTokens: number;
+  keepRecentTokens: number;
+};
+
+export const DEFAULT_CONTEXT_COMPACTION_SETTINGS: ContextCompactionSettings = {
+  enabled: true,
+  reserveTokens: 16_384,
+  keepRecentTokens: 20_000,
+};
+
+export type ContextCompactionRecord = {
+  id: string;
+  summary: string;
+  firstKeptMessageId?: string;
+  throughMessageId: string;
+  tokensBefore: number;
+  usage?: unknown;
+  retainedTail?: unknown[];
+  details?: unknown;
+  providerId?: string;
+  modelId?: string;
+  createdAt: string;
+};
+
+export type ContextCompactionReason = "manual" | "threshold" | "overflow";
 
 export type MessageRevisionSummary = {
   revisionIndex: number;
@@ -124,6 +154,14 @@ export type AgentPromptResponse = {
 export type AgentAbortRequest = {
   sessionId: string;
   turnId?: string;
+};
+
+export type AgentCompactRequest = {
+  sessionId: string;
+};
+
+export type AgentCompactResponse = {
+  accepted: boolean;
 };
 
 export type ToolPermissionRequest = {
@@ -163,6 +201,16 @@ export type AgentEvent =
       isError?: boolean;
     }
   | { type: "tool_permission_request"; request: ToolPermissionRequest }
+  | { type: "compaction_start"; reason: ContextCompactionReason }
+  | {
+      type: "compaction_end";
+      reason: ContextCompactionReason;
+      ok: boolean;
+      tokensBefore?: number;
+      firstKeptMessageId?: string;
+      willRetry: boolean;
+      error?: { code: string; message: string };
+    }
   | { type: "error"; error: { code: string; message: string; retriable?: boolean } }
   | { type: "status"; status: AgentStatus };
 
@@ -294,6 +342,8 @@ export type AppSettings = {
   /** UI language; `auto` (and absent) follows the OS locale. */
   language?: "auto" | "en" | "zh-CN";
   enterToSend: boolean;
+  /** Model-context checkpoint behavior; absent legacy values use defaults. */
+  contextCompaction?: ContextCompactionSettings;
   /** User overrides for the shared application shortcut map. */
   keybindings?: KeybindingOverrides;
   /** Unlocks the devtools console (settings button, F12, macOS View menu). */

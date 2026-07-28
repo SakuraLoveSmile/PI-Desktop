@@ -351,6 +351,25 @@ may be retained while exactly one workspace supplies the visible shell context.
 - No confirmation dialog for abort — it is always immediate
 - Aborted message gets a muted "(aborted)" suffix, not deleted
 
+## 3A. Context checkpoint lifecycle
+
+- `turn_end` marks one completed model/tool turn and may be followed by another
+  provider request. It never re-enables the composer or session configuration.
+- Automatic context protection evaluates after every `turn_end`. A transient
+  soft instruction has no visible row; if the model calls `CompactContext`, its
+  call/result appears in the current processing group and checkpoint generation
+  starts after that tool turn.
+- `compaction_start` keeps the session running. Threshold and overflow
+  `compaction_end` events remain inside the active run; only `agent_end` or
+  `error` settles it. A manual-only checkpoint settles on `compaction_end`.
+- Successful manual/threshold compaction shows one informational toast. A
+  successful overflow recovery shows one warning toast before the single retry.
+- Manual failure shows one error toast. Automatic hard/overflow failure does
+  not duplicate the assistant error with a toast; the terminal error remains
+  attached to the failed turn.
+- Compaction never removes visible transcript messages. The checkpoint affects
+  only future model context and survives session switching/restart.
+
 ## 4. Long content collapse / expand
 
 ### 4.1 Collapse thresholds
@@ -425,6 +444,8 @@ Agent calls high-risk tool
 | Plugin load/unload success | Success | 4s | Confirmation of background action |
 | Settings saved | Success | 4s | Quick confirmation |
 | Manual menu update check failure | Error | 8s | Direct feedback for an explicit command |
+| Context checkpoint completed | Info (Warning before overflow retry) | 4s/8s | Confirms a background context transition without altering transcript rows |
+| Manual context checkpoint failure | Error | 8s | Direct feedback for explicit `/compact`; automatic terminal failures stay inline |
 
 ### 6.2 Inline errors (use for)
 

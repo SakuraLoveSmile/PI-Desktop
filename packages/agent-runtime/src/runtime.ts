@@ -1,17 +1,32 @@
 import { randomUUID } from "node:crypto";
 import {
   Agent,
+  buildSessionContext,
+  compact,
+  convertToLlm,
+  estimateContextTokens,
+  estimateTokens,
+  prepareCompaction,
+  type AgentContext,
   type AgentEvent,
+  type AgentLoopTurnUpdate,
   type AgentMessage,
   type AgentTool,
+  type CompactionEntry,
+  type CompactionSettings,
+  type MessageEntry,
+  type PrepareNextTurnContext,
+  type SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import {
   createModels,
   createProvider,
+  isContextOverflow,
   Type,
   type Api,
   type AssistantMessage,
   type Model,
+  type Models,
   type ProviderStreams,
   type ToolResultMessage,
   type Usage,
@@ -20,9 +35,13 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
+import { DEFAULT_CONTEXT_COMPACTION_SETTINGS } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   AgentStatus,
+  ContextCompactionReason,
+  ContextCompactionRecord,
+  ContextCompactionSettings,
   MessageUsage,
   Mode,
   ThinkingLevel,
@@ -62,6 +81,25 @@ function usageFromPi(usage: Usage | undefined | null): MessageUsage | undefined 
   };
 }
 
+function usageToPi(usage: MessageUsage | undefined): Usage {
+  const input = usage?.inputTokens ?? 0;
+  const output = usage?.outputTokens ?? 0;
+  const cacheRead = usage?.cacheReadTokens ?? 0;
+  const cacheWrite = usage?.cacheWriteTokens ?? 0;
+  return {
+    input,
+    output,
+    cacheRead,
+    cacheWrite,
+    ...(usage?.reasoningTokens !== undefined
+      ? { reasoning: usage.reasoningTokens }
+      : {}),
+    totalTokens:
+      usage?.totalTokens ?? input + output + cacheRead + cacheWrite,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  };
+}
+
 export type RuntimeProviderConfig = {
   id: string;
   name: string;
@@ -79,6 +117,35 @@ export type RuntimeProviderConfig = {
 
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_TOKENS = 8_192;
+const CONTEXT_COMPACTION_TOOL_NAME = "CompactContext";
+const CONTEXT_NUDGE_TURN_INTERVAL = 3;
+const CONTEXT_COMPACTION_NUDGE = [
+  "<context_management>",
+  "The working context is approaching its safe limit.",
+  `Before starting more exploration, call ${CONTEXT_COMPACTION_TOOL_NAME} once with a short focus describing the active task and the facts that must survive.`,
+  "You may finish the current atomic tool batch first. Do not call the tool repeatedly after it confirms the request.",
+  "</context_management>",
+].join("\n");
+
+function normalizeCompactionSettings(
+  value?: Partial<ContextCompactionSettings>,
+): CompactionSettings {
+  const positiveInt = (candidate: unknown, fallback: number) =>
+    typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0
+      ? Math.round(candidate)
+      : fallback;
+  return {
+    enabled: value?.enabled !== false,
+    reserveTokens: positiveInt(
+      value?.reserveTokens,
+      DEFAULT_CONTEXT_COMPACTION_SETTINGS.reserveTokens,
+    ),
+    keepRecentTokens: positiveInt(
+      value?.keepRecentTokens,
+      DEFAULT_CONTEXT_COMPACTION_SETTINGS.keepRecentTokens,
+    ),
+  };
+}
 
 type ApiBinding = {
   api: Api;
@@ -135,6 +202,9 @@ export type AgentRuntimeOptions = {
   /** Persisted transcript to seed the agent with (session isolation: each
    * session's agent carries only its own history). */
   history?: UiMessage[];
+  /** Latest host-owned checkpoint used only to rebuild model context. */
+  compaction?: ContextCompactionRecord;
+  compactionSettings?: ContextCompactionSettings;
   /** Plugin agent tools to expose to the model this session. */
   pluginTools?: PluginToolDef[];
   /** Absolute per-session scratch directory for temporary files (D114).
@@ -146,6 +216,12 @@ export type AgentRuntimeOptions = {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function timestampIso(timestamp: unknown): string {
+  return typeof timestamp === "number" && Number.isFinite(timestamp)
+    ? new Date(timestamp).toISOString()
+    : nowIso();
 }
 
 type AssistantContent = {
@@ -192,6 +268,20 @@ function assistantContent(content: unknown): AssistantContent {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function retainedTailForContext(value: unknown): AgentMessage[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.filter(isRecord).map((message) => {
+    if (message.role !== "assistant") return message as unknown as AgentMessage;
+    // Provider usage describes the request before compaction. Reusing it in a
+    // restored retained tail makes the next budget calculation count the old
+    // full context again instead of the compacted context.
+    return {
+      ...message,
+      usage: usageToPi(undefined),
+    } as AgentMessage;
+  });
 }
 
 function safeJson(value: unknown): string {
@@ -263,6 +353,8 @@ function toolResultFromUi(
 
 export class DesktopAgentRuntime {
   private agent: Agent;
+  private models: Models;
+  private model: Model<Api>;
   private turnId?: string;
   private disposed = false;
   readonly sessionId: string;
@@ -281,6 +373,18 @@ export class DesktopAgentRuntime {
    * which is the correct anchor: the request goes out once all have resolved. */
   private requestStartedAt?: number;
   private streamStartedAt?: number;
+  private fullEntries: MessageEntry[];
+  private activeCompaction?: ContextCompactionRecord;
+  private compactionSettings: CompactionSettings;
+  private pendingUserMessageId?: string;
+  private pendingOverflow = false;
+  private overflowRecoveryAttempted = false;
+  private suppressOverflowRunEnd = false;
+  private turnHadError = false;
+  private compactionAbort?: AbortController;
+  private compactionInProgress = false;
+  private pendingModelCompaction?: { instructions?: string };
+  private nudgeCooldownTurns = 0;
 
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
@@ -291,10 +395,15 @@ export class DesktopAgentRuntime {
     this.onEvent = opts.onEvent;
     this.pluginTools = opts.pluginTools ?? [];
     this.scratchDir = opts.scratchDir;
+    this.compactionSettings = normalizeCompactionSettings(
+      opts.compactionSettings,
+    );
 
     const model = this.buildModel();
+    this.model = model;
     const tools = this.buildTools();
     const models = createModels();
+    this.models = models;
     const runtimeApiKey =
       this.provider.apiKey ||
       (this.provider.authKind === "none" ? "pi-desktop-no-auth" : "");
@@ -315,6 +424,9 @@ export class DesktopAgentRuntime {
     });
     models.setProvider(provider);
 
+    this.fullEntries = this.historyToEntries(opts.history ?? []);
+    this.activeCompaction = opts.compaction;
+
     this.agent = new Agent({
       streamFn: (m, context, options) =>
         models.streamSimple(m, context, {
@@ -327,6 +439,9 @@ export class DesktopAgentRuntime {
           maxRetries: 2,
         }),
       getApiKey: async () => runtimeApiKey,
+      convertToLlm,
+      prepareNextTurnWithContext: (context, signal) =>
+        this.prepareNextTurn(context, signal),
       initialState: {
         systemPrompt:
           opts.systemPrompt ??
@@ -351,13 +466,11 @@ export class DesktopAgentRuntime {
         model,
         tools,
         thinkingLevel: this.thinkingLevel,
-        messages: this.historyToAgentMessages(opts.history ?? []),
+        messages: buildSessionContext(this.entriesWithCompaction()).messages,
       },
     });
 
-    this.agent.subscribe((event) => {
-      void this.handleAgentEvent(event);
-    });
+    this.agent.subscribe((event) => this.handleAgentEvent(event));
   }
 
   /** True when this runtime can be reused for a prompt with the given config. */
@@ -416,17 +529,20 @@ export class DesktopAgentRuntime {
    * the model forgot every file it had read and, seeing its own history
    * "answer" without visible tool use, stopped calling tools altogether.
    * Failed assistant turns stay transcript-only. */
-  private historyToAgentMessages(history: UiMessage[]): AgentMessage[] {
-    const zeroUsage: Usage = {
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      totalTokens: 0,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-    };
+  private historyToEntries(history: UiMessage[]): MessageEntry[] {
     const api = apiBindingForStyle(this.provider.apiStyle).api;
-    const messages: AgentMessage[] = [];
+    const entries: MessageEntry[] = [];
+    const append = (id: string, message: AgentMessage): MessageEntry => {
+      const entry: MessageEntry = {
+        type: "message",
+        id,
+        parentId: entries.at(-1)?.id ?? null,
+        timestamp: timestampIso(message.timestamp),
+        message,
+      };
+      entries.push(entry);
+      return entry;
+    };
     // Tool rows attach their calls to the assistant message that made them
     // (the nearest one above), keeping each call adjacent to its result as
     // the provider APIs require.
@@ -436,7 +552,7 @@ export class DesktopAgentRuntime {
       if (m.role === "user") {
         toolCarrier = undefined;
         if (!(m.content || "").trim()) continue;
-        messages.push({ role: "user", content: m.content, timestamp });
+        append(m.id, { role: "user", content: m.content, timestamp });
       } else if (m.role === "assistant") {
         toolCarrier = undefined;
         // Failed provider responses belong in the transcript for diagnosis,
@@ -458,11 +574,11 @@ export class DesktopAgentRuntime {
           api,
           provider: this.provider.id,
           model: this.provider.modelId,
-          usage: zeroUsage,
+          usage: usageToPi(m.usage),
           stopReason: "stop",
           timestamp,
         };
-        messages.push(assistant);
+        append(m.id, assistant);
         toolCarrier = assistant;
       } else if (m.role === "tool") {
         if (!m.toolCallId || !m.toolName) continue;
@@ -475,11 +591,11 @@ export class DesktopAgentRuntime {
             api,
             provider: this.provider.id,
             model: this.provider.modelId,
-            usage: zeroUsage,
+            usage: usageToPi(undefined),
             stopReason: "toolUse",
             timestamp,
           };
-          messages.push(toolCarrier);
+          append(`${m.id}:carrier`, toolCarrier);
         }
         toolCarrier.content.push({
           type: "toolCall",
@@ -490,12 +606,49 @@ export class DesktopAgentRuntime {
             : {},
         });
         toolCarrier.stopReason = "toolUse";
-        messages.push(toolResultFromUi(m, timestamp));
+        append(m.id, toolResultFromUi(m, timestamp));
       }
     }
-    return messages.filter(
-      (message) => message.role !== "assistant" || message.content.length > 0,
+    return entries.filter(
+      (entry) =>
+        entry.message.role !== "assistant" || entry.message.content.length > 0,
     );
+  }
+
+  private entriesWithCompaction(
+    checkpoint: ContextCompactionRecord | undefined = this.activeCompaction,
+  ): SessionTreeEntry[] {
+    const entries: SessionTreeEntry[] = [...this.fullEntries];
+    if (!checkpoint) return entries;
+    const throughIndex = entries.findIndex(
+      (entry) => entry.id === checkpoint.throughMessageId,
+    );
+    if (throughIndex < 0) return entries;
+    const compactionEntry: CompactionEntry = {
+      type: "compaction",
+      id: checkpoint.id,
+      parentId: checkpoint.throughMessageId,
+      timestamp: checkpoint.createdAt,
+      summary: checkpoint.summary,
+      firstKeptEntryId: checkpoint.firstKeptMessageId,
+      tokensBefore: checkpoint.tokensBefore,
+      retainedTail: retainedTailForContext(checkpoint.retainedTail),
+      details: checkpoint.details,
+      usage: checkpoint.usage as Usage | undefined,
+    };
+    entries.splice(throughIndex + 1, 0, compactionEntry);
+    return entries;
+  }
+
+  private appendLiveEntry(id: string, message: AgentMessage): void {
+    if (!id || this.fullEntries.some((entry) => entry.id === id)) return;
+    this.fullEntries.push({
+      type: "message",
+      id,
+      parentId: this.fullEntries.at(-1)?.id ?? null,
+      timestamp: timestampIso(message.timestamp),
+      message,
+    });
   }
 
   private buildModel(): Model<Api> {
@@ -627,7 +780,44 @@ export class DesktopAgentRuntime {
         Type.Object({})) as AgentTool["parameters"],
       execute: hostExecute(def.name),
     }));
-    return [...builtins, ...pluginTools];
+    const contextTools = this.compactionSettings.enabled
+      ? [this.buildContextCompactionTool()]
+      : [];
+    return [...builtins, ...pluginTools, ...contextTools];
+  }
+
+  private buildContextCompactionTool(): AgentTool {
+    return {
+      name: CONTEXT_COMPACTION_TOOL_NAME,
+      label: "Compact Context",
+      description:
+        "Request a checkpoint summary of older model context while preserving recent work. Use this once when a context-management instruction asks for it; compaction runs after the current tool turn.",
+      parameters: Type.Object({
+        focus: Type.Optional(
+          Type.String({
+            description:
+              "Short description of the active task and details that the checkpoint must preserve.",
+          }),
+        ),
+      }),
+      execute: async (_toolCallId, params) => {
+        const focus = isRecord(params) ? params.focus : undefined;
+        const instructions =
+          typeof focus === "string" && focus.trim()
+            ? `Preserve this active focus with high fidelity: ${focus.trim().slice(0, 1_000)}`
+            : undefined;
+        this.pendingModelCompaction = { instructions };
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Context compaction is queued for the end of this tool turn. Continue after the refreshed context; do not request it again now.",
+            },
+          ],
+          details: { queued: true },
+        };
+      },
+    };
   }
 
   private emit(event: AgentEventEnvelope["event"], turnId?: string) {
@@ -637,6 +827,357 @@ export class DesktopAgentRuntime {
       ts: Date.now(),
       event,
     });
+  }
+
+  setCompactionSettings(settings?: ContextCompactionSettings): void {
+    this.compactionSettings = normalizeCompactionSettings(settings);
+    this.pendingModelCompaction = undefined;
+    this.nudgeCooldownTurns = 0;
+    this.agent.state.tools = this.buildTools();
+  }
+
+  private contextBudget(messages: AgentMessage[]): {
+    tokens: number;
+    softLimit: number;
+    hardLimit: number;
+    requestHeadroom: number;
+    keepRecentTokens: number;
+  } {
+    const contextWindow = Math.max(
+      1,
+      Math.round(this.model.contextWindow || DEFAULT_CONTEXT_WINDOW),
+    );
+    const modelOutputBudget = Math.min(
+      Math.max(1, Math.round(this.model.maxTokens || DEFAULT_MAX_TOKENS)),
+      Math.max(1, Math.floor(contextWindow * 0.25)),
+    );
+    const configuredReserve = Math.min(
+      this.compactionSettings.reserveTokens,
+      Math.max(1, Math.floor(contextWindow * 0.5)),
+    );
+    const requestHeadroom = Math.min(
+      contextWindow - 1,
+      Math.max(
+        configuredReserve,
+        modelOutputBudget,
+        Math.ceil(contextWindow * 0.05),
+      ),
+    );
+    const hardLimit = Math.max(1, contextWindow - requestHeadroom);
+    const keepRecentTokens = Math.min(
+      this.compactionSettings.keepRecentTokens,
+      Math.max(1, Math.floor(hardLimit * 0.5)),
+    );
+    const softGap = Math.min(
+      Math.max(
+        keepRecentTokens,
+        Math.ceil(requestHeadroom / 2),
+      ),
+      Math.max(1, Math.floor(hardLimit * 0.25)),
+    );
+    return {
+      tokens: estimateContextTokens(messages).tokens,
+      softLimit: Math.max(1, hardLimit - softGap),
+      hardLimit,
+      requestHeadroom,
+      keepRecentTokens,
+    };
+  }
+
+  private automaticCompactionNeeded(
+    additionalMessages: AgentMessage[] = [],
+  ): boolean {
+    const context = buildSessionContext(this.entriesWithCompaction());
+    const messages = [...context.messages, ...additionalMessages];
+    const budget = this.contextBudget(messages);
+    return this.compactionSettings.enabled && budget.tokens >= budget.hardLimit;
+  }
+
+  private prepareCompactionInput(
+    entries: SessionTreeEntry[],
+    budget: {
+      hardLimit: number;
+      requestHeadroom: number;
+      keepRecentTokens: number;
+    },
+  ) {
+    const maxRetainedTailTokens = Math.max(1, Math.floor(budget.hardLimit * 0.5));
+    let keepRecentTokens = budget.keepRecentTokens;
+    let trailingToolResultTokens = 0;
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      const entry = entries[index];
+      if (entry.type !== "message" || entry.message.role !== "toolResult") break;
+      trailingToolResultTokens += estimateTokens(entry.message);
+    }
+    // pi's cut-point search cannot split a tool call/result pair. If the final
+    // result batch alone crosses keepRecentTokens, let the scan reach its
+    // assistant carrier instead of falling back to the oldest entry.
+    if (
+      trailingToolResultTokens >= keepRecentTokens &&
+      trailingToolResultTokens < maxRetainedTailTokens
+    ) {
+      keepRecentTokens = Math.min(
+        maxRetainedTailTokens,
+        trailingToolResultTokens + 1,
+      );
+    }
+    return prepareCompaction(entries, {
+      ...this.compactionSettings,
+      reserveTokens: budget.requestHeadroom,
+      keepRecentTokens,
+    });
+  }
+
+  private rebuiltAgentContext(): AgentContext {
+    const messages = buildSessionContext(this.entriesWithCompaction()).messages;
+    this.agent.state.messages = messages;
+    return {
+      systemPrompt: this.agent.state.systemPrompt,
+      messages,
+      tools: this.agent.state.tools,
+    };
+  }
+
+  private async prepareNextTurn(
+    turn: PrepareNextTurnContext,
+    _signal?: AbortSignal,
+  ): Promise<AgentLoopTurnUpdate> {
+    let context = this.rebuiltAgentContext();
+    if (!this.compactionSettings.enabled) {
+      this.pendingModelCompaction = undefined;
+      this.nudgeCooldownTurns = 0;
+      return { context };
+    }
+
+    const budget = this.contextBudget(context.messages);
+    const hardLimitReached = budget.tokens >= budget.hardLimit;
+    const modelRequest = this.pendingModelCompaction;
+    this.pendingModelCompaction = undefined;
+
+    if (hardLimitReached || modelRequest) {
+      const compacted = await this.runCompaction(
+        "threshold",
+        false,
+        modelRequest?.instructions,
+      );
+      if (compacted) {
+        this.nudgeCooldownTurns = 0;
+        context = this.rebuiltAgentContext();
+        const postCompactionBudget = this.contextBudget(context.messages);
+        if (
+          hardLimitReached &&
+          postCompactionBudget.tokens >= postCompactionBudget.hardLimit
+        ) {
+          throw new Error(
+            "CONTEXT_COMPACTION_FAILED: checkpoint remained above the safe model context budget",
+          );
+        }
+        return { context };
+      }
+      if (hardLimitReached) {
+        // Continuing would immediately issue the provider request that this
+        // guard exists to prevent. The Agent wrapper converts this failure to
+        // the normal error/agent_end event sequence.
+        throw new Error(
+          "CONTEXT_COMPACTION_FAILED: unable to create a checkpoint before the next model request",
+        );
+      }
+    }
+
+    if (budget.tokens < budget.softLimit) {
+      this.nudgeCooldownTurns = 0;
+      return { context };
+    }
+    if (turn.toolResults.length === 0) {
+      return { context };
+    }
+    if (this.nudgeCooldownTurns > 0) {
+      this.nudgeCooldownTurns -= 1;
+      return { context };
+    }
+
+    this.nudgeCooldownTurns = CONTEXT_NUDGE_TURN_INTERVAL - 1;
+    return {
+      context: {
+        ...context,
+        systemPrompt: `${context.systemPrompt}\n\n${CONTEXT_COMPACTION_NUDGE}`,
+      },
+    };
+  }
+
+  private async runCompaction(
+    reason: ContextCompactionReason,
+    willRetry: boolean,
+    customInstructions?: string,
+  ): Promise<boolean> {
+    if (this.compactionInProgress) return false;
+    this.compactionInProgress = true;
+    try {
+      return await this.performCompaction(reason, willRetry, customInstructions);
+    } finally {
+      this.compactionAbort = undefined;
+      this.compactionInProgress = false;
+    }
+  }
+
+  private async performCompaction(
+    reason: ContextCompactionReason,
+    willRetry: boolean,
+    customInstructions?: string,
+  ): Promise<boolean> {
+    this.emit({ type: "compaction_start", reason });
+    const entries = this.entriesWithCompaction();
+    const context = buildSessionContext(entries);
+    const budget = this.contextBudget(context.messages);
+    const preparation = this.prepareCompactionInput(entries, budget);
+    if (!preparation.ok || !preparation.value) {
+      const message = preparation.ok
+        ? "No new context is available to compact"
+        : preparation.error.message;
+      this.emit({
+        type: "compaction_end",
+        reason,
+        ok: false,
+        willRetry: false,
+        error: { code: "CONTEXT_COMPACTION_FAILED", message },
+      });
+      return false;
+    }
+
+    this.compactionAbort = new AbortController();
+    let result: Awaited<ReturnType<typeof compact>>;
+    try {
+      result = await compact(
+        preparation.value,
+        this.models,
+        this.model,
+        customInstructions,
+        this.compactionAbort.signal,
+        this.thinkingLevel,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.emit({
+        type: "compaction_end",
+        reason,
+        ok: false,
+        tokensBefore: preparation.value.tokensBefore,
+        willRetry: false,
+        error: { code: "CONTEXT_COMPACTION_FAILED", message },
+      });
+      return false;
+    } finally {
+      this.compactionAbort = undefined;
+    }
+    if (!result.ok) {
+      this.emit({
+        type: "compaction_end",
+        reason,
+        ok: false,
+        tokensBefore: preparation.value.tokensBefore,
+        willRetry: false,
+        error: {
+          code: "CONTEXT_COMPACTION_FAILED",
+          message: result.error.message,
+        },
+      });
+      return false;
+    }
+
+    const throughMessageId = this.fullEntries.at(-1)?.id;
+    if (!throughMessageId) {
+      this.emit({
+        type: "compaction_end",
+        reason,
+        ok: false,
+        willRetry: false,
+        error: {
+          code: "CONTEXT_COMPACTION_FAILED",
+          message: "Compaction has no durable transcript boundary",
+        },
+      });
+      return false;
+    }
+    const checkpoint: ContextCompactionRecord = {
+      id: randomUUID(),
+      summary: result.value.summary,
+      firstKeptMessageId: result.value.firstKeptEntryId,
+      throughMessageId,
+      tokensBefore: result.value.tokensBefore,
+      usage: result.value.usage,
+      retainedTail: result.value.retainedTail,
+      details: result.value.details,
+      providerId: this.provider.id,
+      modelId: this.provider.modelId,
+      createdAt: nowIso(),
+    };
+    const compactedBudget = this.contextBudget(
+      buildSessionContext(this.entriesWithCompaction(checkpoint)).messages,
+    );
+    if (
+      (reason === "overflow" || budget.tokens >= budget.hardLimit) &&
+      compactedBudget.tokens >= compactedBudget.hardLimit
+    ) {
+      this.emit({
+        type: "compaction_end",
+        reason,
+        ok: false,
+        tokensBefore: result.value.tokensBefore,
+        willRetry: false,
+        error: {
+          code: "CONTEXT_COMPACTION_FAILED",
+          message:
+            "The checkpoint did not reduce context below the safe request budget",
+        },
+      });
+      return false;
+    }
+    try {
+      await this.host.call("session.appendCompaction", {
+        sessionId: this.sessionId,
+        compaction: checkpoint,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.emit({
+        type: "compaction_end",
+        reason,
+        ok: false,
+        tokensBefore: result.value.tokensBefore,
+        willRetry: false,
+        error: { code: "CONTEXT_COMPACTION_FAILED", message },
+      });
+      return false;
+    }
+
+    this.activeCompaction = checkpoint;
+    this.agent.state.messages = buildSessionContext(
+      this.entriesWithCompaction(),
+    ).messages;
+    this.emit({
+      type: "compaction_end",
+      reason,
+      ok: true,
+      tokensBefore: checkpoint.tokensBefore,
+      firstKeptMessageId: checkpoint.firstKeptMessageId,
+      willRetry,
+    });
+    return true;
+  }
+
+  async compactManually(): Promise<void> {
+    if (this.disposed) throw new Error("runtime disposed");
+    if (this.agent.state.isStreaming || this.compactionInProgress) {
+      throw Object.assign(new Error("session already has an active turn"), {
+        errorCode: "AGENT_BUSY",
+      });
+    }
+    const ok = await this.runCompaction("manual", false);
+    if (!ok) {
+      throw Object.assign(new Error("context compaction failed"), {
+        errorCode: "CONTEXT_COMPACTION_FAILED",
+      });
+    }
   }
 
   private async handleAgentEvent(event: AgentEvent) {
@@ -709,7 +1250,18 @@ export class DesktopAgentRuntime {
         break;
       }
       case "message_end": {
+        if (event.message.role === "user") {
+          const id = this.pendingUserMessageId ?? randomUUID();
+          this.pendingUserMessageId = undefined;
+          this.appendLiveEntry(id, event.message);
+          break;
+        }
+        if (event.message.role === "toolResult") {
+          this.appendLiveEntry(event.message.toolCallId || randomUUID(), event.message);
+          break;
+        }
         if (this.currentAssistant && event.message.role === "assistant") {
+          const assistantId = this.currentAssistant.id;
           const content = assistantContent((event.message as any).content);
           // pi-agent-core encodes stream failures in the final message
           // (stopReason "error"/"aborted" + errorMessage) and resolves the
@@ -717,7 +1269,11 @@ export class DesktopAgentRuntime {
           const stopReason = (event.message as any).stopReason as
             | string
             | undefined;
-          const failed = stopReason === "error";
+          const overflow = isContextOverflow(
+            event.message as AssistantMessage,
+            this.model.contextWindow || DEFAULT_CONTEXT_WINDOW,
+          );
+          const failed = stopReason === "error" || overflow;
           const aborted = stopReason === "aborted";
           const errorMessage =
             failed &&
@@ -727,9 +1283,18 @@ export class DesktopAgentRuntime {
               : failed
                 ? "provider stream failed"
                 : undefined;
-          const classifiedError = errorMessage
-            ? classifyAgentError(errorMessage)
-            : undefined;
+          const classifiedError = overflow
+            ? errorMessage
+              ? classifyAgentError(errorMessage)
+              : {
+                  code: "CONTEXT_TOO_LARGE",
+                  message:
+                    "The provider rejected or truncated an oversized model context",
+                  retriable: false,
+                }
+            : errorMessage
+              ? classifyAgentError(errorMessage)
+              : undefined;
           const nextText = content.hasText
             ? content.text
             : this.currentAssistant.content;
@@ -777,7 +1342,19 @@ export class DesktopAgentRuntime {
           });
           this.streamStartedAt = undefined;
           this.currentAssistant = undefined;
-          if (classifiedError) {
+          const canRecoverOverflow =
+            this.compactionSettings.enabled &&
+            overflow &&
+            !this.overflowRecoveryAttempted;
+          if (!failed && !aborted) {
+            this.appendLiveEntry(assistantId, event.message);
+          } else {
+            this.turnHadError = true;
+          }
+          if (canRecoverOverflow) {
+            this.pendingOverflow = true;
+            this.suppressOverflowRunEnd = true;
+          } else if (classifiedError) {
             this.emit({ type: "error", error: classifiedError });
           }
         }
@@ -810,9 +1387,11 @@ export class DesktopAgentRuntime {
         });
         break;
       case "turn_end":
+        if (this.suppressOverflowRunEnd) break;
         this.emit({ type: "turn_end" });
         break;
       case "agent_end":
+        if (this.suppressOverflowRunEnd) break;
         this.emit({
           type: "agent_end",
           messageIds: [],
@@ -869,17 +1448,88 @@ export class DesktopAgentRuntime {
     this.currentAssistant = undefined;
   }
 
-  async prompt(content: string): Promise<{ turnId: string }> {
+  private failBeforeProviderRequest(
+    incomingUserMessage: AgentMessage,
+    error: ReturnType<typeof classifyAgentError>,
+  ): void {
+    const userMessageId = this.pendingUserMessageId || randomUUID();
+    this.pendingUserMessageId = undefined;
+    this.appendLiveEntry(userMessageId, incomingUserMessage);
+    this.agent.state.messages = buildSessionContext(
+      this.entriesWithCompaction(),
+    ).messages;
+    this.turnHadError = true;
+    this.finalizeCurrentAssistant("error", error);
+    this.emit({ type: "error", error });
+  }
+
+  async prompt(content: string, userMessageId?: string): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
     this.turnId = randomUUID();
+    this.pendingUserMessageId = userMessageId;
+    this.pendingOverflow = false;
+    this.overflowRecoveryAttempted = false;
+    this.suppressOverflowRunEnd = false;
+    this.turnHadError = false;
     this.requestStartedAt = Date.now();
     this.emit({
       type: "status",
       status: this.getStatus(),
     });
     try {
+      const incomingUserMessage: AgentMessage = {
+        role: "user",
+        content,
+        timestamp: Date.now(),
+      };
+      if (this.automaticCompactionNeeded([incomingUserMessage])) {
+        const compacted = await this.runCompaction("threshold", false);
+        if (!compacted) {
+          this.failBeforeProviderRequest(incomingUserMessage, {
+            code: "CONTEXT_COMPACTION_FAILED",
+            message: "Automatic context compaction failed before the model request",
+            retriable: false,
+          });
+          return { turnId: this.turnId };
+        }
+        if (this.automaticCompactionNeeded([incomingUserMessage])) {
+          this.failBeforeProviderRequest(incomingUserMessage, {
+            code: "CONTEXT_TOO_LARGE",
+            message:
+              "The pending prompt still exceeds the safe model context budget after compaction",
+            retriable: false,
+          });
+          return { turnId: this.turnId };
+        }
+      }
       await this.agent.prompt(content);
       await this.agent.waitForIdle();
+
+      if (this.pendingOverflow) {
+        this.pendingOverflow = false;
+        this.suppressOverflowRunEnd = false;
+        this.overflowRecoveryAttempted = true;
+        const messages = [...this.agent.state.messages];
+        if (messages.at(-1)?.role === "assistant") messages.pop();
+        this.agent.state.messages = messages;
+        const compacted = await this.runCompaction("overflow", true);
+        if (!compacted) {
+          this.emit({
+            type: "error",
+            error: {
+              code: "CONTEXT_COMPACTION_FAILED",
+              message: "Context overflow recovery could not create a checkpoint",
+              retriable: false,
+            },
+          });
+          return { turnId: this.turnId };
+        }
+        this.turnHadError = false;
+        this.requestStartedAt = Date.now();
+        await this.agent.continue();
+        await this.agent.waitForIdle();
+      }
+
     } catch (err) {
       const classifiedError = classifyAgentError(err);
       this.finalizeCurrentAssistant(
@@ -893,12 +1543,13 @@ export class DesktopAgentRuntime {
 
   async abort(): Promise<void> {
     this.agent.abort();
+    this.compactionAbort?.abort();
   }
 
   getStatus(): AgentStatus {
     return {
       sessionId: this.sessionId,
-      isRunning: this.agent.state.isStreaming,
+      isRunning: this.agent.state.isStreaming || this.compactionInProgress,
       currentTurnId: this.turnId,
       modelId: this.provider.modelId,
       pendingToolConfirmations: 0,
@@ -908,5 +1559,6 @@ export class DesktopAgentRuntime {
   async dispose(): Promise<void> {
     this.disposed = true;
     this.agent.abort();
+    this.compactionAbort?.abort();
   }
 }

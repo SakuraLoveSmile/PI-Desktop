@@ -1,8 +1,8 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.10`
-- Date: `2026-07-27`
-- Status: `Frozen for implementation details (session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
+- Baseline Version: `0.4.11`
+- Date: `2026-07-28`
+- Status: `Frozen for implementation details (turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -29,6 +29,8 @@
 > ADR 0027.
 > `0.4.10` replaces destructive work-panel clearing on conversation switches
 > with runtime session-scoped contexts through D142 / ADR 0028.
+> `0.4.11` adopts turn-boundary model-context checkpoint compaction through
+> D158 / ADR 0030 while preserving the complete visible transcript.
 
 ## Frozen Decisions
 
@@ -80,6 +82,9 @@
     project/session pin, archive, collapse, and sort metadata**
 42. Project activation: **one visible host workspace via existing
     `project.set`; tool roots remain bound to the originating session project**
+43. Context management: **pi-native checkpoint summaries with PI-Desktop-owned
+    per-`turn_end` soft guidance, deterministic pre-request hard guards,
+    durable host checkpoints, and one overflow retry**
 
 ## Source of Truth
 
