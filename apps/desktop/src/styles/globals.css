@@ -1476,24 +1476,9 @@ html {
 .composer-input-wrap {
   position: relative;
   display: flex;
-  gap: 8px;
   align-items: flex-start;
   padding: 10px 12px 0;
   min-height: 44px;
-}
-
-.composer-thread-mark {
-  display: inline-flex;
-  width: 15px;
-  height: 18px;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  margin-top: 1px;
-  color: color-mix(in oklab, var(--ds-text-primary) 38%, transparent);
-  line-height: var(--leading-normal);
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .composer-input {
@@ -4123,13 +4108,6 @@ html {
   min-height: 44px;
   align-items: flex-start;
   padding: 10px 14px 0;
-  gap: 8px;
-}
-
-.composer-dock-home .composer-thread-mark {
-  margin-top: 0;
-  line-height: var(--leading-compact);
-  color: color-mix(in oklab, var(--ds-text-primary) 72%, transparent);
 }
 
 .composer-dock-home .composer-input {
@@ -4154,12 +4132,6 @@ html {
   /* Gold empty-home placeholder ink ~#525355–#58595b */
   color: #4a4c4f;
   -webkit-text-fill-color: #4a4c4f;
-  opacity: 1;
-}
-
-:root[data-theme="light"] .composer-thread-mark {
-  /* Preserve the canonical brand asset rather than tinting a legacy glyph. */
-  color: #1a1c1f;
   opacity: 1;
 }
 
@@ -4427,14 +4399,6 @@ html {
 
 :root[data-theme="dark"] .composer-input {
   color: var(--gray-0);
-}
-
-:root[data-theme="dark"] .composer-thread-mark {
-  color: color-mix(in oklab, var(--gray-0) 55%, transparent);
-}
-
-:root[data-theme="dark"] .composer-dock-home .composer-thread-mark {
-  color: color-mix(in oklab, var(--gray-0) 62%, transparent);
 }
 
 :root[data-theme="dark"] .composer-toolbar .icon-btn,

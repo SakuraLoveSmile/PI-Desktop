@@ -43,9 +43,10 @@ destination, chat as the home surface, tools and permissions inline.
   command, and sortable views. Projects not retained in the sidebar remain
   discoverable through Settings → Project archive.
   Collapsible to an icon rail (Cmd/Ctrl+B).
-- **Product identity**: runtime shell copy uses `PI-Desktop`; the home hero,
-  sidebar, and docked composer reuse the canonical `build/icon_1024.png` logo,
-  while New task/session controls use a dedicated message-plus icon. On
+- **Product identity**: runtime shell copy uses `PI-Desktop`; the home hero and
+  sidebar reuse the canonical `build/icon_1024.png` logo, while composer prompt
+  rows have no leading brand icon and New task/session controls use a dedicated
+  message-plus icon. On
   Windows/Linux, the expanded sidebar begins with a keyboard-accessible Home
   brand and Search plus Collapse sidebar controls at the right; activating the
   brand returns the main pane to chat. The macOS expanded sidebar omits the

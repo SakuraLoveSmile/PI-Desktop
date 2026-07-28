@@ -1,8 +1,8 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.11`
+- Baseline Version: `0.4.12`
 - Date: `2026-07-28`
-- Status: `Frozen for implementation details (turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
+- Status: `Frozen for implementation details (icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -31,6 +31,9 @@
 > with runtime session-scoped contexts through D142 / ADR 0028.
 > `0.4.11` adopts turn-boundary model-context checkpoint compaction through
 > D158 / ADR 0030 while preserving the complete visible transcript.
+> `0.4.12` standardizes home and thread-docked composer prompt rows without a
+> leading brand mark through D160 / ADR 0031 while preserving shell branding
+> elsewhere.
 
 ## Frozen Decisions
 
