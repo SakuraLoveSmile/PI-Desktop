@@ -273,6 +273,8 @@ heights (≈28–32px) so density stays WorkBuddy/Codex-like while glyphs scale 
 
 - Projects and Sessions headings have localized names; each disclosure and
   create action has a scope-specific accessible name
+- Under `lang=zh-CN`, section labels keep normal tracking and skip
+  `text-transform: uppercase` so two-glyph labels are not letter-spaced apart
 - Session groups use semantic `section` containers
 - Active session: `aria-current="true"`
 - Every visible session indicator has a localized accessible name and tooltip;
