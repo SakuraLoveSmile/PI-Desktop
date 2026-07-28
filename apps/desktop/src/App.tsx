@@ -36,7 +36,6 @@ import { StartupSplash } from "./components/StartupSplash";
 import { cx } from "./components/ui";
 import {
   IconNewSession,
-  IconPanel,
   IconSidebar,
 } from "./components/icons";
 
@@ -128,24 +127,6 @@ function CollapsedTitlebarActions({
         onClick={onNewTask}
       >
         <IconNewSession size={13} />
-      </button>
-    </div>
-  );
-}
-
-function SessionPaneWorkPanelCollapse({ onCollapse }: { onCollapse: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <div className="session-pane-toggle no-drag">
-      <button
-        type="button"
-        className="title-nav-btn work-panel-collapse"
-        data-action="collapse-work-panel"
-        title={t("panel.collapse")}
-        aria-label={t("panel.collapse")}
-        onClick={onCollapse}
-      >
-        <IconPanel size={13} />
       </button>
     </div>
   );
@@ -812,13 +793,6 @@ function AppShell() {
                   />
                 </div>
               )}
-              {workPanelOpen && (
-                <div className="main-titlebar-right no-drag">
-                  <SessionPaneWorkPanelCollapse
-                    onCollapse={() => useAppStore.getState().collapseWorkPanel()}
-                  />
-                </div>
-              )}
             </div>
             <UpdateBanner />
 
@@ -863,7 +837,7 @@ function AppShell() {
           </section>
 
           {workPanelOpen && (
-            <WorkPanel browserBlocked={paletteOpen || searchOpen} />
+            <WorkPanel browserBlocked={paletteOpen || searchOpen} onCollapse={() => useAppStore.getState().collapseWorkPanel()} />
           )}
 
           <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />

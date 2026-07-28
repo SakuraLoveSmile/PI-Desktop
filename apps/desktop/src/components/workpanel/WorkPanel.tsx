@@ -17,6 +17,7 @@ import {
   IconDiff,
   IconFileText,
   IconGlobe,
+  IconPanel,
   IconTerminal,
 } from "../icons";
 import { ReviewTab } from "./ReviewTab";
@@ -44,6 +45,7 @@ const HEADER_TOOLS = [
   { kind: "review", Icon: IconDiff },
   { kind: "terminal", Icon: IconTerminal },
   { kind: "browser", Icon: IconGlobe },
+  { kind: "file", Icon: IconFileText },
 ] as const;
 
 function workPanelWidthContext() {
@@ -64,7 +66,7 @@ function tabLabel(tab: WorkPanelTab, t: (key: string) => string) {
   return path.split("/").filter(Boolean).pop() || path;
 }
 
-export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean }) {
+export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlocked?: boolean; onCollapse?: () => void }) {
   const { t } = useTranslation();
   const tabs = useAppStore((s) => s.workPanelTabs);
   const activeTabId = useAppStore((s) => s.activeWorkPanelTabId);
@@ -285,6 +287,19 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
         className="work-panel-rail no-drag"
         aria-label={t("panel.openTool")}
       >
+        {onCollapse && (
+          <button
+            type="button"
+            className="work-panel-rail-button work-panel-rail-collapse"
+            data-action="collapse-work-panel"
+            title={t("panel.collapse")}
+            aria-label={t("panel.collapse")}
+            onClick={onCollapse}
+          >
+            <IconPanel size={16} />
+          </button>
+        )}
+        <div className="work-panel-rail-spacer" />
         {HEADER_TOOLS.map(({ kind, Icon }) => {
           const selected = activeTab?.kind === kind;
           const open = tabs.some((tab) => tab.kind === kind);

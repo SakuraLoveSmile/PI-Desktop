@@ -481,16 +481,10 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
           ) : null}
           <div className="composer-input-wrap">
-            {/* Docked threads carry the brand mark; the empty home keeps a clean draft. */}
-            {variant === "docked" ? (
-              <span className="composer-thread-mark" aria-hidden>
-                <BrandLogo size={15} />
-              </span>
-            ) : null}
             <textarea
               ref={ref}
               className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}
-              rows={1}
+              rows={2}
               placeholder={t(variant === "home" ? "chat.placeholderHome" : "chat.placeholder")}
               spellCheck={false}
               autoCorrect="off"

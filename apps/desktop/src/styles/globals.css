@@ -1456,7 +1456,6 @@ html {
   box-shadow:
     var(--ds-elevation-stroke),
     0 7px 24px color-mix(in oklab, var(--ds-text-primary) 9%, transparent);
-  transform: translateY(-1px);
 }
 
 .composer-meta {
@@ -6883,6 +6882,15 @@ html {
 
 .work-panel-collapse {
   flex: 0 0 auto;
+}
+
+.work-panel-rail-collapse {
+  /* collapse button sits at the top of the rail */
+}
+
+.work-panel-rail-spacer {
+  flex: 1;
+  min-height: 0;
 }
 
 .work-panel-body {

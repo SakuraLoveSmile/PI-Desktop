@@ -79,8 +79,8 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
   assert.match(panelSource, /closeTab\(tab\.id\)/);
   assert.doesNotMatch(panelSource, /collapsePanel/);
   assert.doesNotMatch(panelSource, /work-panel-collapse/);
-  assert.match(appSource, /data-action="collapse-work-panel"/);
-  assert.match(appSource, /SessionPaneWorkPanelCollapse/);
+  assert.match(panelSource, /onCollapse/);
+  assert.match(panelSource, /work-panel-rail-collapse/);
   assert.match(panelSource, /data-work-panel-section="current"/);
   assert.match(panelSource, /panel\.openTool/);
   assert.match(panelSource, /panel\.openItems/);
