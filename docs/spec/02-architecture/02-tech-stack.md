@@ -12,8 +12,12 @@
 | Host backend | **Rust** | stable Rust toolchain | tools/plugins/permissions/persistence adapters |
 | Rust async | tokio | stable | host services |
 | Host RPC | stdio JSON-RPC (NDJSON) | frozen (D001) | Electron main ↔ Rust host |
-| Agent engine | `@earendil-works/pi-agent-core` | ^0.82+ | agent loop |
-| Model API | `@earendil-works/pi-ai` | ^0.82+ | providers |
+| Agent engine | `@earendil-works/pi-agent-core` | ^0.82.1+ | agent loop |
+| Model API | `@earendil-works/pi-ai` | ^0.82.1+ | providers |
+
+> Pin **^0.82.1+** is required for Claude Opus 5 catalog metadata
+> (`claude-opus-5`, 1M context, adaptive thinking). Earlier 0.82.0 builds
+> treated that id as an unknown free-form model.
 | Node runtime | Node.js | `>= 22.19` | pi requirement |
 | DB | SQLite | via Rust and/or node adapter | sessions/settings |
 | Packaging | electron-builder | stable | macOS first |
