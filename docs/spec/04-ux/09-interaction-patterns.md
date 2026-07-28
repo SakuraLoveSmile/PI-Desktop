@@ -136,9 +136,25 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 #### Session isolation across tabs
 
-- Selecting a project-scoped conversation activates its project before loading
-  the transcript. Selecting a Temporary conversation clears the visible
-  workspace.
+- Selecting a row immediately marks that destination as selected. A 120ms
+  pointer hover or keyboard focus may prefetch its transcript; duplicate reads
+  share one in-flight request and the renderer retains at most five recent
+  transcript snapshots.
+- Transcript loading starts without waiting for an older superseded selection.
+  When session summary metadata is available, project activation/clearing and
+  transcript IO run in parallel. A monotonic navigation generation permits only
+  the newest selection to project the visible workspace, transcript, run state,
+  navigation history, and work-panel context.
+- A warm transcript snapshot may be presented after workspace alignment and is
+  always revalidated. A cold or React-deferred switch keeps the previous
+  complete transcript as a dimmed, non-interactive stable frame with a thin
+  progress track and `aria-busy`; it never combines the destination session id
+  with the previous session's messages. Once ready, the destination paints at
+  its final record without a top-of-history or empty-home flash.
+- Selecting a project-scoped conversation activates its project as part of the
+  store-owned selection transaction. Selecting a Temporary conversation clears
+  the visible workspace. Sidebar handlers do not perform a second project
+  navigation before session selection.
 - Run state, permission grants, and streamed events are keyed by session id.
   A project/tab switch does not abort a background turn or copy its events into
   the visible transcript. Background message, tool, completion, and permission
@@ -242,7 +258,7 @@ may be retained while exactly one workspace supplies the visible shell context.
 - On every platform, opening the visible panel requests native width equal to
   its committed width. Collapse and final close reclaim the reservation, and a
   committed divider resize updates it. Native window-edge drag changes
-  MainChat only and never the panel width (D162, ADR 0032).
+  MainChat only and never the panel width (D163, ADR 0032).
 - A successful workspace Write/Edit creates or activates Review in its
   originating session. Failed and scratch writes do not. Background-session
   artifacts update only their retained context and never open, activate, resize,

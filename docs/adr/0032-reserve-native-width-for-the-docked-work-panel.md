@@ -5,7 +5,7 @@
 - Related: [01-ui-ia](../spec/04-ux/01-ui-ia.md) ·
   [08-component-spec §5](../spec/04-ux/08-component-spec.md) ·
   [09-interaction-patterns §8](../spec/04-ux/09-interaction-patterns.md) ·
-  [01-ipc-protocol](../spec/03-runtime/01-ipc-protocol.md) · decision D162
+  [01-ipc-protocol](../spec/03-runtime/01-ipc-protocol.md) · decision D163
 - Supersedes in part: ADR 0029 and decision D156
 
 ## Context
@@ -108,4 +108,4 @@ both panel fidelity and operable window chrome.
 - `docs/spec/04-ux/08-component-spec.md`
 - `docs/spec/04-ux/09-interaction-patterns.md`
 - `docs/spec/06-delivery/04-e2e-test-plan.md` (E2E-056)
-- `docs/spec/08-meta/decisions-log.md` (D162)
+- `docs/spec/08-meta/decisions-log.md` (D163)

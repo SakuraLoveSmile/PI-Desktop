@@ -80,7 +80,14 @@ test("permission approval is an inline transcript card, never a global dialog", 
   assert.doesNotMatch(appSource, /PermissionDialog/);
   assert.doesNotMatch(chatSurfaceSource, /PermissionDialog/);
   assert.doesNotMatch(appSource, /Boolean\(permission\)/);
-  assert.match(chatSurfaceSource, /pendingPermission=\{activePermission\}/);
+  assert.match(
+    chatSurfaceSource,
+    /pendingPermission:\s*activePermission/,
+  );
+  assert.match(
+    chatSurfaceSource,
+    /pendingPermission=\{transcriptView\.pendingPermission\}/,
+  );
   assert.match(transcriptSource, /key=\{pendingPermission\.requestId\}/);
   assert.match(transcriptSource, /permission=\{pendingPermission\}/);
   assert.doesNotMatch(cardSource, /className="overlay"|className="dialog"/);
@@ -147,9 +154,11 @@ test("new navigation intents invalidate older asynchronous commits", async () =>
 
 test("session and page navigation share the latest-intent guard", () => {
   assert.match(storeSource, /createNavigationIntentController/);
-  assert.match(storeSource, /let sessionSelectionQueue: Promise<void>/);
+  assert.doesNotMatch(storeSource, /sessionSelectionQueue/);
+  assert.match(storeSource, /let sessionWorkspaceQueue: Promise<void>/);
+  assert.match(storeSource, /const detailPromise = loadSessionDetail\(id\)/);
   assert.match(storeSource, /opts\?\.navigationIntent \?\? beginNavigationIntent\(\)/);
-  assert.match(storeSource, /sessionSelectionQueue\.then\(selectLatest, selectLatest\)/);
+  assert.match(storeSource, /sessionWorkspaceQueue\.then/);
   assert.ok(
     storeSource.match(/navigationIntentIsCurrent\(intent\)/g)?.length >= 12,
     "navigation intent must be checked after asynchronous boundaries",

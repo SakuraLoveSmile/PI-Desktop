@@ -609,7 +609,7 @@ Maximize/unmaximize changes also emit
 do not cross into host-core and do not change the host RPC protocol version.
 The preload intentionally exposes no arbitrary BrowserWindow resize channel.
 The one geometry-specific capability is a target-state work-panel reservation
-(D162, ADR 0032):
+(D163, ADR 0032):
 
 ```ts
 window/setWorkPanelReservation({ width: 0 | number })

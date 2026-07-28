@@ -689,9 +689,9 @@ Codex parity decisions (D034/D070) supersede any older value here.
 | Titlebar row height | 46px | Codex toolbar rhythm (D034); traffic lights {x:16,y:16} |
 | Sidebar width (collapsed) | 48px | Icon-only rail |
 | Sidebar width (expanded) | ~275px | Codex sidebar width (D034/D070) |
-| Main pane minimum readable width | 360px | Preserved while the display work area can supply the complete native panel reservation; constrained work areas assign the unavoidable shortfall to MainChat (D162) |
+| Main pane minimum readable width | 360px | Preserved while the display work area can supply the complete native panel reservation; constrained work areas assign the unavoidable shortfall to MainChat (D163) |
 | Work panel width (closed) | 0px | Hidden by default |
-| Work panel width (open) | `364px–720px`, fixed at the committed width | 44px activity rail preserves the prior 320px content minimum; native window and sidebar changes never compress the panel (D154/D162) |
+| Work panel width (open) | `364px–720px`, fixed at the committed width | 44px activity rail preserves the prior 320px content minimum; native window and sidebar changes never compress the panel (D154/D163) |
 | Composer shell minimum | ~80px | One-line draft + toolbar padding |
 | Composer draft height | 1–7 text lines | Auto-grow; internal scroll beyond line 7 |
 | Chat message max width | 720px assistant / 560px user plate | Prevent eye-span over-stretch; user turns stay compact |
@@ -703,7 +703,7 @@ normal window expands within the display work area so chat width stays stable;
 collapse and final close reclaim that width, and a divider commit updates it.
 If the complete reservation does not fit, the panel remains fixed while chat
 absorbs the difference. Native window edges resize chat only. Persisted normal
-bounds exclude the reservation and its induced x shift (D162, ADR 0032).
+bounds exclude the reservation and its induced x shift (D163, ADR 0032).
 
 ### 10.1 Responsive collapse
 

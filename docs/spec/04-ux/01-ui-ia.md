@@ -104,7 +104,7 @@ destination, chat as the home surface, tools and permissions inline.
   moving between displays or changing a display work area reconciles the target
   against the new available width. Persisted base bounds exclude reservation
   width and its x shift. Background artifacts never change the visible
-  reservation (D162, ADR 0032).
+  reservation (D163, ADR 0032).
   Replaces the former context-panel overlay; workspace/model/status info lives
   in the composer chips and Settings instead.
 - **Composer**: workspace-agnostic floating pill anchored to the chat
