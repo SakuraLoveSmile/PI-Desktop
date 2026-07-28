@@ -94,6 +94,9 @@ export function classifyAgentError(err: unknown): ClassifiedAgentError {
     retriable,
   });
 
+  if (/CONTEXT_COMPACTION_FAILED/i.test(rawMessage)) {
+    return result("CONTEXT_COMPACTION_FAILED", false);
+  }
   if (
     (err instanceof Error && err.name === "AbortError") ||
     /\babort/i.test(rawMessage)

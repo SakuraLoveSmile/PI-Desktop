@@ -45,4 +45,5 @@ Each ADR includes:
 | 0027 | Make pi-ai authoritative for model metadata | Accepted |
 | 0028 | Scope work-panel runtime contexts to conversations | Accepted |
 | 0029 | Separate native-window and work-panel resize ownership | Accepted |
-| 0030 | Keep composer prompt rows free of brand icons | Accepted |
+| 0030 | Turn-boundary context checkpoint compaction | Accepted |
+| 0031 | Keep composer prompt rows free of brand icons | Accepted |

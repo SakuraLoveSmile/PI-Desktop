@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::db::{ms_to_ts, now_ms, ts_to_ms, Database};
 use crate::notifications::{self, Notification};
-use crate::transcripts::{self, MessageRecord, RevisionRecord};
+use crate::transcripts::{self, CompactionRecord, MessageRecord, RevisionRecord};
 
 /// Values accepted by the persisted per-session thinking selector.  Keep this
 /// list in the host boundary so old clients cannot write arbitrary provider
@@ -144,6 +144,8 @@ pub struct SessionDetail {
     #[serde(flatten)]
     pub summary: SessionSummary,
     pub messages: Vec<UiMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compaction: Option<CompactionRecord>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -450,13 +452,26 @@ fn collect_tool_call_ids(records: &[MessageRecord]) -> std::collections::HashMap
     ids
 }
 
-fn clone_records_for_fork(records: Vec<MessageRecord>) -> Vec<MessageRecord> {
+fn clone_records_for_fork(
+    records: Vec<MessageRecord>,
+) -> (
+    Vec<MessageRecord>,
+    std::collections::HashMap<String, String>,
+    std::collections::HashMap<String, String>,
+) {
     let records = dedupe_records(records);
     let tool_call_ids = collect_tool_call_ids(&records);
-    records
+    let message_ids = records
+        .iter()
+        .map(|record| (record.id.clone(), Uuid::new_v4().to_string()))
+        .collect::<std::collections::HashMap<_, _>>();
+    let cloned = records
         .into_iter()
         .map(|mut record| {
-            record.id = Uuid::new_v4().to_string();
+            record.id = message_ids
+                .get(&record.id)
+                .cloned()
+                .unwrap_or_else(|| Uuid::new_v4().to_string());
             if let Some(meta) = record.meta.as_mut().and_then(Value::as_object_mut) {
                 meta.remove("revisionRootId");
                 meta.remove("revisionCount");
@@ -482,7 +497,49 @@ fn clone_records_for_fork(records: Vec<MessageRecord>) -> Vec<MessageRecord> {
             }
             record
         })
-        .collect()
+        .collect();
+    (cloned, message_ids, tool_call_ids)
+}
+
+fn remap_value_strings(
+    value: &mut Value,
+    replacements: &std::collections::HashMap<String, String>,
+) {
+    match value {
+        Value::String(text) => {
+            if let Some(replacement) = replacements.get(text) {
+                *text = replacement.clone();
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                remap_value_strings(item, replacements);
+            }
+        }
+        Value::Object(object) => {
+            for item in object.values_mut() {
+                remap_value_strings(item, replacements);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn clone_compaction_for_fork(
+    mut compaction: CompactionRecord,
+    message_ids: &std::collections::HashMap<String, String>,
+    tool_call_ids: &std::collections::HashMap<String, String>,
+) -> Option<CompactionRecord> {
+    compaction.first_kept_message_id = compaction
+        .first_kept_message_id
+        .as_ref()
+        .and_then(|id| message_ids.get(id).cloned());
+    compaction.through_message_id = message_ids.get(&compaction.through_message_id)?.clone();
+    compaction.id = Uuid::new_v4().to_string();
+    if let Some(tail) = compaction.retained_tail.as_mut() {
+        remap_value_strings(tail, tool_call_ids);
+    }
+    Some(compaction)
 }
 
 /// Insert one search/index row for a message whose content lives in the
@@ -685,7 +742,12 @@ pub fn get_session(db: &Database, id: &str) -> Result<Option<SessionDetail>> {
     // file line lost its index transaction to a crash.
     let records = dedupe_records(transcripts::read_transcript(db.data_dir(), id)?);
     let messages = records.into_iter().map(record_to_ui).collect();
-    Ok(Some(SessionDetail { summary, messages }))
+    let compaction = transcripts::read_latest_compaction(db.data_dir(), id)?;
+    Ok(Some(SessionDetail {
+        summary,
+        messages,
+        compaction,
+    }))
 }
 
 /// Create an independent session from the source session's current canonical
@@ -736,7 +798,10 @@ pub fn fork_session_through(
         };
         source_records.truncate(position + 1);
     }
-    let records = clone_records_for_fork(source_records);
+    let source_compaction = transcripts::read_latest_compaction(db.data_dir(), source_id)?;
+    let (records, message_ids, tool_call_ids) = clone_records_for_fork(source_records);
+    let compaction = source_compaction
+        .and_then(|record| clone_compaction_for_fork(record, &message_ids, &tool_call_ids));
     let texts = records.iter().map(record_index_text).collect::<Vec<_>>();
     let id = Uuid::new_v4().to_string();
     let now = now_ms();
@@ -746,7 +811,13 @@ pub fn fork_session_through(
         .map(|value| value.chars().take(100).collect::<String>())
         .unwrap_or_else(|| format!("{} (branch)", source.summary.title));
 
-    transcripts::write_transcript(db.data_dir(), &id, &created_at, &records)?;
+    transcripts::write_transcript_with_compaction(
+        db.data_dir(),
+        &id,
+        &created_at,
+        &records,
+        compaction.as_ref(),
+    )?;
     let indexed = (|| -> Result<()> {
         let tx = db.conn().unchecked_transaction()?;
         let inserted = tx
@@ -790,6 +861,7 @@ pub fn fork_session_through(
     Ok(ForkSessionResult::Created(Box::new(SessionDetail {
         summary,
         messages,
+        compaction,
     })))
 }
 
@@ -912,10 +984,49 @@ pub fn append_message(
     Ok(())
 }
 
+pub fn append_compaction(
+    db: &Database,
+    session_id: &str,
+    compaction: &CompactionRecord,
+) -> Result<()> {
+    if compaction.id.trim().is_empty()
+        || compaction.summary.trim().is_empty()
+        || compaction.through_message_id.trim().is_empty()
+        || compaction.tokens_before < 0
+    {
+        return Err(anyhow!("invalid compaction record"));
+    }
+    let session_created = session_created_at(db, session_id)?;
+    transcripts::append_compaction(db.data_dir(), session_id, &session_created, compaction)
+}
+
+fn compaction_valid_for_records(compaction: &CompactionRecord, records: &[MessageRecord]) -> bool {
+    let Some(through_index) = records
+        .iter()
+        .position(|record| record.id == compaction.through_message_id)
+    else {
+        return false;
+    };
+    compaction.first_kept_message_id.as_ref().is_none_or(|id| {
+        records
+            .iter()
+            .position(|record| &record.id == id)
+            .is_some_and(|index| index <= through_index)
+    })
+}
+
 pub fn replace_messages(db: &Database, session_id: &str, messages: &[UiMessage]) -> Result<()> {
     let session_created = session_created_at(db, session_id)?;
     let (records, texts) = records_and_texts(messages);
-    transcripts::write_transcript(db.data_dir(), session_id, &session_created, &records)?;
+    let compaction = transcripts::read_latest_compaction(db.data_dir(), session_id)?
+        .filter(|record| compaction_valid_for_records(record, &records));
+    transcripts::write_transcript_with_compaction(
+        db.data_dir(),
+        session_id,
+        &session_created,
+        &records,
+        compaction.as_ref(),
+    )?;
     let conn = db.conn();
     let tx = conn.unchecked_transaction()?;
     tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
@@ -1353,6 +1464,108 @@ mod tests {
             tool_duration_ms: None,
             is_error: None,
         }
+    }
+
+    fn checkpoint(first: &str, through: &str) -> CompactionRecord {
+        CompactionRecord {
+            id: Uuid::new_v4().to_string(),
+            summary: "durable summary".into(),
+            first_kept_message_id: Some(first.into()),
+            through_message_id: through.into(),
+            tokens_before: 120_000,
+            usage: None,
+            retained_tail: Some(json!([{
+                "role": "user",
+                "content": "recent",
+                "timestamp": 1
+            }])),
+            details: None,
+            provider_id: Some("provider-1".into()),
+            model_id: Some("model-1".into()),
+            created_at: "2026-07-28T00:00:03Z".into(),
+        }
+    }
+
+    #[test]
+    fn compaction_survives_restart_and_late_truncation_but_not_early_truncation() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let messages = [
+            user_msg("u1", "old", "2026-07-28T00:00:00Z"),
+            user_msg("u2", "recent", "2026-07-28T00:00:01Z"),
+            user_msg("u3", "after", "2026-07-28T00:00:02Z"),
+        ];
+        for message in &messages {
+            append_message(&db, &session.id, message, None).unwrap();
+        }
+        append_compaction(&db, &session.id, &checkpoint("u2", "u2")).unwrap();
+
+        let restored = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(restored.messages.len(), 3);
+        assert_eq!(
+            restored.compaction.as_ref().unwrap().through_message_id,
+            "u2"
+        );
+
+        replace_messages(&db, &session.id, &messages[..2]).unwrap();
+        assert!(
+            get_session(&db, &session.id)
+                .unwrap()
+                .unwrap()
+                .compaction
+                .is_some()
+        );
+
+        replace_messages(&db, &session.id, &messages[..1]).unwrap();
+        assert!(
+            get_session(&db, &session.id)
+                .unwrap()
+                .unwrap()
+                .compaction
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn fork_copies_only_a_checkpoint_whose_boundary_is_included() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let messages = [
+            user_msg("u1", "old", "2026-07-28T00:00:00Z"),
+            user_msg("u2", "recent", "2026-07-28T00:00:01Z"),
+        ];
+        for message in &messages {
+            append_message(&db, &session.id, message, None).unwrap();
+        }
+        append_compaction(&db, &session.id, &checkpoint("u2", "u2")).unwrap();
+
+        let ForkSessionResult::Created(before) =
+            fork_session_through(&db, &session.id, None, Some("u1")).unwrap()
+        else {
+            panic!("expected fork");
+        };
+        assert!(before.compaction.is_none());
+
+        let ForkSessionResult::Created(including) =
+            fork_session_through(&db, &session.id, None, Some("u2")).unwrap()
+        else {
+            panic!("expected fork");
+        };
+        let copied = including.compaction.unwrap();
+        assert_eq!(
+            copied.first_kept_message_id.as_deref(),
+            Some(including.messages[1].id.as_str())
+        );
+        assert_eq!(copied.through_message_id, including.messages[1].id);
+        assert_ne!(
+            copied.id,
+            get_session(&db, &session.id)
+                .unwrap()
+                .unwrap()
+                .compaction
+                .unwrap()
+                .id
+        );
     }
 
     #[test]

@@ -30,6 +30,17 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     readable foreground/background pairing on macOS, Windows, and Linux
 - **Defaults** and **Permissions** cards retain the host-backed default mode,
   Enter-to-send, and global permission-mode controls.
+- **Context management** card:
+  - automatic compaction is enabled by default
+  - the switch controls per-`turn_end` soft guidance, deterministic threshold
+    checkpoints, the internal `CompactContext` model tool, and one overflow
+    recovery attempt
+  - disabling automatic compaction leaves manual `/compact` available for an
+    idle session
+  - Reserved tokens and Recent tokens to keep are numeric token controls with
+    a 1024 minimum; the runtime further clamps unsafe values to the active
+    model's context window as specified by D158
+  - the card and all three controls are indexed by Settings search
 - **Keyboard shortcuts** card:
   - lists navigation, agent, and window actions from one shared shortcut map
   - renders platform-native modifier labels (`⌘` on macOS, `Ctrl` on
@@ -110,8 +121,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 4. Providers is part of Agent and has no standalone rail destination
 5. Plugins has no Settings destination; the app-shell Plugins page supports
    load, enable, disable, and uninstall
-6. Basics shows host-backed Appearance, Defaults, Permissions, and Keyboard
-   shortcuts cards without adding another settings destination
+6. Basics shows host-backed Appearance, Defaults, Context management,
+   Permissions, and Keyboard shortcuts cards without adding another settings
+   destination
 7. Provider secrets never display raw key values
 8. Model configuration shows the provider studio (hero + defaults + add dialog + cards) rather than a dense always-on form dump
 9. Row descriptions use semantic secondary text and maintain at least 4.5:1
@@ -133,6 +145,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 16. Developer tools remain unavailable by default; enabling developer mode
     unlocks the localized Settings action and platform shortcuts, persists
     across restart, and disabling it closes an open console
+17. Context management defaults to automatic protection, persists all three
+    settings, and cannot configure a retained tail that prevents compaction on
+    a small-window model because runtime limits remain model-aware
 
 ## 5. Basics chrome metrics
 

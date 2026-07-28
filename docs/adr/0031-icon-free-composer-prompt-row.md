@@ -1,10 +1,10 @@
-# ADR 0030: Keep composer prompt rows free of brand icons
+# ADR 0031: Keep composer prompt rows free of brand icons
 
 - Status: Accepted
 - Date: 2026-07-28
 - Related: [01-ui-ia](../spec/04-ux/01-ui-ia.md) ·
   [07-ui-design-system](../spec/04-ux/07-ui-design-system.md) ·
-  [08-component-spec](../spec/04-ux/08-component-spec.md) · decision D158
+  [08-component-spec](../spec/04-ux/08-component-spec.md) · decision D159
 
 ## Context
 
@@ -60,4 +60,4 @@ instead of simplifying the prompt path.
 - `docs/spec/04-ux/07-ui-design-system.md`
 - `docs/spec/04-ux/08-component-spec.md`
 - `docs/spec/06-delivery/04-e2e-test-plan.md` (E2E-046, US-UI-37)
-- `docs/spec/08-meta/decisions-log.md` (D054, D094, D158)
+- `docs/spec/08-meta/decisions-log.md` (D054, D094, D159)

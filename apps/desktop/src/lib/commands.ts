@@ -25,6 +25,9 @@ export async function runPaletteCommand(commandId: string): Promise<void> {
     case "builtin.agent.abort":
       await store.abort();
       break;
+    case "builtin.agent.compact":
+      await store.compactContext();
+      break;
     case "builtin.mode.agent":
     case "builtin.mode.chat": {
       const mode = commandId.endsWith("agent") ? "agent" : "chat";

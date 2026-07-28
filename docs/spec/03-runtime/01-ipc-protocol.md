@@ -134,7 +134,19 @@ type AgentAbortRequest = {
 };
 ```
 
-### 5.3 getStatus
+### 5.3 compact (protocol v6)
+
+```ts
+type AgentCompactRequest = { sessionId: string };
+type AgentCompactResponse = { accepted: boolean };
+```
+
+`pi-desktop/agent/compact` creates a model-context checkpoint for an idle
+session. It is available even when automatic context protection is disabled.
+Missing provider/session configuration fails through the normal `AppError`
+envelope; an active turn or compaction returns `AGENT_BUSY`.
+
+### 5.4 getStatus
 
 ```ts
 type AgentStatus = {
@@ -171,12 +183,27 @@ type AgentEvent =
  | { type: "tool_update"; toolCallId: string; partialResult?: unknown }
  | { type: "tool_end"; toolCallId: string; result: unknown; isError?: boolean }
  | { type: "tool_permission_request"; request: ToolPermissionRequest }
+ | { type: "compaction_start";
+     reason: "manual" | "threshold" | "overflow" }
+ | { type: "compaction_end";
+     reason: "manual" | "threshold" | "overflow";
+     ok: boolean; tokensBefore?: number; firstKeptMessageId?: string;
+     willRetry: boolean; error?: { code: string; message: string } }
  | { type: "error"; error: AppError }
  | { type: "status"; status: AgentStatus };
 ```
 
 > These are **UI-normalized events**, not a pass-through of raw pi events.
 > `packages/agent-runtime` is responsible for mapping pi events to this model.
+
+`turn_end` closes one model/tool turn but is not a terminal desktop run event:
+another provider request may follow immediately. Renderer busy state and
+durable turn completion therefore settle only on `agent_end` or `error`.
+`compaction_start` keeps the run busy; a manual-only operation settles on its
+matching `compaction_end`, while threshold/overflow compaction remains inside
+the active agent run. The soft context-management instruction is transient and
+has no protocol event or transcript row of its own. A model-issued
+`CompactContext` call uses the normal tool lifecycle and is visible/durable.
 
 ## 6a. Notification API (D117, protocol v4)
 
@@ -323,6 +350,11 @@ Message-scoped assistant Fork/Edit uses this option so the child receives a
 new session id and therefore cannot reuse or mutate the source pi runtime or
 its provider cache.
 
+Protocol version 6 adds `pi-desktop/agent/compact`, compaction lifecycle
+events, the optional `SessionDetail.compaction` checkpoint, and the host
+`session.appendCompaction` route. A version 5 host must fail the handshake so a
+desktop cannot appear protected while silently losing checkpoints.
+
 Protocol version 2 adds `thinkingLevel`, `UiMessage.thinking`, and
 `message_update.deltaThinking`. A v1 peer must fail the version check instead
 of silently discarding these fields.
@@ -408,7 +440,7 @@ type ToolPermissionResolution = {
 
 ## 11. Version Compatibility
 
-- IPC/host contract version field: `protocolVersion: 5`
+- IPC/host contract version field: `protocolVersion: 6`
 - Breaking changes must bump the version and record an ADR
 - renderer and main validate the version at startup; on mismatch, prompt to upgrade/reinstall
 - Protocol v4 adds notification records, channels, and the
@@ -420,6 +452,9 @@ type ToolPermissionResolution = {
 - Protocol v5 adds the required `session/fork` snapshot operation. A v4 peer is
   rejected before chat becomes interactive instead of exposing a branch
   command that can only fail at invocation time (ADR 0023).
+- Protocol v6 adds durable context checkpoints plus the manual/lifecycle
+  channels. A v5 peer is rejected because silently omitting a checkpoint can
+  make the next provider request unsafe (ADR 0030).
 
 ## 12. Plugin API (host UI side)
 

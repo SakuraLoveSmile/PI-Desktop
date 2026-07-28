@@ -1,5 +1,7 @@
 import type {
   AgentEventEnvelope,
+  AgentCompactRequest,
+  AgentCompactResponse,
   AgentPromptRequest,
   UiMessage,
   MessageRevisionSummary,
@@ -236,6 +238,8 @@ export const api = {
     invoke<{ messages: UiMessage[] }>(IPC.invoke.sessionActivateRevision, input),
   prompt: (req: AgentPromptRequest) =>
     invoke<AgentPromptResponse>(IPC.invoke.agentPrompt, req),
+  compact: (req: AgentCompactRequest) =>
+    invoke<AgentCompactResponse>(IPC.invoke.agentCompact, req),
   abort: (sessionId: string) =>
     invoke(IPC.invoke.agentAbort, { sessionId }),
   getStatus: (sessionId: string) =>
