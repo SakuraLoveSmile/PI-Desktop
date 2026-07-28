@@ -437,6 +437,15 @@ preview), and Files (workspace browser). Codex-parity surface.
 ^ 6px resize handle on the left edge
 ```
 
+### 5.2.1 Light-theme surface
+
+- Panel body uses quiet inset paper (`#fafafa`); the 46px header band and tool
+  chrome (review toolbar, browser chrome, file viewer header) stay white
+- Active tabs, file-tree rows, diff headers, and the resize handle ease hover
+  fills with `--motion-duration-fast` / `--motion-ease-out`
+- Browser URL and empty-tool chrome share the light inset field treatment used
+  by Settings controls (D148)
+
 ### 5.3 States
 
 | State | Behavior |
