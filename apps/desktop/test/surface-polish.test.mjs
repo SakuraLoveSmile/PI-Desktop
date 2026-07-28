@@ -18,7 +18,11 @@ test("work panel uses a quiet light-theme inset surface", () => {
   );
   assert.match(
     styles,
-    /:root\[data-theme="light"\]\s+\.work-panel-tab\.active\s*\{[\s\S]*?background:\s*color-mix/,
+    /:root\[data-theme="light"\]\s+\.work-panel-rail\s*\{[\s\S]*?background:\s*#f5f5f5/,
+  );
+  assert.match(
+    styles,
+    /\.work-panel-rail-button\.active\s*\{[\s\S]*?background:\s*var\(--ds-bg-active\)/,
   );
 });
 

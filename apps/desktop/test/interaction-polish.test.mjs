@@ -15,7 +15,7 @@ test("high-traffic chrome uses shared motion tokens on hover fills", () => {
     ".search-item",
     ".profile-menu-item",
     ".notification-item",
-    ".work-panel-tab-close",
+    ".work-panel-current-close",
   ]) {
     const re = new RegExp(
       `${selector.replace(/\./g, "\\.")}\\s*\\{[\\s\\S]*?transition:[^;]*var\\(--motion-duration-fast\\)`,

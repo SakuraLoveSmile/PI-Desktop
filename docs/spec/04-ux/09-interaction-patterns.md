@@ -64,7 +64,7 @@
   titlebar keeps sidebar actions at the left edge and native window controls at
   the right edge. While the work panel is open, its sole collapse control sits
   in the session pane top-right ahead of those window controls rather than in
-  the work-panel tab strip. Destination history has no visible back/forward
+  the work-panel content header. Destination history has no visible back/forward
   controls and remains available through the renderer shortcuts. The first
   transcript row starts below the 46px titlebar control band so user and
   assistant content cannot overlap the minimize, maximize/restore, or close
@@ -223,19 +223,22 @@ may be retained while exactly one workspace supplies the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
-### 1.8 Artifact-driven work panel tabs (D128, D140, D142)
+### 1.8 Artifact-driven work panel resources (D128, D140, D142, D154)
 
 - The shell exposes no empty or unconditional work-panel launcher,
   application-menu command, or global shortcut. An artifact trigger atomically
-  creates or reuses its tab, activates it, and opens the panel.
-- File tabs use normalized paths as identity. Review, Terminal, and Browser are
-  singletons; repeated triggers preserve tab order and activate the existing tab.
-- Every tab has its own close control. Closing the active tab selects the right
+  creates or reuses its resource, activates it, and opens the panel.
+- File resources use normalized paths as identity. Review, Terminal, and
+  Browser are singletons; repeated triggers preserve resource order and
+  activate the existing resource.
+- Once open, the panel's 44px activity rail makes Review, Terminal, and Browser
+  one-click actions. The active-resource header opens an ordered resource
+  switcher with pointer and keyboard selection plus per-item close controls.
+- Every resource can be closed from the switcher, and the active resource has
+  a direct header close control. Closing the active resource selects the right
   neighbor, then the left; closing the final tab hides the panel. The separate
   panel collapse control in the session pane top-right hides the panel without
   deleting tabs.
-- Right-click empty work-panel header chrome opens Review/Terminal/Browser; tab
-  rows keep select/close only.
 - On Windows, opening or hiding the panel keeps the native window bounds
   unchanged. The docked renderer layout updates in one pass, avoiding the
   intermediate frameless-window repaint caused by a later native resize.
@@ -498,7 +501,7 @@ Work-panel width resizing is implemented in MVP:
 
 - The left-edge separator follows the pointer during the drag.
 - The width clamps to
-  `320px–min(720px, 60vw, viewport − visible sidebar − 360px)`.
+  `364px–min(720px, 60vw, viewport − visible sidebar − 360px)`.
 - Pointer release persists the committed width; window resize re-clamps it.
 - The MainChat surface never shrinks below 360px in the supported shell.
 

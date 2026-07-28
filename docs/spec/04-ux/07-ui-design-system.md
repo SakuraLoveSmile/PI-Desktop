@@ -164,7 +164,7 @@ Neutral gray scale only — no blue-slate surfaces. Chrome components must consu
 
 Light-surface polish (D148):
 
-- Docked work panel uses quiet inset paper (`#fafafa`) with a white header band so the tool column separates from white chat paper without a heavy divider.
+- Docked work panel uses quiet inset paper (`#fafafa`) with a white header band and a slightly deeper 44px activity rail so the tool column separates from white chat paper without a heavy divider.
 - Shared form fields, browser URL, settings segment tracks, and shortcut keycaps use `#f5f5f5` inset fills with a 0.5px ink stroke; focus lifts to white with a neutral ring.
 - Settings toggles keep a near-black on-track and force a white knob in light mode.
 - Dialog scrim softens to ~28% ink so elevated white dialogs remain readable.
@@ -667,7 +667,7 @@ Codex parity decisions (D034/D070) supersede any older value here.
 | Sidebar width (expanded) | ~275px | Codex sidebar width (D034/D070) |
 | Main pane minimum readable width | 360px | Reserved while the docked work panel is open (D112) |
 | Work panel width (closed) | 0px | Hidden by default |
-| Work panel width (open) | `320px–min(720px, 60vw, viewport − visible sidebar − 360px)` | Live drag clamp preserves MainChat readability (D097/D112) |
+| Work panel width (open) | `364px–min(720px, 60vw, viewport − visible sidebar − 360px)` | 44px activity rail preserves the prior 320px content minimum; live drag clamp preserves MainChat readability (D112/D154) |
 | Composer shell minimum | ~80px | One-line draft + toolbar padding |
 | Composer draft height | 1–7 text lines | Auto-grow; internal scroll beyond line 7 |
 | Chat message max width | 720px assistant / 560px user plate | Prevent eye-span over-stretch; user turns stay compact |
@@ -678,7 +678,7 @@ Codex parity decisions (D034/D070) supersede any older value here.
 
 - Work-panel width re-clamps whenever the native window or visible sidebar
   width changes.
-- At the supported 960px minimum with the expanded sidebar, the 320px panel
+- At the supported 960px minimum with the expanded sidebar, the 364px panel
   minimum and 360px Main pane reserve both remain satisfiable.
 - Width < 960px or height < 640px is unsupported and prevented by Electron.
 

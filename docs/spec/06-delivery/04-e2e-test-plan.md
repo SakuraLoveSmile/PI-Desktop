@@ -951,28 +951,35 @@ Each scenario is documented in this format:
 - **Preconditions**: App running with any workspace state.
 - **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
   Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
-  a URL preview, and a completed command artifact. 3) Right-click empty
-  work-panel header chrome to open Review/Terminal/Browser; confirm existing
-  tab rows do not open that menu. 4) Close an inactive tab, then the active
-  middle and edge tabs. 5) Use the sole session-pane collapse control and
+  a URL preview, and a completed command artifact. 3) Use the work-panel
+  activity rail to open/select Review, Terminal, and Browser; verify active and
+  open-inactive states. Open the current-resource switcher, select file and tool
+  resources with pointer and keyboard, close an inactive item inside it, then
+  close the active item from the header. 4) Close active middle and edge items
+  and verify neighbor selection. 5) Use the sole session-pane collapse control and
   trigger another artifact. 6) In session A, leave the panel open with multiple
   tabs and a Browser resource; switch to session B, create a different tab set,
   then switch repeatedly between A and B and select a project without an active
-  conversation. 7) Drag the left-edge handle below 320px and beyond every upper
+  conversation. 7) Drag the left-edge handle below 364px and beyond every upper
   bound at 960px, 1200px, and 1600px window widths. 8) On Windows, record the
   native window bounds before opening a file artifact, collapsing the panel,
   and closing its final tab; inspect each transition frame. 9) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
-  the docked third column and creates or activates one closeable top tab; file
-  tabs are path-keyed, repeated resources deduplicate, and tabs scroll across
-  the full work-panel header while keeping the active tab visible. Right-click
-  empty header chrome opens Review/Terminal/Browser; tab rows do not. The sole
-  collapse control sits in the session pane top-right rather than the tab strip.
+  the docked third column and creates or activates one resource; file resources
+  are path-keyed and repeated resources deduplicate. Once the panel is open, a
+  44px activity rail exposes one-click Review/Terminal/Browser actions with a
+  fill plus edge marker for the active tool and a dot for open inactive tools.
+  The 46px content header keeps the active label readable, closes it directly,
+  and opens a bounded ordered resource switcher with full-path tooltips and
+  per-item close controls. The switcher supports Arrow keys, Home, End, and
+  Escape, restores focus to its trigger, and temporarily hides the native
+  Browser preview so the menu is never occluded. The sole
+  collapse control sits in the session pane top-right rather than the content header.
   Active close selects the right neighbor then left; closing the last tab hides
   the panel. Collapse retains runtime
   tabs but hides the panel until another artifact reopens it. Width clamps to
-  `320px–min(720px, 60vw, viewport − visible sidebar − 360px)`, re-clamps on
+  `364px–min(720px, 60vw, viewport − visible sidebar − 360px)`, re-clamps on
   window resize, and never squeezes MainChat below 360px in the supported shell.
   A and B independently restore their runtime open state, ordered tabs, active
   tab, and Browser resource; selecting a project without an active conversation
@@ -1069,7 +1076,8 @@ Each scenario is documented in this format:
 - **Preconditions**: Workspace with file artifacts for nested source, large
   (>512KB), image, and binary files.
 - **Steps**: 1) Activate each file artifact and verify a distinct path-keyed
-  top tab; browse the tree, expanding nested folders. 2) Open a source
+  resource in the header switcher; browse the tree, expanding nested folders.
+  2) Open a source
   file, the image, the binary, and the large file. 3) Use reveal-in-Finder.
   4) Attempt a traversal read (`../outside`) via devtools IPC. 5) Switch
   workspaces.
@@ -2250,7 +2258,7 @@ This test plan spec is accepted when:
 - Expect project and session lists to scroll inside the sidebar body without
   clipping behind the footer; sidebar Search/Collapse remain in the sidebar
   header. When the work panel is open, expect its sole collapse control in the
-  session pane top-right rather than the work-panel tab strip, flush against
+  session pane top-right rather than the work-panel content header, flush against
   the divider at the main pane's right edge.
 - Collapse A by clicking its directory label, expand it from the chevron area,
   then activate B and return to A. Only A's child rows collapse; project `+`

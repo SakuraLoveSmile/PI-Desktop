@@ -19,13 +19,13 @@ destination, chat as the home surface, tools and permissions inline.
 | Sidebar (~275px) | Main pane (active destination) | Work panel       |
 |  New task        |  chat home / transcript        |  (optional,      |
 |  Plugins         |  or Plugins page               |   resizable      |
-|                  |                                |   320–720px)     |
+|                  |                                |   364–720px)     |
 |  Sessions     +↕ |                                | surface          |
 |   Recent rows ↕  |                                |                  |
-|  Projects      + |                                | App.tsx Review × |
-|   Project A      |                                | ───────────────  |
-|   Project B      |                                | Active artifact  |
-| Footer + bell    |  Floating composer (chat)      |                  |
+|  Projects      + |                                | ◫ | App.tsx  ⌄ × |
+|   Project A      |                                | > |              |
+|   Project B      |                                | ◎ | Active       |
+| Footer + bell    |  Floating composer (chat)      |   | resource     |
 +------------------+--------------------------------+------------------+
 ```
 
@@ -60,7 +60,7 @@ destination, chat as the home surface, tools and permissions inline.
   the right outside the traffic-light safety area; no logo/title is rendered
   there, including in fullscreen. While the work panel is open, the session
   pane titlebar hosts its collapse control at the top-right so the panel tab
-  strip is tabs-only.
+  header remains focused on the active resource.
   Windows/Linux use a menu-free frameless 46px row with sidebar actions on the
   left and accessible minimize / maximize-or-restore / close controls on the
   right (D129). Destination history is shortcut-only (`Cmd/Ctrl+[` and
@@ -72,11 +72,17 @@ destination, chat as the home surface, tools and permissions inline.
   artifacts, or by the contextual transcript review entry when the current
   session produced a successful workspace Write/Edit and that working tree is
   still dirty. Its
-  top strip contains only currently opened, closeable tabs: file paths get
-  distinct tabs while Review, Terminal, and Browser deduplicate by kind. A
+  44px activity rail keeps Review, Terminal, and Browser one click away while
+  the panel is visible; opened-but-inactive tools show a quiet dot and the
+  active tool has a restrained edge marker. The 46px content header names the
+  current resource, closes it directly, and opens a compact switcher for all
+  current session resources. File paths stay distinct in that switcher while
+  Review, Terminal, and Browser deduplicate by kind. The activity rail is not
+  rendered while the panel is closed and does not create a global or empty
+  manual panel entry point. A
   successful active-session workspace Write/Edit artifact opens Review;
   scratch, failed, and background-session writes never steal focus. Width is
-  drag-resizable from 320px to
+  drag-resizable from 364px (44px rail + 320px content) to
   `min(720px, 60vw, viewport − visible sidebar − 360px)`, preserving a
   readable 360px Main pane. The sole panel-level control collapses the panel;
   each session retains its own runtime open state, tab set, active tab, and
