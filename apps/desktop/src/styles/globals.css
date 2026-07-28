@@ -1049,7 +1049,7 @@ html {
 .main-pane {
   position: relative;
   display: flex;
-  min-width: 360px;
+  min-width: 0;
   flex: 1;
   flex-direction: column;
   background: var(--ds-bg-primary);

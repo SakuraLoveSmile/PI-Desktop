@@ -162,7 +162,10 @@ function loadWorkPanelWidth(): number {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const width = Number(parsed.width);
     return Number.isFinite(width)
-      ? Math.max(WORK_PANEL_MIN_WIDTH, Math.min(WORK_PANEL_MAX_WIDTH, width))
+      ? Math.max(
+          WORK_PANEL_MIN_WIDTH,
+          Math.min(WORK_PANEL_MAX_WIDTH, Math.round(width)),
+        )
       : WORK_PANEL_DEFAULT_WIDTH;
   } catch {
     return WORK_PANEL_DEFAULT_WIDTH;
@@ -2481,10 +2484,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => switchWorkPanelSession(state));
   },
   setWorkPanelWidth: (width) => {
+    const committedWidth = Math.round(width);
     set({
       workPanelWidth: Math.max(
         WORK_PANEL_MIN_WIDTH,
-        Math.min(WORK_PANEL_MAX_WIDTH, width),
+        Math.min(WORK_PANEL_MAX_WIDTH, committedWidth),
       ),
     });
     saveWorkPanelWidth(get().workPanelWidth);

@@ -332,6 +332,11 @@ export const api = {
   fsIndex: () => invoke<FsIndexResult>(IPC.invoke.fsIndex),
   composerCommands: () =>
     invoke<{ commands: ComposerCommand[] }>(IPC.invoke.composerCommands),
+  setWorkPanelReservation: (width: number) =>
+    invoke<{ requested: number; reserved: number }>(
+      IPC.invoke.windowSetWorkPanelReservation,
+      { width },
+    ),
   windowControl: (action: WindowControlAction) =>
     invoke<{ maximized: boolean }>(IPC.invoke.windowControl, { action }),
   menuRendererReady: () =>

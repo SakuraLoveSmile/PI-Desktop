@@ -175,7 +175,14 @@ test("Windows and Linux use menu-free frameless chrome with window controls", ()
     /\.toast\s*\{[^}]*-webkit-app-region:\s*no-drag;[^}]*pointer-events:\s*auto;/s,
   );
   assert.match(mainSource, /window\.on\("maximize", sendMaximized\)/);
-  assert.match(mainSource, /window\.on\("unmaximize", sendMaximized\)/);
+  assert.match(
+    mainSource,
+    /window\.on\("unmaximize", \(\) => \{[\s\S]*process\.platform !== "darwin"[\s\S]*scheduleWorkPanelReservation\(\)/,
+  );
+  assert.match(
+    mainSource,
+    /window\.on\("leave-full-screen", \(\) => \{[\s\S]*scheduleWorkPanelReservation\(\)/,
+  );
   assert.match(mainSource, /window\.webContents\.isDestroyed\(\)/);
   assert.match(mainSource, /mainWindow = null/);
   assert.match(mainSource, /windowCreationPromise/);

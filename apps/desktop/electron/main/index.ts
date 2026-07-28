@@ -7,6 +7,7 @@ import {
   nativeImage,
   nativeTheme,
   Notification as SystemNotification,
+  screen,
   shell,
 } from "electron";
 import { join } from "node:path";
@@ -65,6 +66,13 @@ import {
 } from "./importers";
 import { installApplicationMenu } from "./application-menu";
 import { AppUpdaterController } from "./updater";
+import {
+  baseWindowBounds,
+  displayWorkAreaKey,
+  emptyWorkPanelReservationState,
+  planWorkPanelReservation,
+  type WorkPanelReservationState,
+} from "./work-panel-window";
 
 app.setName(APP_NAME);
 if (process.platform === "win32") {
@@ -73,6 +81,8 @@ if (process.platform === "win32") {
 
 const WINDOW_MIN_WIDTH = 1040;
 const WINDOW_MIN_HEIGHT = 700;
+const WORK_PANEL_MIN_WIDTH = 364;
+const WORK_PANEL_MAX_WIDTH = 720;
 
 let mainWindow: BrowserWindow | null = null;
 let windowCreationPromise: Promise<void> | null = null;
@@ -87,6 +97,9 @@ type MenuRendererReadyGate = {
   resolve: () => void;
 };
 let menuRendererReadyGate: MenuRendererReadyGate | null = null;
+let requestedWorkPanelReservation = 0;
+let workPanelReservation = emptyWorkPanelReservationState();
+let workPanelDisplayKey: string | null = null;
 let host: HostProcess | null = null;
 let sidecar: AgentSidecar | null = null;
 let quitting = false;
@@ -642,8 +655,60 @@ function writeWindowState(state: WindowState) {
   }
 }
 
+function workPanelMinimumWindowWidth() {
+  return WINDOW_MIN_WIDTH + workPanelReservation.width;
+}
+
+function applyWorkPanelReservation(): WorkPanelReservationState {
+  if (
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    mainWindow.isFullScreen() ||
+    mainWindow.isMaximized()
+  ) {
+    return workPanelReservation;
+  }
+
+  const window = mainWindow;
+  const currentBounds = window.getBounds();
+  const display = screen.getDisplayMatching(currentBounds);
+  const workArea = display.workArea;
+  workPanelDisplayKey = displayWorkAreaKey(display.id, workArea);
+  const next = planWorkPanelReservation({
+    bounds: currentBounds,
+    workArea,
+    reservation: workPanelReservation,
+    requestedWidth: requestedWorkPanelReservation,
+  });
+  const minimumWidth = Math.max(
+    WINDOW_MIN_WIDTH,
+    Math.min(workArea.width, WINDOW_MIN_WIDTH + next.reservation.width),
+  );
+
+  // Lower the minimum before a collapse; raise it after the expanded bounds
+  // exist. This keeps native edge gestures assigned to MainChat.
+  if (next.bounds.width < currentBounds.width) {
+    window.setMinimumSize(minimumWidth, WINDOW_MIN_HEIGHT);
+  }
+  window.setBounds(next.bounds, false);
+  if (next.bounds.width >= currentBounds.width) {
+    window.setMinimumSize(minimumWidth, WINDOW_MIN_HEIGHT);
+  }
+
+  const appliedBounds = window.getBounds();
+  const baseBounds = baseWindowBounds(currentBounds, workPanelReservation);
+  workPanelReservation = {
+    width: Math.max(0, appliedBounds.width - baseBounds.width),
+    xOffset: appliedBounds.x - baseBounds.x,
+  };
+  return workPanelReservation;
+}
+
 async function createWindow() {
   notificationViewingSessionId = null;
+  requestedWorkPanelReservation = 0;
+  workPanelReservation = emptyWorkPanelReservationState();
+  workPanelDisplayKey = null;
   const savedState = await readWindowState();
   mainWindow = new BrowserWindow({
     ...(savedState ?? { width: 1200, height: 800 }),
@@ -674,6 +739,14 @@ async function createWindow() {
     mainWindow === window &&
     !window.isDestroyed() &&
     !window.webContents.isDestroyed();
+  let workPanelReconcileTimer: NodeJS.Timeout | null = null;
+  const scheduleWorkPanelReservation = () => {
+    if (workPanelReconcileTimer) clearTimeout(workPanelReconcileTimer);
+    workPanelReconcileTimer = setTimeout(() => {
+      workPanelReconcileTimer = null;
+      if (isLiveWindow()) applyWorkPanelReservation();
+    }, 0);
+  };
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
@@ -715,27 +788,56 @@ async function createWindow() {
     });
   };
   window.on("enter-full-screen", sendFullScreen);
-  window.on("leave-full-screen", sendFullScreen);
+  window.on("leave-full-screen", () => {
+    sendFullScreen();
+    scheduleWorkPanelReservation();
+  });
   window.webContents.on("did-finish-load", sendFullScreen);
 
+  const sendMaximized = () => {
+    if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+    window.webContents.send(IPC.event.windowMaximized, {
+      maximized: window.isMaximized(),
+    });
+  };
   // Custom window controls (Windows/Linux) need maximize state to swap the
   // maximize/restore glyph.
   if (process.platform !== "darwin") {
-    const sendMaximized = () => {
-      if (window.isDestroyed() || window.webContents.isDestroyed()) return;
-      window.webContents.send(IPC.event.windowMaximized, {
-        maximized: window.isMaximized(),
-      });
-    };
     window.on("maximize", sendMaximized);
-    window.on("unmaximize", sendMaximized);
     // Native-runner E2E fixture: establish the initial native state before
     // the renderer mounts, then let WindowControls query it through IPC.
     if (process.env.PI_DESKTOP_START_MAXIMIZED === "1") window.maximize();
   }
+  window.on("unmaximize", () => {
+    if (process.platform !== "darwin") sendMaximized();
+    scheduleWorkPanelReservation();
+  });
+
+  const reconcileWorkPanelDisplay = () => {
+    if (!isLiveWindow()) return;
+    const display = screen.getDisplayMatching(window.getBounds());
+    const nextDisplayKey = displayWorkAreaKey(display.id, display.workArea);
+    if (nextDisplayKey === workPanelDisplayKey) return;
+    scheduleWorkPanelReservation();
+  };
+  const initialDisplay = screen.getDisplayMatching(window.getBounds());
+  workPanelDisplayKey = displayWorkAreaKey(
+    initialDisplay.id,
+    initialDisplay.workArea,
+  );
+  screen.on("display-metrics-changed", reconcileWorkPanelDisplay);
+  screen.on("display-added", reconcileWorkPanelDisplay);
+  screen.on("display-removed", reconcileWorkPanelDisplay);
 
   browserPane.setWindow(window);
   window.on("closed", () => {
+    screen.removeListener("display-metrics-changed", reconcileWorkPanelDisplay);
+    screen.removeListener("display-added", reconcileWorkPanelDisplay);
+    screen.removeListener("display-removed", reconcileWorkPanelDisplay);
+    if (workPanelReconcileTimer) {
+      clearTimeout(workPanelReconcileTimer);
+      workPanelReconcileTimer = null;
+    }
     if (menuRendererReadyGate?.window === window) {
       menuRendererReadyGate.resolve();
       menuRendererReadyGate = null;
@@ -828,6 +930,8 @@ async function createWindow() {
       }
       window.setSize(CODEX_BOUNDS.width, CODEX_BOUNDS.height, false);
       window.setPosition(CODEX_BOUNDS.x, CODEX_BOUNDS.y, false);
+      workPanelReservation = emptyWorkPanelReservationState();
+      applyWorkPanelReservation();
       // Brief pin only when actively recovering from a shelf.
       if (shelved || electronTiny) {
         window.setAlwaysOnTop(true, "floating");
@@ -861,12 +965,16 @@ async function createWindow() {
   window.on("restore", () => ensureStableBounds(false));
   window.on("resize", scheduleBoundsCheck);
   window.on("move", scheduleBoundsCheck);
+  window.on("move", reconcileWorkPanelDisplay);
 
   // Persist last good user bounds so relaunch restores them.
   let saveTimer: NodeJS.Timeout | null = null;
   const persistNormalWindowState = () => {
     if (!isLiveWindow() || boundsGuard) return;
-    const bounds = window.getNormalBounds();
+    const bounds = baseWindowBounds(
+      window.getNormalBounds(),
+      workPanelReservation,
+    );
     if (bounds.width >= WINDOW_MIN_WIDTH && bounds.height >= WINDOW_MIN_HEIGHT) {
       writeWindowState(bounds);
     }
@@ -1288,7 +1396,10 @@ async function createWindow() {
               `);
             } finally {
               mainWindow!.setSize(CODEX_BOUNDS.width, CODEX_BOUNDS.height, false);
-              mainWindow!.setMinimumSize(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT);
+              mainWindow!.setMinimumSize(
+                workPanelMinimumWindowWidth(),
+                WINDOW_MIN_HEIGHT,
+              );
               captureViewportOverride = false;
             }
             await new Promise((r) => setTimeout(r, 300));
@@ -2895,6 +3006,29 @@ function registerIpc() {
     }
     return { commands: [...merged.values()] };
   });
+
+  handle(
+    IPC.invoke.windowSetWorkPanelReservation,
+    async (input: { width?: number } = {}) => {
+      const requested = Number(input.width);
+      if (
+        !Number.isInteger(requested) ||
+        (requested !== 0 &&
+          (requested < WORK_PANEL_MIN_WIDTH || requested > WORK_PANEL_MAX_WIDTH))
+      ) {
+        throw Object.assign(new Error("invalid work panel reservation width"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
+      }
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        throw new Error("main window unavailable");
+      }
+
+      requestedWorkPanelReservation = requested;
+      const reservation = applyWorkPanelReservation();
+      return { requested, reserved: reservation.width };
+    },
+  );
 
   // Custom window-chrome buttons on Windows/Linux (renderer-drawn).
   handle(

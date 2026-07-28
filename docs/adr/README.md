@@ -44,6 +44,7 @@ Each ADR includes:
 | 0026 | Move the Projects index into Settings as an archive | Accepted |
 | 0027 | Make pi-ai authoritative for model metadata | Accepted |
 | 0028 | Scope work-panel runtime contexts to conversations | Accepted |
-| 0029 | Separate native-window and work-panel resize ownership | Accepted |
+| 0029 | Separate native-window and work-panel resize ownership | Superseded in part by 0032 |
 | 0030 | Turn-boundary context checkpoint compaction | Accepted |
 | 0031 | Keep composer prompt rows free of brand icons | Accepted |
+| 0032 | Reserve native width for the docked work panel | Accepted |

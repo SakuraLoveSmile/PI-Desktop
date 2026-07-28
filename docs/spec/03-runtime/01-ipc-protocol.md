@@ -29,7 +29,7 @@ Principles:
 | `terminal` | Work panel PTY create/write/resize/dispose + data/exit events |
 | `browser` | Work panel embedded preview navigation/bounds/visibility + state events |
 | `fs` | Work panel workspace file listing/reading/reveal (read-only) |
-| `window` | Frameless window state and minimize/maximize/close controls |
+| `window` | Frameless window state, controls, and bounded work-panel width reservation |
 | `menu` | Allowlisted application-menu commands and native editing/window actions |
 | `notification` | Durable inbox list/read/clear and new/activated events |
 
@@ -607,9 +607,34 @@ window/control({ action: WindowControlAction })
 Maximize/unmaximize changes also emit
 `window/event/maximized`. Unknown actions fail. These Electron-only channels
 do not cross into host-core and do not change the host RPC protocol version.
-The preload intentionally exposes no arbitrary BrowserWindow resize channel:
-native window edges own outer bounds, while the renderer-local work-panel
-divider owns only the internal column width (ADR 0029).
+The preload intentionally exposes no arbitrary BrowserWindow resize channel.
+The one geometry-specific capability is a target-state work-panel reservation
+(D162, ADR 0032):
+
+```ts
+window/setWorkPanelReservation({ width: 0 | number })
+  -> { requested: number; reserved: number }
+```
+
+`width` is normalized to an integer and must resolve to exactly `0` or the
+inclusive `364..720` range; other values fail with `INVALID_ARGUMENT`. Zero is
+the closed/collapsed target, and a positive value is the visible panel's
+committed fixed width. `requested` is the accepted normalized current target.
+`reserved` is the native width currently added
+to the normal base window for that target and can be smaller than `requested`
+only when the display work area is insufficient. Calls are idempotent target
+updates: repeating the same width never adds another delta.
+
+In normal state, Main expands the base bounds toward the right and shifts left
+only as needed to keep the expanded bounds inside the current display work
+area. A zero target symmetrically removes the added width and reverses that
+reservation-induced shift. Main persists base bounds with both effects removed.
+Native edge gestures update only those base bounds, leaving `requested` and the
+renderer-owned fixed panel width unchanged. Maximized and fullscreen windows
+remember the latest target but defer geometry; returning to normal reconciles
+it once against the restored base bounds and current work area. Renderer code
+sets this target only for the currently visible session: background artifacts
+cannot change visible reservation geometry.
 
 ## 13c. Composer input APIs (D123/D124, ADR 0024)
 

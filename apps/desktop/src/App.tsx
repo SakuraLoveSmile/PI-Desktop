@@ -156,10 +156,13 @@ function AppShell() {
   const reviewRev = useAppStore((s) => s.reviewRev);
   const refreshWorkspaceDiff = useAppStore((s) => s.refreshWorkspaceDiff);
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
+  const workPanelWidth = useAppStore((s) => s.workPanelWidth);
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [presentedWorkPanelOpen, setPresentedWorkPanelOpen] = useState(false);
+  const workPanelReservationRequest = useRef(0);
   const [backendDown, setBackendDown] = useState<
     { fatal: boolean; component?: string } | null
   >(null);
@@ -169,6 +172,21 @@ function AppShell() {
   const splashStartedAt = useRef(
     typeof performance !== "undefined" ? performance.now() : 0,
   );
+
+  useEffect(() => {
+    const shouldPresent = ready && page !== "settings" && workPanelOpen;
+    const requestedWidth = shouldPresent ? Math.round(workPanelWidth) : 0;
+    const request = ++workPanelReservationRequest.current;
+
+    void api
+      .setWorkPanelReservation(requestedWidth)
+      .catch(() => undefined)
+      .finally(() => {
+        if (request === workPanelReservationRequest.current) {
+          setPresentedWorkPanelOpen(shouldPresent);
+        }
+      });
+  }, [page, ready, workPanelOpen, workPanelWidth]);
 
   const runMenuCommand = useCallback(
     async (command: AppMenuCommand) => {
@@ -781,7 +799,7 @@ function AppShell() {
             <div
               className={cx(
                 "main-titlebar",
-                workPanelOpen && "work-panel-open",
+                presentedWorkPanelOpen && "work-panel-open",
               )}
             >
               {sidebarCollapsed && (
@@ -836,8 +854,11 @@ function AppShell() {
             </Suspense>
           </section>
 
-          {workPanelOpen && (
-            <WorkPanel browserBlocked={paletteOpen || searchOpen} onCollapse={() => useAppStore.getState().collapseWorkPanel()} />
+          {presentedWorkPanelOpen && (
+            <WorkPanel
+              browserBlocked={paletteOpen || searchOpen}
+              onCollapse={() => useAppStore.getState().collapseWorkPanel()}
+            />
           )}
 
           <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />

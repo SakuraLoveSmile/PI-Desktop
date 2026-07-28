@@ -689,24 +689,31 @@ Codex parity decisions (D034/D070) supersede any older value here.
 | Titlebar row height | 46px | Codex toolbar rhythm (D034); traffic lights {x:16,y:16} |
 | Sidebar width (collapsed) | 48px | Icon-only rail |
 | Sidebar width (expanded) | ~275px | Codex sidebar width (D034/D070) |
-| Main pane minimum readable width | 360px | Reserved while the docked work panel is open (D112) |
+| Main pane minimum readable width | 360px | Preserved while the display work area can supply the complete native panel reservation; constrained work areas assign the unavoidable shortfall to MainChat (D162) |
 | Work panel width (closed) | 0px | Hidden by default |
-| Work panel width (open) | `364px–min(720px, 60vw, viewport − visible sidebar − 360px)` | 44px activity rail preserves the prior 320px content minimum; live drag clamp preserves MainChat readability (D112/D154) |
+| Work panel width (open) | `364px–720px`, fixed at the committed width | 44px activity rail preserves the prior 320px content minimum; native window and sidebar changes never compress the panel (D154/D162) |
 | Composer shell minimum | ~80px | One-line draft + toolbar padding |
 | Composer draft height | 1–7 text lines | Auto-grow; internal scroll beyond line 7 |
 | Chat message max width | 720px assistant / 560px user plate | Prevent eye-span over-stretch; user turns stay compact |
-| Window min width | 1040px | Enforced by Electron; fits all three column minima |
+| Window min width | 1040px | Enforced by Electron as the base chat-shell minimum; a docked work panel raises the native minimum when the display has room, while constrained displays may reduce the chat pane below its 360px readability target |
 | Window min height | 700px | Enforced by Electron |
+
+An open work panel requests native width equal to its committed width. The
+normal window expands within the display work area so chat width stays stable;
+collapse and final close reclaim that width, and a divider commit updates it.
+If the complete reservation does not fit, the panel remains fixed while chat
+absorbs the difference. Native window edges resize chat only. Persisted normal
+bounds exclude the reservation and its induced x shift (D162, ADR 0032).
 
 ### 10.1 Responsive collapse
 
-- Work-panel effective width re-clamps whenever the native window or visible
-  sidebar width changes. This temporary clamp does not overwrite the persisted
-  preferred width; widening the shell restores that preference.
-- At the supported 1040px minimum, the expanded sidebar, 364px panel floor,
-  and 360px Main pane reserve remain satisfiable.
-- Native window edges resize the shell only. The work-panel divider resizes the
-  internal columns only, and panel open/collapse never moves an outer edge.
+- The work panel never participates in responsive collapse. It keeps its
+  committed `364..720px` width while visible.
+- Native window and sidebar changes assign their layout delta to MainChat. The
+  360px chat target is guaranteed only when the current work area can supply the
+  complete panel reservation.
+- Panel open/collapse/final close and divider commit update the target native
+  reservation. Native edges resize base bounds while reservation stays fixed.
 - Width < 1040px or height < 700px is unsupported and prevented by Electron.
 
 ## 11. Component foundations
