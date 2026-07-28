@@ -83,6 +83,33 @@ describe("pi-ai model resolution", () => {
     });
   });
 
+  it("resolves Claude Opus 5 limits and adaptive thinking from the pinned catalog", () => {
+    const model = resolvePiModelConfig({
+      vendorKey: "custom",
+      modelId: "claude-opus-5",
+      apiStyle: "anthropic_messages",
+    });
+    const capabilities = resolveThinkingCapabilities({
+      vendorKey: "custom",
+      modelId: "claude-opus-5",
+      apiStyle: "anthropic_messages",
+    });
+
+    expect(model).toMatchObject({
+      source: "pi",
+      name: "Claude Opus 5",
+      reasoning: true,
+      contextWindow: 1_000_000,
+      maxTokens: 128_000,
+      thinkingLevelMap: { xhigh: "xhigh", max: "max" },
+      compat: { forceAdaptiveThinking: true },
+    });
+    expect(capabilities.supportsReasoning).toBe(true);
+    expect(capabilities.supportedThinkingLevels).toEqual(
+      expect.arrayContaining(["off", "xhigh", "max"]),
+    );
+  });
+
   it("keeps an unknown free-form model on the generic non-reasoning path", () => {
     const input = {
       vendorKey: "custom",

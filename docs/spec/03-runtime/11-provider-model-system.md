@@ -115,6 +115,13 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
 3. **User-defined model ids** remain selectable; ids absent from pi use the
    explicit generic fallback.
 4. **pi-ai upgrades** refresh the authoritative model metadata snapshot.
+   The current pin is `@earendil-works/pi-ai` / `pi-agent-core` **^0.82.1+**.
+   That snapshot includes **Claude Opus 5** (`claude-opus-5` and provider-native
+   aliases such as Bedrock inference profiles and OpenRouter
+   `anthropic/claude-opus-5`) with 1M context, adaptive thinking, and the
+   published thinking-level map. Free-form gateway ids that match those catalog
+   entries resolve through the same D136 path; ids still absent from the pin
+   remain on the generic non-reasoning fallback.
 
 ### 6.3 Model families to cover
 Catalog and custom model entry must support common capability classes:

@@ -198,3 +198,4 @@ Warnings are non-blocking unless execution is impossible.
       sets clamp the same way in Composer, Electron main, and the pi sidecar
 - [ ] provider settings and cached discovery cannot override a known pi model
 - [ ] unknown free-form models remain runnable without invented capabilities
+- [ ] pinned pi-ai ^0.82.1+ resolves `claude-opus-5` (and gateway-compatible aliases) to the published 1M-context adaptive-thinking record without desktop overrides
