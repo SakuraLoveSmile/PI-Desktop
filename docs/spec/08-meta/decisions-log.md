@@ -334,3 +334,12 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - CJK section labels under `:lang(zh-CN)` use normal tracking without forced uppercase.
 - Empty-home stack gap clamped to 24px; scrollbars refined to 8px with hover thumb; brand chip radius uses `--radius-sm`.
 - Decision D147.
+
+## 2026-07-28 — Work panel / settings light-surface polish
+
+- Light work panel uses a quiet `#fafafa` inset column with a white header band so it separates from white chat paper without a heavy border.
+- Browser URL, generic field controls, shortcut keycaps, segment tracks, and toggle knobs receive light-theme surfaces and focus rings aligned with settings pills.
+- File tree, diff headers, resize handle, and destination filters ease hover fills with shared motion tokens.
+- Light dialog scrim softens to 28% ink so elevated white dialogs stay readable.
+- Decision D148.
+

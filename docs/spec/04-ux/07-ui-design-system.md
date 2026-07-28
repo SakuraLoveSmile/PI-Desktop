@@ -162,6 +162,13 @@ Neutral gray scale only — no blue-slate surfaces. Chrome components must consu
 
 **Invariant:** never paint chrome text with raw `gray-0` (`#fff`) under `data-theme="light"`. Use `--ds-text-primary` / `--ds-text-secondary`.
 
+Light-surface polish (D148):
+
+- Docked work panel uses quiet inset paper (`#fafafa`) with a white header band so the tool column separates from white chat paper without a heavy divider.
+- Shared form fields, browser URL, settings segment tracks, and shortcut keycaps use `#f5f5f5` inset fills with a 0.5px ink stroke; focus lifts to white with a neutral ring.
+- Settings toggles keep a near-black on-track and force a white knob in light mode.
+- Dialog scrim softens to ~28% ink so elevated white dialogs remain readable.
+
 ### 4.4 System theme behavior
 
 - `system` theme follows `prefers-color-scheme` media query
@@ -493,6 +500,8 @@ This is boot-state feedback, not decorative chrome.
 Dialogs, search spotlight, and modal backdrops use shared enter keyframes:
 
 - Scrim: `overlay-in` (opacity, `--motion-duration-normal` / `--motion-ease-out`)
+- Dark theme scrim stays ~45% black; light theme uses ~28% `#1a1c1f` so white
+  dialogs do not sit under a heavy veil (D148)
 - Centered surface: `surface-in` (fade + 8px rise + slight scale)
 - Top-anchored surface (search): `surface-in-top`
 
