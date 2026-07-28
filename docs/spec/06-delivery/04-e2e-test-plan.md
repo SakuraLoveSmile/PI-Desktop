@@ -445,15 +445,18 @@ Each scenario is documented in this format:
 #### E2E-041: Conversation minimap navigates long transcripts
 
 - **Preconditions**: A session contains enough user and assistant turns to
-  scroll beyond one viewport, including one AI response emitted as multiple
-  assistant fragments around tool activity; a second session has at least two
-  eligible turn markers that still fit in one viewport.
+  scroll beyond one viewport and densely fill the minimap, including one AI
+  response emitted as multiple assistant fragments around tool activity; a
+  second session has at least two eligible turn markers that still fit in one
+  viewport.
 - **Steps**: 1) Open the long session. 2) Scroll through the transcript and
   observe the active minimap marker. 3) Hover a marker and inspect its preview.
   4) Use keyboard focus to reach another marker. 5) Activate a marker. 6) Open a
   session with fewer than two eligible turn markers. 7) Open the
   multi-message session that still fits one viewport. 8) Resize the long session
-  window taller until content no longer overflows, then shorter again.
+  window taller until content no longer overflows, then shorter again. 9) At a
+  short window height, inspect and activate the first and last markers near the
+  minimap's vertical bounds, including from the titlebar-facing side.
 - **Expected**: The rail contains one marker per visible user turn and one per
   AI response. Multiple assistant fragments between two user messages share a
   single marker and combined bounded preview, while tool-only rows create no
@@ -463,7 +466,9 @@ Each scenario is documented in this format:
   activation smoothly scrolls to the first contentful message in that response;
   the rail is absent when fewer than two eligible markers exist **or** when
   content does not overflow one viewport; the rail reappears once overflow
-  returns after a resize.
+  returns after a resize. Dense markers remain centered in the unobstructed
+  span between the 46px titlebar and docked composer, compress uniformly, and
+  remain interactive without entering the native window drag region.
 - **Specs linked**: `04-ux/08-component-spec.md`
 - **Acceptance**: C (chat stream), Quality (keyboard and long-thread navigation)
 - **Milestone**: M3

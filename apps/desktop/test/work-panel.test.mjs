@@ -65,7 +65,10 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
   assert.match(panelSource, /"work-panel-rail-button"/);
   assert.match(panelSource, /aria-pressed=\{selected\}/);
   assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
-  assert.match(panelSource, /openWorkPanelTab\(toolWorkPanelTab\(kind\)\)/);
+  assert.match(
+    panelSource,
+    /kind === "file"\s*\? \{ id: "file", kind \}\s*:\s*toolWorkPanelTab\(kind\)/,
+  );
   assert.match(panelSource, /tabs\.map\(\(tab, index\) =>/);
   assert.match(panelSource, /className="work-panel-switcher-menu"/);
   assert.match(panelSource, /id=\{activeTab \? `work-panel-title-\$\{activeTab\.id\}`/);

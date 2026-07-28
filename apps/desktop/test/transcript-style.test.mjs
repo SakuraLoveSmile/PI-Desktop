@@ -10,6 +10,10 @@ const transcriptSource = await readFile(
   new URL("../src/components/ChatTranscript.tsx", import.meta.url),
   "utf8",
 );
+const minimapSource = await readFile(
+  new URL("../src/components/ConversationMinimap.tsx", import.meta.url),
+  "utf8",
+);
 
 test("user turns keep a compact right-aligned plate", () => {
   const userBubbleStyles = stylesSource.match(
@@ -184,11 +188,7 @@ test("regenerate rewrites the current turn instead of appending", async () => {
   assert.match(protocolSource, /sessionReplaceMessages/);
 });
 
-test("conversation minimap hides until content overflows one viewport", async () => {
-  const minimapSource = await readFile(
-    new URL("../src/components/ConversationMinimap.tsx", import.meta.url),
-    "utf8",
-  );
+test("conversation minimap hides until content overflows one viewport", () => {
   assert.match(minimapSource, /OVERFLOW_EPSILON_PX/);
   assert.match(
     minimapSource,
@@ -204,6 +204,29 @@ test("conversation minimap hides until content overflows one viewport", async ()
   );
   assert.match(minimapSource, /new ResizeObserver\(scheduleResize\)/);
   assert.match(minimapSource, /updateOverflow/);
+});
+
+test("conversation minimap stays centered below titlebar at high density", () => {
+  assert.match(
+    minimapSource,
+    /"--minimap-marker-count": markers\.length/,
+  );
+  assert.match(
+    stylesSource,
+    /\.minimap-rail \{[\s\S]*?top:\s*var\(--ds-toolbar-height\);[\s\S]*?bottom:\s*200px;[\s\S]*?justify-content:\s*center;/,
+  );
+  assert.match(
+    stylesSource,
+    /\.minimap-rail \{[\s\S]*?gap:\s*clamp\([\s\S]*?var\(--minimap-marker-count\)[\s\S]*?-webkit-app-region:\s*no-drag;/,
+  );
+  assert.match(
+    stylesSource,
+    /\.minimap-marker \{[\s\S]*?min-height:\s*0;/,
+  );
+  assert.match(
+    stylesSource,
+    /\.minimap-marker::before \{[\s\S]*?height:\s*min\(2px,\s*100%\);/,
+  );
 });
 
 test("regenerate history pager and stable revision family are wired", async () => {
