@@ -48,6 +48,13 @@ const HEADER_TOOLS = [
   { kind: "file", Icon: IconFileText },
 ] as const;
 
+type HeaderToolKind = (typeof HEADER_TOOLS)[number]["kind"];
+
+function headerToolTab(kind: HeaderToolKind): WorkPanelTab {
+  if (kind === "file") return { id: "file", kind };
+  return toolWorkPanelTab(kind);
+}
+
 function workPanelWidthContext() {
   const sidebar = document.querySelector<HTMLElement>(".sidebar, .sidebar-rail");
   return {
@@ -317,13 +324,7 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
               title={label}
               aria-label={label}
               aria-pressed={selected}
-              onClick={() =>
-                openWorkPanelTab(
-                  kind === "file"
-                    ? { id: "file", kind }
-                    : toolWorkPanelTab(kind),
-                )
-              }
+              onClick={() => openWorkPanelTab(headerToolTab(kind))}
             >
               <Icon size={16} />
               {open && !selected && <span className="work-panel-open-dot" aria-hidden />}
