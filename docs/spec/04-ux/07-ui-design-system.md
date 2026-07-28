@@ -290,7 +290,7 @@ All font sizes come from the `--text-*` ramp defined in the `@theme` block of `g
 | `--text-xs-plus` | 11.5px | Muted metadata, menu subtitles |
 | `--text-sm` | 12px | Secondary labels, tool rows, sidebar section labels |
 | `--text-sm-plus` | 12.5px | Chips, working indicator, code text |
-| `--text-md` | 13px | Sidebar project/group titles, empty-state copy, compact chrome |
+| `--text-md` | 13px | Sidebar session/project titles, empty-state copy, compact chrome |
 | `--text-md-plus` | 13.5px | Composer labels, list rows |
 | `--text-base` | 14px | Body text, chat messages, input, primary sidebar chrome |
 | `--text-base-plus` | 15px | Brand, prominent labels |
@@ -305,10 +305,10 @@ Letter-spacing tokens: `--tracking-tighter` −0.03em, `--tracking-tight` −0.0
 
 > Note: 14px base is intentional for developer-density. Do not bump to 16px default.
 >
-> Sidebar primary chrome (nav items, New task, session titles, footer identity,
-> profile menu actions) uses `--text-base` so the left rail matches main body
-> readability. Project/group titles and empty-state copy step down once to
-> `--text-md`; only section labels and secondary metadata use `--text-sm`.
+> Sidebar primary chrome (nav items, New task, footer identity, profile menu
+> actions) uses `--text-base` so the left rail matches main body readability.
+> Session titles, project/group titles, and empty-state copy use the compact
+> `--text-md` tier; only section labels and secondary metadata use `--text-sm`.
 > Never use the micro `--text-xs` band for primary list content.
 
 ### 5.3 Code text sizing
@@ -890,9 +890,8 @@ Full component contract and usage rules: [08-component-spec.md §17](08-componen
 12. Spacing values use the defined scale (no arbitrary pixel values in component code)
 13. Stream updates do not retrigger destination/shell enter motion or a
     backdrop-filter repaint behind the composer
-14. Expanded sidebar session titles use the 14px body token; project/group
-    titles and empty-state copy use the adjacent 13px token without changing
-    the compact 28–32px row pitch
+14. Expanded sidebar session titles, project/group titles, and empty-state copy
+    use the 13px compact token without changing the 28–32px row pitch
 
 ## Dark floating surfaces (Codex parity)
 

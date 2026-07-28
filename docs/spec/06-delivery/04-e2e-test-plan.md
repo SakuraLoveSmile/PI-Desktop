@@ -1916,7 +1916,7 @@ Each scenario is documented in this format:
   `context-compaction.test.mjs`, host-core transcript/session unit tests); full
   provider/UI journey Draft
 
-#### E2E-085: Expanded sidebar typography follows the global body scale
+#### E2E-085: Expanded sidebar typography keeps list content compact
 
 - **Preconditions**: The expanded sidebar contains at least one standalone
   session, one retained project with a session, and one empty project group;
@@ -1930,14 +1930,13 @@ Each scenario is documented in this format:
   3. Compare the sidebar hierarchy with 14px chat body text and inspect long
      session/project names.
 - **Expected**:
-  - Session titles, New task, Plugins, and the footer identity use
-    `--text-base` (14px), matching the global body scale.
-  - Project/group titles and empty-state copy use `--text-md` (13px); section
-    labels and secondary metadata remain at `--text-sm` (12px).
+  - New task, Plugins, and the footer identity use `--text-base` (14px).
+  - Session titles, project/group titles, and empty-state copy use `--text-md`
+    (13px); section labels and secondary metadata remain at `--text-sm` (12px).
   - The hierarchy remains readable in both themes, row pitch stays compact at
     approximately 28–32px, and long labels truncate without shell reflow.
 - **Specs linked**: `04-ux/07-ui-design-system.md`,
-  `04-ux/08-component-spec.md`, D159
+  `04-ux/08-component-spec.md`, D161
 - **Acceptance**: Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`sidebar-navigation.test.mjs`); rendered visual
@@ -2552,14 +2551,14 @@ This test plan spec is accepted when:
   A's resulting Review tab and prior panel selection, while B's tabs and Browser
   resource remain unchanged.
 
-### US-UI-69 Sidebar type balance (D144/D159)
+### US-UI-69 Sidebar type balance (D144/D161)
 - Open the expanded sidebar in light and dark themes at default and minimum
   supported widths with at least one session, one project group, and the local
   profile footer visible.
-- Expect New task, Plugins, session/thread titles, footer profile name, and
-  profile menu actions to render at the body chrome size (`--text-base` / 14px).
-- Expect project/group titles and empty-state copy one step quieter
-  (`--text-md` / 13px), with uppercase section labels (`SESSIONS` / `PROJECTS`)
+- Expect New task, Plugins, footer profile name, and profile menu actions to
+  render at the body chrome size (`--text-base` / 14px).
+- Expect session/thread titles, project/group titles, and empty-state copy at
+  `--text-md` / 13px, with uppercase section labels (`SESSIONS` / `PROJECTS`)
   at `--text-sm` / 12px — never below `--text-md` for primary list content.
 - Confirm row pitch remains compact (≈28–32px), titles still truncate cleanly,
   and collapsed icon-rail controls stay legible without reflowing the shell.

@@ -214,23 +214,22 @@ Collapsed (48px):
 
 ### 3.3 Typography
 
-Primary left-rail chrome and session titles stay body-sized so the expanded
-sidebar remains readable next to the 14px chat body. Project/group labels step
-one token quieter to preserve hierarchy without making the list feel detached
-from the global type scale:
+Primary left-rail chrome stays body-sized so destinations remain readable next
+to the 14px chat body. Session and project/group titles use the adjacent compact
+tier; weight, indentation, and disclosure icons preserve their hierarchy:
 
 | Surface | Token | Notes |
 |---|---|---|
 | New task / Plugins / nav items | `--text-base` (14px) | Primary actions and destinations |
-| Session / thread titles | `--text-base` (14px) | Matches global body readability |
-| Project / group titles, empty copy | `--text-md` (13px) | One step quieter than session rows |
+| Session / thread titles | `--text-md` (13px) | Compact list content |
+| Project / group titles, empty copy | `--text-md` (13px) | Hierarchy comes from weight and indentation |
 | Section labels (`SESSIONS`, `PROJECTS`) | `--text-sm` (12px) | Uppercase secondary labels |
 | Footer profile name + profile menu items | `--text-base` (14px) | Identity cluster matches nav body |
 | Footer status / profile menu secondary | `--text-sm` (12px) | Secondary line only |
 
 Do not render primary sidebar list content below `--text-md`. Keep row heights
-(≈28–32px) so density stays WorkBuddy/Codex-like while session glyphs remain
-coordinated with the global body size.
+(≈28–32px) so density stays WorkBuddy/Codex-like while primary actions remain
+visually distinct from list content.
 
 ### 3.4 States
 
@@ -1720,5 +1719,5 @@ Sidebar footer                                        Popover (360px max)
 18. Native window edges, panel visibility, and the work-panel divider have
     independent resize ownership; cancelled divider gestures restore the prior
     width and responsive clamping never overwrites the persisted preference
-19. Expanded sidebar session titles match the 14px global body token while
-    project/group titles and empty-state copy remain one adjacent step smaller
+19. Expanded sidebar session titles, project/group titles, and empty-state copy
+    use the 13px compact token while primary sidebar actions remain at 14px
