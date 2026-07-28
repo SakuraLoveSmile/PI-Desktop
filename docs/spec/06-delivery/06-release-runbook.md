@@ -89,9 +89,9 @@ Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
    visible.
 2. App launches from DMG install, window appears, and the application-menu,
    About-panel, and Dock branding match the development lane.
-3. Empty home, expanded/collapsed sidebar, and docked composer show the
-   canonical PI-Desktop logo; New task and project/Temporary create controls
-   use the message-plus session icon.
+3. Empty home and expanded/collapsed sidebar show the canonical PI-Desktop
+   logo; composer prompt rows have no leading brand icon; New task and
+   project/Temporary create controls use the message-plus session icon.
 4. Onboarding checklist appears; configure provider; one streamed chat turn.
 5. One permissioned tool call (Write) allow + deny paths.
 6. Quit/relaunch → session history restored, window bounds restored.

@@ -14,7 +14,6 @@ import {
   resolveComposerCommand,
   useComposerAutocomplete,
 } from "../lib/use-composer-autocomplete";
-import { BrandLogo } from "./BrandLogo";
 import { ComposerAutocomplete } from "./ComposerAutocomplete";
 import {
   IconArrowUp,
@@ -481,11 +480,6 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
           ) : null}
           <div className="composer-input-wrap">
-            {variant === "docked" ? (
-              <span className="composer-thread-mark" aria-hidden>
-                <BrandLogo size={15} />
-              </span>
-            ) : null}
             <textarea
               ref={ref}
               className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}

@@ -1099,7 +1099,7 @@ async function createWindow() {
             }
             await new Promise((r) => setTimeout(r, 350));
             // Composer visibility probe (empty draft must not collapse)
-            const composerProbe = await mainWindow!.webContents.executeJavaScript(`(() => { const ta=document.querySelector("textarea.composer-input"); if(!ta) return null; const r=ta.getBoundingClientRect(); return {value:ta.value, ph:ta.placeholder, h:ta.offsetHeight, y:Math.round(r.y), mark:document.querySelector(".composer-thread-mark")?.textContent||""}; })()`);
+            const composerProbe = await mainWindow!.webContents.executeJavaScript(`(() => { const ta=document.querySelector("textarea.composer-input"); if(!ta) return null; const r=ta.getBoundingClientRect(); return {value:ta.value, ph:ta.placeholder, h:ta.offsetHeight, y:Math.round(r.y)}; })()`);
             console.log("COMPOSER_PROBE", composerProbe);
             await shot("pi-final");
             // Work panel scenes are opened by simulated artifacts; production

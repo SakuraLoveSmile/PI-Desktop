@@ -16,7 +16,7 @@
 > compact five-destination directory from D090/D133, and retained path-keyed
 > project groups per D093 (which preserves D088's Temporary/exact-path boundary
 > while restoring scoped project and conversation organization actions), and
-> product branding/icon contract per D094.
+> product branding/icon contract per D094/D160.
 
 ## 1. AppShell
 
@@ -335,7 +335,8 @@ coordinated with the global body size.
   identity.
 - `BrandLogo` imports canonical `build/icon_1024.png` through Vite. The
   empty-home hero renders it at 56px, the expanded/collapsed sidebar at
-  20px/18px, and the docked composer at 15px.
+  20px/18px. Home and thread-docked composer prompt rows do not render a
+  leading brand icon.
 - The expanded/collapsed New task control and project/Temporary session
   creation controls render the dedicated message-plus session icon. Generic
   `IconPlus` remains reserved for adding non-session entities.
