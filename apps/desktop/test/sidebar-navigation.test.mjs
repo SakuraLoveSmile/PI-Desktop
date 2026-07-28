@@ -156,3 +156,21 @@ test("sidebar section toolbars open create actions from context menus", () => {
   assert.match(sidebarSource, /e\.button === 2/);
   assert.match(sidebarSource, /addEventListener\("pointerdown"/);
 });
+
+test("project rows expose open-folder in the project menu and full-path hover", () => {
+  assert.match(sidebarSource, /data-action="open-project-folder"/);
+  assert.match(sidebarSource, /api\.openProjectFolder\(entry\.path\)/);
+  assert.doesNotMatch(sidebarSource, /data-action="open-session-folder"/);
+  assert.doesNotMatch(sidebarSource, /api\.openSessionFolder\(/);
+  assert.match(
+    sidebarSource,
+    /className="sidebar-session-group-title project-toggle"[\s\S]*?aria-describedby=\{`\$\{projectId\}-path-description`\}[\s\S]*?onMouseEnter=\{\(event\) => showProjectPath\(entry, event\.currentTarget\)\}[\s\S]*?onFocus=\{\(event\) => showProjectPath\(entry, event\.currentTarget\)\}/,
+  );
+  assert.match(sidebarSource, /className="sidebar-project-path-tooltip"/);
+  assert.match(sidebarSource, /role="tooltip"/);
+  assert.match(sidebarSource, /className="sr-only">\s*\{entry\.path\}/);
+  assert.match(
+    globalStyles,
+    /\.sidebar-project-path-tooltip\s*\{[^}]*position:\s*fixed;[^}]*max-width:[^;]*;[^}]*overflow-wrap:\s*anywhere;/s,
+  );
+});

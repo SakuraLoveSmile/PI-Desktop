@@ -134,15 +134,18 @@ destination, chat as the home surface, tools and permissions inline.
   scroll independently.
 - **Identity**: each group is keyed by the normalized full project path, never
   by a potentially ambiguous folder basename.
-- **Header**: project name/path, active state, disclosure, new-task action,
-  and an overflow menu. The directory title is one full-row disclosure target;
+- **Header**: project name, active state, disclosure, new-task action, and an
+  overflow menu. The directory title is one full-row disclosure target;
   collapse/expand affects only child visibility, and adjacent groups form one
-  dense tree rather than detached cards.
-- **Project actions**: pin/unpin changes presentation priority;
-  archive/restore hides or restores the group in the default view; close
-  removes the retained tab without deleting or archiving project/session data.
+  dense tree rather than detached cards. Hovering or focusing the project title
+  reveals the full project path.
+- **Project actions**: open folder reveals the project directory; pin/unpin
+  changes presentation priority; archive/restore hides or restores the group in
+  the default view; close removes the retained tab without deleting or
+  archiving project/session data.
 - **Conversation actions**: pin/unpin, archive/restore, and delete remain
-  separate actions. Archive never removes the transcript.
+  separate actions. Archive never removes the transcript. Open folder is a
+  project action, not a conversation action.
 - **Sort**: user-facing modes are Recently updated, Created date, Oldest
   first, and Name. Pinned rows precede unpinned rows. A legacy persisted
   `manual` value remains readable but does not imply a drag-reorder gesture.

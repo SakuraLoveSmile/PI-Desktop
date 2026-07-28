@@ -285,11 +285,12 @@ visually distinct from list content.
   path-less persistent session
 - Right-click the `Sessions` heading or empty standalone-list chrome: open a
   single-item create menu that creates/reuses a path-less temporary session
-- Project overflow: switch, pin/unpin, archive/restore, close retained tab
-- Conversation overflow: pin/unpin, archive/restore, Create branch, open
-  folder, delete. Create branch is disabled while that conversation is
-  running; success activates the independent child session and focuses the
-  composer.
+- Project overflow: switch, open folder, pin/unpin, archive/restore, close
+  retained tab. Open folder reveals the project directory in the system file
+  manager for the selected project row.
+- Conversation overflow: pin/unpin, archive/restore, Create branch, delete.
+  Create branch is disabled while that conversation is running; success
+  activates the independent child session and focuses the composer.
 - The sort menu remains beside the `Sessions` heading: Recently updated,
   Created date, Oldest first, and Name; pinned rows stay ahead of unpinned rows.
   A stored `manual` compatibility value requires no drag-reorder UI.
@@ -362,7 +363,7 @@ controls.
 
 | Element | Contract |
 |---|---|
-| Group root | localized project name; full path in tooltip/accessible description |
+| Group root | localized project name; hover and keyboard focus expose the full path in a portaled tooltip plus an accessible description without changing row geometry |
 | Directory disclosure | single full-row target with `aria-expanded` / `aria-controls`; may activate an inactive project before toggling, but never archives |
 | Project pin | presentation priority only; no host row deletion/move |
 | Project archive | omitted from default view; restorable from archived view |

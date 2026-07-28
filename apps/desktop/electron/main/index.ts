@@ -9,10 +9,10 @@ import {
   Notification as SystemNotification,
   shell,
 } from "electron";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import {
   APP_ID,
   APP_NAME,
@@ -2160,39 +2160,6 @@ function registerIpc() {
       ? { ...result, session: enrichSession(result.session, providers) }
       : result;
   });
-  handle(IPC.invoke.sessionOpenFolder, async (id: string) => {
-    if (!host) throw new Error("host unavailable");
-    const sessionId = String(id ?? "").trim();
-    if (!sessionId) {
-      throw Object.assign(new Error("sessionId required"), {
-        errorCode: ErrorCodes.INVALID_ARGUMENT,
-      });
-    }
-    // Resolve the folder in main from the session record so the renderer
-    // never passes a raw filesystem path over IPC.
-    const res = await host.call<{
-      session?: { projectPath?: string } | null;
-    }>("session.get", { id: sessionId });
-    if (!res.session) {
-      throw Object.assign(new Error("session not found"), {
-        errorCode: ErrorCodes.NOT_FOUND,
-      });
-    }
-    const projectPath = res.session.projectPath?.trim();
-    // Project sessions open their project folder; temporary sessions open
-    // the per-session scratch dir (D114), created on demand so the folder
-    // opens even before the agent has written anything there.
-    const target = projectPath || join(dataDir, "scratch", sessionId);
-    if (!projectPath) mkdirSync(target, { recursive: true });
-    if (!existsSync(target)) {
-      throw Object.assign(new Error("folder not found"), {
-        errorCode: ErrorCodes.NOT_FOUND,
-      });
-    }
-    const openError = await shell.openPath(target);
-    if (openError) throw new Error(openError);
-    return { ok: true, path: target };
-  });
   handle(IPC.invoke.sessionDelete, async (id: string) => {
     if (!host) throw new Error("host unavailable");
     const res = await host.call("session.delete", { id });
@@ -2620,6 +2587,38 @@ function registerIpc() {
   handle(IPC.invoke.projectList, async () => {
     if (!host) throw new Error("host unavailable");
     return host.call("projects.list");
+  });
+  handle(IPC.invoke.projectOpenFolder, async (path: string) => {
+    if (!host) throw new Error("host unavailable");
+    const requestedPath = String(path ?? "").trim();
+    if (!requestedPath) {
+      throw Object.assign(new Error("project path required"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    // Open only known project records so the renderer cannot probe arbitrary
+    // filesystem paths through this channel.
+    const listed = (await host.call("projects.list")) as {
+      projects?: Array<{ path?: string }>;
+    };
+    const projectPath = resolve(requestedPath);
+    const known = (listed.projects ?? []).some((project) => {
+      const candidate = String(project?.path ?? "").trim();
+      return candidate && resolve(candidate) === projectPath;
+    });
+    if (!known) {
+      throw Object.assign(new Error("project not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    if (!existsSync(projectPath) || !statSync(projectPath).isDirectory()) {
+      throw Object.assign(new Error("folder not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    const openError = await shell.openPath(projectPath);
+    if (openError) throw new Error(openError);
+    return { ok: true, path: projectPath };
   });
   handle(IPC.invoke.projectOpen, async () => {
     if (!host) throw new Error("host unavailable");
