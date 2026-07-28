@@ -95,7 +95,8 @@ export type ToastOptions = {
 };
 
 const WORK_PANEL_STORAGE_KEY = "pi.desktop.workPanel";
-export const WORK_PANEL_MIN_WIDTH = 320;
+// Preserve the original 320px tool-content minimum beside the 44px activity rail.
+export const WORK_PANEL_MIN_WIDTH = 364;
 export const WORK_PANEL_DEFAULT_WIDTH = 420;
 
 // Opening the panel grows the OS window outward so the chat column keeps its
