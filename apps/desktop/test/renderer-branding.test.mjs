@@ -18,8 +18,8 @@ const [english, chinese, brandLogo, icons, sidebar, app, composer] =
 test("renderer surfaces the PI-Desktop brand instead of the Codex shell brand", () => {
   assert.match(english, /shellName:\s*"PI-Desktop"/);
   assert.match(chinese, /shellName:\s*"PI-Desktop"/);
-  assert.match(english, /placeholder:\s*"Ask PI-Desktop to do anything"/);
-  assert.match(chinese, /placeholder:\s*"向 PI-Desktop 下达任意指令"/);
+  assert.match(english, /placeholder:\s*"Ask PI-Desktop to help with anything"/);
+  assert.match(chinese, /placeholder:\s*"让 PI-Desktop 帮你做任何事"/);
   assert.doesNotMatch(english, /shellName:\s*"Codex"/);
   assert.doesNotMatch(chinese, /shellName:\s*"Codex"/);
   // Codex remains a supported external import source, not the app identity.

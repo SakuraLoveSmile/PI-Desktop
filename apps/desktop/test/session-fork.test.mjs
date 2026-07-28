@@ -48,8 +48,8 @@ test("session fork labels are localized", () => {
   const english = read("../../../packages/i18n/src/locales/en/index.ts");
   const chinese = read("../../../packages/i18n/src/locales/zh-CN/index.ts");
 
-  assert.match(english, /createBranch:\s*"Create branch"/);
+  assert.match(english, /createBranch:\s*"Branch from here"/);
   assert.match(english, /branchTitle:\s*"\{\{title\}\} \(branch\)"/);
-  assert.match(chinese, /createBranch:\s*"创建分支"/);
+  assert.match(chinese, /createBranch:\s*"从此处分支"/);
   assert.match(chinese, /branchTitle:\s*"\{\{title\}\}（分支）"/);
 });
