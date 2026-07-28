@@ -1120,11 +1120,6 @@ export function ChatTranscript({
       return false;
     return true;
   });
-  const minimapMessages = visible.filter(
-    (message) =>
-      message.role === "user" ||
-      (message.role === "assistant" && (message.content || "").trim()),
-  );
   // Thinking segments and tool calls between two answers merge into one
   // activity group, so a long agent loop reads as a single "Processed"
   // disclosure instead of alternating "Thinking" / tool rows.
@@ -1179,7 +1174,7 @@ export function ChatTranscript({
 
   return (
     <div className="thread-wrap">
-      <ConversationMinimap scrollRef={scrollRef} messages={minimapMessages} />
+      <ConversationMinimap scrollRef={scrollRef} messages={visible} />
       <div
         className="thread-scroll"
         ref={scrollRef}
