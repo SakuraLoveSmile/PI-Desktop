@@ -1055,6 +1055,58 @@ html {
   background: var(--ds-bg-primary);
 }
 
+.chat-surface,
+.route-page {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.route-pending {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-text-muted);
+}
+
+.route-pending-indicator {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--ds-border-default);
+  border-top-color: var(--ds-text-secondary);
+  border-radius: var(--radius-round);
+  animation: route-pending-spin 700ms linear infinite;
+}
+
+@keyframes route-pending-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.route-surface,
+.settings-shell-full {
+  animation: route-surface-in var(--motion-duration-normal) var(--motion-ease-out)
+    both;
+}
+
+@keyframes route-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .thread-wrap {
   position: relative;
   display: flex;
@@ -1090,7 +1142,20 @@ html {
   box-shadow:
     0 3px 7.5px rgba(0, 0, 0, 0.039),
     0 0 20px rgba(0, 0, 0, 0.051);
+  animation: jump-latest-in var(--motion-duration-normal) var(--motion-ease-out)
+    both;
   transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out), border-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+@keyframes jump-latest-in {
+  from {
+    opacity: 0;
+    scale: 0.88;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
 }
 
 .jump-latest-btn:hover {
@@ -1380,8 +1445,18 @@ html {
   border-radius: var(--ds-composer-radius, var(--radius-2xl));
   background: var(--ds-bg-composer);
   box-shadow: var(--ds-shadow-composer);
-  backdrop-filter: blur(18px);
   isolation: isolate;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-normal) var(--motion-ease-out),
+    transform var(--motion-duration-normal) var(--motion-ease-out);
+}
+
+.composer-shell:focus-within {
+  box-shadow:
+    var(--ds-elevation-stroke),
+    0 7px 24px color-mix(in oklab, var(--ds-text-primary) 9%, transparent);
+  transform: translateY(-1px);
 }
 
 .composer-meta {
@@ -1960,6 +2035,16 @@ html {
 .message-row:focus-within .message-actions,
 .message-actions:focus-within {
   opacity: 1;
+}
+
+.icon-btn:active:not(:disabled),
+.title-nav-btn:active:not(:disabled),
+.nav-item:active:not(:disabled),
+.copy-btn:active:not(:disabled),
+.work-panel-tab-trigger:active:not(:disabled),
+.sidebar-toolbar-button:active:not(:disabled),
+.sidebar-session-group-add:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .copy-btn {
@@ -3880,6 +3965,87 @@ html {
   width: min(100%, 980px);
   margin: 0 auto;
   padding: 28px 28px 48px;
+}
+
+.route-page > .thread-scroll {
+  flex: 1;
+}
+
+.chat-error-layer {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 150px;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding-inline: 16px;
+  pointer-events: none;
+}
+
+.chat-error-notice {
+  display: flex;
+  max-width: 820px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in oklab, var(--ds-error) 30%, transparent);
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-bg-secondary);
+  color: var(--ds-error);
+  font-size: var(--text-md);
+  box-shadow: var(--ds-shadow-composer);
+  pointer-events: auto;
+  animation: notice-in var(--motion-duration-normal) var(--motion-ease-out) both;
+}
+
+.chat-error-notice > span {
+  min-width: 0;
+  flex: 1 1 240px;
+  overflow-wrap: anywhere;
+}
+
+.chat-error-action,
+.chat-error-dismiss {
+  flex: none;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-primary);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.chat-error-action {
+  padding: 4px 8px;
+  border: 1px solid var(--ds-border-strong);
+  font-size: var(--text-sm-plus);
+}
+
+.chat-error-dismiss {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-text-secondary);
+}
+
+.chat-error-action:hover,
+.chat-error-dismiss:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .page-header {
@@ -6431,6 +6597,19 @@ html {
   min-height: 0;
   background: var(--ds-bg-primary);
   border-left: 1px solid var(--ds-border-subtle);
+  animation: work-panel-in var(--motion-duration-normal) var(--motion-ease-out)
+    both;
+}
+
+@keyframes work-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 :root[data-theme="light"] .work-panel {
@@ -8262,4 +8441,32 @@ html {
 .plugins-row:not(.off):focus-within .plugins-glyph {
   background: color-mix(in oklab, var(--ds-text-primary) 12%, transparent);
   color: var(--ds-text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-surface,
+  .settings-shell-full,
+  .jump-latest-btn,
+  .chat-error-notice,
+  .work-panel {
+    animation-duration: 0.01ms !important;
+  }
+
+  .route-pending-indicator {
+    animation: none;
+    border-color: var(--ds-text-muted);
+  }
+
+  .composer-shell,
+  .composer-shell:focus-within,
+  .icon-btn,
+  .title-nav-btn,
+  .nav-item,
+  .copy-btn,
+  .work-panel-tab-trigger,
+  .sidebar-toolbar-button,
+  .sidebar-session-group-add {
+    transform: none !important;
+    transition-duration: 0.01ms !important;
+  }
 }

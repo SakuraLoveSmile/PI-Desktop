@@ -10,9 +10,10 @@ import {
 import { createNavigationIntentController } from "../src/lib/navigation-intent.ts";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [appSource, transcriptSource, cardSource, storeSource, browserSource] =
+const [appSource, chatSurfaceSource, transcriptSource, cardSource, storeSource, browserSource] =
   await Promise.all([
     read("../src/App.tsx"),
+    read("../src/components/ChatSurface.tsx"),
     read("../src/components/ChatTranscript.tsx"),
     read("../src/components/PermissionCard.tsx"),
     read("../src/stores/app-store.ts"),
@@ -77,8 +78,9 @@ test("permission countdown uses its absolute receipt time", () => {
 
 test("permission approval is an inline transcript card, never a global dialog", () => {
   assert.doesNotMatch(appSource, /PermissionDialog/);
+  assert.doesNotMatch(chatSurfaceSource, /PermissionDialog/);
   assert.doesNotMatch(appSource, /Boolean\(permission\)/);
-  assert.match(appSource, /pendingPermission=\{activePermission\}/);
+  assert.match(chatSurfaceSource, /pendingPermission=\{activePermission\}/);
   assert.match(transcriptSource, /key=\{pendingPermission\.requestId\}/);
   assert.match(transcriptSource, /permission=\{pendingPermission\}/);
   assert.doesNotMatch(cardSource, /className="overlay"|className="dialog"/);

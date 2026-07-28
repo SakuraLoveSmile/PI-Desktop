@@ -6,6 +6,7 @@ export const zhCN = {
     shellName: "PI-Desktop",
     tagline: "本地 AI 编程助手",
     starting: "正在启动 PI-Desktop…",
+    loadingView: "正在加载页面…",
     uiCrashed: "界面出现了问题",
   },
   window: {

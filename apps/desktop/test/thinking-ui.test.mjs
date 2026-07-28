@@ -11,7 +11,7 @@ const transcriptSource = await readFile(
   "utf8",
 );
 const appSource = await readFile(
-  new URL("../src/App.tsx", import.meta.url),
+  new URL("../src/components/ChatSurface.tsx", import.meta.url),
   "utf8",
 );
 const mainSource = await readFile(
@@ -129,7 +129,7 @@ test("transcript keeps assistant thinking in a separate disclosure", () => {
 });
 
 test("thinking-only assistant streams open the transcript surface", () => {
-  assert.match(appSource, /typeof m\.thinking === "string"/);
+  assert.match(appSource, /typeof message\.thinking === "string"/);
   assert.match(appSource, /hasContent \|\| hasThinking/);
 });
 

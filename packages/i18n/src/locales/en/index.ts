@@ -4,6 +4,7 @@ export const en = {
     shellName: "PI-Desktop",
     tagline: "Your local AI coding partner",
     starting: "Starting PI-Desktop…",
+    loadingView: "Loading view…",
     uiCrashed: "Something went wrong with the interface",
   },
   window: {

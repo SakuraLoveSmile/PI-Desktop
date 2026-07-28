@@ -51,7 +51,7 @@ import { useAppStore } from "../stores/app-store";
 import type { PendingPermission } from "../lib/pending-permissions";
 import { PermissionCard } from "./PermissionCard";
 
-function WorkspaceChangesEntry() {
+const WorkspaceChangesEntry = memo(function WorkspaceChangesEntry() {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((state) => state.activeSessionId);
   const workspacePath = useAppStore((state) => state.workspace?.path);
@@ -109,7 +109,7 @@ function WorkspaceChangesEntry() {
       </button>
     </div>
   );
-}
+});
 
 /**
  * Copy chip. Message toolbars are glyph-only (`icon`) with the label in a
@@ -598,15 +598,35 @@ function ThinkingRow({
   );
 }
 
-function ActivityGroup({
-  items,
-  isActive,
-  endedAt,
-}: {
+type ActivityGroupProps = {
   items: ActivityItem[];
   isActive: boolean;
   endedAt?: string;
-}) {
+};
+
+function activityGroupPropsEqual(
+  previous: ActivityGroupProps,
+  next: ActivityGroupProps,
+) {
+  if (
+    previous.isActive !== next.isActive ||
+    previous.endedAt !== next.endedAt ||
+    previous.items.length !== next.items.length
+  ) {
+    return false;
+  }
+  return previous.items.every(
+    (item, index) =>
+      item.kind === next.items[index].kind &&
+      item.message === next.items[index].message,
+  );
+}
+
+const ActivityGroup = memo(function ActivityGroup({
+  items,
+  isActive,
+  endedAt,
+}: ActivityGroupProps) {
   const { t } = useTranslation();
   const detailsId = useId();
   const [open, setOpen] = useState(false);
@@ -723,7 +743,7 @@ function ActivityGroup({
       </div>
     </div>
   );
-}
+}, activityGroupPropsEqual);
 
 /* Shimmering "Working…" line with elapsed time, Codex-style. */
 function WorkingIndicator() {
@@ -988,7 +1008,7 @@ const MessageRow = memo(function MessageRow({
 });
 
 
-export function ChatTranscript({
+export const ChatTranscript = memo(function ChatTranscript({
   messages,
   isRunning,
   pendingPermission,
@@ -1002,6 +1022,7 @@ export function ChatTranscript({
   const contentRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
   const wasRunningRef = useRef(isRunning);
+  const followFrameRef = useRef(0);
   const [showJump, setShowJump] = useState(false);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
@@ -1009,6 +1030,19 @@ export function ChatTranscript({
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior });
   }, []);
+
+  const scheduleFollowScroll = useCallback(() => {
+    if (!pinnedRef.current || followFrameRef.current !== 0) return;
+    followFrameRef.current = requestAnimationFrame(() => {
+      followFrameRef.current = 0;
+      if (pinnedRef.current) scrollToBottom();
+    });
+  }, [scrollToBottom]);
+
+  useEffect(
+    () => () => cancelAnimationFrame(followFrameRef.current),
+    [],
+  );
 
   // Follow the stream only while the user is pinned to the bottom; a manual
   // scroll up pauses following and surfaces the jump-to-latest pill.
@@ -1029,77 +1063,77 @@ export function ChatTranscript({
     pinnedRef.current = true;
     setShowJump(false);
     scrollToBottom();
-    const frame = requestAnimationFrame(() => scrollToBottom());
-    return () => cancelAnimationFrame(frame);
-  }, [isRunning, scrollToBottom]);
+    scheduleFollowScroll();
+  }, [isRunning, scrollToBottom, scheduleFollowScroll]);
 
   useEffect(() => {
-    if (pinnedRef.current) scrollToBottom();
-  }, [messages, isRunning, pendingPermission?.requestId, scrollToBottom]);
+    scheduleFollowScroll();
+  }, [messages, isRunning, pendingPermission?.requestId, scheduleFollowScroll]);
 
-  // The typewriter reveal grows message height without changing `messages`,
-  // so follow content resizes too while pinned to the bottom.
+  // Streamed Markdown and expanded activity rows can change content height, so
+  // keep pinned follow synchronized with the observed layout.
   useEffect(() => {
     const el = contentRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => {
-      if (pinnedRef.current) scrollToBottom();
-    });
+    const ro = new ResizeObserver(scheduleFollowScroll);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [scrollToBottom]);
+  }, [scheduleFollowScroll]);
 
-  const visible = messages.filter((message) => {
-    if (
-      message.role === "assistant" &&
-      !(message.content || "").trim() &&
-      !thinkingText(message) &&
-      !message.error
-    )
-      return false;
-    return true;
-  });
-  // Thinking segments and tool calls between two answers merge into one
-  // activity group, so a long agent loop reads as a single "Processed"
-  // disclosure instead of alternating "Thinking" / tool rows.
-  const entries: Array<
-    | { kind: "message"; message: UiMessage }
-    | { kind: "activity"; items: ActivityItem[]; endedAt?: string }
-  > = [];
-  const pushActivity = (item: ActivityItem) => {
-    const last = entries[entries.length - 1];
-    if (last?.kind === "activity") last.items.push(item);
-    else entries.push({ kind: "activity", items: [item] });
-  };
-  for (const message of visible) {
-    if (message.role === "tool") {
-      pushActivity({ kind: "tool", message });
-      continue;
-    }
-    if (message.role === "assistant") {
-      if (thinkingText(message)) pushActivity({ kind: "thinking", message });
-      if ((message.content || "").trim() || !thinkingText(message)) {
-        entries.push({ kind: "message", message });
+  const { entries, visible } = useMemo(() => {
+    const visible = messages.filter((message) => {
+      if (
+        message.role === "assistant" &&
+        !(message.content || "").trim() &&
+        !thinkingText(message) &&
+        !message.error
+      ) {
+        return false;
       }
-      continue;
+      return true;
+    });
+    // Thinking segments and tool calls between two answers merge into one
+    // activity group so long agent loops stay compact.
+    const entries: Array<
+      | { kind: "message"; message: UiMessage }
+      | { kind: "activity"; items: ActivityItem[]; endedAt?: string }
+    > = [];
+    const pushActivity = (item: ActivityItem) => {
+      const last = entries[entries.length - 1];
+      if (last?.kind === "activity") last.items.push(item);
+      else entries.push({ kind: "activity", items: [item] });
+    };
+    for (const message of visible) {
+      if (message.role === "tool") {
+        pushActivity({ kind: "tool", message });
+        continue;
+      }
+      if (message.role === "assistant") {
+        if (thinkingText(message)) pushActivity({ kind: "thinking", message });
+        if ((message.content || "").trim() || !thinkingText(message)) {
+          entries.push({ kind: "message", message });
+        }
+        continue;
+      }
+      entries.push({ kind: "message", message });
     }
-    entries.push({ kind: "message", message });
-  }
-  // An answer following a group closes it; skip the timestamp when the
-  // answer is the same message as a thinking segment (its createdAt marks
-  // the start of thinking, not the end).
-  for (let index = 0; index < entries.length; index += 1) {
-    const entry = entries[index];
-    const next = entries[index + 1];
-    if (
-      entry.kind === "activity" &&
-      next?.kind === "message" &&
-      next.message.role === "assistant" &&
-      !entry.items.some((item) => item.message.id === next.message.id)
-    ) {
-      entry.endedAt = next.message.createdAt;
+    // An answer following a group closes it; skip the timestamp when the
+    // answer is the same message as a thinking segment because its createdAt
+    // marks the start of thinking, not the end.
+    for (let index = 0; index < entries.length; index += 1) {
+      const entry = entries[index];
+      const next = entries[index + 1];
+      if (
+        entry.kind === "activity" &&
+        next?.kind === "message" &&
+        next.message.role === "assistant" &&
+        !entry.items.some((item) => item.message.id === next.message.id)
+      ) {
+        entry.endedAt = next.message.createdAt;
+      }
     }
-  }
+    return { entries, visible };
+  }, [messages]);
   const activeToolGroup =
     isRunning && entries[entries.length - 1]?.kind === "activity";
   const lastEntry = entries[entries.length - 1];
@@ -1156,7 +1190,11 @@ export function ChatTranscript({
           onClick={() => {
             pinnedRef.current = true;
             setShowJump(false);
-            scrollToBottom("smooth");
+            scrollToBottom(
+              window.matchMedia("(prefers-reduced-motion: reduce)").matches
+                ? "auto"
+                : "smooth",
+            );
           }}
         >
           <IconArrowDown size={14} />
@@ -1164,4 +1202,4 @@ export function ChatTranscript({
       ) : null}
     </div>
   );
-}
+});

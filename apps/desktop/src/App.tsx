@@ -1,8 +1,9 @@
 import {
   Component,
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ErrorInfo,
@@ -21,23 +22,16 @@ import {
 } from "@pi-desktop/shared";
 import { Sidebar } from "./components/Sidebar";
 import { WorkPanel } from "./components/workpanel/WorkPanel";
-import { ChatTranscript } from "./components/ChatTranscript";
-import { Composer } from "./components/Composer";
-import { OnboardingChecklist } from "./components/OnboardingChecklist";
+import { ChatSurface } from "./components/ChatSurface";
 import { CommandPalette } from "./components/CommandPalette";
 import { SearchDialog } from "./components/SearchDialog";
 import { ToastHost } from "./components/Toast";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { WindowControls } from "./components/WindowControls";
-import { SettingsPage } from "./pages/SettingsPage";
-import { PullRequestsPage } from "./pages/PullRequestsPage";
-import { ScheduledPage } from "./pages/ScheduledPage";
-import { PluginsPage } from "./pages/PluginsPage";
 import { useAppStore } from "./stores/app-store";
 import type { ToastOptions } from "./stores/app-store";
 import { api } from "./lib/api";
 import { toolWorkPanelTab } from "./lib/work-panel-tabs";
-import { BrandLogo } from "./components/BrandLogo";
 import { StartupSplash } from "./components/StartupSplash";
 import { cx } from "./components/ui";
 import {
@@ -53,6 +47,27 @@ const MODIFIER_ONLY_KEYS = new Set([
   "Meta",
   "Shift",
 ]);
+
+const SettingsPage = lazy(() =>
+  import("./pages/SettingsPage").then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
+const PullRequestsPage = lazy(() =>
+  import("./pages/PullRequestsPage").then((module) => ({
+    default: module.PullRequestsPage,
+  })),
+);
+const ScheduledPage = lazy(() =>
+  import("./pages/ScheduledPage").then((module) => ({
+    default: module.ScheduledPage,
+  })),
+);
+const PluginsPage = lazy(() =>
+  import("./pages/PluginsPage").then((module) => ({
+    default: module.PluginsPage,
+  })),
+);
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -80,18 +95,6 @@ class ErrorBoundary extends Component<
     }
     return this.props.children;
   }
-}
-
-function i18nHasError(t: (k: string) => string, code: string) {
-  const key = `errors.${code}`;
-  return t(key) !== key;
-}
-
-function projectName(path?: string | null, name?: string | null) {
-  if (name) return name;
-  if (!path) return null;
-  const parts = path.split(/[/\\]/).filter(Boolean);
-  return parts[parts.length - 1] || path;
 }
 
 function CollapsedTitlebarActions({
@@ -148,6 +151,15 @@ function SessionPaneWorkPanelCollapse({ onCollapse }: { onCollapse: () => void }
   );
 }
 
+function RoutePending() {
+  const { t } = useTranslation();
+  return (
+    <div className="route-pending" role="status" aria-label={t("app.loadingView")}>
+      <span className="route-pending-indicator" aria-hidden />
+    </div>
+  );
+}
+
 function AppShell() {
   const { t } = useTranslation();
   const platform = window.piDesktop?.platform ?? "darwin";
@@ -155,25 +167,14 @@ function AppShell() {
   const ready = useAppStore((s) => s.ready);
   const page = useAppStore((s) => s.page);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
-  const messages = useAppStore((s) => s.messages);
-  const error = useAppStore((s) => s.error);
-  const errorCode = useAppStore((s) => s.errorCode);
-  const errorRetriable = useAppStore((s) => s.errorRetriable);
   const showToast = useAppStore((s) => s.showToast);
   const handleAgentEvent = useAppStore((s) => s.handleAgentEvent);
-  const isRunning = useAppStore((s) => s.isRunning);
   const abort = useAppStore((s) => s.abort);
   const settings = useAppStore((s) => s.settings);
   const workspace = useAppStore((s) => s.workspace);
   const reviewRev = useAppStore((s) => s.reviewRev);
   const refreshWorkspaceDiff = useAppStore((s) => s.refreshWorkspaceDiff);
-  const openProject = useAppStore((s) => s.openProject);
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
-  const activePermission = useAppStore((state) =>
-    state.activeSessionId
-      ? state.pendingPermissions[state.activeSessionId]
-      : undefined,
-  );
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -442,18 +443,6 @@ function AppShell() {
     runMenuCommand,
     settings?.keybindings,
   ]);
-
-  const heroProject = useMemo(
-    () => projectName(workspace?.path, workspace?.name),
-    [workspace?.path, workspace?.name],
-  );
-
-  const emptyTitleParts = useMemo(() => {
-    const marker = "__PROJECT__";
-    const template = t("chat.emptyTitleInProject", { project: marker });
-    const [before = "", after = ""] = template.split(marker);
-    return { before, after };
-  }, [t]);
 
   useEffect(() => {
     const originalRefreshNotifications =
@@ -765,16 +754,6 @@ function AppShell() {
     <StartupSplash exiting={splashPhase === "exiting"} />
   ) : null;
 
-  const showComposer = page === "chat";
-  const hasTranscript =
-    Boolean(activePermission) ||
-    messages.some((m) => {
-      const hasContent = Boolean((m.content || "").trim());
-      const hasThinking =
-        typeof m.thinking === "string" && Boolean(m.thinking.trim());
-      if (m.role === "assistant") return hasContent || hasThinking;
-      return hasContent || m.role === "tool";
-    });
   const shortcutPlatform = platform as ShortcutPlatform;
   const toggleSidebarShortcut = KEYBOARD_SHORTCUTS.find(
     (shortcut) => shortcut.id === "toggleSidebar",
@@ -796,7 +775,9 @@ function AppShell() {
       shell = (
         <>
           <WindowControls />
-          <SettingsPage />
+          <Suspense fallback={<RoutePending />}>
+            <SettingsPage />
+          </Suspense>
           <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
           <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
           <ToastHost />
@@ -862,109 +843,23 @@ function AppShell() {
               </div>
             )}
 
-            {page === "pulls" ? (
-              <PullRequestsPage />
-            ) : page === "scheduled" ? (
-              <ScheduledPage />
-            ) : page === "plugins" ? (
-              <PluginsPage />
-            ) : (
-              <>
-                {!hasTranscript ? (
-                  <div className="home-main-content" data-testid="home-empty">
-                    <div className="home-scroll">
-                      <div className="home-stack-inner">
-                        <div className="empty-hero">
-                          <div className="empty-hero-icon" data-testid="home-icon" aria-hidden>
-                            <BrandLogo size={56} />
-                          </div>
-                          <h1>
-                            {heroProject ? (
-                              <>
-                                {emptyTitleParts.before}
-                                <button
-                                  type="button"
-                                  className="project-underline"
-                                  onClick={() => void openProject()}
-                                  title={workspace?.path || t("project.open")}
-                                >
-                                  {heroProject}
-                                </button>
-                                {emptyTitleParts.after}
-                              </>
-                            ) : (
-                              t("chat.emptyTitle")
-                            )}
-                          </h1>
-                        </div>
-                        <OnboardingChecklist />
-                        {showComposer && (
-                          <div className="home-composer-wrap">
-                            <Composer variant="home" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <ChatTranscript
-                      messages={messages}
-                      isRunning={isRunning}
-                      pendingPermission={activePermission}
-                    />
-                    {showComposer && <Composer variant="docked" />}
-                  </>
-                )}
-
-                {error && (
-                  <div className="absolute inset-x-0 bottom-[150px] z-10 flex justify-center px-4">
-                    <div className="flex max-w-[820px] items-center gap-3 rounded-md-plus border border-error/30 bg-bg-secondary px-3 py-2 text-md text-error">
-                      {/* Localized text when the code is known; raw provider
-                          detail stays reachable via the tooltip. */}
-                      <span title={error ?? undefined}>
-                        {errorCode && i18nHasError(t, errorCode)
-                          ? t(`errors.${errorCode}`)
-                          : error}
-                      </span>
-                      {(errorCode === "MODEL_NOT_CONFIGURED" ||
-                        errorCode === "PROVIDER_SECRET_MISSING" ||
-                        errorCode === "PROVIDER_UNAUTHORIZED") && (
-                        <button
-                          type="button"
-                          className="flex-none rounded-md border border-border-strong px-2 py-1 text-sm-plus text-text-primary hover:bg-bg-hover"
-                          onClick={() => {
-                            useAppStore.getState().setSettingsTab("agent");
-                            useAppStore.getState().setPage("settings");
-                          }}
-                        >
-                          {t("errors.action.openSettings")}
-                        </button>
-                      )}
-                      {errorRetriable && !isRunning && (
-                        <button
-                          type="button"
-                          className="flex-none rounded-md border border-border-strong px-2 py-1 text-sm-plus text-text-primary hover:bg-bg-hover"
-                          onClick={() => {
-                            void useAppStore.getState().retryLastPrompt();
-                          }}
-                        >
-                          {t("errors.action.retry")}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        aria-label={t("errors.action.dismiss")}
-                        className="flex-none rounded-md px-1.5 py-1 text-sm-plus text-text-secondary hover:bg-bg-hover hover:text-text-primary"
-                        onClick={() => useAppStore.getState().clearError()}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+            <Suspense fallback={<RoutePending />}>
+              {page === "pulls" ? (
+                <div className="route-surface route-page">
+                  <PullRequestsPage />
+                </div>
+              ) : page === "scheduled" ? (
+                <div className="route-surface route-page">
+                  <ScheduledPage />
+                </div>
+              ) : page === "plugins" ? (
+                <div className="route-surface route-page">
+                  <PluginsPage />
+                </div>
+              ) : (
+                <ChatSurface />
+              )}
+            </Suspense>
           </section>
 
           {workPanelOpen && (
