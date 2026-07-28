@@ -2448,15 +2448,16 @@ This test plan spec is accepted when:
   A's resulting Review tab and prior panel selection, while B's tabs and Browser
   resource remain unchanged.
 
-### US-UI-69 Sidebar type balance (D144)
+### US-UI-69 Sidebar type balance (D144/D155)
 - Open the expanded sidebar in light and dark themes at default and minimum
   supported widths with at least one session, one project group, and the local
   profile footer visible.
-- Expect New task, Plugins, session titles, footer profile name, and profile
-  menu actions to render at the body chrome size (`--text-base` / 14px).
-- Expect project/group titles and empty-state copy one step quieter
-  (`--text-md` / 13px) and uppercase section labels (`SESSIONS` / `PROJECTS`)
-  at `--text-sm` / 12px — never micro `--text-xs` for primary left-rail content.
+- Expect New task, Plugins, footer profile name, and profile menu actions to
+  render at the body chrome size (`--text-base` / 14px).
+- Expect session / thread titles one step quieter (`--text-md` / 13px).
+- Expect project/group titles, empty-state copy, and uppercase section labels
+  (`SESSIONS` / `PROJECTS`) at `--text-sm` / 12px — never micro `--text-xs` for
+  primary left-rail list content.
 - Confirm row pitch remains compact (≈28–32px), titles still truncate cleanly,
   and collapsed icon-rail controls stay legible without reflowing the shell.
 
