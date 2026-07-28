@@ -28,7 +28,9 @@ Required (all **implemented**):
 ### Content Security Policy
 
 - Dev: `script-src 'self' 'unsafe-inline' 'unsafe-eval'` (required by Vite
-  HMR tooling), localhost websocket connect-src.
+  HMR tooling), localhost websocket connect-src. Fonts are restricted to
+  `'self'` and `data:` so Vite-inlined KaTeX WOFF2 assets can render without
+  admitting remote font origins.
 - Production build: `'unsafe-eval'` and localhost connect-src are stripped
   at build time (`tightenCsp` plugin in `electron.vite.config.ts`);
   `connect-src 'self'` only. Provider network traffic happens in the Node

@@ -50,7 +50,12 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 - Sidebar toggle: keyboard shortcut + icon button beside Search in the expanded
   sidebar header; the button moves to the main titlebar while collapsed
 - Work panel collapse: sole control lives in the session pane titlebar top-right
-  while the panel is open, so the work-panel content header is not occupied
+  while the panel is open, with its outer edge flush against the divider
+  between the session pane and work panel so the work-panel content header is
+  not occupied. On
+  Windows/Linux, opening the work panel removes the main titlebar's native
+  window-control clearance because those controls occupy the work-panel header
+  at the outer window edge.
 - Work panel resize: left-edge drag handle (§5.4)
 - Window resize: responsive collapse per [07-ui-design-system.md](07-ui-design-system.md) §10.1
 
@@ -381,14 +386,15 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 
 - Background: bg-primary
 - Max content width: 720px (messages), centered
-- Scroll behavior: auto-scroll to bottom on new message; manual scroll pauses auto-scroll
+- Scroll behavior: auto-scroll to bottom on new message while pinned; manual scroll pauses auto-scroll; send / retry / regenerate re-pins and jumps to bottom
 
 ### 4.4 States
 
 | State | Behavior |
 |---|---|
 | Empty | Hero + optional onboarding checklist + home composer in one scrollable stack; no suggestion cards (D111/D131) |
-| Streaming | Auto-scroll locked; new tokens append |
+| Streaming | Auto-scroll follows while pinned; new tokens append |
+| Turn start (send / retry / regenerate) | Re-pins and jumps to bottom even if the user had scrolled up |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
 | Session-owned dirty Git workspace | After this session successfully writes or edits the workspace, a compact Review changes command follows its transcript outside collapsed activity groups; it shows the capped file count plus explicit addition/deletion totals and opens the singleton Review tab. Other sessions in the same project do not render the command. |
 
@@ -642,6 +648,7 @@ responses, lightweight tool activity rows, and permission cards for a session.
 | State | Behavior |
 |---|---|
 | Streaming | New tokens append; auto-scroll only while pinned to bottom |
+| Turn start | Send / retry / regenerate re-pins follow mode and jumps to bottom |
 | Thinking-only streaming | Transcript opens; disclosure stays open; no empty answer bubble or duplicate Working row |
 | Idle | Scrollable; no auto-scroll |
 | Permission pending | PermissionCard inserted inline; transcript continues after resolution |
@@ -649,14 +656,15 @@ responses, lightweight tool activity rows, and permission cards for a session.
 
 ### 7.4 Interactions
 
-- Scroll: user scroll pauses auto-scroll; "scroll to bottom" floating button appears
+- Scroll: user scroll pauses auto-scroll; "scroll to bottom" floating button appears; send / retry / regenerate re-pins and jumps to bottom
 - Hover message: copy action appears
 - Toggle Thinking disclosure: expand/collapse reasoning independently from the
   final answer; streaming reopens it while reasoning is arriving
 - Hover code block: copy button appears
 - Hover or focus a minimap marker: show the localized sender and a bounded
-  plaintext preview; nearby markers magnify horizontally without reflowing the
-  rail
+  plaintext preview; multiple assistant fragments produced within one user
+  turn are combined into one AI-response marker and preview; nearby markers
+  magnify horizontally without reflowing the rail
 - Click a minimap marker: smoothly scroll its message near the top of the
   transcript viewport
 - Scroll the transcript: update the active minimap marker against an anchor
@@ -683,10 +691,12 @@ responses, lightweight tool activity rows, and permission cards for a session.
 - No inline message branching tree; regenerate variants remain linear per user
   root turn. Session-level Create branch produces an independent conversation
   row instead of adding tree chrome inside the transcript.
-- The minimap renders only when at least two visible user or assistant messages
-  exist **and** the transcript content overflows one viewport (scrollHeight >
-  clientHeight); tool-only rows do not create markers and a one-page transcript
-  never shows the rail
+- The minimap renders only when at least two eligible turn markers exist **and**
+  the transcript content overflows one viewport (scrollHeight > clientHeight).
+  Each visible user message creates one marker; all contentful assistant
+  fragments until the next user message create one AI-response marker anchored
+  to the first contentful fragment. Tool-only rows do not create markers or
+  split an AI response, and a one-page transcript never shows the rail.
 - Marker previews are capped at 280 source characters and are display-only
 
 ---
@@ -802,13 +812,16 @@ Single message render — either user (plaintext) or assistant (markdown streami
 Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shiki.ts`
 + prose styles under `.prose-chat` / `.code-block` in `globals.css`.
 
-- **Streaming without jank**: source splits into top-level blocks via `marked`'s
-  lexer; each block renders through a memoized `<ReactMarkdown>`. While
-  streaming only the tail block re-parses (incremental re-lex from the last
-  block boundary), so cost stays linear in message length.
+- **Streaming without jank**: runtime content chunks render directly, without a
+  second renderer-side typewriter or animation-frame state loop. Source splits
+  into top-level blocks via `marked`'s lexer; each block renders through a
+  memoized `<ReactMarkdown>`. While streaming only the tail block re-parses
+  (incremental re-lex from the last block boundary), so cost stays linear in
+  message length.
 - **Plugins**: `remark-gfm` (tables, task lists, strikethrough, autolinks),
   `remark-math` + `rehype-katex` (inline `$…$`, display `$$…$$`). Raw HTML
-  stays escaped (no `rehype-raw`).
+  stays escaped (no `rehype-raw`). KaTeX's Vite-inlined WOFF2 fonts are allowed
+  by the renderer's `font-src 'self' data:` CSP directive.
 - **Syntax highlighting**: Shiki singleton with the JavaScript regex engine
   (no wasm), themes `one-light`/`one-dark-pro` following `data-theme`.
   Languages lazy-load per fence tag with a plain-mono fallback until ready.

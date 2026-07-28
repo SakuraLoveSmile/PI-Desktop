@@ -192,12 +192,21 @@ Each scenario is documented in this format:
 #### E2E-009: Streamed tokens visible in UI
 
 - **Preconditions**: Session active; message sent.
-- **Steps**: 1) Observe assistant response as it streams.
-- **Expected**: Tokens appear progressively in chat UI; final response complete.
-- **Specs linked**: `03-runtime/02-agent-runtime.md`
-- **Acceptance**: C (streamed output)
+- **Steps**: 1) Request a long answer containing Markdown and inline/display
+  math. 2) Observe the assistant response as it streams. 3) Let the answer
+  complete and inspect the renderer console.
+- **Expected**: Runtime chunks appear progressively through the incremental
+  Markdown renderer and the final response is complete. The renderer does not
+  start a second animation-frame typewriter loop, raise React error 185, or
+  reject Vite-inlined KaTeX fonts under CSP.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`,
+  `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
+  `05-security/01-security.md`
+- **Acceptance**: C (streamed output), Quality
 - **Milestone**: M2
-- **Status**: Automated (protocol smoke, live-model lane; requires PI_DESKTOP_TEST_API_KEY)
+- **Status**: Partially automated (protocol live-model stream plus renderer
+  source regression in `renderer-stream-safety.test.mjs`; full UI observation
+  remains Draft)
 
 #### E2E-010: Abort generation
 
@@ -435,23 +444,26 @@ Each scenario is documented in this format:
 
 #### E2E-041: Conversation minimap navigates long transcripts
 
-- **Preconditions**: A session contains enough user and assistant messages to
-  scroll beyond one viewport, including tool activity between messages; a second
-  session has at least two eligible messages that still fit in one viewport.
+- **Preconditions**: A session contains enough user and assistant turns to
+  scroll beyond one viewport, including one AI response emitted as multiple
+  assistant fragments around tool activity; a second session has at least two
+  eligible turn markers that still fit in one viewport.
 - **Steps**: 1) Open the long session. 2) Scroll through the transcript and
   observe the active minimap marker. 3) Hover a marker and inspect its preview.
   4) Use keyboard focus to reach another marker. 5) Activate a marker. 6) Open a
-  session with fewer than two visible user or assistant messages. 7) Open the
+  session with fewer than two eligible turn markers. 7) Open the
   multi-message session that still fits one viewport. 8) Resize the long session
   window taller until content no longer overflows, then shorter again.
-- **Expected**: The rail contains one marker per visible user or assistant
-  message and no marker for tool-only rows; the marker near the upper-third
-  reading anchor exposes `aria-current`; hover and focus show the same
-  localized sender and bounded plaintext preview; nearby markers magnify
-  horizontally without shifting the stack; activation smoothly scrolls to the
-  corresponding message; the rail is absent when fewer than two eligible
-  messages exist **or** when content does not overflow one viewport; the rail
-  reappears once overflow returns after a resize.
+- **Expected**: The rail contains one marker per visible user turn and one per
+  AI response. Multiple assistant fragments between two user messages share a
+  single marker and combined bounded preview, while tool-only rows create no
+  marker and do not split the response. The marker near the upper-third reading
+  anchor exposes `aria-current`; hover and focus show the same localized sender
+  and preview; nearby markers magnify horizontally without shifting the stack;
+  activation smoothly scrolls to the first contentful message in that response;
+  the rail is absent when fewer than two eligible markers exist **or** when
+  content does not overflow one viewport; the rail reappears once overflow
+  returns after a resize.
 - **Specs linked**: `04-ux/08-component-spec.md`
 - **Acceptance**: C (chat stream), Quality (keyboard and long-thread navigation)
 - **Milestone**: M3
@@ -1359,11 +1371,13 @@ Each scenario is documented in this format:
   3) Close the macOS window, immediately invoke two native menu
   commands, and acknowledge renderer readiness after the replacement loads.
   Verify one window and one delivery per command. 4) On Windows/Linux, repeat
-  from the main chat, Settings, and an open work panel. In the main chat, send a
-  first user message and confirm its full bubble starts below the 46px titlebar
-  control band. Click the center plus the top, bottom, and titlebar-facing edges
-  of each right-side control to minimize, maximize, restore, and close the
-  window. 5) Start
+  from the main chat, Settings, and an open work panel. With the work panel
+  open, confirm the panel collapse button is flush with the main-pane right
+  divider and does not retain the 112px outer-window control clearance. In the
+  main chat, send a first user message and confirm its full bubble starts below
+  the 46px titlebar control band. Click the center plus the top, bottom, and
+  titlebar-facing edges of each right-side control to minimize, maximize,
+  restore, and close the window. 5) Start
   the renderer while its native window is already maximized and inspect the
   initial queried glyph/state. 6) Attempt unknown menu/window IPC actions
   while a window exists and after it closes. 7) Build each target on its
@@ -1374,7 +1388,9 @@ Each scenario is documented in this format:
   macOS follows native menu conventions and accelerators.
   Windows/Linux show no application menu inside the window; navigation and
   right-side controls do not collide with drag regions, keyboard shortcuts
-  remain operational, and no work-panel launcher is present. Check for Updates
+  remain operational, and no work-panel launcher is present. The open-panel
+  collapse button touches the main-pane right divider without an inset or a
+  duplicate native-control gap. Check for Updates
   invokes the allowlisted update command from the macOS system menu and the
   Settings surface and shows the resulting up-to-date state. Replacement-window
   commands wait for renderer readiness without
@@ -1737,6 +1753,23 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status detail**: Source-level coverage for catalog contracts; visual wording review remains manual.
 
+#### E2E-081: Send re-pins transcript and jumps to bottom
+
+- **Preconditions**: Long transcript that overflows one viewport; provider configured.
+- **Steps**:
+  1. Scroll up so earlier messages are visible and the jump-to-latest control appears.
+  2. Type a new prompt in the composer and send it.
+  3. Observe transcript position while the turn starts and streams.
+  4. Optionally scroll up again mid-stream, then click jump-to-latest.
+- **Expected**:
+  - On send, the transcript re-pins, hides jump-to-latest, and jumps to the bottom so the new user message (and following stream) is visible.
+  - Streaming continues to follow while pinned.
+  - Manual scroll mid-stream pauses follow and shows jump-to-latest again; clicking it resumes follow.
+- **Specs linked**: `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`
+- **Acceptance**: C (chat stream), Quality / D151
+- **Milestone**: M5
+- **Status**: Draft
+
 ## 8. Traceability Matrix
 
 
@@ -1747,14 +1780,14 @@ Each scenario is documented in this format:
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080 |
-| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075 |
+| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075, E2E-081 |
 | D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
 | E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049, E2E-074 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073 |
 | G — Plugins | E2E-022, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -1762,7 +1795,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080 (+ packaging scenarios in release runbook) |
+| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081 (+ packaging scenarios in release runbook) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -2201,7 +2234,8 @@ This test plan spec is accepted when:
 - Expect project and session lists to scroll inside the sidebar body without
   clipping behind the footer; sidebar Search/Collapse remain in the sidebar
   header. When the work panel is open, expect its sole collapse control in the
-  session pane top-right rather than the work-panel content header.
+  session pane top-right rather than the work-panel content header, flush against
+  the divider at the main pane's right edge.
 - Collapse A by clicking its directory label, expand it from the chevron area,
   then activate B and return to A. Only A's child rows collapse; project `+`
   and overflow actions do not toggle it; the

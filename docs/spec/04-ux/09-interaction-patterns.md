@@ -223,7 +223,7 @@ may be retained while exactly one workspace supplies the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
-### 1.8 Artifact-driven work panel resources (D128, D140, D142, D151)
+### 1.8 Artifact-driven work panel resources (D128, D140, D142, D153)
 
 - The shell exposes no empty or unconditional work-panel launcher,
   application-menu command, or global shortcut. An artifact trigger atomically
@@ -301,6 +301,8 @@ may be retained while exactly one workspace supplies the visible shell context.
 ### 2.1 Token rendering
 
 - Tokens append to the current assistant MessageBubble as they arrive
+- Renderer displays runtime stream chunks directly; it does not enqueue a
+  second requestAnimationFrame-driven typewriter state loop
 - Rendering uses incremental markdown parse — do not re-render the entire message on each token
 - Cursor indicator: subtle pulsing accent dot or line at the end of streaming content
 - When stream completes: cursor indicator replaced by success state (2s fade)
@@ -309,6 +311,7 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 - Auto-scroll to bottom on each new token group (throttled: check every 100ms, not every token)
 - User manual scroll up: pause auto-scroll
+- Sending a new prompt, retrying, or regenerating always re-pins follow mode and jumps to the bottom before the turn continues, even if the user had scrolled up
 - "Scroll to bottom" floating button appears when user is >200px from bottom during stream
 - Click "Scroll to bottom" button: resumes auto-scroll and snaps to bottom
 - Stream completion: if user was auto-scrolling, keep at bottom; if manual, stay at position
@@ -563,8 +566,9 @@ When drag/drop is implemented, these patterns should apply:
 
 ### 9.1 Transcript scrolling
 
-- Default: auto-scroll to bottom on new content during stream
+- Default: auto-scroll to bottom on new content during stream while pinned
 - User scroll up: pauses auto-scroll, shows "↓ Scroll to bottom" button
+- User send / retry / regenerate: re-pins, hides the jump control, and jumps to the latest content so the new turn is visible
 - Scroll-to-bottom button: position fixed at bottom-right of transcript area, offset 12px
 - Button appears when viewport bottom is >200px from transcript bottom
 - Click button: scrolls to bottom, resumes auto-scroll

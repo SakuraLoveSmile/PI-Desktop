@@ -667,7 +667,7 @@ Codex parity decisions (D034/D070) supersede any older value here.
 | Sidebar width (expanded) | ~275px | Codex sidebar width (D034/D070) |
 | Main pane minimum readable width | 360px | Reserved while the docked work panel is open (D112) |
 | Work panel width (closed) | 0px | Hidden by default |
-| Work panel width (open) | `364px–min(720px, 60vw, viewport − visible sidebar − 360px)` | 44px activity rail preserves the prior 320px content minimum; live drag clamp preserves MainChat readability (D112/D151) |
+| Work panel width (open) | `364px–min(720px, 60vw, viewport − visible sidebar − 360px)` | 44px activity rail preserves the prior 320px content minimum; live drag clamp preserves MainChat readability (D112/D153) |
 | Composer shell minimum | ~80px | One-line draft + toolbar padding |
 | Composer draft height | 1–7 text lines | Auto-grow; internal scroll beyond line 7 |
 | Chat message max width | 720px assistant / 560px user plate | Prevent eye-span over-stretch; user turns stay compact |
