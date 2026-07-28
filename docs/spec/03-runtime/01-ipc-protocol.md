@@ -616,10 +616,11 @@ window/setWorkPanelReservation({ width: 0 | number })
   -> { requested: number; reserved: number }
 ```
 
-`width` is normalized to an integer and must resolve to exactly `0` or the
-inclusive `364..720` range; other values fail with `INVALID_ARGUMENT`. Zero is
-the closed/collapsed target, and a positive value is the visible panel's
-committed fixed width. `requested` is the accepted normalized current target.
+`width` must be a finite integer JSON number equal to `0` or inside the
+inclusive `364..720` range. Strings, booleans, null, fractional values, and
+other malformed payloads fail with `INVALID_ARGUMENT` rather than being
+coerced. Zero is the closed/collapsed target, and a positive value is the
+visible panel's committed fixed width. `requested` is the accepted current target.
 `reserved` is the native width currently added
 to the normal base window for that target and can be smaller than `requested`
 only when the display work area is insufficient. Calls are idempotent target
@@ -632,7 +633,10 @@ reservation-induced shift. Main persists base bounds with both effects removed.
 Native edge gestures update only those base bounds, leaving `requested` and the
 renderer-owned fixed panel width unchanged. Maximized and fullscreen windows
 remember the latest target but defer geometry; returning to normal reconciles
-it once against the restored base bounds and current work area. Renderer code
+it once against the restored base bounds and current work area. If the window
+manager first compresses or relocates the outer window during a display or
+work-area transition, reconciliation preserves the last confirmed base bounds;
+returning to a roomier work area restores the original chat width. Renderer code
 sets this target only for the currently visible session: background artifacts
 cannot change visible reservation geometry.
 

@@ -70,7 +70,12 @@ import {
   baseWindowBounds,
   displayWorkAreaKey,
   emptyWorkPanelReservationState,
+  parseWorkPanelReservationWidth,
   planWorkPanelReservation,
+  reconcileBaseWindowBounds,
+  WORK_PANEL_MAX_WIDTH,
+  WORK_PANEL_MIN_WIDTH,
+  type WindowBounds,
   type WorkPanelReservationState,
 } from "./work-panel-window";
 
@@ -81,8 +86,6 @@ if (process.platform === "win32") {
 
 const WINDOW_MIN_WIDTH = 1040;
 const WINDOW_MIN_HEIGHT = 700;
-const WORK_PANEL_MIN_WIDTH = 364;
-const WORK_PANEL_MAX_WIDTH = 720;
 
 let mainWindow: BrowserWindow | null = null;
 let windowCreationPromise: Promise<void> | null = null;
@@ -100,6 +103,9 @@ let menuRendererReadyGate: MenuRendererReadyGate | null = null;
 let requestedWorkPanelReservation = 0;
 let workPanelReservation = emptyWorkPanelReservationState();
 let workPanelDisplayKey: string | null = null;
+// Base bounds are persistable; last-applied bounds isolate later native deltas.
+let workPanelBaseBounds: WindowBounds | null = null;
+let workPanelLastAppliedBounds: WindowBounds | null = null;
 let host: HostProcess | null = null;
 let sidecar: AgentSidecar | null = null;
 let quitting = false;
@@ -659,6 +665,21 @@ function workPanelMinimumWindowWidth() {
   return WINDOW_MIN_WIDTH + workPanelReservation.width;
 }
 
+function observedWorkPanelBaseBounds(
+  currentBounds: WindowBounds,
+  displayChanged: boolean,
+) {
+  if (!workPanelBaseBounds || !workPanelLastAppliedBounds) {
+    return baseWindowBounds(currentBounds, workPanelReservation);
+  }
+  return reconcileBaseWindowBounds({
+    baseBounds: workPanelBaseBounds,
+    lastAppliedBounds: workPanelLastAppliedBounds,
+    currentBounds,
+    displayChanged,
+  });
+}
+
 function applyWorkPanelReservation(): WorkPanelReservationState {
   if (
     !mainWindow ||
@@ -673,11 +694,18 @@ function applyWorkPanelReservation(): WorkPanelReservationState {
   const currentBounds = window.getBounds();
   const display = screen.getDisplayMatching(currentBounds);
   const workArea = display.workArea;
-  workPanelDisplayKey = displayWorkAreaKey(display.id, workArea);
+  const nextDisplayKey = displayWorkAreaKey(display.id, workArea);
+  const displayChanged =
+    workPanelDisplayKey !== null && nextDisplayKey !== workPanelDisplayKey;
+  const baseBounds = observedWorkPanelBaseBounds(
+    currentBounds,
+    displayChanged,
+  );
+  workPanelBaseBounds = baseBounds;
+  workPanelDisplayKey = nextDisplayKey;
   const next = planWorkPanelReservation({
-    bounds: currentBounds,
+    baseBounds,
     workArea,
-    reservation: workPanelReservation,
     requestedWidth: requestedWorkPanelReservation,
   });
   const minimumWidth = Math.max(
@@ -696,7 +724,7 @@ function applyWorkPanelReservation(): WorkPanelReservationState {
   }
 
   const appliedBounds = window.getBounds();
-  const baseBounds = baseWindowBounds(currentBounds, workPanelReservation);
+  workPanelLastAppliedBounds = { ...appliedBounds };
   workPanelReservation = {
     width: Math.max(0, appliedBounds.width - baseBounds.width),
     xOffset: appliedBounds.x - baseBounds.x,
@@ -709,6 +737,8 @@ async function createWindow() {
   requestedWorkPanelReservation = 0;
   workPanelReservation = emptyWorkPanelReservationState();
   workPanelDisplayKey = null;
+  workPanelBaseBounds = null;
+  workPanelLastAppliedBounds = null;
   const savedState = await readWindowState();
   mainWindow = new BrowserWindow({
     ...(savedState ?? { width: 1200, height: 800 }),
@@ -734,6 +764,9 @@ async function createWindow() {
     },
   });
   const window = mainWindow;
+  const initialBounds = window.getBounds();
+  workPanelBaseBounds = savedState ? { ...savedState } : { ...initialBounds };
+  workPanelLastAppliedBounds = { ...initialBounds };
   resetMenuRendererReady(window);
   const isLiveWindow = () =>
     mainWindow === window &&
@@ -930,6 +963,9 @@ async function createWindow() {
       }
       window.setSize(CODEX_BOUNDS.width, CODEX_BOUNDS.height, false);
       window.setPosition(CODEX_BOUNDS.x, CODEX_BOUNDS.y, false);
+      const restoredBounds = window.getBounds();
+      workPanelBaseBounds = { ...restoredBounds };
+      workPanelLastAppliedBounds = { ...restoredBounds };
       workPanelReservation = emptyWorkPanelReservationState();
       applyWorkPanelReservation();
       // Brief pin only when actively recovering from a shelf.
@@ -971,10 +1007,19 @@ async function createWindow() {
   let saveTimer: NodeJS.Timeout | null = null;
   const persistNormalWindowState = () => {
     if (!isLiveWindow() || boundsGuard) return;
-    const bounds = baseWindowBounds(
-      window.getNormalBounds(),
-      workPanelReservation,
-    );
+    const normalBounds = window.getNormalBounds();
+    const display = screen.getDisplayMatching(normalBounds);
+    const nextDisplayKey = displayWorkAreaKey(display.id, display.workArea);
+    const displayChanged =
+      workPanelDisplayKey !== null && nextDisplayKey !== workPanelDisplayKey;
+    const bounds =
+      workPanelBaseBounds && workPanelLastAppliedBounds
+        ? observedWorkPanelBaseBounds(normalBounds, displayChanged)
+        : baseWindowBounds(window.getNormalBounds(), workPanelReservation);
+    if (!displayChanged) {
+      workPanelBaseBounds = bounds;
+      workPanelLastAppliedBounds = { ...normalBounds };
+    }
     if (bounds.width >= WINDOW_MIN_WIDTH && bounds.height >= WINDOW_MIN_HEIGHT) {
       writeWindowState(bounds);
     }
@@ -3009,13 +3054,9 @@ function registerIpc() {
 
   handle(
     IPC.invoke.windowSetWorkPanelReservation,
-    async (input: { width?: number } = {}) => {
-      const requested = Number(input.width);
-      if (
-        !Number.isInteger(requested) ||
-        (requested !== 0 &&
-          (requested < WORK_PANEL_MIN_WIDTH || requested > WORK_PANEL_MAX_WIDTH))
-      ) {
+    async (input: unknown = {}) => {
+      const requested = parseWorkPanelReservationWidth(input);
+      if (requested === null) {
         throw Object.assign(new Error("invalid work panel reservation width"), {
           errorCode: ErrorCodes.INVALID_ARGUMENT,
         });

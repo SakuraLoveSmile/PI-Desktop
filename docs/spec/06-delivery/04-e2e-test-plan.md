@@ -1001,9 +1001,11 @@ Each scenario is documented in this format:
   the complete reservation. 11) Open or collapse while maximized and fullscreen,
   then return to normal. 12) Move the normal window between displays with
   different work areas, change the active display's work-area geometry, and
-  perform ordinary moves within one unchanged work area. 13) Inject one rejected
-  reservation while opening and one while collapsing, then retry each action.
-  14) Relaunch.
+  perform ordinary moves within one unchanged work area; include a transition
+  where the window manager compresses and relocates the outer window before the
+  display-change callback. 13) Inject one rejected reservation while opening
+  and one while collapsing, then retry each action. 14) Send string, boolean,
+  null, fractional, and out-of-range reservation payloads. 15) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one resource; file resources
@@ -1045,8 +1047,12 @@ Each scenario is documented in this format:
   requested target without changing geometry, then reconcile once on return to
   normal. Display/work-area changes reconcile the same target against current
   available width and update the native minimum; ordinary movement within one
-  unchanged work area does not reapply geometry. Relaunch restores base bounds
-  without reservation width or induced x shift. A rejected reservation keeps
+  unchanged work area does not reapply geometry. System compression or
+  relocation during a display transition does not overwrite the confirmed base
+  bounds, and returning to a roomier display restores the prior chat width.
+  Relaunch restores base bounds without reservation width or induced x shift.
+  Malformed reservation payloads fail with `INVALID_ARGUMENT` and never coerce.
+  A rejected reservation keeps
   the last confirmed panel presentation until a later successful request; a
   superseded success cannot commit stale presentation. No transition produces
   a second resize or position drift.
@@ -1057,8 +1063,8 @@ Each scenario is documented in this format:
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`work-panel-resize.test.mjs`,
-  `work-panel-presentation.test.mjs`, `work-panel.test.mjs`); full UI scenario
-  Draft
+  `work-panel-window.test.mjs`, `work-panel-presentation.test.mjs`,
+  `work-panel.test.mjs`); full UI scenario Draft
 
 #### E2E-057: Review tab reflects the git working tree
 
