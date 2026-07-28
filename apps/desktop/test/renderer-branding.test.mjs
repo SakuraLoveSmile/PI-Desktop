@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [english, chinese, brandLogo, icons, sidebar, app, composer] =
+const [english, chinese, brandLogo, icons, sidebar, app, chatSurface, composer] =
   await Promise.all([
     read("../../../packages/i18n/src/locales/en/index.ts"),
     read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
@@ -12,6 +12,7 @@ const [english, chinese, brandLogo, icons, sidebar, app, composer] =
     read("../src/components/icons.tsx"),
     read("../src/components/Sidebar.tsx"),
     read("../src/App.tsx"),
+    read("../src/components/ChatSurface.tsx"),
     read("../src/components/Composer.tsx"),
   ]);
 
@@ -33,7 +34,7 @@ test("app chrome uses the shared brand asset, while session creation uses its ow
   assert.match(brandLogo, /src=\{brandLogoUrl\}/);
   assert.match(icons, /export const IconNewSession/);
   assert.doesNotMatch(icons, /IconCodexHome|IconCompose|IconPiMark|IconPiHome/);
-  assert.match(app, /<BrandLogo\s+size=\{56\}/);
+  assert.match(chatSurface, /<BrandLogo\s+size=\{56\}/);
   assert.match(composer, /<BrandLogo\s+size=\{15\}/);
   assert.doesNotMatch(composer, /infinity-mark|∞/);
   assert.match(sidebar, /<BrandLogo\s+size=\{20\}/);

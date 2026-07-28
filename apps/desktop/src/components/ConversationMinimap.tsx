@@ -1,6 +1,8 @@
 import {
+  memo,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type RefObject,
@@ -27,7 +29,7 @@ const POPOVER_HEIGHT = 132;
 /* Hide the rail until content actually overflows one viewport. */
 const OVERFLOW_EPSILON_PX = 1;
 
-export function ConversationMinimap({
+export const ConversationMinimap = memo(function ConversationMinimap({
   scrollRef,
   messages,
 }: {
@@ -45,7 +47,14 @@ export function ConversationMinimap({
   const markerEls = useRef(new Map<string, HTMLButtonElement>());
   const moveRaf = useRef(0);
 
-  const markers = buildConversationMinimapMarkers(messages);
+  const markers = useMemo(
+    () => buildConversationMinimapMarkers(messages),
+    [messages],
+  );
+  const markerIdentity = useMemo(
+    () => markers.map((marker) => marker.id).join("\u0000"),
+    [markers],
+  );
   const markersRef = useRef(markers);
   markersRef.current = markers;
 
@@ -93,38 +102,44 @@ export function ConversationMinimap({
 
   useEffect(() => {
     updateOverflow();
-  }, [messages, updateOverflow]);
+  }, [markerIdentity, updateOverflow]);
 
   useEffect(() => {
     updateActive();
-  }, [messages, updateActive]);
+  }, [markerIdentity, updateActive]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    let raf = 0;
-    const schedule = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
+    let scrollRaf = 0;
+    let resizeRaf = 0;
+    const scheduleScroll = () => {
+      cancelAnimationFrame(scrollRaf);
+      scrollRaf = requestAnimationFrame(() => {
         updateActive();
         updateOverflow();
       });
     };
-    el.addEventListener("scroll", schedule, { passive: true });
-    // Streaming (typewriter) grows messages without changing `messages`.
+    const scheduleResize = () => {
+      cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(updateOverflow);
+    };
+    el.addEventListener("scroll", scheduleScroll, { passive: true });
+    // Streamed content can change layout between marker identity changes.
     const content = el.firstElementChild;
     const ro =
       content && typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(schedule)
+        ? new ResizeObserver(scheduleResize)
         : null;
     if (ro && content) ro.observe(content);
     // Viewport resizes can create or remove overflow without content changes.
-    window.addEventListener("resize", schedule);
+    window.addEventListener("resize", scheduleScroll);
     return () => {
-      el.removeEventListener("scroll", schedule);
+      el.removeEventListener("scroll", scheduleScroll);
       ro?.disconnect();
-      cancelAnimationFrame(raf);
-      window.removeEventListener("resize", schedule);
+      cancelAnimationFrame(scrollRaf);
+      cancelAnimationFrame(resizeRaf);
+      window.removeEventListener("resize", scheduleScroll);
     };
   }, [scrollRef, updateActive, updateOverflow]);
 
@@ -134,7 +149,13 @@ export function ConversationMinimap({
       if (!el) return;
       const target = getOffsets().find((entry) => entry.id === id);
       if (!target) return;
-      el.scrollTo({ top: Math.max(0, target.offset - 24), behavior: "smooth" });
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      el.scrollTo({
+        top: Math.max(0, target.offset - 24),
+        behavior: reduceMotion ? "auto" : "smooth",
+      });
     },
     [scrollRef, getOffsets],
   );
@@ -243,4 +264,4 @@ export function ConversationMinimap({
       ) : null}
     </nav>
   );
-}
+});

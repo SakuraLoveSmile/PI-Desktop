@@ -633,6 +633,15 @@ This does not prevent state changes — it makes them instant.
 | Modal/dialog enter | 300ms fade+scale | instant appear |
 | Notification popover enter | menu-scale/fade token | instant appear |
 
+### 10.4 Programmatic scrolling
+
+- Jump-to-latest and minimap navigation use smooth scrolling only when the OS
+  has not requested reduced motion.
+- Pinned stream following is frame-coalesced and uses instant scroll updates;
+  it does not start overlapping smooth-scroll animations for token groups.
+- Resize observers schedule work and never synchronously measure every
+  transcript row from their callback.
+
 ## 11. Acceptance criteria
 
 1. All keyboard shortcuts in §1 are functional and do not conflict with system shortcuts
@@ -665,3 +674,6 @@ This does not prevent state changes — it makes them instant.
     arrow/Home/End keyboard navigation behave as documented in §1.7
 19. Native notifications appear only while the main window is unfocused and
     their activation focuses the window and opens the corresponding session
+20. Streamed message updates stay within the chat render boundary; shell
+    navigation, composer, completed rows, and work-panel content do not rerender
+    solely because the current assistant message appended content

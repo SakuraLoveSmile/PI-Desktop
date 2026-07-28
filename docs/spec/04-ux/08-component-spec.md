@@ -70,6 +70,14 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   column, resized from its divider or the native right window edge
 - The main pane renders one active transcript and one selected workspace while
   the sidebar may retain several project tabs/groups
+- `AppShell` owns low-frequency shell/navigation state only. Streamed
+  `messages`, active-turn rendering, inline chat errors, and active permission
+  projection are subscribed inside a memoized `ChatSurface`, so a token update
+  cannot rerender Sidebar, WorkPanel, window chrome, global dialogs, or toasts.
+- Settings, Plugins, Pull requests, and Scheduled are route-level lazy modules.
+  Chat and shell chrome stay in the initial renderer bundle; first entry to a
+  secondary destination shows a compact localized status indicator until its
+  local chunk resolves.
 - No status bar (deferred)
 
 ### 1.7 Platform application chrome
@@ -388,6 +396,8 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 - Background: bg-primary
 - Max content width: 720px (messages), centered
 - Scroll behavior: auto-scroll to bottom on new message while pinned; manual scroll pauses auto-scroll; send / retry / regenerate re-pins and jumps to bottom
+- Destination entry uses one short opacity/translate transition. Streaming
+  updates occur inside the mounted surface and never replay this transition.
 
 ### 4.4 States
 
@@ -682,6 +692,12 @@ responses, lightweight tool activity rows, and permission cards for a session.
   near the upper third of the viewport
 - Show the minimap rail only while the transcript overflows one page; if
   content fits the viewport, hide the rail even when two or more markers exist
+- Follow-scroll requests from stream events and content resize are coalesced to
+  at most one pending animation frame. A new token cannot cancel and recreate
+  already scheduled follow work.
+- Minimap content resize checks only overflow. Message-position measurement is
+  reserved for scrolling, marker identity changes, and viewport resize, so a
+  streamed content height update does not scan every message twice.
 
 ### 7.5 Accessibility
 
@@ -709,6 +725,9 @@ responses, lightweight tool activity rows, and permission cards for a session.
   to the first contentful fragment. Tool-only rows do not create markers or
   split an AI response, and a one-page transcript never shows the rail.
 - Marker previews are capped at 280 source characters and are display-only
+- Derived visible rows, minimap rows, and activity grouping are memoized by the
+  `messages` snapshot. Completed message rows and activity groups keep stable
+  render boundaries while only the current stream row changes.
 
 ---
 
@@ -1051,6 +1070,9 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   background image, or decorative wash
 - Elevation: 20px radius with a hairline stroke and restrained soft shadow;
   the docked transcript fade is outside the composer shell
+- The solid/near-opaque surface uses no `backdrop-filter`; focus-within adds a
+  1px lift and token shadow without forcing transcript repaint through a blur
+  layer.
 - Border: border-default top
 - Padding: px-4 py-3 inner textarea
 - Font: font-mono text-sm for agent mode; font-sans text-sm for chat mode

@@ -534,6 +534,28 @@ also explicitly suppressed or collapsed to a static state.
 - No bounce effects
 - No multi-second boot theatrical sequences; splash exits as soon as ready (+ min dwell)
 
+### 8.7 Responsive interaction feedback
+
+High-frequency workstation feedback must remain compositor-friendly and bounded:
+
+- Destination surfaces, the work panel, jump-to-latest control, and inline
+  error notices enter once with `opacity` plus a maximum 8px
+  `transform`/`scale` offset using `--motion-duration-normal` and
+  `--motion-ease-out`.
+- Icon, navigation, message-action, tab, and sidebar tool controls provide a
+  subtle pressed scale while active. Hover styling never changes element
+  dimensions or surrounding layout.
+- Composer focus lifts by 1px with a restrained token-based shadow. Its
+  near-opaque surface must not use backdrop blur: transcript updates beneath a
+  blur layer would force avoidable repaint/compositing work while streaming.
+- Inline chat error notices wrap long provider detail and keep their actions
+  reachable without introducing horizontal page overflow.
+- Stream-driven updates never restart route or shell animations. Every enter
+  effect is mount/state-transition feedback, not a response to token arrival.
+- Reduced-motion mode keeps every state change and scroll destination but uses
+  near-zero animation durations and instant rather than smooth programmatic
+  scrolling.
+
 ## 8.0 Home empty stack (scrollable flow, D111)
 
 Empty composer placeholder: EN `Ask PI-Desktop to do anything` / zh-CN `向 PI-Desktop 下达任意指令`.
@@ -861,6 +883,8 @@ Full component contract and usage rules: [08-component-spec.md §17](08-componen
 10. Layout shell metrics (topbar, sidebar, composer) match spec values in CSS
 11. Icon components use Lucide/Heroicons SVG — no emoji icon affordances
 12. Spacing values use the defined scale (no arbitrary pixel values in component code)
+13. Stream updates do not retrigger destination/shell enter motion or a
+    backdrop-filter repaint behind the composer
 
 ## Dark floating surfaces (Codex parity)
 

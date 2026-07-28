@@ -4,20 +4,20 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [app, styles, checklist] = await Promise.all([
-  read("../src/App.tsx"),
+const [chatSurface, styles, checklist] = await Promise.all([
+  read("../src/components/ChatSurface.tsx"),
   read("../src/styles/globals.css"),
   read("../src/components/OnboardingChecklist.tsx"),
 ]);
 
 test("empty home uses a single scrollable stack instead of dual-grow portals", () => {
-  assert.match(app, /className="home-main-content" data-testid="home-empty"/);
-  assert.match(app, /className="home-scroll"/);
-  assert.match(app, /className="home-stack-inner"/);
-  assert.match(app, /<OnboardingChecklist \/>/);
-  assert.match(app, /home-composer-wrap/);
+  assert.match(chatSurface, /className="home-main-content" data-testid="home-empty"/);
+  assert.match(chatSurface, /className="home-scroll"/);
+  assert.match(chatSurface, /className="home-stack-inner"/);
+  assert.match(chatSurface, /<OnboardingChecklist \/>/);
+  assert.match(chatSurface, /home-composer-wrap/);
   assert.doesNotMatch(
-    app,
+    chatSurface,
     /HomeSuggestions|home-suggestions-block|home-upper|home-lower|home-suggestions-portal/,
   );
 
@@ -41,9 +41,9 @@ test("empty home uses a single scrollable stack instead of dual-grow portals", (
 });
 
 test("empty home omits suggestion cards and keeps onboarding above the composer", () => {
-  const emptyStart = app.indexOf("{!hasTranscript ? (");
-  const emptyEnd = app.indexOf("<ChatTranscript", emptyStart);
-  const emptyBlock = app.slice(emptyStart, emptyEnd);
+  const emptyStart = chatSurface.indexOf("{!hasTranscript ? (");
+  const emptyEnd = chatSurface.indexOf("<ChatTranscript", emptyStart);
+  const emptyBlock = chatSurface.slice(emptyStart, emptyEnd);
   const onboardingAt = emptyBlock.indexOf("<OnboardingChecklist />");
   const composerAt = emptyBlock.indexOf("home-composer-wrap");
   assert.notEqual(onboardingAt, -1);
