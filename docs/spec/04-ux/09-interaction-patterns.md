@@ -269,6 +269,10 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 - Electron Main checks the fixed release feed 15 seconds after packaged app
   startup and every 6 hours afterward. Development builds remain disabled.
+  The checker always tracks GitHub's latest stable release
+  (`allowPrerelease = false`), so installs that still carry a prerelease
+  version such as `0.2.0-rc.6` are offered the newer stable tag instead of
+  staying pinned to the same prerelease channel.
 - Settings → Info and application-menu checks share one typed update state.
   Manual checks expose up-to-date or error feedback; automatic failures do not
   open a toast or ambient banner.

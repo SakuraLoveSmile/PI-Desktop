@@ -1367,6 +1367,27 @@ Each scenario is documented in this format:
   platform bridge, native menu installation, and the pre-render maximize
   fixture on Windows/Linux; native visual scenario Draft
 
+#### E2E-067A: Prerelease install discovers newer stable release (D120)
+
+- **Preconditions**: Packaged build whose embedded version is a prerelease such
+  as `0.2.0-rc.6`; GitHub Releases latest stable tag is newer (for example
+  `0.2.2`) with published `latest*.yml` feeds.
+- **Steps**: 1) Launch the packaged prerelease install. 2) Wait for the
+  automatic check or invoke Check for Updates from the application menu /
+  Settings → Info.
+- **Expected**: Update state reports `available` (manual platforms) or
+  advances through in-app download for Windows NSIS / Linux AppImage with
+  `availableVersion` equal to the newer stable tag. The client must not report
+  up-to-date merely because no newer release shares the same `rc` prerelease
+  channel.
+- **Specs linked**: `04-ux/09-interaction-patterns.md`,
+  `05-security/01-security.md`, `08-meta/decisions-log.md` (D120),
+  ADR 0022
+- **Acceptance**: A (app startup), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`auto-update.test.mjs` asserts
+  `allowPrerelease = false`); packaged discovery scenario Draft
+
 #### E2E-068: Fork a conversation into an independent session
 
 - **Preconditions**: An idle project conversation has user, assistant,

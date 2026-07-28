@@ -2,7 +2,9 @@
  * App auto-update via electron-updater against GitHub Releases.
  *
  * The feed (latest*.yml + installers) is attached to each GitHub Release by
- * .github/workflows/release.yml. Delivery mode per install:
+ * .github/workflows/release.yml. Discovery always tracks the latest stable
+ * release (`allowPrerelease = false`) so RC installs still graduate to newer
+ * stables. Delivery mode per install:
  *  - Windows NSIS / Linux AppImage → full in-app flow: silent background
  *    download, "restart to update" prompt, install-on-quit fallback.
  *  - macOS → manual discovery and a releases-page link. In-app installation
@@ -73,6 +75,12 @@ export class AppUpdaterController {
     this.listenersAttached = true;
 
     autoUpdater.autoDownload = this.state.mode === "in-app";
+    // electron-updater defaults allowPrerelease=true when the installed
+    // version has a prerelease component (e.g. 0.2.0-rc.6). That pins the
+    // GitHub provider to the same custom channel ("rc") and never offers a
+    // newer stable release such as 0.2.2. Always track GitHub's latest
+    // stable release so RC installs can graduate to stable.
+    autoUpdater.allowPrerelease = false;
     // Even if the user ignores the restart prompt, a downloaded update
     // lands on the next normal quit.
     autoUpdater.autoInstallOnAppQuit = true;

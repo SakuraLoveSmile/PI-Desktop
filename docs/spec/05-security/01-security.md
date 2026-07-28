@@ -76,6 +76,8 @@ Required (all **implemented**):
 
 - Electron Main owns `electron-updater`; renderer IPC cannot provide or
   override the fixed HTTPS GitHub owner/repository or releases URL.
+- The updater forces `allowPrerelease = false` so discovery always uses
+  GitHub's latest stable release rather than a same-channel prerelease pin.
 - Feed manifests bind artifacts with electron-builder hashes. An error,
   unavailable feed, hash mismatch, or invalid updater state must not install.
 - Packaged macOS is manual-only: it detects a release and opens the fixed

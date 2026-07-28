@@ -76,6 +76,11 @@ test("updater gates delivery mode by platform, packaging and signature reality",
   assert.match(updaterSource, /win32.*in-app|in-app.*win32/s);
   assert.match(updaterSource, /APPIMAGE/);
   assert.match(updaterSource, /autoInstallOnAppQuit = true/);
+  assert.match(
+    updaterSource,
+    /allowPrerelease = false/,
+    "prerelease installs must still track the stable GitHub latest release",
+  );
   assert.match(updaterSource, /quitAndInstall/);
   assert.match(
     updaterSource,
