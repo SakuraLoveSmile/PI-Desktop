@@ -1141,22 +1141,21 @@ export function Sidebar({
           >
             <IconSearch size={15} />
           </button>
+          <button
+            type="button"
+            className="icon-btn"
+            title={`${t("nav.collapseSidebar")} (${sidebarToggleShortcut})`}
+            aria-label={t("nav.collapseSidebar")}
+            aria-expanded={true}
+            data-nav="toggle-sidebar"
+            onClick={onToggleSidebar}
+          >
+            <IconSidebar size={15} />
+          </button>
         </div>
       </div>
 
       <div className="sidebar-body no-drag">
-
-        <button
-          className="nav-item collapse-sidebar-btn"
-          data-nav="toggle-sidebar"
-          title={`${t("nav.collapseSidebar")} (${sidebarToggleShortcut})`}
-          aria-label={t("nav.collapseSidebar")}
-          aria-expanded={true}
-          onClick={onToggleSidebar}
-        >
-          <IconSidebar size={15} />
-          <span>{t("nav.collapseSidebar")}</span>
-        </button>
 
         <button className="nav-item new-task-btn mb-1" data-nav="new-task" onClick={() => void createSession()}>
           <IconNewSession size={15} />
