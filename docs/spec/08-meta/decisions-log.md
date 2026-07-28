@@ -463,3 +463,12 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - The canonical logo remains in the home hero, sidebar, native application
   identity, startup splash, and About surfaces. Session-creation controls keep
   their dedicated message-plus icon. Decision D160; ADR 0031.
+
+## 2026-07-28 — Compact sidebar session titles
+
+- Expanded-sidebar session titles use `--text-md` (13px), matching the compact
+  project/group tier while primary actions and footer identity remain at
+  `--text-base` (14px).
+- Row height, truncation, indentation, weight, and sidebar dimensions remain
+  unchanged.
+- Decision D161; refines D159's session-title size.

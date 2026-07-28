@@ -1663,7 +1663,7 @@ html {
 
 .thread-item-title {
   overflow: hidden;
-  font-size: var(--text-base); /* session titles match the global body size */
+  font-size: var(--text-md); /* session titles stay compact within the sidebar */
   line-height: var(--leading-row);
   text-overflow: ellipsis;
   white-space: nowrap;

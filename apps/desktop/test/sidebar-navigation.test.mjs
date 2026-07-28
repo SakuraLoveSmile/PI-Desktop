@@ -131,7 +131,7 @@ test("sidebar shows a bounded standalone session list before retained projects",
 test("sidebar project and session lists stay coordinated with the global type scale", () => {
   assert.match(
     globalStyles,
-    /\.thread-item-title\s*\{[^}]*font-size:\s*var\(--text-base\);/s,
+    /\.thread-item-title\s*\{[^}]*font-size:\s*var\(--text-md\);/s,
   );
   assert.match(
     globalStyles,
