@@ -306,6 +306,7 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 - Auto-scroll to bottom on each new token group (throttled: check every 100ms, not every token)
 - User manual scroll up: pause auto-scroll
+- Sending a new prompt, retrying, or regenerating always re-pins follow mode and jumps to the bottom before the turn continues, even if the user had scrolled up
 - "Scroll to bottom" floating button appears when user is >200px from bottom during stream
 - Click "Scroll to bottom" button: resumes auto-scroll and snaps to bottom
 - Stream completion: if user was auto-scrolling, keep at bottom; if manual, stay at position
@@ -560,8 +561,9 @@ When drag/drop is implemented, these patterns should apply:
 
 ### 9.1 Transcript scrolling
 
-- Default: auto-scroll to bottom on new content during stream
+- Default: auto-scroll to bottom on new content during stream while pinned
 - User scroll up: pauses auto-scroll, shows "↓ Scroll to bottom" button
+- User send / retry / regenerate: re-pins, hides the jump control, and jumps to the latest content so the new turn is visible
 - Scroll-to-bottom button: position fixed at bottom-right of transcript area, offset 12px
 - Button appears when viewport bottom is >200px from transcript bottom
 - Click button: scrolls to bottom, resumes auto-scroll
