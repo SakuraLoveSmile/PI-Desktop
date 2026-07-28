@@ -64,6 +64,12 @@ import {
   setPendingPermission,
   type PendingPermission,
 } from "../lib/pending-permissions";
+import {
+  WORK_PANEL_DEFAULT_WIDTH,
+  WORK_PANEL_MAX_WIDTH,
+  WORK_PANEL_MIN_WIDTH,
+  workPanelWindowResizeAttributor,
+} from "../lib/work-panel-resize";
 
 export type { WorkPanelTab } from "../lib/work-panel-tabs";
 
@@ -95,8 +101,7 @@ export type ToastOptions = {
 };
 
 const WORK_PANEL_STORAGE_KEY = "pi.desktop.workPanel";
-export const WORK_PANEL_MIN_WIDTH = 320;
-export const WORK_PANEL_DEFAULT_WIDTH = 420;
+export { WORK_PANEL_MIN_WIDTH };
 
 // Opening the panel grows the OS window outward so the chat column keeps its
 // width; closing shrinks it back by whatever the expansion actually achieved.
@@ -126,13 +131,27 @@ function canResizeWindowForPanel() {
   return window.piDesktop?.platform !== "win32";
 }
 
+function resizeWindowForPanel(deltaWidth: number) {
+  const ticket = workPanelWindowResizeAttributor.begin(deltaWidth);
+  return api.windowResizeBy(deltaWidth).then(
+    (result) => {
+      workPanelWindowResizeAttributor.settle(ticket, result.applied);
+      return result;
+    },
+    (error) => {
+      workPanelWindowResizeAttributor.settle(ticket, 0);
+      throw error;
+    },
+  );
+}
+
 function expandWindowForPanel(width: number) {
   if (!canResizeWindowForPanel()) {
     panelWindowGrowth = 0;
     return;
   }
   panelWindowGrowth = null;
-  api.windowResizeBy(width).then(
+  resizeWindowForPanel(width).then(
     (r) => {
       panelWindowGrowth = r.applied;
     },
@@ -151,7 +170,7 @@ function shrinkWindowForPanel(width: number) {
   // already include it — shrinking by the panel width restores the chat size.
   const growth = panelWindowGrowth ?? width;
   panelWindowGrowth = null;
-  if (growth !== 0) void api.windowResizeBy(-growth).catch(() => {});
+  if (growth !== 0) void resizeWindowForPanel(-growth).catch(() => {});
 }
 
 function messageErrorFromUnknown(error: unknown): AppError {
@@ -191,7 +210,7 @@ function loadWorkPanelWidth(): number {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     const width = Number(parsed.width);
     return Number.isFinite(width)
-      ? Math.max(WORK_PANEL_MIN_WIDTH, Math.min(720, width))
+      ? Math.max(WORK_PANEL_MIN_WIDTH, Math.min(WORK_PANEL_MAX_WIDTH, width))
       : WORK_PANEL_DEFAULT_WIDTH;
   } catch {
     return WORK_PANEL_DEFAULT_WIDTH;
@@ -392,7 +411,10 @@ export type AppState = {
   collapseWorkPanel: () => void;
   /** Hide the visible panel while retaining its session-owned context. */
   resetWorkPanelContext: () => void;
-  setWorkPanelWidth: (width: number) => void;
+  setWorkPanelWidth: (
+    width: number,
+    options?: { resizeWindow?: boolean; persist?: boolean },
+  ) => void;
   /** Open a workspace-relative file in the work panel files viewer. */
   openFileInWorkPanel: (path: string) => void;
   /** Open a URL in the work panel browser tab. */
@@ -2496,16 +2518,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => switchWorkPanelSession(state));
     syncPanelWindowForVisibility(wasOpen, false, get().workPanelWidth);
   },
-  setWorkPanelWidth: (width) => {
+  setWorkPanelWidth: (width, options) => {
     const prev = get().workPanelWidth;
     set({
-      workPanelWidth: Math.max(WORK_PANEL_MIN_WIDTH, Math.min(720, width)),
+      workPanelWidth: Math.max(
+        WORK_PANEL_MIN_WIDTH,
+        Math.min(WORK_PANEL_MAX_WIDTH, width),
+      ),
     });
-    saveWorkPanelWidth(get().workPanelWidth);
+    if (options?.persist !== false) saveWorkPanelWidth(get().workPanelWidth);
     // Committed drag-resize also extends the window instead of the chat.
     const next = get().workPanelWidth;
     if (canResizeWindowForPanel() && get().workPanelOpen && next !== prev) {
-      api.windowResizeBy(next - prev).then(
+      if (options?.resizeWindow === false) return;
+      resizeWindowForPanel(next - prev).then(
         (r) => {
           if (panelWindowGrowth !== null) panelWindowGrowth += r.applied;
         },

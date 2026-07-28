@@ -7,8 +7,9 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { useAppStore, WORK_PANEL_MIN_WIDTH } from "../../stores/app-store";
+import { useAppStore } from "../../stores/app-store";
 import type { WorkPanelTab } from "../../stores/app-store";
+import { api } from "../../lib/api";
 import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { cx } from "../ui";
 import {
@@ -22,9 +23,15 @@ import { ReviewTab } from "./ReviewTab";
 import { TerminalTab } from "./TerminalTab";
 import { BrowserTab } from "./BrowserTab";
 import { FilesTab } from "./FilesTab";
-
-const WORK_PANEL_MAX_WIDTH_RATIO = 0.6;
-const MAIN_PANE_MIN_WIDTH = 360;
+import {
+  WORK_PANEL_DEFAULT_WIDTH,
+  clampWorkPanelWidth,
+  rightWindowEdgeDelta,
+  userRightEdgeDelta,
+  workPanelWidthLimits,
+  workPanelWindowResizeAttributor,
+  type WindowHorizontalGeometry,
+} from "../../lib/work-panel-resize";
 
 const TAB_ICONS = {
   review: IconDiff,
@@ -39,21 +46,16 @@ const HEADER_TOOLS = [
   { kind: "browser", Icon: IconGlobe },
 ] as const;
 
-function clampWidth(width: number) {
+function workPanelWidthContext() {
   const sidebar = document.querySelector<HTMLElement>(".sidebar, .sidebar-rail");
-  const sidebarWidth = sidebar?.getBoundingClientRect().width ?? 0;
-  const mainPaneSafeMax = Math.floor(
-    window.innerWidth - sidebarWidth - MAIN_PANE_MIN_WIDTH,
-  );
-  const max = Math.max(
-    WORK_PANEL_MIN_WIDTH,
-    Math.min(
-      720,
-      Math.floor(window.innerWidth * WORK_PANEL_MAX_WIDTH_RATIO),
-      mainPaneSafeMax,
-    ),
-  );
-  return Math.max(WORK_PANEL_MIN_WIDTH, Math.min(max, width));
+  return {
+    viewportWidth: window.innerWidth,
+    sidebarWidth: sidebar?.getBoundingClientRect().width ?? 0,
+  };
+}
+
+function clampWidth(width: number) {
+  return clampWorkPanelWidth(width, workPanelWidthContext());
 }
 
 function tabLabel(tab: WorkPanelTab, t: (key: string) => string) {
@@ -78,9 +80,15 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
   // Live width during a drag stays local; the store (and localStorage)
   // only sees the committed value on pointer-up.
   const [dragWidth, setDragWidth] = useState<number | null>(null);
-  const dragState = useRef<{ pointerId: number } | null>(null);
+  const dragState = useRef<{ pointerId: number; width: number } | null>(null);
   const activeTabRef = useRef<HTMLDivElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
+  const resizeCommitTimer = useRef(0);
+  const skipWindowResizeUntil = useRef(0);
+  const viewportGeometry = useRef<WindowHorizontalGeometry>({
+    x: window.screenX,
+    width: window.innerWidth,
+  });
   const [toolsMenu, setToolsMenu] = useState<{ top: number; right: number } | null>(
     null,
   );
@@ -161,46 +169,118 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
 
   const onResizeStart = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
       e.preventDefault();
-      dragState.current = { pointerId: e.pointerId };
+      const nextWidth = clampWidth(window.innerWidth - e.clientX);
+      dragState.current = { pointerId: e.pointerId, width: nextWidth };
       e.currentTarget.setPointerCapture(e.pointerId);
-      setDragWidth(clampWidth(window.innerWidth - e.clientX));
+      setDragWidth(nextWidth);
     },
     [],
   );
 
   const onResizeMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragState.current) return;
-    setDragWidth(clampWidth(window.innerWidth - e.clientX));
+    if (dragState.current?.pointerId !== e.pointerId) return;
+    const nextWidth = clampWidth(window.innerWidth - e.clientX);
+    dragState.current.width = nextWidth;
+    setDragWidth(nextWidth);
   }, []);
 
   const onResizeEnd = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!dragState.current) return;
+      if (dragState.current?.pointerId !== e.pointerId) return;
+      const nextWidth = dragState.current.width;
       dragState.current = null;
-      e.currentTarget.releasePointerCapture(e.pointerId);
-      setWidth(clampWidth(window.innerWidth - e.clientX));
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      setWidth(nextWidth);
       setDragWidth(null);
     },
     [setWidth],
   );
 
-  // The persisted width is a preference, not a guarantee: window growth on
-  // open can be denied (maximized / screen edge), so clamp the rendered width
-  // to what actually fits and re-clamp whenever the window resizes.
   const [, bumpViewport] = useState(0);
+  const renderWidth = clampWidth(dragWidth ?? width);
+  const renderWidthRef = useRef(renderWidth);
+  renderWidthRef.current = renderWidth;
+  const widthLimits = workPanelWidthLimits(workPanelWidthContext());
+
+  // Native right-edge resizing belongs to the outermost visible column. The
+  // work panel absorbs that delta first; opening/collapse and divider commits
+  // are attributed separately so their programmatic resize is not counted twice.
   useEffect(() => {
-    const onWindowResize = () => bumpViewport((v) => v + 1);
+    const offMaximized = api.onWindowMaximized(() => {
+      skipWindowResizeUntil.current = Date.now() + 300;
+    });
+    const offFullScreen = api.onWindowFullScreen(() => {
+      skipWindowResizeUntil.current = Date.now() + 300;
+    });
+    const persistWidthSoon = () => {
+      window.clearTimeout(resizeCommitTimer.current);
+      resizeCommitTimer.current = window.setTimeout(() => {
+        setWidth(useAppStore.getState().workPanelWidth, {
+          resizeWindow: false,
+        });
+      }, 160);
+    };
+    const onWindowResize = () => {
+      const previous = viewportGeometry.current;
+      const next = { x: window.screenX, width: window.innerWidth };
+      viewportGeometry.current = next;
+      if (Date.now() <= skipWindowResizeUntil.current) {
+        bumpViewport((value) => value + 1);
+        return;
+      }
+      const viewportDelta = next.width - previous.width;
+      const unattributedDelta =
+        workPanelWindowResizeAttributor.consume(viewportDelta);
+      const outerDelta = userRightEdgeDelta(
+        viewportDelta,
+        rightWindowEdgeDelta(previous, next),
+        unattributedDelta,
+      );
+      if (outerDelta !== 0) {
+        const nextPanelWidth = clampWidth(renderWidthRef.current + outerDelta);
+        if (nextPanelWidth !== renderWidthRef.current) {
+          renderWidthRef.current = nextPanelWidth;
+          setWidth(nextPanelWidth, { resizeWindow: false, persist: false });
+          persistWidthSoon();
+        }
+      }
+      bumpViewport((value) => value + 1);
+    };
     window.addEventListener("resize", onWindowResize);
-    return () => window.removeEventListener("resize", onWindowResize);
-  }, []);
+    return () => {
+      window.removeEventListener("resize", onWindowResize);
+      offMaximized();
+      offFullScreen();
+      window.clearTimeout(resizeCommitTimer.current);
+      setWidth(useAppStore.getState().workPanelWidth, {
+        resizeWindow: false,
+      });
+    };
+  }, [setWidth]);
   useEffect(() => {
     activeTabRef.current?.scrollIntoView({
       block: "nearest",
       inline: "nearest",
     });
   }, [activeTabId]);
-  const renderWidth = clampWidth(dragWidth ?? width);
+  const onResizeKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const step = event.shiftKey ? 32 : 16;
+      let nextWidth: number | null = null;
+      if (event.key === "ArrowLeft") nextWidth = renderWidth + step;
+      else if (event.key === "ArrowRight") nextWidth = renderWidth - step;
+      else if (event.key === "Home") nextWidth = widthLimits.min;
+      else if (event.key === "End") nextWidth = widthLimits.max;
+      if (nextWidth === null) return;
+      event.preventDefault();
+      setWidth(clampWidth(nextWidth));
+    },
+    [renderWidth, setWidth, widthLimits.max, widthLimits.min],
+  );
 
   const toolsMenuPortal =
     toolsMenu && typeof document !== "undefined"
@@ -245,10 +325,18 @@ export function WorkPanel({ browserBlocked = false }: { browserBlocked?: boolean
         className="work-panel-resize no-drag"
         role="separator"
         aria-orientation="vertical"
+        aria-label={t("panel.resize")}
+        aria-valuemin={widthLimits.min}
+        aria-valuemax={widthLimits.max}
+        aria-valuenow={Math.round(renderWidth)}
+        tabIndex={0}
         onPointerDown={onResizeStart}
         onPointerMove={onResizeMove}
         onPointerUp={onResizeEnd}
         onPointerCancel={onResizeEnd}
+        onLostPointerCapture={onResizeEnd}
+        onKeyDown={onResizeKeyDown}
+        onDoubleClick={() => setWidth(clampWidth(WORK_PANEL_DEFAULT_WIDTH))}
       />
       <div className="work-panel-main">
         <header

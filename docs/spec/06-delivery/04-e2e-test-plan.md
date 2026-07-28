@@ -959,9 +959,13 @@ Each scenario is documented in this format:
   tabs and a Browser resource; switch to session B, create a different tab set,
   then switch repeatedly between A and B and select a project without an active
   conversation. 7) Drag the left-edge handle below 320px and beyond every upper
-  bound at 960px, 1200px, and 1600px window widths. 8) On Windows, record the
-  native window bounds before opening a file artifact, collapsing the panel,
-  and closing its final tab; inspect each transition frame. 9) Relaunch.
+  bound at 960px, 1200px, and 1600px window widths; focus it and exercise
+  Arrow/Shift+Arrow/Home/End. 8) With the panel open, drag the native right
+  window edge outward and inward through the panel limits, then drag the left
+  edge; collapse the panel and repeat the right-edge drag. 9) On Windows,
+  record the native window bounds before opening a file artifact, collapsing
+  the panel, and closing its final tab; inspect each transition frame.
+  10) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one closeable top tab; file
@@ -972,8 +976,14 @@ Each scenario is documented in this format:
   Active close selects the right neighbor then left; closing the last tab hides
   the panel. Collapse retains runtime
   tabs but hides the panel until another artifact reopens it. Width clamps to
-  `320px–min(720px, 60vw, viewport − visible sidebar − 360px)`, re-clamps on
-  window resize, and never squeezes MainChat below 360px in the supported shell.
+  `320px–min(720px, 60vw, viewport − visible sidebar − 360px)`, exposes its
+  current/minimum/maximum width to assistive technology, supports the documented
+  keyboard steps, and never squeezes MainChat below 360px in the supported
+  shell. Native right-edge drag changes the open work panel first and changes
+  MainChat only after a panel bound is reached; left-edge drag changes the shell
+  without resizing the right panel. With the panel closed, right-edge drag
+  changes MainChat directly, and programmatic open/collapse growth is never
+  double-counted as panel width.
   A and B independently restore their runtime open state, ordered tabs, active
   tab, and Browser resource; selecting a project without an active conversation
   hides the panel, and no relative resource crosses session/workspace context.

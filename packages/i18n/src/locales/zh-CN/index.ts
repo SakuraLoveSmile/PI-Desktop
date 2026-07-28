@@ -535,6 +535,7 @@ export const zhCN = {
   panel: {
     title: "工作面板",
     collapse: "收起工作面板",
+    resize: "调整工作面板宽度",
     openTool: "打开工具",
     closeTab: "关闭{{name}}",
     tabs: {

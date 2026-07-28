@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import {
+  MAIN_PANE_MIN_WIDTH,
+  WORK_PANEL_MIN_WIDTH,
+} from "../src/lib/work-panel-resize.ts";
 
 const appSource = await readFile(
   new URL("../src/App.tsx", import.meta.url),
@@ -97,10 +101,33 @@ test("work panel starts closed with no tabs and persists width only", () => {
 });
 
 test("work panel resizing preserves a readable main pane", () => {
-  assert.match(panelSource, /const MAIN_PANE_MIN_WIDTH = 360;/);
-  assert.match(panelSource, /window\.innerWidth - sidebarWidth - MAIN_PANE_MIN_WIDTH/);
+  assert.equal(MAIN_PANE_MIN_WIDTH, 360);
+  assert.equal(WORK_PANEL_MIN_WIDTH, 320);
+  assert.match(panelSource, /clampWorkPanelWidth\(width, workPanelWidthContext\(\)\)/);
   assert.match(panelSource, /\.sidebar, \.sidebar-rail/);
   assert.match(globalStyles, /\.main-pane \{[^}]*min-width:\s*360px;/s);
+});
+
+test("native right-edge resize belongs to the open work panel", () => {
+  assert.match(panelSource, /rightWindowEdgeDelta\(previous, next\)/);
+  assert.match(panelSource, /workPanelWindowResizeAttributor\.consume\(viewportDelta\)/);
+  assert.match(
+    panelSource,
+    /setWidth\(nextPanelWidth, \{ resizeWindow: false, persist: false \}\)/,
+  );
+  assert.match(panelSource, /skipWindowResizeUntil/);
+});
+
+test("work panel separator exposes pointer and keyboard resizing", () => {
+  assert.match(panelSource, /role="separator"/);
+  assert.match(panelSource, /aria-valuemin=\{widthLimits\.min\}/);
+  assert.match(panelSource, /aria-valuemax=\{widthLimits\.max\}/);
+  assert.match(panelSource, /aria-valuenow=\{Math\.round\(renderWidth\)\}/);
+  assert.match(panelSource, /tabIndex=\{0\}/);
+  assert.match(panelSource, /event\.key === "ArrowLeft"/);
+  assert.match(panelSource, /event\.key === "ArrowRight"/);
+  assert.match(panelSource, /onLostPointerCapture=\{onResizeEnd\}/);
+  assert.match(globalStyles, /\.work-panel-resize:focus-visible/);
 });
 
 test("work panel window growth is excluded from persisted launch bounds", () => {
