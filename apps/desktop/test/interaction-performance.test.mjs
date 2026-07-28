@@ -40,7 +40,9 @@ test("stream rendering avoids duplicate frame state and coalesces following", ()
   assert.match(transcript, /const scheduleFollowScroll = useCallback/);
   assert.match(transcript, /followFrameRef\.current !== 0/);
   assert.match(transcript, /const \{ entries, visible \} = useMemo/);
+  assert.match(transcript, /buildTranscriptEntries\(messages\)/);
   assert.match(transcript, /activityGroupPropsEqual/);
+  assert.match(transcript, /assistantTurnPropsEqual/);
 });
 
 test("session activation pins the latest record before the first paint", () => {

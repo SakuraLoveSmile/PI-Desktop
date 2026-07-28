@@ -2304,6 +2304,11 @@ This test plan spec is accepted when:
   independently copyable and capped with internal scrolling.
 - Reloading the session preserves the action label and argument hint instead of
   degrading the row to a generic `Tool`.
+- Run a turn that emits assistant text, calls multiple tools, and resumes with
+  more assistant text. During streaming and after session reload, expect one
+  assistant article for the whole user turn, with fragments and activity in
+  original order but only one trailing model/usage row and one Copy/Fork/Retry
+  toolbar. Copy includes all assistant text fragments in order.
 
 ### US-UI-57 Multi-project sidebar groups
 - Open projects A and B without closing either.

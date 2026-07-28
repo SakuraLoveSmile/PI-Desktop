@@ -49,7 +49,7 @@ test("assistant turns stay transparent full-width prose", () => {
   );
   assert.match(
     stylesSource,
-    /\.message-row\.assistant\.streaming \.message-bubble \{[\s\S]*?border-left:\s*2px solid/,
+    /\.message-row\.assistant \.message-bubble\.streaming \{[\s\S]*?border-left:\s*2px solid/,
   );
 });
 
@@ -63,10 +63,12 @@ test("transcript density and hover actions are quiet", () => {
   assert.match(stylesSource, /\.message-row\.user \.message-actions \{[\s\S]*?justify-content:\s*flex-end;/);
 });
 
-test("transcript markup uses the dedicated user text surface and streaming class", () => {
+test("transcript markup uses dedicated user text and assistant turn surfaces", () => {
   assert.match(transcriptSource, /className="message-user-text selectable"/);
   assert.match(transcriptSource, /streaming \? " streaming" : ""/);
   assert.match(transcriptSource, /CopyButton text=\{message\.content\}/);
+  assert.match(transcriptSource, /className=\{`message-row assistant assistant-turn/);
+  assert.match(transcriptSource, /CopyButton text=\{content\}/);
 });
 
 test("user plaintext preserves hard newlines without forced mid-word breaks", () => {
@@ -100,7 +102,7 @@ test("delete remains on user turns and is removed from assistant toolbar", async
   assert.match(storeSource, /replaceSessionMessages\(sessionId,\s*next\)/);
   assert.match(transcriptSource, /deleteMessage\(message\.id\)/);
   assert.match(transcriptSource, /chat\.deleteMessage/);
-  assert.match(transcriptSource, /\{isUser && !streaming \? \(/);
+  assert.match(transcriptSource, /\{isUser \? \(/);
   assert.match(stylesSource, /\.copy-btn\.danger:hover/);
 });
 
@@ -136,7 +138,7 @@ test("message toolbars are icon-only with hover tooltips", () => {
     transcriptSource,
     /<span>\{(?:forkLabel|retryLabel|editLabel|copyLabel)\}<\/span>/,
   );
-  for (const label of ["forkLabel", "retryLabel", "editLabel", "deleteLabel"]) {
+  for (const label of ["editLabel", "deleteLabel"]) {
     assert.ok(
       transcriptSource.includes(`aria-label={${label}}`),
       `${label} needs an aria-label`,
@@ -146,9 +148,13 @@ test("message toolbars are icon-only with hover tooltips", () => {
       `${label} needs a hover tooltip`,
     );
   }
+  for (const key of ["chat.forkResponse", "chat.retry"]) {
+    assert.match(transcriptSource, new RegExp(`aria-label=\\{t\\("${key}"\\)\\}`));
+    assert.match(transcriptSource, new RegExp(`data-tip=\\{t\\("${key}"\\)\\}`));
+  }
   assert.ok(transcriptSource.includes("label={copyLabel}"));
   assert.match(transcriptSource, /className="copy-btn icon"/);
-  assert.match(transcriptSource, /data-tip=\{forkLabel\}/);
+  assert.match(transcriptSource, /data-tip=\{t\("chat\.forkResponse"\)\}/);
   assert.match(stylesSource, /\.copy-btn\[data-tip\]::after \{[\s\S]*?content:\s*attr\(data-tip\);/);
   assert.match(
     stylesSource,

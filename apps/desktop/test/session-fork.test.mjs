@@ -40,7 +40,7 @@ test("assistant response fork reuses isolated session snapshots", () => {
   assert.match(main, /throughMessageId/);
   assert.match(store, /forkAssistantMessage:\s*async \(messageId\)/);
   assert.match(store, /api\.forkSession\([\s\S]*?messageId/);
-  assert.match(transcript, /forkAssistantMessage\(message\.id\)/);
+  assert.match(transcript, /forkAssistantMessage\(actionMessage\.id\)/);
   assert.match(transcript, /chat\.forkResponse/);
 });
 

@@ -2260,7 +2260,7 @@ html {
   box-shadow: none;
 }
 
-.message-row.assistant.streaming .message-bubble {
+.message-row.assistant .message-bubble.streaming {
   border-left: 2px solid color-mix(in oklab, var(--ds-text-primary) 24%, transparent);
   padding-left: 12px;
 }
