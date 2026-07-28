@@ -6458,8 +6458,14 @@ html {
 }
 
 .work-panel-resize:hover,
-.work-panel-resize:active {
+.work-panel-resize:active,
+.work-panel-resize:focus-visible {
   background: color-mix(in oklab, var(--ds-accent) 28%, transparent);
+}
+
+.work-panel-resize:focus-visible {
+  outline: 1px solid var(--ds-focus);
+  outline-offset: -1px;
 }
 
 .work-panel-header {

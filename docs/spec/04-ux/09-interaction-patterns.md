@@ -242,6 +242,11 @@ may be retained while exactly one workspace supplies the visible shell context.
 - On Windows, opening or hiding the panel keeps the native window bounds
   unchanged. The docked renderer layout updates in one pass, avoiding the
   intermediate frameless-window repaint caused by a later native resize.
+- Native right-window-edge drag follows outermost-column ownership: an open
+  work panel absorbs horizontal delta until its 364px/dynamic maximum bounds,
+  then MainChat receives the remainder; without the panel, MainChat resizes
+  directly. Left-edge window drag continues to resize the shell/MainChat, and
+  programmatic panel window growth is never counted as user edge drag.
 - A successful workspace Write/Edit creates or activates Review in its
   originating session. Failed and scratch writes do not. Background-session
   artifacts update only their retained context and never open, activate, resize,

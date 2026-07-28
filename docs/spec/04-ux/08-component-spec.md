@@ -66,7 +66,8 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 ### 1.6 MVP constraints
 
-- Sidebar width is fixed; only the work panel drag-resizes
+- Sidebar width is fixed; the work panel is the only adjustable auxiliary
+  column, resized from its divider or the native right window edge
 - The main pane renders one active transcript and one selected workspace while
   the sidebar may retain several project tabs/groups
 - No status bar (deferred)
@@ -460,7 +461,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 | Open | Docked flex row right of the main pane; opened by an artifact with width 364–`min(720, 60vw, viewport − visible sidebar − 360px)`, preserving 320px of content beside the rail. Windows keeps the native window bounds stable so its frameless window does not repaint between the panel layout and an asynchronous bounds change; other platforms may grow the window outward when space permits. |
 | Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded switcher lists resources in first-open order with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
-| Resizing | Live width follows pointer while preserving a 360px MainChat; committed (and persisted) on release |
+| Resizing | The left divider follows pointer or keyboard input while preserving a 360px MainChat; pointer changes commit on release. Native right-window-edge drag first resizes the open work panel, then passes any delta beyond the panel's dynamic limits to MainChat. With no work panel, MainChat receives the window delta directly. |
 | No workspace | Each tab renders its own "open a project" empty state |
 | Narrow window | Width re-clamps on window resize; the 364px panel minimum wins only when the supported shell itself cannot satisfy both minima |
 
@@ -512,7 +513,14 @@ preview), and Files (workspace browser). Codex-parity surface.
   again. A workspace selection with no active conversation hides the panel.
   Every context remains bound to its originating session/workspace, so relative
   file and Browser resources are never reinterpreted against another workspace.
-- Resize: pointer drag on the left-edge handle.
+- Resize: pointer drag on the left-edge handle; `ArrowLeft` / `ArrowRight`
+  adjust it in 16px steps (`Shift` uses 32px), `Home` / `End` reach the current
+  dynamic limits, and double-click restores the default width. Dragging the
+  native right window edge resizes the work panel while it is the outermost
+  visible column. The panel consumes the delta only between
+  `364px–min(720px, 60vw, viewport − visible sidebar − 360px)`; remaining
+  growth or shrinkage changes MainChat. Programmatic window changes used by
+  panel open, collapse, or divider commit are excluded from this allocation.
 - Persistence: all session contexts are renderer runtime state only. On app
   startup, open state, tabs, active-tab selection, file requests, and Browser
   resources reset; only `{width}` remains in localStorage
@@ -529,7 +537,10 @@ preview), and Files (workspace browser). Codex-parity surface.
   `aria-haspopup="menu"` / `aria-expanded`; switcher rows use
   `menuitemradio` / `aria-checked`, and each resource body remains a
   `role="tabpanel"`
-- Resize handle: `role="separator"` `aria-orientation="vertical"`
+- Resize handle: focusable `role="separator"` with
+  `aria-orientation="vertical"`, a localized label, dynamic
+  `aria-valuemin` / `aria-valuemax` / `aria-valuenow`, visible focus, and
+  Arrow/Home/End keyboard control
 - Every resource close and the sole session-pane panel collapse button expose
   localized names
 
