@@ -411,7 +411,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Session titles use `--text-md` (13px); project/group titles and empty-state
   copy use `--text-sm` (12px). Primary chrome (New task, Plugins, footer) stays
   at `--text-base`.
-- Decision D155.
+- Decision D155; superseded by D159 for the expanded sidebar's primary list
+  content.
 
 ## 2026-07-28 — Independent window and work-panel resizing
 
@@ -445,3 +446,12 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - The implementation reuses pi-agent-core primitives. OpenCode DCP remains an
   AGPL-3.0 behavioral reference, not a dependency or copied implementation.
 - Decision D158; ADR 0030.
+
+## 2026-07-28 — Sidebar typography aligned with the global body scale
+
+- Expanded-sidebar session titles return to `--text-base` (14px), matching the
+  app body and primary sidebar chrome; project/group titles and empty-state copy
+  return to the adjacent `--text-md` (13px) tier.
+- Section labels and secondary metadata remain at `--text-sm` (12px), and the
+  existing compact row pitch, truncation, and sidebar dimensions are unchanged.
+- Decision D159; supersedes D155 and restores D144's primary-list hierarchy.
