@@ -75,3 +75,8 @@ Plugins may include localized display fields later, but English fields are requi
 8. Boot splash and renderer crash chrome use catalog keys (`app.starting`,
    `app.shellName`, `app.tagline`, `app.uiCrashed`); empty-home hero titles are
    translated in every shipped locale
+9. User-visible catalog copy prefers plain product language over internal
+   engineering terms (`host`/`backend`/`repo refresh`/`workspace` where the UI
+   already says project). Status, empty states, errors, and setup hints explain
+   what happened and what to do next (D149)
+

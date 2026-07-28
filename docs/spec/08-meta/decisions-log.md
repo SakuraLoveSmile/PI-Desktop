@@ -343,3 +343,14 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Light dialog scrim softens to 28% ink so elevated white dialogs stay readable.
 - Decision D148.
 
+## 2026-07-28 — User-facing i18n copy pass
+
+- English and zh-CN catalogs rewrite high-traffic shell copy away from internal
+  jargon: local service instead of host/backend, AI provider instead of bare
+  provider, project instead of workspace in user strings, marketplace refresh
+  instead of "from repo", temporary chats, and calmer status/error phrasing.
+- Empty states, onboarding, settings help, plugin permissions, and notifications
+  explain outcomes in plain language while keeping stable i18n keys and
+  interpolation names.
+- Decision D149.
+
