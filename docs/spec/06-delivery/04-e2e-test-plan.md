@@ -792,13 +792,17 @@ Each scenario is documented in this format:
 - **Steps**: 1) Open project A from Settings → Project archive. 2) Open project B without closing
   A. 3) Click A's directory row on its chevron, folder, label, and trailing
   disclosure hit area in turn to collapse/expand it; use B's directory row to
-  activate and collapse B; verify `+` and overflow do not toggle B. 4) Select
-  A's conversation. 5) Close B. 6)
-  Restart the app. 7) Reopen B from Settings → Project archive.
+  activate and collapse B; verify `+` and overflow do not toggle B. 4) Hover and
+  keyboard-focus A's project title and confirm the full path is exposed; open
+  A's project overflow or right-click menu and choose Open folder; confirm
+  conversation overflow no longer offers Open folder. 5) Select A's conversation.
+  6) Close B. 7) Restart the app. 8) Reopen B from Settings → Project archive.
 - **Expected**: A and B render as separate exact-path sidebar groups in a
   compact continuous list with one keyboard stop per directory disclosure;
   every non-action point in A's row toggles only A, project actions appear on
-  hover/focus without shifting labels, and collapse survives restart;
+  hover/focus without shifting labels, the project title hover/focus path shows
+  A's full absolute path, Open folder is a project-menu action only and opens A
+  in the system file manager, and collapse survives restart;
   activating a group or its conversation
   clears the previous visible transcript, updates the selected workspace and
   session binding, and then loads only the selected project's conversation;

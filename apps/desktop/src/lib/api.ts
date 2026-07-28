@@ -136,8 +136,8 @@ export const api = {
   getSession: (id: string) =>
     invoke<{ session: SessionDetail | null }>(IPC.invoke.sessionGet, id),
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),
-  openSessionFolder: (id: string) =>
-    invoke<{ ok: boolean; path: string }>(IPC.invoke.sessionOpenFolder, id),
+  openProjectFolder: (path: string) =>
+    invoke<{ ok: boolean; path: string }>(IPC.invoke.projectOpenFolder, path),
   renameSession: (id: string, title: string) =>
     invoke(IPC.invoke.sessionRename, id, title),
   configureSession: (

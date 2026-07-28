@@ -112,7 +112,6 @@ export const en = {
     restoreTask: "Restore",
     createBranch: "Branch from here",
     branchTitle: "{{title}} (branch)",
-    openTaskFolder: "Open folder",
     deleteTask: "Delete",
   },
   chat: {
@@ -448,6 +447,7 @@ export const en = {
   },
   project: {
     open: "Open project",
+    openFolder: "Open folder",
     none: "No project",
     clear: "Clear project",
     title: "Projects",

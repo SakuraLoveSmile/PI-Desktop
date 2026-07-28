@@ -47,6 +47,7 @@ Examples:
 - `pi-desktop/agent/event/message`
 - `pi-desktop/session/list`
 - `pi-desktop/project/open`
+- `pi-desktop/project/openFolder`
 
 ## 4. Common Response Envelope
 
@@ -390,6 +391,8 @@ Forbidden:
 ## 9. Project API
 
 - `project/open()`: system directory picker
+- `project/openFolder(path)`: open a known project directory in the system file
+  manager
 - `project/get()`: current workspace
 - `project/list()`: durable project records, including import-created entries
 - `project/set(path)`: set workspace

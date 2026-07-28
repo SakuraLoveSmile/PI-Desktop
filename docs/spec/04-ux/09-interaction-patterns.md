@@ -629,6 +629,17 @@ When drag/drop is implemented, these patterns should apply:
 - Click button: scrolls to bottom, resumes auto-scroll
 - Button disappears when at bottom
 
+### 9.1a Sidebar project path and open folder
+
+- Hovering or focusing a retained project title shows the full absolute path.
+- The truncated project name remains visible in the row; the full path is
+  tooltip/accessible-description only and never forces horizontal scroll.
+- Right-clicking a project row or opening its overflow menu exposes **Open
+  folder** as a project action. Conversation overflow no longer carries that
+  action.
+- Choosing **Open folder** opens the project directory in the system file
+  manager without changing the active session transcript.
+
 ### 9.2 Sidebar scrolling
 
 - The standalone Sessions body is capped at five compact rows and scrolls

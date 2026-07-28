@@ -114,7 +114,6 @@ export const zhCN = {
     restoreTask: "恢复",
     createBranch: "从此处分支",
     branchTitle: "{{title}}（分支）",
-    openTaskFolder: "打开文件夹",
     deleteTask: "删除",
   },
   chat: {
@@ -450,6 +449,7 @@ export const zhCN = {
   },
   project: {
     open: "打开项目",
+    openFolder: "打开文件夹",
     none: "无项目",
     clear: "关闭项目",
     title: "项目",

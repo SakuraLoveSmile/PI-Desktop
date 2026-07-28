@@ -56,6 +56,13 @@ type ProjectEntry = {
   meta: ProjectMeta;
 };
 
+type ProjectPathTooltip = {
+  id: string;
+  path: string;
+  top: number;
+  left: number;
+};
+
 function projectName(path: string, fallback?: string) {
   if (fallback?.trim()) return fallback.trim();
   const clean = path.replace(/[\\/]+$/, "");
@@ -190,6 +197,7 @@ export function Sidebar({
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
   const [sectionMenu, setSectionMenu] = useState<"sessions" | "projects" | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const [projectPathTooltip, setProjectPathTooltip] = useState<ProjectPathTooltip | null>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
@@ -258,10 +266,28 @@ export function Sidebar({
   const openProjectRowMenu = useCallback(
     (projectKey: string, trigger: HTMLButtonElement | null) => {
       menuTriggerRef.current = trigger;
+      setProjectPathTooltip(null);
       setSortOpen(false);
       setSessionMenu(null);
       setSectionMenu(null);
       setProjectMenu(projectKey);
+    },
+    [],
+  );
+
+  const showProjectPath = useCallback(
+    (entry: ProjectEntry, target: HTMLButtonElement) => {
+      const rect = target.getBoundingClientRect();
+      const tooltipWidth = Math.min(420, window.innerWidth - 16);
+      setProjectPathTooltip({
+        id: `${projectDomId(entry.key)}-path-tooltip`,
+        path: entry.path,
+        top:
+          rect.bottom + 48 <= window.innerHeight
+            ? rect.bottom + 6
+            : Math.max(8, rect.top - 42),
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - tooltipWidth - 8)),
+      });
     },
     [],
   );
@@ -310,6 +336,13 @@ export function Sidebar({
     if (!sessionMenu && !projectMenu && !sectionMenu && !sortOpen && !profileOpen) return;
     requestAnimationFrame(() => menuFirstItemRef.current?.focus());
   }, [sessionMenu, projectMenu, sectionMenu, sortOpen, profileOpen]);
+
+  useEffect(() => {
+    if (!projectPathTooltip) return;
+    const hideTooltip = () => setProjectPathTooltip(null);
+    window.addEventListener("resize", hideTooltip);
+    return () => window.removeEventListener("resize", hideTooltip);
+  }, [projectPathTooltip]);
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -694,10 +727,10 @@ export function Sidebar({
     }
   };
 
-  const openSessionFolder = async (session: SessionSummary) => {
+  const openProjectFolder = async (entry: ProjectEntry) => {
     closeMenus(false);
     try {
-      await (await import("../lib/api")).api.openSessionFolder(session.id);
+      await (await import("../lib/api")).api.openProjectFolder(entry.path);
     } catch (error) {
       reportError(error);
     }
@@ -886,10 +919,15 @@ export function Sidebar({
             type="button"
             id={projectId}
             className="sidebar-session-group-title project-toggle"
-            title={entry.path}
+            aria-label={entry.name}
+            aria-describedby={`${projectId}-path-description`}
             aria-expanded={!collapsedProject}
             aria-controls={`${projectId}-sessions`}
             data-action="toggle-project-collapse"
+            onMouseEnter={(event) => showProjectPath(entry, event.currentTarget)}
+            onMouseLeave={() => setProjectPathTooltip(null)}
+            onFocus={(event) => showProjectPath(entry, event.currentTarget)}
+            onBlur={() => setProjectPathTooltip(null)}
             onClick={() => void (async () => {
               if (!entry.active && !(await selectProject(entry.path))) return;
               setCollapsed(entry.path, !collapsedProject);
@@ -903,6 +941,9 @@ export function Sidebar({
             <span>{entry.name}</span>
             {entry.active ? <span className="sidebar-project-active-dot" aria-label={t("project.active", { defaultValue: "Active" })} /> : null}
           </button>
+          <span id={`${projectId}-path-description`} className="sr-only">
+            {entry.path}
+          </span>
           <button
             type="button"
             className="sidebar-session-group-add"
@@ -1067,15 +1108,6 @@ export function Sidebar({
             <button
               type="button"
               role="menuitem"
-              data-action="open-session-folder"
-              onClick={() => void openSessionFolder(session)}
-            >
-              <IconFolder size={14} />
-              {t("nav.openTaskFolder", { defaultValue: "Open folder" })}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
               className="danger"
               data-action="delete-session"
               onClick={() => void deleteSession(session)}
@@ -1104,6 +1136,15 @@ export function Sidebar({
               {entry.active
                 ? t("project.active", { defaultValue: "Active" })
                 : t("project.switch", { defaultValue: "Switch" })}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              data-action="open-project-folder"
+              onClick={() => void openProjectFolder(entry)}
+            >
+              <IconFolder size={14} />
+              {t("project.openFolder", { defaultValue: "Open folder" })}
             </button>
             <button
               type="button"
@@ -1141,6 +1182,21 @@ export function Sidebar({
             ) : null}
           </>
         ) : null}
+      </div>,
+      document.body,
+    );
+  };
+
+  const renderProjectPathTooltip = () => {
+    if (!projectPathTooltip || typeof document === "undefined") return null;
+    return createPortal(
+      <div
+        id={projectPathTooltip.id}
+        className="sidebar-project-path-tooltip"
+        role="tooltip"
+        style={{ top: projectPathTooltip.top, left: projectPathTooltip.left }}
+      >
+        {projectPathTooltip.path}
       </div>,
       document.body,
     );
@@ -1259,6 +1315,7 @@ export function Sidebar({
           <div
             className="sidebar-session-group-body standalone"
             onScroll={() => {
+              setProjectPathTooltip(null);
               if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
             }}
             onContextMenu={(event) => {
@@ -1302,6 +1359,7 @@ export function Sidebar({
         <div
           className="sidebar-session-groups min-h-0 flex-1 overflow-auto px-0.5"
           onScroll={() => {
+            setProjectPathTooltip(null);
             if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
           }}
           onContextMenu={(event) => {
@@ -1409,6 +1467,7 @@ export function Sidebar({
         </div>
       </div>
       {renderFloatingMenu()}
+      {renderProjectPathTooltip()}
     </aside>
   );
 }

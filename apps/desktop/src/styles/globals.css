@@ -6548,6 +6548,23 @@ html {
   color: var(--ds-text-primary);
 }
 
+.sidebar-project-path-tooltip {
+  position: fixed;
+  z-index: 70;
+  max-width: min(420px, calc(100vw - 16px));
+  padding: 5px 8px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-elevated-opaque, var(--ds-bg-primary));
+  box-shadow: var(--ds-shadow-dialog);
+  color: var(--ds-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
 .sidebar-disclosure-icon {
   flex: 0 0 auto;
   transition: transform var(--motion-duration-fast) var(--motion-ease-out);
