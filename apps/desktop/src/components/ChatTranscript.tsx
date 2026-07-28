@@ -6,7 +6,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { MessageUsage, UiMessage } from "@pi-desktop/shared";
@@ -752,68 +751,6 @@ function thinkingText(message: UiMessage): string {
   return message.thinking.trim() ? message.thinking : "";
 }
 
-/* Typewriter reveal for streaming assistant messages: incoming chunks
- * accumulate in message.content (the buffer); we surface it a few characters
- * per animation frame, speeding up with backlog so the display never trails
- * far behind. Messages that arrive already complete (history loads) render in
- * full, and reduced-motion users get the buffer verbatim. */
-const reduceMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-function usePrefersReducedMotion() {
-  return useSyncExternalStore(
-    (onChange) => {
-      reduceMotionQuery.addEventListener("change", onChange);
-      return () => reduceMotionQuery.removeEventListener("change", onChange);
-    },
-    () => reduceMotionQuery.matches,
-  );
-}
-
-function useTypewriter(message: UiMessage) {
-  const target = message.content || "";
-  const animate = message.role === "assistant";
-  const reduceMotion = usePrefersReducedMotion();
-  const everStreamedRef = useRef(message.status === "streaming");
-  if (message.status === "streaming") everStreamedRef.current = true;
-  const reveal = animate && everStreamedRef.current && !reduceMotion;
-  const [visibleLen, setVisibleLen] = useState(() => (reveal ? 0 : target.length));
-  const visibleLenRef = useRef(visibleLen);
-  const targetRef = useRef(target);
-  targetRef.current = target;
-  const statusRef = useRef(message.status);
-  statusRef.current = message.status;
-
-  useEffect(() => {
-    if (!reveal) {
-      visibleLenRef.current = target.length;
-      setVisibleLen(target.length);
-      return;
-    }
-    let raf = 0;
-    const tick = () => {
-      const full = targetRef.current;
-      const len = visibleLenRef.current;
-      if (len < full.length) {
-        const backlog = full.length - len;
-        const step = Math.max(1, Math.round(backlog / 24));
-        const next = Math.min(full.length, len + step);
-        visibleLenRef.current = next;
-        setVisibleLen(next);
-      } else if (statusRef.current !== "streaming") {
-        // Caught up and the stream ended — stop until new content arrives
-        // (the effect restarts when `target` changes).
-        return;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [reveal, target]);
-
-  if (!reveal) return target;
-  return target.slice(0, Math.min(visibleLen, target.length));
-}
-
 const MessageRow = memo(function MessageRow({
   message,
   isRunning,
@@ -840,7 +777,9 @@ const MessageRow = memo(function MessageRow({
   const forkLabel = t("chat.forkResponse");
   const editLabel = t("chat.editMessage");
   const deleteLabel = t("chat.deleteMessage");
-  const displayed = useTypewriter(message);
+  // Runtime chunks are already progressive. Rendering that source directly
+  // avoids a second per-frame state loop while Markdown memoizes stable blocks.
+  const displayed = message.content || "";
   const hasAnswer = Boolean((message.content || "").trim());
   const hasError = Boolean(message.error);
   const streaming =

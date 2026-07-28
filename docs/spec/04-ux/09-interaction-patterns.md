@@ -298,6 +298,8 @@ may be retained while exactly one workspace supplies the visible shell context.
 ### 2.1 Token rendering
 
 - Tokens append to the current assistant MessageBubble as they arrive
+- Renderer displays runtime stream chunks directly; it does not enqueue a
+  second requestAnimationFrame-driven typewriter state loop
 - Rendering uses incremental markdown parse — do not re-render the entire message on each token
 - Cursor indicator: subtle pulsing accent dot or line at the end of streaming content
 - When stream completes: cursor indicator replaced by success state (2s fade)
