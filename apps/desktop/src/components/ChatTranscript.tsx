@@ -28,6 +28,15 @@ import {
 import { summarizeSessionWorkspaceChanges } from "../lib/workspace-review";
 import { toolWorkPanelTab } from "../lib/work-panel-tabs";
 import {
+  assistantTurnContent,
+  assistantTurnMessages,
+  assistantTurnUsage,
+  buildTranscriptEntries,
+  messageThinking as thinkingText,
+  type AssistantActivityItem,
+  type AssistantTurnEntry,
+} from "../lib/assistant-turns";
+import {
   IconArrowDown,
   IconBranch,
   IconCheck,
@@ -527,9 +536,7 @@ function ToolRow({ message }: { message: UiMessage }) {
  * into a single disclosure keeps long agent loops from stacking alternating
  * "Thinking" / "Processed" rows down the transcript.
  */
-type ActivityItem =
-  | { kind: "thinking"; message: UiMessage }
-  | { kind: "tool"; message: UiMessage };
+type ActivityItem = AssistantActivityItem;
 
 function activityItemSummary(
   item: ActivityItem,
@@ -766,11 +773,6 @@ function WorkingIndicator() {
   );
 }
 
-function thinkingText(message: UiMessage): string {
-  if (typeof message.thinking !== "string") return "";
-  return message.thinking.trim() ? message.thinking : "";
-}
-
 const MessageRow = memo(function MessageRow({
   message,
   isRunning,
@@ -779,13 +781,10 @@ const MessageRow = memo(function MessageRow({
   isRunning: boolean;
 }) {
   const { t } = useTranslation();
-  const retryAssistantMessage = useAppStore((s) => s.retryAssistantMessage);
-  const forkAssistantMessage = useAppStore((s) => s.forkAssistantMessage);
   const editUserMessage = useAppStore((s) => s.editUserMessage);
   const activateMessageRevision = useAppStore((s) => s.activateMessageRevision);
   const deleteMessage = useAppStore((s) => s.deleteMessage);
   const isUser = message.role === "user";
-  const isAssistant = message.role === "assistant";
   // Slash prompts are stored expanded; editing works on the typed form so the
   // resent turn re-expands the template (D123).
   const editSeed = (isUser && message.command) || message.content || "";
@@ -793,21 +792,12 @@ const MessageRow = memo(function MessageRow({
   const [editValue, setEditValue] = useState(editSeed);
   const [savingEdit, setSavingEdit] = useState(false);
   const copyLabel = t("chat.copy");
-  const retryLabel = t("chat.retry");
-  const forkLabel = t("chat.forkResponse");
   const editLabel = t("chat.editMessage");
   const deleteLabel = t("chat.deleteMessage");
   // Runtime chunks are already progressive. Rendering that source directly
   // avoids a second per-frame state loop while Markdown memoizes stable blocks.
   const displayed = message.content || "";
   const hasAnswer = Boolean((message.content || "").trim());
-  const hasError = Boolean(message.error);
-  const streaming =
-    !isUser && isRunning && message.status === "streaming";
-  const completeAssistant =
-    isAssistant && message.status !== "streaming" && hasAnswer;
-  const showAnswer = isUser || Boolean(displayed) || isRunning || hasError;
-  const showMeta = completeAssistant && Boolean(message.modelId || message.usage);
   const revisionCount = message.revisionCount ?? 0;
   const activeRevision = message.activeRevision ?? revisionCount;
   const showRevisionPager = isUser && revisionCount > 1;
@@ -830,13 +820,13 @@ const MessageRow = memo(function MessageRow({
   };
   return (
     <div
-      className={`message-row ${isUser ? "user" : message.role}${streaming ? " streaming" : ""}`}
+      className={`message-row ${isUser ? "user" : message.role}`}
       data-minimap-id={message.id}
       role="article"
       aria-label={isUser ? t("chat.userMessage") : t("chat.assistantMessage")}
     >
       <div className="message-col">
-        {showAnswer ? (
+        {isUser || displayed ? (
           <div className="message-bubble">
             {editing ? (
               <div className="message-edit">
@@ -896,26 +886,13 @@ const MessageRow = memo(function MessageRow({
                 )}
               </div>
             ) : (
-              <>
-                {displayed ? (
-                  <div className="prose-chat">
-                    <Markdown source={displayed} />
-                  </div>
-                ) : null}
-                {message.error ? <AssistantErrorMessage message={message} /> : null}
-                {!displayed && !message.error && isRunning ? (
-                  <div className="prose-chat">
-                    <Markdown source="…" />
-                  </div>
-                ) : null}
-              </>
+              <div className="prose-chat">
+                <Markdown source={displayed} />
+              </div>
             )}
           </div>
         ) : null}
-        {showMeta && !editing ? (
-          <MessageMeta modelId={message.modelId} usage={message.usage} />
-        ) : null}
-        {!editing && (hasAnswer || hasError || showRevisionPager) ? (
+        {!editing && (hasAnswer || showRevisionPager) ? (
           <div className="message-actions">
             {showRevisionPager ? (
               <div className="message-revision-pager" role="group" aria-label={t("chat.revisions")}>
@@ -953,29 +930,7 @@ const MessageRow = memo(function MessageRow({
               </div>
             ) : null}
             {hasAnswer ? <CopyButton text={message.content} label={copyLabel} /> : null}
-            {completeAssistant ? (
-              <button
-                className="copy-btn icon"
-                data-tip={forkLabel}
-                aria-label={forkLabel}
-                disabled={isRunning}
-                onClick={() => void forkAssistantMessage(message.id)}
-              >
-                <IconBranch size={13} />
-              </button>
-            ) : null}
-            {completeAssistant ? (
-              <button
-                className="copy-btn icon"
-                data-tip={retryLabel}
-                aria-label={retryLabel}
-                disabled={isRunning}
-                onClick={() => void retryAssistantMessage(message.id)}
-              >
-                <IconReview size={13} />
-              </button>
-            ) : null}
-            {isUser && !streaming ? (
+            {isUser ? (
               <button
                 className="copy-btn icon"
                 data-tip={editLabel}
@@ -989,7 +944,7 @@ const MessageRow = memo(function MessageRow({
                 <IconPencil size={13} />
               </button>
             ) : null}
-            {isUser && !streaming ? (
+            {isUser ? (
               <button
                 className="copy-btn icon danger"
                 data-tip={deleteLabel}
@@ -1006,6 +961,134 @@ const MessageRow = memo(function MessageRow({
     </div>
   );
 });
+
+type AssistantTurnProps = {
+  entry: AssistantTurnEntry;
+  isActive: boolean;
+};
+
+function assistantTurnPropsEqual(
+  previous: AssistantTurnProps,
+  next: AssistantTurnProps,
+) {
+  if (
+    previous.isActive !== next.isActive ||
+    previous.entry.anchorId !== next.entry.anchorId ||
+    previous.entry.parts.length !== next.entry.parts.length
+  ) {
+    return false;
+  }
+  return previous.entry.parts.every((part, index) => {
+    const nextPart = next.entry.parts[index];
+    if (part.kind !== nextPart.kind) return false;
+    if (part.kind === "message" && nextPart.kind === "message") {
+      return part.message === nextPart.message;
+    }
+    if (part.kind === "activity" && nextPart.kind === "activity") {
+      return (
+        part.endedAt === nextPart.endedAt &&
+        part.items.length === nextPart.items.length &&
+        part.items.every(
+          (item, itemIndex) =>
+            item.kind === nextPart.items[itemIndex].kind &&
+            item.message === nextPart.items[itemIndex].message,
+        )
+      );
+    }
+    return false;
+  });
+}
+
+const AssistantTurn = memo(function AssistantTurn({
+  entry,
+  isActive,
+}: AssistantTurnProps) {
+  const { t } = useTranslation();
+  const retryAssistantMessage = useAppStore((s) => s.retryAssistantMessage);
+  const forkAssistantMessage = useAppStore((s) => s.forkAssistantMessage);
+  const messages = assistantTurnMessages(entry);
+  const content = assistantTurnContent(entry);
+  const actionMessage = [...messages]
+    .reverse()
+    .find((message) => (message.content || "").trim());
+  const metaMessage = [...messages]
+    .reverse()
+    .find((message) => message.modelId || message.usage);
+  const usage = assistantTurnUsage(entry);
+  const hasError = messages.some((message) => Boolean(message.error));
+  const complete =
+    !isActive && !hasError && Boolean(content) && Boolean(actionMessage);
+  const streaming =
+    isActive && messages.some((message) => message.status === "streaming");
+
+  return (
+    <div
+      className={`message-row assistant assistant-turn${streaming ? " streaming" : ""}`}
+      data-minimap-id={entry.anchorId}
+      role="article"
+      aria-label={t("chat.assistantMessage")}
+    >
+      <div className="message-col">
+        {entry.parts.map((part, index) =>
+          part.kind === "activity" ? (
+            <ActivityGroup
+              key={`activity-${part.items[0].message.id}`}
+              items={part.items}
+              endedAt={part.endedAt}
+              isActive={isActive && index === entry.parts.length - 1}
+            />
+          ) : (
+            <div
+              className={`message-bubble assistant-turn-fragment${
+                isActive && part.message.status === "streaming"
+                  ? " streaming"
+                  : ""
+              }`}
+              key={part.message.id}
+            >
+              {part.message.content ? (
+                <div className="prose-chat">
+                  <Markdown source={part.message.content} />
+                </div>
+              ) : null}
+              {part.message.error ? (
+                <AssistantErrorMessage message={part.message} />
+              ) : null}
+            </div>
+          ),
+        )}
+        {!isActive && metaMessage && (metaMessage.modelId || usage) ? (
+          <MessageMeta modelId={metaMessage.modelId} usage={usage} />
+        ) : null}
+        {(content || hasError) && actionMessage ? (
+          <div className="message-actions">
+            {content ? <CopyButton text={content} label={t("chat.copy")} /> : null}
+            {complete ? (
+              <button
+                className="copy-btn icon"
+                data-tip={t("chat.forkResponse")}
+                aria-label={t("chat.forkResponse")}
+                onClick={() => void forkAssistantMessage(actionMessage.id)}
+              >
+                <IconBranch size={13} />
+              </button>
+            ) : null}
+            {complete ? (
+              <button
+                className="copy-btn icon"
+                data-tip={t("chat.retry")}
+                aria-label={t("chat.retry")}
+                onClick={() => void retryAssistantMessage(actionMessage.id)}
+              >
+                <IconReview size={13} />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}, assistantTurnPropsEqual);
 
 
 export const ChatTranscript = memo(function ChatTranscript({
@@ -1080,68 +1163,18 @@ export const ChatTranscript = memo(function ChatTranscript({
     return () => ro.disconnect();
   }, [scheduleFollowScroll]);
 
-  const { entries, visible } = useMemo(() => {
-    const visible = messages.filter((message) => {
-      if (
-        message.role === "assistant" &&
-        !(message.content || "").trim() &&
-        !thinkingText(message) &&
-        !message.error
-      ) {
-        return false;
-      }
-      return true;
-    });
-    // Thinking segments and tool calls between two answers merge into one
-    // activity group so long agent loops stay compact.
-    const entries: Array<
-      | { kind: "message"; message: UiMessage }
-      | { kind: "activity"; items: ActivityItem[]; endedAt?: string }
-    > = [];
-    const pushActivity = (item: ActivityItem) => {
-      const last = entries[entries.length - 1];
-      if (last?.kind === "activity") last.items.push(item);
-      else entries.push({ kind: "activity", items: [item] });
-    };
-    for (const message of visible) {
-      if (message.role === "tool") {
-        pushActivity({ kind: "tool", message });
-        continue;
-      }
-      if (message.role === "assistant") {
-        if (thinkingText(message)) pushActivity({ kind: "thinking", message });
-        if ((message.content || "").trim() || !thinkingText(message)) {
-          entries.push({ kind: "message", message });
-        }
-        continue;
-      }
-      entries.push({ kind: "message", message });
-    }
-    // An answer following a group closes it; skip the timestamp when the
-    // answer is the same message as a thinking segment because its createdAt
-    // marks the start of thinking, not the end.
-    for (let index = 0; index < entries.length; index += 1) {
-      const entry = entries[index];
-      const next = entries[index + 1];
-      if (
-        entry.kind === "activity" &&
-        next?.kind === "message" &&
-        next.message.role === "assistant" &&
-        !entry.items.some((item) => item.message.id === next.message.id)
-      ) {
-        entry.endedAt = next.message.createdAt;
-      }
-    }
-    return { entries, visible };
-  }, [messages]);
-  const activeToolGroup =
-    isRunning && entries[entries.length - 1]?.kind === "activity";
+  const { entries, visible } = useMemo(
+    () => buildTranscriptEntries(messages),
+    [messages],
+  );
   const lastEntry = entries[entries.length - 1];
+  const lastTurnPart =
+    lastEntry?.kind === "assistant-turn" ? lastEntry.parts.at(-1) : undefined;
+  const activeToolGroup = isRunning && lastTurnPart?.kind === "activity";
   const assistantIsAnswering =
-    lastEntry?.kind === "message" &&
-    lastEntry.message.role === "assistant" &&
-    lastEntry.message.status === "streaming" &&
-    Boolean((lastEntry.message.content || "").trim());
+    lastTurnPart?.kind === "message" &&
+    lastTurnPart.message.status === "streaming" &&
+    Boolean((lastTurnPart.message.content || "").trim());
   const showWorking =
     isRunning && !pendingPermission && !activeToolGroup && !assistantIsAnswering;
 
@@ -1157,11 +1190,10 @@ export const ChatTranscript = memo(function ChatTranscript({
       >
         <div className="thread-content" ref={contentRef}>
           {entries.map((entry, index) =>
-            entry.kind === "activity" ? (
-              <ActivityGroup
-                key={`activity-${entry.items[0].message.id}`}
-                items={entry.items}
-                endedAt={entry.endedAt}
+            entry.kind === "assistant-turn" ? (
+              <AssistantTurn
+                key={entry.id}
+                entry={entry}
                 isActive={isRunning && index === entries.length - 1}
               />
             ) : (

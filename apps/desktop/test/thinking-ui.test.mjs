@@ -120,10 +120,10 @@ test("transcript keeps assistant thinking in a separate disclosure", () => {
   assert.match(transcriptSource, /aria-hidden=\{!open\}/);
   assert.match(transcriptSource, /inert=\{!open\}/);
   assert.match(transcriptSource, /IconSparkles/);
-  assert.match(transcriptSource, /message\.thinking/);
+  assert.match(transcriptSource, /messageThinking as thinkingText/);
   assert.match(transcriptSource, /thinking-prose[\s\S]*?Markdown source=\{text\}/);
-  assert.match(transcriptSource, /CopyButton text=\{message\.content\}/);
-  assert.match(transcriptSource, /!thinkingText\(message\)/);
+  assert.match(transcriptSource, /CopyButton text=\{content\}/);
+  assert.match(transcriptSource, /messageThinking as thinkingText/);
   assert.match(transcriptSource, /onlyThinking = items\.every/);
   assert.match(stylesSource, /\.thinking-prose/);
 });

@@ -651,7 +651,9 @@ SESSIONS                                      [msg+][↕]
 ### 7.1 Purpose
 
 Scrollable container rendering the ordered sequence of user messages, assistant
-responses, lightweight tool activity rows, and permission cards for a session.
+turns, lightweight tool activity rows, and permission cards for a session.
+Provider-level assistant fragments separated by tool calls remain distinct in
+storage but compose into one assistant turn until the next user message.
 
 ### 7.2 Anatomy
 
@@ -659,10 +661,12 @@ responses, lightweight tool activity rows, and permission cards for a session.
 +----+-------------------------------------+
 |map | [User MessageBubble]                |
 |rail| [Thinking disclosure]               |
-|    | [Assistant MessageBubble]           |
+|    | [Assistant Turn]                    |
+|    |   [Assistant fragment]              |
 |    |   [ToolCallRow]                     |
 |    |   [PermissionCard] (interrupt)      |
-|    | [Assistant MessageBubble (resume)]  |
+|    |   [Assistant fragment (resume)]     |
+|    |   [Meta + one action toolbar]       |
 |    | [User MessageBubble]                |
 |    | ...                                 |
 +----+-------------------------------------+
@@ -683,6 +687,10 @@ responses, lightweight tool activity rows, and permission cards for a session.
 
 - Scroll: user scroll pauses auto-scroll; "scroll to bottom" floating button appears; send / retry / regenerate re-pins and jumps to bottom
 - Hover message: copy action appears
+- Assistant fragments emitted before and after tool calls compose into one
+  `role="article"` turn. The turn exposes one trailing meta row and one action
+  toolbar; Copy joins all contentful fragments in order, while Fork and
+  Regenerate use the last contentful assistant message as the durable boundary.
 - Toggle Thinking disclosure: expand/collapse reasoning independently from the
   final answer; streaming reopens it while reasoning is arriving
 - Hover code block: copy button appears
@@ -711,7 +719,8 @@ responses, lightweight tool activity rows, and permission cards for a session.
 
 - `role="log"` container
 - `aria-live="polite"` for new content announcements
-- Each message: `role="article"` with `aria-label` describing sender
+- Each user message and composed assistant turn: `role="article"` with
+  `aria-label` describing sender
 - Thinking uses a button disclosure with `aria-expanded` and `aria-controls`;
   the localized label distinguishes Show thinking from Hide thinking, and the
   collapsed panel is hidden from accessibility and focus traversal
@@ -734,8 +743,9 @@ responses, lightweight tool activity rows, and permission cards for a session.
   split an AI response, and a one-page transcript never shows the rail.
 - Marker previews are capped at 280 source characters and are display-only
 - Derived visible rows, minimap rows, and activity grouping are memoized by the
-  `messages` snapshot. Completed message rows and activity groups keep stable
-  render boundaries while only the current stream row changes.
+  `messages` snapshot. Completed message rows, composed assistant turns, and
+  activity groups keep stable render boundaries while only the current stream
+  fragment changes.
 
 ---
 
@@ -813,6 +823,13 @@ Single message render — either user (plaintext) or assistant (markdown streami
   session, so the replaced prompt and its whole answer tail are archived as a
   D109 revision and the pager walks back to the original exchange. An
   unchanged prompt closes the editor without spending a turn (D137).
+- Tool-mediated assistant output uses one visual turn from the preceding user
+  message to the next user message. Intermediate provider message boundaries
+  remain visible as ordered markdown fragments around activity disclosures but
+  do not create additional meta rows or action toolbars. The single Copy action
+  copies all contentful fragments in order; Fork and Regenerate target the last
+  contentful fragment so existing durable transcript semantics remain intact
+  (D157).
 - Assistant meta: optional model badge + token-usage chip under the answer
   (collapsed summary with hover breakdown for input/output/cache/reasoning)
 - Gap: 10px vertical padding between consecutive message rows (denser than
