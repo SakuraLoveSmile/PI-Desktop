@@ -6,9 +6,10 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { api } from "../../lib/api";
+import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { useAppStore } from "../../stores/app-store";
 import type { WorkPanelTab } from "../../stores/app-store";
-import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
 import { cx } from "../ui";
 import {
   IconChevronDown,
@@ -98,6 +99,28 @@ export function WorkPanel({
   const switcherButtonRef = useRef<HTMLButtonElement | null>(null);
   const switcherFirstItemRef = useRef<HTMLButtonElement | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [nativeSurfaceReadyForExit, setNativeSurfaceReadyForExit] =
+    useState(false);
+
+  useEffect(() => {
+    if (!exiting) {
+      setNativeSurfaceReadyForExit(false);
+      return;
+    }
+
+    let current = true;
+    // WebContentsView is composited above the renderer and cannot follow the
+    // panel's CSS animation. Detach it before the dock starts moving.
+    void api
+      .browserSetVisible(false)
+      .catch(() => undefined)
+      .then(() => {
+        if (current) setNativeSurfaceReadyForExit(true);
+      });
+    return () => {
+      current = false;
+    };
+  }, [exiting]);
 
   useEffect(() => {
     if (!switcherOpen) return;
@@ -253,18 +276,24 @@ export function WorkPanel({
   );
   const activeLabel = activeTab ? tabLabel(activeTab, t) : t("panel.title");
   const ActiveIcon = activeTab ? TAB_ICONS[activeTab.kind] : IconDiff;
+  const exitAnimationReady = exiting && nativeSurfaceReadyForExit;
 
   return (
     <aside
-      className={cx("work-panel", exiting && "is-exiting")}
+      className={cx(
+        "work-panel",
+        exiting && !exitAnimationReady && "is-exit-pending",
+        exitAnimationReady && "is-exiting",
+      )}
       style={{ width: renderWidth }}
       data-testid="work-panel"
       data-resizing={dragWidth === null ? undefined : "true"}
       data-exiting={exiting ? "true" : undefined}
       onAnimationEnd={(event) => {
-        if (!exiting) return;
+        if (!exitAnimationReady) return;
         // Bubbled tab/chrome animations must not finish the shell exit.
         if (event.target !== event.currentTarget) return;
+        if (!event.animationName.startsWith("work-panel-out")) return;
         onExitAnimationEnd?.();
       }}
     >
@@ -456,7 +485,9 @@ export function WorkPanel({
               aria-labelledby={`work-panel-title-${activeTab.id}`}
             >
               <BrowserTab
-                blocked={browserBlocked || switcherOpen || dragWidth !== null}
+                blocked={
+                  exiting || browserBlocked || switcherOpen || dragWidth !== null
+                }
                 sessionId={activeSessionId}
                 initialUrl={activeTab.resource}
               />

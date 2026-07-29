@@ -999,11 +999,12 @@ Each scenario is documented in this format:
   Browser active. 8) On a display with enough work area, record MainChat width,
   native bounds, and `window/setWorkPanelReservation` results while opening,
   repeating the same open target, committing a divider width, collapsing,
-  reopening, and closing the final resource. 9) With the panel open, resize the
-  native window from both left and right edges; repeat after toggling the
-  sidebar. 10) Repeat open/resize/collapse on a work area too narrow to supply
-  the complete reservation. 11) Open or collapse while maximized and fullscreen,
-  then return to normal. 12) Move the normal window between displays with
+  reopening, and closing the final resource. With Browser active on Windows,
+  repeat collapse while watching the entire frameless window. 9) With the panel
+  open, resize the native window from both left and right edges; repeat after
+  toggling the sidebar. 10) Repeat open/resize/collapse on a work area too narrow
+  to supply the complete reservation. 11) Open or collapse while maximized and
+  fullscreen, then return to normal. 12) Move the normal window between displays with
   different work areas, change the active display's work-area geometry, and
   perform ordinary moves within one unchanged work area; include a transition
   where the window manager compresses and relocates the outer window before the
@@ -1037,6 +1038,10 @@ Each scenario is documented in this format:
   hides the panel, and no relative resource crosses session/workspace context.
   Background artifacts update only their retained context and never change the
   visible reservation.
+  Before exit motion, the native Browser preview detaches from the window. On
+  Windows the dock remains opaque through its bounded exit slide, and collapse
+  produces no white/full-pane flash or stale preview frame while native bounds
+  return to the base width.
   Only `{width}` is restored after relaunch; every session's open state, tabs,
   active tab, and Browser resource reset. The open panel remains exactly at its
   committed width through native-edge and sidebar changes; those gestures resize

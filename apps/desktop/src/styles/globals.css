@@ -6828,10 +6828,14 @@ html {
     both;
 }
 
+.work-panel.is-exit-pending,
+.work-panel.is-exiting {
+  pointer-events: none;
+}
+
 .work-panel.is-exiting {
   animation: work-panel-out var(--motion-duration-fast) var(--motion-ease-in)
     both;
-  pointer-events: none;
 }
 
 @keyframes work-panel-in {
@@ -6854,6 +6858,22 @@ html {
     opacity: 0;
     transform: translateX(8px);
   }
+}
+
+/* A large opacity layer can expose the frameless window background while
+   Windows applies the native-width collapse. Keep the dock opaque there; the
+   bounded slide still communicates the state change without a full-pane flash. */
+@keyframes work-panel-out-windows {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(8px);
+  }
+}
+
+:root[data-platform="win32"] .work-panel.is-exiting {
+  animation-name: work-panel-out-windows;
 }
 
 :root[data-theme="light"] .work-panel {

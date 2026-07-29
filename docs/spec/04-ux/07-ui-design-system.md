@@ -704,6 +704,11 @@ collapse and final close reclaim that width, and a divider commit updates it.
 If the complete reservation does not fit, the panel remains fixed while chat
 absorbs the difference. Native window edges resize chat only. Persisted normal
 bounds exclude the reservation and its induced x shift (D163, ADR 0032).
+Before collapse motion starts, any native Browser preview surface is detached
+because it cannot participate in renderer CSS animation. Windows keeps the
+exiting dock opaque during its bounded slide so a frameless native resize never
+exposes a full-panel background flash; macOS and Linux retain the fade-and-slide
+exit.
 
 ### 10.1 Responsive collapse
 
