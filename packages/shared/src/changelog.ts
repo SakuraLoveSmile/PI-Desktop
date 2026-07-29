@@ -7,6 +7,7 @@
  *
  * Update this file before cutting a release tag. GitHub release bodies may
  * still be auto-generated for the web; they are not the in-app source.
+ * Stable product versions only — omit pre-releases.
  */
 
 export type ChangelogLocale = "en" | "zh-CN";
@@ -23,21 +24,94 @@ export type ChangelogEntry = {
 const enEntries: ChangelogEntry[] = [
   {
     version: "0.2.7",
-    date: "2026-07-29",
+    date: "2026-07-28",
     highlights: [
-      "Keep chat readable beside the work panel by reserving native window width for docked tools.",
-      "Smoother conversation switching with cached transcripts and a stable deferred frame.",
-      "Project overflow can open the folder in your system file manager.",
-      "Markdown can render audio and video media in assistant replies.",
+      "Markdown replies can render images, audio, and video inline.",
+      "Remote images display with updated content security policy.",
+      "Media markup is sanitized so only safe tags are allowed.",
     ],
   },
   {
     version: "0.2.6",
     date: "2026-07-28",
     highlights: [
-      "Turn-boundary context checkpoints compact long chats without hiding transcript history.",
+      "Turn-boundary context checkpoints compact long chats without hiding history.",
+      "Smoother conversation switching with cached transcripts and a stable frame.",
+      "Docked tools keep a fixed width so chat stays readable beside the work panel.",
+      "Project menu can open the folder in your system file manager.",
       "Composer prompt rows no longer show a leading brand icon.",
-      "Sidebar session titles use a denser type scale that matches project groups.",
+    ],
+  },
+  {
+    version: "0.2.5",
+    date: "2026-07-28",
+    highlights: [
+      "Work panel navigation redesigned with a clearer tool rail.",
+      "Window resizing is panel-aware so layout stays predictable.",
+      "Streaming renders are isolated for snappier interaction.",
+      "New reasoning sessions default to maximum thinking when available.",
+      "Transcript stays pinned to the latest message after you send.",
+    ],
+  },
+  {
+    version: "0.2.4",
+    date: "2026-07-28",
+    highlights: [
+      "Composer chips keep descenders fully visible.",
+      "Updated pi-ai for newer Claude models including Opus 5 support.",
+    ],
+  },
+  {
+    version: "0.2.3",
+    date: "2026-07-28",
+    highlights: [
+      "Shell copy rewritten in plain user language across locales.",
+      "Selection, CJK labels, and hover motion polish.",
+      "Work panel and Settings light surfaces refined.",
+      "Prerelease installs now discover newer stable GitHub releases.",
+    ],
+  },
+  {
+    version: "0.2.2",
+    date: "2026-07-27",
+    highlights: [
+      "Plugin marketplace with official remote catalog and detail panes.",
+      "Isolated plugin panels and gated high-risk APIs.",
+      "Right-click section toolbars to create projects or sessions.",
+      "Startup splash, smoother motion, and i18n polish.",
+      "Work panel top nav supports right-click to open tools.",
+    ],
+  },
+  {
+    version: "0.2.1",
+    date: "2026-07-27",
+    highlights: [
+      "Work panel tools are retained per conversation.",
+      "Review entry is scoped to the session that made the edits.",
+    ],
+  },
+  {
+    version: "0.2.0",
+    date: "2026-07-27",
+    highlights: [
+      "Sidebar separates projects and sessions with clearer task status.",
+      "Fork or edit assistant replies; icon-only message toolbars.",
+      "Workspace review entry after successful file edits.",
+      "Keyboard shortcut mappings and developer mode for DevTools.",
+      "pi model catalog is the authority for provider models.",
+      "Thinking control sits beside mode in the composer.",
+    ],
+  },
+  {
+    version: "0.1.1",
+    date: "2026-07-26",
+    highlights: [
+      "First public release: local-first AI coding agent desktop client.",
+      "Chat and Agent modes with streaming, thinking levels, and model management.",
+      "Workspace tools with permission gating, terminal, browser, and git review.",
+      "Rust host core for storage, secrets, sessions, and notifications.",
+      "Plugin foundation plus dual English / 简体中文 UI.",
+      "Update checks against GitHub Releases (in-app where supported).",
     ],
   },
 ];
@@ -45,21 +119,94 @@ const enEntries: ChangelogEntry[] = [
 const zhCNEntries: ChangelogEntry[] = [
   {
     version: "0.2.7",
-    date: "2026-07-29",
+    date: "2026-07-28",
     highlights: [
-      "停靠工作面板时为工具预留原生窗口宽度，聊天区域保持可读。",
-      "会话切换更顺畅：缓存最近对话，并在加载时保持稳定过渡帧。",
-      "项目溢出菜单可在系统文件管理器中打开项目文件夹。",
-      "助手回复中的 Markdown 可渲染音频与视频。",
+      "助手 Markdown 回复可内联渲染图片、音频与视频。",
+      "远程图片可正常显示（内容安全策略已更新）。",
+      "媒体标记经消毒过滤，仅允许安全标签。",
     ],
   },
   {
     version: "0.2.6",
     date: "2026-07-28",
     highlights: [
-      "在回合边界做上下文检查点压缩，长对话不再隐藏历史记录。",
+      "在回合边界做上下文检查点压缩，长对话不再隐藏历史。",
+      "会话切换更顺畅：缓存最近对话，并保持稳定过渡帧。",
+      "停靠工具保持固定宽度，聊天区域在工作面板旁仍可读。",
+      "项目菜单可在系统文件管理器中打开项目文件夹。",
       "输入框提示行不再显示品牌图标。",
-      "侧边栏会话标题字号更紧凑，与项目分组层级一致。",
+    ],
+  },
+  {
+    version: "0.2.5",
+    date: "2026-07-28",
+    highlights: [
+      "工作面板导航重做，工具轨更清晰。",
+      "窗口缩放感知面板布局，尺寸变化更可预期。",
+      "流式渲染隔离，交互更跟手。",
+      "具备推理能力的新会话默认使用最高思考级别。",
+      "发送后对话列表保持贴在最新消息。",
+    ],
+  },
+  {
+    version: "0.2.4",
+    date: "2026-07-28",
+    highlights: [
+      "输入框芯片的下行字母完整可见。",
+      "更新 pi-ai，支持包括 Claude Opus 5 在内的新模型。",
+    ],
+  },
+  {
+    version: "0.2.3",
+    date: "2026-07-28",
+    highlights: [
+      "界面文案改为更直白的用户语言（含多语言）。",
+      "选中态、中文标签与悬停动效打磨。",
+      "工作面板与设置页浅色表面细化。",
+      "预发布安装现可发现更新的正式版 GitHub Release。",
+    ],
+  },
+  {
+    version: "0.2.2",
+    date: "2026-07-27",
+    highlights: [
+      "插件市场支持官方远程目录与详情页。",
+      "插件面板隔离，高风险 API 受权限门控。",
+      "分区工具栏支持右键新建项目或会话。",
+      "启动闪屏、更顺滑动效与 i18n 打磨。",
+      "工作面板顶栏支持右键打开工具。",
+    ],
+  },
+  {
+    version: "0.2.1",
+    date: "2026-07-27",
+    highlights: [
+      "工作面板工具按会话保留。",
+      "“审查更改”入口仅属于产生编辑的那次会话。",
+    ],
+  },
+  {
+    version: "0.2.0",
+    date: "2026-07-27",
+    highlights: [
+      "侧边栏区分项目与会话，任务状态更清晰。",
+      "可分支或编辑助手回复；消息工具栏改为图标按钮。",
+      "文件编辑成功后提供工作区审查入口。",
+      "键盘快捷键映射，以及用于 DevTools 的开发者模式。",
+      "以 pi 模型目录作为提供商模型的权威来源。",
+      "思考级别控件放在输入区模式旁。",
+    ],
+  },
+  {
+    version: "0.1.1",
+    date: "2026-07-26",
+    highlights: [
+      "首次公开发布：本地优先的 AI 编程助手桌面客户端。",
+      "Chat / Agent 模式，支持流式回复、思考级别与模型管理。",
+      "工作区工具含权限确认、终端、浏览器与 Git 审查。",
+      "Rust 宿主负责存储、密钥、会话与通知。",
+      "插件基础能力，界面支持 English / 简体中文。",
+      "可检查 GitHub Releases 更新（支持的平台可应用内更新）。",
     ],
   },
 ];
