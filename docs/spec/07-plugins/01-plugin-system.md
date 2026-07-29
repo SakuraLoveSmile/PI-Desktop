@@ -182,14 +182,14 @@ Host Main (PI-Desktop)
 ### 6.2 Plugin Runtime (restricted)
 Plugin logic runs in a restricted environment; it is not equivalent to full Electron main privileges.
 
-MVP recommendation:
-- Prefer running the plugin main in a **UtilityProcess / Child Process**
-- Call Host APIs via JSON-RPC / IPC
+**Implemented today (ADR 0008):** each plugin's main module runs in its own
+`utilityProcess` (`electron/main/plugin-host-process.mjs`) and reaches the host
+only through JSON RPC to the broker in `electron/main/plugin-runtime.ts`, which
+enforces the API allowlist and the permission gateway. Plugin code never gets a
+host object and cannot `require` host modules.
 
-If the first iteration's implementation cost is too high, a transitional approach:
-- vm isolation inside main + a strict API proxy
-
-but the target architecture should still move toward a separate process.
+Still open: capability sandboxing inside the plugin process (raw Node built-ins
+are reachable there) and CPU/memory limits.
 
 ### 6.3 Plugin Panel UI
 - Load the plugin page with an `iframe` or `webview`
@@ -311,7 +311,7 @@ Hooks:
 - `onUnload`
 - `onUninstall`
 
-**Implemented today:** the MVP runtime (`apps/desktop/electron/main/plugin-runtime.ts`) invokes only `onLoad` (when a plugin is loaded on load/enable); unloading tears down the plugin's registered commands and tools. The other hooks are declared in the API but not yet fired.
+**Implemented today:** the runtime (`apps/desktop/electron/main/plugin-runtime.ts`) invokes `onLoad` (when a plugin is loaded on load/enable) and `onUnload` (in the plugin process, before it is stopped, 5s budget); unloading tears down the plugin's registered commands and tools. The other hooks are declared in the API but not yet fired.
 
 **Planned:** once the full lifecycle lands, hooks fire in this order: install → enable → load → (running) → unload → disable → uninstall. See [05-plugin-lifecycle.md](05-plugin-lifecycle.md) for the detailed sequence.
 

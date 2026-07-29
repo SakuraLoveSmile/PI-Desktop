@@ -1,0 +1,291 @@
+/**
+ * Plugin host process (ADR 0008).
+ *
+ * One instance runs exactly one plugin's main module, outside the Electron main
+ * process. It owns no host capability: every `pi.*` call is proxied back to the
+ * broker in `plugin-runtime.ts`, where the permission gateway and the host API
+ * allowlist live. Plain ESM JS (not TS) so the same file can be forked directly
+ * by tests and bundled to `out/main/plugin-host-process.js` for the app.
+ *
+ * Wire protocol (both directions, one JSON message per frame):
+ *   parent -> child  { t: "init", id, pluginId, pluginPath, main, manifest }
+ *   parent -> child  { t: "call", id, method, payload }   command.run | tool.execute | lifecycle.unload
+ *   child  -> parent { t: "call", id, api, args }         host API request
+ *   *      -> *      { t: "res", id, ok, value } | { t: "res", id, ok: false, error: { code, message } }
+ *   child  -> parent { t: "log", level, message }         diagnostics, fire and forget
+ */
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+import { join } from "node:path";
+
+const parentPort = process.parentPort;
+
+/** Electron utilityProcess and node:child_process disagree on the transport. */
+function send(message) {
+  if (parentPort) parentPort.postMessage(message);
+  else process.send?.(message);
+}
+
+function onHostMessage(handler) {
+  if (parentPort) parentPort.on("message", (event) => handler(event.data));
+  else process.on("message", handler);
+}
+
+function log(level, message) {
+  send({ t: "log", level, message: String(message) });
+}
+
+let pluginId = "";
+let pluginPath = "";
+let manifest = { id: "", name: "", version: "", main: "", schemaVersion: 1 };
+let pluginModule = null;
+
+const pending = new Map();
+let nextCallId = 1;
+
+/** Proxy a host API call to the broker and await its verdict. */
+function call(api, args = []) {
+  const id = `c${nextCallId++}`;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    send({ t: "call", id, api, args });
+  });
+}
+
+function settle(message) {
+  const entry = pending.get(message.id);
+  if (!entry) return;
+  pending.delete(message.id);
+  if (message.ok) {
+    entry.resolve(message.value);
+    return;
+  }
+  const error = new Error(message.error?.message || "plugin host call failed");
+  error.code = message.error?.code || "UNKNOWN";
+  entry.reject(error);
+}
+
+// Contribution points registered by this plugin. The callable half stays here;
+// the broker only ever holds the descriptor plus a proxy back into this process.
+const commands = new Map();
+const tools = new Map();
+
+function buildApi() {
+  return {
+    app: {
+      getVersion: () => call("app.getVersion"),
+      getLocale: () => call("app.getLocale"),
+    },
+    plugin: {
+      getId: () => pluginId,
+      getManifest: () => manifest,
+      getSettings: () => call("plugin.getSettings"),
+      setSettings: (partial) => call("plugin.setSettings", [partial]),
+      getDataPath: () => call("plugin.getDataPath"),
+    },
+    commands: {
+      register: async (command) => {
+        if (!command || typeof command.id !== "string" || !command.id) {
+          throw new Error("command.id is required");
+        }
+        if (typeof command.run !== "function") {
+          throw new Error("command.run must be a function");
+        }
+        commands.set(command.id, command.run);
+        try {
+          await call("commands.register", [
+            {
+              id: command.id,
+              title: command.title,
+              keywords: command.keywords,
+              category: command.category,
+            },
+          ]);
+        } catch (error) {
+          commands.delete(command.id);
+          throw error;
+        }
+      },
+      unregister: async (id) => {
+        commands.delete(id);
+        await call("commands.unregister", [id]);
+      },
+    },
+    ui: {
+      openPanel: (options) => call("ui.openPanel", [options]),
+      closePanel: () => call("ui.closePanel"),
+      showToast: (message, level) => call("ui.showToast", [message, level]),
+      notify: (input) => call("ui.notify", [input]),
+    },
+    workspace: {
+      get: () => call("workspace.get"),
+    },
+    fs: {
+      readText: (path) => call("fs.readText", [path]),
+      writeText: (path, content) => call("fs.writeText", [path, content]),
+      glob: (pattern) => call("fs.glob", [pattern]),
+    },
+    agent: {
+      registerTool: async (tool) => {
+        if (!tool || typeof tool.name !== "string" || !tool.name) {
+          throw new Error("tool.name is required");
+        }
+        if (typeof tool.execute !== "function") {
+          throw new Error("tool.execute must be a function");
+        }
+        tools.set(tool.name, tool.execute);
+        try {
+          await call("agent.registerTool", [
+            {
+              name: tool.name,
+              description: tool.description,
+              risk: tool.risk,
+              schema: tool.schema,
+            },
+          ]);
+        } catch (error) {
+          tools.delete(tool.name);
+          throw error;
+        }
+      },
+      unregisterTool: async (name) => {
+        tools.delete(name);
+        await call("agent.unregisterTool", [name]);
+      },
+    },
+    clipboard: {
+      readText: () => call("clipboard.readText"),
+      writeText: (text) => call("clipboard.writeText", [text]),
+    },
+    shell: {
+      openExternal: (url) => call("shell.openExternal", [url]),
+    },
+    net: {
+      fetch: (input) => call("net.fetch", [input]),
+    },
+    // Host events are not brokered yet; keep the SDK shape callable.
+    events: {
+      on: () => undefined,
+      off: () => undefined,
+    },
+  };
+}
+
+async function loadPluginModule(entry) {
+  const require = createRequire(import.meta.url);
+  try {
+    delete require.cache[require.resolve(entry)];
+    return require(entry);
+  } catch (error) {
+    if (error?.code === "ERR_REQUIRE_ESM" || error?.code === "ERR_REQUIRE_ASYNC_MODULE") {
+      const mod = await import(pathToFileURL(entry).href);
+      return mod?.default && typeof mod.default === "object" ? mod.default : mod;
+    }
+    throw error;
+  }
+}
+
+async function handleInit(message) {
+  pluginId = String(message.pluginId ?? "");
+  pluginPath = String(message.pluginPath ?? "");
+  manifest = message.manifest ?? manifest;
+  const entry = join(pluginPath, String(message.main ?? manifest.main ?? ""));
+
+  globalThis.pi = buildApi();
+  pluginModule = await loadPluginModule(entry);
+  if (pluginModule?.onLoad) await pluginModule.onLoad();
+  return { pluginId };
+}
+
+async function handleParentCall(method, payload) {
+  switch (method) {
+    case "command.run": {
+      const run = commands.get(String(payload?.id ?? ""));
+      if (!run) {
+        const error = new Error(`command not registered: ${payload?.id}`);
+        error.code = "NOT_FOUND";
+        throw error;
+      }
+      await run();
+      return { ok: true };
+    }
+    case "tool.execute": {
+      const execute = tools.get(String(payload?.name ?? ""));
+      if (!execute) {
+        const error = new Error(`tool not registered: ${payload?.name}`);
+        error.code = "TOOL_NOT_FOUND";
+        throw error;
+      }
+      const result = await execute(payload?.args, {
+        sessionId: payload?.sessionId,
+        turnId: payload?.turnId,
+        log: (msg) => log("info", msg),
+      });
+      return result ?? null;
+    }
+    case "lifecycle.unload": {
+      // Best effort: a throwing onUnload must not block teardown.
+      try {
+        if (pluginModule?.onUnload) await pluginModule.onUnload();
+      } catch (error) {
+        log("warn", `onUnload failed: ${error?.message ?? error}`);
+      }
+      commands.clear();
+      tools.clear();
+      return { ok: true };
+    }
+    default: {
+      const error = new Error(`unknown method: ${method}`);
+      error.code = "UNSUPPORTED";
+      throw error;
+    }
+  }
+}
+
+onHostMessage((message) => {
+  if (!message || typeof message !== "object") return;
+  if (message.t === "res") {
+    settle(message);
+    return;
+  }
+  if (message.t === "init") {
+    void handleInit(message)
+      .then((value) => send({ t: "res", id: message.id, ok: true, value }))
+      .catch((error) =>
+        send({
+          t: "res",
+          id: message.id,
+          ok: false,
+          error: {
+            code: error?.code || "PLUGIN_LOAD_FAILED",
+            message: error?.message ? String(error.message) : String(error),
+          },
+        }),
+      );
+    return;
+  }
+  if (message.t === "call") {
+    void handleParentCall(message.method, message.payload)
+      .then((value) => send({ t: "res", id: message.id, ok: true, value: value ?? null }))
+      .catch((error) =>
+        send({
+          t: "res",
+          id: message.id,
+          ok: false,
+          error: {
+            code: error?.code || "PLUGIN_CALL_FAILED",
+            message: error?.message ? String(error.message) : String(error),
+          },
+        }),
+      );
+  }
+});
+
+// A misbehaving plugin must not take down its own host process silently, and it
+// can never take down the app: the broker owns teardown decisions.
+process.on("uncaughtException", (error) => {
+  log("error", `uncaught exception: ${error?.stack || error}`);
+});
+process.on("unhandledRejection", (reason) => {
+  log("error", `unhandled rejection: ${reason instanceof Error ? reason.stack : String(reason)}`);
+});

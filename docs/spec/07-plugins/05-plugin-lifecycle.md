@@ -41,7 +41,7 @@ discovered
 
 ## 3. Lifecycle hooks
 
-**Implemented today:** the MVP runtime (`apps/desktop/electron/main/plugin-runtime.ts`) invokes only `onLoad` (when a plugin is loaded on load/enable); unloading tears down the plugin's registered commands and tools. The other hooks below are declared in the API but not yet fired.
+**Implemented today:** the runtime (`apps/desktop/electron/main/plugin-runtime.ts`) invokes `onLoad` (when a plugin is loaded on load/enable) and `onUnload` (dispatched into the plugin process on unload/disable/reload, 5s budget, then the process is stopped); unloading tears down the plugin's registered commands and tools. The other hooks below are declared in the API but not yet fired.
 
 **Planned:** once the full lifecycle lands, hooks fire in this order:
 
