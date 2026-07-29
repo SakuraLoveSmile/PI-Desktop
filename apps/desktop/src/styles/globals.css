@@ -1792,6 +1792,17 @@ html {
   display: flex;
   flex-direction: column;
   gap: 0;
+  overflow: hidden;
+  max-height: 2000px;
+  opacity: 1;
+  transition: max-height var(--motion-duration-slow) var(--motion-ease-out),
+    opacity var(--motion-duration-normal) var(--motion-ease-out);
+}
+
+.sidebar-session-group-body.collapsed {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .sidebar-session-group-body.project {
@@ -4365,9 +4376,6 @@ html {
   .tool-activity-collapse {
     transition: none;
   }
-  .footer-profile-chevron {
-    transition: none;
-  }
   /* Near-zero (not none): toast removal listens for animationend. */
   .toast,
   .toast.closing {
@@ -4627,11 +4635,14 @@ html {
 .sidebar-footer {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 58px;
+  gap: 8px;
+  min-height: 40px;
   margin-top: auto;
-  padding: 7px 4px 5px;
-  border-top: none;
+  /* No side padding: .sidebar-body's 8px already sets the content grid, so the
+     chip's own padding lands its text on the 16px nav inset and the trailing
+     icon's hover fill ends flush with the nav rows above. */
+  padding: 5px 0 2px;
+  border-top: 1px solid color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
   background: transparent;
 }
 
@@ -4639,83 +4650,75 @@ html {
   background: transparent;
 }
 
-.footer-profile {
-  display: flex;
-  flex: 1;
+/* Build chip: quiet by default, accented only when an update is actionable. */
+.footer-build {
+  display: inline-flex;
   min-width: 0;
-  min-height: 44px;
   align-items: center;
-  gap: 9px;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  padding: 6px 7px;
-  color: var(--ds-text-primary);
-  text-align: left;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  line-height: var(--leading-none);
   transition: background var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.footer-profile:hover,
-.footer-profile.active {
+.footer-build:hover {
   background: var(--ds-bg-hover);
-}
-
-.footer-profile-avatar,
-.profile-menu-avatar {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-full);
-  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
   color: var(--ds-text-secondary);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--ds-text-primary) 10%, transparent);
 }
 
-.footer-profile-avatar {
-  width: 30px;
-  height: 30px;
-}
-
-.footer-profile-copy,
-.profile-menu-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.footer-profile-copy {
-  flex: 1;
-  gap: 1px;
-}
-
-.footer-profile-name,
-.footer-profile-status {
+.footer-build-version {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.footer-profile-name {
-  font-size: var(--text-base); /* identity name matches sidebar body */
-  font-weight: var(--font-weight-medium);
-  line-height: var(--leading-compact);
+.footer-build.has-update {
+  color: var(--ds-text-primary);
 }
 
-.footer-profile-status {
-  color: var(--ds-text-muted);
-  font-size: var(--text-sm); /* status line still secondary, but readable */
-  line-height: var(--leading-none);
-}
-
-.footer-profile-chevron {
+.footer-build-dot {
+  width: 5px;
+  height: 5px;
   flex: 0 0 auto;
-  color: var(--ds-text-muted);
-  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+  border-radius: var(--radius-full);
+  background: var(--ds-accent);
 }
 
-.footer-profile-chevron.open {
-  transform: rotate(180deg);
+.footer-actions {
+  display: flex;
+  margin-left: auto;
+  align-items: center;
+  gap: 0;
+}
+
+/* Shares the notification trigger's 32px hit target so the row reads as one bar. */
+.footer-action {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--ds-text-muted);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.footer-action:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.footer-action.active {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
 }
 
 .composer-toolbar .icon-btn {
@@ -5022,91 +5025,9 @@ html {
   text-align: center;
 }
 
-.profile-menu {
-  position: absolute;
-  left: 8px;
-  bottom: calc(100% + 8px);
-  z-index: 50;
-  width: min(280px, calc(100vw - 16px));
-  max-height: calc(100vh - 88px);
-  overflow-y: auto;
-  padding: 6px;
-  border-radius: var(--radius-lg);
-  background: var(--ds-bg-elevated-opaque);
-  box-shadow: var(--ds-shadow-dialog);
-  border: 1px solid var(--ds-border-subtle);
-}
-
-/* Portaled to document.body so chat content cannot cover the menu. */
-.profile-menu-portaled {
-  position: fixed;
-  right: auto;
-  z-index: 60;
-}
-
+/* The sidebar footer keeps a positioning context for the notification popover. */
 .sidebar-footer {
   position: relative;
-}
-
-.profile-menu-identity {
-  display: flex;
-  min-height: 54px;
-  align-items: center;
-  gap: 11px;
-  padding: 7px 9px;
-}
-
-.profile-menu-avatar {
-  width: 34px;
-  height: 34px;
-}
-
-.profile-menu-copy {
-  gap: 2px;
-}
-
-.profile-menu-copy strong {
-  overflow: hidden;
-  color: var(--ds-text-primary);
-  font-size: var(--text-base); /* profile menu name tracks footer */
-  font-weight: var(--font-weight-semibold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-menu-copy small {
-  color: var(--ds-text-muted);
-  font-size: var(--text-sm); /* secondary line readability */
-}
-
-.profile-menu-divider {
-  height: 1px;
-  margin: 3px 6px;
-  background: var(--ds-border-subtle);
-}
-
-.profile-menu-item {
-  display: flex;
-  width: 100%;
-  min-height: 38px;
-  align-items: center;
-  gap: 10px;
-  border-radius: var(--radius-md);
-  padding: 7px 10px;
-  color: var(--ds-text-primary);
-  font-size: var(--text-base); /* menu actions match sidebar body */
-  text-align: left;
-  transition: background var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.profile-menu-item:hover {
-  background: var(--ds-bg-hover);
-}
-
-.profile-menu-item .meta {
-  margin-left: auto;
-  color: var(--ds-text-muted);
-  font-size: var(--text-sm);
 }
 
 

@@ -23,6 +23,7 @@ import type {
 } from "../lib/sidebar-preferences";
 import { BrandLogo } from "./BrandLogo";
 import { NotificationCenter } from "./NotificationCenter";
+import { useUpdateState } from "../lib/use-update-state";
 import {
   IconArchive,
   IconArchiveRestore,
@@ -34,17 +35,21 @@ import {
   IconCircleAlert,
   IconNewSession,
   IconFolder,
-  IconFileText,
+  IconMonitor,
+  IconMoon,
   IconMore,
   IconNewProject,
   IconPin,
   IconSearch,
   IconSidebar,
   IconSettings,
-  IconSliders,
-  IconUser,
+  IconSun,
   IconX,
 } from "./icons";
+
+/** Theme rotation for the footer toggle; also the shape guard for settings. */
+const THEME_ORDER = ["system", "light", "dark"] as const;
+type ThemeChoice = (typeof THEME_ORDER)[number];
 
 type ProjectEntry = {
   path: string;
@@ -189,16 +194,17 @@ export function Sidebar({
   const setProjectCollapsed = useAppStore((s) => s.setProjectCollapsed);
   const setProjectSort = useAppStore((s) => s.setProjectSort);
   const showToast = useAppStore((s) => s.showToast);
+  const version = useAppStore((s) => s.version);
+  const setSettingsTab = useAppStore((s) => s.setSettingsTab);
+  const setSettingsAnchor = useAppStore((s) => s.setSettingsAnchor);
+  const update = useUpdateState();
 
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [profileMenuPos, setProfileMenuPos] = useState<{ bottom: number; left: number } | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
   const [sectionMenu, setSectionMenu] = useState<"sessions" | "projects" | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const [projectPathTooltip, setProjectPathTooltip] = useState<ProjectPathTooltip | null>(null);
-  const profileRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
   const sessionPrefetchTimerRef = useRef<number | undefined>(undefined);
@@ -221,8 +227,6 @@ export function Sidebar({
 
   const closeMenus = useCallback((restoreFocus = true) => {
     const trigger = menuTriggerRef.current;
-    setProfileOpen(false);
-    setProfileMenuPos(null);
     setSortOpen(false);
     setSessionMenu(null);
     setProjectMenu(null);
@@ -295,7 +299,6 @@ export function Sidebar({
   const openSectionMenu = useCallback(
     (section: "sessions" | "projects", x: number, y: number) => {
       menuTriggerRef.current = null;
-      setProfileOpen(false);
       setSortOpen(false);
       setSessionMenu(null);
       setProjectMenu(null);
@@ -306,14 +309,13 @@ export function Sidebar({
   );
 
   useEffect(() => {
-    if (!profileOpen && !sortOpen && !sessionMenu && !projectMenu && !sectionMenu) return;
+    if (!sortOpen && !sessionMenu && !projectMenu && !sectionMenu) return;
     const onPointer = (e: PointerEvent) => {
       // Right-click must not dismiss first; contextmenu handlers reopen create menus.
       if (e.button === 2 || (e.pointerType === "mouse" && e.buttons === 2)) return;
       const target = e.target as Node;
-      if (profileRef.current?.contains(target)) return;
       if ((target as Element)?.closest?.(
-        ".sidebar-popover, .sidebar-row-menu, .profile-menu-portaled, .notification-popover-portaled",
+        ".sidebar-popover, .sidebar-row-menu, .notification-popover-portaled",
       )) return;
       closeMenus(false);
     };
@@ -330,12 +332,12 @@ export function Sidebar({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", onViewportChange);
     };
-  }, [profileOpen, sortOpen, sessionMenu, projectMenu, sectionMenu, closeMenus]);
+  }, [sortOpen, sessionMenu, projectMenu, sectionMenu, closeMenus]);
 
   useEffect(() => {
-    if (!sessionMenu && !projectMenu && !sectionMenu && !sortOpen && !profileOpen) return;
+    if (!sessionMenu && !projectMenu && !sectionMenu && !sortOpen) return;
     requestAnimationFrame(() => menuFirstItemRef.current?.focus());
-  }, [sessionMenu, projectMenu, sectionMenu, sortOpen, profileOpen]);
+  }, [sessionMenu, projectMenu, sectionMenu, sortOpen]);
 
   useEffect(() => {
     if (!projectPathTooltip) return;
@@ -343,6 +345,49 @@ export function Sidebar({
     window.addEventListener("resize", hideTooltip);
     return () => window.removeEventListener("resize", hideTooltip);
   }, [projectPathTooltip]);
+
+  // Footer utility bar: build chip + settings / theme / logs / notifications.
+  const theme: ThemeChoice = (THEME_ORDER as readonly string[]).includes(
+    settings?.theme ?? "",
+  )
+    ? (settings?.theme as ThemeChoice)
+    : "system";
+  const ThemeIcon =
+    theme === "light" ? IconSun : theme === "dark" ? IconMoon : IconMonitor;
+  const themeTitle = `${t("nav.profileTheme")} · ${t(
+    theme === "light"
+      ? "settings.themeLight"
+      : theme === "dark"
+        ? "settings.themeDark"
+        : "settings.themeSystem",
+  )}`;
+
+  const cycleTheme = useCallback(async () => {
+    const current = useAppStore.getState().settings;
+    if (!current) return;
+    const index = THEME_ORDER.indexOf(current.theme as ThemeChoice);
+    const next = THEME_ORDER[(index + 1) % THEME_ORDER.length];
+    try {
+      await (await import("../lib/api")).api.setSettings({ ...current, theme: next });
+      useAppStore.setState({ settings: { ...current, theme: next } });
+    } catch { /* ignore */ }
+  }, []);
+
+  // An update only earns the accent dot once it is actionable — a pending
+  // check or a failed one keeps the chip quiet.
+  const updateReady =
+    update?.status === "available" || update?.status === "downloaded";
+  const appVersion = update?.currentVersion || version?.version || "";
+  const buildLabel = updateReady
+    ? `v${update?.availableVersion ?? appVersion}`
+    : update?.status === "checking"
+      ? t("updates.checking")
+      : appVersion
+        ? `v${appVersion}`
+        : t("nav.buildUnknown");
+  const buildTitle = updateReady
+    ? t("updates.available", { version: update?.availableVersion ?? "" })
+    : t("nav.checkForUpdates");
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -974,13 +1019,16 @@ export function Sidebar({
             </button>
           </div>
         </div>
-        {!collapsedProject ? (
-          <div id={`${projectId}-sessions`} className="sidebar-session-group-body project">
-            {entry.sessions.length > 0 ? renderSessionRows(entry.sessions, { projectPath: entry.path }) : (
-              <div className="sidebar-session-empty">{t("nav.noProjectSessions")}</div>
-            )}
-          </div>
-        ) : null}
+        <div
+          id={`${projectId}-sessions`}
+          className={`sidebar-session-group-body project ${collapsedProject ? "collapsed" : ""}`}
+          role="region"
+          aria-hidden={collapsedProject}
+        >
+          {entry.sessions.length > 0 ? renderSessionRows(entry.sessions, { projectPath: entry.path }) : (
+            <div className="sidebar-session-empty">{t("nav.noProjectSessions")}</div>
+          )}
+        </div>
       </section>
     );
   };
@@ -1387,83 +1435,53 @@ export function Sidebar({
           )}
         </div>
 
-        <div className="sidebar-footer no-drag" ref={profileRef}>
-          {profileOpen && profileMenuPos && typeof document !== "undefined"
-            ? createPortal(
-                <div
-                  id="sidebar-profile-menu"
-                  className="profile-menu profile-menu-portaled"
-                  role="menu"
-                  onKeyDown={onMenuKeyDown}
-                  style={{ bottom: profileMenuPos.bottom, left: profileMenuPos.left }}
-                >
-              <div className="profile-menu-identity" role="presentation">
-                <span className="profile-menu-avatar" aria-hidden>
-                  <IconUser size={15} />
-                </span>
-                <span className="profile-menu-copy">
-                  <strong>{t("nav.custom")}</strong>
-                  <small>{t("nav.localProfile")}</small>
-                </span>
-              </div>
-              <div className="profile-menu-divider" role="separator" />
-              <button ref={menuFirstItemRef} className="profile-menu-item" role="menuitem" data-nav="settings" onClick={() => { setProfileOpen(false); setPage("settings"); }}>
-                <IconSettings size={15} />
-                <span>{t("nav.settings")}</span>
-              </button>
-              <button className="profile-menu-item" role="menuitem" onClick={async () => { setProfileOpen(false); try { await (await import("../lib/api")).api.openLogs(); } catch { /* ignore */ } }}>
-                <IconFileText size={15} />
-                <span>{t("nav.profileLogs")}</span>
-              </button>
-              <button className="profile-menu-item" role="menuitem" onClick={async () => {
-                setProfileOpen(false);
-                const current = useAppStore.getState().settings;
-                if (!current) return;
-                const order = ["system", "light", "dark"] as const;
-                const index = order.indexOf((current.theme as (typeof order)[number]) || "system");
-                const theme = order[(index + 1) % order.length];
-                try {
-                  await (await import("../lib/api")).api.setSettings({ ...current, theme });
-                  useAppStore.setState({ settings: { ...current, theme } });
-                } catch { /* ignore */ }
-              }}>
-                <IconSliders size={15} />
-                <span>{t("nav.profileTheme")}</span>
-                <span className="meta">{settings?.theme || "system"}</span>
-              </button>
-                </div>,
-                document.body,
-              )
-            : null}
-
-          <button className={`footer-profile ${profileOpen ? "active" : ""}`} data-nav="profile" aria-haspopup="menu" aria-controls="sidebar-profile-menu" aria-expanded={profileOpen} onClick={(event) => {
-              const trigger = event.currentTarget;
-              menuTriggerRef.current = trigger;
-              if (profileOpen) {
-                setProfileOpen(false);
-                setProfileMenuPos(null);
+        <div className="sidebar-footer no-drag">
+          <button
+            type="button"
+            className={`footer-build ${updateReady ? "has-update" : ""}`}
+            data-nav="build"
+            title={buildTitle}
+            aria-label={buildTitle}
+            onClick={() => {
+              if (updateReady) {
+                setSettingsAnchor("updates.title");
+                setSettingsTab("about");
                 return;
               }
-              // Capture geometry before any state update; React nulls currentTarget
-              // once the event callback finishes / inside updater functions.
-              const rect = trigger.getBoundingClientRect();
-              const width = Math.min(280, window.innerWidth - 16);
-              setProfileMenuPos({
-                bottom: Math.max(12, window.innerHeight - rect.top + 8),
-                left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
-              });
-              setProfileOpen(true);
-            }} title={t("nav.openProfileMenu")}>
-            <span className="footer-profile-avatar" aria-hidden>
-              <IconUser size={14} />
-            </span>
-            <span className="footer-profile-copy">
-              <span className="footer-profile-name">{t("nav.custom")}</span>
-              <span className="footer-profile-status">{t("nav.localProfile")}</span>
-            </span>
-            <IconChevronDown className={`footer-profile-chevron ${profileOpen ? "open" : ""}`} size={13} aria-hidden />
+              void (async () => {
+                try {
+                  await (await import("../lib/api")).api.updatesCheck();
+                } catch { /* ignore */ }
+              })();
+            }}
+          >
+            <span className="footer-build-version">{buildLabel}</span>
+            {updateReady ? <span className="footer-build-dot" aria-hidden /> : null}
           </button>
-          <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
+
+          <div className="footer-actions">
+            <button
+              type="button"
+              className={`footer-action ${page === "settings" ? "active" : ""}`}
+              data-nav="settings"
+              title={t("nav.settings")}
+              aria-label={t("nav.settings")}
+              onClick={() => setPage("settings")}
+            >
+              <IconSettings size={14} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="footer-action"
+              data-nav="theme"
+              title={themeTitle}
+              aria-label={themeTitle}
+              onClick={() => void cycleTheme()}
+            >
+              <ThemeIcon size={14} aria-hidden />
+            </button>
+            <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
+          </div>
         </div>
       </div>
       {renderFloatingMenu()}
