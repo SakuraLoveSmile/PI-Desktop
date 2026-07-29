@@ -3727,7 +3727,7 @@ html {
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-compact);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: var(--tracking-wide);
 }
 
 .update-notice-notes-body {
