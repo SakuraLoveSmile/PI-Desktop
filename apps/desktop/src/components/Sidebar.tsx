@@ -1107,15 +1107,6 @@ export function Sidebar({
           <span id={`${projectId}-path-description`} className="sr-only">
             {entry.path}
           </span>
-          <button
-            type="button"
-            className="sidebar-session-group-add"
-            title={entry.active ? t("project.newTask") : t("project.openAndNewTask", { defaultValue: "Open project and create task" })}
-            aria-label={entry.active ? t("project.newTask") : t("project.openAndNewTask", { defaultValue: "Open project and create task" })}
-            onClick={() => void createProjectSession(entry.path)}
-          >
-            <IconNewSession size={13} />
-          </button>
           <div className="sidebar-menu-wrap">
             <button
               type="button"
@@ -1136,6 +1127,15 @@ export function Sidebar({
               <IconMore size={14} />
             </button>
           </div>
+          <button
+            type="button"
+            className="sidebar-session-group-add"
+            title={entry.active ? t("project.newTask") : t("project.openAndNewTask", { defaultValue: "Open project and create task" })}
+            aria-label={entry.active ? t("project.newTask") : t("project.openAndNewTask", { defaultValue: "Open project and create task" })}
+            onClick={() => void createProjectSession(entry.path)}
+          >
+            <IconNewSession size={13} />
+          </button>
         </div>
         <div
           id={`${projectId}-sessions`}

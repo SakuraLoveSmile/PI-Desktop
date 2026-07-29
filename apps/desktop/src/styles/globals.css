@@ -6931,7 +6931,11 @@ html {
 }
 
 .sidebar-session-group-header:hover .sidebar-session-group-add,
-.sidebar-session-group-header:focus-within .sidebar-session-group-add {
+.sidebar-session-group-header:focus-within .sidebar-session-group-add,
+.sidebar-session-group-header:hover .sidebar-menu-wrap,
+.sidebar-session-group-header:focus-within .sidebar-menu-wrap,
+.sidebar-session-group-header:hover .sidebar-menu-wrap .thread-item-more,
+.sidebar-session-group-header:focus-within .sidebar-menu-wrap .thread-item-more {
   opacity: 1;
 }
 
