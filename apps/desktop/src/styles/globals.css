@@ -4695,7 +4695,7 @@ html {
   color: var(--ds-text-muted);
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
+  letter-spacing: var(--tracking-normal);
   line-height: var(--leading-none);
   transition: background var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out);
