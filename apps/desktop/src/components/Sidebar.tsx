@@ -208,6 +208,7 @@ export function Sidebar({
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
   const sessionPrefetchTimerRef = useRef<number | undefined>(undefined);
+  const projectPathTimerRef = useRef<number | undefined>(undefined);
 
   const showArchived = sessionView.archived;
   const sessionSort = sessionView.sort;
@@ -270,6 +271,7 @@ export function Sidebar({
   const openProjectRowMenu = useCallback(
     (projectKey: string, trigger: HTMLButtonElement | null) => {
       menuTriggerRef.current = trigger;
+      window.clearTimeout(projectPathTimerRef.current);
       setProjectPathTooltip(null);
       setSortOpen(false);
       setSessionMenu(null);
@@ -281,17 +283,23 @@ export function Sidebar({
 
   const showProjectPath = useCallback(
     (entry: ProjectEntry, target: HTMLButtonElement) => {
-      const rect = target.getBoundingClientRect();
-      const tooltipWidth = Math.min(420, window.innerWidth - 16);
-      setProjectPathTooltip({
-        id: `${projectDomId(entry.key)}-path-tooltip`,
-        path: entry.path,
-        top:
-          rect.bottom + 48 <= window.innerHeight
-            ? rect.bottom + 6
-            : Math.max(8, rect.top - 42),
-        left: Math.max(8, Math.min(rect.left, window.innerWidth - tooltipWidth - 8)),
-      });
+      // Clear any existing timer
+      window.clearTimeout(projectPathTimerRef.current);
+      
+      // Set a new timer for 1.5 seconds
+      projectPathTimerRef.current = window.setTimeout(() => {
+        const rect = target.getBoundingClientRect();
+        const tooltipWidth = Math.min(420, window.innerWidth - 16);
+        setProjectPathTooltip({
+          id: `${projectDomId(entry.key)}-path-tooltip`,
+          path: entry.path,
+          top:
+            rect.bottom + 48 <= window.innerHeight
+              ? rect.bottom + 6
+              : Math.max(8, rect.top - 42),
+          left: Math.max(8, Math.min(rect.left, window.innerWidth - tooltipWidth - 8)),
+        });
+      }, 400);
     },
     [],
   );
@@ -341,7 +349,10 @@ export function Sidebar({
 
   useEffect(() => {
     if (!projectPathTooltip) return;
-    const hideTooltip = () => setProjectPathTooltip(null);
+    const hideTooltip = () => {
+      window.clearTimeout(projectPathTimerRef.current);
+      setProjectPathTooltip(null);
+    };
     window.addEventListener("resize", hideTooltip);
     return () => window.removeEventListener("resize", hideTooltip);
   }, [projectPathTooltip]);
@@ -970,9 +981,15 @@ export function Sidebar({
             aria-controls={`${projectId}-sessions`}
             data-action="toggle-project-collapse"
             onMouseEnter={(event) => showProjectPath(entry, event.currentTarget)}
-            onMouseLeave={() => setProjectPathTooltip(null)}
+            onMouseLeave={() => {
+              window.clearTimeout(projectPathTimerRef.current);
+              setProjectPathTooltip(null);
+            }}
             onFocus={(event) => showProjectPath(entry, event.currentTarget)}
-            onBlur={() => setProjectPathTooltip(null)}
+            onBlur={() => {
+              window.clearTimeout(projectPathTimerRef.current);
+              setProjectPathTooltip(null);
+            }}
             onClick={() => void (async () => {
               if (!entry.active && !(await selectProject(entry.path))) return;
               setCollapsed(entry.path, !collapsedProject);
@@ -1363,6 +1380,7 @@ export function Sidebar({
           <div
             className="sidebar-session-group-body standalone"
             onScroll={() => {
+              window.clearTimeout(projectPathTimerRef.current);
               setProjectPathTooltip(null);
               if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
             }}
@@ -1407,6 +1425,7 @@ export function Sidebar({
         <div
           className="sidebar-session-groups min-h-0 flex-1 overflow-auto px-0.5"
           onScroll={() => {
+            window.clearTimeout(projectPathTimerRef.current);
             setProjectPathTooltip(null);
             if (sessionMenu || projectMenu || sectionMenu || sortOpen) closeMenus(false);
           }}

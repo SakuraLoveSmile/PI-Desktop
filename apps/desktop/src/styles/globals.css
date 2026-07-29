@@ -6666,13 +6666,11 @@ html {
 
 .thread-item:hover .thread-item-more,
 .thread-item.active .thread-item-more:hover,
-.thread-item-more[aria-expanded="true"],
-.project-group .thread-item-more[aria-expanded="true"] {
+.thread-item-more[aria-expanded="true"] {
   opacity: 1;
 }
 
 .thread-item:focus-within .thread-item-more,
-.project-group:focus-within .thread-item-more,
 .thread-item-more:focus-visible {
   opacity: 1;
 }
