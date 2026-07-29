@@ -510,6 +510,13 @@ export type UpdateState = {
   status: UpdateStatus;
   currentVersion: string;
   availableVersion?: string;
+  /**
+   * Localized product highlights for `availableVersion` from the dual-locale
+   * in-app changelog. Plain text (bullet lines); absent when the version has
+   * no catalog entry. Main selects the locale — the renderer never supplies
+   * a feed or remote notes URL (ADR 0022 / D164).
+   */
+  releaseNotes?: string;
   /** 0-100 while status is "downloading". */
   progressPercent?: number;
   error?: string;
