@@ -157,12 +157,25 @@ function UpdatesRow() {
     }
   }
 
+  const notes = update?.releaseNotes?.trim() || null;
+  const showNotes =
+    notes &&
+    (update?.status === "available" ||
+      update?.status === "downloading" ||
+      update?.status === "downloaded");
+
   return (
     <SettingsRow title={t("updates.title")} description={t("updates.desc")}>
       <div className="flex flex-col items-end gap-1.5">
         {action}
         {statusText ? (
           <div className="text-right text-xs-plus text-text-muted">{statusText}</div>
+        ) : null}
+        {showNotes ? (
+          <div className="update-settings-notes">
+            <div className="update-settings-notes-label">{t("updates.whatsNew")}</div>
+            <pre className="update-settings-notes-body">{notes}</pre>
+          </div>
         ) : null}
       </div>
     </SettingsRow>

@@ -57,6 +57,7 @@ export const en = {
     downloaded: "Version {{version}} is ready to install.",
     restart: "Restart to update",
     viewRelease: "View release",
+    whatsNew: "What's new",
     manualHint: "Download the new version from the releases page.",
     error: "Couldn't check for updates: {{message}}",
     dismiss: "Dismiss",
