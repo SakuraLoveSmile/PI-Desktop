@@ -86,7 +86,11 @@ Rules:
   return every message unchanged and separately select the newest valid
   checkpoint. `throughMessageId` is its durable transcript boundary;
   `firstKeptMessageId` and `retainedTail` reproduce pi's summary + recent-tail
-  context after restart.
+  context after restart. When one atomic parallel tool-result batch exceeds the
+  checkpoint tail budget, `retainedTail` stores a marked, budget-bounded copy
+  that preserves every call/result envelope but may shorten result text and
+  omit duplicate provider-irrelevant details; the original message lines stay
+  complete and authoritative for UI/diagnostics.
 - Writers append with flush + fsync (message durability ≈ WAL
   `synchronous=NORMAL`); full transcript rewrites (regenerate/edit, revision
   switch, import) go through a sibling temp file + atomic rename. A normal

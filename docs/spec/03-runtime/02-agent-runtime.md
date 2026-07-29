@@ -117,9 +117,16 @@ For every pi loop turn:
 pi's cut point keeps provider-valid tool call/result pairs together. When the
 final tool-result batch alone exceeds the configured recent-tail target,
 PI-Desktop raises the effective target just enough for pi's reverse scan to
-reach the batch's assistant carrier, bounded by half the hard budget. A larger
-atomic batch may stop the run with `CONTEXT_COMPACTION_FAILED`, but it can never
-pass the next-request guard unchanged.
+reach the batch's assistant carrier. When the carrier plus results reaches half
+the hard budget, the runtime first builds a checkpoint-only copy of the batch.
+Every tool result keeps its call identity and error state; available text budget
+is distributed fairly across the parallel results, retained as head + tail,
+and marked with
+`[checkpoint truncated: tool result exceeded the retained context budget]`.
+Provider-irrelevant duplicate `details` are dropped from truncated checkpoint
+results. Original durable message rows and the visible transcript are not
+modified. The bounded tail is re-estimated with the summary before persistence
+and before continuation, so an oversized request still cannot pass the guard.
 
 The hard boundary is the model context window minus request headroom.
 Headroom is the maximum of the configured reserve, model maximum output capped

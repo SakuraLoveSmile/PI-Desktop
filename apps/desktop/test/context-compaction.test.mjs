@@ -52,6 +52,7 @@ test("per-turn protection nudges softly and blocks unsafe provider requests", ()
   assert.match(runtime, /CONTEXT_NUDGE_TURN_INTERVAL = 3/);
   assert.match(runtime, /budget\.tokens >= budget\.hardLimit/);
   assert.match(runtime, /CONTEXT_COMPACTION_FAILED: unable to create a checkpoint/);
+  assert.match(runtime, /checkpoint truncated: tool result exceeded the retained context budget/);
   assert.match(runtime, /pendingOverflow/);
   assert.match(runtime, /runCompaction\("overflow", true\)/);
 });
