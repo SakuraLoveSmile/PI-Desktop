@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   AppSettings,
@@ -27,12 +27,14 @@ import {
   IconBot,
   IconChevronLeft,
   IconDownload,
+  IconFileText,
   IconInfo,
   IconSearch,
   IconSliders,
 } from "../components/icons";
 import { ProvidersSection } from "../components/settings/ProvidersSection";
 import { KeyboardShortcutsSection } from "../components/settings/KeyboardShortcutsSection";
+import { ReleaseNotesDialog } from "../components/ReleaseNotesDialog";
 import { ProjectsPage } from "./ProjectsPage";
 
 type SettingsTab = ReturnType<typeof useAppStore.getState>["settingsTab"];
@@ -86,9 +88,11 @@ function SettingsCard({
   );
 }
 
-function UpdatesRow() {
+function UpdatesRow({ currentVersion }: { currentVersion?: string }) {
   const { t } = useTranslation();
   const update = useUpdateState();
+  const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
+  const closeReleaseNotes = useCallback(() => setReleaseNotesOpen(false), []);
   const disabled = !update || update.mode === "disabled";
   const busy = update?.status === "checking" || update?.status === "downloading";
 
@@ -167,7 +171,16 @@ function UpdatesRow() {
   return (
     <SettingsRow title={t("updates.title")} description={t("updates.desc")}>
       <div className="flex flex-col items-end gap-1.5">
-        {action}
+        <div className="update-settings-actions">
+          <Button
+            variant="secondary"
+            onClick={() => setReleaseNotesOpen(true)}
+          >
+            <IconFileText size={14} />
+            {t("updates.releaseNotes")}
+          </Button>
+          {action}
+        </div>
         {statusText ? (
           <div className="text-right text-xs-plus text-text-muted">{statusText}</div>
         ) : null}
@@ -178,6 +191,13 @@ function UpdatesRow() {
           </div>
         ) : null}
       </div>
+      {releaseNotesOpen ? (
+        <ReleaseNotesDialog
+          currentVersion={update?.currentVersion ?? currentVersion}
+          availableVersion={update?.availableVersion}
+          onClose={closeReleaseNotes}
+        />
+      ) : null}
     </SettingsRow>
   );
 }
@@ -884,7 +904,7 @@ export function SettingsPage() {
                   {t("settings.openLogs")}
                 </Button>
               </SettingsRow>
-              <UpdatesRow />
+              <UpdatesRow currentVersion={version?.version} />
             </SettingsCard>
           )}
 

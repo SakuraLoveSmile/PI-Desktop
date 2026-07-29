@@ -12,6 +12,7 @@ const [
   menuSource,
   apiSource,
   bannerSource,
+  releaseNotesDialogSource,
   settingsSource,
   appSource,
   stylesSource,
@@ -28,6 +29,7 @@ const [
   read("../electron/main/application-menu.ts"),
   read("../src/lib/api.ts"),
   read("../src/components/UpdateBanner.tsx"),
+  read("../src/components/ReleaseNotesDialog.tsx"),
   read("../src/pages/SettingsPage.tsx"),
   read("../src/App.tsx"),
   read("../src/styles/globals.css"),
@@ -128,9 +130,16 @@ test("renderer exposes the updates API, banner and settings row", () => {
   assert.match(bannerSource, /availableVersion}:\$\{update\.status/);
   assert.match(bannerSource, /className="update-notice"/);
   assert.match(bannerSource, /role="progressbar"/);
-  assert.match(settingsSource, /<UpdatesRow \/>/);
+  assert.match(settingsSource, /<UpdatesRow currentVersion=/);
   assert.match(settingsSource, /update-settings-notes/);
   assert.match(settingsSource, /updates\.whatsNew/);
+  assert.match(settingsSource, /updates\.releaseNotes/);
+  assert.match(settingsSource, /<ReleaseNotesDialog/);
+  assert.match(releaseNotesDialogSource, /CHANGELOG\[locale\]/);
+  assert.match(releaseNotesDialogSource, /role="dialog"/);
+  assert.match(releaseNotesDialogSource, /aria-modal="true"/);
+  assert.match(releaseNotesDialogSource, /data-release-version/);
+  assert.match(releaseNotesDialogSource, /event\.key === "Escape"/);
   assert.match(
     appSource,
     /<section className="main-pane">[\s\S]*?<UpdateBanner \/>/,
@@ -160,6 +169,10 @@ test("check-for-updates is reachable from the application menu", () => {
       "downloaded",
       "restart",
       "whatsNew",
+      "releaseNotes",
+      "closeReleaseNotes",
+      "currentBadge",
+      "availableBadge",
     ]) {
       assert.match(source, new RegExp(`${key}:`), key);
     }
