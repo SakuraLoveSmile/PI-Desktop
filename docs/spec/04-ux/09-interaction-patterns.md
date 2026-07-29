@@ -311,6 +311,13 @@ may be retained while exactly one workspace supplies the visible shell context.
   progress when available, and keeps the relevant action inside the same
   surface. Dismissal suppresses the current version-and-status stage; a later
   stage such as `downloaded` appears again.
+- When Main attaches dual-locale product notes for the discovered version
+  (`UpdateState.releaseNotes`, D164), the notice and Settings → Info Updates
+  row show a compact "What's new" list under the status message. Notes come
+  from the shipped EN/zh-CN changelog catalog selected by the product UI
+  locale — never from a renderer-supplied feed or remote URL. Missing catalog
+  entries omit the section; locale changes re-resolve notes without a new
+  check.
 - D126 tag releases publish all platform manifests and installers. Windows
   NSIS and Linux AppImage therefore use the in-app lane; macOS and Linux deb
   remain notify-and-link delivery modes.

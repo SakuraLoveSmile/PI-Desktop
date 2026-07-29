@@ -91,6 +91,10 @@ Required (all **implemented**):
 - The client carries no GitHub token. A private or otherwise unreachable feed
   fails closed; automatic failures stay ambient and explicit checks expose the
   error.
+- Dual-locale product "what's new" text (D164) is selected in Main from the
+  shipped changelog catalog and attached to `UpdateState.releaseNotes`. The
+  renderer cannot supply a notes URL, feed, or remote body; missing catalog
+  entries simply omit the section.
 - The Developer ID + notarization lane remains documented in the
   [release runbook](../06-delivery/06-release-runbook.md).
 

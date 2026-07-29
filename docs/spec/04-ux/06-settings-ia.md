@@ -99,6 +99,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - app/host/protocol versions + open logs
 - Updates row with the current delivery state and one applicable action:
   Check for updates, View release, or Restart to update
+- When an update is available, downloading, or downloaded and Main attached
+  dual-locale product notes, the Updates row shows a compact "What's new"
+  list under the status text (same notes as the ambient banner; D164)
 
 ## 3. Navigation rules
 

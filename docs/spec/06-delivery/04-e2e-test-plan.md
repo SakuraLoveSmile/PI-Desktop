@@ -1509,6 +1509,29 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`auto-update.test.mjs` asserts
   `allowPrerelease = false`); packaged discovery scenario Draft
 
+#### E2E-067B: Dual-locale in-app changelog on update available (D164)
+
+- **Preconditions**: Packaged or fixture updater state with
+  `availableVersion` present in `packages/shared` CHANGELOG for both `en` and
+  `zh-CN`; product language can be switched.
+- **Steps**: 1) Force or wait for update discovery so status is manual
+  `available`, in-app `downloading`, or `downloaded`. 2) Inspect the ambient
+  banner and Settings → Info Updates row in English. 3) Switch UI language to
+  zh-CN and re-inspect without invoking a new check. 4) Repeat with a version
+  absent from the catalog.
+- **Expected**: `UpdateState.releaseNotes` is plain multi-line product
+  highlights selected by Main from the dual-locale catalog — never a
+  renderer-supplied URL. Both surfaces show a localized "What's new" block
+  when notes exist and hide it when they do not. Locale change refreshes notes
+  for the same version. No new IPC domain or feed configuration is exposed.
+- **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/09-interaction-patterns.md`,
+  `05-security/01-security.md`, `06-delivery/06-release-runbook.md`,
+  `08-meta/decisions-log.md` (D164), ADR 0022
+- **Acceptance**: A (app startup), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`auto-update.test.mjs`, `changelog.test.ts`);
+  packaged UI scenario Draft
+
 #### E2E-068: Fork a conversation into an independent session
 
 - **Preconditions**: An idle project conversation has user, assistant,
@@ -2556,6 +2579,11 @@ This test plan spec is accepted when:
   `downloading`, the applicable View release or Restart to update action, and a
   24px dismiss control with an accessible name. Dismissing one status stage
   does not suppress a later stage for the same version.
+- When the fixture includes `releaseNotes`, expect a "What's new" section under
+  the status message on both the banner and Settings → Info Updates row, using
+  the product UI locale (EN or zh-CN). A fixture without notes omits the
+  section. Switching language re-resolves the same version's notes without a
+  new check.
 
 ### US-UI-67 Distinct sidebar task status indicators (D135)
 - In light and dark themes, keep session B selected while session A progresses

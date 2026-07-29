@@ -60,6 +60,18 @@ overwriting the canonical source.
 
 ## 4. Release steps
 
+Before tagging, update the dual-locale in-app product changelog so packaged
+builds can show "what's new" without a network fetch (D164):
+
+1. Edit `packages/shared/src/changelog.ts` — add a newest-first entry under
+   both `en` and `zh-CN` with the same `version` (no leading `v`), optional
+   ISO `date`, and matching highlight counts. English is the source of truth
+   (ADR 0009); keep each bullet one user-facing idea.
+2. Confirm `pnpm --filter @pi-desktop/shared test` still passes catalog
+   alignment.
+3. GitHub Release bodies may still use `generate_release_notes: true` for the
+   web page; they are **not** the in-app notes source.
+
 ```bash
 export MAC_SIGNING_IDENTITY="Developer ID Application: ... (TEAMID)"
 export APPLE_ID=...

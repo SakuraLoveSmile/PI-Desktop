@@ -40,6 +40,11 @@ download-and-install flow.
    platform artifacts and update manifests produced by the release matrix.
    macOS remains notify-and-link until a signed in-app channel is separately
    qualified.
+7. Dual-locale product "what's new" text (D164) is maintained in
+   `packages/shared` as EN + zh-CN catalogs. Main formats notes for the
+   discovered version using the product UI locale and attaches them as optional
+   `UpdateState.releaseNotes` on the existing updates path. GitHub auto-generated
+   release bodies remain web-only; the renderer never supplies a notes URL.
 
 ## Consequences
 
@@ -51,6 +56,8 @@ download-and-install flow.
   macOS and Linux deb users install from the release page.
 - Prerelease installs graduate to newer stable releases through the same
   latest feed; a dedicated RC channel is not active.
+- In-app bilingual release highlights ship with the build and follow the
+  product locale without a second network surface.
 - Signing, rollback, staged rollout, and optional prerelease-channel policy
   remain operational follow-ups rather than renderer capabilities.
 
