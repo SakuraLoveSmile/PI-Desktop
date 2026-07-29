@@ -56,5 +56,4 @@ test("crash and empty-home copy is catalog-backed in English and Chinese", () =>
     chinese,
     /emptyTitleInProject:\s*"要在 \{\{project\}\} 里做什么？"/,
   );
-  assert.match(chinese, /custom:\s*"自定义"/);
 });

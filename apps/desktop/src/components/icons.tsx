@@ -40,6 +40,8 @@ import {
   Mic,
   MessageSquare,
   MessageSquarePlus,
+  Monitor,
+  Moon,
   MoreHorizontal,
   Palette,
   PanelLeft,
@@ -145,6 +147,8 @@ export const IconPerson = icon(Smile);
 export const IconInfo = icon(Info);
 export const IconServer = icon(Server);
 export const IconSun = icon(Sun);
+export const IconMoon = icon(Moon);
+export const IconMonitor = icon(Monitor);
 export const IconPet = icon(PawPrint);
 export const IconSnapshot = icon(RotateCw);
 export const IconGear = icon(Settings);
