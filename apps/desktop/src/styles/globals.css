@@ -1720,7 +1720,10 @@ html {
 .sidebar-session-groups {
   display: flex;
   min-height: 0;
-  flex: 1 1 auto;
+  /* Basis 0, not auto: with a content-derived basis the scroller's resolved
+     height is re-solved from its own content, so collapsing the first project
+     nudges the whole list up a few pixels before it settles back. */
+  flex: 1 1 0;
   flex-direction: column;
   gap: 2px;
   overflow-x: hidden;
