@@ -60,17 +60,45 @@ overwriting the canonical source.
 
 ## 4. Release steps
 
-Before tagging, update the dual-locale in-app product changelog so packaged
-builds can show "what's new" without a network fetch (D164):
+### 4.1 Mandatory in-app changelog gate (D164)
 
-1. Edit `packages/shared/src/changelog.ts` — add a newest-first entry under
-   both `en` and `zh-CN` with the same `version` (no leading `v`), optional
-   ISO `date`, and matching highlight counts. English is the source of truth
-   (ADR 0009); keep each bullet one user-facing idea.
-2. Confirm `pnpm --filter @pi-desktop/shared test` still passes catalog
-   alignment.
-3. GitHub Release bodies may still use `generate_release_notes: true` for the
-   web page; they are **not** the in-app notes source.
+**Every product release that bumps a stable app version and cuts a tag MUST
+update the dual-locale in-app product changelog first.** Tagging a stable
+version without matching EN + zh-CN entries in
+`packages/shared/src/changelog.ts` is a **release process failure**: packaged
+builds cannot show "what's new" without a network fetch, and GitHub
+auto-generated release bodies are **not** a substitute (extends D120 /
+ADR 0022).
+
+Blocking steps:
+
+1. Edit `packages/shared/src/changelog.ts` **before**
+   `node scripts/release.mjs <version>` / `git tag`:
+   - Add a **newest-first** entry under both `en` and `zh-CN`.
+   - Same `version` string (semver **without** a leading `v`, matching
+     `apps/desktop` / `APP_VERSION`).
+   - Optional ISO `date` (`YYYY-MM-DD`).
+   - Matching highlight counts; English is the source of truth (ADR 0009).
+   - Each bullet is one short user-facing idea (not raw PR titles).
+2. Do **not** catalog pre-release-only versions (`x.y.z-rc.*`) unless product
+   explicitly ships in-app notes for that channel.
+3. Run `pnpm --filter @pi-desktop/shared test` and confirm catalog alignment
+   (version sets + highlight counts) still passes.
+4. Commit the catalog update so the tagged commit contains notes for that
+   version (alone or adjacent to the version bump).
+5. GitHub Release bodies may still use `generate_release_notes: true` for the
+   web page; they remain web-only and are **not** the in-app notes source.
+
+Pre-tag checklist:
+
+- [ ] `packages/shared/src/changelog.ts` has EN + zh-CN entries for the version
+      about to be tagged
+- [ ] Highlight counts match across locales
+- [ ] Shared changelog tests pass
+- [ ] `release.mjs` / tag runs only after the catalog commit is on the release
+      branch
+
+### 4.2 Build / package
 
 ```bash
 export MAC_SIGNING_IDENTITY="Developer ID Application: ... (TEAMID)"

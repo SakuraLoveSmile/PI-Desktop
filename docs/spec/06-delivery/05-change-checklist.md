@@ -98,7 +98,26 @@ Before marking the request complete:
 
 ---
 
-## 7. Final Definition-of-Done Gate
+## 7. App version release checklist (stable tag)
+
+Required for every stable app version bump / tag (D164). Skip only for
+documentation-only work or non-release chores.
+
+- [ ] `packages/shared/src/changelog.ts` has a newest-first entry for the
+      release version under **both** `en` and `zh-CN` (no leading `v`).
+- [ ] Highlight counts match across locales; English is the source of truth.
+- [ ] Bullets are short user-facing product notes (not raw PR/commit lists).
+- [ ] Pre-release-only versions are omitted from the product catalog unless
+      product explicitly ships in-app notes for that channel.
+- [ ] `pnpm --filter @pi-desktop/shared test` passes catalog alignment.
+- [ ] Catalog commit is on the release branch **before**
+      `node scripts/release.mjs <version> --tag` / `git tag v<version>`.
+- [ ] GitHub auto-generated release body is treated as web-only, not the
+      in-app source ([06-release-runbook.md §4.1](06-release-runbook.md#41-mandatory-in-app-changelog-gate-d164)).
+
+---
+
+## 8. Final Definition-of-Done Gate
 
 Before marking work complete, verify **all** of the following:
 
