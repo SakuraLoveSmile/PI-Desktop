@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { estimateTokens } from "@earendil-works/pi-agent-core";
 import { DesktopAgentRuntime, type RuntimeProviderConfig } from "./runtime.js";
 import type {
   ContextCompactionRecord,
@@ -992,6 +993,115 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
       "assistant",
       "toolResult",
     ]);
+    await runtime.dispose();
+  });
+
+  it("bounds an atomic parallel tool batch in the checkpoint copy", async () => {
+    const constrainedProvider: RuntimeProviderConfig = {
+      ...provider,
+      modelConfig: {
+        ...provider.modelConfig!,
+        contextWindow: 128_000,
+        maxTokens: 8_192,
+      },
+    };
+    const runtime = createRuntime({ provider: constrainedProvider });
+    const resultSizes = [2_687, 90_920, 41_099, 155_573];
+    const toolCalls = resultSizes.map((_, index) => ({
+      type: "toolCall" as const,
+      id: `parallel-tool-${index}`,
+      name: "Read",
+      arguments: { path: `large-${index}.txt` },
+    }));
+    const toolCarrier = {
+      ...assistant,
+      content: toolCalls,
+      usage: {
+        ...assistant.usage,
+        input: 110_000,
+        totalTokens: 110_000,
+      },
+      stopReason: "toolUse" as const,
+    };
+    const largeResults = resultSizes.map((size, index) => ({
+      ...toolResult,
+      toolCallId: `parallel-tool-${index}`,
+      content: [
+        { type: "text" as const, text: `${index}${"x".repeat(size - 1)}` },
+      ],
+      details: { duplicatedDiagnostic: "x".repeat(size) },
+    }));
+    (runtime as any).fullEntries = [
+      {
+        type: "message",
+        id: "old-user",
+        parentId: null,
+        timestamp: "2026-07-29T00:00:00Z",
+        message: { role: "user", content: "inspect the repository", timestamp: 1 },
+      },
+      {
+        type: "message",
+        id: "parallel-carrier",
+        parentId: "old-user",
+        timestamp: "2026-07-29T00:00:01Z",
+        message: toolCarrier,
+      },
+      ...largeResults.map((message, index) => ({
+        type: "message",
+        id: message.toolCallId,
+        parentId:
+          index === 0
+            ? "parallel-carrier"
+            : largeResults[index - 1].toolCallId,
+        timestamp: `2026-07-29T00:00:0${index + 2}Z`,
+        message,
+      })),
+    ];
+
+    const entries = (runtime as any).entriesWithCompaction();
+    const budget = (runtime as any).contextBudget(
+      entries.map((entry: any) => entry.message),
+    );
+    const preparation = (runtime as any).prepareCompactionInput(entries, budget);
+    const retainedTail = preparation.value.retainedTail;
+
+    expect(budget.tokens).toBeGreaterThan(budget.hardLimit);
+    expect(preparation.ok).toBe(true);
+    expect(preparation.value.firstKeptEntryId).toBe("parallel-carrier");
+    expect(retainedTail.map((message: any) => message.role)).toEqual([
+      "assistant",
+      "toolResult",
+      "toolResult",
+      "toolResult",
+      "toolResult",
+    ]);
+    expect(
+      retainedTail.reduce(
+        (sum: number, message: any) => sum + estimateTokens(message),
+        0,
+      ),
+    ).toBeLessThan(Math.floor(budget.hardLimit * 0.5));
+    expect(
+      retainedTail.filter((message: any) => message.role === "toolResult"),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          toolCallId: "parallel-tool-3",
+          details: undefined,
+          content: [
+            expect.objectContaining({
+              text: expect.stringContaining("[checkpoint truncated:"),
+            }),
+          ],
+        }),
+      ]),
+    );
+    expect(
+      (runtime as any).fullEntries.at(-1).message.content[0].text,
+    ).toHaveLength(155_573);
+    expect((runtime as any).fullEntries.at(-1).message.details).toEqual({
+      duplicatedDiagnostic: "x".repeat(155_573),
+    });
     await runtime.dispose();
   });
 

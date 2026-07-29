@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-28
+- Last amended: 2026-07-29
 
 ## Context
 
@@ -51,9 +52,13 @@ implements the desktop-specific controller.
   another provider request with `CONTEXT_COMPACTION_FAILED`.
 - A final tool-result batch is kept with its assistant tool-call carrier. If
   that atomic batch exceeds the normal retained-tail target, the runtime lets
-  pi move the cut point to the carrier while keeping the effective tail bounded
-  to half the hard budget. A still-larger indivisible batch is blocked rather
-  than sent above the provider limit.
+  pi move the cut point to the carrier. If the batch itself reaches half the
+  hard budget, PI-Desktop creates a checkpoint-only bounded copy: each result
+  keeps its tool identity/error envelope and a fair share of head/tail text
+  with an explicit checkpoint-truncation marker, while duplicate diagnostic
+  details are omitted. The original durable messages and visible transcript
+  remain complete. The bounded copy is re-estimated before persistence and can
+  never authorize an oversized provider request.
 - An exact provider overflow is a final safety net. The failed assistant stays
   visible for diagnosis but is removed from model context; the runtime creates
   one checkpoint and retries the model request once. A second overflow is
@@ -78,6 +83,10 @@ implements the desktop-specific controller.
   the human-readable conversation.
 - Compaction itself is one extra provider request and can fail; its lifecycle
   is explicit, abortable, and surfaced through stable error codes.
+- A checkpoint may retain a shortened model-facing copy of an oversized atomic
+  tool-result batch. This is a loss of future model detail under pressure, but
+  it is explicit in context, preserves every call/result pair, and does not
+  alter the user-visible or diagnostic transcript.
 - Provider token accounting on retained assistant messages is cleared while
   reconstructing a checkpoint, because that usage described the pre-compacted
   request and would otherwise overcount the restored context.

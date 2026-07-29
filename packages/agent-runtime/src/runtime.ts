@@ -119,6 +119,9 @@ const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_TOKENS = 8_192;
 const CONTEXT_COMPACTION_TOOL_NAME = "CompactContext";
 const CONTEXT_NUDGE_TURN_INTERVAL = 3;
+const CHECKPOINT_TAIL_SAFETY_TOKENS = 256;
+const CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER =
+  "\n\n[checkpoint truncated: tool result exceeded the retained context budget]\n\n";
 const CONTEXT_COMPACTION_NUDGE = [
   "<context_management>",
   "The working context is approaching its safe limit.",
@@ -290,6 +293,80 @@ function safeJson(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function fairToolResultTokenBudgets(
+  tokenCounts: number[],
+  totalBudget: number,
+): number[] {
+  if (tokenCounts.length === 0) return [];
+  if (tokenCounts.reduce((sum, value) => sum + value, 0) <= totalBudget) {
+    return tokenCounts;
+  }
+
+  const budgets = tokenCounts.map(() => 0);
+  let remainingBudget = Math.max(tokenCounts.length, totalBudget);
+  let pending = tokenCounts.map((_, index) => index);
+  while (pending.length > 0) {
+    const share = Math.floor(remainingBudget / pending.length);
+    const complete = pending.filter((index) => tokenCounts[index] <= share);
+    if (complete.length === 0) {
+      const remainder = remainingBudget - share * pending.length;
+      pending.forEach((index, position) => {
+        budgets[index] = share + (position < remainder ? 1 : 0);
+      });
+      break;
+    }
+    for (const index of complete) {
+      budgets[index] = tokenCounts[index];
+      remainingBudget -= tokenCounts[index];
+    }
+    const completed = new Set(complete);
+    pending = pending.filter((index) => !completed.has(index));
+  }
+  return budgets;
+}
+
+function toolResultTextForCheckpoint(message: ToolResultMessage): string {
+  return message.content
+    .map((block) =>
+      block.type === "text"
+        ? block.text
+        : `[${block.type} tool result block omitted from checkpoint]`,
+    )
+    .join("\n");
+}
+
+function truncateTextForCheckpoint(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  if (maxChars <= CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER.length) {
+    return CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER.trim().slice(0, maxChars);
+  }
+  const retainedChars = maxChars - CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER.length;
+  const headChars = Math.ceil(retainedChars * 0.75);
+  const tailChars = retainedChars - headChars;
+  return `${text.slice(0, headChars)}${CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER}${
+    tailChars > 0 ? text.slice(-tailChars) : ""
+  }`;
+}
+
+function truncateToolResultForCheckpoint(
+  message: ToolResultMessage,
+  tokenBudget: number,
+): ToolResultMessage {
+  const text = toolResultTextForCheckpoint(message);
+  return {
+    ...message,
+    content: [
+      {
+        type: "text",
+        text: truncateTextForCheckpoint(text, Math.max(1, tokenBudget) * 4),
+      },
+    ],
+    // Host details often duplicate the content and are not provider-facing.
+    // The original durable message still owns the complete diagnostic value.
+    details: undefined,
+  };
 }
 
 /** Rebuild a pi-ai tool result from a persisted tool row. Rows that never
@@ -903,25 +980,74 @@ export class DesktopAgentRuntime {
   ) {
     const maxRetainedTailTokens = Math.max(1, Math.floor(budget.hardLimit * 0.5));
     let keepRecentTokens = budget.keepRecentTokens;
+    let compactionEntries = entries;
+    const trailingToolResultIndexes: number[] = [];
     let trailingToolResultTokens = 0;
     for (let index = entries.length - 1; index >= 0; index -= 1) {
       const entry = entries[index];
       if (entry.type !== "message" || entry.message.role !== "toolResult") break;
+      trailingToolResultIndexes.unshift(index);
       trailingToolResultTokens += estimateTokens(entry.message);
     }
-    // pi's cut-point search cannot split a tool call/result pair. If the final
-    // result batch alone crosses keepRecentTokens, let the scan reach its
-    // assistant carrier instead of falling back to the oldest entry.
+    const carrierIndex =
+      trailingToolResultIndexes.length > 0 ? trailingToolResultIndexes[0] - 1 : -1;
+    const carrier = entries[carrierIndex];
+    const carrierTokens =
+      carrier?.type === "message" && carrier.message.role === "assistant"
+        ? estimateTokens(carrier.message)
+        : 0;
+    const trailingAtomicBatchTokens = trailingToolResultTokens + carrierTokens;
+
     if (
-      trailingToolResultTokens >= keepRecentTokens &&
-      trailingToolResultTokens < maxRetainedTailTokens
+      trailingToolResultIndexes.length > 0 &&
+      trailingAtomicBatchTokens >= maxRetainedTailTokens
     ) {
+      const toolResultBudget = Math.max(
+        trailingToolResultIndexes.length,
+        maxRetainedTailTokens - carrierTokens - CHECKPOINT_TAIL_SAFETY_TOKENS,
+      );
+      const originalTokenCounts = trailingToolResultIndexes.map((index) => {
+        const entry = entries[index] as MessageEntry;
+        return estimateTokens(entry.message);
+      });
+      const resultBudgets = fairToolResultTokenBudgets(
+        originalTokenCounts,
+        toolResultBudget,
+      );
+      compactionEntries = [...entries];
+      trailingToolResultIndexes.forEach((index, resultIndex) => {
+        const entry = entries[index] as MessageEntry;
+        if (resultBudgets[resultIndex] >= originalTokenCounts[resultIndex]) {
+          return;
+        }
+        compactionEntries[index] = {
+          ...entry,
+          message: truncateToolResultForCheckpoint(
+            entry.message as ToolResultMessage,
+            resultBudgets[resultIndex],
+          ),
+        };
+      });
+      trailingToolResultTokens = trailingToolResultIndexes.reduce(
+        (sum, index) => {
+          const entry = compactionEntries[index] as MessageEntry;
+          return sum + estimateTokens(entry.message);
+        },
+        0,
+      );
+    }
+    // pi's cut-point search cannot split a tool call/result pair. If the final
+    // result batch crosses keepRecentTokens, let the scan reach its assistant
+    // carrier instead of falling back to the oldest entry. An oversized batch
+    // is truncated only in the checkpoint copy above; visible history remains
+    // complete and every provider-valid tool call/result pair is retained.
+    if (trailingToolResultTokens >= keepRecentTokens) {
       keepRecentTokens = Math.min(
         maxRetainedTailTokens,
         trailingToolResultTokens + 1,
       );
     }
-    return prepareCompaction(entries, {
+    return prepareCompaction(compactionEntries, {
       ...this.compactionSettings,
       reserveTokens: budget.requestHeadroom,
       keepRecentTokens,

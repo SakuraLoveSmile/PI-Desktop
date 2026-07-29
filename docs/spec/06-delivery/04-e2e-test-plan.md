@@ -1947,11 +1947,13 @@ Each scenario is documented in this format:
      composer/session controls and processing rows.
   3. Continue until the hard boundary forces a checkpoint, then allow the task
      to finish.
-  4. Restart the app, reopen the session, and send a follow-up that depends on
+  4. Repeat the hard-boundary turn with multiple parallel capped tool results
+     whose aggregate carrier/result batch exceeds half the hard budget.
+  5. Restart the app, reopen the session, and send a follow-up that depends on
      both summarized old work and the retained recent tail.
-  5. Repeat with a provider fixture that returns Bedrock's
+  6. Repeat with a provider fixture that returns Bedrock's
      `prompt is too long: N tokens > M maximum` once.
-  6. Disable automatic compaction and invoke `/compact` manually while idle.
+  7. Disable automatic compaction and invoke `/compact` manually while idle.
 - **Expected**:
   - Each `turn_end` is evaluated before another provider request and never
     marks the overall task idle; composer/config controls remain blocked until
@@ -1963,6 +1965,11 @@ Each scenario is documented in this format:
     request. The complete visible transcript is unchanged, and the continued
     task stays below the model-aware safe budget, including when the last
     retained tool result is larger than the configured recent-tail target.
+  - An aggregate oversized parallel result batch keeps every assistant
+    tool-call/result pair in the checkpoint, fairly bounds result text with the
+    checkpoint-truncation marker, and continues without
+    `CONTEXT_COMPACTION_FAILED`; expanding the original transcript rows still
+    shows their complete persisted results.
   - Restart restores summary + retained tail. A regenerate/fork before the
     checkpoint boundary drops it; a later boundary preserves/remaps it.
   - The exact provider overflow removes only the failed assistant from model
