@@ -599,7 +599,7 @@ function ThinkingRow({
       {open ? (
         <div className="tool-row-body" id={detailsId}>
           <div className="prose-chat thinking-prose">
-            <Markdown source={text} />
+            <Markdown source={text} renderDiagrams={false} />
           </div>
         </div>
       ) : null}

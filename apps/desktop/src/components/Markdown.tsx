@@ -1,15 +1,19 @@
 import {
+  createContext,
   Fragment,
   isValidElement,
   memo,
   useCallback,
+  useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
   type CSSProperties,
   type ComponentProps,
+  type RefObject,
   type ReactNode,
 } from "react";
 import ReactMarkdown, { type Components, type Options } from "react-markdown";
@@ -22,9 +26,22 @@ import { lexer } from "marked";
 import { useTranslation } from "react-i18next";
 import type { ThemedToken } from "shiki";
 import "katex/dist/katex.min.css";
-import { IconCheck, IconCopy, IconImage } from "./icons";
+import {
+  IconCheck,
+  IconCircleAlert,
+  IconCode,
+  IconCopy,
+  IconImage,
+  IconWorkflow,
+} from "./icons";
 import { useAppStore } from "../stores/app-store";
 import { resolvePreviewTarget, toWorkspaceRel } from "../lib/chat-links";
+import {
+  isClosedFencedCodeBlock,
+  MAX_MERMAID_SOURCE_LENGTH,
+  MermaidSourceTooLargeError,
+  renderMermaidSvg,
+} from "../lib/mermaid";
 import {
   ensureLang,
   getHighlightVersion,
@@ -172,7 +189,173 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
   );
 }
 
+function useNearViewport(ref: RefObject<HTMLDivElement | null>): boolean {
+  const [nearViewport, setNearViewport] = useState(false);
+  useEffect(() => {
+    if (nearViewport) return;
+    const element = ref.current;
+    if (!element || typeof IntersectionObserver === "undefined") {
+      setNearViewport(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setNearViewport(true);
+        observer.disconnect();
+      },
+      { rootMargin: "240px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [nearViewport, ref]);
+  return nearViewport;
+}
+
+function MermaidBlock({ code }: { code: string }) {
+  const { t } = useTranslation();
+  const theme = useThemeMode();
+  const reactId = useId();
+  const renderId = useMemo(
+    () => `mermaid-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`,
+    [reactId],
+  );
+  const rootRef = useRef<HTMLDivElement>(null);
+  const nearViewport = useNearViewport(rootRef);
+  const renderedSourceRef = useRef("");
+  const [svg, setSvg] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<"invalid" | "too-large" | null>(null);
+  const [showSource, setShowSource] = useState(false);
+  const { copied, copy } = useCopy();
+
+  useEffect(() => {
+    setShowSource(false);
+  }, [code]);
+
+  useEffect(() => {
+    if (!nearViewport) return;
+    if (code.length > MAX_MERMAID_SOURCE_LENGTH) {
+      setSvg("");
+      setLoading(false);
+      setError("too-large");
+      return;
+    }
+
+    let active = true;
+    if (renderedSourceRef.current !== code) setSvg("");
+    setLoading(true);
+    setError(null);
+    void renderMermaidSvg({ id: renderId, source: code, theme })
+      .then((nextSvg) => {
+        if (!active) return;
+        renderedSourceRef.current = code;
+        setSvg(nextSvg);
+        setLoading(false);
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setSvg("");
+        setLoading(false);
+        setError(
+          cause instanceof MermaidSourceTooLargeError ? "too-large" : "invalid",
+        );
+      });
+    return () => {
+      active = false;
+    };
+  }, [code, nearViewport, renderId, theme]);
+
+  const sourceVisible = showSource || error !== null;
+  const statusLabel =
+    error === "too-large"
+      ? t("chat.diagramTooLarge")
+      : t("chat.diagramUnavailable");
+
+  return (
+    <div
+      ref={rootRef}
+      className={`mermaid-block${error ? " error" : ""}`}
+      aria-busy={loading}
+    >
+      <div className="mermaid-block-head">
+        <span className="mermaid-block-title">
+          <IconWorkflow size={13} aria-hidden />
+          <span>mermaid</span>
+        </span>
+        <div className="mermaid-block-actions">
+          {svg && !error ? (
+            <button
+              type="button"
+              className={`mermaid-action-btn${showSource ? " active" : ""}`}
+              aria-label={
+                showSource ? t("chat.showDiagram") : t("chat.showDiagramSource")
+              }
+              title={
+                showSource ? t("chat.showDiagram") : t("chat.showDiagramSource")
+              }
+              aria-pressed={showSource}
+              onClick={() => setShowSource((value) => !value)}
+            >
+              {showSource ? (
+                <IconWorkflow size={13} />
+              ) : (
+                <IconCode size={13} />
+              )}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className={`mermaid-action-btn${copied ? " copied" : ""}`}
+            aria-label={t("chat.copyDiagramSource")}
+            title={copied ? t("chat.copied") : t("chat.copyDiagramSource")}
+            onClick={() => copy(code)}
+          >
+            {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
+          </button>
+        </div>
+      </div>
+      <div className="mermaid-block-body">
+        {error ? (
+          <div className="mermaid-block-error" role="status">
+            <IconCircleAlert size={14} aria-hidden />
+            <span>{statusLabel}</span>
+          </div>
+        ) : null}
+        {sourceVisible ? (
+          <pre className="mermaid-source">
+            <code>{code}</code>
+          </pre>
+        ) : svg ? (
+          <div
+            className={`mermaid-svg${loading ? " refreshing" : ""}`}
+            role="img"
+            aria-label={t("chat.mermaidDiagram")}
+            // Mermaid strict mode output is sanitized again in renderMermaidSvg.
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        ) : (
+          <div
+            className="mermaid-loading"
+            role="status"
+            aria-label={t("chat.diagramRendering")}
+          >
+            <span aria-hidden />
+            <span aria-hidden />
+            <span aria-hidden />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- react-markdown component overrides ---------- */
+
+const MarkdownBlockContext = createContext({
+  closedFence: false,
+  renderDiagrams: true,
+});
 
 function extractCode(children: ReactNode): { code: string; lang: string } | null {
   const element = Array.isArray(children)
@@ -198,8 +381,16 @@ function PreBlock({
   children,
   ...rest
 }: ComponentProps<"pre"> & { node?: unknown }) {
+  const { closedFence, renderDiagrams } = useContext(MarkdownBlockContext);
   const info = extractCode(children);
   if (!info) return <pre {...rest}>{children}</pre>;
+  if (
+    renderDiagrams &&
+    closedFence &&
+    info.lang.toLowerCase() === "mermaid"
+  ) {
+    return <MermaidBlock code={info.code} />;
+  }
   return <CodeBlock code={info.code} lang={info.lang} />;
 }
 
@@ -384,7 +575,7 @@ const markdownComponents: Components = {
 
 const remarkPlugins = [remarkGfm, remarkMath];
 
-// 自定义 sanitize schema：只允许安全的媒体标签
+// Extend the default schema only for the media elements rendered above.
 const sanitizeSchema = {
   ...defaultSchema,
   attributes: {
@@ -449,24 +640,45 @@ function useBlocks(source: string): string[] {
   }, [source]);
 }
 
-const Block = memo(function MarkdownBlock({ raw }: { raw: string }) {
+const Block = memo(function MarkdownBlock({
+  raw,
+  renderDiagrams,
+}: {
+  raw: string;
+  renderDiagrams: boolean;
+}) {
+  const context = useMemo(
+    () => ({
+      closedFence: isClosedFencedCodeBlock(raw),
+      renderDiagrams,
+    }),
+    [raw, renderDiagrams],
+  );
   return (
-    <ReactMarkdown
-      remarkPlugins={remarkPlugins}
-      rehypePlugins={rehypePlugins}
-      components={markdownComponents}
-    >
-      {raw}
-    </ReactMarkdown>
+    <MarkdownBlockContext.Provider value={context}>
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={markdownComponents}
+      >
+        {raw}
+      </ReactMarkdown>
+    </MarkdownBlockContext.Provider>
   );
 });
 
-export const Markdown = memo(function Markdown({ source }: { source: string }) {
+export const Markdown = memo(function Markdown({
+  source,
+  renderDiagrams = true,
+}: {
+  source: string;
+  renderDiagrams?: boolean;
+}) {
   const blocks = useBlocks(source);
   return (
     <>
       {blocks.map((raw, i) => (
-        <Block key={i} raw={raw} />
+        <Block key={i} raw={raw} renderDiagrams={renderDiagrams} />
       ))}
     </>
   );
