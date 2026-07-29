@@ -54,9 +54,10 @@ test("work panel replaces the context panel overlay", async () => {
 test("work panel reserves native window space before it is presented", () => {
   assert.match(appSource, /presentedWorkPanelOpen/);
   assert.match(appSource, /setPresentedWorkPanelOpen/);
+  assert.match(appSource, /workPanelExiting/);
   assert.match(
     appSource,
-    /requestedWidth\s*=\s*[^;]*workPanelWidth[^;]*:\s*0/,
+    /requestedWidth\s*=\s*Math\.round\(workPanelWidth\)/,
   );
   assert.match(appSource, /setWorkPanelReservation\(requestedWidth\)/);
   assert.ok(
@@ -66,19 +67,30 @@ test("work panel reserves native window space before it is presented", () => {
   );
   assert.match(appSource, /commitWorkPanelPresentation/);
   assert.doesNotMatch(appSource, /\.finally\(\(\) => \{[\s\S]*setPresentedWorkPanelOpen/);
+  // Mount follows presentation commit; exit keep-alive plays work-panel-out
+  // before releasing the native reservation and unmounting.
   assert.match(
     appSource,
-    /<\/section>\s*\{presentedWorkPanelOpen && \(?\s*<WorkPanel/,
+    /<\/section>\s*\{\(presentedWorkPanelOpen \|\| workPanelExiting\) && \(?\s*<WorkPanel/,
   );
   assert.doesNotMatch(
     appSource,
     /<\/section>\s*\{workPanelOpen && \(?\s*<WorkPanel/,
   );
+  assert.match(appSource, /finishWorkPanelExit/);
+  assert.match(appSource, /setWorkPanelReservation\(0\)/);
+  assert.match(appSource, /onExitAnimationEnd=\{\(\) =>/);
+  assert.match(appSource, /finishWorkPanelExit\(workPanelExitGeneration\.current\)/);
   // The panel remains a fixed-width shell sibling after the native window grows.
   assert.match(globalStyles, /\.work-panel \{[^}]*flex: 0 0 auto/s);
   assert.doesNotMatch(
     globalStyles.match(/\.work-panel \{[^}]*\}/s)?.[0] ?? "",
     /position:\s*absolute/,
+  );
+  assert.match(globalStyles, /@keyframes work-panel-out/);
+  assert.match(
+    globalStyles,
+    /@keyframes work-panel-in \{[^}]*translateX\(8px\)/s,
   );
 });
 
