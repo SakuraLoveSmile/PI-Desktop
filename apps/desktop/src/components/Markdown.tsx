@@ -12,7 +12,7 @@ import {
   type ComponentProps,
   type ReactNode,
 } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown, { type Components, type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -402,7 +402,7 @@ const sanitizeSchema = {
   ],
 };
 
-const rehypePlugins = [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex];
+const rehypePlugins = [rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex] as Options["rehypePlugins"];
 
 /* ---------- block splitting ---------- */
 
