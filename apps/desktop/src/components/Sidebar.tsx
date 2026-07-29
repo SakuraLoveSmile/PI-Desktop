@@ -889,6 +889,7 @@ export function Sidebar({
           );
         }}
       >
+        {status ? renderSessionStatus(status) : null}
         <button
           type="button"
           className="thread-item-main"
@@ -904,7 +905,6 @@ export function Sidebar({
           title={taskTitle(session.title)}
           aria-current={active ? "page" : undefined}
         >
-          {status ? renderSessionStatus(status) : null}
           {sessionPinned(session, meta) ? (
             <IconPin size={11} className="thread-item-pin" aria-hidden />
           ) : null}
