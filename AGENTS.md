@@ -87,6 +87,9 @@ Run the [change checklist](docs/spec/06-delivery/05-change-checklist.md):
 - [ ] Necessary local validation completed, or confirmed unnecessary
 - [ ] No secrets / local data in diff
 - [ ] Conventional commit message
+- [ ] If cutting a **stable app version tag**: dual-locale entries for that
+      version exist in `packages/shared/src/changelog.ts` (EN + zh-CN) **before**
+      the tag — see [release runbook §4.1](docs/spec/06-delivery/06-release-runbook.md#41-mandatory-in-app-changelog-gate-d164)
 - [ ] All Definition-of-Done gates pass
 - [ ] PR/MR passed required remote checks and was merged into `main`
 
@@ -100,6 +103,7 @@ Run the [change checklist](docs/spec/06-delivery/05-change-checklist.md):
 | AI dev workflow | `docs/spec/06-delivery/03-ai-development-workflow.md` |
 | E2E test plan | `docs/spec/06-delivery/04-e2e-test-plan.md` |
 | Change checklist | `docs/spec/06-delivery/05-change-checklist.md` |
+| Release runbook | `docs/spec/06-delivery/06-release-runbook.md` |
 | ADR index | `docs/adr/README.md` |
 | Project board | `docs/project/BOARD.md` |
 
@@ -111,6 +115,8 @@ Run the [change checklist](docs/spec/06-delivery/05-change-checklist.md):
 - Skip e2e doc for user-visible changes
 - Manually run or dispatch E2E without an explicit user request
 - Modify frozen baseline decisions without ADR + version bump
+- Tag a stable app release without updating `packages/shared/src/changelog.ts`
+  (EN + zh-CN) for that version
 - Develop or push directly on `main`
 - Develop a new request in the primary checkout or another request's worktree
 - Mark work complete before its PR/MR is merged into `main`
