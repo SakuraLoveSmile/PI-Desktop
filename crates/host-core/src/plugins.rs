@@ -1792,6 +1792,11 @@ mod tests {
         with_local_market(|| {
         let dir = tempdir().unwrap();
         unsafe { std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path()); }
+        // Clean up any existing packages to ensure fresh generation
+        let packages_dir = dir.path().join("plugins/market/packages");
+        if packages_dir.exists() {
+            let _ = fs::remove_dir_all(&packages_dir);
+        }
         let mut mgr = PluginManager::new(dir.path());
         let installed = mgr
             .install_from_market("demo.workspace-notes", None, true, false, None)
