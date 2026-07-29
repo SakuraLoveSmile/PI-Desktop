@@ -163,7 +163,12 @@ function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [presentedWorkPanelOpen, setPresentedWorkPanelOpen] = useState(false);
+  const [workPanelExiting, setWorkPanelExiting] = useState(false);
   const workPanelReservationRequest = useRef(0);
+  const workPanelExitGeneration = useRef(0);
+  const workPanelExitClosing = useRef(false);
+  const presentedWorkPanelRef = useRef(false);
+  const workPanelExitingRef = useRef(false);
   const [backendDown, setBackendDown] = useState<
     { fatal: boolean; component?: string } | null
   >(null);
@@ -175,16 +180,83 @@ function AppShell() {
   );
 
   useEffect(() => {
+    presentedWorkPanelRef.current = presentedWorkPanelOpen;
+  }, [presentedWorkPanelOpen]);
+
+  useEffect(() => {
+    workPanelExitingRef.current = workPanelExiting;
+  }, [workPanelExiting]);
+
+  const finishWorkPanelExit = useCallback((generation: number) => {
+    if (generation !== workPanelExitGeneration.current) return;
+    if (workPanelExitClosing.current) return;
+    if (!workPanelExitingRef.current) return;
+    workPanelExitClosing.current = true;
+    const request = ++workPanelReservationRequest.current;
+    void commitWorkPanelPresentation({
+      reservation: api.setWorkPanelReservation(0),
+      isCurrent: () =>
+        request === workPanelReservationRequest.current &&
+        generation === workPanelExitGeneration.current,
+      commit: () => {
+        setPresentedWorkPanelOpen(false);
+        setWorkPanelExiting(false);
+        workPanelExitingRef.current = false;
+        workPanelExitClosing.current = false;
+      },
+    }).then((committed) => {
+      // Reservation failed or was superseded — allow a later exit retry.
+      if (!committed) workPanelExitClosing.current = false;
+    });
+  }, []);
+
+  useEffect(() => {
     const shouldPresent = ready && page !== "settings" && workPanelOpen;
-    const requestedWidth = shouldPresent ? Math.round(workPanelWidth) : 0;
     const request = ++workPanelReservationRequest.current;
 
+    if (shouldPresent) {
+      // Cancel any in-flight exit and reserve native width before mount.
+      workPanelExitGeneration.current += 1;
+      workPanelExitClosing.current = false;
+      workPanelExitingRef.current = false;
+      setWorkPanelExiting(false);
+      const requestedWidth = Math.round(workPanelWidth);
+      void commitWorkPanelPresentation({
+        reservation: api.setWorkPanelReservation(requestedWidth),
+        isCurrent: () => request === workPanelReservationRequest.current,
+        commit: () => setPresentedWorkPanelOpen(shouldPresent),
+      });
+      return;
+    }
+
+    // Close: keep the dock mounted through work-panel-out, then release the
+    // native reservation. Instant path when the shell was never presented.
+    if (presentedWorkPanelRef.current || workPanelExitingRef.current) {
+      if (presentedWorkPanelRef.current && !workPanelExitingRef.current) {
+        workPanelExitGeneration.current += 1;
+        workPanelExitingRef.current = true;
+        setWorkPanelExiting(true);
+      }
+      return;
+    }
+
+    const requestedWidth = 0;
     void commitWorkPanelPresentation({
       reservation: api.setWorkPanelReservation(requestedWidth),
       isCurrent: () => request === workPanelReservationRequest.current,
       commit: () => setPresentedWorkPanelOpen(shouldPresent),
     });
   }, [page, ready, workPanelOpen, workPanelWidth]);
+
+  // Fallback if animationend is skipped (display:none mid-flight, etc.).
+  useEffect(() => {
+    if (!workPanelExiting) return;
+    const generation = workPanelExitGeneration.current;
+    const timer = window.setTimeout(() => {
+      finishWorkPanelExit(generation);
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [workPanelExiting, finishWorkPanelExit]);
 
   const runMenuCommand = useCallback(
     async (command: AppMenuCommand) => {
@@ -852,9 +924,13 @@ function AppShell() {
             </Suspense>
           </section>
 
-          {presentedWorkPanelOpen && (
+          {(presentedWorkPanelOpen || workPanelExiting) && (
             <WorkPanel
               browserBlocked={paletteOpen || searchOpen}
+              exiting={workPanelExiting}
+              onExitAnimationEnd={() =>
+                finishWorkPanelExit(workPanelExitGeneration.current)
+              }
               onCollapse={() => useAppStore.getState().collapseWorkPanel()}
             />
           )}

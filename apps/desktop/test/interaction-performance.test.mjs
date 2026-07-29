@@ -89,11 +89,17 @@ test("minimap separates resize checks from message-position measurement", () => 
 test("motion feedback is composited, bounded, and accessible", () => {
   assert.match(styles, /@keyframes route-surface-in/);
   assert.match(styles, /@keyframes work-panel-in/);
+  assert.match(styles, /@keyframes work-panel-out/);
+  assert.match(styles, /translateX\(8px\)/);
   assert.match(styles, /\.composer-shell:focus-within/);
   assert.doesNotMatch(styles, /backdrop-filter:\s*blur/);
   assert.match(styles, /\.chat-error-notice > span[\s\S]*?overflow-wrap:\s*anywhere/);
   assert.match(
     styles,
     /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.route-surface,[\s\S]*?animation-duration:\s*0\.01ms !important/,
+  );
+  assert.match(
+    styles,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.work-panel\.is-exiting[\s\S]*?animation-duration:\s*0\.01ms !important/,
   );
 });

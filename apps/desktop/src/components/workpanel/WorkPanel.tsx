@@ -62,7 +62,18 @@ function tabLabel(tab: WorkPanelTab, t: (key: string) => string) {
   return path.split("/").filter(Boolean).pop() || path;
 }
 
-export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlocked?: boolean; onCollapse?: () => void }) {
+export function WorkPanel({
+  browserBlocked = false,
+  onCollapse,
+  exiting = false,
+  onExitAnimationEnd,
+}: {
+  browserBlocked?: boolean;
+  onCollapse?: () => void;
+  /** Plays work-panel-out; parent unmounts after animationend. */
+  exiting?: boolean;
+  onExitAnimationEnd?: () => void;
+}) {
   const { t } = useTranslation();
   const tabs = useAppStore((s) => s.workPanelTabs);
   const activeTabId = useAppStore((s) => s.activeWorkPanelTabId);
@@ -245,10 +256,17 @@ export function WorkPanel({ browserBlocked = false, onCollapse }: { browserBlock
 
   return (
     <aside
-      className="work-panel"
+      className={cx("work-panel", exiting && "is-exiting")}
       style={{ width: renderWidth }}
       data-testid="work-panel"
       data-resizing={dragWidth === null ? undefined : "true"}
+      data-exiting={exiting ? "true" : undefined}
+      onAnimationEnd={(event) => {
+        if (!exiting) return;
+        // Bubbled tab/chrome animations must not finish the shell exit.
+        if (event.target !== event.currentTarget) return;
+        onExitAnimationEnd?.();
+      }}
     >
       <div
         className="work-panel-resize no-drag"

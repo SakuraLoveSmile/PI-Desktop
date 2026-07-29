@@ -6622,16 +6622,36 @@ html {
   min-height: 0;
   background: var(--ds-bg-primary);
   border-left: 1px solid var(--ds-border-subtle);
+  /* Compositor-friendly dock: opacity + ≤8px slide (design-system §8.7). */
   animation: work-panel-in var(--motion-duration-normal) var(--motion-ease-out)
     both;
+}
+
+.work-panel.is-exiting {
+  animation: work-panel-out var(--motion-duration-fast) var(--motion-ease-in)
+    both;
+  pointer-events: none;
 }
 
 @keyframes work-panel-in {
   from {
     opacity: 0;
+    transform: translateX(8px);
   }
   to {
     opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes work-panel-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(8px);
   }
 }
 
@@ -8535,7 +8555,9 @@ html {
   .settings-shell-full,
   .jump-latest-btn,
   .chat-error-notice,
-  .work-panel {
+  .work-panel,
+  .work-panel.is-exiting {
+    /* Near-zero (not none): exit unmount listens for animationend. */
     animation-duration: 0.01ms !important;
   }
 
