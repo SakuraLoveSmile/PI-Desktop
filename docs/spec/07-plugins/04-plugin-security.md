@@ -111,3 +111,14 @@ Current enforcement:
 4. Secrets / host DB remain inaccessible to plugins
 5. Marketplace/package install requires explicit permission acceptance in UI
 6. Auto-update refuses silent permission expansion
+7. Plugin main runs in a dedicated `utilityProcess` per plugin (ADR 0008) with a
+   minimal environment; all `pi.*` calls cross an allowlist + permission gateway
+   in the host, and a plugin crash only tears down that plugin
+
+Not enforced yet:
+
+- Capability sandboxing inside the plugin process (Node built-ins are reachable
+  there, so `fs.*` permissions gate the plugin API, not the process)
+- CPU / memory limits
+- Signature verification (packages are only sha256-checked)
+- Declared manifest permissions are auto-granted at load time

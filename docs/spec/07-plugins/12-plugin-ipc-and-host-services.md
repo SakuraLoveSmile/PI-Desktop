@@ -101,6 +101,14 @@ plugin runtime
 - runtime crash: mark load_error, clean up contributions
 - panel crash: only close the panel, do not unload the plugin (can prompt to reload)
 
+**Implemented (2026-07-29, ADR 0008):** the broker lives in
+`electron/main/plugin-runtime.ts` and every plugin call is a request to the
+plugin's own `utilityProcess`. Budgets: load 15s, lifecycle hook 5s, command 30s,
+tool 110s (under host-core's 120s tool budget). On process exit the broker
+rejects pending calls with `PLUGIN_CRASHED`, deregisters that plugin's commands
+and tools, closes its panel, writes a `plugin.crash` audit entry, and emits a
+toast plus `pluginChanged` to the renderer.
+
 ## 9. Acceptance
 
 1. The plugin list IPC works

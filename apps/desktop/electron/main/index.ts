@@ -165,6 +165,19 @@ const plugins = new PluginRuntime({
   audit: (entry) => {
     logger.app("info", "plugin.api", entry);
   },
+  // A plugin host process dying is contained: contributions are already
+  // deregistered by the runtime, we only have to tell the user and the UI.
+  onPluginCrash: ({ pluginId, name, exitCode }) => {
+    logger.app("error", "plugin host process crashed", {
+      pluginId,
+      code: "PLUGIN_CRASHED",
+      data: { exitCode },
+    });
+    sendToRenderer(IPC.event.toast, {
+      message: `Plugin stopped unexpectedly: ${name}`,
+    });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "crash", pluginId });
+  },
 });
 const ptys = new PtyManager({
   onData: (termId, data) =>
