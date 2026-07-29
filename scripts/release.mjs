@@ -6,6 +6,12 @@
  *   node scripts/release.mjs <version>          # bump files only
  *   node scripts/release.mjs <version> --tag    # bump + commit (only bumped files) + tag v<version>
  *
+ * BEFORE running this for a stable release: update the dual-locale in-app
+ * product changelog in packages/shared/src/changelog.ts (EN + zh-CN entries
+ * for <version>, matching highlight counts). Required by D164 and
+ * docs/spec/06-delivery/06-release-runbook.md section 4.1. GitHub auto-generated
+ * release bodies are web-only and are not a substitute.
+ *
  * Pushing the tag triggers .github/workflows/release.yml, which builds the
  * macOS / Windows / Linux installers and publishes them to a GitHub Release:
  *

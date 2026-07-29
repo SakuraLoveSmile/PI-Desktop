@@ -510,6 +510,16 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Release tagging requires updating both locale catalogs before the tag build.
 - Decision D164; extends D120 / ADR 0022.
 
+## 2026-07-29 — Release process: mandatory dual-locale changelog gate
+
+- Stable app version bumps / tags **must** update
+  `packages/shared/src/changelog.ts` (EN + zh-CN) before the tag; shipping
+  without catalog entries is a release process failure (D164).
+- Codified in the release runbook §4.1, AI development workflow matrix +
+  forbidden practices, change checklist, `AGENTS.md`, and `scripts/release.mjs`
+  header so agents and humans hit the same gate.
+- GitHub auto-generated release notes remain web-only.
+
 ## 2026-07-29 — Bounded atomic tool batches in context checkpoints
 
 - Automatic compaction now bounds an oversized final parallel tool-result

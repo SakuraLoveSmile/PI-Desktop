@@ -144,6 +144,7 @@ Which change types require which doc updates.
 | UX change | Related `04-ux/` spec | — | — | New UI scenario | — |
 | Spec-only update | The spec itself | — | — | — | — |
 | Chore (deps, tooling) | — | — | If tooling decision | — | — |
+| **App version release / stable tag** | `06-delivery/06-release-runbook.md` (mandatory dual-locale catalog in `packages/shared/src/changelog.ts` before tag) | — | If release policy changes | Confirm E2E-067B still accurate | If milestone ship |
 
 ---
 
@@ -273,6 +274,15 @@ A change is **Done** when all of the following are true:
 9. The branch was pushed and its PR/MR was reviewed and merged into `main`.
 10. The request worktree was removed and the merged request branch was deleted.
 
+### Release / version-tag gate
+
+When the change is a **stable app version release** (version bump + tag),
+Definition of Done also requires the dual-locale in-app changelog entry
+for that version in `packages/shared/src/changelog.ts` (EN + zh-CN,
+aligned highlight counts) **before** the tag, per
+[06-release-runbook.md §4.1](06-release-runbook.md#41-mandatory-in-app-changelog-gate-d164)
+and D164. GitHub release notes are not a substitute.
+
 ---
 
 ## 7. Forbidden Practices
@@ -292,6 +302,7 @@ A change is **Done** when all of the following are true:
 | Modifying baseline frozen decisions without ADR + version bump | Baseline is frozen; changes need formal process |
 | Committing generated artifacts that CI should rebuild | Repo bloat, merge conflicts |
 | Mixing multiple logical changes in one commit without clear message | Loss of history granularity |
+| Tagging a stable app release without updating `packages/shared/src/changelog.ts` (EN + zh-CN) | Violates D164 / release runbook; in-app What's new is empty for that version |
 
 ---
 
