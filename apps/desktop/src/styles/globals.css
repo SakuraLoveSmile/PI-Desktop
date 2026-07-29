@@ -1821,6 +1821,35 @@ html {
   padding-left: 9px;
 }
 
+.sidebar-time-group-header {
+  padding: 6px 6px 2px 20px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-load-more {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 4px 6px 4px 20px;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  text-align: left;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.sidebar-load-more:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-secondary);
+}
+
 .sidebar-session-group-body.standalone {
   max-height: 140px; /* Five compact session rows before internal scrolling. */
   min-height: 0;

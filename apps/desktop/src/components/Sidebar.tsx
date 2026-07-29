@@ -7,6 +7,27 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+
+// --- Time-based session grouping ---
+type TimeGroup = "today" | "yesterday" | "thisWeek" | "older14d" | "archived";
+
+function getTimeGroup(dateStr?: string): TimeGroup {
+  if (!dateStr) return "older14d";
+  const ts = Date.parse(dateStr);
+  if (!Number.isFinite(ts)) return "older14d";
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 86400000;
+  const startOfWeek = startOfToday - 6 * 86400000; // last 7 days
+  const startOf14d = startOfToday - 13 * 86400000;
+  if (ts >= startOfToday) return "today";
+  if (ts >= startOfYesterday) return "yesterday";
+  if (ts >= startOfWeek) return "thisWeek";
+  if (ts >= startOf14d) return "older14d";
+  return "archived"; // older than 14 days
+}
+
+const TIME_GROUP_ORDER: TimeGroup[] = ["today", "yesterday", "thisWeek", "older14d", "archived"];
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
@@ -205,6 +226,7 @@ export function Sidebar({
   const [sectionMenu, setSectionMenu] = useState<"sessions" | "projects" | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const [projectPathTooltip, setProjectPathTooltip] = useState<ProjectPathTooltip | null>(null);
+  const [visibleTimeGroups, setVisibleTimeGroups] = useState<Record<string, Set<TimeGroup>>>({});
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
   const sessionPrefetchTimerRef = useRef<number | undefined>(undefined);
@@ -698,6 +720,15 @@ export function Sidebar({
     closeMenus();
   };
 
+  const showTimeGroup = (projectKey: string, group: TimeGroup) => {
+    setVisibleTimeGroups((prev) => {
+      const current = prev[projectKey] || new Set<TimeGroup>();
+      const next = new Set(current);
+      next.add(group);
+      return { ...prev, [projectKey]: next };
+    });
+  };
+
   const toggleSessionPin = (session: SessionSummary) => {
     toggleSessionPinned(session.id);
     closeMenus();
@@ -950,6 +981,76 @@ export function Sidebar({
     const collapsedProject = entry.meta.collapsed ?? projectCollapsed[entry.key] ?? false;
     const projectId = projectDomId(entry.key);
     const isMenuOpen = projectMenu === entry.key;
+
+    // Group sessions by time
+    const groupedSessions = new Map<TimeGroup, SessionSummary[]>();
+    for (const session of entry.sessions) {
+      const group = getTimeGroup(session.updatedAt);
+      if (!groupedSessions.has(group)) groupedSessions.set(group, []);
+      groupedSessions.get(group)!.push(session);
+    }
+
+    const visibleGroups = visibleTimeGroups[entry.key] || new Set<TimeGroup>();
+    // By default show today, yesterday, thisWeek, older14d; hide archived
+    const defaultVisibleGroups = new Set<TimeGroup>(["today", "yesterday", "thisWeek", "older14d"]);
+    const allVisible = new Set([...defaultVisibleGroups, ...visibleGroups]);
+
+    // Count sessions in hidden groups
+    let hiddenCount = 0;
+    for (const [group, sessions] of groupedSessions) {
+      if (!allVisible.has(group)) hiddenCount += sessions.length;
+    }
+
+    // Find the next hidden group (the first one not in allVisible)
+    const nextHiddenGroup = TIME_GROUP_ORDER.find(
+      (g) => groupedSessions.has(g) && !allVisible.has(g)
+    );
+
+    const renderTimeGroupedSessions = () => {
+      const result: React.ReactNode[] = [];
+      for (const group of TIME_GROUP_ORDER) {
+        const sessions = groupedSessions.get(group);
+        if (!sessions || sessions.length === 0) continue;
+        if (!allVisible.has(group)) continue;
+
+        // For today, don't show header (as per requirement)
+        if (group !== "today") {
+          const i18nKey =
+            group === "yesterday" ? "nav.timeGroupYesterday" :
+            group === "thisWeek" ? "nav.timeGroupThisWeek" :
+            group === "older14d" ? "nav.timeGroupOlder14d" :
+            "nav.timeGroupArchived";
+          result.push(
+            <div key={`group-header-${group}`} className="sidebar-time-group-header">
+              {t(i18nKey)}
+            </div>
+          );
+        }
+        result.push(...renderSessionRows(sessions, { projectPath: entry.path }));
+      }
+      // Add "load more" button if there are hidden sessions
+      if (hiddenCount > 0 && nextHiddenGroup) {
+        result.push(
+          <button
+            key="load-more"
+            type="button"
+            className="sidebar-load-more"
+            onClick={() => {
+              // Show all hidden groups when clicking load more
+              for (const g of TIME_GROUP_ORDER) {
+                if (groupedSessions.has(g) && !allVisible.has(g)) {
+                  showTimeGroup(entry.key, g);
+                }
+              }
+            }}
+          >
+            {t("nav.loadMoreCount", { count: hiddenCount })}
+          </button>
+        );
+      }
+      return result;
+    };
+
     return (
       <section
         key={entry.key}
@@ -1042,7 +1143,7 @@ export function Sidebar({
           role="region"
           aria-hidden={collapsedProject}
         >
-          {entry.sessions.length > 0 ? renderSessionRows(entry.sessions, { projectPath: entry.path }) : (
+          {entry.sessions.length > 0 ? renderTimeGroupedSessions() : (
             <div className="sidebar-session-empty">{t("nav.noProjectSessions")}</div>
           )}
         </div>

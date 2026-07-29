@@ -120,6 +120,13 @@ export const zhCN = {
     createBranch: "从此处分支",
     branchTitle: "{{title}}（分支）",
     deleteTask: "删除",
+    timeGroupToday: "今天",
+    timeGroupYesterday: "昨天",
+    timeGroupThisWeek: "近 7 天",
+    timeGroupOlder14d: "近 14 天",
+    timeGroupArchived: "更早",
+    loadMore: "加载更多…",
+    loadMoreCount: "加载更多（{{count}} 条）…",
   },
   chat: {
     emptyTitle: "今天想做什么？",

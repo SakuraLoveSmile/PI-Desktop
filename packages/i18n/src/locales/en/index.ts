@@ -118,6 +118,13 @@ export const en = {
     createBranch: "Branch from here",
     branchTitle: "{{title}} (branch)",
     deleteTask: "Delete",
+    timeGroupToday: "Today",
+    timeGroupYesterday: "Yesterday",
+    timeGroupThisWeek: "Previous 7 days",
+    timeGroupOlder14d: "Previous 14 days",
+    timeGroupArchived: "Older",
+    loadMore: "Load more…",
+    loadMoreCount: "Load {{count}} more…",
   },
   chat: {
     emptyTitle: "What should we build?",
