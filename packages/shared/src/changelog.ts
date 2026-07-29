@@ -23,6 +23,15 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.2.8",
+    date: "2026-07-29",
+    highlights: [
+      "Update prompts and Settings now open complete localized release notes.",
+      "Work panel expansion and collapse animations feel smoother.",
+      "Long conversations compact oversized tool-result batches more reliably.",
+    ],
+  },
+  {
     version: "0.2.7",
     date: "2026-07-28",
     highlights: [
@@ -117,6 +126,15 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.2.8",
+    date: "2026-07-29",
+    highlights: [
+      "更新提示与设置页现可打开完整的本地化发布说明。",
+      "工作面板展开与收起动画更加顺滑。",
+      "长对话可更可靠地压缩超大工具结果批次。",
+    ],
+  },
   {
     version: "0.2.7",
     date: "2026-07-28",
