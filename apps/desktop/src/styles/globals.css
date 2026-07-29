@@ -1694,7 +1694,7 @@ html {
   min-width: 0;
   flex: 1;
   align-items: center;
-  padding: 5px 6px 5px 8px;
+  padding: 5px 6px 5px 20px;
   text-align: left;
   color: inherit;
 }
@@ -1720,7 +1720,10 @@ html {
 .sidebar-session-groups {
   display: flex;
   min-height: 0;
-  flex: 1 1 auto;
+  /* Basis 0, not auto: with a content-derived basis the scroller's resolved
+     height is re-solved from its own content, so collapsing the first project
+     nudges the whole list up a few pixels before it settles back. */
+  flex: 1 1 0;
   flex-direction: column;
   gap: 2px;
   overflow-x: hidden;
@@ -1781,6 +1784,8 @@ html {
   justify-content: center;
   border-radius: var(--radius-2xs);
   color: var(--ds-text-muted);
+  opacity: 0;
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out), background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .sidebar-session-group-add:hover {
@@ -6551,6 +6556,10 @@ html {
   align-items: center;
   justify-content: center;
   color: var(--ds-text-muted);
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .thread-item-status.running::before {
@@ -6656,9 +6665,8 @@ html {
 }
 
 .thread-item:hover .thread-item-more,
-.thread-item.active .thread-item-more,
+.thread-item.active .thread-item-more:hover,
 .thread-item-more[aria-expanded="true"],
-.project-group:hover .thread-item-more,
 .project-group .thread-item-more[aria-expanded="true"] {
   opacity: 1;
 }
