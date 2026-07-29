@@ -10,6 +10,8 @@ import { IconClose, IconCloudDown, IconExternal } from "./icons";
  * Ambient update notice in the main pane's top safe area. Appears when an
  * update is ready to install (in-app mode) or newly detected (manual mode);
  * silent otherwise. The Settings → Info tab owns explicit checks and status.
+ * When Main attaches dual-locale release notes, they appear under the status
+ * message as a compact "What's new" list (D164).
  */
 export function UpdateBanner() {
   const { t } = useTranslation();
@@ -28,6 +30,7 @@ export function UpdateBanner() {
 
   const message = bannerMessage(update, t);
   const progress = Math.max(0, Math.min(100, update.progressPercent ?? 0));
+  const notes = update.releaseNotes?.trim() || null;
 
   return (
     <div
@@ -44,6 +47,13 @@ export function UpdateBanner() {
       <div className="update-notice-body">
         <div className="update-notice-title">{t("updates.title")}</div>
         <div className="update-notice-message">{message}</div>
+
+        {notes ? (
+          <div className="update-notice-notes">
+            <div className="update-notice-notes-label">{t("updates.whatsNew")}</div>
+            <pre className="update-notice-notes-body">{notes}</pre>
+          </div>
+        ) : null}
 
         {update.status === "downloading" && (
           <div

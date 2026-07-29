@@ -15,7 +15,12 @@
 import { app, shell } from "electron";
 import electronUpdaterPkg from "electron-updater";
 import type { UpdateInfo, ProgressInfo } from "electron-updater";
-import { IPC, type UpdateMode, type UpdateState } from "@pi-desktop/shared";
+import {
+  formatChangelogNotes,
+  IPC,
+  type UpdateMode,
+  type UpdateState,
+} from "@pi-desktop/shared";
 import type { Logger } from "./logger";
 
 const { autoUpdater } = electronUpdaterPkg;
@@ -29,6 +34,11 @@ export type UpdaterOptions = {
   logger: Logger;
   send: (channel: string, payload: unknown) => void;
   currentVersion: string;
+  /**
+   * Active product UI locale for dual-locale release notes (en / zh-CN).
+   * Called when attaching notes to update state; defaults to English.
+   */
+  getLocale?: () => string | null | undefined;
   /** Overrides for tests. */
   platform?: NodeJS.Platform;
   isPackaged?: boolean;
@@ -48,6 +58,7 @@ export function resolveUpdateMode(
 export class AppUpdaterController {
   private readonly logger: Logger;
   private readonly send: (channel: string, payload: unknown) => void;
+  private readonly getLocale: () => string | null | undefined;
   private state: UpdateState;
   private manualRequested = false;
   private initialTimer: NodeJS.Timeout | null = null;
@@ -57,6 +68,7 @@ export class AppUpdaterController {
   constructor(options: UpdaterOptions) {
     this.logger = options.logger;
     this.send = options.send;
+    this.getLocale = options.getLocale ?? (() => "en");
     const mode = resolveUpdateMode(
       options.platform ?? process.platform,
       options.isPackaged ?? app.isPackaged,
@@ -68,6 +80,12 @@ export class AppUpdaterController {
       releasesUrl: RELEASES_URL,
     };
     if (mode !== "disabled") this.attachListeners();
+  }
+
+  /** Localized product notes for a discovered version, if catalogued. */
+  private notesFor(version: string | undefined): string | undefined {
+    if (!version) return undefined;
+    return formatChangelogNotes(version, this.getLocale());
   }
 
   private attachListeners() {
@@ -98,6 +116,7 @@ export class AppUpdaterController {
       this.setState({
         status: this.state.mode === "in-app" ? "downloading" : "available",
         availableVersion: info.version,
+        releaseNotes: this.notesFor(info.version),
         progressPercent: this.state.mode === "in-app" ? 0 : undefined,
       });
     });
@@ -105,12 +124,16 @@ export class AppUpdaterController {
       this.setState({
         status: "up-to-date",
         availableVersion: undefined,
+        releaseNotes: undefined,
         progressPercent: undefined,
       });
     });
     autoUpdater.on("download-progress", (progress: ProgressInfo) => {
       this.setState({
         status: "downloading",
+        // Preserve notes already attached when discovery advanced to download.
+        releaseNotes:
+          this.state.releaseNotes ?? this.notesFor(this.state.availableVersion),
         progressPercent: Math.round(progress.percent),
       });
     });
@@ -118,6 +141,7 @@ export class AppUpdaterController {
       this.setState({
         status: "downloaded",
         availableVersion: info.version,
+        releaseNotes: this.notesFor(info.version),
         progressPercent: 100,
       });
     });
@@ -135,6 +159,18 @@ export class AppUpdaterController {
   }
 
   getState(): UpdateState {
+    return this.state;
+  }
+
+  /**
+   * Re-resolve release notes after the product UI locale changes so the
+   * banner and Settings → Info stay aligned without a new feed check.
+   */
+  refreshReleaseNotes(): UpdateState {
+    if (!this.state.availableVersion) return this.state;
+    const next = this.notesFor(this.state.availableVersion);
+    if (next === this.state.releaseNotes) return this.state;
+    this.setState({ releaseNotes: next });
     return this.state;
   }
 

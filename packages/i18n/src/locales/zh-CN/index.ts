@@ -59,6 +59,7 @@ export const zhCN = {
     downloaded: "新版本 {{version}} 已就绪，可安装。",
     restart: "重启以更新",
     viewRelease: "查看发布页",
+    whatsNew: "更新内容",
     manualHint: "请前往发布页下载新版本。",
     error: "检查更新失败：{{message}}",
     dismiss: "忽略",

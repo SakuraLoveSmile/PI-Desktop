@@ -191,11 +191,15 @@ const logger = new Logger(
   process.env.NODE_ENV === "production" ? "info" : "debug",
 );
 
+/** Product UI locale for dual-locale update notes (mirrored from settings). */
+let updaterLocale = "en";
+
 const updater = new AppUpdaterController({
   logger,
   send: sendToRenderer,
   currentVersion: APP_VERSION,
   isPackaged: !isDevelopmentBuild,
+  getLocale: () => updaterLocale,
 });
 
 type RuntimeProvider = {
@@ -497,6 +501,10 @@ function applyApplicationMenuSettings(settings?: {
     settings.language !== "auto"
       ? settings.language
       : app.getLocale();
+  if (locale !== updaterLocale) {
+    updaterLocale = locale;
+    updater.refreshReleaseNotes();
+  }
   const keybindings =
     settings?.keybindings && typeof settings.keybindings === "object"
       ? (settings.keybindings as KeybindingOverrides)

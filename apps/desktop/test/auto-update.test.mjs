@@ -19,6 +19,7 @@ const [
   releaseWorkflowSource,
   enSource,
   zhSource,
+  changelogSource,
 ] = await Promise.all([
   read("../../../packages/shared/src/protocol.ts"),
   read("../../../packages/shared/src/types.ts"),
@@ -34,6 +35,7 @@ const [
   read("../../../.github/workflows/release.yml"),
   read("../../../packages/i18n/src/locales/en/index.ts"),
   read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
+  read("../../../packages/shared/src/changelog.ts"),
 ]);
 
 test("update IPC channels are declared and whitelisted for the preload bridge", () => {
@@ -51,6 +53,11 @@ test("update IPC channels are declared and whitelisted for the preload bridge", 
   assert.match(protocolSource, /\.\.\.Object\.values\(IPC\.invoke\)/);
   assert.match(protocolSource, /\.\.\.Object\.values\(IPC\.event\)/);
   assert.match(typesSource, /export type UpdateState = \{/);
+  assert.match(
+    typesSource,
+    /releaseNotes\?: string/,
+    "UpdateState carries dual-locale product notes from Main",
+  );
 });
 
 test("main process registers update handlers and the auto-check lifecycle", () => {
@@ -92,6 +99,21 @@ test("updater gates delivery mode by platform, packaging and signature reality",
     /github\.com\/vastsa\/PI-Desktop\/releases/,
     "releases fallback URL",
   );
+  assert.match(
+    updaterSource,
+    /formatChangelogNotes/,
+    "in-app dual-locale notes attach from the shared changelog catalog",
+  );
+  assert.match(
+    updaterSource,
+    /releaseNotes: this\.notesFor/,
+    "discovery and download events attach releaseNotes on UpdateState",
+  );
+  assert.match(
+    updaterSource,
+    /refreshReleaseNotes/,
+    "locale changes re-resolve notes without a new feed check",
+  );
 });
 
 test("renderer exposes the updates API, banner and settings row", () => {
@@ -101,10 +123,14 @@ test("renderer exposes the updates API, banner and settings row", () => {
   assert.match(apiSource, /onUpdateState:/);
   assert.match(bannerSource, /updates\.restart/);
   assert.match(bannerSource, /updates\.viewRelease/);
+  assert.match(bannerSource, /updates\.whatsNew/);
+  assert.match(bannerSource, /releaseNotes/);
   assert.match(bannerSource, /availableVersion}:\$\{update\.status/);
   assert.match(bannerSource, /className="update-notice"/);
   assert.match(bannerSource, /role="progressbar"/);
   assert.match(settingsSource, /<UpdatesRow \/>/);
+  assert.match(settingsSource, /update-settings-notes/);
+  assert.match(settingsSource, /updates\.whatsNew/);
   assert.match(
     appSource,
     /<section className="main-pane">[\s\S]*?<UpdateBanner \/>/,
@@ -128,7 +154,13 @@ test("check-for-updates is reachable from the application menu", () => {
   for (const source of [enSource, zhSource]) {
     assert.match(source, /checkForUpdates:/);
     assert.match(source, /updates: \{/);
-    for (const key of ["upToDate", "downloading", "downloaded", "restart"]) {
+    for (const key of [
+      "upToDate",
+      "downloading",
+      "downloaded",
+      "restart",
+      "whatsNew",
+    ]) {
       assert.match(source, new RegExp(`${key}:`), key);
     }
   }
@@ -158,4 +190,19 @@ test("packaging publishes an electron-updater feed for GitHub Releases", () => {
   assert.match(releaseWorkflowSource, /release\/\*\.zip/);
   assert.match(releaseWorkflowSource, /release\/latest\*\.yml/);
   assert.match(releaseWorkflowSource, /files: dist\/\*/);
+});
+
+test("shared dual-locale changelog is the in-app notes source of truth", () => {
+  assert.match(changelogSource, /export const CHANGELOG/);
+  assert.match(changelogSource, /formatChangelogNotes/);
+  assert.match(changelogSource, /"zh-CN"/);
+  assert.match(changelogSource, /version: "0\.2\.7"/);
+  assert.match(
+    mainSource,
+    /getLocale:\s*\(\)\s*=>\s*updaterLocale/,
+    "Main supplies product locale to the updater for note selection",
+  );
+  assert.match(mainSource, /updater\.refreshReleaseNotes\(\)/);
+  assert.match(stylesSource, /\.update-notice-notes/);
+  assert.match(stylesSource, /\.update-settings-notes/);
 });
