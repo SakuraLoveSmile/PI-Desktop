@@ -81,6 +81,12 @@ test("work panel reserves native window space before it is presented", () => {
   assert.match(appSource, /setWorkPanelReservation\(0\)/);
   assert.match(appSource, /onExitAnimationEnd=\{\(\) =>/);
   assert.match(appSource, /finishWorkPanelExit\(workPanelExitGeneration\.current\)/);
+  assert.match(panelSource, /browserSetVisible\(false\)/);
+  assert.match(panelSource, /nativeSurfaceReadyForExit/);
+  assert.match(panelSource, /is-exit-pending/);
+  assert.match(panelSource, /exitAnimationReady && "is-exiting"/);
+  assert.match(panelSource, /if \(!exitAnimationReady\) return/);
+  assert.match(panelSource, /animationName\.startsWith\("work-panel-out"\)/);
   // The panel remains a fixed-width shell sibling after the native window grows.
   assert.match(globalStyles, /\.work-panel \{[^}]*flex: 0 0 auto/s);
   assert.doesNotMatch(
@@ -88,6 +94,11 @@ test("work panel reserves native window space before it is presented", () => {
     /position:\s*absolute/,
   );
   assert.match(globalStyles, /@keyframes work-panel-out/);
+  assert.match(globalStyles, /@keyframes work-panel-out-windows/);
+  assert.match(
+    globalStyles,
+    /:root\[data-platform="win32"\] \.work-panel\.is-exiting \{[^}]*animation-name:\s*work-panel-out-windows;/s,
+  );
   assert.match(
     globalStyles,
     /@keyframes work-panel-in \{[^}]*translateX\(8px\)/s,
@@ -129,7 +140,7 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
   assert.match(panelSource, /panel\.openItems/);
   assert.match(
     panelSource,
-    /blocked=\{browserBlocked \|\| switcherOpen \|\| dragWidth !== null\}/,
+    /blocked=\{[\s\S]*exiting \|\| browserBlocked \|\| switcherOpen \|\| dragWidth !== null[\s\S]*\}/,
   );
   assert.doesNotMatch(panelSource, /onContextMenu|createPortal|work-panel-tools-menu/);
   assert.match(
