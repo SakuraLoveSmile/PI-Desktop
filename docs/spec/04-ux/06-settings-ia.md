@@ -99,9 +99,15 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - app/host/protocol versions + open logs
 - Updates row with the current delivery state and one applicable action:
   Check for updates, View release, or Restart to update
+- The Updates row always exposes a Release notes action. It opens a modal
+  containing the complete shipped stable changelog in newest-first order,
+  localized to the product language and marking the current and available
+  versions when present
 - When an update is available, downloading, or downloaded and Main attached
   dual-locale product notes, the Updates row shows a compact "What's new"
-  list under the status text (same notes as the ambient banner; D164)
+  list under the status text (same notes as the ambient banner; D164). The
+  full-history modal remains available when the app is up to date or update
+  checks are disabled in development
 
 ## 3. Navigation rules
 
