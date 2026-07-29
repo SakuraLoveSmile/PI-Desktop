@@ -35,6 +35,14 @@ Required (all **implemented**):
   at build time (`tightenCsp` plugin in `electron.vite.config.ts`);
   `connect-src 'self'` only. Provider network traffic happens in the Node
   sidecar, never in the renderer.
+- Assistant Mermaid diagrams do not widen CSP or renderer privileges. Only a
+  completed answer fence may dynamically load the bundled local renderer.
+  Mermaid runs with `securityLevel: strict`, protected security/theme/limit
+  configuration, HTML labels disabled, a 20,000-character source limit, and a
+  500-edge limit. Its generated SVG then passes through DOMPurify's SVG profile;
+  links, URL attributes, `foreignObject`, script, embedded media, and external
+  image elements are removed before the SVG reaches the DOM. Invalid or
+  oversized input fails closed to escaped source text.
 
 ### Future hardening (tracked, post-MVP)
 

@@ -916,11 +916,27 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   into top-level blocks via `marked`'s lexer; each block renders through a
   memoized `<ReactMarkdown>`. While streaming only the tail block re-parses
   (incremental re-lex from the last block boundary), so cost stays linear in
-  message length.
+  message length. A Mermaid fence stays in the normal source-code presentation
+  until its matching closing fence arrives; partial streamed diagrams never
+  enter the diagram parser.
 - **Plugins**: `remark-gfm` (tables, task lists, strikethrough, autolinks),
-  `remark-math` + `rehype-katex` (inline `$…$`, display `$$…$$`). Raw HTML
-  stays escaped (no `rehype-raw`). KaTeX's Vite-inlined WOFF2 fonts are allowed
-  by the renderer's `font-src 'self' data:` CSP directive.
+  `remark-math` + `rehype-katex` (inline `$…$`, display `$$…$$`). Raw HTML is
+  parsed by `rehype-raw` and immediately constrained by the extended
+  `rehype-sanitize` default schema; only the renderer-owned audio/video/source
+  additions are admitted. KaTeX's Vite-inlined WOFF2 fonts are allowed by the
+  renderer's `font-src 'self' data:` CSP directive.
+- **Mermaid diagrams (D165)**: a completed `mermaid` fenced block in assistant
+  answer prose renders through the official Mermaid package. The dependency is
+  dynamically imported only when a diagram approaches the viewport; Mermaid's
+  global theme configuration and render calls are serialized. Diagram source
+  is capped at 20,000 characters and graph edges at 500. Strict security,
+  protected configuration keys, disabled HTML labels/links, and a second
+  DOMPurify SVG-profile pass precede insertion. Unsafe external/media elements,
+  `foreignObject`, event-capable links, and URL attributes are removed. Invalid
+  or oversized input falls back to a readable source view. The toolbar toggles
+  diagram/source and copies the original source; light/dark theme changes
+  re-render the SVG. Thinking prose deliberately keeps `mermaid` fences as
+  source code so a collapsed reasoning trace cannot start diagram layout.
 - **Syntax highlighting**: Shiki singleton with the JavaScript regex engine
   (no wasm), themes `one-light`/`one-dark-pro` following `data-theme`.
   Languages lazy-load per fence tag with a plain-mono fallback until ready.
@@ -949,10 +965,10 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
 - **Links**: plain click previews in the work panel; modified click keeps
   `target="_blank"` so main routes through `shell.openExternal`; in-window
   navigation stays blocked.
-- **Typewriter**: rAF-driven reveal (speed scales with backlog);
-  `prefers-reduced-motion` renders the buffer verbatim. `.thread-scroll` sets
-  `overflow-anchor: none` (pinned-follow owns the scroll position) and
-  `.message-row` uses `content-visibility: auto` for long transcripts.
+- **Long transcript behavior**: `.thread-scroll` sets `overflow-anchor: none`
+  (pinned-follow owns the scroll position), `.message-row` uses
+  `content-visibility: auto`, and offscreen Mermaid diagrams defer loading and
+  layout until they approach the viewport.
 
 ---
 

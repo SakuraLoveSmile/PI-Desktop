@@ -21,6 +21,7 @@ import {
   CircleHelp,
   Clock,
   CloudDownload,
+  Code2,
   Download,
   Copy,
   Dot,
@@ -67,6 +68,7 @@ import {
   TriangleAlert,
   UserRound,
   Webhook,
+  Workflow,
   Wrench,
   X,
   type LucideIcon,
@@ -109,6 +111,7 @@ export const IconSidebar = icon(PanelLeft);
 export const IconArrowUp = icon(ArrowUp);
 export const IconArrowDown = icon(ArrowDown);
 export const IconCopy = icon(Copy);
+export const IconCode = icon(Code2);
 export const IconCheck = icon(Check);
 export const IconBell = icon(Bell);
 export const IconBot = icon(Bot);
@@ -135,6 +138,7 @@ export const IconUser = icon(UserRound);
 export const IconSparkles = icon(Sparkles);
 export const IconBrowser = icon(AppWindow);
 export const IconHook = icon(Webhook);
+export const IconWorkflow = icon(Workflow);
 export const IconLink = icon(Link);
 export const IconPalette = icon(Palette);
 export const IconPerson = icon(Smile);

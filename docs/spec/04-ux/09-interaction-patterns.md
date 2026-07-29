@@ -336,6 +336,11 @@ may be retained while exactly one workspace supplies the visible shell context.
 - Renderer displays runtime stream chunks directly; it does not enqueue a
   second requestAnimationFrame-driven typewriter state loop
 - Rendering uses incremental markdown parse — do not re-render the entire message on each token
+- An unfinished `mermaid` fence remains a source code block. After its closing
+  fence arrives, answer prose loads and renders the diagram only when it
+  approaches the viewport; thinking disclosures always retain Mermaid source.
+- Diagram render failure or the 20,000-character / 500-edge safety limit keeps
+  the source visible and copyable instead of failing the assistant turn.
 - Cursor indicator: subtle pulsing accent dot or line at the end of streaming content
 - When stream completes: cursor indicator replaced by success state (2s fade)
 
@@ -354,6 +359,9 @@ may be retained while exactly one workspace supplies the visible shell context.
   releases follow mode
 - Click "Scroll to bottom" button: resumes auto-scroll and snaps to bottom
 - Stream completion: if user was auto-scrolling, keep at bottom; if manual, stay at position
+- An asynchronously completed diagram height update follows the same rule:
+  ResizeObserver keeps a pinned transcript at the bottom, while a user who has
+  scrolled upward remains at their reading position.
 
 ### 2.3 Stream interruption
 
