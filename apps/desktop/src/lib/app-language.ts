@@ -5,14 +5,28 @@ import { useAppStore } from "../stores/app-store";
 
 export type AppLanguageSetting = NonNullable<AppSettings["language"]>;
 
+/**
+ * Authoritative OS locale for "auto" detection.
+ *
+ * The renderer's `navigator.language` often reports `en-US` regardless of
+ * the actual system language, so we prefer the main-process
+ * `app.getLocale()` exposed synchronously by the preload bridge.
+ */
+export function resolveOsLocale(): string {
+  return (
+    window.piDesktop?.locale ||
+    navigator.language ||
+    (navigator as { userLanguage?: string }).userLanguage ||
+    "en-US"
+  );
+}
+
 /** Concrete locale for a stored language setting; `auto`/absent follows the OS. */
 export function resolveAppLanguage(
   language: AppSettings["language"],
 ): "en" | "zh-CN" {
   if (language === "en" || language === "zh-CN") return language;
-  return resolveLocale(
-    navigator.language || (navigator as { userLanguage?: string }).userLanguage,
-  );
+  return resolveLocale(resolveOsLocale());
 }
 
 export function applyAppLanguage(language: AppSettings["language"]) {
