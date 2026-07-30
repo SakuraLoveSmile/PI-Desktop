@@ -1,5 +1,3 @@
-下面这版保留核心约束，删除重复说明，更适合作为仓库根目录的 `AGENTS.md`。
-
 # AGENTS.md
 
 Mandatory rules for AI coding agents working in this repository.
@@ -8,9 +6,50 @@ Mandatory rules for AI coding agents working in this repository.
 
 Use English for code, identifiers, comments, commits, specifications, and documentation.
 
-Follow the repository baseline:
+Follow:
 
 * [Baseline](docs/spec/00-baseline.md)
+
+## Mandatory Isolated Development
+
+Every request must use its own dedicated branch and worktree.
+
+Before modifying any file, the agent must:
+
+1. Update the primary checkout's local `main`
+2. Create a unique branch from the updated `main`
+3. Create a dedicated worktree for that branch
+4. Enter the new worktree
+5. Only then begin development
+
+Example:
+
+```bash
+git switch main
+git pull --ff-only
+git worktree add ../worktrees/<request-id> -b <type>/<request-id> main
+cd ../worktrees/<request-id>
+```
+
+Branch and worktree names must be unique and clearly associated with the request.
+
+## Multi-Agent Isolation
+
+To ensure multiple AI agents can work concurrently:
+
+* Each agent must use its own branch and worktree
+* Never develop directly in the primary checkout
+* Never develop directly on `main`
+* Never reuse another agent's branch or worktree
+* Never modify files inside another request's worktree
+* Never switch another agent's branch
+* Never delete another agent's branch or worktree
+* Never include unrelated changes from another request
+* Do not commit local environment files, caches, databases, or secrets
+
+The primary checkout is reserved for synchronizing and merging `main`.
+
+Shared dependencies or environments may be reused only when doing so cannot modify tracked files or interfere with another worktree.
 
 ## Immutable Rules
 
@@ -18,7 +57,7 @@ Follow the repository baseline:
 
 Every behavior change must update the relevant document under `docs/spec/`.
 
-Add an ADR under `docs/adr/` when changing architectural boundaries, public interfaces, data ownership, security boundaries, or frozen design decisions.
+Add an ADR under `docs/adr/` when changing architecture, public interfaces, data ownership, security boundaries, or frozen decisions.
 
 ### 2. Commit Every Logical Change
 
@@ -27,7 +66,7 @@ Every completed logical change must be committed.
 * One logical change per commit
 * No large uncommitted diffs
 * No unrelated cleanup
-* Leave the working tree clean
+* Leave the request worktree clean
 
 ### 3. Keep E2E Documentation Synchronized
 
@@ -35,48 +74,52 @@ Every user-visible or protocol-visible behavior change must add or update a scen
 
 * [E2E test plan](docs/spec/06-delivery/04-e2e-test-plan.md)
 
-Updating E2E documentation is mandatory.
+Do not run local E2E commands or manually trigger remote E2E jobs unless explicitly requested by the user.
 
-Do not run local E2E commands or manually trigger remote E2E jobs unless the user explicitly requests E2E validation.
+### 4. Merge Back into Local `main`
 
-### 4. Use a Branch and Dedicated Worktree
+After development:
 
-Every new request must:
+1. Complete targeted validation
+2. Review the complete diff
+3. Commit all logical changes
+4. Update the request branch with the latest local `main`
+5. Resolve conflicts inside the request worktree
+6. Return to the primary checkout
+7. Merge the request branch into local `main`
+8. Verify the expected commits are present
+9. Do not push to remote
 
-1. Start from an up-to-date local `main`
-2. Use a dedicated branch
-3. Use a dedicated worktree
-4. Be committed on that branch
-5. Be merged into local `main`
+If another agent has updated `main`, the request branch must be refreshed before merging:
 
-Do not:
+```bash
+git fetch
+git rebase main
+```
 
-* Develop directly on `main`
-* Develop in the primary checkout
-* Reuse another request's worktree
-* Push branches or `main` to remote
-* Open a PR or MR unless explicitly requested
+Use merge instead of rebase when repository policy requires it.
+
+Do not overwrite, reset, or discard changes already merged by another agent.
 
 Remote publishing is the user's responsibility.
 
 ## Development Workflow
 
 1. Update local `main`
-2. Create a request branch and worktree
-3. Read the baseline and relevant specs
-4. Identify affected specs, ADRs, E2E scenarios, and validation
-5. Implement the smallest coherent change
-6. Update specs, ADRs, decisions log, and E2E documentation as required
-7. Run targeted, risk-based checks
-8. Review the complete diff
-9. Commit each logical change
-10. Update `docs/project/BOARD.md` when milestone-related
-11. Merge the branch into local `main`
-12. Do not push
+2. Create a unique request branch
+3. Create and enter a dedicated worktree
+4. Read the baseline and relevant specs
+5. Identify affected specs, ADRs, E2E scenarios, and validation
+6. Implement the smallest coherent change
+7. Update documentation as required
+8. Run targeted, risk-based checks
+9. Review the complete diff
+10. Commit each logical change
+11. Refresh the branch against the latest local `main`
+12. Merge into local `main`
+13. Do not push
 
-Local validation may be skipped when it provides no meaningful value, but the reason must be reported.
-
-Automatically triggered required remote checks remain part of the merge gate.
+Development must not begin before steps 1–3 are complete.
 
 ## Commit Format
 
@@ -96,12 +139,6 @@ Requirements:
 * Concise, imperative description
 * One logical change per commit
 
-Example:
-
-```text
-fix(auth): prevent expired session reuse
-```
-
 ## Stable Release Rule
 
 Before creating a stable application version tag, ensure the version has both English and Simplified Chinese entries in:
@@ -116,43 +153,27 @@ See:
 
 ## Completion Checklist
 
-Before finishing:
-
-* [ ] Impact analysis completed
-* [ ] Branch and worktree created from updated `main`
-* [ ] Relevant specs updated
-* [ ] ADR added when required
-* [ ] E2E scenarios updated when required
+* [ ] Local `main` was updated before development
+* [ ] A unique request branch was created
+* [ ] A dedicated worktree was created
+* [ ] All development occurred inside that worktree
+* [ ] No other agent's branch or worktree was modified
+* [ ] Relevant specs and E2E scenarios were updated
 * [ ] Targeted validation passed or was documented as unnecessary
-* [ ] No secrets, local data, or unrelated changes in the diff
-* [ ] Conventional commits created
-* [ ] Definition-of-Done gates passed
-* [ ] Changes merged into local `main`
-* [ ] Nothing pushed to remote
+* [ ] No secrets, local data, or unrelated changes are included
+* [ ] All logical changes were committed
+* [ ] The branch was refreshed against the latest local `main`
+* [ ] Changes were merged into local `main`
+* [ ] Nothing was pushed to remote
 
 ## Final Report
 
 Report:
 
+* Branch and worktree used
 * What changed
 * Documentation updated
 * Validation performed or skipped
 * Commit hashes and messages
-* Confirmation that changes were merged into local `main`
+* Merge result
 * Confirmation that nothing was pushed
-
-## Key References
-
-| Document        | Path                                                  |
-| --------------- | ----------------------------------------------------- |
-| Baseline        | `docs/spec/00-baseline.md`                            |
-| Spec index      | `docs/spec/README.md`                                 |
-| Decisions log   | `docs/spec/08-meta/decisions-log.md`                  |
-| AI workflow     | `docs/spec/06-delivery/03-ai-development-workflow.md` |
-| E2E plan        | `docs/spec/06-delivery/04-e2e-test-plan.md`           |
-| Checklist       | `docs/spec/06-delivery/05-change-checklist.md`        |
-| Release runbook | `docs/spec/06-delivery/06-release-runbook.md`         |
-| ADR index       | `docs/adr/README.md`                                  |
-| Project board   | `docs/project/BOARD.md`                               |
-
-相比上一版，这版去掉了规则优先级、变更分类和大量解释，只保留 Agent 真正需要执行的内容。
