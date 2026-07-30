@@ -493,8 +493,8 @@ Each scenario is documented in this format:
 #### E2E-038: Settings owns the project archive destination
 
 - **Preconditions**: App running with at least one configured provider, one supported local session store, one retained project, and one archived project.
-- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card using the theme preview cards. 4) Open Model configuration and inspect the provider studio. 5) Open Import, Project archive, and Info in order. 6) Search Settings for "project" or "archive". 7) Restore the archived project, then activate it. 8) Return to the app shell and open Plugins.
-- **Expected**: The rail contains exactly Basics, Model configuration, Import, Project archive, and Info in that order, each with its semantic Lucide icon (SlidersHorizontal / Bot / Download / Archive / Info); Appearance and Providers remain merged into their owning destinations; Project archive shows active, closed, and archived durable rows without a visibility toggle; restore keeps the archive open and activation returns to chat with the restored project retained in the sidebar; the home sidebar and global page results have no standalone Projects destination; Settings search finds Project archive; Plugins remains an independent app-shell destination.
+- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card using the theme preview cards. 4) Open 全局 AI and inspect the Permissions and Context management cards. 5) Open Shortcuts and inspect the Keyboard shortcuts card. 6) Open Model configuration and inspect the provider studio. 7) Open Import, Project archive, and Info in order. 8) Search Settings for "project" or "archive". 9) Restore the archived project, then activate it. 10) Return to the app shell and open Plugins.
+- **Expected**: The rail contains exactly Basics, 全局 AI/AI, Shortcuts, Model configuration, Import, Project archive, and Info in that order, each with its semantic Lucide icon (SlidersHorizontal / Sparkles / Keyboard / Bot / Download / Archive / Info); Appearance and Providers remain merged into their owning destinations; Permissions and Context management live under 全局 AI; Keyboard shortcuts has its own destination; Developer lives under Info; Project archive shows active, closed, and archived durable rows without a visibility toggle; restore keeps the archive open and activation returns to chat with the restored project retained in the sidebar; the home sidebar and global page results have no standalone Projects destination; Settings search finds Project archive; Plugins remains an independent app-shell destination.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/01-ui-ia.md`, `03-runtime/11-provider-model-system.md`
 - **Acceptance**: B (model configuration), F (session import)
 - **Milestone**: M4
@@ -1803,7 +1803,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: App running on macOS and on one Windows/Linux target with
   Settings open; no custom shortcut overrides are stored.
-- **Steps**: 1) Open Settings → Basics and inspect Keyboard shortcuts. 2) Change
+- **Steps**: 1) Open Settings → Shortcuts and inspect Keyboard shortcuts. 2) Change
   Search to an unused modifier chord. 3) invoke the new chord and then the old
   chord. 4) Attempt to assign that chord to the command shortcut (now opened via global search). 5) Attempt a bare
   letter and a reserved editing chord. 6) Restart the app and invoke the custom
@@ -1816,8 +1816,8 @@ Each scenario is documented in this format:
   the custom Search chord takes effect immediately, replaces the old chord,
   survives restart, and updates the macOS menu; duplicate, modifier-free, and
   reserved assignments show an inline error without changing either action;
-  individual and global reset restore the shared defaults; the five-item
-  Settings rail remains unchanged and has no Keyboard destination. Modifier-only
+  individual and global reset restore the shared defaults; Keyboard shortcuts is
+  its own Settings destination (the seven-item rail remains unchanged). Modifier-only
   and IME keydowns dispatch nothing, and a held history chord traverses only
   once per physical press.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
@@ -1831,7 +1831,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: App running on macOS and on one Windows/Linux target;
   developer mode is absent or false in persisted settings and Settings ->
-  Basics is open.
+  Info is open.
 - **Steps**: 1) Find the Developer card through Settings search. 2) Confirm the
   Open console action is disabled and invoke F12 plus the platform secondary
   shortcut. 3) Enable developer mode and open the console from Settings.
@@ -2437,8 +2437,8 @@ This test plan spec is accepted when:
 ### US-UI-24 Settings full-page shell
 - Open Settings (footer profile → Settings).
 - Expect **full-page** Codex settings (no app sidebar/nav). Left rail has Back
-  to app, search, and exactly Basics / Model configuration / Import / Project
-  archive / Info in that order; content pane shows section title and the
+  to app, search, and exactly Basics / 全局 AI / Shortcuts / Model configuration /
+  Import / Project archive / Info in that order; content pane shows section title and the
   destination's settings or archive content.
 - Return to the app shell and expect Plugins to remain an independent sidebar
   destination.
@@ -2537,12 +2537,14 @@ This test plan spec is accepted when:
 ### US-UI-44 Settings compact directory + merged sections
 - Open Settings light theme at ~1200×690.
 - Full-page shell: rail ~260px on `#f3f3f3`, main `#fff`; Back to app; search pill; Basics active pill with icon.
-- Rail order is exactly Basics, Model configuration, Import, Project archive,
-  and Info;
+- Rail order is exactly Basics, 全局 AI/AI, Shortcuts, Model configuration,
+  Import, Project archive, and Info;
   there are no Personal/Integrations/Coding group headings, plugin duplicate,
   or placeholder destinations.
 - Basics content: large title and an **Appearance** card with working
-  system/light/dark controls. Permission defaults, file-open target, language
+  system/light/dark controls and a **Defaults** card. 全局 AI holds Permissions
+  and Context management; Shortcuts holds the Keyboard shortcuts card.
+  File-open target, language
   override, menu-bar behavior, and bottom-panel behavior are absent until
   host-backed implementations exist.
 - Model configuration contains the provider studio hero, default mode/model, Enter-to-send
