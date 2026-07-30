@@ -1027,7 +1027,9 @@ Each scenario is documented in this format:
   Browser preview so the menu is never occluded. The sole
   collapse control sits in the session pane top-right rather than the content header.
   Active close selects the right neighbor then left; closing the last tab hides
-  the panel. Collapse retains runtime
+  the panel. The switcher dropdown and the create dropdown are mutually
+  exclusive: opening one closes the other, so only one menu is visible at a
+  time. Collapse retains runtime
   tabs but hides the panel until another artifact reopens it. Width clamps to
   the fixed `364px–720px` range, exposes those current/minimum/maximum values to
   assistive technology, and supports the documented keyboard steps.

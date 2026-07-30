@@ -371,7 +371,10 @@ export function WorkPanel({
               aria-haspopup="menu"
               aria-expanded={switcherOpen}
               title={activeTab?.resource ?? activeLabel}
-              onClick={() => setSwitcherOpen((open) => !open)}
+              onClick={() => {
+                setSwitcherOpen((open) => !open);
+                setCreateOpen(false);
+              }}
             >
               <span className="work-panel-current-icon" aria-hidden>
                 <ActiveIcon size={15} />
@@ -463,7 +466,10 @@ export function WorkPanel({
                 aria-haspopup="menu"
                 aria-expanded={createOpen}
                 title={t("panel.openTool")}
-                onClick={() => setCreateOpen((open) => !open)}
+                onClick={() => {
+                  setCreateOpen((open) => !open);
+                  setSwitcherOpen(false);
+                }}
               >
                 <IconPlus size={16} />
                 <IconChevronDown
