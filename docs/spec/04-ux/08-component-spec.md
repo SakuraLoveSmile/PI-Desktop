@@ -474,7 +474,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 |    |  Browser: URL bar + preview     |
 |    |  Files: tree + file viewer      |
 +----+---------------------------------+
- 44px activity rail
+ create trigger
 ^ 10px transparent resize hit area on the left edge
 ```
 
@@ -482,8 +482,8 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 - Panel body uses quiet inset paper (`#fafafa`); the 46px header band and tool
   chrome (review toolbar, browser chrome, file viewer header) stay white
-- The 44px activity rail uses a slightly deeper neutral surface with a subtle
-  divider; selected state uses an edge marker plus fill, never color alone
+- The combined create trigger opens a resource menu; its dropdown items use a
+  neutral fill with a 2px edge marker for the active tool, never color alone
 - Active tabs, file-tree rows, diff headers, and the resize handle ease hover
   fills with `--motion-duration-fast` / `--motion-ease-out`
 - Browser URL and empty-tool chrome share the light inset field treatment used
@@ -524,12 +524,13 @@ preview), and Files (workspace browser). Codex-parity surface.
   failed-refresh states hide the transcript entry. Session ownership is
   renderer-memory state and is discarded on relaunch with D142's work-panel
   contexts.
-- Tool activity rail: while the panel is visible, Review, Terminal, and Browser
-  are stable 32px icon buttons inside a 44px rail. Activating a closed tool
-  creates it through `openWorkPanelTab`; activating an open tool selects its
-  singleton tab. Selected state combines a neutral fill with a 2px edge marker,
-  and open inactive tools show a small status dot. The rail disappears with the
-  panel and therefore does not replace D128's artifact-driven entry point.
+- Tool create menu: while the panel is visible, one combined create trigger in
+  the header opens a dropdown listing Review, Terminal, Browser, and Files as
+  stable items. Activating a closed tool creates it through `openWorkPanelTab`;
+  activating an open tool selects its singleton tab. The active tool combines a
+  neutral fill with a 2px edge marker, and open inactive tools show a small
+  status dot. The trigger disappears with the panel and therefore does not
+  replace D128's artifact-driven entry point.
 - Resource switcher: the 46px header shows the active resource icon and
   ellipsized label. Its chevron opens a bounded menu containing every current
   session resource in first-open order; rows select resources, expose full
@@ -576,8 +577,9 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 ### 5.5 Accessibility
 
-- `<aside>` landmark; the activity rail uses a localized `<nav>` label and
-  pressed state on each tool button. The current-resource control exposes
+- `<aside>` landmark; the create trigger uses a localized label and
+  `aria-expanded`, while its dropdown items use `menuitemradio` / `aria-checked`.
+  The current-resource control exposes
   `aria-haspopup="menu"` / `aria-expanded`; switcher rows use
   `menuitemradio` / `aria-checked`, and each resource body remains a
   `role="tabpanel"`

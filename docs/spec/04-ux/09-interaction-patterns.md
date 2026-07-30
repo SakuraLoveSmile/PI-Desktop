@@ -247,8 +247,9 @@ may be retained while exactly one workspace supplies the visible shell context.
 - File resources use normalized paths as identity. Review, Terminal, and
   Browser are singletons; repeated triggers preserve resource order and
   activate the existing resource.
-- Once open, the panel's 44px activity rail makes Review, Terminal, and Browser
-  one-click actions. The active-resource header opens an ordered resource
+- Once open, the panel's combined create trigger opens a dropdown that makes
+  Review, Terminal, Browser, and Files one-click actions. The active-resource
+  header opens an ordered resource
   switcher with pointer and keyboard selection plus per-item close controls.
 - Every resource can be closed from the switcher, and the active resource has
   a direct header close control. Closing the active resource selects the right

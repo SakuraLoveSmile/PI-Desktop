@@ -984,7 +984,7 @@ Each scenario is documented in this format:
 - **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
   Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
   a URL preview, and a completed command artifact. 3) Use the work-panel
-  activity rail to open/select Review, Terminal, and Browser; verify active and
+  create trigger dropdown to open/select Review, Terminal, Browser, and Files; verify active and
   open-inactive states. Open the current-resource switcher, select file and tool
   resources with pointer and keyboard, close an inactive item inside it, then
   close the active item from the header. 4) Close active middle and edge items
@@ -1017,8 +1017,9 @@ Each scenario is documented in this format:
   are path-keyed and repeated resources deduplicate. Opening, collapse, and
   divider commit never change the OS window size — only MainChat reflows inside
   the fixed client area (ADR 0033). Once the panel is open, a
-  44px activity rail exposes one-click Review/Terminal/Browser actions with a
-  fill plus edge marker for the active tool and a dot for open inactive tools.
+  a combined create trigger opens a dropdown exposing one-click
+  Review/Terminal/Browser/Files actions with a fill plus edge marker for the
+  active tool and a dot for open inactive tools.
   The 46px content header keeps the active label readable, closes it directly,
   and opens a bounded ordered resource switcher with full-path tooltips and
   per-item close controls. The switcher supports Arrow keys, Home, End, and

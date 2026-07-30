@@ -73,17 +73,18 @@ destination, chat as the home surface, tools and permissions inline.
   artifacts, or by the contextual transcript review entry when the current
   session produced a successful workspace Write/Edit and that working tree is
   still dirty. Its
-  44px activity rail keeps Review, Terminal, and Browser one click away while
-  the panel is visible; opened-but-inactive tools show a quiet dot and the
-  active tool has a restrained edge marker. The 46px content header names the
+  a combined create trigger keeps Review, Terminal, Browser, and Files one
+  click away while the panel is visible; opened-but-inactive tools show a quiet
+  dot and the active tool has a restrained edge marker. The 46px content header
+  names the
   current resource, closes it directly, and opens a compact switcher for all
   current session resources. File paths stay distinct in that switcher while
-  Review, Terminal, and Browser deduplicate by kind. The activity rail is not
+  Review, Terminal, and Browser deduplicate by kind. The create trigger is not
   rendered while the panel is closed and does not create a global or empty
   manual panel entry point. A
   successful active-session workspace Write/Edit artifact opens Review;
   scratch, failed, and background-session writes never steal focus. Width is
-  drag-resizable from 364px (44px rail + 320px content) to 720px and remains at
+  drag-resizable from 364px to 720px and remains at
   its fixed committed width while open. The sole panel-level control collapses
   the panel;
   each session retains its own runtime open state, tab set, active tab, and

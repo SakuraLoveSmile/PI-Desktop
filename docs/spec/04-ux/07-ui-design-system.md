@@ -165,7 +165,7 @@ Neutral gray scale only — no blue-slate surfaces. Chrome components must consu
 
 Light-surface polish (D148):
 
-- Docked work panel uses quiet inset paper (`#fafafa`) with a white header band and a slightly deeper 44px activity rail so the tool column separates from white chat paper without a heavy divider.
+- Docked work panel uses quiet inset paper (`#fafafa`) with a white header band and a combined create trigger in the header so the tool column stays on content without a heavy divider.
 - Shared form fields, browser URL, settings segment tracks, and shortcut keycaps use `#f5f5f5` inset fills with a 0.5px ink stroke; focus lifts to white with a neutral ring.
 - Settings toggles keep a near-black on-track and force a white knob in light mode.
 - Dialog scrim softens to ~28% ink so elevated white dialogs remain readable.
@@ -691,7 +691,7 @@ Codex parity decisions (D034/D070) supersede any older value here.
 | Sidebar width (expanded) | ~275px | Codex sidebar width (D034/D070) |
 | Main pane minimum readable width | 360px | Target while the fixed window can fit panel + chat; constrained windows reflow chat below it (D163, ADR 0033) |
 | Work panel width (closed) | 0px | Hidden by default |
-| Work panel width (open) | `364px–720px` (default 420px), fixed at the committed width | 44px activity rail preserves the prior 320px content minimum; the panel is an in-flow column and never expands the OS window (D154/D163, ADR 0033) |
+| Work panel width (open) | `364px–720px` (default 420px), fixed at the committed width | the combined create trigger keeps the full panel width on content; the panel is an in-flow column and never expands the OS window (D154/D163, ADR 0033) |
 | Composer shell minimum | ~80px | One-line draft + toolbar padding |
 | Composer draft height | 1–7 text lines | Auto-grow; internal scroll beyond line 7 |
 | Chat message max width | 720px assistant / 560px user plate | Prevent eye-span over-stretch; user turns stay compact |

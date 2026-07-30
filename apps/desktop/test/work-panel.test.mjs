@@ -106,15 +106,15 @@ test("work panel is an internal dock that never expands the OS window", () => {
 
 test("work panel activity rail exposes tools and keeps resources in a switcher", () => {
   const headerIndex = panelSource.indexOf('className="work-panel-header"');
-  const railIndex = panelSource.indexOf('className="work-panel-rail no-drag"');
+  const toolListIndex = panelSource.indexOf('className="work-panel-create no-drag"');
   const switcherIndex = panelSource.indexOf('className="work-panel-switcher-trigger"');
   const bodyIndex = panelSource.indexOf('<div className="work-panel-body">');
 
-  assert.ok(railIndex > -1 && headerIndex > railIndex && switcherIndex > headerIndex);
+  assert.ok(toolListIndex > headerIndex && switcherIndex > toolListIndex);
   assert.ok(bodyIndex > headerIndex);
-  assert.match(panelSource, /HEADER_TOOLS\.map\(\(\{ kind, Icon \}\) =>/);
-  assert.match(panelSource, /"work-panel-rail-button"/);
-  assert.match(panelSource, /aria-pressed=\{selected\}/);
+  assert.match(panelSource, /HEADER_TOOLS\.map\(\(\{ kind, Icon \}/);
+  assert.match(panelSource, /"work-panel-create-item"/);
+  assert.match(panelSource, /aria-expanded=\{createOpen\}/);
   assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
   assert.match(panelSource, /function headerToolTab\(kind: HeaderToolKind\): WorkPanelTab/);
   assert.match(panelSource, /if \(kind === "file"\) return \{ id: "file", kind \}/);
@@ -133,7 +133,7 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
   assert.doesNotMatch(panelSource, /collapsePanel/);
   assert.doesNotMatch(panelSource, /work-panel-collapse/);
   assert.match(panelSource, /onCollapse/);
-  assert.match(panelSource, /work-panel-rail-collapse/);
+  assert.match(panelSource, /work-panel-toolbar-collapse/);
   assert.match(panelSource, /data-work-panel-section="current"/);
   assert.match(panelSource, /panel\.openTool/);
   assert.match(panelSource, /panel\.openItems/);
@@ -144,7 +144,7 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
   assert.doesNotMatch(panelSource, /onContextMenu|createPortal|work-panel-tools-menu/);
   assert.match(
     globalStyles,
-    /\.work-panel-rail \{[^}]*width:\s*44px;[^}]*flex-direction:\s*column;/s,
+    /\.work-panel-create-menu \{[^}]*position:\s*absolute;[^}]*min-width:/s,
   );
   assert.match(
     globalStyles,

@@ -18,6 +18,7 @@ import {
   IconFileText,
   IconGlobe,
   IconPanel,
+  IconPlus,
   IconTerminal,
 } from "../icons";
 import { ReviewTab } from "./ReviewTab";
@@ -99,6 +100,10 @@ export function WorkPanel({
   const switcherButtonRef = useRef<HTMLButtonElement | null>(null);
   const switcherFirstItemRef = useRef<HTMLButtonElement | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const createRef = useRef<HTMLDivElement | null>(null);
+  const createButtonRef = useRef<HTMLButtonElement | null>(null);
+  const createFirstItemRef = useRef<HTMLButtonElement | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [nativeSurfaceReadyForExit, setNativeSurfaceReadyForExit] =
     useState(false);
 
@@ -123,17 +128,24 @@ export function WorkPanel({
   }, [exiting]);
 
   useEffect(() => {
-    if (!switcherOpen) return;
+    if (!switcherOpen && !createOpen) return;
     const onPointer = (e: PointerEvent) => {
       if (switcherRef.current?.contains(e.target as Node)) return;
+      if (createRef.current?.contains(e.target as Node)) return;
       setSwitcherOpen(false);
+      setCreateOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       setSwitcherOpen(false);
+      setCreateOpen(false);
       switcherButtonRef.current?.focus();
+      createButtonRef.current?.focus();
     };
-    const onViewportChange = () => setSwitcherOpen(false);
+    const onViewportChange = () => {
+      setSwitcherOpen(false);
+      setCreateOpen(false);
+    };
     window.addEventListener("pointerdown", onPointer);
     window.addEventListener("keydown", onKey);
     window.addEventListener("resize", onViewportChange);
@@ -142,20 +154,54 @@ export function WorkPanel({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", onViewportChange);
     };
-  }, [switcherOpen]);
+  }, [switcherOpen, createOpen]);
 
   useEffect(() => {
     if (!switcherOpen) return;
     requestAnimationFrame(() => switcherFirstItemRef.current?.focus());
   }, [switcherOpen]);
 
-  useEffect(() => setSwitcherOpen(false), [activeTabId]);
+  useEffect(() => {
+    if (!createOpen) return;
+    requestAnimationFrame(() => createFirstItemRef.current?.focus());
+  }, [createOpen]);
+
+  useEffect(() => {
+    setSwitcherOpen(false);
+    setCreateOpen(false);
+  }, [activeTabId]);
 
   const onSwitcherKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
       setSwitcherOpen(false);
       switcherButtonRef.current?.focus();
+      return;
+    }
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>(
+        '[data-work-panel-menu-item]:not(:disabled)',
+      ),
+    );
+    if (!items.length) return;
+    event.preventDefault();
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    let next = current;
+    if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = items.length - 1;
+    else if (event.key === "ArrowDown") next = current < 0 ? 0 : (current + 1) % items.length;
+    else if (event.key === "ArrowUp") {
+      next = current < 0 ? items.length - 1 : (current - 1 + items.length) % items.length;
+    }
+    items[next]?.focus();
+  };
+
+  const onCreateKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setCreateOpen(false);
+      createButtonRef.current?.focus();
       return;
     }
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
@@ -314,50 +360,66 @@ export function WorkPanel({
         onKeyDown={onResizeKeyDown}
         onDoubleClick={() => setWidth(clampWidth(WORK_PANEL_DEFAULT_WIDTH))}
       />
-      <nav
-        className="work-panel-rail no-drag"
-        aria-label={t("panel.openTool")}
-      >
-        {onCollapse && (
-          <button
-            type="button"
-            className="work-panel-rail-button work-panel-rail-collapse"
-            data-action="collapse-work-panel"
-            title={t("panel.collapse")}
-            aria-label={t("panel.collapse")}
-            onClick={onCollapse}
-          >
-            <IconPanel size={16} />
-          </button>
-        )}
-        <div className="work-panel-rail-spacer" />
-        {HEADER_TOOLS.map(({ kind, Icon }) => {
-          const selected = activeTab?.kind === kind;
-          const open = tabs.some((tab) => tab.kind === kind);
-          const label = t(`panel.tabs.${kind}`, { defaultValue: kind });
-          return (
-            <button
-              key={kind}
-              type="button"
-              className={cx(
-                "work-panel-rail-button",
-                selected && "active",
-                open && "is-open",
-              )}
-              data-action={`open-work-panel-${kind}`}
-              title={label}
-              aria-label={label}
-              aria-pressed={selected}
-              onClick={() => openWorkPanelTab(headerToolTab(kind))}
-            >
-              <Icon size={16} />
-              {open && !selected && <span className="work-panel-open-dot" aria-hidden />}
-            </button>
-          );
-        })}
-      </nav>
       <div className="work-panel-main">
         <header className="work-panel-header" data-work-panel-section="current">
+          <div className="work-panel-create no-drag" ref={createRef}>
+            <button
+              ref={createButtonRef}
+              type="button"
+              className="work-panel-create-trigger"
+              aria-label={t("panel.openTool")}
+              aria-haspopup="menu"
+              aria-expanded={createOpen}
+              title={t("panel.openTool")}
+              onClick={() => setCreateOpen((open) => !open)}
+            >
+              <IconPlus size={16} />
+              <IconChevronDown
+                size={12}
+                className={cx("work-panel-create-chevron", createOpen && "open")}
+              />
+            </button>
+            {createOpen && (
+              <div
+                className="work-panel-create-menu"
+                role="menu"
+                aria-label={t("panel.openTool")}
+                onKeyDown={onCreateKeyDown}
+              >
+                <div className="work-panel-create-title">{t("panel.openTool")}</div>
+                <div className="work-panel-create-list">
+                  {HEADER_TOOLS.map(({ kind, Icon }, index) => {
+                    const selected = activeTab?.kind === kind;
+                    const open = tabs.some((tab) => tab.kind === kind);
+                    const label = t(`panel.tabs.${kind}`, { defaultValue: kind });
+                    return (
+                      <button
+                        key={kind}
+                        ref={index === 0 ? createFirstItemRef : undefined}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={selected}
+                        data-work-panel-menu-item=""
+                        data-action={`open-work-panel-${kind}`}
+                        className={cx("work-panel-create-item", selected && "active")}
+                        title={label}
+                        aria-label={label}
+                        onClick={() => {
+                          openWorkPanelTab(headerToolTab(kind));
+                          setCreateOpen(false);
+                          requestAnimationFrame(() => createButtonRef.current?.focus());
+                        }}
+                      >
+                        <Icon size={15} />
+                        <span>{label}</span>
+                        {open && !selected && <span className="work-panel-open-dot" aria-hidden />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="work-panel-switcher-wrap no-drag" ref={switcherRef}>
             <button
               ref={switcherButtonRef}
@@ -447,6 +509,18 @@ export function WorkPanel({
               onClick={() => closeTab(activeTab.id)}
             >
               <IconClose size={13} />
+            </button>
+          )}
+          {onCollapse && (
+            <button
+              type="button"
+              className="work-panel-current-close no-drag work-panel-toolbar-collapse"
+              data-action="collapse-work-panel"
+              title={t("panel.collapse")}
+              aria-label={t("panel.collapse")}
+              onClick={onCollapse}
+            >
+              <IconPanel size={16} />
             </button>
           )}
         </header>
