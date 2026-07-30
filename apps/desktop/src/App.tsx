@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type AnimationEvent as ReactAnimationEvent,
   type ErrorInfo,
   type ReactNode,
 } from "react";
@@ -162,6 +163,29 @@ function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarExiting, setSidebarExiting] = useState(false);
+  const toggleSidebar = () => {
+    if (sidebarCollapsed) {
+      setSidebarExiting(false);
+      setSidebarCollapsed(false);
+    } else {
+      setSidebarExiting(true);
+      setSidebarCollapsed(true);
+    }
+  };
+  const handleSidebarAnimationEnd = (event: ReactAnimationEvent<HTMLElement>) => {
+    if (event.target !== event.currentTarget) return;
+    if (!sidebarExiting) return;
+    if (!event.animationName.startsWith("sidebar-out")) return;
+    setSidebarExiting(false);
+  };
+
+  // Fallback in case animationend is skipped (e.g. display:none mid-flight).
+  useEffect(() => {
+    if (!sidebarExiting) return;
+    const timer = window.setTimeout(() => setSidebarExiting(false), 240);
+    return () => window.clearTimeout(timer);
+  }, [sidebarExiting]);
   const [presentedWorkPanelOpen, setPresentedWorkPanelOpen] = useState(false);
   const [workPanelExiting, setWorkPanelExiting] = useState(false);
   const workPanelReservationRequest = useRef(0);
@@ -286,7 +310,7 @@ function AppShell() {
             setPaletteOpen(true);
             break;
           case "toggleSidebar":
-            setSidebarCollapsed((value) => !value);
+            toggleSidebar();
             break;
           case "openHelp":
             store.setSettingsTab("about");
@@ -478,7 +502,7 @@ function AppShell() {
             setPaletteOpen(true);
             break;
           case "toggleSidebar":
-            setSidebarCollapsed((value) => !value);
+            toggleSidebar();
             break;
           case "abort":
             void abort();
@@ -861,13 +885,15 @@ function AppShell() {
       shell = (
         <>
           <WindowControls />
-          {!sidebarCollapsed && (
+          {!sidebarCollapsed || sidebarExiting ? (
             <Sidebar
+              className={sidebarExiting ? "is-exiting" : undefined}
+              onAnimationEnd={handleSidebarAnimationEnd}
               onOpenSearch={() => setSearchOpen(true)}
-              onToggleSidebar={() => setSidebarCollapsed(true)}
+              onToggleSidebar={toggleSidebar}
               sidebarToggleShortcut={sidebarToggleShortcut}
             />
-          )}
+          ) : null}
 
           <section className="main-pane">
             <div
@@ -879,7 +905,7 @@ function AppShell() {
               {sidebarCollapsed && (
                 <div className="main-titlebar-left no-drag">
                   <CollapsedTitlebarActions
-                    onToggleSidebar={() => setSidebarCollapsed(false)}
+                    onToggleSidebar={toggleSidebar}
                     onNewTask={() => void runMenuCommand("newTask")}
                     sidebarToggleShortcut={sidebarToggleShortcut}
                   />

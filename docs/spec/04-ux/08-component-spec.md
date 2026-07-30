@@ -48,7 +48,11 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ### 1.4 Interactions
 
 - Sidebar toggle: keyboard shortcut + icon button beside Search in the expanded
-  sidebar header; the button moves to the main titlebar while collapsed
+  sidebar header; the button moves to the main titlebar while collapsed. The
+  collapse and expand use a mounted-then-animated dock transition (entrance
+  `sidebar-in`, exit `sidebar-out` keyframes) that mirrors the work-panel dock:
+  the aside stays in the tree through the exit keyframe, then unmounts
+  (`is-exiting` flag + `animationend` guard, with a timeout fallback)
 - Work panel collapse: sole control lives in the session pane titlebar top-right
   while the panel is open, with its outer edge flush against the divider
   between the session pane and work panel so the work-panel content header is
@@ -482,15 +486,15 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 - Panel body uses quiet inset paper (`#fafafa`); the 46px header band and tool
   chrome (review toolbar, browser chrome, file viewer header) stay white
-- The combined create trigger opens a resource menu; its dropdown items use a
-  neutral fill with a 2px edge marker for the active tool, never color alone
-- The 46px header follows a "context left, actions right" model: the
-  current-resource switcher anchors the left and shows the active tool icon and
-  ellipsized label; a right action cluster groups the close / create / collapse
-  controls behind a thin divider. The collapse control uses a right chevron so
-  it reads as "push the panel away", not "open a panel". The switcher dropdown
-  and the create dropdown are mutually exclusive: opening one closes the other,
-  so only one menu is ever visible at a time
+- The header exposes one unified context trigger whose menu lists the open
+  resources and, after a divider, the create-new tools (Review, Terminal,
+  Browser, Files); dropdown items use a neutral fill with a 2px edge marker for
+  the active tool, never color alone
+- The 46px header follows a "context left, actions right" model: the unified
+  context trigger anchors the left and shows the active tool icon and ellipsized
+  label; a right action cluster groups the close / collapse controls behind a
+  thin divider. The collapse control uses a right chevron so it reads as "push
+  the panel away", not "open a panel"
 - Active tabs, file-tree rows, diff headers, and the resize handle ease hover
   fills with `--motion-duration-fast` / `--motion-ease-out`
 - Browser URL and empty-tool chrome share the light inset field treatment used
@@ -531,20 +535,20 @@ preview), and Files (workspace browser). Codex-parity surface.
   failed-refresh states hide the transcript entry. Session ownership is
   renderer-memory state and is discarded on relaunch with D142's work-panel
   contexts.
-- Tool create menu: while the panel is visible, one combined create trigger in
-  the header opens a dropdown listing Review, Terminal, Browser, and Files as
-  stable items. Activating a closed tool creates it through `openWorkPanelTab`;
-  activating an open tool selects its singleton tab. The active tool combines a
-  neutral fill with a 2px edge marker, and open inactive tools show a small
-  status dot. The trigger disappears with the panel and therefore does not
-  replace D128's artifact-driven entry point.
-- Resource switcher: the 46px header shows the active resource icon and
-  ellipsized label. Its chevron opens a bounded menu containing every current
-  session resource in first-open order; rows select resources, expose full
-  paths in tooltips, and retain per-resource close controls. The header's
-  trailing close button closes the current resource directly. Arrow keys,
-  Home, End, and Escape operate the menu; opening the switcher hides the native
-  Browser preview until it closes.
+- Unified context menu: while the panel is visible, one context trigger in the
+  header opens a single dropdown. Its top section lists the open resources in
+  first-open order (rows select a resource and retain per-resource close
+  controls); a divider separates it from the create-new section listing Review,
+  Terminal, Browser, and Files as stable items. Activating a closed tool creates
+  it through `openWorkPanelTab`; activating an open tool selects its singleton
+  tab. The active tool combines a neutral fill with a 2px edge marker, and open
+  inactive tools show a small status dot. The trigger disappears with the panel
+  and therefore does not replace D128's artifact-driven entry point.
+- Resource header: the 46px header shows the active resource icon and
+  ellipsized label. Its context chevron opens the bounded unified menu described
+  above; the header's trailing close button closes the current resource
+  directly. Arrow keys, Home, End, and Escape operate the menu; opening the menu
+  hides the native Browser preview until it closes.
 - Tab close: closing an active tab selects its right neighbor, then its left;
   closing the last tab hides the panel. The panel-level collapse control lives
   in the session pane top-right (not the work-panel content header) and hides the

@@ -106,22 +106,21 @@ test("work panel is an internal dock that never expands the OS window", () => {
 
 test("work panel activity rail exposes tools and keeps resources in a switcher", () => {
   const headerIndex = panelSource.indexOf('className="work-panel-header"');
-  const switcherIndex = panelSource.indexOf('className="work-panel-switcher-trigger"');
-  const toolListIndex = panelSource.indexOf('className="work-panel-create"');
+  const contextIndex = panelSource.indexOf('className="work-panel-context no-drag"');
   const actionsIndex = panelSource.indexOf('className="work-panel-actions no-drag"');
   const bodyIndex = panelSource.indexOf('<div className="work-panel-body">');
 
-  assert.ok(switcherIndex > headerIndex && toolListIndex > switcherIndex);
-  assert.ok(actionsIndex > switcherIndex && bodyIndex > actionsIndex);
+  assert.ok(contextIndex > headerIndex);
+  assert.ok(actionsIndex > contextIndex && bodyIndex > actionsIndex);
   assert.match(panelSource, /HEADER_TOOLS\.map\(\(\{ kind, Icon \}/);
   assert.match(panelSource, /"work-panel-create-item"/);
-  assert.match(panelSource, /aria-expanded=\{createOpen\}/);
+  assert.match(panelSource, /aria-expanded=\{contextOpen\}/);
   assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
   assert.match(panelSource, /function headerToolTab\(kind: HeaderToolKind\): WorkPanelTab/);
   assert.match(panelSource, /if \(kind === "file"\) return \{ id: "file", kind \}/);
   assert.match(panelSource, /openWorkPanelTab\(headerToolTab\(kind\)\)/);
   assert.match(panelSource, /tabs\.map\(\(tab, index\) =>/);
-  assert.match(panelSource, /className="work-panel-switcher-menu"/);
+  assert.match(panelSource, /className="work-panel-context-menu"/);
   assert.match(panelSource, /id=\{activeTab \? `work-panel-title-\$\{activeTab\.id\}`/);
   assert.match(panelSource, /role="menuitemradio"/);
   assert.match(panelSource, /aria-checked=\{selected\}/);
@@ -140,16 +139,16 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
   assert.match(panelSource, /panel\.openItems/);
   assert.match(
     panelSource,
-    /blocked=\{[\s\S]*exiting \|\| browserBlocked \|\| switcherOpen \|\| dragWidth !== null[\s\S]*\}/,
+    /blocked=\{[\s\S]*exiting \|\| browserBlocked \|\| contextOpen \|\| dragWidth !== null[\s\S]*\}/,
   );
   assert.doesNotMatch(panelSource, /onContextMenu|createPortal|work-panel-tools-menu/);
   assert.match(
     globalStyles,
-    /\.work-panel-create-menu \{[^}]*position:\s*absolute;[^}]*min-width:/s,
+    /\.work-panel-context-menu \{[^}]*position:\s*absolute;[^}]*min-width:/s,
   );
   assert.match(
     globalStyles,
-    /\.work-panel-switcher-menu \{[^}]*position:\s*absolute;[^}]*max-height:/s,
+    /\.work-panel-context-menu \{[^}]*position:\s*absolute;[^}]*max-height:/s,
   );
   assert.doesNotMatch(globalStyles, /\.work-panel-tabs\s*\{/);
 });

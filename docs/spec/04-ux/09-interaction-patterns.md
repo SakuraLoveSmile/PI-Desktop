@@ -247,12 +247,12 @@ may be retained while exactly one workspace supplies the visible shell context.
 - File resources use normalized paths as identity. Review, Terminal, and
   Browser are singletons; repeated triggers preserve resource order and
   activate the existing resource.
-- Once open, the panel's combined create trigger (in the right action cluster)
-  opens a dropdown that makes Review, Terminal, Browser, and Files one-click
-  actions. The active-resource switcher anchors the left of the header and opens
-  an ordered resource switcher with pointer and keyboard selection plus per-item
-  close controls. Close / create / collapse are grouped in the right action
-  cluster behind a divider.
+- Once open, the panel's unified context trigger anchors the left of the header
+  and opens a single dropdown: its top section is an ordered resource switcher
+  (pointer and keyboard selection plus per-item close controls) and, after a
+  divider, a create-new section that makes Review, Terminal, Browser, and Files
+  one-click actions. A right action cluster groups the close / collapse controls
+  behind a divider.
 - Every resource can be closed from the switcher, and the active resource has
   a direct header close control. Closing the active resource selects the right
   neighbor, then the left; closing the final tab hides the panel. The separate

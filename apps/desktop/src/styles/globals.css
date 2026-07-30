@@ -508,6 +508,50 @@ html {
   background: var(--ds-bg-sidebar, var(--ds-bg-primary));
   /* Codex expanded shell: continuous sidebar/main edge (hairline only) */
   border-right: 1px solid color-mix(in oklab, var(--ds-text-primary) 4%, transparent);
+  /* Mount/exit dock animation (design-system §8.7, mirrors work-panel). */
+  animation: sidebar-in var(--motion-duration-normal) var(--motion-ease-out) both;
+}
+
+.sidebar.is-exiting {
+  pointer-events: none;
+  animation: sidebar-out var(--motion-duration-fast) var(--motion-ease-in) both;
+}
+
+@keyframes sidebar-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes sidebar-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
+/* win32 native-width collapse: keep the dock opaque to avoid exposing the
+   frameless window background (mirrors work-panel-out-windows). */
+@keyframes sidebar-out-windows {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-8px);
+  }
+}
+
+:root[data-platform="win32"] .sidebar.is-exiting {
+  animation-name: sidebar-out-windows;
 }
 
 .sidebar-rail {
@@ -7120,62 +7164,41 @@ html {
   border-bottom-color: color-mix(in oklab, #1a1c1f 8%, transparent);
 }
 
-/* The four tool launchers are combined into one "create resource" trigger in
-   the panel header (it was an activity rail, then a row of buttons). The full
-   panel width stays on content, matching the ChatGPT / WorkBuddy layout. It is
-   never a global panel launcher. */
-.work-panel-create {
+/* The panel header exposes one unified context menu (left trigger) that lists
+   the open resources and, after a divider, the create-new tools. It replaces
+   the old separate resource-switcher and create dropdowns. The full panel width
+   stays on content, matching the ChatGPT / WorkBuddy layout. */
+.work-panel-context {
   position: relative;
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   align-items: center;
 }
 
-.work-panel-create-trigger {
-  display: inline-flex;
-  height: 32px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  padding: 0 5px;
-  border-radius: var(--radius-sm);
-  color: var(--ds-text-muted);
-  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.work-panel-create-trigger:hover,
-.work-panel-create-trigger[aria-expanded="true"] {
-  color: var(--ds-text-primary);
-  background: var(--ds-bg-hover);
-}
-
-.work-panel-create-chevron {
-  flex: 0 0 auto;
-  color: var(--ds-text-muted);
-  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.work-panel-create-chevron.open {
-  transform: rotate(180deg);
-}
-
-.work-panel-create-menu {
+.work-panel-context-menu {
   position: absolute;
   top: 38px;
-  right: 0;
-  left: auto;
+  left: 0;
+  right: auto;
   z-index: 50;
   width: max-content;
-  min-width: 184px;
+  min-width: 200px;
   max-width: 280px;
-  max-height: min(360px, calc(100vh - 72px));
-  overflow: hidden;
+  max-height: min(420px, calc(100vh - 72px));
+  overflow-y: auto;
+  padding-bottom: 5px;
   border: 1px solid var(--ds-border-default);
   border-radius: var(--radius-md);
   background: var(--ds-bg-elevated-opaque);
   box-shadow: var(--ds-shadow-dialog);
   -webkit-app-region: no-drag;
+}
+
+.work-panel-context-divider {
+  height: 1px;
+  margin: 5px 8px;
+  background: var(--ds-border-subtle);
 }
 
 .work-panel-create-title {
@@ -7313,21 +7336,6 @@ html {
 .work-panel-switcher-close:hover {
   color: var(--ds-text-primary);
   background: var(--ds-bg-active);
-}
-
-.work-panel-switcher-menu {
-  position: absolute;
-  top: 38px;
-  left: 0;
-  right: 0;
-  z-index: 50;
-  max-height: min(360px, calc(100vh - 72px));
-  overflow: hidden;
-  border: 1px solid var(--ds-border-default);
-  border-radius: var(--radius-md);
-  background: var(--ds-bg-elevated-opaque);
-  box-shadow: var(--ds-shadow-dialog);
-  -webkit-app-region: no-drag;
 }
 
 .work-panel-switcher-title {

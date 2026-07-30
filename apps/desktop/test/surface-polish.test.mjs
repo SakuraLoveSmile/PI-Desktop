@@ -18,7 +18,7 @@ test("work panel uses a quiet light-theme inset surface", () => {
   );
   assert.match(
     styles,
-    /\.work-panel-create\s*\{[\s\S]*?display:\s*flex/,
+    /\.work-panel-context\s*\{[\s\S]*?display:\s*flex/,
   );
   assert.match(
     styles,
