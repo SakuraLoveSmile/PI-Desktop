@@ -157,6 +157,18 @@ test("sidebar section toolbars open create actions from context menus", () => {
   assert.match(sidebarSource, /addEventListener\("pointerdown"/);
 });
 
+test("sidebar session and project context menus open to the pointer's right", () => {
+  const pointPlacement = sidebarSource.match(
+    /const placeMenuAtPoint = useCallback\([\s\S]*?\n  }, \[\]\);/,
+  )?.[0] ?? "";
+
+  assert.match(pointPlacement, /left:\s*Math\.max\(/);
+  assert.match(pointPlacement, /x \+ 4/);
+  assert.match(pointPlacement, /FLOATING_MENU_WIDTH/);
+  assert.match(sidebarSource, /placeMenuAtPoint\(event\.clientX, event\.clientY\)/);
+  assert.match(sidebarSource, /left: menuPosition\.left/);
+});
+
 test("project rows expose folder and AGENTS actions in the project menu", () => {
   assert.match(sidebarSource, /data-action="open-project-folder"/);
   assert.match(sidebarSource, /api\.openProjectFolder\(entry\.path\)/);

@@ -1906,6 +1906,9 @@ Each scenario is documented in this format:
     folder-plus control.
   - Existing row context menus and heading glyph buttons remain available; the
     section menus stay one-item and theme-matched with other sidebar menus.
+  - Section, session-row, and project-row right-click menus open to the right
+    of the pointer when space permits, and remain fully within the viewport at
+    the right edge.
   - Escape and outside click dismiss the menu without creating anything.
 
 #### E2E-076: Startup splash appears then yields to the main shell

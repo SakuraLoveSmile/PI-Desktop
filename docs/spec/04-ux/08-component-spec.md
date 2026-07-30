@@ -694,6 +694,9 @@ SESSIONS                                      [msg+][↕]
 - Selecting a conversation with a different project first activates that
   project's workspace. A running turn in the previously selected session is
   not aborted.
+- Right-click menus for sessions, projects, and sidebar sections open to the
+  pointer's right. When that side lacks room, the menu is clamped within the
+  viewport instead of overflowing.
 - Keyboard: arrow up/down, Enter to select
 - Delete: row menu or command palette `builtin.session.delete`
 

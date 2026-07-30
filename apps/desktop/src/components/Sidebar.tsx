@@ -93,6 +93,9 @@ type ProjectPathTooltip = {
   left: number;
 };
 
+const FLOATING_MENU_WIDTH = 184;
+const VIEWPORT_PADDING = 8;
+
 function projectName(path: string, fallback?: string) {
   if (fallback?.trim()) return fallback.trim();
   const clean = path.replace(/[\\/]+$/, "");
@@ -236,7 +239,11 @@ export function Sidebar({
     name: string;
     path: string;
   } | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left?: number;
+    right?: number;
+  } | null>(null);
   const [projectPathTooltip, setProjectPathTooltip] = useState<ProjectPathTooltip | null>(null);
   const [visibleTimeGroups, setVisibleTimeGroups] = useState<Record<string, Set<TimeGroup>>>({});
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -273,20 +280,31 @@ export function Sidebar({
   const placeMenu = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setMenuPosition({
-      top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 220)),
-      right: Math.max(8, window.innerWidth - rect.right),
+      top: Math.max(
+        VIEWPORT_PADDING,
+        Math.min(rect.bottom + 4, window.innerHeight - 220),
+      ),
+      right: Math.max(VIEWPORT_PADDING, window.innerWidth - rect.right),
     });
   }, []);
 
-  // Context-menu variant: anchor to the pointer. The menu is positioned by
-  // its right edge, so keep that edge far enough from the left border for
-  // the 184px menu to stay on screen.
+  // Context menus open to the pointer's right. At the viewport edge, clamp
+  // their left edge so the complete menu remains visible.
   const placeMenuAtPoint = useCallback((x: number, y: number) => {
     setMenuPosition({
-      top: Math.max(8, Math.min(y + 4, window.innerHeight - 220)),
-      right: Math.min(
-        Math.max(8, window.innerWidth - x),
-        Math.max(8, window.innerWidth - 192),
+      top: Math.max(
+        VIEWPORT_PADDING,
+        Math.min(y + 4, window.innerHeight - 220),
+      ),
+      left: Math.max(
+        VIEWPORT_PADDING,
+        Math.min(
+          x + 4,
+          Math.max(
+            VIEWPORT_PADDING,
+            window.innerWidth - FLOATING_MENU_WIDTH - VIEWPORT_PADDING,
+          ),
+        ),
       ),
     });
   }, []);
@@ -1184,7 +1202,11 @@ export function Sidebar({
           role="menu"
           data-sidebar-section-menu={sectionMenu}
           onKeyDown={onMenuKeyDown}
-          style={{ top: menuPosition.top, right: menuPosition.right }}
+          style={{
+            top: menuPosition.top,
+            right: menuPosition.right,
+            left: menuPosition.left,
+          }}
         >
           <button
             ref={menuFirstItemRef}
@@ -1210,7 +1232,11 @@ export function Sidebar({
           className="sidebar-popover sidebar-sort-menu sidebar-floating-menu"
           role="menu"
           onKeyDown={onMenuKeyDown}
-          style={{ top: menuPosition.top, right: menuPosition.right }}
+          style={{
+            top: menuPosition.top,
+            right: menuPosition.right,
+            left: menuPosition.left,
+          }}
         >
           <div className="sidebar-popover-title">
             {t("nav.sortSessions", { defaultValue: "Sort sessions" })}
@@ -1242,7 +1268,11 @@ export function Sidebar({
         className="sidebar-row-menu sidebar-floating-menu"
         role="menu"
         onKeyDown={onMenuKeyDown}
-        style={{ top: menuPosition.top, right: menuPosition.right }}
+        style={{
+          top: menuPosition.top,
+          right: menuPosition.right,
+          left: menuPosition.left,
+        }}
       >
         {session ? (
           <>
