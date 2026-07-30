@@ -26,7 +26,12 @@ const enEntries: ChangelogEntry[] = [
     version: "0.2.10",
     date: "2025-07-30",
     highlights: [
-      "Version bump to 0.2.10 with updated release process.",
+      "Add Codex/WorkBuddy-style conversation top bar with improved controls.",
+      "Refresh chat transcript and markdown prose styling for better readability.",
+      "Unify work panel header with context menu and animate sidebar collapse.",
+      "Combine tool launchers into one create dropdown for cleaner interface.",
+      "Dock work panel inside fixed window instead of expanding it.",
+      "Polish top bar controls: de-duplicate toggle, protect controls, macOS alignment.",
     ],
   },
   {
@@ -137,7 +142,12 @@ const zhCNEntries: ChangelogEntry[] = [
     version: "0.2.10",
     date: "2025-07-30",
     highlights: [
-      "版本更新至 0.2.10，更新发版流程。",
+      "添加 Codex/WorkBuddy 风格对话顶栏，改进控制按钮。",
+      "刷新聊天记录和 Markdown 样式，提升可读性。",
+      "统一工作面板头部，添加上下文菜单并动画化侧边栏折叠。",
+      "合并工具启动器为单个创建下拉菜单，界面更简洁。",
+      "工作面板在固定窗口内停靠，不再扩展窗口。",
+      "优化顶栏控制：去重切换按钮、保护控件、macOS 对齐。",
     ],
   },
   {
