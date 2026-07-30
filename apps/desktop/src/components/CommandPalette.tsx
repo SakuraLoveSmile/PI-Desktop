@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import { runPaletteCommand } from "../lib/commands";
 import { useAppStore } from "../stores/app-store";
 import type { CommandItem } from "@pi-desktop/shared";
+
+type CommandGroup = { category: string; items: CommandItem[] };
 
 export function CommandPalette({
   open,
@@ -36,6 +38,18 @@ export function CommandPalette({
     return () => window.clearTimeout(handle);
   }, [query, open]);
 
+  // Group flat results by category, preserving first-seen order.
+  const groups = useMemo<CommandGroup[]>(() => {
+    const map = new Map<string, CommandItem[]>();
+    for (const command of commands) {
+      const key = command.category ?? t("palette.uncategorized");
+      const list = map.get(key);
+      if (list) list.push(command);
+      else map.set(key, [command]);
+    }
+    return Array.from(map, ([category, items]) => ({ category, items }));
+  }, [commands, t]);
+
   if (!open) return null;
 
   const run = async (command: CommandItem) => {
@@ -47,55 +61,89 @@ export function CommandPalette({
     }
   };
 
+  // Flat index across grouped render so keyboard nav maps to the right item.
+  let flatIndex = -1;
+
   return (
-    <div className="overlay" onClick={onClose}>
+    <div className="palette-overlay" onClick={onClose}>
       <div
-        className="dialog w-full max-w-[560px] p-0"
+        className="palette-dialog"
+        role="dialog"
+        aria-label={t("commandPalette")}
         onClick={(e) => e.stopPropagation()}
       >
-        <input
-          className="w-full border-b border-border-subtle bg-transparent px-4 py-3 text-base outline-none"
-          placeholder={t("palette.placeholder")}
-          value={query}
-          autoFocus
-          spellCheck={false}
-          autoCorrect="off"
-          autoCapitalize="off"
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onClose();
-            if (e.key === "ArrowDown") {
-              e.preventDefault();
-              setActive((v) => Math.min(v + 1, Math.max(commands.length - 1, 0)));
-            }
-            if (e.key === "ArrowUp") {
-              e.preventDefault();
-              setActive((v) => Math.max(v - 1, 0));
-            }
-            if (e.key === "Enter" && commands[active]) {
-              e.preventDefault();
-              void run(commands[active]);
-            }
-          }}
-        />
-        <div className="max-h-[360px] overflow-auto p-2">
+        <div className="palette-input-row">
+          <svg
+            className="palette-input-icon"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            className="palette-input"
+            placeholder={t("palette.placeholder")}
+            aria-label={t("palette.placeholder")}
+            value={query}
+            autoFocus
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") onClose();
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setActive((v) => Math.min(v + 1, Math.max(commands.length - 1, 0)));
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setActive((v) => Math.max(v - 1, 0));
+              }
+              if (e.key === "Enter" && commands[active]) {
+                e.preventDefault();
+                void run(commands[active]);
+              }
+            }}
+          />
+        </div>
+        <div className="palette-results" role="listbox" aria-label={t("commandPalette")}>
           {commands.length === 0 ? (
-            <div className="px-2 py-6 text-center text-md text-text-muted">
-              {t("palette.empty")}
-            </div>
+            <div className="palette-empty">{t("palette.empty")}</div>
           ) : (
-            commands.map((command, index) => (
-              <button
-                key={command.id}
-                className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-md-plus ${
-                  index === active ? "bg-bg-active text-text-primary" : "text-text-secondary hover:bg-bg-hover"
-                }`}
-                onMouseEnter={() => setActive(index)}
-                onClick={() => void run(command)}
-              >
-                <span>{command.title}</span>
-                <span className="text-xs text-text-muted">{command.category}</span>
-              </button>
+            groups.map((group) => (
+              <div key={group.category} role="group" aria-label={group.category}>
+                <div className="palette-group-label">{group.category}</div>
+                {group.items.map((command) => {
+                  flatIndex += 1;
+                  const index = flatIndex;
+                  const isActive = index === active;
+                  return (
+                    <button
+                      key={command.id}
+                      type="button"
+                      role="option"
+                      aria-selected={isActive}
+                      className={`palette-item${isActive ? " active" : ""}`}
+                      onMouseEnter={() => setActive(index)}
+                      onClick={() => void run(command)}
+                    >
+                      <span className="palette-item-title">{command.title}</span>
+                      {command.source === "plugin" && (
+                        <span className="palette-item-badge">{t("plugins.title")}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             ))
           )}
         </div>

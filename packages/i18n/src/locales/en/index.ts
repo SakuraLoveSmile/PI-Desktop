@@ -618,6 +618,7 @@ export const en = {
   palette: {
     placeholder: "Search commands…",
     empty: "No commands found",
+    uncategorized: "Other",
   },
   search: {
     placeholder: "Search chats…",

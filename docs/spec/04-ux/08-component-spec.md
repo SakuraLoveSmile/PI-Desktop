@@ -1478,7 +1478,7 @@ Overlay surface for the command palette (Cmd/Ctrl+Shift+P, per D014). Defined in
 ### 16.3 Layout
 
 - Position: centered overlay, max-width 480px, max-height 360px
-- Background: bg-secondary, radius-lg, shadow-lg (light)
+- Background: bg-elevated-opaque (elevated floating surface, consistent with `.dialog` / `.search-dialog`), radius-lg-plus, shadow-dialog
 - Z-index: `z-command-palette` (60)
 - Backdrop: semi-transparent bg-primary (0.5 opacity)
 
