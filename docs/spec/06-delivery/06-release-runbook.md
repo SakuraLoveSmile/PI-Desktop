@@ -120,6 +120,27 @@ scripts/release-macos.sh
 
 Artifacts land in `apps/desktop/release/` (DMG + blockmap).
 
+### 4.3 GitHub tag workflow
+
+The GitHub Release workflow starts all native platform runners without a
+separate validation-job barrier. Each runner validates that the pushed tag
+matches `apps/desktop/package.json` immediately after checkout, before package
+inputs are prepared.
+
+On every platform, the release preparation step starts the locked Rust host
+build in parallel with pnpm installation and native dependency rebuilding. It
+then builds only the workspace dependencies selected by
+`@pi-desktop/desktop^...`, failing if that dependency selection is unexpectedly
+empty. The platform `dist:*` command remains responsible for bundling the agent
+runtime, verifying the host build, building the Desktop application once, and
+invoking electron-builder. This avoids a redundant Desktop build without
+changing the package scripts or release artifacts.
+
+DMG, ZIP, NSIS, AppImage, deb, blockmap, and updater feed outputs are already
+compressed or compression-insensitive. The workflow therefore uploads their
+temporary Actions artifacts with compression level zero before the publish job
+assembles the GitHub Release.
+
 ## 5. Verification gates
 
 Run after every release build:
