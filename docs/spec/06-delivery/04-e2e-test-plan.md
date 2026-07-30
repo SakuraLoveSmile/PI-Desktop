@@ -1061,7 +1061,7 @@ Each scenario is documented in this format:
 - **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
   Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
   a URL preview, and a completed command artifact. 3) Use the work-panel
-  activity rail to open/select Review, Terminal, and Browser; verify active and
+  create trigger dropdown to open/select Review, Terminal, Browser, and Files; verify active and
   open-inactive states. Open the current-resource switcher, select file and tool
   resources with pointer and keyboard, close an inactive item inside it, then
   close the active item from the header. 4) Close active middle and edge items
@@ -1091,14 +1091,16 @@ Each scenario is documented in this format:
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one resource; file resources
-  are path-keyed and repeated resources deduplicate. Once the panel is open, a
-  44px activity rail exposes one-click Review/Terminal/Browser actions with a
-  fill plus edge marker for the active tool and a dot for open inactive tools.
-  The 46px content header keeps the active label readable, closes it directly,
-  and opens a bounded ordered resource switcher with full-path tooltips and
-  per-item close controls. The switcher supports Arrow keys, Home, End, and
-  Escape, restores focus to its trigger, and temporarily hides the native
-  Browser preview so the menu is never occluded. The sole
+  are path-keyed and repeated resources deduplicate. Opening, collapse, and
+  divider commit never change the OS window size — only MainChat reflows inside
+  the fixed client area (ADR 0033). Once the panel is open, a single unified
+  context trigger opens one dropdown whose top section is the ordered resource
+  switcher (full-path tooltips, per-item close, Arrow/Home/End/Escape, focus
+  restored to the trigger) and, after a divider, a create-new section exposing
+  one-click Review/Terminal/Browser/Files actions with a fill plus edge marker
+  for the active tool and a dot for open inactive tools. Opening the menu
+  temporarily hides the native Browser preview so it is never occluded. The
+  sole
   collapse control sits in the session pane top-right rather than the content header.
   Active close selects the right neighbor then left; closing the last tab hides
   the panel. Collapse retains runtime
@@ -1136,9 +1138,9 @@ Each scenario is documented in this format:
   unchanged work area does not reapply geometry. System compression or
   relocation during a display transition does not overwrite the confirmed base
   bounds, and returning to a roomier display restores the prior chat width.
-  Relaunch restores base bounds without reservation width or induced x shift.
-  Malformed reservation payloads fail with `INVALID_ARGUMENT` and never coerce.
-  A rejected reservation keeps
+  Relaunch restores the user's window size (the native reservation is always 0,
+  ADR 0033). Malformed reservation payloads fail with `INVALID_ARGUMENT` and
+  never coerce. A rejected reservation keeps
   the last confirmed panel presentation until a later successful request; a
   superseded success cannot commit stale presentation. No transition produces
   a second resize or position drift.
@@ -1729,6 +1731,28 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`renderer-branding.test.mjs`,
   `sidebar-navigation.test.mjs`); rendered interaction scenario Draft
+
+#### E2E-086: Sidebar collapse and expand animate as a docked transition
+
+- **Preconditions**: PI-Desktop is open with the expanded sidebar and an active
+  chat session; `prefers-reduced-motion` is off.
+- **Steps**: 1) Click Collapse sidebar in the expanded sidebar header (or press
+  the sidebar toggle shortcut). 2) Watch the sidebar during collapse. 3) Confirm
+  the main pane expands and the collapsed titlebar now shows an Expand control.
+  4) Click Expand in the collapsed titlebar (or press the shortcut again). 5)
+  Watch the sidebar during expand. 6) Repeat on Windows/Linux.
+- **Expected**: Collapse plays the `sidebar-out` keyframe (opacity + ≤8px slide)
+  while the aside stays in the tree, then unmounts once the animation ends; the
+  main pane fills the freed space. Expand plays the `sidebar-in` keyframe and
+  the controls return to the expanded header. On Windows the dock stays opaque
+  during exit (`sidebar-out-windows`), matching the work-panel dock behavior. No
+  layout jump precedes the animation, and focus returns to the sidebar/Expand
+  control predictably.
+- **Specs linked**: `04-ux/08-component-spec.md`, `07-ui-design-system.md`
+- **Acceptance**: Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`sidebar-collapse-animation.test.mjs`); rendered
+  interaction scenario Draft
 
 #### E2E-070: Settings native select menus follow the Windows theme
 

@@ -139,6 +139,9 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const [thinkingOpen, setThinkingOpen] = useState(false);
   const thinkingRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const modelRef = useRef<HTMLDivElement>(null);
+  const modelSearchRef = useRef<HTMLInputElement>(null);
+  const modelListRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

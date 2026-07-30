@@ -57,8 +57,8 @@ test("sidebar header retains non-mac branding and keeps collapse beside search",
 
 test("work panel collapse control lives in the switcher menu", () => {
   assert.match(panelSource, /onCollapse/);
-  assert.match(panelSource, /work-panel-rail-collapse/);
-  assert.match(panelSource, /IconPanel/);
+  assert.match(panelSource, /work-panel-toolbar-collapse/);
+  assert.match(panelSource, /IconChevronRight/);
   assert.match(appSource, /collapseWorkPanel\(\)/);
   assert.doesNotMatch(panelSource, /work-panel-collapse/);
   assert.doesNotMatch(panelSource, /collapsePanel/);
