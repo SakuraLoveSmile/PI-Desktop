@@ -50,6 +50,7 @@ import type {
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
 import { clampThinkingLevel, type PiModelConfig } from "./thinking-level.js";
+import type { ProjectInstructions } from "./project-instructions.js";
 import { projectInstructionsPrompt } from "./project-instructions-prompt.js";
 import { logTiming } from "./timing.js";
 
@@ -121,6 +122,12 @@ const DEFAULT_MAX_TOKENS = 8_192;
 const CONTEXT_COMPACTION_TOOL_NAME = "CompactContext";
 const CONTEXT_NUDGE_TURN_INTERVAL = 3;
 const CHECKPOINT_TAIL_SAFETY_TOKENS = 256;
+const PATH_SCOPED_INSTRUCTION_TOOLS = new Set([
+  "Read",
+  "Write",
+  "Edit",
+  "BrowserPreview",
+]);
 const CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER =
   "\n\n[checkpoint truncated: tool result exceeded the retained context budget]\n\n";
 const CONTEXT_COMPACTION_NUDGE = [
@@ -203,8 +210,8 @@ export type AgentRuntimeOptions = {
   provider: RuntimeProviderConfig;
   thinkingLevel: ThinkingLevel;
   systemPrompt?: string;
-  /** Instructions read from the session's workspace-root AGENTS.md. */
-  projectInstructions?: string;
+  /** Instructions resolved from the session's workspace. */
+  projectInstructions?: ProjectInstructions;
   /** Persisted transcript to seed the agent with (session isolation: each
    * session's agent carries only its own history). */
   history?: UiMessage[];
@@ -446,7 +453,8 @@ export class DesktopAgentRuntime {
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
   private scratchDir?: string;
-  private projectInstructions?: string;
+  private baseProjectInstructions?: ProjectInstructions;
+  private projectInstructions?: ProjectInstructions;
   /* Timing anchors (D137). `requestStartedAt` marks the moment the agent is
    * free to issue the next provider request — turn start, or the last tool
    * result coming back — so `providerWaitMs` below is the model's own latency
@@ -476,7 +484,8 @@ export class DesktopAgentRuntime {
     this.onEvent = opts.onEvent;
     this.pluginTools = opts.pluginTools ?? [];
     this.scratchDir = opts.scratchDir;
-    this.projectInstructions = opts.projectInstructions?.trim() || undefined;
+    this.baseProjectInstructions = opts.projectInstructions;
+    this.projectInstructions = opts.projectInstructions;
     this.compactionSettings = normalizeCompactionSettings(
       opts.compactionSettings,
     );
@@ -511,6 +520,26 @@ export class DesktopAgentRuntime {
     const projectInstructions = projectInstructionsPrompt(
       this.projectInstructions,
     );
+    const baseSystemPrompt =
+      opts.systemPrompt ??
+      [
+        "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
+        // Work panel browser preview (D100): workspace HTML files render
+        // in the embedded browser with live reload on file changes.
+        "When you create or edit an HTML page in the workspace, call the BrowserPreview tool with its workspace-relative path (e.g. `index.html` or `demo/index.html`) to show it in PI-Desktop's built-in browser panel. The preview live-reloads as you keep editing, so one call per page is enough — no external browser or manual refresh needed.",
+        // Shell dialect (host-core D084): commands run through bash on
+        // every platform — Git Bash on Windows, bash on macOS/Linux.
+        process.platform === "win32"
+          ? "Shell commands run in Git Bash (POSIX bash on Windows). Always write bash/POSIX syntax with forward-slash paths — never cmd.exe or PowerShell syntax."
+          : "Shell commands run in bash. Write bash/POSIX syntax.",
+        // Session scratch directory (D114): temp files must not dirty
+        // the user's workspace or its git status.
+        ...(this.scratchDir
+          ? [
+              `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
+            ]
+          : []),
+      ].join("\n\n");
 
     this.agent = new Agent({
       streamFn: (m, context, options) =>
@@ -528,27 +557,10 @@ export class DesktopAgentRuntime {
       prepareNextTurnWithContext: (context, signal) =>
         this.prepareNextTurn(context, signal),
       initialState: {
-        systemPrompt:
-          opts.systemPrompt ??
-          [
-            "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
-            // Work panel browser preview (D100): workspace HTML files render
-            // in the embedded browser with live reload on file changes.
-            "When you create or edit an HTML page in the workspace, call the BrowserPreview tool with its workspace-relative path (e.g. `index.html` or `demo/index.html`) to show it in PI-Desktop's built-in browser panel. The preview live-reloads as you keep editing, so one call per page is enough — no external browser or manual refresh needed.",
-            // Shell dialect (host-core D084): commands run through bash on
-            // every platform — Git Bash on Windows, bash on macOS/Linux.
-            process.platform === "win32"
-              ? "Shell commands run in Git Bash (POSIX bash on Windows). Always write bash/POSIX syntax with forward-slash paths — never cmd.exe or PowerShell syntax."
-              : "Shell commands run in bash. Write bash/POSIX syntax.",
-            // Session scratch directory (D114): temp files must not dirty
-            // the user's workspace or its git status.
-            ...(this.scratchDir
-              ? [
-                  `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
-                ]
-              : []),
-            ...(projectInstructions ? [projectInstructions] : []),
-          ].join("\n\n"),
+        systemPrompt: [
+          baseSystemPrompt,
+          ...(projectInstructions ? [projectInstructions] : []),
+        ].join("\n\n"),
         model,
         tools,
         thinkingLevel: this.thinkingLevel,
@@ -565,7 +577,7 @@ export class DesktopAgentRuntime {
     provider: RuntimeProviderConfig,
     thinkingLevelOrPluginToolNames: ThinkingLevel | string[] = this.thinkingLevel,
     pluginToolNames: string[] = [],
-    projectInstructions?: string,
+    projectInstructions?: ProjectInstructions,
   ): boolean {
     // Keep the pre-thinking overload usable for callers that passed plugin
     // names as the third argument. New callers pass the selected level.
@@ -606,7 +618,8 @@ export class DesktopAgentRuntime {
         safeJson(provider.modelConfig ?? null) &&
       this.thinkingLevel === clampThinkingLevel(provider, thinkingLevel) &&
       current === next &&
-      this.projectInstructions === (projectInstructions?.trim() || undefined)
+      safeJson(this.baseProjectInstructions ?? null) ===
+        safeJson(projectInstructions ?? null)
     );
   }
 
@@ -811,6 +824,7 @@ export class DesktopAgentRuntime {
                   : { command: Type.String() },
       ),
       execute: async (toolCallId, params) => {
+        await this.loadPathInstructions(toolName, params);
         const startedAt = Date.now();
         const result = await this.host.call<{
           ok: boolean;
@@ -872,6 +886,44 @@ export class DesktopAgentRuntime {
       ? [this.buildContextCompactionTool()]
       : [];
     return [...builtins, ...pluginTools, ...contextTools];
+  }
+
+  private async loadPathInstructions(
+    toolName: string,
+    params: unknown,
+  ): Promise<void> {
+    if (!PATH_SCOPED_INSTRUCTION_TOOLS.has(toolName)) {
+      return;
+    }
+    const path = isRecord(params) && typeof params.path === "string"
+      ? params.path.trim()
+      : "";
+    if (!path) return;
+
+    let resolved: ProjectInstructions | undefined;
+    try {
+      resolved = await this.host.call<ProjectInstructions | undefined>(
+        "project.instructions.resolve",
+        { sessionId: this.sessionId, path },
+      );
+    } catch {
+      return;
+    }
+    const knownSources = new Set(
+      this.projectInstructions?.entries.map((entry) => entry.source) ?? [],
+    );
+    const additions = resolved?.entries.filter(
+      (entry) => !knownSources.has(entry.source),
+    ) ?? [];
+    if (additions.length === 0) return;
+
+    this.projectInstructions = {
+      entries: [...(this.projectInstructions?.entries ?? []), ...additions],
+    };
+    const prompt = projectInstructionsPrompt({ entries: additions });
+    if (prompt) {
+      this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n${prompt}`;
+    }
   }
 
   private buildContextCompactionTool(): AgentTool {

@@ -1785,6 +1785,13 @@ function wireSidecar(s: AgentSidecar) {
 async function startSidecar(): Promise<void> {
   const s = new AgentSidecar((text) => logger.child("agent", text));
   wireSidecar(s);
+  s.setProjectInstructionResolver(async ({ sessionId, path }) => {
+    const detail = await host?.call<{ session?: { projectPath?: string } | null }>(
+      "session.get",
+      { id: sessionId },
+    );
+    return loadProjectInstructions(detail?.session?.projectPath, path);
+  });
   // Agent-driven work panel preview (D100): open a workspace HTML file in
   // the embedded browser; live reload keeps it current through later edits.
   s.setLocalTool("BrowserPreview", async ({ args, sessionId }) => {

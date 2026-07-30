@@ -1,11 +1,19 @@
-export function projectInstructionsPrompt(instructions?: string): string | undefined {
-  const trimmed = instructions?.trim();
-  if (!trimmed) return undefined;
+import type { ProjectInstructions } from "./project-instructions.js";
+
+export function projectInstructionsPrompt(
+  instructions?: ProjectInstructions,
+): string | undefined {
+  if (!instructions?.entries.length) return undefined;
   return [
     "# Project instructions",
     "",
-    "The following instructions come from the workspace-root AGENTS.md. Follow them when they apply to the task.",
+    "The following instructions are loaded from the workspace. Follow them when they apply to the task; entries later in this section are closer to the file being worked on and take precedence.",
     "",
-    trimmed,
-  ].join("\n");
+    ...instructions.entries.flatMap((entry) => [
+      `## ${entry.source}`,
+      "",
+      entry.content,
+      "",
+    ]),
+  ].join("\n").trimEnd();
 }

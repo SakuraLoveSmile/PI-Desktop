@@ -2150,19 +2150,25 @@ Each scenario is documented in this format:
   `context-compaction.test.mjs`, host-core transcript/session unit tests); full
   provider/UI journey Draft
 
-#### E2E-AGENTS-001: Workspace AGENTS.md instructions configure an agent session
+#### E2E-AGENTS-001: Project instruction chain configures an agent session
 
-- **Preconditions**: A project is open and its root contains a non-empty
-  `AGENTS.md`; a provider is configured.
+- **Preconditions**: A project contains root `AGENTS.md`, nested
+  `packages/api/AGENTS.md`, and a provider is configured.
 - **Steps**:
-  1. Start an Agent-mode conversation in the project and submit a task covered
-     by the project instructions.
-  2. Edit `AGENTS.md` while the session is idle, then submit a follow-up task.
-  3. Remove or empty `AGENTS.md` and submit another follow-up task.
-- **Expected**: The first task receives the root instruction content under the
-  runtime's project-instructions section. The idle follow-up uses the changed
-  content rather than reusing the prior runtime. Removing, emptying, or making
-  the file unreadable starts the turn normally without project instructions.
+  1. Start an Agent-mode conversation and submit a task covered by the root
+     instruction.
+  2. Let the agent read or edit `packages/api/handler.ts`.
+  3. Add `packages/api/AGENTS.override.md`, then have the agent access another
+     file in that directory.
+  4. Edit the root instruction while the session is idle, then submit a
+     follow-up task.
+- **Expected**: The initial runtime receives the root chain. Before the file
+  tool executes, the nested instruction is appended after its root source and
+  therefore takes precedence. In one directory, `AGENTS.override.md` wins over
+  `AGENTS.md`; `CLAUDE.md` and `.claude/CLAUDE.md` are fallback names. The idle
+  follow-up uses changed root content rather than reusing the prior runtime.
+  Empty, unreadable, oversized, and out-of-root instruction files do not block
+  the turn; combined UTF-8 content is capped at 32 KiB.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`
 - **Acceptance**: C (chat/stream), F (persistence)
 - **Milestone**: M5
