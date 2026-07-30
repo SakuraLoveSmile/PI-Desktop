@@ -484,6 +484,11 @@ preview), and Files (workspace browser). Codex-parity surface.
   chrome (review toolbar, browser chrome, file viewer header) stay white
 - The combined create trigger opens a resource menu; its dropdown items use a
   neutral fill with a 2px edge marker for the active tool, never color alone
+- The 46px header follows a "context left, actions right" model: the
+  current-resource switcher anchors the left and shows the active tool icon and
+  ellipsized label; a right action cluster groups the close / create / collapse
+  controls behind a thin divider. The collapse control uses a right chevron so
+  it reads as "push the panel away", not "open a panel"
 - Active tabs, file-tree rows, diff headers, and the resize handle ease hover
   fills with `--motion-duration-fast` / `--motion-ease-out`
 - Browser URL and empty-tool chrome share the light inset field treatment used

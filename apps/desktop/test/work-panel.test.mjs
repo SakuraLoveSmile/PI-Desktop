@@ -106,12 +106,13 @@ test("work panel is an internal dock that never expands the OS window", () => {
 
 test("work panel activity rail exposes tools and keeps resources in a switcher", () => {
   const headerIndex = panelSource.indexOf('className="work-panel-header"');
-  const toolListIndex = panelSource.indexOf('className="work-panel-create no-drag"');
   const switcherIndex = panelSource.indexOf('className="work-panel-switcher-trigger"');
+  const toolListIndex = panelSource.indexOf('className="work-panel-create"');
+  const actionsIndex = panelSource.indexOf('className="work-panel-actions no-drag"');
   const bodyIndex = panelSource.indexOf('<div className="work-panel-body">');
 
-  assert.ok(toolListIndex > headerIndex && switcherIndex > toolListIndex);
-  assert.ok(bodyIndex > headerIndex);
+  assert.ok(switcherIndex > headerIndex && toolListIndex > switcherIndex);
+  assert.ok(actionsIndex > switcherIndex && bodyIndex > actionsIndex);
   assert.match(panelSource, /HEADER_TOOLS\.map\(\(\{ kind, Icon \}/);
   assert.match(panelSource, /"work-panel-create-item"/);
   assert.match(panelSource, /aria-expanded=\{createOpen\}/);
@@ -127,7 +128,7 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
   assert.match(panelSource, /data-work-panel-switch-item/);
   assert.match(panelSource, /data-work-panel-menu-item/);
   assert.match(panelSource, /role="tabpanel"/);
-  assert.match(panelSource, /className="work-panel-current-close no-drag"/);
+  assert.match(panelSource, /className="work-panel-current-close"/);
   assert.match(panelSource, /className="work-panel-switcher-close"/);
   assert.match(panelSource, /closeTab\(tab\.id\)/);
   assert.doesNotMatch(panelSource, /collapsePanel/);

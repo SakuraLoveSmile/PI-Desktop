@@ -7097,6 +7097,24 @@ html {
   -webkit-app-region: drag;
 }
 
+/* The header follows a "context on the left, actions on the right" model:
+   the current-resource switcher anchors the left, and the close / create /
+   collapse controls are grouped into one action cluster on the right. A thin
+   divider keeps the two zones visually separate (ChatGPT / WorkBuddy style). */
+.work-panel-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+  padding-left: 6px;
+  border-left: 1px solid var(--ds-border-subtle);
+}
+
+:root[data-theme="light"] .work-panel-actions {
+  border-left-color: color-mix(in oklab, #1a1c1f 8%, transparent);
+}
+
 :root[data-theme="light"] .work-panel-header {
   background: #ffffff;
   border-bottom-color: color-mix(in oklab, #1a1c1f 8%, transparent);
@@ -7145,7 +7163,8 @@ html {
 .work-panel-create-menu {
   position: absolute;
   top: 38px;
-  left: 0;
+  right: 0;
+  left: auto;
   z-index: 50;
   min-width: 184px;
   max-height: min(360px, calc(100vh - 72px));
@@ -7271,8 +7290,8 @@ html {
 .work-panel-current-close,
 .work-panel-switcher-close {
   display: inline-flex;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
@@ -7374,7 +7393,20 @@ html {
 }
 
 .work-panel-toolbar-collapse {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-muted);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.work-panel-toolbar-collapse:hover {
+  color: var(--ds-text-primary);
+  background: var(--ds-bg-hover);
 }
 
 .work-panel-body {
