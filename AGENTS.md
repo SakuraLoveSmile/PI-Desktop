@@ -1,122 +1,158 @@
-# AGENTS.md — Rules for AI Coding Agents
+下面这版保留核心约束，删除重复说明，更适合作为仓库根目录的 `AGENTS.md`。
 
-Concise, mandatory rules for any AI agent working in this repository.
+# AGENTS.md
+
+Mandatory rules for AI coding agents working in this repository.
 
 ## Language
 
-- **English only** for commits, specs, code identifiers, and comments.
-- Match the repo's existing English-first policy ([baseline](docs/spec/00-baseline.md)).
+Use English for code, identifiers, comments, commits, specifications, and documentation.
 
-## Four Immutable Rules
+Follow the repository baseline:
 
-### 1. Spec-sync
+* [Baseline](docs/spec/00-baseline.md)
 
-Every behavior change must update the corresponding `docs/spec/` document. Architectural boundary changes also need an ADR (`docs/adr/`).
+## Immutable Rules
 
-→ [03-ai-development-workflow.md §R1](docs/spec/06-delivery/03-ai-development-workflow.md#1-core-immutable-rules)
+### 1. Keep Specs Synchronized
 
-### 2. Commit-per-change
+Every behavior change must update the relevant document under `docs/spec/`.
 
-Every completed logical change must be git committed. No large uncommitted piles.
+Add an ADR under `docs/adr/` when changing architectural boundaries, public interfaces, data ownership, security boundaries, or frozen design decisions.
 
-→ [03-ai-development-workflow.md §R2](docs/spec/06-delivery/03-ai-development-workflow.md#1-core-immutable-rules)
+### 2. Commit Every Logical Change
 
-### 3. E2E doc update
+Every completed logical change must be committed.
 
-Every user-visible or protocol-visible behavior change must add or update a scenario in the e2e test plan.
+* One logical change per commit
+* No large uncommitted diffs
+* No unrelated cleanup
+* Leave the working tree clean
 
-→ [04-e2e-test-plan.md](docs/spec/06-delivery/04-e2e-test-plan.md)
+### 3. Keep E2E Documentation Synchronized
 
-### 4. Request branch + worktree + merge request
+Every user-visible or protocol-visible behavior change must add or update a scenario in:
 
-Every new request must start in a dedicated worktree on a dedicated branch
-created from an up-to-date `main`. Reuse the primary checkout's development
-environment where safe; do not duplicate or commit local environment state.
-After development, push the branch, open a PR/MR targeting `main`, pass the
-required remote checks, and merge it. Local validation is risk-based and may be
-skipped when it is not necessary. Direct development or pushes on `main` are
-not allowed.
+* [E2E test plan](docs/spec/06-delivery/04-e2e-test-plan.md)
 
-→ [03-ai-development-workflow.md §R4](docs/spec/06-delivery/03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate)
+Updating E2E documentation is mandatory.
 
-## Development Loop
+Do not run local E2E commands or manually trigger remote E2E jobs unless the user explicitly requests E2E validation.
 
-1. Sync `main` and create a request branch in a dedicated worktree
-2. Read baseline + relevant specs
-3. Plan change + list impacted specs and necessary validation
-4. Implement
-5. Update specs / ADR / decisions-log
-6. Update or add e2e scenarios when Rule 3 applies
-7. Run only the targeted local checks justified by the change's risk; when no
-   local validation is necessary, skip it and continue to delivery. Run E2E
-   only when the user explicitly requests it
-8. Commit with conventional message
-9. Update BOARD if milestone-related
-10. Push the branch and open a PR/MR to `main`
-11. Pass required remote checks, merge, and remove the request worktree and branch
+### 4. Use a Branch and Dedicated Worktree
 
-→ [03-ai-development-workflow.md §2](docs/spec/06-delivery/03-ai-development-workflow.md#2-development-loop)
+Every new request must:
 
-E2E scenario documentation remains mandatory under Rule 3. Agents must not
-proactively run local E2E commands or manually dispatch/rerun remote E2E jobs
-unless the user explicitly requests E2E validation. Automatically triggered
-required remote checks remain part of the merge gate. Skipping unnecessary
-local validation does not block commit, push, or PR/MR creation.
+1. Start from an up-to-date local `main`
+2. Use a dedicated branch
+3. Use a dedicated worktree
+4. Be committed on that branch
+5. Be merged into local `main`
+
+Do not:
+
+* Develop directly on `main`
+* Develop in the primary checkout
+* Reuse another request's worktree
+* Push branches or `main` to remote
+* Open a PR or MR unless explicitly requested
+
+Remote publishing is the user's responsibility.
+
+## Development Workflow
+
+1. Update local `main`
+2. Create a request branch and worktree
+3. Read the baseline and relevant specs
+4. Identify affected specs, ADRs, E2E scenarios, and validation
+5. Implement the smallest coherent change
+6. Update specs, ADRs, decisions log, and E2E documentation as required
+7. Run targeted, risk-based checks
+8. Review the complete diff
+9. Commit each logical change
+10. Update `docs/project/BOARD.md` when milestone-related
+11. Merge the branch into local `main`
+12. Do not push
+
+Local validation may be skipped when it provides no meaningful value, but the reason must be reported.
+
+Automatically triggered required remote checks remain part of the merge gate.
 
 ## Commit Format
 
-```
+```text
 type(scope): description
 ```
 
-Types: `feat` `fix` `docs` `test` `chore` `refactor` `perf` `build` `ci`
+Allowed types:
 
-English messages only. One logical change per commit.
+```text
+feat fix docs test chore refactor perf build ci
+```
 
-→ [03-ai-development-workflow.md §4](docs/spec/06-delivery/03-ai-development-workflow.md#4-git-commit-rules)
+Requirements:
 
-## Before Finishing Work
+* English only
+* Concise, imperative description
+* One logical change per commit
 
-Run the [change checklist](docs/spec/06-delivery/05-change-checklist.md):
+Example:
 
-- [ ] Impact analysis done
-- [ ] Request branch and worktree were created from an up-to-date `main`
-- [ ] Task environment reuses the primary checkout where safe
-- [ ] Specs updated per matrix
-- [ ] E2E doc updated if behavior changed
-- [ ] Necessary local validation completed, or confirmed unnecessary
-- [ ] No secrets / local data in diff
-- [ ] Conventional commit message
-- [ ] If cutting a **stable app version tag**: dual-locale entries for that
-      version exist in `packages/shared/src/changelog.ts` (EN + zh-CN) **before**
-      the tag — see [release runbook §4.1](docs/spec/06-delivery/06-release-runbook.md#41-mandatory-in-app-changelog-gate-d164)
-- [ ] All Definition-of-Done gates pass
-- [ ] PR/MR passed required remote checks and was merged into `main`
+```text
+fix(auth): prevent expired session reuse
+```
+
+## Stable Release Rule
+
+Before creating a stable application version tag, ensure the version has both English and Simplified Chinese entries in:
+
+```text
+packages/shared/src/changelog.ts
+```
+
+See:
+
+* [Release runbook](docs/spec/06-delivery/06-release-runbook.md#41-mandatory-in-app-changelog-gate-d164)
+
+## Completion Checklist
+
+Before finishing:
+
+* [ ] Impact analysis completed
+* [ ] Branch and worktree created from updated `main`
+* [ ] Relevant specs updated
+* [ ] ADR added when required
+* [ ] E2E scenarios updated when required
+* [ ] Targeted validation passed or was documented as unnecessary
+* [ ] No secrets, local data, or unrelated changes in the diff
+* [ ] Conventional commits created
+* [ ] Definition-of-Done gates passed
+* [ ] Changes merged into local `main`
+* [ ] Nothing pushed to remote
+
+## Final Report
+
+Report:
+
+* What changed
+* Documentation updated
+* Validation performed or skipped
+* Commit hashes and messages
+* Confirmation that changes were merged into local `main`
+* Confirmation that nothing was pushed
 
 ## Key References
 
-| Doc | Path |
-|---|---|
-| Baseline | `docs/spec/00-baseline.md` |
-| Spec index | `docs/spec/README.md` |
-| Decisions log | `docs/spec/08-meta/decisions-log.md` |
-| AI dev workflow | `docs/spec/06-delivery/03-ai-development-workflow.md` |
-| E2E test plan | `docs/spec/06-delivery/04-e2e-test-plan.md` |
-| Change checklist | `docs/spec/06-delivery/05-change-checklist.md` |
-| Release runbook | `docs/spec/06-delivery/06-release-runbook.md` |
-| ADR index | `docs/adr/README.md` |
-| Project board | `docs/project/BOARD.md` |
+| Document        | Path                                                  |
+| --------------- | ----------------------------------------------------- |
+| Baseline        | `docs/spec/00-baseline.md`                            |
+| Spec index      | `docs/spec/README.md`                                 |
+| Decisions log   | `docs/spec/08-meta/decisions-log.md`                  |
+| AI workflow     | `docs/spec/06-delivery/03-ai-development-workflow.md` |
+| E2E plan        | `docs/spec/06-delivery/04-e2e-test-plan.md`           |
+| Checklist       | `docs/spec/06-delivery/05-change-checklist.md`        |
+| Release runbook | `docs/spec/06-delivery/06-release-runbook.md`         |
+| ADR index       | `docs/adr/README.md`                                  |
+| Project board   | `docs/project/BOARD.md`                               |
 
-## Never Do
-
-- Commit secrets, API keys, or tokens
-- Leave large uncommitted diffs at session end
-- Change behavior without updating specs
-- Skip e2e doc for user-visible changes
-- Manually run or dispatch E2E without an explicit user request
-- Modify frozen baseline decisions without ADR + version bump
-- Tag a stable app release without updating `packages/shared/src/changelog.ts`
-  (EN + zh-CN) for that version
-- Develop or push directly on `main`
-- Develop a new request in the primary checkout or another request's worktree
-- Mark work complete before its PR/MR is merged into `main`
+相比上一版，这版去掉了规则优先级、变更分类和大量解释，只保留 Agent 真正需要执行的内容。
