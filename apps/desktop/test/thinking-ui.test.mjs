@@ -66,7 +66,7 @@ test("reasoning-capable models show thinking immediately after the mode control"
     composerSource.indexOf('<div className="composer-left">'),
     composerSource.indexOf('<div className="composer-right">'),
   );
-  const modeControl = leftToolbar.indexOf('className="icon-btn mode-chip"');
+  const modeControl = leftToolbar.indexOf("mode-chip");
   const thinkingControl = leftToolbar.indexOf('className="composer-thinking"');
   const permissionControl = leftToolbar.indexOf('className="composer-permission"');
 

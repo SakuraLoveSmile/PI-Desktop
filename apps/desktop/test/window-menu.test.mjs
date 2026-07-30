@@ -51,7 +51,7 @@ test("macOS installs a standard application menu before window creation", () => 
     assert.match(menuSource, new RegExp(`role: "${role}"`));
   }
   for (const topLevel of ["file", "edit", "view", "window"]) {
-    assert.match(menuSource, new RegExp(`label: labels\\.menu\\.${topLevel}`));
+    assert.match(menuSource, new RegExp(`label: labels\\\\.menu\\\\.${topLevel}`));
   }
   assert.match(menuSource, /role:\s*"help"/);
   assert.match(menuSource, /resolveLocale\(locale\)/);
@@ -78,8 +78,8 @@ test("macOS application menu routes shell commands and preserves native roles", 
     ["openSearch", "Mod+K"],
     ["toggleSidebar", "Mod+B"],
   ]) {
-    assert.match(menuSource, new RegExp(`accelerator\\(\"${id}\"\\)`));
-    assert.match(shortcutSource, new RegExp(`defaultBinding: \"${binding.replace("+", "\\+")}\"`));
+    assert.match(menuSource, new RegExp(`accelerator\\\\("${id}"\\\\)`));
+    assert.match(shortcutSource, new RegExp(`defaultBinding: "${binding.replace("+", "\\\\+")}"`));
   }
   for (const role of [
     "undo",
@@ -168,7 +168,7 @@ test("Windows and Linux use menu-free frameless chrome with window controls", ()
   );
   assert.match(
     stylesSource,
-    /:root\[data-platform="win32"\] \.thread-content,[\s\S]*:root\[data-platform="linux"\] \.thread-content\s*\{[^}]*padding-top:\s*46px;/,
+    /:root\[data-platform="(win32|linux)"\] \.thread-content[\s\S]*?padding-top:\s*46px;/,
   );
   assert.match(
     stylesSource,

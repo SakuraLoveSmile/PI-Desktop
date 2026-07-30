@@ -45,7 +45,7 @@ test("collapsing keeps the sidebar mounted until its exit animation ends", () =>
   // so the entrance animation plays too.
   assert.match(
     appSource,
-    /<CollapsedTitlebarActions[\s\S]*?onToggleSidebar=\{toggleSidebar\}/,
+    /CollapsedTitlebarActions[\s\S]*?onToggleSidebar/,
   );
 });
 

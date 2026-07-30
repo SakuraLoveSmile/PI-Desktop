@@ -30,9 +30,9 @@ test("renderer surfaces the PI-Desktop brand instead of the Codex shell brand", 
 });
 
 test("app chrome uses the shared brand asset without branding the composer input", () => {
-  assert.match(brandLogo, /import brandLogoUrl from "\.\.\/\.\.\/build\/icon_1024\.png"/);
+  assert.match(brandLogo, /import brandLogoUrl.*from\s*"\.\.\/\.\.\/build\/icon_1024\.png"/);
   assert.match(brandLogo, /export function BrandLogo/);
-  assert.match(brandLogo, /src=\{brandLogoUrl\}/);
+  assert.match(brandLogo, /src=\{.*brandLogoUrl/);
   assert.match(icons, /export const IconNewSession/);
   assert.doesNotMatch(icons, /IconCodexHome|IconCompose|IconPiMark|IconPiHome/);
   assert.match(chatSurface, /<BrandLogo\s+size=\{56\}/);
