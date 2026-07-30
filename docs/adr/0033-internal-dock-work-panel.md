@@ -48,8 +48,8 @@ expansion.
 3. The native browser `WebContentsView` continues to be positioned from the
    renderer-measured panel rect via `browserSetBounds`. No window expansion is
    required for it to sit correctly.
-4. The default committed width is raised from **420px to 480px**; the
-   `364..720px` clamp is unchanged.
+4. The default committed width is **420px** (the established baseline), within
+   the unchanged `364..720px` clamp.
 5. Native window-edge resize changes `MainChat` only, now by plain reflow
    (the panel is internal and stays at its committed width).
 
@@ -85,7 +85,7 @@ failure mode, for no benefit over measuring the in-flow rect.
 - `docs/adr/0032-reserve-native-width-for-the-docked-work-panel.md` (superseded
   in part)
 - `apps/desktop/src/App.tsx` (reservation target set to `0`)
-- `apps/desktop/src/lib/work-panel-resize.ts` (`WORK_PANEL_DEFAULT_WIDTH = 480`)
+- `apps/desktop/src/lib/work-panel-resize.ts` (`WORK_PANEL_DEFAULT_WIDTH = 420`)
 - `apps/desktop/src/components/workpanel/BrowserTab.tsx` (`browserSetBounds`
   from measured rect)
 - `apps/desktop/electron/main/browser-view.ts` (`BrowserPane.setBounds`)

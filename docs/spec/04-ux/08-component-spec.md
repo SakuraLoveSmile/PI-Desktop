@@ -494,7 +494,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 | State | Behavior |
 |---|---|
 | Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only in a session that produced a successful workspace Write/Edit while that Git working tree remains dirty. |
-| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 364–720px (default 480px), preserving at least 320px of content beside the rail. It occupies client-area space and never expands the OS window (ADR 0033). |
+| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 364–720px (default 420px), preserving at least 320px of content beside the rail. It occupies client-area space and never expands the OS window (ADR 0033). |
 | Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded switcher lists resources in first-open order with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows anchored pointer delta or keyboard input. Pointer changes preview once per animation frame and commit width plus reservation only on release; Escape, pointer cancellation, or lost capture restores both. Native window-edge resize changes MainChat only. |
