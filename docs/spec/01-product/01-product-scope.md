@@ -96,7 +96,7 @@ Install or develop local plugins for commands/panels/tools.
 
 | Platform | MVP | Notes |
 |---|---|---|
-| macOS Apple Silicon | Required | Primary dev/acceptance |
-| macOS Intel | Compatible | Best effort |
-| Windows x64 | Planned | Architecture reserved |
-| Linux x64 | Planned | Architecture reserved |
+| macOS Apple Silicon | Published | Primary development and acceptance platform |
+| macOS Intel | Not packaged | No current x64 release target |
+| Windows x64 | Published | NSIS installer and in-app update lane; native qualification continues |
+| Linux x64 | Published | AppImage and deb packages; AppImage update lane; native qualification continues |

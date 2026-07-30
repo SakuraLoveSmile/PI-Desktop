@@ -19,10 +19,10 @@
 > (`claude-opus-5`, 1M context, adaptive thinking). Earlier 0.82.0 builds
 > treated that id as an unknown free-form model.
 | Node runtime | Node.js | `>= 22.19` | pi requirement |
-| DB | SQLite | via Rust and/or node adapter | sessions/settings |
+| DB | SQLite | Rust host-core via `rusqlite` | sessions/settings |
 | Packaging | electron-builder | stable | macOS first |
 | Terminal | node-pty (main) + @xterm/xterm (renderer) | stable, N-API | work panel PTY (ADR 0019); allowBuilds + asarUnpack + install-app-deps |
-| Package manager | pnpm | 10.x | JS monorepo |
+| Package manager | pnpm | 11.18.x | JS monorepo |
 | Lint/test | style-token checker (`scripts/check-style-tokens.mjs`) + vitest + cargo test; general JS linter still open (biome vs oxlint) | stable | dual stack quality |
 | Schema (TS) | typebox | frozen (D011) | shared contracts |
 | i18n | i18next + react-i18next | frozen (D012) | English source locale |

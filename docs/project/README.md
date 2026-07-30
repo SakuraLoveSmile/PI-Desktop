@@ -1,5 +1,6 @@
 # Project Tracking
 
-- 本地看板文档：`BOARD.md`
-- GitHub Issues + Milestones：仓库 Issues 页
-- GitHub Projects：待补充 `project` token scope 后创建
+- Local board: [`BOARD.md`](BOARD.md)
+- Documentation/code alignment audit: [2026-07-30 audit](2026-07-30-docs-code-audit.md)
+- GitHub Issues + Milestones: repository Issues page
+- GitHub Projects: create after adding the `project` token scope
