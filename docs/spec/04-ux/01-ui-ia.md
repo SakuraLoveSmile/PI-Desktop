@@ -178,9 +178,12 @@ declarations.
 
 ### 3.6 Settings (full-page takeover)
 Settings replaces the whole shell (D063): back-to-app + search + a compact
-five-destination rail in the exact order Basics / Model configuration / Import /
-Project archive / Info (D133), with elevated content cards.
-Appearance lives inside Basics; provider management lives inside
+seven-destination rail in the exact order Basics / 全局 AI / Shortcuts / Model
+configuration / Import / Project archive / Info (D133, D166), with elevated
+content cards.
+Appearance lives inside Basics; global AI behavior (permissions and context
+management) lives inside 全局 AI; keyboard shortcuts has its own destination;
+provider management lives inside
 Agent. Import scans supported local agent stores and presents
 candidates in collapsible groups. Project path is an alternate grouping
 alongside the default source grouping, and every scan or grouping change starts

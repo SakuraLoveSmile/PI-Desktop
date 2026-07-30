@@ -917,8 +917,8 @@ Full component contract and usage rules: [08-component-spec.md §17](08-componen
   is embedded in Settings with no duplicate page title or outer page padding;
   the earlier standalone Projects destination and card grid (D042) are
   superseded by D133
-- **Settings**: full-page Codex shell per D063/D090/D133 (275px compact
-  five-destination rail, `#f4f4f4` light, elevated content cards, Back to app);
+- **Settings**: full-page Codex shell per D063/D090/D133/D166 (275px compact
+  seven-destination rail, `#f4f4f4` light, elevated content cards, Back to app);
   per D092, the content cards fill the pane width available from the current
   window instead of retaining D070's fixed 720px cap — the earlier in-shell
   200px rail and broad grouped directory are superseded

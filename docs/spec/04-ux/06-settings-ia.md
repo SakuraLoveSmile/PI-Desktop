@@ -9,11 +9,13 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - The 46px top band across both the rail and content pane is a native window
   drag region; interactive controls remain explicitly non-draggable
 - A compact navigation directory with icons, in this exact order:
-  1. **Basics** — Lucide `SlidersHorizontal` (appearance, defaults, shortcuts)
-  2. **Model configuration** — Lucide `Bot` (providers and default model)
-  3. **Import** — Lucide `Download` (bring sessions in from other tools)
-  4. **Project archive** — Lucide `Archive` (durable project index)
-  5. **Info** — Lucide `Info` (versions, logs, updates)
+  1. **Basics** — Lucide `SlidersHorizontal` (appearance, defaults)
+  2. **全局 AI / AI** — Lucide `Sparkles` (permissions, context management)
+  3. **Shortcuts** — Lucide `Keyboard` (keyboard shortcuts)
+  4. **Model configuration** — Lucide `Bot` (providers and default model)
+  5. **Import** — Lucide `Download` (bring sessions in from other tools)
+  6. **Project archive** — Lucide `Archive` (durable project index)
+  7. **Info** — Lucide `Info` (versions, logs, updates, developer)
   Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
   with the rail label; do not reuse refresh/rotate glyphs here.
 - No additional settings destinations or placeholder navigation rows are shown
@@ -36,8 +38,14 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     Auto card shows the detected language inline (e.g. "当前：简体中文")
   - native select triggers and their opened option lists use the active theme's
     readable foreground/background pairing on macOS, Windows, and Linux
-- **Defaults** and **Permissions** cards retain the host-backed default mode,
-  Enter-to-send, and global permission-mode controls.
+- **Defaults** card retains the host-backed default mode and Enter-to-send
+  controls.
+- File-open target, menu-bar behavior, and bottom-panel behavior are not
+  rendered until their host-backed settings schemas and runtime effects exist.
+
+### 全局 AI (`ai` tab)
+- **Permissions** card: the global permission-mode control
+  (ask / accept-edits / auto) that governs how autonomously the agent acts.
 - **Context management** card:
   - automatic compaction is enabled by default
   - the switch controls per-`turn_end` soft guidance, deterministic threshold
@@ -49,6 +57,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     a 1024 minimum; the runtime further clamps unsafe values to the active
     model's context window as specified by D158
   - the card and all three controls are indexed by Settings search
+
+### Shortcuts (`shortcuts` tab)
 - **Keyboard shortcuts** card:
   - lists navigation, agent, and window actions from one shared shortcut map
   - renders platform-native modifier labels (`⌘` on macOS, `Ctrl` on
@@ -61,17 +71,6 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     restored together
   - overrides persist in optional `AppSettings.keybindings`; macOS native-menu
     accelerators and renderer-owned shortcuts update from the same map
-- **Developer** card:
-  - developer mode is off unless the optional persisted
-    `AppSettings.developerMode` value is `true`
-  - the developer mode switch unlocks the Open console button, F12 on every
-    platform, Ctrl+Shift+I on Windows/Linux, and the macOS View-menu developer
-    tools item
-  - disabling developer mode closes an open console and disables or removes
-    every entry point; Settings search indexes the card, switch, and console
-    action
-- File-open target, menu-bar behavior, and bottom-panel behavior are not
-  rendered until their host-backed settings schemas and runtime effects exist.
 
 ### Model configuration (`agent` tab)
 - **Studio hero**: provider count, ready count, and current default provider/model summary
@@ -107,6 +106,15 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - app/host/protocol versions + open logs
 - Updates row with the current delivery state and one applicable action:
   Check for updates, View release, or Restart to update
+- **Developer** card:
+  - developer mode is off unless the optional persisted
+    `AppSettings.developerMode` value is `true`
+  - the developer mode switch unlocks the Open console button, F12 on every
+    platform, Ctrl+Shift+I on Windows/Linux, and the macOS View-menu developer
+    tools item
+  - disabling developer mode closes an open console and disables or removes
+    every entry point; Settings search indexes the card, switch, and console
+    action
 - The Updates row always exposes a Release notes action. It opens a modal
   containing the complete shipped stable changelog in newest-first order,
   localized to the product language and marking the current and available
@@ -132,15 +140,16 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ## 4. Acceptance
 
 1. Opening Settings hides the coding app sidebar (full-page takeover)
-2. Rail shows search + back and exactly Basics, Model configuration, Import,
-   Project archive, and Info in that order
+2. Rail shows search + back and exactly Basics, 全局 AI/AI, Shortcuts, Model
+   configuration, Import, Project archive, and Info in that order
 3. Appearance is part of Basics and has no standalone rail destination
 4. Providers is part of Agent and has no standalone rail destination
 5. Plugins has no Settings destination; the app-shell Plugins page supports
    load, enable, disable, and uninstall
-6. Basics shows host-backed Appearance, Defaults, Context management,
-   Permissions, and Keyboard shortcuts cards without adding another settings
-   destination
+6. Basics shows host-backed Appearance and Defaults cards only; the AI
+   destination shows Permissions and Context management; the Shortcuts
+   destination shows the Keyboard shortcuts card; Info shows the Developer card.
+   No additional settings destinations are rendered
 7. Provider secrets never display raw key values
 8. Model configuration shows the provider studio (hero + defaults + add dialog + cards) rather than a dense always-on form dump
 9. Row descriptions use semantic secondary text and maintain at least 4.5:1

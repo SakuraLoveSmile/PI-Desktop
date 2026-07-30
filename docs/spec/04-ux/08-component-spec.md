@@ -13,7 +13,7 @@
 > updated values: sidebar ~275px (not 240px), toolbar 46px (not 44px),
 > composer placeholder per D094/D066, home empty stack per D111,
 > Projects index table per D066/D133, settings full-page shell per D063 with the
-> compact five-destination directory from D090/D133, and retained path-keyed
+> compact seven-destination directory from D090/D133/D166, and retained path-keyed
 > project groups per D093 (which preserves D088's Temporary/exact-path boundary
 > while restoring scoped project and conversation organization actions), and
 > product branding/icon contract per D094/D160.
@@ -109,7 +109,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   Check for Updates actions. Windows/Linux expose equivalent product actions
   through in-app controls and keyboard shortcuts, with update checks in
   Settings -> Info.
-- When Settings -> Basics -> Developer mode is enabled, the macOS View menu
+- When Settings -> Info -> Developer mode is enabled, the macOS View menu
   additionally exposes the native developer-tools role. All platforms expose
   F12, and Windows/Linux also expose Ctrl+Shift+I; the commands and Settings
   Open console action are unavailable while the mode is disabled.
