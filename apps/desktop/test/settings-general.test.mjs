@@ -80,6 +80,8 @@ test("model configuration keeps model defaults; basics owns app behavior", () =>
 
 test("settings nav icons map each destination to a semantic lucide glyph", () => {
   assert.match(settingsPageSource, /general: <IconSliders/);
+  assert.match(settingsPageSource, /ai: <IconSparkles/);
+  assert.match(settingsPageSource, /shortcuts: <IconKeyboard/);
   assert.match(settingsPageSource, /agent: <IconBot/);
   assert.match(settingsPageSource, /import: <IconDownload/);
   assert.match(settingsPageSource, /projects: <IconArchive/);

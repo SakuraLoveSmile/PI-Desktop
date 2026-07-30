@@ -290,6 +290,8 @@ export const zhCN = {
     mode: "默认模式",
     back: "返回",
     general: "基础",
+    ai: "全局 AI",
+    shortcuts: "快捷键",
     configuration: "模型配置",
     personalization: "个性化",
     voice: "语音",

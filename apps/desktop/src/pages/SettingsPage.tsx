@@ -32,10 +32,12 @@ import {
   IconFileText,
   IconGlobe,
   IconInfo,
+  IconKeyboard,
   IconMonitor,
   IconMoon,
   IconSearch,
   IconSliders,
+  IconSparkles,
   IconSun,
 } from "../components/icons";
 import { ProvidersSection } from "../components/settings/ProvidersSection";
@@ -566,8 +568,10 @@ export function SettingsPage() {
   // are view-level.
   const navGroups: NavGroup[] = useMemo(() => {
     const iconFor: Record<SettingsTab, ReactNode> = {
-      // Semantic Lucide glyphs for the five-destination rail.
+      // Semantic Lucide glyphs for the settings destinations.
       general: <IconSliders size={14} />,
+      ai: <IconSparkles size={14} />,
+      shortcuts: <IconKeyboard size={14} />,
       agent: <IconBot size={14} />,
       import: <IconDownload size={14} />,
       projects: <IconArchive size={14} />,
@@ -861,7 +865,11 @@ export function SettingsPage() {
                   </button>
                 </SettingsRow>
               </SettingsCard>
+            </div>
+          )}
 
+          {tab === "ai" && settings && (
+            <div className="settings-stack">
               <SettingsCard title={t("settings.permissions")}>
                 <SettingsRow
                   title={t("settings.permissionMode")}
@@ -964,14 +972,16 @@ export function SettingsPage() {
                   />
                 </SettingsRow>
               </SettingsCard>
+            </div>
+          )}
 
+          {tab === "shortcuts" && settings && (
+            <div className="settings-stack">
               <KeyboardShortcutsSection
                 settings={settings}
                 platform={platform}
                 saveSettings={saveSettings}
               />
-
-              <DeveloperSection settings={settings} saveSettings={saveSettings} />
             </div>
           )}
 
@@ -982,24 +992,30 @@ export function SettingsPage() {
           {tab === "projects" && <ProjectsPage />}
 
           {tab === "about" && (
-            <SettingsCard>
-              <SettingsRow title={t("settings.application")} description={t("settings.applicationDesc")}>
-                <div className="settings-about-meta">
-                  <div className="font-medium">
-                    {version?.name || "PI-Desktop"} {version?.version}
+            <div className="settings-stack">
+              <SettingsCard>
+                <SettingsRow title={t("settings.application")} description={t("settings.applicationDesc")}>
+                  <div className="settings-about-meta">
+                    <div className="font-medium">
+                      {version?.name || "PI-Desktop"} {version?.version}
+                    </div>
+                    <div className="font-mono text-xs-plus text-text-muted">
+                      protocol {version?.protocolVersion} · host {version?.hostVersion}
+                    </div>
                   </div>
-                  <div className="font-mono text-xs-plus text-text-muted">
-                    protocol {version?.protocolVersion} · host {version?.hostVersion}
-                  </div>
-                </div>
-              </SettingsRow>
-              <SettingsRow title={t("settings.logs")} description={t("settings.logsDesc")}>
-                <Button variant="secondary" onClick={() => void api.openLogs()}>
-                  {t("settings.openLogs")}
-                </Button>
-              </SettingsRow>
-              <UpdatesRow currentVersion={version?.version} />
-            </SettingsCard>
+                </SettingsRow>
+                <SettingsRow title={t("settings.logs")} description={t("settings.logsDesc")}>
+                  <Button variant="secondary" onClick={() => void api.openLogs()}>
+                    {t("settings.openLogs")}
+                  </Button>
+                </SettingsRow>
+                <UpdatesRow currentVersion={version?.version} />
+              </SettingsCard>
+
+              {settings && (
+                <DeveloperSection settings={settings} saveSettings={saveSettings} />
+              )}
+            </div>
           )}
 
         </div>

@@ -288,6 +288,8 @@ export const en = {
     mode: "Default mode",
     back: "Back",
     general: "Basics",
+    ai: "AI",
+    shortcuts: "Shortcuts",
     configuration: "Model configuration",
     personalization: "Personalization",
     voice: "Voice",
