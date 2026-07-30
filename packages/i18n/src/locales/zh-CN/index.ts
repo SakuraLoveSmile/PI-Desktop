@@ -94,6 +94,8 @@ export const zhCN = {
     noProjectSessions: "当前项目还没有对话",
     noTemporarySessions: "暂无临时对话",
     newChat: "新对话",
+    conversation: "对话",
+    toggleSidebar: "切换侧边栏",
     sessions: "会话",
     commandPalette: "命令面板",
     back: "后退",

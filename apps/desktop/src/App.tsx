@@ -22,6 +22,7 @@ import {
   type ShortcutPlatform,
 } from "@pi-desktop/shared";
 import { Sidebar } from "./components/Sidebar";
+import { ConversationTopbar } from "./components/ConversationTopbar";
 import { WorkPanel } from "./components/workpanel/WorkPanel";
 import { ChatSurface } from "./components/ChatSurface";
 import { CommandPalette } from "./components/CommandPalette";
@@ -896,22 +897,34 @@ function AppShell() {
           ) : null}
 
           <section className="main-pane">
-            <div
-              className={cx(
-                "main-titlebar",
-                presentedWorkPanelOpen && "work-panel-open",
-              )}
-            >
-              {sidebarCollapsed && (
-                <div className="main-titlebar-left no-drag">
-                  <CollapsedTitlebarActions
-                    onToggleSidebar={toggleSidebar}
-                    onNewTask={() => void runMenuCommand("newTask")}
-                    sidebarToggleShortcut={sidebarToggleShortcut}
-                  />
-                </div>
-              )}
-            </div>
+            {page === "chat" ? (
+              <ConversationTopbar
+                sidebarCollapsed={sidebarCollapsed}
+                workPanelOpen={presentedWorkPanelOpen}
+                onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+                onNewTask={() => void runMenuCommand("newTask")}
+                onOpenSearch={() => setSearchOpen(true)}
+                onOpenCommandPalette={() => setPaletteOpen(true)}
+                onOpenSettings={() => void runMenuCommand("openSettings")}
+              />
+            ) : (
+              <div
+                className={cx(
+                  "main-titlebar",
+                  presentedWorkPanelOpen && "work-panel-open",
+                )}
+              >
+                {sidebarCollapsed && (
+                  <div className="main-titlebar-left no-drag">
+                    <CollapsedTitlebarActions
+                      onToggleSidebar={() => setSidebarCollapsed(false)}
+                      onNewTask={() => void runMenuCommand("newTask")}
+                      sidebarToggleShortcut={sidebarToggleShortcut}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
             <UpdateBanner />
 
             {backendDown && (

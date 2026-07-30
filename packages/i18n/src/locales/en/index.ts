@@ -92,6 +92,8 @@ export const en = {
     noProjectSessions: "No chats in this project yet",
     noTemporarySessions: "No temporary chats yet",
     newChat: "New chat",
+    conversation: "Conversation",
+    toggleSidebar: "Toggle sidebar",
     sessions: "Sessions",
     commandPalette: "Command palette",
     back: "Back",

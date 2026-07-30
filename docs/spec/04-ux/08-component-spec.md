@@ -136,16 +136,34 @@ button, and settings entry.
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [📁 Project name] [🤖 Model: provider/model] [🛡 Mode badge] [⏹ Abort] [⚙ Settings]
+[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [Agent | Chat] [🤖 Model] [＋ New] [🔍 Search] [⚙ Commands] [⚙ Settings]
 ```
 
-(Icons described functionally; actual render uses Lucide SVGs.)
+(Icons described functionally; actual render uses Lucide SVGs. The `[☰ Sidebar]`
+toggle renders **only when the sidebar is collapsed**; when the sidebar is
+expanded it owns that control, so the top bar does not duplicate it.)
+
+The conversation top bar renders for the chat route only; Pull requests, Scheduled,
+Plugins, and Settings keep the frameless drag band. The Agent/Chat control is a
+segmented toggle (not a badge) and writes the session `mode`; the model picker
+opens **downward** because the bar anchors the top of the viewport. The composer
+no longer carries the mode chip or model selector — both moved here. The Thinking
+and permission triggers remain in the composer (§11).
 
 ### 2.3 Layout
 
 - Height: 46px (Codex toolbar rhythm, D034; supersedes the old 44px)
-- Background: bg-secondary
+- Background: bg-primary
 - Border: border-subtle bottom
+- Position: absolute 46px frameless band; `-webkit-app-region: drag` with
+  `no-drag` on interactive controls; macOS reserves the left ~76px for traffic
+  lights (only when the sidebar is collapsed), Windows/Linux reserve the right
+  112px for native window controls
+- Title cluster (project ▸ task title) flexes and **ellipsizes**; the right
+  cluster (Agent|Chat toggle, model picker, action icons) is `flex: 0 0 auto`
+  and is never squeezed by a long title. The conversation surface keeps a
+  `min-width` so its content is not crushed on narrow windows.
+- macOS fullscreen resets the left reserve to 8px (mirrors the sidebar header).
 - Sticky: `z-sticky`
 - Items: left-aligned controls, right-aligned actions
 
@@ -153,9 +171,10 @@ button, and settings entry.
 
 | Element | Default | Running | Error | No workspace |
 |---|---|---|---|---|
+| Task title | session title (or untitled) | same, plus a "Running" pill with a pulsing dot | same | same |
 | Model selector | clickable dropdown | disabled during stream | clickable | clickable (no provider warning) |
-| Mode badge | "Agent" or "Chat" badge | same | same | same |
-| Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
+| Mode toggle | "Agent" or "Chat" highlighted | same, disabled while running | same | same |
+| New task / Search / Commands / Settings | icon buttons | same | same | same |
 | Project name | workspace folder name | same | same | "No project" muted |
 
 ### 2.5 Accessibility
@@ -428,6 +447,13 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
   regenerate re-pins and jumps to bottom
 - Destination entry uses one short opacity/translate transition. Streaming
   updates occur inside the mounted surface and never replay this transition.
+- The transcript's bottom reserve is **height-aware**, not a fixed gap. The
+  docked composer measures its real rendered height (it grows with multi-line
+  drafts) and publishes it as the `--composer-dock-height` custom property on
+  `:root`; `.thread-content` reserves `calc(var(--composer-dock-height) + 16px)`
+  so the last message sits ~16px above the box and is never overlapped even as
+  the draft grows. `.jump-latest-btn` and `.minimap-rail` anchor to the same
+  variable so they stay just above the composer.
 
 ### 4.4 States
 
@@ -1202,11 +1228,14 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Text correction off (D145): composer textarea sets `spellCheck={false}`,
   `autoCorrect="off"`, and `autoCapitalize="off"` so browser/OS spelling and
   autocorrect never rewrite coding prompts
-- Runtime chips keep descenders fully visible (D150): mode, thinking,
-  permission, and model triggers use compact line-height rather than
-  `leading-none` under overflow; the model trigger still ellipsizes long IDs.
-- Chat / Agent and provider/model changes update the active session, not the
-  app default. They are disabled while a turn runs.
+- Runtime chips keep descenders fully visible (D150): the Thinking and
+  permission triggers in the composer use compact line-height rather than
+  `leading-none` under overflow. The Agent/Chat mode toggle and provider/model
+  picker now live in the conversation top bar (§2); the top bar's model trigger
+  still ellipsizes long IDs.
+- Chat / Agent mode and provider/model changes (made from the conversation top
+  bar, §2) update the active session, not the app default. They are disabled
+  while a turn runs.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing
