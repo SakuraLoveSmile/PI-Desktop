@@ -253,8 +253,10 @@ uses at most one non-empty file in this order: `AGENTS.override.md`, `AGENTS.md`
 root to the target directory, so the closest file appears last and takes
 precedence. The initial chain targets the project root. Before a `Read`,
 `Write`, `Edit`, or `BrowserPreview` call, the sidecar asks Electron main to
-resolve the target path; newly discovered nested entries are appended before
-the tool executes.
+resolve the target path and replaces the active instruction section with that
+path's complete chain before the tool executes. This keeps rules lazy and
+prevents sibling-directory rules from persisting after the agent moves to a
+different file tree.
 
 All discovery stays within the session project root. Empty, unreadable, and
 out-of-root files are skipped. The combined UTF-8 content is capped at 32 KiB
@@ -263,9 +265,10 @@ The sidecar never reads workspace instructions directly. A changed root chain
 recreates an idle runtime on its next prompt; nested instructions are resolved
 again when a relevant file tool runs.
 
-Settings provides dedicated management for the fixed global path and the
-current project's root `AGENTS.md`. Its IPC does not accept arbitrary renderer
-file paths. Saves affect the next prompt without restarting the application.
+Settings provides dedicated management for the fixed global path. Project list
+menus provide an `AGENTS.md` editor for their corresponding registered project
+root. Its IPC does not accept arbitrary renderer file paths. Saves affect the
+next prompt without restarting the application.
 
 ## 8. Concurrency
 

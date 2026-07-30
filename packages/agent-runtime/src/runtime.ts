@@ -453,6 +453,7 @@ export class DesktopAgentRuntime {
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
   private scratchDir?: string;
+  private baseSystemPrompt: string;
   private baseProjectInstructions?: ProjectInstructions;
   private projectInstructions?: ProjectInstructions;
   /* Timing anchors (D137). `requestStartedAt` marks the moment the agent is
@@ -540,6 +541,7 @@ export class DesktopAgentRuntime {
             ]
           : []),
       ].join("\n\n");
+    this.baseSystemPrompt = baseSystemPrompt;
 
     this.agent = new Agent({
       streamFn: (m, context, options) =>
@@ -909,21 +911,15 @@ export class DesktopAgentRuntime {
     } catch {
       return;
     }
-    const knownSources = new Set(
-      this.projectInstructions?.entries.map((entry) => entry.source) ?? [],
-    );
-    const additions = resolved?.entries.filter(
-      (entry) => !knownSources.has(entry.source),
-    ) ?? [];
-    if (additions.length === 0) return;
-
-    this.projectInstructions = {
-      entries: [...(this.projectInstructions?.entries ?? []), ...additions],
-    };
-    const prompt = projectInstructionsPrompt({ entries: additions });
-    if (prompt) {
-      this.agent.state.systemPrompt = `${this.agent.state.systemPrompt}\n\n${prompt}`;
-    }
+    // Rules are scoped to the file currently being accessed. Rebuild the
+    // complete chain so sibling-directory rules never leak into one another
+    // and edits to an existing instruction file take effect immediately.
+    this.projectInstructions = resolved;
+    const prompt = projectInstructionsPrompt(resolved);
+    this.agent.state.systemPrompt = [
+      this.baseSystemPrompt,
+      ...(prompt ? [prompt] : []),
+    ].join("\n\n");
   }
 
   private buildContextCompactionTool(): AgentTool {

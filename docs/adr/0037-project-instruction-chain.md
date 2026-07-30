@@ -18,9 +18,9 @@ workspace file access in Electron main and host-core.
    root; it never follows an instruction file whose canonical path escapes that
    root.
 2. The global file `~/.pi/agent/AGENTS.md` is loaded before all project
-   entries. Settings manages this fixed path and the current project's fixed
-   root `AGENTS.md` path through dedicated IPC; renderer input cannot select an
-   arbitrary filesystem location.
+   entries. Settings manages this fixed path. A project's `AGENTS.md` is
+   managed from that project's list-menu action; dedicated IPC accepts only a
+   project root registered by host-core and never an arbitrary file path.
 3. For every project directory, the first non-empty candidate wins in this order:
    `AGENTS.override.md`, `AGENTS.md`, `CLAUDE.md`,
    `.claude/CLAUDE.md`.
@@ -37,8 +37,9 @@ workspace file access in Electron main and host-core.
 - Repository-wide rules load without a recursive workspace scan.
 - Global defaults are editable without a project; project instructions remain
   reviewable and versionable in the repository root.
-- Nested rules become available only when an agent accesses a matching path,
-  limiting irrelevant context in large repositories.
+- Nested rules become available only when an agent accesses a matching path.
+  Each file tool replaces the active chain with that target's complete chain,
+  preventing sibling-directory rules from leaking into later tool calls.
 - Root instruction changes rebuild an idle runtime on the next prompt. Nested
   rules are re-resolved for future file-path tool calls.
 - This private sidecar proxy remains constrained to a session id and a path

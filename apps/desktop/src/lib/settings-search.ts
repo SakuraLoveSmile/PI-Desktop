@@ -81,7 +81,6 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     groupId: "personal",
     keywordKeys: [
       "settings.instructionsGlobal",
-      "settings.instructionsProject",
       "settings.instructionsPath",
     ],
   },

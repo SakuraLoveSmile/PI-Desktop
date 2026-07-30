@@ -9,6 +9,7 @@ import {
   IconArchiveRestore,
   IconChevronDown,
   IconChevronRight,
+  IconFileText,
   IconFolder,
   IconMore,
   IconPin,
@@ -26,6 +27,7 @@ import {
   normalizeProjectPath,
   sessionMatchesProject,
 } from "../lib/sidebar-session-groups";
+import { ProjectInstructionsDialog } from "../components/ProjectInstructionsDialog";
 
 function formatUpdated(ts?: number, locale?: string, neverLabel = "—") {
   if (!ts) return neverLabel;
@@ -78,6 +80,10 @@ export function ProjectsPage() {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [instructionsFor, setInstructionsFor] = useState<{
+    name: string;
+    path: string;
+  } | null>(null);
 
   useEffect(() => {
     let canceled = false;
@@ -414,6 +420,20 @@ export function ProjectsPage() {
                                 type="button"
                                 role="menuitem"
                                 onClick={() => {
+                                  setMenuFor(null);
+                                  setInstructionsFor({
+                                    name: project.name,
+                                    path: project.path,
+                                  });
+                                }}
+                              >
+                                <IconFileText size={14} />
+                                {t("project.editInstructions")}
+                              </button>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
                                   toggleProjectPinned(project.path, !project.pinned);
                                   setMenuFor(null);
                                 }}
@@ -494,6 +514,18 @@ export function ProjectsPage() {
           )}
         </div>
       </div>
+      {instructionsFor ? (
+        <ProjectInstructionsDialog
+          project={instructionsFor}
+          onClose={() => setInstructionsFor(null)}
+          onSaved={() => showToast(t("project.instructionsSaved"), { variant: "success" })}
+          onError={(error) =>
+            showToast(error instanceof Error ? error.message : String(error), {
+              variant: "error",
+            })
+          }
+        />
+      ) : null}
     </div>
   );
 }

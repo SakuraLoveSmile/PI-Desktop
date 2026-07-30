@@ -8757,6 +8757,77 @@ html {
   margin: 0;
 }
 
+.project-instructions-dialog-overlay {
+  z-index: 45;
+}
+
+.project-instructions-dialog {
+  width: min(100%, 720px);
+  max-height: min(86vh, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  padding: 20px;
+}
+
+.project-instructions-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-instructions-dialog-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--leading-heading);
+}
+
+.project-instructions-dialog-project,
+.project-instructions-dialog-path {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}
+
+.project-instructions-dialog-project {
+  margin-top: 3px;
+}
+
+.project-instructions-dialog-path {
+  font-family: var(--font-mono);
+}
+
+.project-instructions-dialog-close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-secondary);
+}
+
+.project-instructions-dialog-close:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.project-instructions-dialog-editor {
+  min-height: 260px;
+}
+
+.project-instructions-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* Model combobox: plain input that reveals discovered models beneath it. */
 .provider-model-combo {
   position: relative;

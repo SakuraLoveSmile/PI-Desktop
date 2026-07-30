@@ -99,40 +99,33 @@ function SettingsCard({
 
 function AgentInstructionsSection() {
   const { t } = useTranslation();
-  const workspace = useAppStore((s) => s.workspace);
   const [global, setGlobal] = useState<AgentInstructionFile | null>(null);
-  const [project, setProject] = useState<AgentInstructionFile | null>(null);
   const [globalDraft, setGlobalDraft] = useState("");
-  const [projectDraft, setProjectDraft] = useState("");
-  const [saving, setSaving] = useState<AgentInstructionFile["scope"] | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void api.getAgentInstructions().then((result) => {
       if (cancelled) return;
       setGlobal(result.global);
-      setProject(result.project ?? null);
       setGlobalDraft(result.global.content);
-      setProjectDraft(result.project?.content ?? "");
     }).catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [workspace?.path]);
+  }, []);
 
-  const save = async (scope: AgentInstructionFile["scope"], content: string) => {
-    setSaving(scope);
+  const save = async () => {
+    setSaving(true);
     try {
-      const result = await api.saveAgentInstructions(scope, content);
-      if (scope === "global") setGlobal(result.file);
-      else setProject(result.file);
+      const result = await api.saveAgentInstructions("global", globalDraft);
+      setGlobal(result.file);
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
   };
 
   const globalDirty = global !== null && globalDraft !== global.content;
-  const projectDirty = project !== null && projectDraft !== project.content;
   return (
     <div className="settings-stack">
       <SettingsCard title={t("settings.instructionsGlobal")}>
@@ -154,49 +147,12 @@ function AgentInstructionsSection() {
         <div className="settings-panel-actions">
           <Button
             variant="primary"
-            disabled={!globalDirty || saving === "global"}
-            onClick={() => void save("global", globalDraft)}
+            disabled={!globalDirty || saving}
+            onClick={() => void save()}
           >
-            {saving === "global" ? t("settings.saving") : t("settings.instructionsSave")}
+            {saving ? t("settings.saving") : t("settings.instructionsSave")}
           </Button>
         </div>
-      </SettingsCard>
-
-      <SettingsCard title={t("settings.instructionsProject")}>
-        {project ? (
-          <>
-            <div className="settings-form-grid">
-              <div className="settings-row-copy">
-                <div className="settings-row-desc">{t("settings.instructionsProjectDesc")}</div>
-                <div className="settings-instruction-path">{project.path}</div>
-              </div>
-              <textarea
-                className="field-textarea settings-instruction-editor"
-                value={projectDraft}
-                onChange={(event) => setProjectDraft(event.target.value)}
-                aria-label={t("settings.instructionsProject")}
-                spellCheck={false}
-                autoCorrect="off"
-                autoCapitalize="off"
-              />
-            </div>
-            <div className="settings-panel-actions">
-              <Button
-                variant="primary"
-                disabled={!projectDirty || saving === "project"}
-                onClick={() => void save("project", projectDraft)}
-              >
-                {saving === "project" ? t("settings.saving") : t("settings.instructionsSave")}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className="settings-row settings-row-plain">
-            <div className="settings-row-copy">
-              <div className="settings-row-desc">{t("settings.instructionsNoProject")}</div>
-            </div>
-          </div>
-        )}
       </SettingsCard>
     </div>
   );
