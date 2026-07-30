@@ -19,8 +19,9 @@ workspace file access in Electron main and host-core.
    root.
 2. The global file `~/.pi/agent/AGENTS.md` is loaded before all project
    entries. Settings manages this fixed path. A project's `AGENTS.md` is
-   managed from that project's list-menu action; dedicated IPC accepts only a
-   project root registered by host-core and never an arbitrary file path.
+   managed from that project's list-menu action in either the Projects view or
+   the home sidebar; dedicated IPC accepts only a project root registered by
+   host-core and never an arbitrary file path.
 3. For every project directory, the first non-empty candidate wins in this order:
    `AGENTS.override.md`, `AGENTS.md`, `CLAUDE.md`,
    `.claude/CLAUDE.md`.
