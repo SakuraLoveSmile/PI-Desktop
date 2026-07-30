@@ -626,6 +626,7 @@ export const zhCN = {
     placeholder: "搜索对话…",
     empty: "没有匹配的对话",
     pages: "页面",
+    commands: "命令",
     today: "今天",
     yesterday: "昨天",
     previous7Days: "近 7 天",

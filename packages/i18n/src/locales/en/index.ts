@@ -624,6 +624,7 @@ export const en = {
     placeholder: "Search chats…",
     empty: "No matching chats",
     pages: "Pages",
+    commands: "Commands",
     today: "Today",
     yesterday: "Yesterday",
     previous7Days: "Previous 7 days",

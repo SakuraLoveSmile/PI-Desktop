@@ -29,7 +29,6 @@ test("primary editable surfaces disable browser text correction", async () => {
   const files = [
     "../src/components/Composer.tsx",
     "../src/components/ChatTranscript.tsx",
-    "../src/components/CommandPalette.tsx",
     "../src/components/SearchDialog.tsx",
     "../src/components/workpanel/BrowserTab.tsx",
     "../src/pages/SettingsPage.tsx",

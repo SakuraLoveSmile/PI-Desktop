@@ -1456,7 +1456,7 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 
 ### 16.1 Purpose
 
-Overlay surface for the command palette (Cmd/Ctrl+Shift+P, per D014). Defined in [04-builtin-commands.md](04-builtin-commands.md).
+**Status: merged into the global search surface.** The command palette overlay was removed; its command list (built-in + plugin commands) now renders as the "Commands" section inside `SearchDialog` (opened with Cmd/Ctrl+K or Cmd/Ctrl+Shift+P). Defined in [04-builtin-commands.md](04-builtin-commands.md) and surfaced by the global search component spec.
 
 ### 16.2 Anatomy
 
@@ -1490,10 +1490,9 @@ Overlay surface for the command palette (Cmd/Ctrl+Shift+P, per D014). Defined in
 
 ### 16.5 Accessibility
 
-- `role="dialog"` with `aria-label="Command palette"`
-- Focus trapped within palette while open
-- Search input auto-focused on open
-- Results: `role="listbox"` with `role="option"` per item
+- The standalone palette overlay no longer exists; commands are part of the global search dialog (`role="dialog"`, `aria-label` from `nav.search`).
+- The "Commands" section uses the same `role="listbox"` / `role="option"` semantics as the other search result groups.
+- Search input auto-focused on open; arrow up/down navigate, Enter executes, Escape closes.
 
 ### 16.6 MVP constraints
 
