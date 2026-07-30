@@ -61,6 +61,40 @@ const EXPECTED_LANGUAGES = [
   "yaml",
 ];
 
+const EXPECTED_ALIASES = {
+  batch: "bat",
+  "c++": "cpp",
+  "c#": "csharp",
+  cs: "csharp",
+  dockerfile: "docker",
+  gql: "graphql",
+  properties: "ini",
+  js: "javascript",
+  cjs: "javascript",
+  mjs: "javascript",
+  kt: "kotlin",
+  kts: "kotlin",
+  makefile: "make",
+  md: "markdown",
+  mmd: "mermaid",
+  ps: "powershell",
+  ps1: "powershell",
+  protobuf: "proto",
+  py: "python",
+  rb: "ruby",
+  rs: "rust",
+  bash: "shellscript",
+  sh: "shellscript",
+  shell: "shellscript",
+  zsh: "shellscript",
+  tf: "terraform",
+  tfvars: "terraform",
+  ts: "typescript",
+  cts: "typescript",
+  mts: "typescript",
+  yml: "yaml",
+};
+
 function waitForHighlightChange(version) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -86,12 +120,9 @@ async function loadAndTokenize(lang) {
 
 test("language support is an explicit coding-focused bundle", () => {
   assert.deepEqual(SUPPORTED_LANGUAGES, EXPECTED_LANGUAGES);
-  assert.equal(resolveLang(" TS "), "typescript");
-  assert.equal(resolveLang("c++"), "cpp");
-  assert.equal(resolveLang("C#"), "csharp");
-  assert.equal(resolveLang("dockerfile"), "docker");
-  assert.equal(resolveLang("bash"), "shellscript");
-  assert.equal(resolveLang("mmd"), "mermaid");
+  for (const [alias, canonical] of Object.entries(EXPECTED_ALIASES)) {
+    assert.equal(resolveLang(` ${alias.toUpperCase()} `), canonical);
+  }
   assert.equal(resolveLang("text"), null);
   assert.equal(resolveLang("an-unbundled-language"), null);
 });
