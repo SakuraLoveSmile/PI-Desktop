@@ -1208,7 +1208,7 @@ html {
 /* Floats above the docked composer fade when the user scrolls away from latest */
 .jump-latest-btn {
   position: absolute;
-  bottom: 168px;
+  bottom: calc(var(--composer-dock-height, 168px) + 12px);
   left: 50%;
   translate: -50% 0;
   z-index: 5;
@@ -1248,7 +1248,10 @@ html {
 .thread-content {
   width: min(100%, 760px);
   margin: 0 auto;
-  padding: 20px 28px 228px;
+  /* Reserve exactly the composer's real height (+ a small gap) so the last
+   * message sits just above the box instead of far below it. The variable is
+   * published by Composer.tsx from the docked composer's measured height. */
+  padding: 20px 28px calc(var(--composer-dock-height, 228px) + 16px);
 }
 
 /* Frameless Windows/Linux controls occupy the 46px titlebar band. Keep the
@@ -1267,7 +1270,7 @@ html {
   position: absolute;
   left: 8px;
   top: var(--ds-toolbar-height);
-  bottom: 200px;
+  bottom: calc(var(--composer-dock-height, 200px) + 16px);
   z-index: 6;
   display: flex;
   width: 26px;
