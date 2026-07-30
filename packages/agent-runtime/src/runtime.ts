@@ -50,6 +50,7 @@ import type {
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
 import { clampThinkingLevel, type PiModelConfig } from "./thinking-level.js";
+import { projectInstructionsPrompt } from "./project-instructions-prompt.js";
 import { logTiming } from "./timing.js";
 
 
@@ -202,6 +203,8 @@ export type AgentRuntimeOptions = {
   provider: RuntimeProviderConfig;
   thinkingLevel: ThinkingLevel;
   systemPrompt?: string;
+  /** Instructions read from the session's workspace-root AGENTS.md. */
+  projectInstructions?: string;
   /** Persisted transcript to seed the agent with (session isolation: each
    * session's agent carries only its own history). */
   history?: UiMessage[];
@@ -443,6 +446,7 @@ export class DesktopAgentRuntime {
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
   private scratchDir?: string;
+  private projectInstructions?: string;
   /* Timing anchors (D137). `requestStartedAt` marks the moment the agent is
    * free to issue the next provider request — turn start, or the last tool
    * result coming back — so `providerWaitMs` below is the model's own latency
@@ -472,6 +476,7 @@ export class DesktopAgentRuntime {
     this.onEvent = opts.onEvent;
     this.pluginTools = opts.pluginTools ?? [];
     this.scratchDir = opts.scratchDir;
+    this.projectInstructions = opts.projectInstructions?.trim() || undefined;
     this.compactionSettings = normalizeCompactionSettings(
       opts.compactionSettings,
     );
@@ -503,6 +508,9 @@ export class DesktopAgentRuntime {
 
     this.fullEntries = this.historyToEntries(opts.history ?? []);
     this.activeCompaction = opts.compaction;
+    const projectInstructions = projectInstructionsPrompt(
+      this.projectInstructions,
+    );
 
     this.agent = new Agent({
       streamFn: (m, context, options) =>
@@ -539,6 +547,7 @@ export class DesktopAgentRuntime {
                   `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
                 ]
               : []),
+            ...(projectInstructions ? [projectInstructions] : []),
           ].join("\n\n"),
         model,
         tools,
@@ -556,6 +565,7 @@ export class DesktopAgentRuntime {
     provider: RuntimeProviderConfig,
     thinkingLevelOrPluginToolNames: ThinkingLevel | string[] = this.thinkingLevel,
     pluginToolNames: string[] = [],
+    projectInstructions?: string,
   ): boolean {
     // Keep the pre-thinking overload usable for callers that passed plugin
     // names as the third argument. New callers pass the selected level.
@@ -595,7 +605,8 @@ export class DesktopAgentRuntime {
       safeJson(this.provider.modelConfig ?? null) ===
         safeJson(provider.modelConfig ?? null) &&
       this.thinkingLevel === clampThinkingLevel(provider, thinkingLevel) &&
-      current === next
+      current === next &&
+      this.projectInstructions === (projectInstructions?.trim() || undefined)
     );
   }
 

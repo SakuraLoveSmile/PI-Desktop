@@ -43,6 +43,7 @@ import {
   resolveThinkingCapabilities,
   expandSlashInvocation,
   loadComposerTemplates,
+  loadProjectInstructions,
   type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
@@ -337,6 +338,7 @@ async function resolveAgentRuntimeLaunch(
     modelId,
     apiStyle: provider.apiStyle,
   });
+  const projectInstructions = await loadProjectInstructions(session.projectPath);
   return {
     providerId: provider.id,
     modelId,
@@ -345,6 +347,7 @@ async function resolveAgentRuntimeLaunch(
       mode: session.mode || settings.defaultMode || "agent",
       thinkingLevel,
       scratchDir: join(dataDir, "scratch", sessionId),
+      projectInstructions,
       compactionSettings: settings.contextCompaction,
       provider: {
         id: provider.id,
