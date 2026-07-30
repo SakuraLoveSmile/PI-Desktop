@@ -2195,7 +2195,8 @@ Each scenario is documented in this format:
   show their resolved paths, preserve the typed text, and save through the
   dedicated IPC rather than a general file write API. Global content precedes
   project content in the next runtime; the saved project content follows it and
-  takes precedence on conflicts.
+  takes precedence on conflicts. The project editor is a viewport-level dialog
+  and is never constrained to the home sidebar.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`, ADR 0037
 - **Acceptance**: C (chat/stream), D (workspace), F (persistence)
 - **Milestone**: M5

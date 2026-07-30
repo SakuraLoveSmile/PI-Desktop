@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { AgentInstructionFile } from "@pi-desktop/shared";
 import { api } from "../lib/api";
@@ -57,7 +58,7 @@ export function ProjectInstructionsDialog({
   };
 
   const dirty = file !== null && draft !== file.content;
-  return (
+  const dialog = (
     <div
       className="overlay project-instructions-dialog-overlay"
       role="presentation"
@@ -108,4 +109,8 @@ export function ProjectInstructionsDialog({
       </div>
     </div>
   );
+
+  return typeof document === "undefined"
+    ? dialog
+    : createPortal(dialog, document.body);
 }
