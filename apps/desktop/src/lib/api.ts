@@ -7,6 +7,7 @@ import type {
   MessageRevisionSummary,
   AgentPromptResponse,
   AgentStatus,
+  AgentInstructionFile,
   AppSettings,
   AppVersionInfo,
   BrowserAction,
@@ -246,6 +247,15 @@ export const api = {
     invoke(IPC.invoke.agentAbort, { sessionId }),
   getStatus: (sessionId: string) =>
     invoke<{ status: AgentStatus }>(IPC.invoke.agentGetStatus, sessionId),
+  getAgentInstructions: () =>
+    invoke<{ global: AgentInstructionFile; project?: AgentInstructionFile }>(
+      IPC.invoke.agentInstructionsGet,
+    ),
+  saveAgentInstructions: (scope: AgentInstructionFile["scope"], content: string) =>
+    invoke<{ file: AgentInstructionFile }>(IPC.invoke.agentInstructionsSave, {
+      scope,
+      content,
+    }),
   resolvePermission: (resolution: ToolPermissionResolution) =>
     invoke(IPC.invoke.toolResolvePermission, resolution),
   listPlugins: () =>

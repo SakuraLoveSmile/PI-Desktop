@@ -9,6 +9,7 @@ export type SettingsTabId =
   | "general"
   | "ai"
   | "shortcuts"
+  | "instructions"
   | "agent"
   | "import"
   | "projects"
@@ -72,6 +73,16 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.shortcutAction.openSearch",
       "settings.shortcutAction.openCommandPalette",
       "settings.shortcutAction.toggleSidebar",
+    ],
+  },
+  {
+    id: "instructions",
+    labelKey: "settings.instructions",
+    groupId: "personal",
+    keywordKeys: [
+      "settings.instructionsGlobal",
+      "settings.instructionsProject",
+      "settings.instructionsPath",
     ],
   },
   {

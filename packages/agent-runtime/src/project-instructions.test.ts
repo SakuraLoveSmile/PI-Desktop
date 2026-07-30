@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  loadInstructionChain,
   loadProjectInstructions,
   type ProjectInstructions,
 } from "./project-instructions.js";
@@ -94,6 +95,33 @@ describe("loadProjectInstructions", () => {
     await writeFile(join(root, "AGENTS.md"), " \n\t ");
     await expect(loadProjectInstructions(root)).resolves.toBeUndefined();
     await expect(loadProjectInstructions(root, "../outside/file.ts")).resolves.toBeUndefined();
+  });
+});
+
+describe("loadInstructionChain", () => {
+  it("loads global instructions before project instructions", async () => {
+    root = await mkdtemp(join(tmpdir(), "pi-desktop-instructions-"));
+    const globalPath = join(root, "global-AGENTS.md");
+    await writeFile(globalPath, "Use global conventions.");
+    await writeFile(join(root, "AGENTS.md"), "Use project conventions.");
+
+    await expect(loadInstructionChain(root, undefined, globalPath)).resolves.toEqual({
+      entries: [
+        { source: "~/.pi/agent/AGENTS.md", content: "Use global conventions." },
+        { source: "AGENTS.md", content: "Use project conventions." },
+      ],
+    });
+  });
+
+  it("shares the 32 KiB byte budget between global and project instructions", async () => {
+    root = await mkdtemp(join(tmpdir(), "pi-desktop-instructions-"));
+    const globalPath = join(root, "global-AGENTS.md");
+    await writeFile(globalPath, "a".repeat(32 * 1024));
+    await writeFile(join(root, "AGENTS.md"), "Use project conventions.");
+
+    await expect(loadInstructionChain(root, undefined, globalPath)).resolves.toEqual({
+      entries: [{ source: "~/.pi/agent/AGENTS.md", content: "a".repeat(32 * 1024) }],
+    });
   });
 });
 

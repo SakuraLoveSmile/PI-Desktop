@@ -245,9 +245,10 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 + [optional user custom instructions]
 ```
 
-The Electron main process resolves project instruction files inside the
-session-bound project root when a runtime starts. For each directory it uses at
-most one non-empty file in this order: `AGENTS.override.md`, `AGENTS.md`,
+The Electron main process first resolves the global
+`~/.pi/agent/AGENTS.md`, then project instruction files inside the
+session-bound project root when a runtime starts. For each project directory it
+uses at most one non-empty file in this order: `AGENTS.override.md`, `AGENTS.md`,
 `CLAUDE.md`, then `.claude/CLAUDE.md`. Entries are concatenated from project
 root to the target directory, so the closest file appears last and takes
 precedence. The initial chain targets the project root. Before a `Read`,
@@ -261,6 +262,10 @@ and source paths are labelled under `# Project instructions`.
 The sidecar never reads workspace instructions directly. A changed root chain
 recreates an idle runtime on its next prompt; nested instructions are resolved
 again when a relevant file tool runs.
+
+Settings provides dedicated management for the fixed global path and the
+current project's root `AGENTS.md`. Its IPC does not accept arbitrary renderer
+file paths. Saves affect the next prompt without restarting the application.
 
 ## 8. Concurrency
 

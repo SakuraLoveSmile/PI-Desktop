@@ -1,4 +1,5 @@
 import { readFile, realpath } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 const INSTRUCTION_FILE_NAMES = [
@@ -8,6 +9,7 @@ const INSTRUCTION_FILE_NAMES = [
   join(".claude", "CLAUDE.md"),
 ];
 const MAX_INSTRUCTION_BYTES = 32 * 1024;
+const GLOBAL_INSTRUCTION_PATH = join(homedir(), ".pi", "agent", "AGENTS.md");
 
 export type ProjectInstruction = {
   source: string;
@@ -17,6 +19,10 @@ export type ProjectInstruction = {
 export type ProjectInstructions = {
   entries: ProjectInstruction[];
 };
+
+export function globalInstructionPath(): string {
+  return GLOBAL_INSTRUCTION_PATH;
+}
 
 function isWithinRoot(root: string, path: string): boolean {
   return path === root || path.startsWith(`${root}${sep}`);
@@ -68,6 +74,7 @@ async function readInstruction(
 export async function loadProjectInstructions(
   workspaceRoot: string | null | undefined,
   workspacePath?: string,
+  maxBytes = MAX_INSTRUCTION_BYTES,
 ): Promise<ProjectInstructions | undefined> {
   if (!workspaceRoot?.trim()) return undefined;
 
@@ -87,7 +94,7 @@ export async function loadProjectInstructions(
   }
 
   const entries: ProjectInstruction[] = [];
-  let remaining = MAX_INSTRUCTION_BYTES;
+  let remaining = Math.max(0, maxBytes);
   for (const directory of directories) {
     if (remaining <= 0) break;
     const entry = await readInstruction(root, canonicalRoot, directory, remaining);
@@ -96,4 +103,32 @@ export async function loadProjectInstructions(
     remaining -= Buffer.byteLength(entry.content, "utf8");
   }
   return entries.length > 0 ? { entries } : undefined;
+}
+
+/** Build the complete chain: global defaults precede project instructions. */
+export async function loadInstructionChain(
+  workspaceRoot: string | null | undefined,
+  workspacePath?: string,
+  globalPath = GLOBAL_INSTRUCTION_PATH,
+): Promise<ProjectInstructions | undefined> {
+  const entries: ProjectInstruction[] = [];
+  let remaining = MAX_INSTRUCTION_BYTES;
+  try {
+    const content = (await readFile(globalPath, "utf8")).trim();
+    if (content) {
+      const limited = limitUtf8(content, remaining);
+      entries.push({ source: "~/.pi/agent/AGENTS.md", content: limited });
+      remaining -= Buffer.byteLength(limited, "utf8");
+    }
+  } catch {
+    // A missing global file is an expected first-run state.
+  }
+  const project = await loadProjectInstructions(
+    workspaceRoot,
+    workspacePath,
+    remaining,
+  );
+  return entries.length || project?.entries.length
+    ? { entries: [...entries, ...(project?.entries ?? [])] }
+    : undefined;
 }
