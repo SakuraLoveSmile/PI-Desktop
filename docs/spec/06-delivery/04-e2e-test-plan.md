@@ -307,6 +307,26 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
+#### E2E-090: Transcript bottom reserve tracks the docked composer height
+
+- **Preconditions**: Chat route active; a session with a transcript that
+  exceeds one viewport so the last message sits near the docked composer.
+- **Steps**: 1) Scroll the transcript to the latest message. 2) Measure the
+  vertical gap between the last message and the top of the docked composer.
+  3) Type several lines into the composer so the draft grows multi-line. 4)
+  Re-measure the gap and confirm the last message is still fully visible above
+  the composer (not overlapped). 5) Collapse the draft back to a single line and
+  confirm the gap shrinks back toward the tight ~16px reserve.
+- **Expected**: The last message sits close above the composer (a small,
+  consistent gap) rather than far below it; the reserve follows the composer's
+  real height via `--composer-dock-height` so a taller multi-line draft pushes
+  the transcript up instead of covering it. The jump-to-latest button and the
+  minimap stay anchored just above the composer at every draft height.
+- **Specs linked**: `04-ux/08-component-spec.md` (§4.3 MainChat layout)
+- **Acceptance**: C (send/UI), Quality
+- **Milestone**: M2
+- **Status**: Draft
+
 ### Workspace Open
 
 #### E2E-012: Open a project directory

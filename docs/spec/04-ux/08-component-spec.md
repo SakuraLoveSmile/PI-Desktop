@@ -436,6 +436,13 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
   regenerate re-pins and jumps to bottom
 - Destination entry uses one short opacity/translate transition. Streaming
   updates occur inside the mounted surface and never replay this transition.
+- The transcript's bottom reserve is **height-aware**, not a fixed gap. The
+  docked composer measures its real rendered height (it grows with multi-line
+  drafts) and publishes it as the `--composer-dock-height` custom property on
+  `:root`; `.thread-content` reserves `calc(var(--composer-dock-height) + 16px)`
+  so the last message sits ~16px above the box and is never overlapped even as
+  the draft grows. `.jump-latest-btn` and `.minimap-rail` anchor to the same
+  variable so they stay just above the composer.
 
 ### 4.4 States
 
