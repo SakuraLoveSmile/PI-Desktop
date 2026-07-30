@@ -262,7 +262,7 @@ Each scenario is documented in this format:
 - **Steps**: 1) Open the chat route. 2) Inspect the 46px bar at the top of the
   conversation area. 3) Confirm it shows the active project name and
   session/task title, the Agent|Chat segmented mode toggle, the model picker,
-  and the New task / Search / Commands / Settings action buttons; confirm the
+  and the New task / Search / Commands action buttons; confirm the
   sidebar toggle appears **only when the sidebar is collapsed** (when expanded,
   the sidebar owns that control). 4) Switch to the Pull requests, Scheduled,
   Plugins, or Settings routes and inspect the same top region.
@@ -300,10 +300,11 @@ Each scenario is documented in this format:
 - **Preconditions**: Chat route active; provider configured.
 - **Steps**: 1) Click the model picker in the top bar. 2) Confirm the dropdown
   opens downward from the bar. 3) Select a different provider/model. 4) Open
-  Settings from the top-bar action buttons.
+  Settings from the command palette or application menu (the top bar no longer
+  has a Settings action button).
 - **Expected**: The menu lists enabled runnable providers with a default model
   and opens downward (anchored to the top bar); selecting updates the active
-  session model; the Settings action opens Settings. The model trigger
+  session model; Settings opens from the command palette/menu. The model trigger
   ellipsizes long IDs.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2, model dropdown),
   `03-runtime/13-model-catalog-and-selection.md`
