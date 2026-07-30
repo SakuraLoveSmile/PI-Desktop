@@ -131,12 +131,13 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ### 2.1 Purpose
 
 Global controls bar: project identity, model selection, mode indicator, abort
-button, and settings entry.
+button. (Settings is reached from the command palette / application menu, not the
+top bar.)
 
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [Agent | Chat] [🤖 Model] [＋ New] [🔍 Search] [⚙ Commands] [⚙ Settings]
+[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [Agent | Chat] [🤖 Model] [＋ New] [🔍 Search] [⚙ Commands]
 ```
 
 (Icons described functionally; actual render uses Lucide SVGs. The `[☰ Sidebar]`
@@ -174,7 +175,7 @@ and permission triggers remain in the composer (§11).
 | Task title | session title (or untitled) | same, plus a "Running" pill with a pulsing dot | same | same |
 | Model selector | clickable dropdown | disabled during stream | clickable | clickable (no provider warning) |
 | Mode toggle | "Agent" or "Chat" highlighted | same, disabled while running | same | same |
-| New task / Search / Commands / Settings | icon buttons | same | same | same |
+| New task / Search / Commands | icon buttons | same | same | same |
 | Project name | workspace folder name | same | same | "No project" muted |
 
 ### 2.5 Accessibility
