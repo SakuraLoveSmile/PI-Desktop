@@ -29,20 +29,29 @@
     "dist:linux": "pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --linux --publish never"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
+    "node-pty": "^1.1.0"
+  },
+  "devDependencies": {
     "@pi-desktop/agent-runtime": "workspace:*",
     "@pi-desktop/i18n": "workspace:*",
     "@pi-desktop/plugin-sdk": "workspace:*",
     "@pi-desktop/shared": "workspace:*",
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "dompurify": "^3.4.12",
-    "electron-updater": "^6.8.9",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^4.0.0",
     "i18next": "^25.3.2",
     "katex": "^0.16.47",
     "lucide-react": "^1.26.0",
     "marked": "^18.0.7",
     "mermaid": "^11.16.0",
-    "node-pty": "^1.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-i18next": "^15.6.0",
@@ -53,19 +62,10 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "shiki": "^4.3.1",
-    "zustand": "^5.0.6"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.1.11",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "electron": "^37.2.0",
-    "electron-builder": "^26.15.3",
-    "electron-vite": "^4.0.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "zustand": "^5.0.6"
   },
   "build": {
     "appId": "com.pi-desktop.app",
@@ -82,10 +82,18 @@
     ],
     "files": [
       "out/**/*",
-      "package.json"
+      "package.json",
+      "!**/*.map",
+      "!**/node_modules/*/{test,tests,__tests__,powered-test,example,examples}/**"
     ],
     "asarUnpack": [
-      "**/node_modules/node-pty/**"
+      "**/node_modules/node-pty/build/{Release,Debug}/**",
+      "**/node_modules/node-pty/prebuilds/**"
+    ],
+    "electronLanguages": [
+      "en-US",
+      "zh-CN",
+      "zh_CN"
     ],
     "extraResources": [
       {
@@ -175,6 +183,8 @@
         }
       ]
     },
-    "asar": true
+    "asar": {
+      "smartUnpack": false
+    }
   }
 }
