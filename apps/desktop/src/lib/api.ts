@@ -74,6 +74,8 @@ declare global {
       on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
       channels: typeof IPC;
       platform: NodeJS.Platform;
+      /** Authoritative OS locale from the main process (`app.getLocale()`). */
+      locale: string;
     };
   }
 }

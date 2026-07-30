@@ -9,6 +9,7 @@ import { DEFAULT_CONTEXT_COMPACTION_SETTINGS } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import type { ImportCandidate } from "../lib/api";
+import { resolveAppLanguage } from "../lib/app-language";
 import { useUpdateState } from "../lib/use-update-state";
 import {
   DEFAULT_IMPORT_GROUP_BY,
@@ -26,11 +27,16 @@ import {
   IconArchive,
   IconBot,
   IconChevronLeft,
+  IconCircleCheck,
   IconDownload,
   IconFileText,
+  IconGlobe,
   IconInfo,
+  IconMonitor,
+  IconMoon,
   IconSearch,
   IconSliders,
+  IconSun,
 } from "../components/icons";
 import { ProvidersSection } from "../components/settings/ProvidersSection";
 import { KeyboardShortcutsSection } from "../components/settings/KeyboardShortcutsSection";
@@ -671,55 +677,143 @@ export function SettingsPage() {
           {tab === "general" && settings && (
             <div className="settings-stack">
               <SettingsCard title={t("settings.appearance")}>
-                <SettingsRow
-                  title={t("settings.language")}
-                  description={t("settings.languageDesc")}
-                >
-                  <select
-                    className="field-select"
-                    aria-label={t("settings.language")}
-                    value={settings.language ?? "auto"}
-                    onChange={(e) =>
-                      void saveSettings({
-                        language: e.target.value as "auto" | "en" | "zh-CN",
-                      })
-                    }
-                  >
-                    <option value="auto">{t("settings.languageAuto")}</option>
-                    <option value="en">English</option>
-                    <option value="zh-CN">简体中文</option>
-                  </select>
-                </SettingsRow>
+                {(() => {
+                  const detectedLocale = resolveAppLanguage("auto");
+                  const detectedLocaleLabel =
+                    detectedLocale === "zh-CN"
+                      ? t("settings.languageZh")
+                      : t("settings.languageEn");
+                  return (
+                    <div
+                      className="settings-theme-grid"
+                      role="radiogroup"
+                      aria-label={t("settings.language")}
+                    >
+                      {(["auto", "zh-CN", "en"] as const).map((value) => {
+                        const active = (settings.language ?? "auto") === value;
+                        const LangIcon = value === "auto" ? IconGlobe : null;
+                        const glyph = value === "zh-CN" ? "中" : value === "en" ? "A" : null;
+                        const label =
+                          value === "auto"
+                            ? t("settings.languageAuto")
+                            : value === "zh-CN"
+                              ? t("settings.languageZh")
+                              : t("settings.languageEn");
+                        const sub =
+                          value === "auto"
+                            ? t("settings.languageAutoDesc", { state: detectedLocaleLabel })
+                            : value === "zh-CN"
+                              ? t("settings.languageZhDesc")
+                              : t("settings.languageEnDesc");
+                        const sample =
+                          value === "auto"
+                            ? detectedLocale === "zh-CN"
+                              ? "中 / A"
+                              : "A / 中"
+                            : value === "zh-CN"
+                              ? "你好，世界"
+                              : "Hello, world";
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={active}
+                            className={cx(
+                              "settings-theme-card",
+                              active && "active",
+                              "lang",
+                              value,
+                            )}
+                            onClick={() => void saveSettings({ language: value })}
+                          >
+                            {active && (
+                              <span className="settings-card-check" aria-hidden="true">
+                                <IconCircleCheck size={16} />
+                              </span>
+                            )}
+                            <span className="settings-lang-preview" aria-hidden="true">
+                              {LangIcon ? (
+                                <LangIcon size={20} className="settings-lang-glyph-icon" />
+                              ) : (
+                                <span className="settings-lang-glyph">{glyph}</span>
+                              )}
+                              <span className="settings-lang-sample">{sample}</span>
+                            </span>
+                            <span className="settings-theme-meta">
+                              <span className="settings-theme-label">{label}</span>
+                              <span className="settings-theme-sub">{sub}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
                 <div className="settings-row settings-row-plain">
                   <div className="settings-row-copy">
                     <div className="settings-row-title">{t("settings.theme")}</div>
                     <div className="settings-row-desc">{t("settings.themeDesc")}</div>
                   </div>
                 </div>
-                <div className="settings-theme-grid" role="group" aria-label={t("settings.theme")}>
-                  {(["light", "dark", "system"] as const).map((theme) => (
-                    <button
-                      key={theme}
-                      type="button"
-                      className={cx(
-                        "settings-theme-card",
-                        settings.theme === theme && "active",
-                        theme,
-                      )}
-                      onClick={() => void saveSettings({ theme })}
-                    >
-                      <span className="settings-theme-swatch" />
-                      <span className="settings-theme-label">
-                        {t(
-                          theme === "light"
-                            ? "settings.themeLight"
-                            : theme === "dark"
-                              ? "settings.themeDark"
-                              : "settings.themeSystem",
+                <div
+                  className="settings-theme-grid"
+                  role="radiogroup"
+                  aria-label={t("settings.theme")}
+                >
+                  {(["system", "light", "dark"] as const).map((theme) => {
+                    const active = settings.theme === theme;
+                    const ThemeIcon =
+                      theme === "light"
+                        ? IconSun
+                        : theme === "dark"
+                          ? IconMoon
+                          : IconMonitor;
+                    const label = t(
+                      theme === "light"
+                        ? "settings.themeLight"
+                        : theme === "dark"
+                          ? "settings.themeDark"
+                          : "settings.themeSystem",
+                    );
+                    const sub = t(
+                      theme === "light"
+                        ? "settings.themeLightDesc"
+                        : theme === "dark"
+                          ? "settings.themeDarkDesc"
+                          : "settings.themeSystemDesc",
+                    );
+                    return (
+                      <button
+                        key={theme}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        className={cx("settings-theme-card", active && "active", theme)}
+                        onClick={() => void saveSettings({ theme })}
+                      >
+                        {active && (
+                          <span className="settings-card-check" aria-hidden="true">
+                            <IconCircleCheck size={16} />
+                          </span>
                         )}
-                      </span>
-                    </button>
-                  ))}
+                        <span className="settings-theme-preview" aria-hidden="true">
+                          <span className="settings-theme-preview-bar" />
+                          <span className="settings-theme-preview-line" />
+                          <span className="settings-theme-preview-line short" />
+                          <span className="settings-theme-preview-btn" />
+                        </span>
+                        <span className="settings-theme-meta">
+                          <span className="settings-theme-label">
+                            <ThemeIcon size={15} className="settings-theme-icon" />
+                            {label}
+                          </span>
+                          <span className="settings-theme-sub">{sub}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </SettingsCard>
 

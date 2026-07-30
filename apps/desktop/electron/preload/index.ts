@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { app, contextBridge, ipcRenderer } from "electron";
 import { IPC, IPC_WHITELIST } from "@pi-desktop/shared";
 
 function assertChannel(channel: string) {
@@ -24,6 +24,12 @@ const api = {
   // (traffic lights on macOS vs. controls overlay on Windows/Linux)
   // before first paint, without an IPC round-trip.
   platform: process.platform,
+  // Authoritative OS locale. `app.getLocale()` reads the system display
+  // language, unlike `navigator.language` in the renderer which defaults
+  // to `en-US` regardless of the actual OS language. Surfaced
+  // synchronously so the "auto" language resolves correctly without an
+  // IPC round-trip.
+  locale: app.getLocale(),
 };
 
 contextBridge.exposeInMainWorld("piDesktop", api);

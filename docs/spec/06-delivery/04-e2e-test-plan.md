@@ -492,12 +492,35 @@ Each scenario is documented in this format:
 #### E2E-038: Settings owns the project archive destination
 
 - **Preconditions**: App running with at least one configured provider, one supported local session store, one retained project, and one archived project.
-- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card. 4) Open Model configuration and inspect the provider studio. 5) Open Import, Project archive, and Info in order. 6) Search Settings for "project" or "archive". 7) Restore the archived project, then activate it. 8) Return to the app shell and open Plugins.
+- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card using the theme preview cards. 4) Open Model configuration and inspect the provider studio. 5) Open Import, Project archive, and Info in order. 6) Search Settings for "project" or "archive". 7) Restore the archived project, then activate it. 8) Return to the app shell and open Plugins.
 - **Expected**: The rail contains exactly Basics, Model configuration, Import, Project archive, and Info in that order, each with its semantic Lucide icon (SlidersHorizontal / Bot / Download / Archive / Info); Appearance and Providers remain merged into their owning destinations; Project archive shows active, closed, and archived durable rows without a visibility toggle; restore keeps the archive open and activation returns to chat with the restored project retained in the sidebar; the home sidebar and global page results have no standalone Projects destination; Settings search finds Project archive; Plugins remains an independent app-shell destination.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/01-ui-ia.md`, `03-runtime/11-provider-model-system.md`
 - **Acceptance**: B (model configuration), F (session import)
 - **Milestone**: M4
 - **Status**: Unit-covered (`settings-project-archive.test.mjs`, `sidebar-navigation.test.mjs`); rendered scenario Draft
+
+#### E2E-091: Appearance card selects theme and language via preview cards
+
+- **Preconditions**: App running on macOS with a Simplified Chinese system locale.
+- **Steps**:
+  1) Open Settings → Basics.
+  2) In the Appearance card, confirm the Theme row shows three preview cards
+     (System, Light, Dark) with the System card first; select Dark and confirm
+     the selected card shows a check badge and the UI switches to dark.
+  3) Select Light and confirm the UI switches to light.
+  4) In the Language row, confirm three preview cards (Auto, 简体中文, English);
+     with the OS locale set to Chinese, the Auto card description reads
+     "当前：简体中文" and selecting Auto applies Simplified Chinese.
+  5) Select English and confirm the UI switches to English; select 简体中文 and
+     confirm it switches back.
+- **Expected**: Theme and Language are card grids (not native selects), each with
+  a selected check badge and a per-option description; the Auto language card
+  resolves the OS locale through the main process (`app.getLocale()`) and reflects
+  it inline; switching options updates the live UI without a reload.
+- **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/02-i18n-english-first.md`
+- **Acceptance**: A (core shell), H (localization)
+- **Milestone**: M4
+- **Status**: Documented
 
 #### E2E-039: Settings titlebar drag moves the window
 

@@ -25,7 +25,15 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 
 ### Basics
 - **Appearance** card:
-  - theme system/light/dark (select + theme cards)
+  - **Theme**: three selectable preview cards (System / Light / Dark, System
+    first) with a live mini-window mockup, a per-option description, and a
+    selected check badge; selection updates `settings.theme`
+  - **Language**: three selectable preview cards (Auto / 简体中文 / English) with
+    a sample-text preview, a per-option description, and a selected check badge;
+    selection updates `settings.language`
+  - **Auto language detection** resolves the OS locale through the main process
+    (`app.getLocale()`) rather than the renderer's `navigator.language`, and the
+    Auto card shows the detected language inline (e.g. "当前：简体中文")
   - native select triggers and their opened option lists use the active theme's
     readable foreground/background pairing on macOS, Windows, and Linux
 - **Defaults** and **Permissions** cards retain the host-backed default mode,

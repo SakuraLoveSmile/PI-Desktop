@@ -50,3 +50,4 @@ Each ADR includes:
 | 0032 | Reserve native width for the docked work panel | Accepted (superseded in part by 0033) |
 | 0033 | Internal-dock work panel (no native window expansion) | Accepted |
 | 0034 | Merge command palette into global search | Accepted |
+| 0035 | Surface the OS locale through the preload bridge | Accepted |
