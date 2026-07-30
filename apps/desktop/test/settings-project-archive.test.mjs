@@ -44,6 +44,17 @@ test("project archive includes archived projects without a visibility toggle", (
   assert.match(projectsPageSource, /setSettingsTab\("projects"\)/);
 });
 
+test("project archive makes project sessions searchable and progressively visible", () => {
+  assert.match(projectsPageSource, /sessionMatchesQuery/);
+  assert.match(projectsPageSource, /sessionTimestamp\(b\.updatedAt\) - sessionTimestamp\(a\.updatedAt\)/);
+  assert.doesNotMatch(projectsPageSource, /\.slice\(0, 4\)/);
+  assert.match(projectsPageSource, /INITIAL_VISIBLE_SESSION_COUNT = 8/);
+  assert.match(projectsPageSource, /project\.sessionsCount/);
+  assert.match(projectsPageSource, /project\.showMoreSessions/);
+  assert.match(projectsPageSource, /project\.showFewerSessions/);
+  assert.match(projectsPageSource, /projects-detail-task-updated/);
+});
+
 test("project archive is no longer a standalone app page", () => {
   assert.doesNotMatch(searchDialogSource, /page: "projects"/);
   assert.doesNotMatch(appSource, /page === "projects"/);

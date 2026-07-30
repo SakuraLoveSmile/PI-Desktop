@@ -6851,6 +6851,17 @@ html {
   color: var(--ds-text-muted);
 }
 
+.projects-detail-more {
+  margin-top: 4px;
+  color: var(--ds-text-secondary);
+}
+
+.projects-detail-header {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+}
+
 .projects-detail-label {
   margin: 8px 0 6px;
   color: var(--ds-text-muted);
@@ -6870,11 +6881,30 @@ html {
 }
 
 .projects-detail-task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   text-align: left;
   border-radius: var(--radius-sm);
   padding: 7px 8px;
   color: var(--ds-text-secondary);
   font-size: var(--text-sm-plus);
+}
+
+.projects-detail-task-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projects-detail-task-updated {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .projects-detail-task:hover {

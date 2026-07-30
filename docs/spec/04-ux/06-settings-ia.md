@@ -99,6 +99,10 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - Always includes archived records and keeps archived rows visually muted
 - Supports project search, add, activate, project-session expansion, pin,
   archive/restore, and close
+- Project search also matches session titles. Matching a session retains and
+  expands its owning project; expanded sessions are ordered by latest activity,
+  show a count and relative update time, and reveal additional rows in batches
+  of eight rather than silently truncating the history
 - Activating a project or project session returns to chat; archive and close
   actions keep Project archive open even when the active workspace changes
 

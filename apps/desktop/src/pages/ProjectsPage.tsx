@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ProjectRecord } from "@pi-desktop/shared";
+import type { ProjectRecord, SessionSummary } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import { Button } from "../components/ui";
@@ -28,6 +28,8 @@ import {
   sessionMatchesProject,
 } from "../lib/sidebar-session-groups";
 import { ProjectInstructionsDialog } from "../components/ProjectInstructionsDialog";
+
+const INITIAL_VISIBLE_SESSION_COUNT = 8;
 
 function formatUpdated(ts?: number, locale?: string, neverLabel = "—") {
   if (!ts) return neverLabel;
@@ -57,6 +59,20 @@ function shortenPath(path: string) {
   return path.replace(/^\/(?:Users|home)\/[^/]+/, "~");
 }
 
+function sessionTimestamp(value: string): number {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function sessionMatchesQuery(session: SessionSummary, query: string) {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  return (
+    !normalizedQuery ||
+    session.title.toLocaleLowerCase().includes(normalizedQuery) ||
+    session.id.toLocaleLowerCase().includes(normalizedQuery)
+  );
+}
+
 export function ProjectsPage() {
   const { t, i18n } = useTranslation();
   const workspace = useAppStore((s) => s.workspace);
@@ -79,6 +95,7 @@ export function ProjectsPage() {
   const [durableProjects, setDurableProjects] = useState<ProjectRecord[]>([]);
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [visibleSessionCounts, setVisibleSessionCounts] = useState<Record<string, number>>({});
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [instructionsFor, setInstructionsFor] = useState<{
     name: string;
@@ -174,9 +191,13 @@ export function ProjectsPage() {
       (p) =>
         p.name.toLowerCase().includes(q) ||
         p.path.toLowerCase().includes(q) ||
-        (p.branch || "").toLowerCase().includes(q),
+        (p.branch || "").toLowerCase().includes(q) ||
+        sessions.some(
+          (session) =>
+            sessionMatchesProject(session, p.path) && sessionMatchesQuery(session, q),
+        ),
     );
-  }, [items, query]);
+  }, [items, query, sessions]);
 
   const activate = async (path: string): Promise<boolean> => {
     try {
@@ -333,10 +354,31 @@ export function ProjectsPage() {
                   normalizeProjectPath(path) === normalizeProjectPath(project.path),
               );
               const color = project.color || projectColor(project.path);
-              const isOpen = !!expanded[project.path];
+              const projectMatchesQuery =
+                !query.trim() ||
+                project.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) ||
+                project.path.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) ||
+                (project.branch || "")
+                  .toLocaleLowerCase()
+                  .includes(query.trim().toLocaleLowerCase());
               const related = sessions
                 .filter((session) => sessionMatchesProject(session, project.path))
-                .slice(0, 4);
+                .sort(
+                  (a, b) =>
+                    sessionTimestamp(b.updatedAt) - sessionTimestamp(a.updatedAt) ||
+                    sessionTimestamp(b.createdAt) - sessionTimestamp(a.createdAt) ||
+                    a.title.localeCompare(b.title) ||
+                    a.id.localeCompare(b.id),
+                );
+              const matchingSessions = related.filter((session) =>
+                sessionMatchesQuery(session, query),
+              );
+              const sessionSearchMatch = !projectMatchesQuery && matchingSessions.length > 0;
+              const isOpen = !!expanded[project.path] || sessionSearchMatch;
+              const displayedSessions = sessionSearchMatch ? matchingSessions : related;
+              const visibleCount = visibleSessionCounts[project.path] ?? INITIAL_VISIBLE_SESSION_COUNT;
+              const visibleSessions = displayedSessions.slice(0, visibleCount);
+              const hiddenSessionCount = displayedSessions.length - visibleSessions.length;
               return (
                 <div
                   key={project.path}
@@ -480,23 +522,64 @@ export function ProjectsPage() {
                   </div>
                   {isOpen ? (
                     <div className="projects-row-detail">
-                      <div className="projects-detail-label">{t("project.sessions")}</div>
-                      {related.length === 0 ? (
+                      <div className="projects-detail-header">
+                        <div className="projects-detail-label">
+                          {t("project.sessionsCount", { count: displayedSessions.length })}
+                        </div>
+                      </div>
+                      {displayedSessions.length === 0 ? (
                         <div className="projects-detail-empty">{t("project.noSessions")}</div>
                       ) : (
                         <div className="projects-detail-tasks">
-                          {related.map((s) => (
+                          {visibleSessions.map((s) => (
                             <button
                               key={s.id}
                               type="button"
                               className="projects-detail-task"
                               onClick={() => void openProjectSession(project.path, s.id)}
+                              title={s.title || s.id}
                             >
-                              {s.title || s.id}
+                              <span className="projects-detail-task-title">{s.title || s.id}</span>
+                              <span className="projects-detail-task-updated">
+                                {formatUpdated(
+                                  sessionTimestamp(s.updatedAt),
+                                  i18n.resolvedLanguage || i18n.language,
+                                  t("project.updatedNever"),
+                                )}
+                              </span>
                             </button>
                           ))}
                         </div>
                       )}
+                      {hiddenSessionCount > 0 ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="projects-detail-more"
+                          onClick={() =>
+                            setVisibleSessionCounts((prev) => ({
+                              ...prev,
+                              [project.path]: visibleCount + INITIAL_VISIBLE_SESSION_COUNT,
+                            }))
+                          }
+                        >
+                          {t("project.showMoreSessions", { count: hiddenSessionCount })}
+                        </Button>
+                      ) : displayedSessions.length > INITIAL_VISIBLE_SESSION_COUNT ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="projects-detail-more"
+                          onClick={() =>
+                            setVisibleSessionCounts((prev) => ({
+                              ...prev,
+                              [project.path]: INITIAL_VISIBLE_SESSION_COUNT,
+                            }))
+                          }
+                        >
+                          {t("project.showFewerSessions")}
+                        </Button>
+                      ) : null}
                       <Button
                         size="sm"
                         variant="ghost"
