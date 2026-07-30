@@ -620,6 +620,7 @@ export const zhCN = {
   palette: {
     placeholder: "搜索命令…",
     empty: "没有找到命令",
+    uncategorized: "其他",
   },
   search: {
     placeholder: "搜索对话…",
