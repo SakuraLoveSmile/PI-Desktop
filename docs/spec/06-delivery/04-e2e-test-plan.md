@@ -254,6 +254,59 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Source-level regression covered; full visual scenario Draft
 
+### Conversation Top Bar
+
+#### E2E-087: Conversation top bar renders on the chat route
+
+- **Preconditions**: Provider configured; at least one session exists.
+- **Steps**: 1) Open the chat route. 2) Inspect the 46px bar at the top of the
+  conversation area. 3) Confirm it shows the sidebar toggle, the active project
+  name and session/task title, the Agent|Chat segmented mode toggle, the model
+  picker, and the New task / Search / Commands / Settings action buttons. 4)
+  Switch to the Pull requests, Scheduled, Plugins, or Settings routes and inspect
+  the same top region.
+- **Expected**: On the chat route the conversation top bar renders with all
+  controls; on every other route the frameless drag band renders instead (no
+  top-bar controls). The bar is draggable to move the window; interactive
+  controls do not start a window drag. macOS leaves the left ~76px clear for
+  traffic lights only while the sidebar is collapsed; Windows/Linux leave the
+  right 112px clear for native window controls.
+- **Specs linked**: `04-ux/08-component-spec.md` (§2 Topbar)
+- **Acceptance**: C (send/UI), Quality
+- **Milestone**: M2
+- **Status**: Draft
+
+#### E2E-088: Top-bar Agent/Chat mode toggle updates the session
+
+- **Preconditions**: Chat route active; a session selected.
+- **Steps**: 1) Click the Chat segment of the mode toggle. 2) Send a prompt that
+  would normally require Write/Edit and observe behavior. 3) Click the Agent
+  segment. 4) Begin a turn and try to toggle mode mid-run.
+- **Expected**: The toggle updates the active session `mode` (Chat hard-denies
+  Write/Edit; Agent allows them per permission settings). The toggle is disabled
+  while a turn runs and re-enables when idle.
+- **Specs linked**: `04-ux/08-component-spec.md` (§2, §11),
+  `03-runtime/03-tools-and-permissions.md`
+- **Acceptance**: C
+- **Milestone**: M2
+- **Status**: Draft
+
+#### E2E-089: Top-bar model picker opens downward and switches model
+
+- **Preconditions**: Chat route active; provider configured.
+- **Steps**: 1) Click the model picker in the top bar. 2) Confirm the dropdown
+  opens downward from the bar. 3) Select a different provider/model. 4) Open
+  Settings from the top-bar action buttons.
+- **Expected**: The menu lists enabled runnable providers with a default model
+  and opens downward (anchored to the top bar); selecting updates the active
+  session model; the Settings action opens Settings. The model trigger
+  ellipsizes long IDs.
+- **Specs linked**: `04-ux/08-component-spec.md` (§2, model dropdown),
+  `03-runtime/13-model-catalog-and-selection.md`
+- **Acceptance**: C
+- **Milestone**: M2
+- **Status**: Draft
+
 ### Workspace Open
 
 #### E2E-012: Open a project directory
@@ -1391,7 +1444,7 @@ Each scenario is documented in this format:
 - **Preconditions**: A saved provider has returned at least two models from its
   discovery endpoint and the resulting catalog is stored in `models`.
 - **Steps**: 1) Quit and restart the app. 2) Disconnect the provider endpoint.
-  3) Open the composer model picker. 4) Wait for background refresh to fail.
+  3) Open the top-bar model picker. 4) Wait for background refresh to fail.
   5) Reconnect the endpoint with one renamed model and one additional model,
   then update the provider configuration and reopen the picker.
 - **Expected**: The first picker open renders the prior catalog without starting
@@ -1414,7 +1467,7 @@ Each scenario is documented in this format:
   ^0.82.1+; a custom or Anthropic-compatible provider uses apiStyle
   `anthropic_messages` (or OpenAI-compatible `chat_completions` with
   `anthropic/claude-opus-5`) and model id `claude-opus-5`.
-- **Steps**: 1) Select `claude-opus-5` in the composer model control. 2) Open
+- **Steps**: 1) Select `claude-opus-5` in the top-bar model picker. 2) Open
   the Thinking selector. 3) Start a short turn and inspect the sidecar model
   snapshot / request metadata (or the unit-equivalent resolution path).
 - **Expected**: The id maps to the pinned pi catalog record (1M
@@ -2254,8 +2307,8 @@ This test plan spec is accepted when:
 - Switch to dark theme on chat home.
 - Expect main `#181818`, sidebar `#000000`, and the floating composer plate at elevated-primary (`#212121f5` / gray-800 96%) with elevation-prominent stroke + soft lift so the box reads against the main surface.
 
-### US-UI-21 Composer model menu configures pi
-- Create a session with provider A/model A, then open the composer model menu.
+### US-UI-21 Top-bar model menu configures pi
+- Create a session with provider A/model A, then open the top-bar model menu.
 - Expect enabled, runnable provider/default-model pairs and an Agent entry. The
   model trigger shows only the model ID; a capability-gated Thinking trigger is
   placed beside Chat / Agent instead of being nested in the model menu.
