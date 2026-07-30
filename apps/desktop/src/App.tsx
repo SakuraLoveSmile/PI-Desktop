@@ -220,7 +220,11 @@ function AppShell() {
       workPanelExitClosing.current = false;
       workPanelExitingRef.current = false;
       setWorkPanelExiting(false);
-      const requestedWidth = Math.round(workPanelWidth);
+      // Internal-dock redesign (ADR 0033): the work panel is a flex column
+      // inside the fixed client area, so it never expands the OS window. The
+      // native reservation target is therefore always 0; the native browser
+      // view still follows the renderer-measured panel rect via browserSetBounds.
+      const requestedWidth = 0;
       void commitWorkPanelPresentation({
         reservation: api.setWorkPanelReservation(requestedWidth),
         isCurrent: () => request === workPanelReservationRequest.current,

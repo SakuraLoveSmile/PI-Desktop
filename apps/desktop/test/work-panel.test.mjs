@@ -51,14 +51,13 @@ test("work panel replaces the context panel overlay", async () => {
   assert.doesNotMatch(appSource, /key\.toLowerCase\(\) === "j"/);
 });
 
-test("work panel reserves native window space before it is presented", () => {
+test("work panel is an internal dock that never expands the OS window", () => {
   assert.match(appSource, /presentedWorkPanelOpen/);
   assert.match(appSource, /setPresentedWorkPanelOpen/);
   assert.match(appSource, /workPanelExiting/);
-  assert.match(
-    appSource,
-    /requestedWidth\s*=\s*Math\.round\(workPanelWidth\)/,
-  );
+  // Internal-dock redesign (ADR 0033): the panel occupies client-area space
+  // and never reserves native window width, so the reservation target is 0.
+  assert.match(appSource, /requestedWidth\s*=\s*0/);
   assert.match(appSource, /setWorkPanelReservation\(requestedWidth\)/);
   assert.ok(
     appSource.indexOf("setWorkPanelReservation(requestedWidth)") <
@@ -87,7 +86,7 @@ test("work panel reserves native window space before it is presented", () => {
   assert.match(panelSource, /exitAnimationReady && "is-exiting"/);
   assert.match(panelSource, /if \(!exitAnimationReady\) return/);
   assert.match(panelSource, /animationName\.startsWith\("work-panel-out"\)/);
-  // The panel remains a fixed-width shell sibling after the native window grows.
+  // The panel remains a fixed-width in-flow shell sibling; the window never grows.
   assert.match(globalStyles, /\.work-panel \{[^}]*flex: 0 0 auto/s);
   assert.doesNotMatch(
     globalStyles.match(/\.work-panel \{[^}]*\}/s)?.[0] ?? "",

@@ -494,12 +494,12 @@ preview), and Files (workspace browser). Codex-parity surface.
 | State | Behavior |
 |---|---|
 | Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only in a session that produced a successful workspace Write/Edit while that Git working tree remains dirty. |
-| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 364–720px, preserving at least 320px of content beside the rail. The normal native window reserves that width when its work area permits. |
+| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 364–720px (default 480px), preserving at least 320px of content beside the rail. It occupies client-area space and never expands the OS window (ADR 0033). |
 | Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded switcher lists resources in first-open order with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows anchored pointer delta or keyboard input. Pointer changes preview once per animation frame and commit width plus reservation only on release; Escape, pointer cancellation, or lost capture restores both. Native window-edge resize changes MainChat only. |
 | No workspace | Each tab renders its own "open a project" empty state |
-| Constrained work area | The panel stays at its committed width; Main reserves available native width and MainChat absorbs the unavoidable shortfall |
+| Constrained work area | The panel stays at its committed width; MainChat reflows to absorb it and may fall below its 360px target on small windows (ADR 0033) |
 
 ### 5.4 Interactions
 
@@ -558,22 +558,20 @@ preview), and Files (workspace browser). Codex-parity surface.
   commits once, while Escape, pointer cancellation, and lost capture cancel.
   The 10px hit area keeps a global column-resize cursor and suppresses text
   selection during the gesture. The live preview changes renderer columns only;
-  a successful commit updates the Main-owned native reservation to the committed
-  fixed width. Native window edges remain independent and resize MainChat only,
-  never the panel or its preference.
+  a successful commit updates the committed preferred width. Native window edges
+  resize MainChat by reflow only, never the panel or its preference (ADR 0033).
 - Persistence: all session contexts are renderer runtime state only. On app
   startup, open state, tabs, active-tab selection, file requests, and Browser
   resources reset; only the committed preferred `{width}` remains in
-  localStorage `pi.desktop.workPanel`. Opening the visible panel reserves its
-  committed width in the normal native window; collapse and final-tab close
-  request zero, and a divider commit updates the target. Target updates are
-  idempotent. If the current work area cannot supply the full target, Electron
-  reserves available width while the panel stays fixed and MainChat absorbs the
-  shortfall. Maximized/fullscreen geometry waits until normal. Electron persists
-  base bounds excluding the reservation and its induced x shift. Background
-  session artifacts never update the visible reservation. The renderer changes
-  panel presentation only after the latest reservation request succeeds; a
-  rejected or superseded request keeps the last confirmed presentation state
+  localStorage `pi.desktop.workPanel`. The renderer always requests a native
+  reservation width of 0, so the OS window never expands (ADR 0033). Collapse
+  and final-tab close and a divider commit update only the committed preferred
+  width. Target updates are idempotent. The panel reflows MainChat inside the
+  fixed window; on constrained work areas chat may fall below its 360px target.
+  Maximized/fullscreen geometry is unaffected. Background session artifacts
+  never update the visible panel. The renderer changes panel presentation only
+  after the latest (zero-width) reservation request succeeds; a rejected or
+  superseded request keeps the last confirmed presentation state
   (D163, ADR 0032).
 
 ### 5.5 Accessibility
@@ -1751,8 +1749,8 @@ Sidebar footer                                        Popover (360px max)
 17. NotificationInbox exposes All/Unread views, exact unread badge semantics,
     row activation, mark-all-read and clear actions; it is keyboard-operable
     and never treats a visible-current or aborted turn as a notification
-18. Native edges resize MainChat without compressing the fixed work panel;
-    panel visibility and divider commits update an idempotent native reservation,
-    and cancelled divider gestures restore the prior width and reservation
+18. Native edges resize MainChat by reflow without compressing the fixed work panel;
+    panel visibility and divider commits update the committed preferred width,
+    and cancelled divider gestures restore the prior width (ADR 0033)
 19. Expanded sidebar session titles, project/group titles, and empty-state copy
     use the 13px compact token while primary sidebar actions remain at 14px

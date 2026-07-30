@@ -1014,7 +1014,9 @@ Each scenario is documented in this format:
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one resource; file resources
-  are path-keyed and repeated resources deduplicate. Once the panel is open, a
+  are path-keyed and repeated resources deduplicate. Opening, collapse, and
+  divider commit never change the OS window size — only MainChat reflows inside
+  the fixed client area (ADR 0033). Once the panel is open, a
   44px activity rail exposes one-click Review/Terminal/Browser actions with a
   fill plus edge marker for the active tool and a dot for open inactive tools.
   The 46px content header keeps the active label readable, closes it directly,
@@ -1059,9 +1061,9 @@ Each scenario is documented in this format:
   unchanged work area does not reapply geometry. System compression or
   relocation during a display transition does not overwrite the confirmed base
   bounds, and returning to a roomier display restores the prior chat width.
-  Relaunch restores base bounds without reservation width or induced x shift.
-  Malformed reservation payloads fail with `INVALID_ARGUMENT` and never coerce.
-  A rejected reservation keeps
+  Relaunch restores the user's window size (the native reservation is always 0,
+  ADR 0033). Malformed reservation payloads fail with `INVALID_ARGUMENT` and
+  never coerce. A rejected reservation keeps
   the last confirmed panel presentation until a later successful request; a
   superseded success cannot commit stale presentation. No transition produces
   a second resize or position drift.
