@@ -2175,7 +2175,7 @@ Each scenario is documented in this format:
 - **Status**: Partially automated (`project-instructions.test.ts`); full
   provider/UI journey Draft
 
-#### E2E-AGENTS-002: Settings manages global and project instruction files
+#### E2E-AGENTS-002: Global settings and project menus manage instruction files
 
 - **Preconditions**: PI-Desktop is running; a project can be opened.
 - **Steps**:
@@ -2183,14 +2183,15 @@ Each scenario is documented in this format:
      content.
   2. Start a new agent session and verify its instruction context includes the
      global source.
-  3. Open a project, edit and save the displayed project `AGENTS.md`, then
-     submit a prompt in a new or idle session.
+  3. Open the Projects list, use a project's more menu to edit and save its
+     displayed `AGENTS.md`, then submit a prompt in a new or idle session.
 - **Expected**: The global editor targets only `~/.pi/agent/AGENTS.md`. The
-  project editor is unavailable until a project is active and then targets only
-  its root `AGENTS.md`. Both editors show their resolved paths, preserve the
-  typed text, and save through the dedicated IPC rather than a general file
-  write API. Global content precedes project content in the next runtime; the
-  saved project content follows it and takes precedence on conflicts.
+  project editor is available only from a known project's more menu and targets
+  only that project's root `AGENTS.md`. Both editors show their resolved paths,
+  preserve the typed text, and save through the dedicated IPC rather than a
+  general file write API. Global content precedes project content in the next
+  runtime; the saved project content follows it and takes precedence on
+  conflicts.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`, ADR 0037
 - **Acceptance**: C (chat/stream), D (workspace), F (persistence)
 - **Milestone**: M5

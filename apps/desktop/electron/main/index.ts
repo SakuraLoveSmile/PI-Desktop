@@ -2215,16 +2215,41 @@ function registerIpc() {
     }
   };
 
-  const activeWorkspacePath = async () => {
-    if (!host) return null;
-    const res = (await host.call("workspace.get")) as {
-      workspace: { path?: string } | null;
+  const managedProjectPath = async (input: unknown): Promise<string> => {
+    if (!host) throw new Error("host unavailable");
+    const requestedPath = typeof input === "string" ? input.trim() : "";
+    if (!requestedPath) {
+      throw Object.assign(new Error("project path required"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    const projectPath = resolve(requestedPath);
+    const listed = (await host.call("projects.list")) as {
+      projects?: Array<{ path?: string }>;
     };
-    return res.workspace?.path ?? null;
+    const known = (listed.projects ?? []).some((project) => {
+      const candidate = String(project?.path ?? "").trim();
+      return candidate && resolve(candidate) === projectPath;
+    });
+    if (!known) {
+      throw Object.assign(new Error("project not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    if (!existsSync(projectPath) || !statSync(projectPath).isDirectory()) {
+      throw Object.assign(new Error("project folder not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    return projectPath;
   };
 
-  handle(IPC.invoke.agentInstructionsGet, async () => {
-    const projectPath = await activeWorkspacePath();
+  handle(
+    IPC.invoke.agentInstructionsGet,
+    async (input: { projectPath?: unknown } = {}) => {
+      const projectPath = input.projectPath === undefined
+        ? null
+        : await managedProjectPath(input.projectPath);
     return {
       global: await instructionFile("global"),
       ...(projectPath
@@ -2235,14 +2260,20 @@ function registerIpc() {
 
   handle(
     IPC.invoke.agentInstructionsSave,
-    async (input: { scope?: "global" | "project"; content?: unknown } = {}) => {
+    async (input: {
+      scope?: "global" | "project";
+      content?: unknown;
+      projectPath?: unknown;
+    } = {}) => {
       if (input.scope !== "global" && input.scope !== "project") {
         throw Object.assign(new Error("instruction scope required"), {
           errorCode: ErrorCodes.INVALID_ARGUMENT,
         });
       }
       const scope = input.scope;
-      const projectPath = scope === "project" ? await activeWorkspacePath() : null;
+      const projectPath = scope === "project"
+        ? await managedProjectPath(input.projectPath)
+        : null;
       const file = await instructionFile(scope, projectPath);
       const content = typeof input.content === "string" ? input.content : "";
       const { mkdir, writeFile } = await import("node:fs/promises");

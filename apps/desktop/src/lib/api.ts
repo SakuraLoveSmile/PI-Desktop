@@ -247,14 +247,20 @@ export const api = {
     invoke(IPC.invoke.agentAbort, { sessionId }),
   getStatus: (sessionId: string) =>
     invoke<{ status: AgentStatus }>(IPC.invoke.agentGetStatus, sessionId),
-  getAgentInstructions: () =>
+  getAgentInstructions: (projectPath?: string) =>
     invoke<{ global: AgentInstructionFile; project?: AgentInstructionFile }>(
       IPC.invoke.agentInstructionsGet,
+      projectPath === undefined ? {} : { projectPath },
     ),
-  saveAgentInstructions: (scope: AgentInstructionFile["scope"], content: string) =>
+  saveAgentInstructions: (
+    scope: AgentInstructionFile["scope"],
+    content: string,
+    projectPath?: string,
+  ) =>
     invoke<{ file: AgentInstructionFile }>(IPC.invoke.agentInstructionsSave, {
       scope,
       content,
+      ...(projectPath === undefined ? {} : { projectPath }),
     }),
   resolvePermission: (resolution: ToolPermissionResolution) =>
     invoke(IPC.invoke.toolResolvePermission, resolution),
