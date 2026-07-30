@@ -4,9 +4,11 @@ import {
   useMemo,
   useRef,
   useState,
+  type AnimationEventHandler as ReactAnimationEventHandler,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { cx } from "./ui";
 
 // --- Time-based session grouping ---
 type TimeGroup = "today" | "yesterday" | "thisWeek" | "older14d" | "archived";
@@ -171,10 +173,14 @@ export function Sidebar({
   onOpenSearch,
   onToggleSidebar,
   sidebarToggleShortcut,
+  className,
+  onAnimationEnd,
 }: {
   onOpenSearch: () => void;
   onToggleSidebar: () => void;
   sidebarToggleShortcut: string;
+  className?: string;
+  onAnimationEnd?: ReactAnimationEventHandler<HTMLElement>;
 }) {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
@@ -1369,7 +1375,10 @@ export function Sidebar({
   };
 
   return (
-    <aside className="sidebar">
+    <aside
+      className={cx("sidebar", className)}
+      onAnimationEnd={onAnimationEnd}
+    >
       <div className="sidebar-header">
         <button
           type="button"

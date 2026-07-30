@@ -148,6 +148,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const modelRef = useRef<HTMLDivElement>(null);
   const modelSearchRef = useRef<HTMLInputElement>(null);
   const modelListRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!composerPrefill) return;
@@ -472,8 +473,31 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
     });
   };
 
+  // Keep the transcript's bottom reserve in sync with the composer's real
+  // height (it grows with multi-line input) so the last message sits just
+  // above the box instead of far below it.
+  useEffect(() => {
+    const el = dockRef.current;
+    if (!el) return;
+    const publish = () => {
+      const h = el.getBoundingClientRect().height;
+      document.documentElement.style.setProperty(
+        "--composer-dock-height",
+        `${Math.round(h)}px`,
+      );
+    };
+    publish();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [variant]);
+
   return (
-    <div className={`composer-dock composer-dock-${variant}`}>
+    <div
+      ref={dockRef}
+      className={`composer-dock composer-dock-${variant}`}
+    >
       <div className="composer-stack">
         <div className="composer-shell">
           {inputFocused ? (

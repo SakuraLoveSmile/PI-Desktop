@@ -499,8 +499,9 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Maximized/fullscreen geometry waits for normal state. Persisted base bounds
   exclude reservation width/x shift, and background artifacts cannot change the
   visible target.
-- Decision D163; ADR 0032. This supersedes the contrary portions of D156 and
-  ADR 0029.
+- Decision D163; ADR 0032 (the window-expansion portion is superseded by ADR 0033:
+  the work panel is an internal dock that never expands the OS window). This
+  supersedes the contrary portions of D156 and ADR 0029.
 
 ## 2026-07-29 — Dual-locale in-app product changelog
 

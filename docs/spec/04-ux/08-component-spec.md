@@ -48,7 +48,11 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ### 1.4 Interactions
 
 - Sidebar toggle: keyboard shortcut + icon button beside Search in the expanded
-  sidebar header; the button moves to the main titlebar while collapsed
+  sidebar header; the button moves to the main titlebar while collapsed. The
+  collapse and expand use a mounted-then-animated dock transition (entrance
+  `sidebar-in`, exit `sidebar-out` keyframes) that mirrors the work-panel dock:
+  the aside stays in the tree through the exit keyframe, then unmounts
+  (`is-exiting` flag + `animationend` guard, with a timeout fallback)
 - Work panel collapse: sole control lives in the session pane titlebar top-right
   while the panel is open, with its outer edge flush against the divider
   between the session pane and work panel so the work-panel content header is
@@ -474,7 +478,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 |    |  Browser: URL bar + preview     |
 |    |  Files: tree + file viewer      |
 +----+---------------------------------+
- 44px activity rail
+ create trigger
 ^ 10px transparent resize hit area on the left edge
 ```
 
@@ -482,8 +486,15 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 - Panel body uses quiet inset paper (`#fafafa`); the 46px header band and tool
   chrome (review toolbar, browser chrome, file viewer header) stay white
-- The 44px activity rail uses a slightly deeper neutral surface with a subtle
-  divider; selected state uses an edge marker plus fill, never color alone
+- The header exposes one unified context trigger whose menu lists the open
+  resources and, after a divider, the create-new tools (Review, Terminal,
+  Browser, Files); dropdown items use a neutral fill with a 2px edge marker for
+  the active tool, never color alone
+- The 46px header follows a "context left, actions right" model: the unified
+  context trigger anchors the left and shows the active tool icon and ellipsized
+  label; a right action cluster groups the close / collapse controls behind a
+  thin divider. The collapse control uses a right chevron so it reads as "push
+  the panel away", not "open a panel"
 - Active tabs, file-tree rows, diff headers, and the resize handle ease hover
   fills with `--motion-duration-fast` / `--motion-ease-out`
 - Browser URL and empty-tool chrome share the light inset field treatment used
@@ -494,12 +505,12 @@ preview), and Files (workspace browser). Codex-parity surface.
 | State | Behavior |
 |---|---|
 | Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only in a session that produced a successful workspace Write/Edit while that Git working tree remains dirty. |
-| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 364–720px, preserving at least 320px of content beside the rail. The normal native window reserves that width when its work area permits. |
+| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 364–720px (default 420px), preserving at least 320px of content beside the rail. It occupies client-area space and never expands the OS window (ADR 0033). |
 | Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded switcher lists resources in first-open order with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows anchored pointer delta or keyboard input. Pointer changes preview once per animation frame and commit width plus reservation only on release; Escape, pointer cancellation, or lost capture restores both. Native window-edge resize changes MainChat only. |
 | No workspace | Each tab renders its own "open a project" empty state |
-| Constrained work area | The panel stays at its committed width; Main reserves available native width and MainChat absorbs the unavoidable shortfall |
+| Constrained work area | The panel stays at its committed width; MainChat reflows to absorb it and may fall below its 360px target on small windows (ADR 0033) |
 
 ### 5.4 Interactions
 
@@ -524,19 +535,20 @@ preview), and Files (workspace browser). Codex-parity surface.
   failed-refresh states hide the transcript entry. Session ownership is
   renderer-memory state and is discarded on relaunch with D142's work-panel
   contexts.
-- Tool activity rail: while the panel is visible, Review, Terminal, and Browser
-  are stable 32px icon buttons inside a 44px rail. Activating a closed tool
-  creates it through `openWorkPanelTab`; activating an open tool selects its
-  singleton tab. Selected state combines a neutral fill with a 2px edge marker,
-  and open inactive tools show a small status dot. The rail disappears with the
-  panel and therefore does not replace D128's artifact-driven entry point.
-- Resource switcher: the 46px header shows the active resource icon and
-  ellipsized label. Its chevron opens a bounded menu containing every current
-  session resource in first-open order; rows select resources, expose full
-  paths in tooltips, and retain per-resource close controls. The header's
-  trailing close button closes the current resource directly. Arrow keys,
-  Home, End, and Escape operate the menu; opening the switcher hides the native
-  Browser preview until it closes.
+- Unified context menu: while the panel is visible, one context trigger in the
+  header opens a single dropdown. Its top section lists the open resources in
+  first-open order (rows select a resource and retain per-resource close
+  controls); a divider separates it from the create-new section listing Review,
+  Terminal, Browser, and Files as stable items. Activating a closed tool creates
+  it through `openWorkPanelTab`; activating an open tool selects its singleton
+  tab. The active tool combines a neutral fill with a 2px edge marker, and open
+  inactive tools show a small status dot. The trigger disappears with the panel
+  and therefore does not replace D128's artifact-driven entry point.
+- Resource header: the 46px header shows the active resource icon and
+  ellipsized label. Its context chevron opens the bounded unified menu described
+  above; the header's trailing close button closes the current resource
+  directly. Arrow keys, Home, End, and Escape operate the menu; opening the menu
+  hides the native Browser preview until it closes.
 - Tab close: closing an active tab selects its right neighbor, then its left;
   closing the last tab hides the panel. The panel-level collapse control lives
   in the session pane top-right (not the work-panel content header) and hides the
@@ -558,28 +570,27 @@ preview), and Files (workspace browser). Codex-parity surface.
   commits once, while Escape, pointer cancellation, and lost capture cancel.
   The 10px hit area keeps a global column-resize cursor and suppresses text
   selection during the gesture. The live preview changes renderer columns only;
-  a successful commit updates the Main-owned native reservation to the committed
-  fixed width. Native window edges remain independent and resize MainChat only,
-  never the panel or its preference.
+  a successful commit updates the committed preferred width. Native window edges
+  resize MainChat by reflow only, never the panel or its preference (ADR 0033).
 - Persistence: all session contexts are renderer runtime state only. On app
   startup, open state, tabs, active-tab selection, file requests, and Browser
   resources reset; only the committed preferred `{width}` remains in
-  localStorage `pi.desktop.workPanel`. Opening the visible panel reserves its
-  committed width in the normal native window; collapse and final-tab close
-  request zero, and a divider commit updates the target. Target updates are
-  idempotent. If the current work area cannot supply the full target, Electron
-  reserves available width while the panel stays fixed and MainChat absorbs the
-  shortfall. Maximized/fullscreen geometry waits until normal. Electron persists
-  base bounds excluding the reservation and its induced x shift. Background
-  session artifacts never update the visible reservation. The renderer changes
-  panel presentation only after the latest reservation request succeeds; a
-  rejected or superseded request keeps the last confirmed presentation state
+  localStorage `pi.desktop.workPanel`. The renderer always requests a native
+  reservation width of 0, so the OS window never expands (ADR 0033). Collapse
+  and final-tab close and a divider commit update only the committed preferred
+  width. Target updates are idempotent. The panel reflows MainChat inside the
+  fixed window; on constrained work areas chat may fall below its 360px target.
+  Maximized/fullscreen geometry is unaffected. Background session artifacts
+  never update the visible panel. The renderer changes panel presentation only
+  after the latest (zero-width) reservation request succeeds; a rejected or
+  superseded request keeps the last confirmed presentation state
   (D163, ADR 0032).
 
 ### 5.5 Accessibility
 
-- `<aside>` landmark; the activity rail uses a localized `<nav>` label and
-  pressed state on each tool button. The current-resource control exposes
+- `<aside>` landmark; the create trigger uses a localized label and
+  `aria-expanded`, while its dropdown items use `menuitemradio` / `aria-checked`.
+  The current-resource control exposes
   `aria-haspopup="menu"` / `aria-expanded`; switcher rows use
   `menuitemradio` / `aria-checked`, and each resource body remains a
   `role="tabpanel"`
@@ -1751,8 +1762,8 @@ Sidebar footer                                        Popover (360px max)
 17. NotificationInbox exposes All/Unread views, exact unread badge semantics,
     row activation, mark-all-read and clear actions; it is keyboard-operable
     and never treats a visible-current or aborted turn as a notification
-18. Native edges resize MainChat without compressing the fixed work panel;
-    panel visibility and divider commits update an idempotent native reservation,
-    and cancelled divider gestures restore the prior width and reservation
+18. Native edges resize MainChat by reflow without compressing the fixed work panel;
+    panel visibility and divider commits update the committed preferred width,
+    and cancelled divider gestures restore the prior width (ADR 0033)
 19. Expanded sidebar session titles, project/group titles, and empty-state copy
     use the 13px compact token while primary sidebar actions remain at 14px
