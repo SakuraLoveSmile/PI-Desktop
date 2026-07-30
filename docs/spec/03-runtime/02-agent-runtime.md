@@ -2,7 +2,7 @@
 
 ## 1. Goal
 
-Applied decisions: **D002/D003/D008/D158**.
+Applied decisions: **D002/D003/D008/D158/D166**.
 
 
 Wrap pi into a product runtime that desktop layers can consume safely.
@@ -78,6 +78,11 @@ interface AgentRuntime {
     visible assistant error message
 11. finalize and persist successful answer/thinking blocks independently
 
+The runtime constructs exactly one pi `Agent` per durable session. Plan does
+not select a second model, planner service, permission implementation, or
+runtime. The same Agent changes its planning state and tool registry after a
+host-confirmed transition.
+
 ### 5.1 Context checkpoint protection (D158, ADR 0030)
 
 The complete visible transcript and the model context are separate views of
@@ -149,15 +154,40 @@ Automatic protection is enabled by default. Disabling it removes
 checkpoint generation are abortable and count as running state until durable
 persistence completes.
 
-## 5b. Mode defaults
+## 5b. Operating mode and planning state
 
 - Default product mode: **Agent**
-- Chat mode is available as a safer read-only profile
+- The product selector is **Agent | Plan**; the internal conversation page may
+  still use `page = "chat"`
 - Mode is session-scoped and persisted with session metadata
 - Thinking level is session-scoped and persisted with session metadata
 - Composer configuration is mutable only while the session is idle
 - Changing mode/provider/model/thinking level applies to the next turn and
   recreates the pi runtime when any runtime-affecting configuration changes
+
+The live planning state is derived and projected as:
+
+```ts
+type OperatingMode = "agent" | "plan";
+type PlanningState = "inactive" | "planning" | "awaiting_approval";
+```
+
+`Agent / inactive` enters `Plan / planning` either when the user selects Plan
+while idle or when the Agent calls `EnterPlanMode`. In Plan, the Agent can
+inspect, use context controls, run Bash through the selected permission mode,
+and call `ExitPlanMode` with a structured plan. The host then moves the live
+state to `awaiting_approval` and blocks that tool call until a matching plan
+approval response arrives.
+
+Approval commits `mode = agent` and the selected explicit permission mode in
+one host transaction. The same Agent receives a fresh model turn with the
+Agent tool set. `request_changes` returns non-empty feedback to the same Agent
+as a Plan tool result and returns to `planning`; it never starts a second Agent.
+`reject`, approval timeout, host/sidecar crash, abort, stale response, or
+persistence failure leaves durable mode as Plan and grants no execution tools.
+
+Manual mode selection is allowed only while idle. Selecting Agent is an
+intentional user override and does not synthesize a plan or approval.
 
 ## 5c. Thinking capability and stream contract
 
@@ -238,11 +268,23 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 
 ```text
 [base product prompt in English]
-+ [mode prompt: chat/agent]
++ [operating-state prompt: agent/plan]
 + [workspace info]
 + [tool instructions]
 + [optional user custom instructions]
 ```
+
+### 7.1 Plan prompt requirements
+
+The Plan prompt tells the same Agent to understand the request, inspect the
+relevant repository/specification/test context, identify impacted files and
+risks, include focused validation and migration/recovery implications, surface
+open questions, and call `ExitPlanMode` exactly when the plan is ready. It must
+not claim that changes were made. After `request_changes`, it must incorporate
+the feedback and submit a revised plan rather than attempting execution.
+
+The prompt may describe Bash as permission-gated and potentially mutating. It
+must not describe Plan as a strict read-only security boundary.
 
 ## 8. Concurrency
 

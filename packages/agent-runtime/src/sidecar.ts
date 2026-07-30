@@ -16,6 +16,7 @@ import {
   normalizeSupportedThinkingLevels,
   normalizeThinkingLevel,
 } from "./sidecar-config.js";
+import { normalizeMode } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   ContextCompactionRecord,
@@ -33,6 +34,8 @@ const hostProxy = new ParentHostProxy();
 type RuntimeParams = {
   sessionId: string;
   mode?: Mode;
+  /** Durable host turn ID for the prompt currently being executed. */
+  turnId?: string;
   thinkingLevel?: ThinkingLevel;
   provider: RuntimeProviderConfig;
   pluginTools?: PluginToolDef[];
@@ -58,7 +61,7 @@ async function runtimeFor(
   currentPrompt?: string,
 ): Promise<DesktopAgentRuntime> {
   const sessionId = String(params.sessionId);
-  const mode = params.mode || "agent";
+  const mode = normalizeMode(params.mode);
   const providerInput = params.provider;
   const provider = {
     ...providerInput,
@@ -99,6 +102,7 @@ async function runtimeFor(
   }
   if (reusable) {
     reusable.setCompactionSettings(params.compactionSettings);
+    reusable.setMode(mode);
     return reusable;
   }
 
@@ -126,6 +130,7 @@ async function runtimeFor(
     host: hostProxy as any,
     sessionId,
     mode,
+    turnId: params.turnId,
     provider,
     thinkingLevel,
     history,
@@ -169,13 +174,16 @@ async function handle(method: string, params: any): Promise<unknown> {
     case "agent.prompt": {
       const sessionId = String(params.sessionId);
       const content = String(params.content ?? "");
-      const turnId = randomUUID();
+      const turnId =
+        typeof params.turnId === "string" && params.turnId.trim()
+          ? params.turnId
+          : randomUUID();
       const runtime = await runtimeFor(params, content);
       const userMessageId =
         typeof params.userMessageId === "string" && params.userMessageId
           ? params.userMessageId
           : undefined;
-      void runtime.prompt(content, userMessageId).catch((err) => {
+      void runtime.prompt(content, userMessageId, turnId).catch((err) => {
         // Rejected-prompt path (pre-flight/transport failures). Streamed
         // provider errors surface via stopReason "error" and are classified
         // and emitted by the runtime itself.
@@ -198,6 +206,7 @@ async function handle(method: string, params: any): Promise<unknown> {
     }
     case "agent.abort": {
       const sessionId = String(params.sessionId);
+      await hostProxy.call("plans.abort", { sessionId }).catch(() => undefined);
       const runtime = runtimes.get(sessionId);
       if (runtime) await runtime.abort();
       return { ok: true };

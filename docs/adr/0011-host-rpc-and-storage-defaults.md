@@ -1,6 +1,6 @@
 # ADR 0011: Freeze host RPC, storage ownership, and mode defaults
 
-- Status: Accepted
+- Status: Accepted; mode-profile clause superseded in part by ADR 0033
 - Date: 2026-07-25
 
 ## Context
@@ -10,7 +10,7 @@ After baseline 0.3.0, implementation still depended on several high-impact defau
 - Electron ↔ Rust transport
 - SQLite ownership
 - default interaction mode
-- chat/agent tool split
+- former restricted-profile tool split (superseded by ADR 0033)
 - permission timeout behavior
 
 ## Decision
@@ -20,7 +20,8 @@ Freeze the following defaults for implementation:
 1. Transport = **Rust sidecar + stdio JSON-RPC (NDJSON)**
 2. SQLite ownership = **Rust host-core only**
 3. Default mode = **Agent**
-4. Chat mode = **read-only tools**
+4. The former restricted profile was read-only; this mode-profile clause is
+   superseded by ADR 0033, which replaces it with the Plan operating state
 5. Permission timeout = **120s deny**
 6. Session grants = **by toolName**
 7. First release platform = **macOS arm64 only**
@@ -32,7 +33,7 @@ Freeze the following defaults for implementation:
 ### Positive
 - M1/M2 can proceed without re-litigating core choices
 - Clear process and data ownership
-- Safer chat/agent split
+- Explicit host-owned operating-state and permission policy
 
 ### Negative
 - JSON-RPC text protocol may later need binary upgrade

@@ -22,7 +22,7 @@
 | `Cmd/Ctrl + .` | Abort active turn | Global (same as abort button) |
 | `Cmd/Ctrl + K` | Open command palette | Global |
 
-### 1.2 Chat context shortcuts
+### 1.2 Conversation context shortcuts
 
 | Shortcut | Action | Context |
 |---|---|---|
@@ -449,7 +449,7 @@ may be retained while exactly one workspace supplies the visible shell context.
 ### 5.1 Flow sequence
 
 ```text
-Agent calls high-risk tool
+Agent calls a permission-gated tool (including Plan Bash under Ask or Accept edits)
   → PermissionCard inserted inline in transcript
   → Composer disabled (cannot send new prompt)
   → Countdown starts (120s)
@@ -474,6 +474,30 @@ Agent calls high-risk tool
 - Action buttons are tab-reachable within the card
 - After resolution: focus returns to composer
 - Full spec: [03-permission-ux.md](03-permission-ux.md)
+
+## 5A. Plan workflow
+
+1. The user selects Plan while the session is idle, or the same Agent calls
+   `EnterPlanMode`; the host persists/validates `mode = plan` and the renderer
+   projects `planning`.
+2. The Agent investigates with the Plan tool set. Read/Glob/Grep and
+   BrowserPreview are allowed; Bash follows the visible permission mode. A
+   Plan Bash command may mutate under Auto, so the mode chip remains visible.
+3. The Agent calls `ExitPlanMode` alone in its tool batch with a structured
+   proposal. The host persists a pending approval and the renderer displays
+   `PlanApprovalCard`; the Agent waits.
+4. Approve requires Ask / Accept edits / Auto selection. Host-core commits the
+   approval, `mode = agent`, and permission mode atomically, then the same
+   Agent continues on a fresh model turn with Agent tools.
+5. Request changes requires feedback, returns it to the same Agent, and keeps
+   the session in Plan for revision. Reject stops the run and keeps Plan.
+6. Timeout, abort, persistence failure, renderer/host/sidecar crash, or stale
+   response renders a failed-closed state. No control clears Plan optimistically
+   and no execution tool becomes available.
+
+The approval card is session-scoped. Background sessions may retain a pending
+request, but opening another session never covers it or moves focus; returning
+to the originating session restores the live card and original deadline.
 
 ## 6. Toast vs inline error
 

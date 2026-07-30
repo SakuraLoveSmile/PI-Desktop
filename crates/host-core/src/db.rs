@@ -4,10 +4,10 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-/// Storage schema v7 (docs/spec/03-runtime/04-data-storage.md): SQLite holds
+/// Storage schema v8: SQLite holds
 /// index data only; transcript content lives in per-session JSONL files
 /// (D119, `transcripts.rs`).
-pub const SCHEMA_VERSION: i64 = 7;
+pub const SCHEMA_VERSION: i64 = 8;
 
 /// Audit rows older than this are pruned at boot.
 const AUDIT_RETENTION_MS: i64 = 90 * 24 * 3600 * 1000;
@@ -278,6 +278,36 @@ CREATE TABLE audit_log (
 );
 CREATE INDEX idx_audit_ts ON audit_log(ts);
 CREATE INDEX idx_audit_session ON audit_log(session_id, ts) WHERE session_id IS NOT NULL;
+
+"#;
+
+/// Approval storage is kept in one batch so fresh databases and v7 -> v8
+/// migrations cannot drift in table names, checks, or indexes.
+const PLAN_APPROVALS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS plan_approvals (
+  request_id             TEXT PRIMARY KEY,
+  session_id            TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  turn_id               TEXT NOT NULL,
+  tool_call_id          TEXT NOT NULL UNIQUE,
+  plan_json             TEXT NOT NULL,
+  status                TEXT NOT NULL CHECK (status IN (
+    'pending', 'approved', 'changes_requested', 'rejected',
+    'expired', 'interrupted'
+  )),
+  action                TEXT CHECK (action IN ('approve', 'request_changes', 'reject')),
+  target_permission_mode TEXT CHECK (target_permission_mode IN ('ask', 'accept-edits', 'auto')),
+  feedback              TEXT,
+  created_at            INTEGER NOT NULL,
+  expires_at            INTEGER NOT NULL,
+  resolved_at           INTEGER,
+  error_code            TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_plan_approvals_session
+  ON plan_approvals(session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_plan_approvals_pending
+  ON plan_approvals(status, expires_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_approvals_one_pending_session
+  ON plan_approvals(session_id) WHERE status = 'pending';
 "#;
 
 pub struct Database {
@@ -353,8 +383,12 @@ impl Database {
                 conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL;")?;
                 let tx = conn.unchecked_transaction()?;
                 tx.execute_batch(SCHEMA_LATEST)?;
+                tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
                 tx.commit()?;
+            }
+            7 => {
+                migrate_v7_to_v8(&conn)?;
             }
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
@@ -388,6 +422,16 @@ impl Database {
         )?;
         self.conn.execute(
             "UPDATE task_runs SET status = 'aborted', ended_at = ?1 WHERE status = 'running'",
+            params![now],
+        )?;
+        // A pending approval is process-local: after a full host restart the
+        // sidecar that was waiting on it no longer exists, so it must never
+        // become actionable through a stale renderer request.
+        self.conn.execute(
+            "UPDATE plan_approvals
+             SET status = 'interrupted', resolved_at = ?1,
+                 error_code = 'PLAN_APPROVAL_INTERRUPTED'
+             WHERE status = 'pending'",
             params![now],
         )?;
         self.conn.execute(
@@ -526,6 +570,79 @@ fn archive_legacy_db(path: &Path, version: i64) -> Result<()> {
     Ok(())
 }
 
+fn migrate_legacy_mode_json(value: &mut Value) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                migrate_legacy_mode_json(item);
+            }
+        }
+        Value::Object(object) => {
+            for (key, item) in object.iter_mut() {
+                if matches!(key.as_str(), "mode" | "defaultMode" | "operatingMode")
+                    && item.as_str() == Some("chat")
+                {
+                    *item = Value::String("plan".into());
+                }
+                migrate_legacy_mode_json(item);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn migrate_v7_to_v8(conn: &Connection) -> Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("UPDATE sessions SET mode = 'plan' WHERE mode = 'chat'", [])?;
+
+    let settings: Vec<(String, String, String)> = {
+        let mut stmt = tx.prepare(
+            "SELECT ns, key, value_json FROM kv WHERE value_json LIKE '%chat%'",
+        )?;
+        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    for (ns, key, raw) in settings {
+        let Ok(mut value) = serde_json::from_str::<Value>(&raw) else {
+            continue;
+        };
+        let before = value.clone();
+        migrate_legacy_mode_json(&mut value);
+        if value != before {
+            tx.execute(
+                "UPDATE kv SET value_json = ?1, updated_at = ?2 WHERE ns = ?3 AND key = ?4",
+                params![value.to_string(), now_ms(), ns, key],
+            )?;
+        }
+    }
+
+    let scheduled: Vec<(String, String)> = {
+        let mut stmt = tx.prepare(
+            "SELECT id, config_json FROM scheduled_tasks WHERE config_json LIKE '%chat%'",
+        )?;
+        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    for (id, raw) in scheduled {
+        let Ok(mut value) = serde_json::from_str::<Value>(&raw) else {
+            continue;
+        };
+        let before = value.clone();
+        migrate_legacy_mode_json(&mut value);
+        if value != before {
+            tx.execute(
+                "UPDATE scheduled_tasks SET config_json = ?, updated_at = ? WHERE id = ?",
+                params![value.to_string(), now_ms(), id],
+            )?;
+        }
+    }
+
+    tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
+    tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    tx.commit()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -564,6 +681,7 @@ mod tests {
             "task_runs",
             "secrets_meta",
             "audit_log",
+            "plan_approvals",
         ] {
             assert!(table_exists(db.conn(), table), "missing {table}");
         }
@@ -578,6 +696,21 @@ mod tests {
             )
             .unwrap();
         assert_eq!(thinking_column, ("thinking_level".into(), "'off'".into()));
+
+        let index_count: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master
+                 WHERE type = 'index' AND name IN (
+                   'idx_plan_approvals_session',
+                   'idx_plan_approvals_pending',
+                   'idx_plan_approvals_one_pending_session'
+                 )",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(index_count, 3);
 
         // v7: transcript payloads live in per-session files, not columns.
         for (table, column) in [
@@ -656,6 +789,82 @@ mod tests {
         );
         db.kv_delete("plugin:demo", "cfg").unwrap();
         assert!(db.kv_get("plugin:demo", "cfg").unwrap().is_none());
+    }
+
+    #[test]
+    fn migrates_v7_chat_modes_settings_and_scheduled_values_to_plan() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, mode, created_at, updated_at)
+                     VALUES ('legacy-session', 'chat', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.kv_set(
+                "app",
+                "app",
+                &serde_json::json!({ "defaultMode": "chat", "theme": "dark" }),
+            )
+            .unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO scheduled_tasks
+                        (id, title, prompt, config_json, created_at, updated_at)
+                     VALUES ('task-1', 'legacy', 'run', '{\"mode\":\"chat\"}', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            // Simulate a real v7 file: the approval table did not exist until
+            // the migration itself creates the canonical table and indexes.
+            db.conn().execute_batch("DROP TABLE plan_approvals;").unwrap();
+            db.conn().pragma_update(None, "user_version", 7).unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        let version: i64 = db
+            .conn()
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 8);
+        let mode: String = db
+            .conn()
+            .query_row("SELECT mode FROM sessions WHERE id = 'legacy-session'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(mode, "plan");
+        assert_eq!(
+            db.get_setting("app").unwrap().unwrap()["defaultMode"],
+            serde_json::json!("plan")
+        );
+        let config: String = db
+            .conn()
+            .query_row(
+                "SELECT config_json FROM scheduled_tasks WHERE id = 'task-1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&config).unwrap()["mode"], "plan");
+        assert!(table_exists(db.conn(), "plan_approvals"));
+        let index_count: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master
+                 WHERE type = 'index' AND name IN (
+                   'idx_plan_approvals_session',
+                   'idx_plan_approvals_pending',
+                   'idx_plan_approvals_one_pending_session'
+                 )",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(index_count, 3);
     }
 
     #[test]

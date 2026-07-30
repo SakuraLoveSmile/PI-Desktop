@@ -78,7 +78,7 @@ Params:
 
 ```ts
 type HandshakeParams = {
-  protocolVersion: 6
+  protocolVersion: 7
   client: "electron-main"
   clientVersion: string
   locale: string // default "en"
@@ -89,7 +89,7 @@ Result:
 
 ```ts
 type HandshakeResult = {
-  protocolVersion: 6
+  protocolVersion: 7
   host: "rust-host-core"
   hostVersion: string
   features: string[]
@@ -108,6 +108,9 @@ Rules:
 6. Version 6 adds durable model-context checkpoints through
    `session.appendCompaction`; a version 5 host must be rejected before the
    runtime claims automatic context protection (ADR 0030).
+7. Version 7 adds the Plan/Agent operating-mode union, plan state and approval
+   events, and the `plans.pending` / `plans.resolve` methods. A version 6 host
+   must be rejected before the UI becomes interactive (ADR 0033).
 
 ## 4. Method catalog (MVP)
 
@@ -156,7 +159,8 @@ Rules:
 - `session.configure` — atomically persists `mode`, `providerId`, `modelId`,
   and optional `thinkingLevel` for the next pi turn; omitting/null
   `thinkingLevel` preserves the current value; invalid modes or levels return
-  `INVALID_PARAMS`
+  `INVALID_PARAMS`; mode is `plan | agent` and changing it is allowed only
+  while idle
 - `session.appendMessage`
 - `session.appendCompaction` — sidecar-only append of the newest typed
   model-context checkpoint. It requires non-empty checkpoint/summary/boundary
@@ -179,6 +183,14 @@ Rules:
 - `session.import` — atomically imports one converted session; a non-empty
   project path is normalized and upserted into `projects` before the session
   references it; returns `{ imported, skipped }`
+
+### Plan approvals
+
+- `plans.pending` — returns still-live pending approval requests for renderer
+  reload recovery; it never returns an approval whose host waiter has died
+- `plans.resolve` — validates and commits one matching approval response
+- `plans.cancelSession` — optional explicit shutdown cleanup; marks a pending
+  request interrupted and leaves the session in Plan
 
 Canonical thinking levels at the host boundary are:
 
@@ -285,27 +297,46 @@ type ToolsExecuteParams = {
   toolCallId: string
   toolName: string
   args: unknown
-  mode: "chat" | "agent"
+  /** Diagnostic/request context only; never used for authorization. */
+  requestedMode?: "plan" | "agent"
   timeoutMs?: number
 }
 ```
 
-Workspace resolution is session-scoped:
+Authoritative mode and workspace resolution are session-scoped:
 
 1. Host loads `sessionId` and resolves its persisted `project_id`/path.
-2. That path becomes the tool sandbox root for permission preview, execution,
+2. Host reads the persisted `sessions.mode` and validates it as `plan | agent`.
+   A conflicting `requestedMode` is ignored for authorization and recorded only
+   as diagnostic data.
+3. That path becomes the tool sandbox root for permission preview, execution,
    artifact paths, and audit context.
-3. The mutable `workspace.get` selection is not consulted for a valid durable
+4. The mutable `workspace.get` selection is not consulted for a valid durable
    session, so switching a retained project tab cannot redirect a background
    call.
-4. A durable path-less session resolves no root and receives
+5. A durable path-less session resolves no root and receives
    `WORKSPACE_REQUIRED` where the tool requires one. A selected project is not
    inherited.
-5. Legacy calls whose session does not exist may temporarily fall back to the
+6. Legacy calls whose session does not exist may temporarily fall back to the
    selected workspace; new renderer flows must always provide a valid
    `sessionId`.
-6. A database/session-resolution error returns `INTERNAL` and fails closed;
+7. A database/session-resolution error returns `INTERNAL` and fails closed;
    only a confirmed missing session may use the legacy fallback.
+
+Before generic permission evaluation, host-core applies the mode policy:
+
+- Plan allows `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`,
+  `CompactContext`, and `ExitPlanMode` as applicable to the live planning
+  state.
+- Plan denies `Write`, `Edit`, every plugin tool, and unknown tools under all
+  permission modes and grants.
+- Plan `Bash` follows the resolved permission mode: `ask` and `accept-edits`
+  emit `permissions.request`; `auto` executes without confirmation and may
+  mutate.
+- Agent applies the normal registered-tool and permission policy.
+
+The visible tool list is not the security boundary; a forged RPC call is
+authorized by this host-side matrix.
 
 ### result
 
@@ -320,6 +351,74 @@ type ToolsExecuteResult = {
   errorCode?: string
 }
 ```
+
+### 5.1 Plan submission and approval contracts
+
+`ExitPlanMode` is handled as a host transition before generic tool execution.
+The plan is application/transcript state, not a workspace file and not command
+authorization.
+
+```ts
+type PlanDocument = {
+  title: string;
+  summary: string;
+  steps: Array<{
+    title: string;
+    description: string;
+    files?: string[];
+    validation?: string[];
+  }>;
+  risks?: string[];
+  openQuestions?: string[];
+  proposedCommands?: string[]; // display-only
+};
+
+type PlanApprovalRequest = {
+  requestId: string;
+  sessionId: string;
+  turnId: string;
+  toolCallId: string;
+  plan: PlanDocument;
+  createdAt: string;
+  expiresAt: string;
+  timeoutMs: number;
+};
+
+type PlanApprovalResponse = {
+  requestId: string;
+  sessionId: string;
+  action: "approve" | "request_changes" | "reject";
+  feedback?: string;
+  targetPermissionMode?: "ask" | "accept-edits" | "auto";
+};
+```
+
+Host notifications:
+
+```text
+method: "plans.request"
+params: PlanApprovalRequest
+
+method: "plans.resolved"
+params: {
+  requestId: string
+  sessionId: string
+  action: "approve" | "request_changes" | "reject"
+}
+```
+
+`plans.resolve` accepts only an authenticated, still-pending request whose
+session and turn match. `approve` requires an explicit permission mode and
+commits `plan_approvals.approved`, `sessions.mode = agent`, and the selected
+`sessions.permission_mode` atomically before waking `ExitPlanMode`. The same
+Agent then receives a new provider request with Agent tools.
+
+`request_changes` requires non-empty feedback, records
+`changes_requested`, leaves the session in Plan, and returns the feedback as a
+model-visible Plan tool result. `reject` records `rejected`, leaves Plan
+active, and stops the run. Timeout records `expired`; abort, host crash,
+sidecar crash, or persistence failure records `interrupted`. All non-approval
+outcomes fail closed and grant no execution tool.
 
 ## 6. Permission request notification
 
@@ -367,6 +466,14 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 | 1009 | PLUGIN_INVALID | manifest/validation failure |
 | 1010 | PLUGIN_LOAD_FAILED | enable/load failure |
 | 1011 | PROTOCOL_MISMATCH | handshake version mismatch |
+| 1012 | WRITE_DISABLED_IN_PLAN | Write is unavailable in Plan |
+| 1013 | EDIT_DISABLED_IN_PLAN | Edit is unavailable in Plan |
+| 1014 | PLUGIN_DISABLED_IN_PLAN | plugin tools are unavailable in Plan |
+| 1015 | PLAN_APPROVAL_REQUIRED | ExitPlanMode is waiting for approval |
+| 1016 | PLAN_APPROVAL_TIMEOUT | approval deadline expired |
+| 1017 | PLAN_APPROVAL_STALE | response does not match live request/session/turn |
+| 1018 | PLAN_APPROVAL_INTERRUPTED | approval failed closed during abort/recovery |
+| 1019 | PLAN_REQUIRES_INTERACTIVE_SESSION | unattended Plan cannot run |
 
 ## 8. Concurrency / ordering
 
@@ -375,11 +482,15 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
    each resolves its own project root and grants
 3. Notifications may arrive anytime after handshake
 4. Abort should be best-effort and idempotent
-5. A session fork is one host-owned snapshot operation. The source transcript
+5. Plan approval requests are session/turn scoped; only one pending request
+   exists per session and resolution is serialized by host-core
+6. A host or sidecar crash interrupts pending approvals, keeps the durable
+   session in Plan, and rejects late renderer responses
+7. A session fork is one host-owned snapshot operation. The source transcript
    is never rewritten, and a handled child write/index failure leaves no
    visible session or orphan transcript file. A process crash follows D119's
    existing orphan-transcript recovery policy.
-6. A message-scoped fork is identical except that the canonical snapshot ends
+8. A message-scoped fork is identical except that the canonical snapshot ends
    inclusively at `throughMessageId`. It still remaps message/tool-call ids and
    creates no runtime or revision state, so later child reseed/cache state is
    isolated by the new session id.
@@ -408,3 +519,8 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
    the source and its regenerate revisions unchanged
 9. Forking through a message excludes every later source row and rejects an
    unknown message without creating a child
+10. A forged `requestedMode` cannot authorize a tool against the durable mode;
+    Plan denies Write/Edit/plugin/unknown tools and applies permission prompts
+    to Bash according to `ask`/`accept-edits`/`auto`
+11. Plan submission, approval, feedback, rejection, timeout, abort, crash, and
+    stale responses produce the documented durable statuses and events

@@ -9,7 +9,12 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type { MessageUsage, UiMessage } from "@pi-desktop/shared";
+import type {
+  MessageUsage,
+  PlanProposal,
+  PlanningState,
+  UiMessage,
+} from "@pi-desktop/shared";
 import { ConversationMinimap } from "./ConversationMinimap";
 import { Markdown, useCopy } from "./Markdown";
 import {
@@ -50,6 +55,7 @@ import {
   IconFileText,
   IconFolder,
   IconGlobe,
+  IconListChecks,
   IconPencil,
   IconSearch,
   IconReview,
@@ -61,6 +67,7 @@ import {
 import { useAppStore } from "../stores/app-store";
 import type { PendingPermission } from "../lib/pending-permissions";
 import { PermissionCard } from "./PermissionCard";
+import { PlanApprovalCard } from "./PlanApprovalCard";
 
 const WorkspaceChangesEntry = memo(function WorkspaceChangesEntry() {
   const { t } = useTranslation();
@@ -775,6 +782,16 @@ function WorkingIndicator() {
   );
 }
 
+function PlanningIndicator() {
+  const { t } = useTranslation();
+  return (
+    <div className="planning-state-indicator" role="status" aria-live="polite">
+      <IconListChecks size={14} aria-hidden />
+      <span>{t("plan.planning")}</span>
+    </div>
+  );
+}
+
 const MessageRow = memo(function MessageRow({
   message,
   isRunning,
@@ -1098,11 +1115,15 @@ export const ChatTranscript = memo(function ChatTranscript({
   messages,
   isRunning,
   pendingPermission,
+  pendingPlan,
+  planningState,
 }: {
   sessionId: string | undefined;
   messages: UiMessage[];
   isRunning: boolean;
   pendingPermission?: PendingPermission;
+  pendingPlan?: PlanProposal;
+  planningState?: PlanningState;
 }) {
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1177,7 +1198,14 @@ export const ChatTranscript = memo(function ChatTranscript({
 
   useEffect(() => {
     scheduleFollowScroll();
-  }, [messages, isRunning, pendingPermission?.requestId, scheduleFollowScroll]);
+  }, [
+    messages,
+    isRunning,
+    pendingPermission?.requestId,
+    pendingPlan?.id,
+    planningState,
+    scheduleFollowScroll,
+  ]);
 
   // Streamed Markdown and expanded activity rows can change content height, so
   // keep pinned follow synchronized with the observed layout.
@@ -1202,7 +1230,14 @@ export const ChatTranscript = memo(function ChatTranscript({
     lastTurnPart.message.status === "streaming" &&
     Boolean((lastTurnPart.message.content || "").trim());
   const showWorking =
-    isRunning && !pendingPermission && !activeToolGroup && !assistantIsAnswering;
+    isRunning &&
+    !pendingPermission &&
+    !pendingPlan &&
+    planningState !== "planning" &&
+    !activeToolGroup &&
+    !assistantIsAnswering;
+  const showPlanning =
+    isRunning && planningState === "planning" && !pendingPlan && !pendingPermission;
 
   return (
     <div className="thread-wrap">
@@ -1231,12 +1266,16 @@ export const ChatTranscript = memo(function ChatTranscript({
             ),
           )}
           <WorkspaceChangesEntry />
+          {pendingPlan ? (
+            <PlanApprovalCard key={pendingPlan.id} proposal={pendingPlan} />
+          ) : null}
           {pendingPermission ? (
             <PermissionCard
               key={pendingPermission.requestId}
               permission={pendingPermission}
             />
           ) : null}
+          {showPlanning ? <PlanningIndicator /> : null}
           {showWorking ? <WorkingIndicator /> : null}
         </div>
       </div>

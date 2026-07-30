@@ -1,14 +1,15 @@
 # 03. Tools and Permissions
 
-> Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115
+> Decisions applied: D003, D005, D006, D013, D015, D093, D114, D115, D166
 
 ## 0. Frozen policy summary
 
 | Topic | Decision |
 |---|---|
 | Default mode | Agent |
-| Chat tools | Read / Glob / Grep only |
 | Agent tools | Read / Glob / Grep / Write / Edit / Bash |
+| Plan tools | Read / Glob / Grep / BrowserPreview / Bash / CompactContext / ExitPlanMode |
+| Plan hard deny | Write / Edit / all plugin tools / unknown tools |
 | Permission timeout | 120s → deny |
 | allow-session scope | toolName |
 | Bash style (M3) | non-interactive (no PTY) |
@@ -24,6 +25,10 @@ Let the agent get things done, but stay under control by default.
 | `Read` | low | Read files within the workspace |
 | `Glob` | low | List files by pattern |
 | `Grep` | low | Content search |
+| `BrowserPreview` | low | Open a workspace-relative preview in the user-driven Browser panel |
+| `CompactContext` | low | Create a model-context checkpoint without workspace mutation |
+| `EnterPlanMode` | low | Move the same Agent from Agent to Plan after host validation |
+| `ExitPlanMode` | low | Submit a structured Plan for separate user approval |
 | `Write` | high | Create/overwrite files |
 | `Edit` | high | Modify files |
 | `Bash` | high | Execute commands |
@@ -75,8 +80,10 @@ session gets a scratch directory outside the workspace:
 - **Permissions.** `Write`/`Edit` whose `path` is lexically inside the
   session's scratch root auto-allow without a permission card — they cannot
   touch the project. The lexical check only skips the prompt; execution still
-  goes through the full resolver, so it is not an escape vector. Chat mode
-  still denies Write/Edit/Bash entirely (D004 unchanged).
+  goes through the full resolver, so it is not an escape vector. Plan does not
+  expose Write/Edit, so the scratch auto-allow rule cannot make those tools
+  available in Plan. A Plan Bash call may still create or mutate scratch data
+  when its permission mode allows it.
 - **Artifacts.** Successful scratch writes are not recorded in the
   `artifacts` table; artifact-driven file tabs represent workspace
   deliverables only, while the Files surface may still browse the active
@@ -169,14 +176,19 @@ Rules:
 - The session value is stored in `sessions.permission_mode`
   (`inherit | ask | accept-edits | auto`, default `inherit`, schema v5) and
   set via `session.configure` `permissionMode`.
-- **Chat mode's hard deny wins over every permission mode** — `auto` cannot
-  re-enable Write/Edit/Bash in chat (D004 unchanged).
+- Plan's hard deny wins over every permission mode for Write/Edit and plugin
+  tools. `auto` cannot re-enable a hidden or denied tool.
 - Low-risk tools (`Read`/`Glob`/`Grep`) auto-allow in every mode, as before.
+- `BrowserPreview` is an explicit read-only UI inspection capability and is
+  available in both operating modes.
+- Plan retains the permission-mode selector. Bash is confirmed under `ask` and
+  `accept-edits`, and is auto-allowed under `auto`; therefore Plan is planning
+  intent, not a strict read-only security profile.
 - `allow-session` grants continue to work under `ask` and stay scoped to the
   session; under `accept-edits`/`auto` they are simply never needed.
 - Scratch-directory writes (D114) stay prompt-free in every mode.
-- UI: Settings → segmented global default; composer shows a per-session chip
-  (agent mode only) whose menu offers the three effective modes without a
+- UI: Settings → segmented global default; composer shows a per-session chip in
+  both Agent and Plan whose menu offers the three effective modes without a
   separate global-default/inherit entry. The chip and selected menu item
   display the effective mode; choosing an item stores that explicit session
   override. Existing inherited sessions continue to resolve through the
@@ -226,28 +238,47 @@ the same fields with a zero tool body. See
 [09. Logging and Observability](09-logging-and-observability.md) for the
 matching log lines.
 
-## 10. Mode matrix (Chat vs Agent)
+## 10. Operating-mode matrix
 
-| Mode | Read/Glob/Grep | Write/Edit | Bash |
-|---|---|---|---|
-| Chat | allow | deny | deny |
-| Agent | allow | confirm | confirm |
+| Mode | Read/Glob/Grep | BrowserPreview | Write/Edit | Bash | Plugins |
+|---|---|---|---|---|---|
+| Agent | allow | allow | permission policy | permission policy | registered risk policy |
+| Plan | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | deny |
 
 ### Notes
-- Chat mode hard-denies high-risk tools before permission UI
-- Agent mode uses permission cards for Write/Edit/Bash
+- Plan hard-denies Write/Edit/plugin tools before permission UI; a direct host
+  call cannot bypass the matrix.
+- Agent mode uses permission cards or the selected automatic policy for
+  Write/Edit/Bash and registered plugin tools.
+- Plan Bash may mutate workspace or scratch state when the user selected Auto;
+  the UI must make that tradeoff visible.
 - allow-session is remembered per toolName for the active session only
 - Session grants follow `sessionId` across project-tab switches and are never
   inherited by another session or Temporary conversation
 
+### 10.1 Plan control and context tools
+
+`CompactContext` is available when automatic context protection permits it and
+does not mutate the workspace. `ExitPlanMode` is available only in Plan and
+must be the only tool call in its assistant batch. `EnterPlanMode` is available
+only in Agent and must be the only tool call in its batch. The host validates
+the durable mode before either transition; the visible tool list is guidance,
+not the security boundary.
+
 ## 11. Plugin Tools
 
-Plugins can contribute tools via `agentTools`:
+Plugins can contribute tools via `agentTools` in Agent only:
 
 1. manifest declaration
 2. user grants `agent.tool.register`
 3. PluginManager registers them into the ToolHost
 4. execution goes through the unified permission/audit/timeout wrapper
+
+No plugin tool is visible or executable in Plan, regardless of manifest risk,
+declared permission, session grant, or `auto`. A direct attempt returns
+`PLUGIN_DISABLED_IN_PLAN` and is audited as a Plan policy denial. Missing or
+invalid plugin risk defaults to `medium` for Agent and never grants Plan
+access.
 
 Naming:
 - Internal full name: `plugin.<pluginId>.<toolName>`

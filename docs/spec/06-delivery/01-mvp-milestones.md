@@ -107,13 +107,42 @@ Progress:
   ([06-release-runbook](06-release-runbook.md)); blocked only on Apple
   Developer credentials (operational, not code)
 
+### M6 — Plan Operating State
+Status: **In Progress (spec freeze; implementation not complete)**
+
+Goal: replace the former Chat operating profile with a host-authoritative Plan
+state on the same pi Agent, including a separate approval boundary.
+
+Deliverables:
+- Agent | Plan selector with Agent as the default
+- persisted session/settings/scheduled `chat` → `plan` migration
+- protocol v7 and schema v8 with durable plan approvals
+- Rust-owned mode resolution, Plan tool policy, Bash permission behavior, and
+  atomic Plan → Agent approval transition
+- one-Agent `EnterPlanMode` / `ExitPlanMode` lifecycle with request-changes
+  feedback and fail-closed recovery
+- Plan approval IPC/RPC/events, renderer projection, approval UX, and EN/zh-CN
+  copy
+- plugin denial, scheduled/unattended policy, and focused unit/integration
+  verification documented in the E2E plan
+
+Exit criteria:
+- only one pi Agent is used before, during, and after planning
+- Plan denies Write/Edit/plugin tools but exposes Bash under the selected
+  permission mode, including Auto's explicit mutation tradeoff
+- approval is separate from generic tool permission and atomically selects the
+  Agent permission mode
+- reject, timeout, abort, crash, stale response, and persistence failure leave
+  the session in Plan without execution capability
+- all M6 scenarios are documented; E2E execution remains opt-in
+
 ### M6+ (Post-MVP)
 - Skills depth
 - MCP
 - `.piplug` packaging UX polish
 - marketplace preview
 - Windows/Linux hardening
-- additional locales (e.g. zh-CN)
+- additional locales beyond the shipped zh-CN catalog
 
 ## Release constraint
 

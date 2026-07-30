@@ -32,6 +32,10 @@ const HOST_PROXY_ALLOWED = new Set([
   "session.appendCompaction",
   "session.replaceMessages",
   "workspace.get",
+  "plans.enter",
+  "plans.submit",
+  "plans.pending",
+  "plans.abort",
   "app.health",
 ]);
 

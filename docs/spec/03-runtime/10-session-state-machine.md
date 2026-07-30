@@ -1,4 +1,28 @@
-# 10. Session State Machine
+# 10. Session and Plan State Machine
+
+## 0. Durable operating mode versus live planning state
+
+Each session persists exactly one operating mode: `agent | plan`. There is one
+pi Agent. Live planning state is a host/runtime projection:
+
+```text
+Agent / inactive
+  -- user selects Plan while idle OR Agent calls EnterPlanMode --> Plan / planning
+Plan / planning
+  -- ExitPlanMode(structured plan) --> Plan / awaiting_approval
+Plan / awaiting_approval
+  -- approve(permission mode) --> Agent / inactive, same Agent continues
+  -- request_changes(feedback) --> Plan / planning, same Agent revises
+  -- reject | timeout | abort | crash | persistence failure --> Plan / stopped
+```
+
+Plan retains the permission-mode selector. Its `Bash` policy is `ask` or
+`accept-edits` = confirmation and `auto` = no confirmation, so Plan expresses
+planning intent but is not a strict read-only security profile. Write/Edit and
+plugin tools remain denied by host policy in every Plan permission mode.
+
+Mode changes through the UI/session API are allowed only while idle. Approval
+is not a generic tool permission: it is a separate host-owned state transition.
 
 ## 1. Session status
 
@@ -50,8 +74,17 @@ accept_prompt
    `CONFLICT` fallback to the same IPC error. Neither path produces a partial
    child.
 10. Supplying `throughMessageId` changes only the snapshot boundary. Assistant
-    Fork/Edit still creates a new idle session id with no shared turn,
-    permission wait, runtime, or provider-cache state (D134).
+     Fork/Edit still creates a new idle session id with no shared turn,
+     permission wait, runtime, or provider-cache state (D134).
+11. `EnterPlanMode` and `ExitPlanMode` must be the only tool call in their
+    assistant batch. `ExitPlanMode` creates one host-owned pending approval;
+    the same session cannot start another plan proposal while one is pending.
+12. Only a matching `plans.resolve` can settle a pending proposal. Approval
+    atomically changes the durable mode to Agent and stores the selected
+    explicit permission mode before the waiting tool call succeeds.
+13. Requesting changes returns feedback to the same Agent and stays Plan.
+    Reject, timeout, abort, crash, stale responses, and persistence failure
+    stay Plan and grant no execution tools.
 
 ## 4. Persistence points
 
@@ -64,6 +97,9 @@ transcript-file line first, index transaction second.
   update; never for a visible-current result or abort
 - assistant/tool messages: on message_end/tool_end
 - mode/project fields: on change
+- Plan submission: durable pending approval row before the approval event
+- Plan approval: approval outcome, mode transition, and permission mode in one
+  transaction; feedback/reject/timeout/interruption retain Plan
 - fork snapshot: new transcript file plus one child session/index transaction;
   source persistence remains untouched; a message-scoped snapshot ends
   inclusively at the selected message
@@ -81,3 +117,8 @@ transcript-file line first, index transaction second.
    produce a child
 7. a message-scoped fork excludes later rows and begins with no source runtime
    or provider-cache state
+8. Plan and Agent use one pi Agent; UI entry and `EnterPlanMode` converge on the
+   same planning state, and approval resumes that Agent in Agent mode
+9. Plan policy permits Bash only through the selected permission mode and
+   denies Write/Edit/plugins regardless of `auto` or session grants
+10. plan approval failure and process recovery are fail closed

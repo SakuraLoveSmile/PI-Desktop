@@ -42,3 +42,10 @@ test("common setup and marketplace copy avoid developer jargon", () => {
   assert.equal(chinese["menu.refreshMarket"], "刷新插件市场");
   assert.equal(chinese["chat.emptyHint"], "添加 AI 模型服务、打开项目，然后发送第一条消息。");
 });
+
+test("Plan mode and Auto permission copy stay explicit in both locales", () => {
+  assert.equal(english["settings.modePlan"], "Plan");
+  assert.equal(chinese["settings.modePlan"], "规划");
+  assert.match(english["plan.autoWarning"], /may change files/);
+  assert.match(chinese["plan.autoWarning"], /可能修改文件/);
+});

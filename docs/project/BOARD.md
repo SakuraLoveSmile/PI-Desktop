@@ -17,7 +17,7 @@ Until that is enabled, track delivery with:
 | Review | Waiting validation |
 | Done | Completed |
 
-## Status snapshot (2026-07-25, evening)
+## Status snapshot (2026-07-30)
 
 | Milestone | GitHub | Local status |
 |---|---|---|
@@ -27,6 +27,7 @@ Until that is enabled, track delivery with:
 | M3 Workspace Tools | [closed](https://github.com/vastsa/PI-Desktop/milestone/4) | Done |
 | M4 Plugin Foundation | [closed](https://github.com/vastsa/PI-Desktop/milestone/5) | Done |
 | M5 Desktop Hardening | [open](https://github.com/vastsa/PI-Desktop/milestone/6) | Done except notarization (credential-gated) |
+| M6 Plan Operating State | planned | In Progress: documentation contract and implementation plan; runtime/UI implementation not complete |
 
 Open issue:
 - [#6 M5: Packaging and desktop hardening](https://github.com/vastsa/PI-Desktop/issues/6)
@@ -75,6 +76,9 @@ Open issue:
 - Codex visual gold polish (ongoing capture-driven iteration)
 - Composer slash commands + @ file references wired to pi prompt templates
   (D123–D125 / ADR 0024)
+- M6 Plan operating state: protocol v7/schema v8 contract, ADR 0033, D166,
+  E2E-087–E2E-097, and implementation plan are documented; implementation is
+  not complete and the milestone is not Done.
 
 ### Blocked (external)
 - Full DMG notarization — needs Apple Developer credentials; runbook ready

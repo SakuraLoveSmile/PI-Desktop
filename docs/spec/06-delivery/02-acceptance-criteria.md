@@ -43,7 +43,10 @@ MVP passes when:
 - [x] Tool paths resolve against the project root — auto:host-core tests (`workspace::tests`)
 
 ### E. Tools and permissions
-- [x] Chat mode cannot run Write/Edit/Bash — manual:M3 (D004)
+- [ ] Plan denies Write/Edit/plugin tools under every permission mode — M6
+- [ ] Plan Bash prompts under Ask/Accept edits and runs without confirmation
+  under explicit Auto — M6
+- [x] Agent mode uses permission policy for Write/Edit/Bash — manual:M3
 - [x] Permission timeout (120s) becomes deny — manual:M3 (D005)
 - [x] Read/Glob/Grep work inside the project — auto:`test:e2e` (glob tool)
 - [x] Write/Edit/Bash trigger an inline, session-scoped confirmation card — manual:M3
@@ -52,6 +55,21 @@ MVP passes when:
 - [x] Deny prevents execution — manual:M3
 - [x] Allow returns the result to model and UI — manual:M3
 - [x] Paths outside the workspace are rejected — auto:host-core tests (`blocks_escape`)
+
+### M6. Plan operating state
+- [ ] One pi Agent owns Agent, planning, approval, feedback, and post-approval
+  execution — M6
+- [ ] `EnterPlanMode` and UI/session Plan selection converge on the same state — M6
+- [ ] `ExitPlanMode` submits structured plan data and waits for a separate
+  host-owned approval — M6
+- [ ] Approval atomically enters Agent and persists the selected permission
+  mode; request-changes stays Plan and reaches the same Agent — M6
+- [ ] Reject, timeout, abort, crash, stale response, and persistence failure
+  fail closed — M6
+- [ ] v7→v8 migration maps sessions, app defaults, and scheduled values from
+  Chat to Plan while preserving transcripts and permission settings — M6
+- [ ] Scheduled/unattended Plan runs fail before the provider request — M6
+- [ ] Plan plugin tools remain denied despite low risk, grants, or Auto — M6
 
 ### F. Persistence
 - [x] Sessions survive restart — manual:M2 (SQLite via host-core)

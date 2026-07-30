@@ -77,7 +77,7 @@ If the command needs a permission:
 [ search input ]
 -------------------------------------------------
 Builtin
- New Chat
+ New Task
  Open Project
 Demo
  Hello: Open Panel

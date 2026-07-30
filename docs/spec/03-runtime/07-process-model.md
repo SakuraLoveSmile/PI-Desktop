@@ -39,8 +39,8 @@ If step 3–4 fails: block app with recovery message.
 | Crash | Policy |
 |---|---|
 | Renderer crash | reload window, keep host/agent processes |
-| Rust host crash | mark app degraded, attempt restart host, fail open sessions gracefully |
-| Node agent crash | abort active turns, restart sidecar, preserve DB state in Rust |
+| Rust host crash | mark app degraded, interrupt pending Plan approvals, keep durable Plan sessions in Plan, attempt restart host, and fail active sessions closed |
+| Node agent crash | abort active turns and pending Plan waiters, keep affected sessions in Plan when applicable, restart sidecar, preserve DB state in Rust |
 | Electron main crash | full app exit |
 
 Supervision parameters (implemented in Electron main):
@@ -57,12 +57,13 @@ Supervision parameters (implemented in Electron main):
 
 1. Reject new prompts
 2. Abort active turns
-3. Unload plugins
-4. Stop Node agent sidecar
-5. Flush/close Rust host DB
-6. Stop Rust host
-7. Dispose update polling
-8. Close windows / exit
+3. Interrupt pending Plan approvals and reject late responses
+4. Unload plugins
+5. Stop Node agent sidecar
+6. Flush/close Rust host DB
+7. Stop Rust host
+8. Dispose update polling
+9. Close windows / exit
 
 `updates/install` invokes Electron's quit-and-install path only after an update
 reaches `downloaded`. Electron still emits `before-quit`, so the normal
@@ -94,3 +95,5 @@ sidecar/host shutdown sequence runs before the updater replaces the app.
 1. Clean boot path documented and scriptable
 2. Host crash does not silently continue tool execution
 3. Agent crash does not corrupt SQLite
+4. Host/sidecar crash never turns a pending Plan approval into Agent execution;
+   restart recovery leaves it interrupted and the durable session in Plan

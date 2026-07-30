@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type {
+  Mode,
   PermissionMode,
   ProviderPublic,
   ThinkingLevel,
@@ -21,6 +22,7 @@ import {
   IconStop,
   IconChevronDown,
   IconCheck,
+  IconListChecks,
   IconSearch,
   IconSparkles,
 } from "./icons";
@@ -259,7 +261,9 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   }, [thinkingOpen]);
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
-  const mode = activeSession?.mode ?? settings?.defaultMode ?? "agent";
+  const mode: Mode = activeSession
+    ? activeSession.mode
+    : settings?.defaultMode ?? "agent";
   // Permission mode (D115/D132): inherited sessions still resolve through the
   // global setting, but the composer presents only the effective mode.
   const globalPermissionMode: PermissionMode =
@@ -551,7 +555,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                   setThinkingOpen(false);
                   setPermissionOpen(false);
                   setModelOpen(false);
-                  const next = mode === "agent" ? "chat" : "agent";
+                  const next: Mode = mode === "agent" ? "plan" : "agent";
                   try {
                     await configureActiveSession({
                       mode: next,
@@ -566,10 +570,14 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                   }
                 }}
               >
-                <IconShield size={14} />
+                {mode === "plan" ? (
+                  <IconListChecks size={14} />
+                ) : (
+                  <IconShield size={14} />
+                )}
                 <span className="text-sm">
-                  {mode === "chat"
-                    ? t("settings.modeChat")
+                  {mode === "plan"
+                    ? t("settings.modePlan")
                     : t("settings.modeAgent")}
                 </span>
               </button>
@@ -649,11 +657,15 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                   ) : null}
                 </div>
               ) : null}
-              {mode === "agent" ? (
+              {mode === "agent" || mode === "plan" ? (
                 <div className="composer-permission" ref={permissionRef}>
                   <button
                     className={`icon-btn mode-chip ${permissionOpen ? "active" : ""}`}
-                    title={t("chat.permissionMode")}
+                    title={
+                      mode === "plan" && effectivePermissionMode === "auto"
+                        ? `${t("chat.permissionMode")} · ${t("plan.autoWarning")}`
+                        : t("chat.permissionMode")
+                    }
                     aria-haspopup="menu"
                     aria-expanded={permissionOpen}
                     disabled={isRunning || !activeSession}

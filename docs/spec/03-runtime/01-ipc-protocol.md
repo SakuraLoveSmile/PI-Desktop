@@ -17,6 +17,7 @@ Principles:
 |---|---|
 | `app` | App info, health checks |
 | `agent` | Conversation, abort, status |
+| `plan` | Plan approval request listing and resolution |
 | `session` | Session CRUD / history |
 | `settings` | Config read/write |
 | `secrets` | Secret write/delete/exists (never return plaintext to UI logs) |
@@ -104,7 +105,7 @@ type ThinkingLevel =
 
 type SessionConfigureRequest = {
   id: string;
-  mode: "chat" | "agent";
+  mode: "plan" | "agent";
   providerId?: string;
   modelId?: string;
   thinkingLevel: ThinkingLevel;
@@ -135,7 +136,7 @@ type AgentAbortRequest = {
 };
 ```
 
-### 5.3 compact (protocol v6)
+### 5.3 compact (protocol v7)
 
 ```ts
 type AgentCompactRequest = { sessionId: string };
@@ -146,6 +147,61 @@ type AgentCompactResponse = { accepted: boolean };
 session. It is available even when automatic context protection is disabled.
 Missing provider/session configuration fails through the normal `AppError`
 envelope; an active turn or compaction returns `AGENT_BUSY`.
+
+### 5.4 Plan approval
+
+Plan approval is separate from a tool permission. The renderer receives a
+structured proposal from the same Agent and resolves it through typed preload
+IPC; it never changes the session mode optimistically.
+
+```ts
+type PlanStep = {
+  title: string;
+  description: string;
+  files?: string[];
+  validation?: string[];
+};
+
+type PlanDocument = {
+  title: string;
+  summary: string;
+  steps: PlanStep[];
+  risks?: string[];
+  openQuestions?: string[];
+  proposedCommands?: string[]; // display-only; never authorization
+};
+
+type PlanApprovalRequest = {
+  requestId: string;
+  sessionId: string;
+  turnId: string;
+  toolCallId: string;
+  plan: PlanDocument;
+  createdAt: string;
+  expiresAt: string;
+  timeoutMs: number;
+};
+
+type PlanApprovalAction = "approve" | "request_changes" | "reject";
+
+type PlanApprovalResponse = {
+  requestId: string;
+  sessionId: string;
+  action: PlanApprovalAction;
+  feedback?: string;
+  targetPermissionMode?: "ask" | "accept-edits" | "auto";
+};
+```
+
+Preload methods:
+
+- `pi-desktop/plan/pending() -> { requests: PlanApprovalRequest[] }`
+- `pi-desktop/plan/resolve(PlanApprovalResponse) -> { accepted: true }`
+
+Approval requires a non-empty `feedback` for `request_changes` and an explicit
+`targetPermissionMode` for `approve`. The UI defaults that choice to `ask`; the
+Agent cannot choose it. Responses with a wrong session, turn, request id, or
+expired host-owned deadline fail with a stable Plan approval error.
 
 ### 5.4 getStatus
 
@@ -183,8 +239,20 @@ type AgentEvent =
  | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
  | { type: "tool_update"; toolCallId: string; partialResult?: unknown }
  | { type: "tool_end"; toolCallId: string; result: unknown; isError?: boolean }
- | { type: "tool_permission_request"; request: ToolPermissionRequest }
- | { type: "compaction_start";
+  | { type: "tool_permission_request"; request: ToolPermissionRequest }
+  | {
+      type: "plan_state_changed";
+      state: "inactive" | "planning" | "awaiting_approval";
+      source: "session" | "tool" | "approval" | "abort" | "recovery";
+    }
+  | { type: "plan_approval_request"; request: PlanApprovalRequest }
+  | {
+      type: "plan_approval_resolved";
+      requestId: string;
+      sessionId: string;
+      action: PlanApprovalAction;
+    }
+  | { type: "compaction_start";
      reason: "manual" | "threshold" | "overflow" }
  | { type: "compaction_end";
      reason: "manual" | "threshold" | "overflow";
@@ -292,7 +360,7 @@ type SessionSummary = {
  projectPath?: string;
  modelId?: string;
  providerId?: string;
- mode: "chat" | "agent";
+  mode: "plan" | "agent";
  thinkingLevel: ThinkingLevel;
  supportsReasoning?: boolean;
  supportedThinkingLevels?: ThinkingLevel[];
@@ -351,10 +419,13 @@ Message-scoped assistant Fork/Edit uses this option so the child receives a
 new session id and therefore cannot reuse or mutate the source pi runtime or
 its provider cache.
 
-Protocol version 6 adds `pi-desktop/agent/compact`, compaction lifecycle
-events, the optional `SessionDetail.compaction` checkpoint, and the host
-`session.appendCompaction` route. A version 5 host must fail the handshake so a
-desktop cannot appear protected while silently losing checkpoints.
+Protocol version 7 adds Plan/Agent operating-mode values, normalized planning
+state events, structured plan approval request/resolution events, typed
+`pi-desktop/plan/pending` and `pi-desktop/plan/resolve`, and the existing
+protocol-v6 context checkpoint fields. A version 6 host must fail the handshake
+so a desktop cannot display Plan while silently losing the approval or policy
+boundary. `pi-desktop/agent/compact` and `session.appendCompaction` remain part
+of the v7 contract.
 
 Protocol version 2 adds `thinkingLevel`, `UiMessage.thinking`, and
 `message_update.deltaThinking`. A v1 peer must fail the version check instead
@@ -441,9 +512,15 @@ type ToolPermissionResolution = {
 };
 ```
 
+Plan does not replace this generic permission contract. A Plan `Bash` call
+uses the normal session-scoped permission flow: `ask` and `accept-edits` emit a
+tool permission request, while `auto` executes without confirmation. Plan
+approval is a separate state transition and always uses the `plan` methods
+above.
+
 ## 11. Version Compatibility
 
-- IPC/host contract version field: `protocolVersion: 6`
+- IPC/host contract version field: `protocolVersion: 7`
 - Breaking changes must bump the version and record an ADR
 - renderer and main validate the version at startup; on mismatch, prompt to upgrade/reinstall
 - Protocol v4 adds notification records, channels, and the
@@ -455,9 +532,13 @@ type ToolPermissionResolution = {
 - Protocol v5 adds the required `session/fork` snapshot operation. A v4 peer is
   rejected before chat becomes interactive instead of exposing a branch
   command that can only fail at invocation time (ADR 0023).
-- Protocol v6 adds durable context checkpoints plus the manual/lifecycle
+- Protocol v6 added durable context checkpoints plus the manual/lifecycle
   channels. A v5 peer is rejected because silently omitting a checkpoint can
   make the next provider request unsafe (ADR 0030).
+- Protocol v7 adds the `plan | agent` mode union, Plan state events, structured
+  plan approval request/response events and preload methods. A v6 peer is
+  rejected before the UI becomes interactive because it cannot enforce or
+  represent the Plan approval boundary (ADR 0033).
 
 ## 12. Plugin API (host UI side)
 

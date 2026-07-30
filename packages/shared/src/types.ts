@@ -1,7 +1,84 @@
 import type { AppError } from "./errors.js";
 import type { KeybindingOverrides } from "./keyboard-shortcuts.js";
 
-export type Mode = "chat" | "agent";
+export type Mode = "plan" | "agent";
+
+/** Normalize mode values at compatibility boundaries. Older persisted and
+ * scheduled data used `chat`; it is now the Plan operating state. */
+export function normalizeMode(value: unknown, fallback: Mode = "agent"): Mode {
+  if (value === "agent") return "agent";
+  if (value === "plan" || value === "chat") return "plan";
+  return fallback;
+}
+
+export type PlanningState = "inactive" | "planning" | "awaiting_approval";
+export type PlanApprovalAction = "approve" | "request_changes" | "reject";
+export type PlanApprovalPermissionMode = Exclude<PermissionMode, "inherit">;
+export type PlanApprovalStatus =
+  | "pending"
+  | "approved"
+  | "changes_requested"
+  | "rejected"
+  | "expired"
+  | "interrupted";
+
+/** Compatibility name for the proposal-shaped approval wire record. */
+export type PlanProposalStatus = PlanApprovalStatus;
+
+export type PlanProposal = {
+  id: string;
+  sessionId: string;
+  /** Durable host turn ID owning the ExitPlanMode call. */
+  turnId: string;
+  /** Exact ExitPlanMode tool-call ID used to create this approval. */
+  toolCallId: string;
+  plan: string;
+  status: PlanProposalStatus;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  resolvedAt?: string;
+  action?: PlanApprovalAction;
+  targetPermissionMode?: PlanApprovalPermissionMode;
+  feedback?: string;
+  errorCode?: string;
+};
+
+export type PlanningStateEvent = {
+  sessionId: string;
+  state: PlanningState;
+  proposalId?: string;
+  plan?: string;
+  feedback?: string;
+  action?: PlanApprovalAction;
+  targetPermissionMode?: PlanApprovalPermissionMode;
+  proposal?: PlanProposal;
+};
+
+export type PlansPendingResult = {
+  plans: PlanProposal[];
+  state?: PlanningState;
+};
+
+export type PlanResolveRequest = {
+  proposalId: string;
+  /** Identity fields must match the live host approval row exactly. */
+  sessionId: string;
+  turnId: string;
+  toolCallId: string;
+  action: PlanApprovalAction;
+  targetPermissionMode?: PlanApprovalPermissionMode;
+  feedback?: string;
+};
+
+export type PlanResolutionResult = {
+  ok: boolean;
+  proposal: PlanProposal;
+  state: PlanningState;
+  action?: PlanApprovalAction;
+  targetPermissionMode?: PlanApprovalPermissionMode;
+  feedback?: string;
+};
 export const THINKING_LEVELS = [
   "off",
   "minimal",
@@ -133,6 +210,8 @@ export type AgentStatus = {
   currentTurnId?: string;
   modelId?: string;
   pendingToolConfirmations: number;
+  planningState?: PlanningState;
+  pendingPlanId?: string;
 };
 
 export type AgentPromptRequest = {
@@ -200,6 +279,7 @@ export type AgentEvent =
       result: unknown;
       isError?: boolean;
     }
+  | ({ type: "planning_state" } & Omit<PlanningStateEvent, "sessionId">)
   | { type: "tool_permission_request"; request: ToolPermissionRequest }
   | { type: "compaction_start"; reason: ContextCompactionReason }
   | {

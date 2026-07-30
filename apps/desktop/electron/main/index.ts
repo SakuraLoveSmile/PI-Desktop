@@ -28,12 +28,17 @@ import {
   WINDOW_CONTROL_ACTIONS,
   err,
   ok,
+  normalizeMode,
   type AgentEventEnvelope,
   type AppMenuCommand,
   type AppNotification,
   type KeybindingOverrides,
   type NativeMenuAction,
+  type Mode,
+  type PlanResolveRequest,
+  type PlanApprovalPermissionMode,
   type Result,
+  type Risk,
   type ThinkingLevel,
   type WindowControlAction,
 } from "@pi-desktop/shared";
@@ -342,7 +347,7 @@ async function resolveAgentRuntimeLaunch(
     modelId,
     sidecarParams: {
       sessionId,
-      mode: session.mode || settings.defaultMode || "agent",
+      mode: normalizeMode(session.mode || settings.defaultMode || "agent"),
       thinkingLevel,
       scratchDir: join(dataDir, "scratch", sessionId),
       compactionSettings: settings.contextCompaction,
@@ -363,6 +368,9 @@ async function resolveAgentRuntimeLaunch(
         name: tool.fullName,
         description: tool.description,
         parameters: tool.schema ?? { type: "object", properties: {} },
+        ...(tool.risk === "low" || tool.risk === "medium" || tool.risk === "high"
+          ? { risk: tool.risk as Risk }
+          : {}),
       })),
     },
   };
@@ -1711,6 +1719,8 @@ function wireHost(h: HostProcess) {
           sendToRenderer(IPC.event.toast, { message: toast });
         }
       })();
+    } else if (method === "plans.changed") {
+      sendToRenderer(IPC.event.plansChanged, params);
     }
   });
   h.onExit(({ code, signal, intentional }) => {
@@ -1763,6 +1773,17 @@ function wireSidecar(s: AgentSidecar) {
   });
   s.onExit(({ code, signal, intentional }) => {
     if (intentional || quitting) return;
+    // A sidecar crash closes live approval waiters before the replacement
+    // sidecar starts. This prevents an old renderer response from waking a
+    // dead runtime and records the durable turn as interrupted.
+    for (const sessionId of [...activeTurns.keys()]) {
+      void (async () => {
+        if (host) {
+          await host.call("plans.abort", { sessionId }).catch(() => undefined);
+        }
+        finishTurn(sessionId, "aborted", "PLAN_APPROVAL_INTERRUPTED");
+      })();
+    }
     logger.app("error", "agent sidecar exited unexpectedly", {
       data: { exitCode: code, signal },
     });
@@ -2428,7 +2449,7 @@ function registerIpc() {
     async (
       id: string,
       config: {
-        mode: "chat" | "agent";
+        mode: Mode;
         providerId?: string;
         modelId?: string;
         thinkingLevel?: ThinkingLevel;
@@ -3468,6 +3489,9 @@ function registerIpc() {
         "agent.prompt",
         {
           ...launch.sidecarParams,
+          // The host-created durable turn is the approval identity used by
+          // Rust. The runtime must not replace it with a provider-local UUID.
+          turnId: turn?.turnId,
           content: promptContent,
           userMessageId: userMessage.id,
         },
@@ -3535,6 +3559,44 @@ function registerIpc() {
       data: { requestId: resolution.requestId, decision: resolution.decision },
     });
     return host.call("permissions.resolve", resolution);
+  });
+
+  handle(IPC.invoke.plansPending, async (input: { sessionId?: string } = {}) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("plans.pending", {
+      ...(typeof input.sessionId === "string" && input.sessionId.trim()
+        ? { sessionId: input.sessionId.trim() }
+        : {}),
+    });
+  });
+
+  handle(IPC.invoke.plansResolve, async (resolution: PlanResolveRequest) => {
+    if (!host) throw new Error("host unavailable");
+    const proposalId = String(resolution?.proposalId ?? "").trim();
+    if (!proposalId) throw new Error("proposalId required");
+    const sessionId = String(resolution?.sessionId ?? "").trim();
+    if (!sessionId) throw new Error("sessionId required");
+    const turnId = String(resolution?.turnId ?? "").trim();
+    if (!turnId) throw new Error("turnId required");
+    const toolCallId = String(resolution?.toolCallId ?? "").trim();
+    if (!toolCallId) throw new Error("toolCallId required");
+    const action = resolution?.action;
+    if (action !== "approve" && action !== "request_changes" && action !== "reject") {
+      throw new Error("invalid plan approval action");
+    }
+    const targetPermissionMode: PlanApprovalPermissionMode | undefined =
+      resolution?.targetPermissionMode;
+    return host.call("plans.resolve", {
+      proposalId,
+      sessionId,
+      turnId,
+      toolCallId,
+      action,
+      ...(targetPermissionMode ? { targetPermissionMode } : {}),
+      ...(typeof resolution?.feedback === "string"
+        ? { feedback: resolution.feedback }
+        : {}),
+    });
   });
 
   handle(IPC.invoke.pluginList, async () => {

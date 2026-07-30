@@ -6,12 +6,17 @@ Make high-risk local actions visible, interruptible, and predictable.
 
 ## 2. Mode matrix
 
-| Mode | Read/Glob/Grep | Write/Edit | Bash |
-|---|---|---|---|
-| Chat | allow | deny | deny |
-| Agent | allow | confirm | confirm |
+| Mode | Read/Glob/Grep | BrowserPreview | Write/Edit | Bash | Plugins |
+|---|---|---|---|---|---|
+| Agent | allow | allow | permission policy | permission policy | registered risk policy |
+| Plan | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | deny |
 
-Decision source: **D003/D004**.
+Decision source: **D003/D166**.
+
+Plan keeps this permission-mode control visible. It is planning intent, not a
+strict read-only security profile: a Bash command can mutate workspace or
+scratch state when the user selects Auto. Write/Edit/plugin tools are denied by
+the host before a permission card, regardless of grants or Auto.
 
 ## 3. Decision types
 
@@ -83,12 +88,38 @@ A durable grants-management surface is deferred until a host-backed settings
 schema exists; Settings must not render a control that cannot persist or affect
 the permission runtime.
 
-## 9. Acceptance
+## 9. Plan approval card
 
-1. Chat mode cannot execute Bash/Write/Edit
-2. Agent mode prompts for high-risk tools
-3. timeout becomes deny in UI + tool result
-4. allow-session suppresses repeat prompts for same toolName only
-5. concurrent session requests remain isolated and never take over the visible
+Plan approval is not a generic tool permission card. It is rendered inline in
+the originating session after `ExitPlanMode` submits a structured proposal.
+
+The card shows the plan title, summary, ordered steps, files, validation,
+risks, open questions, and proposed commands. Proposed commands are display
+only and never pre-authorize Bash. It offers:
+
+- **Approve** with an explicit target permission mode (`Ask`, `Accept edits`,
+  or `Auto`; default `Ask`)
+- **Request changes**, which requires non-empty feedback and leaves Plan active
+- **Reject**, which stops the run and leaves Plan active
+
+The card has distinct `pending`, `resolving`, `approved`, `changes requested`,
+`rejected`, `expired`, and `interrupted` states. Approval is enabled only for a
+matching live host request. Renderer reload may restore a still-live request;
+full process restart shows a failed-closed interrupted state and offers no
+stale action.
+
+## 10. Acceptance
+
+1. Plan denies Write/Edit/plugins in every permission mode
+2. Plan Bash prompts under Ask and Accept edits and runs without confirmation
+   under Auto, with the mutation tradeoff visible
+3. Agent mode uses the normal high-risk permission policy
+4. timeout becomes deny in UI + tool result
+5. allow-session suppresses repeat prompts for same toolName only
+6. concurrent session requests remain isolated and never take over the visible
    conversation or its work panel; post-approval artifacts remain assigned to
    the request's originating session
+7. Plan approval displays all structured fields, requires feedback for changes,
+   and sends the selected permission mode only on approval
+8. reject, timeout, abort, crash, stale response, and persistence failure leave
+   the session in Plan with no execution capability

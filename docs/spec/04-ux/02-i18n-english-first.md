@@ -47,6 +47,12 @@ Examples:
 - `settings.providers.add`
 - `plugins.permissions.fs.write.workspace`
 - `errors.tool.denied`
+- `composer.mode.agent`
+- `composer.mode.plan`
+- `plan.approval.title`
+- `plan.approval.requestChanges`
+- `plan.approval.permissionAutoWarning`
+- `errors.PLAN_REQUIRES_INTERACTIVE_SESSION`
 
 ## 5. Non-UI language surfaces
 
@@ -78,5 +84,8 @@ Plugins may include localized display fields later, but English fields are requi
 9. User-visible catalog copy prefers plain product language over internal
    engineering terms (`host`/`backend`/`repo refresh`/`workspace` where the UI
    already says project). Status, empty states, errors, and setup hints explain
-   what happened and what to do next (D149)
-
+    what happened and what to do next (D149)
+10. Agent/Plan selector, Plan states, structured approval fields/actions,
+    Bash/Auto mutation warning, fail-closed recovery, and Plan error codes have
+    matching English and zh-CN keys; no Chat operating-mode key or command is
+    shipped

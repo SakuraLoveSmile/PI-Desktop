@@ -10,6 +10,7 @@ use tokio::sync::{mpsc, Mutex};
 use crate::artifacts;
 use crate::audit;
 use crate::notifications;
+use crate::plans;
 use crate::permissions::{PermissionDecision, PermissionManager};
 use crate::providers::{self, DiscoveredModelInput, ProviderCreateInput, ProviderUpdateInput};
 use crate::scheduled;
@@ -180,6 +181,26 @@ fn thinking_level_param(params: &Value) -> Result<Option<String>, JsonRpcError> 
         ));
     }
     Ok(Some(level.to_string()))
+}
+
+fn normalize_settings_value(mut value: Value) -> Value {
+    if let Some(object) = value.as_object_mut() {
+        if object.get("defaultMode").and_then(Value::as_str) == Some("chat") {
+            object.insert("defaultMode".into(), Value::String("plan".into()));
+        }
+    }
+    value
+}
+
+fn plan_rpc_err(error: impl ToString) -> JsonRpcError {
+    let message = error.to_string();
+    let error_code = message
+        .split_whitespace()
+        .next()
+        .filter(|code| code.starts_with("PLAN_"))
+        .unwrap_or("PLAN_INTERNAL")
+        .to_string();
+    rpc_err(1015, message, &error_code)
 }
 
 fn resolve_tool_workspace(
@@ -405,9 +426,9 @@ async fn handle_request(
                 .db
                 .get_setting("app")
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            Ok(stored.unwrap_or_else(|| {
+            Ok(normalize_settings_value(stored.unwrap_or_else(|| {
                 json!({
-                    "defaultMode": "chat",
+                    "defaultMode": "agent",
                     "theme": "dark",
                     "enterToSend": true,
                     "contextCompaction": {
@@ -417,12 +438,13 @@ async fn handle_request(
                     },
                     "onboardingDismissed": false
                 })
-            }))
+            })))
         }
         "settings.set" => {
             let st = state.lock().await;
+            let settings = normalize_settings_value(params);
             st.db
-                .set_setting("app", &params)
+                .set_setting("app", &settings)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "ok": true }))
         }
@@ -945,6 +967,247 @@ async fn handle_request(
             Ok(json!({ "artifacts": artifacts }))
         }
 
+        "plans.pending" => {
+            let session_id = params.get("sessionId").and_then(|v| v.as_str());
+            let mut st = state.lock().await;
+            let (pending, planning_state) = {
+                let crate::state::AppState { db, plans, .. } = &mut *st;
+                let pending = plans
+                    .pending_for_session(&*db, session_id)
+                    .map_err(plan_rpc_err)?;
+                let planning_state = session_id
+                    .map(|id| plans.state_for_session(&*db, id))
+                    .transpose()
+                    .map_err(plan_rpc_err)?;
+                (pending, planning_state)
+            };
+            Ok(json!({ "plans": pending, "state": planning_state }))
+        }
+        "plans.enter" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let mut st = state.lock().await;
+            let planning_state = {
+                let crate::state::AppState { db, plans, .. } = &mut *st;
+                plans.enter(&*db, session_id).map_err(plan_rpc_err)?;
+                plans
+                    .state_for_session(&*db, session_id)
+                    .map_err(plan_rpc_err)?
+            };
+            emit_notification(
+                &tx,
+                "plans.changed",
+                json!({
+                    "sessionId": session_id,
+                    "state": planning_state,
+                }),
+            )
+            .await;
+            Ok(json!({ "ok": true, "state": planning_state }))
+        }
+        "plans.submit" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let plan = params
+                .get("plan")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "plan required", "INVALID_PARAMS"))?;
+            let turn_id = params
+                .get("turnId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "turnId required", "INVALID_PARAMS"))?;
+            let tool_call_id = params
+                .get("toolCallId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "toolCallId required", "INVALID_PARAMS"))?;
+            let (proposal, receiver) = {
+                let mut guard = state.lock().await;
+                let st = &mut *guard;
+                let plans = &mut st.plans;
+                let db = &st.db;
+                plans
+                    .submit(db, session_id, turn_id, tool_call_id, plan)
+                    .map_err(plan_rpc_err)?
+            };
+            emit_notification(
+                &tx,
+                "plans.changed",
+                json!({
+                    "sessionId": session_id,
+                    "state": "awaiting_approval",
+                    "proposalId": proposal.id,
+                    "proposal": proposal
+                }),
+            )
+            .await;
+
+            let resolution = match tokio::time::timeout(
+                std::time::Duration::from_millis(plans::PLAN_APPROVAL_TIMEOUT_MS),
+                receiver,
+            )
+            .await
+            {
+                Ok(Ok(resolution)) => resolution,
+                Ok(Err(_)) => {
+                    let mut guard = state.lock().await;
+                    let st = &mut *guard;
+                    let terminal = {
+                        let crate::state::AppState { db, plans, .. } = st;
+                        plans
+                            .resolution_for(db, &proposal.id)
+                            .map_err(plan_rpc_err)?
+                    };
+                    if let Some(resolution) = terminal {
+                        resolution
+                    } else {
+                        let _ = {
+                            let crate::state::AppState { db, plans, .. } = st;
+                            plans.abort_session(db, session_id)
+                        };
+                        return Err(plan_rpc_err("PLAN_APPROVAL_INTERRUPTED"));
+                    }
+                }
+                Err(_) => {
+                    let mut guard = state.lock().await;
+                    let st = &mut *guard;
+                    let plans = &mut st.plans;
+                    let db = &st.db;
+                    plans
+                        .timeout(db, &proposal.id)
+                        .map_err(plan_rpc_err)?
+                        .ok_or_else(|| plan_rpc_err("PLAN_APPROVAL_STALE"))?
+                }
+            };
+            let state_name = if resolution.status == "approved" {
+                "inactive"
+            } else {
+                "planning"
+            };
+            emit_notification(
+                &tx,
+                "plans.changed",
+                json!({
+                    "sessionId": session_id,
+                    "state": state_name,
+                    "proposalId": resolution.proposal.id,
+                    "proposal": resolution.proposal,
+                    "action": resolution.action,
+                    "feedback": resolution.feedback,
+                    "targetPermissionMode": resolution.target_permission_mode
+                }),
+            )
+            .await;
+            serde_json::to_value(resolution).map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))
+        }
+        "plans.resolve" => {
+            let proposal_id = params
+                .get("proposalId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "proposalId required", "INVALID_PARAMS"))?;
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let turn_id = params
+                .get("turnId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "turnId required", "INVALID_PARAMS"))?;
+            let tool_call_id = params
+                .get("toolCallId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "toolCallId required", "INVALID_PARAMS"))?;
+            let action = params
+                .get("action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let target = params
+                .get("targetPermissionMode")
+                .and_then(|v| v.as_str());
+            let feedback = params.get("feedback").and_then(|v| v.as_str());
+            let resolution = {
+                let mut guard = state.lock().await;
+                let st = &mut *guard;
+                let plans = &mut st.plans;
+                let db = &st.db;
+                plans
+                    .resolve(
+                        db,
+                        proposal_id,
+                        session_id,
+                        turn_id,
+                        tool_call_id,
+                        action,
+                        target,
+                        feedback,
+                    )
+                    .map_err(plan_rpc_err)?
+            };
+            let state_name = if resolution.status == plans::STATUS_APPROVED {
+                "inactive"
+            } else {
+                "planning"
+            };
+            emit_notification(
+                &tx,
+                "plans.changed",
+                json!({
+                    "sessionId": resolution.proposal.session_id,
+                    "state": state_name,
+                    "proposalId": resolution.proposal.id,
+                    "proposal": resolution.proposal,
+                    "action": resolution.action,
+                    "feedback": resolution.feedback,
+                    "targetPermissionMode": resolution.target_permission_mode
+                }),
+            )
+            .await;
+            Ok(json!({
+                "ok": true,
+                "proposal": resolution.proposal,
+                "state": state_name,
+                "action": resolution.action,
+                "targetPermissionMode": resolution.target_permission_mode,
+                "feedback": resolution.feedback
+            }))
+        }
+        "plans.abort" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let changed = {
+                let mut guard = state.lock().await;
+                let st = &mut *guard;
+                let plans = &mut st.plans;
+                let db = &st.db;
+                plans
+                    .abort_session(db, session_id)
+                    .map_err(plan_rpc_err)?
+            };
+            if changed {
+                emit_notification(
+                    &tx,
+                    "plans.changed",
+                    json!({ "sessionId": session_id, "state": "planning" }),
+                )
+                .await;
+            }
+            Ok(json!({ "ok": true, "changed": changed }))
+        }
+
         "scheduled.list" => {
             let st = state.lock().await;
             let tasks = scheduled::list_tasks(&st.db)
@@ -1006,7 +1269,9 @@ async fn handle_request(
                     settings
                         .get("defaultMode")
                         .and_then(|v| v.as_str())
-                        .unwrap_or("chat")
+                        .map(|mode| sessions::normalize_mode(Some(mode)))
+                        .as_deref()
+                        .unwrap_or("agent")
                         .to_string(),
                 ),
                 settings
@@ -1076,13 +1341,24 @@ async fn handle_request(
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
 
-            let (auto_decision, workspace_path, scratch_path, pending_rx, request_opt) = {
+            let (
+                auto_decision,
+                workspace_path,
+                scratch_path,
+                pending_rx,
+                request_opt,
+                durable_mode,
+            ) = {
                 let mut st = state.lock().await;
                 st.permissions.expire_stale();
+                let Some(durable_mode) = sessions::session_mode(&st.db, &p.session_id)
+                    .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                else {
+                    return Err(rpc_err(1007, "session not found", "SESSION_NOT_FOUND"));
+                };
                 // Effective permission mode (D115): per-session override
                 // unless it is `inherit`, then the global settings default,
-                // then `ask`. Unknown sessions (legacy callers) resolve to
-                // the global default too.
+                // then `ask`.
                 let session_pm = sessions::session_permission_mode(&st.db, &p.session_id)
                     .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                     .filter(|m| m != "inherit");
@@ -1101,27 +1377,32 @@ async fn handle_request(
                         .filter(|m| sessions::is_valid_permission_mode(m) && m != "inherit")
                         .unwrap_or_else(|| "ask".to_string()),
                 };
-                let mut auto = st.permissions.evaluate_auto_with_permission_mode(
-                    &p.session_id,
-                    &p.tool_name,
-                    &p.mode,
-                    &effective_pm,
-                    &st.session_grants,
-                );
+                let mut auto = st
+                    .permissions
+                    .evaluate_auto_with_permission_mode_and_risk(
+                        &p.session_id,
+                        &p.tool_name,
+                        &durable_mode,
+                        &effective_pm,
+                        &st.session_grants,
+                        p.declared_risk.as_deref(),
+                    );
                 // Resolve the tool root from the persisted session instead of
                 // the mutable global workspace. This keeps background turns
                 // isolated when the renderer switches between project tabs.
-                // Fall back to the global workspace only for legacy callers
-                // that do not have a persisted session.
+                // The session's project remains the containment root for all
+                // known sessions.
                 let ws = resolve_tool_workspace(&st, &p.session_id)?;
                 let scratch = scratch::session_dir(&st.data_dir, &p.session_id);
                 // Write/Edit targeting the session scratch dir never touch
                 // the user's project — skip the prompt (D114). The lexical
                 // pre-check only decides prompting; execution still goes
                 // through the symlink-aware resolver, so it cannot be used
-                // to escape containment. Chat mode already resolved to Deny
-                // above and is unaffected.
-                if auto.is_none() && matches!(p.tool_name.as_str(), "Write" | "Edit") {
+                // to escape containment. Plan's hard deny is never bypassed.
+                if durable_mode != "plan"
+                    && auto.is_none()
+                    && matches!(p.tool_name.as_str(), "Write" | "Edit")
+                {
                     if let (Some(scratch_dir), Some(path)) = (
                         scratch.as_deref(),
                         p.args.get("path").and_then(|v| v.as_str()),
@@ -1132,7 +1413,7 @@ async fn handle_request(
                     }
                 }
                 if let Some(decision) = auto {
-                    (Some(decision), ws, scratch, None, None)
+                    (Some(decision), ws, scratch, None, None, durable_mode)
                 } else {
                     let reason = match p.tool_name.as_str() {
                         "Write" | "Edit" => "Modifies files in your workspace",
@@ -1142,14 +1423,15 @@ async fn handle_request(
                         }
                         _ => "High-risk tool requires approval",
                     };
-                    let (req, rx) = st.permissions.create_request(
+                    let (req, rx) = st.permissions.create_request_with_risk(
                         &p.session_id,
                         &p.tool_call_id,
                         &p.tool_name,
                         p.args.clone(),
                         reason,
+                        p.declared_risk.as_deref(),
                     );
-                    (None, ws, scratch, Some(rx), Some(req))
+                    (None, ws, scratch, Some(rx), Some(req), durable_mode)
                 }
             };
 
@@ -1201,7 +1483,7 @@ async fn handle_request(
                     json!({
                         "toolName": p.tool_name,
                         "toolCallId": p.tool_call_id,
-                        "mode": p.mode,
+                        "mode": durable_mode,
                         "prompted": prompted,
                         "permissionWaitMs": permission_wait_ms,
                         "totalMs": call_started.elapsed().as_millis() as u64
@@ -1219,16 +1501,18 @@ async fn handle_request(
                     outcome = "denied",
                     "tool timing"
                 );
-                let error_code =
-                    if p.mode == "chat" && !PermissionManager::chat_mode_allows(&p.tool_name) {
-                        if p.tool_name == "Bash" {
-                            "BASH_DISABLED_IN_CHAT"
-                        } else {
-                            "WRITE_DISABLED_IN_CHAT"
-                        }
-                    } else {
-                        "TOOL_DENIED"
-                    };
+                let error_code = if durable_mode == "plan"
+                    && !PermissionManager::plan_mode_allows(&p.tool_name)
+                {
+                    match p.tool_name.as_str() {
+                        "Write" => "WRITE_DISABLED_IN_PLAN",
+                        "Edit" => "EDIT_DISABLED_IN_PLAN",
+                        name if name.starts_with("plugin_") => "PLUGIN_DISABLED_IN_PLAN",
+                        _ => "TOOL_DISABLED_IN_PLAN",
+                    }
+                } else {
+                    "TOOL_DENIED"
+                };
                 return Ok(json!({
                     "toolCallId": p.tool_call_id,
                     "ok": false,
@@ -1333,17 +1617,45 @@ async fn handle_request(
                 .get("toolName")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            let mode = params
-                .get("mode")
-                .and_then(|v| v.as_str())
-                .unwrap_or("agent");
+            let declared_risk = params.get("declaredRisk").and_then(|v| v.as_str());
             let st = state.lock().await;
-            let decision =
-                st.permissions
-                    .evaluate_auto(session_id, tool_name, mode, &st.session_grants);
+            let Some(mode) = sessions::session_mode(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+            else {
+                return Err(rpc_err(1007, "session not found", "SESSION_NOT_FOUND"));
+            };
+            let session_pm = sessions::session_permission_mode(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
+                .filter(|value| value != "inherit");
+            let effective_pm = session_pm
+                .or_else(|| {
+                    st.db
+                        .get_setting("app")
+                        .ok()
+                        .flatten()
+                        .and_then(|settings| {
+                            settings
+                                .get("defaultPermissionMode")
+                                .and_then(|value| value.as_str())
+                                .filter(|value| {
+                                    sessions::is_valid_permission_mode(value)
+                                        && *value != "inherit"
+                                })
+                                .map(str::to_string)
+                        })
+                })
+                .unwrap_or_else(|| "ask".into());
+            let decision = st.permissions.evaluate_auto_with_permission_mode_and_risk(
+                session_id,
+                tool_name,
+                &mode,
+                &effective_pm,
+                &st.session_grants,
+                declared_risk,
+            );
             Ok(json!({
                 "decision": decision,
-                "risk": PermissionManager::tool_risk(tool_name)
+                "risk": PermissionManager::tool_risk_with_declared(tool_name, declared_risk)
             }))
         }
         "permissions.resolve" => {
@@ -1726,7 +2038,7 @@ mod tests {
     use std::fs;
     use std::sync::Arc;
 
-    use serde_json::json;
+    use serde_json::{json, Value};
     use tokio::sync::{mpsc, Mutex};
 
     use super::{handle_request, resolve_tool_workspace};
@@ -1858,6 +2170,131 @@ mod tests {
             total_ms - execute_ms - permission_wait_ms,
             "segments add up to the total"
         );
+    }
+
+    #[tokio::test]
+    async fn plan_authorization_uses_durable_mode_and_keeps_bash_permission_semantics() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project = data_dir.path().join("project");
+        fs::create_dir_all(&project).unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Plan".into()),
+            Some("plan".into()),
+            None,
+            None,
+            Some(project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let session_id = session.id.clone();
+        sessions::configure_session_with_thinking(
+            &app_state.db,
+            &session_id,
+            "plan",
+            None,
+            None,
+            None,
+            Some("auto"),
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        for (tool_name, args, expected) in [
+            (
+                "Write",
+                json!({ "path": "ignored.txt", "content": "no" }),
+                "WRITE_DISABLED_IN_PLAN",
+            ),
+            (
+                "Edit",
+                json!({ "path": "ignored.txt", "old_string": "a", "new_string": "b" }),
+                "EDIT_DISABLED_IN_PLAN",
+            ),
+            (
+                "plugin_demo_run",
+                json!({}),
+                "PLUGIN_DISABLED_IN_PLAN",
+            ),
+            ("UnknownTool", json!({}), "TOOL_DISABLED_IN_PLAN"),
+        ] {
+            let result = handle_request(
+                state.clone(),
+                "tools.execute",
+                json!({
+                    "sessionId": session_id,
+                    "toolCallId": format!("{tool_name}-call"),
+                    "toolName": tool_name,
+                    "args": args,
+                    "mode": "agent"
+                }),
+                tx.clone(),
+            )
+            .await
+            .unwrap();
+            assert_eq!(result["errorCode"], expected, "{tool_name}");
+            assert_eq!(result["ok"], false);
+        }
+
+        let bash = handle_request(
+            state.clone(),
+            "tools.execute",
+            json!({
+                "sessionId": session_id,
+                "toolCallId": "bash-auto",
+                "toolName": "Bash",
+                "args": { "command": "printf plan-bash" },
+                "mode": "agent"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(bash["ok"], true);
+        assert_eq!(bash["content"]["stdout"], "plan-bash");
+
+        sessions::configure_session_with_thinking(
+            &state.lock().await.db,
+            &session_id,
+            "plan",
+            None,
+            None,
+            None,
+            Some("ask"),
+        )
+        .unwrap();
+        let (notify_tx, mut notify_rx) = mpsc::unbounded_channel();
+        let pending_state = state.clone();
+        let pending_task = tokio::spawn(async move {
+            handle_request(
+                pending_state,
+                "tools.execute",
+                json!({
+                    "sessionId": session_id,
+                    "toolCallId": "bash-ask",
+                    "toolName": "Bash",
+                    "args": { "command": "printf ask-bash" },
+                    "mode": "agent"
+                }),
+                notify_tx,
+            )
+            .await
+        });
+        let notification = notify_rx.recv().await.unwrap();
+        let notification: Value = serde_json::from_str(&notification).unwrap();
+        assert_eq!(notification["method"], "permissions.request");
+        let request_id = notification["params"]["requestId"].as_str().unwrap();
+        handle_request(
+            state,
+            "permissions.resolve",
+            json!({ "requestId": request_id, "decision": "allow-once" }),
+            tx,
+        )
+        .await
+        .unwrap();
+        assert_eq!(pending_task.await.unwrap().unwrap()["ok"], true);
     }
 
     #[tokio::test]

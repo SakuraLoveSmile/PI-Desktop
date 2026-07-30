@@ -31,11 +31,12 @@ PI-Desktop uses a layered desktop architecture:
 ## 2. Design principles
 
 1. **UI and privileged runtime are separated**
-2. **Rust owns host/system capabilities**
+2. **Rust owns host/system capabilities, durable mode, and approval policy**
 3. **pi owns model/agent loop semantics**
 4. **Renderer is unprivileged**
 5. **All cross-boundary contracts are typed**
 6. **English is the product source language**
+7. **Plan is a state of the one pi Agent, never a second planner**
 
 ## 3. Subsystems
 
@@ -62,6 +63,8 @@ not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 - workspace path enforcement
 - builtin tool execution
 - permission policy evaluation
+- durable session mode resolution (`agent | plan`)
+- plan approval records, requests, and atomic Plan → Agent transition
 - plugin install/registry/lifecycle services
 - sqlite adapters / secure storage glue
 - audit logs
@@ -71,6 +74,7 @@ not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 - `Agent.prompt/abort`
 - event normalization from pi events
 - tool call requests emitted to host core
+- one-Agent planning state, structured plan submission, and feedback loop
 
 ### 3.5 Plugin System
 - manifest validation
@@ -78,7 +82,7 @@ not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 - plugin panels
 - permission grants
 
-## 4. Request path (chat + tool)
+## 4. Request path (conversation + tool)
 
 ```text
 1. UI submits prompt
@@ -87,13 +91,25 @@ not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 4. UI renders text deltas
 5. On tool call:
  5.1 pi requests tool execution via host bridge
- 5.2 Rust permission gateway evaluates risk
- 5.3 UI confirms if required
+  5.2 Rust resolves the durable session mode and evaluates the authoritative
+      Plan/Agent tool policy before permission modes
+  5.3 UI confirms if required, including a separate Plan approval request
  5.4 Rust resolves the durable session's project and executes the tool in that
      workspace sandbox (never whichever sidebar tab is currently active)
  5.5 result returns to pi runtime
 6. turn ends; session persistence updates
 ```
+
+When the same Agent calls `ExitPlanMode`, host-core persists the structured
+proposal and waits for `plans.resolve`. Approval atomically changes the durable
+session to Agent with the selected permission mode, then the sidecar starts a
+new provider request with the Agent tool set. Requesting changes returns
+feedback to that same Agent and keeps the session in Plan. Reject, timeout,
+host/sidecar crash, and persistence failure grant no execution capability.
+
+The renderer may display Plan state and approval UI, but it is only a projection
+of host/runtime events. It cannot authorize a tool or choose a mode for host
+policy by sending a conflicting request field.
 
 The renderer may retain several project tabs, but this does not create several
 host workspace singletons. One project supplies visible shell context;

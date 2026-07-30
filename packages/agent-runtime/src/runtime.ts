@@ -14,6 +14,8 @@ import {
   type AgentTool,
   type CompactionEntry,
   type CompactionSettings,
+  type BeforeToolCallContext,
+  type BeforeToolCallResult,
   type MessageEntry,
   type PrepareNextTurnContext,
   type SessionTreeEntry,
@@ -44,11 +46,18 @@ import type {
   ContextCompactionSettings,
   MessageUsage,
   Mode,
+  PlanProposal,
+  PlanningState,
+  Risk,
   ThinkingLevel,
   UiMessage,
 } from "@pi-desktop/shared";
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
+import {
+  composeModeSystemPrompt,
+  DEFAULT_RUNTIME_SYSTEM_PROMPT,
+} from "./mode-prompts.js";
 import { clampThinkingLevel, type PiModelConfig } from "./thinking-level.js";
 import { logTiming } from "./timing.js";
 
@@ -193,12 +202,16 @@ export type PluginToolDef = {
   description?: string;
   /** JSON schema for arguments (manifest agentTools[].schema). */
   parameters?: unknown;
+  /** Declared plugin risk, when the plugin supplied a bounded value. */
+  risk?: Risk;
 };
 
 export type AgentRuntimeOptions = {
   host: HostClient;
   sessionId: string;
   mode: Mode;
+  /** Durable host turn ID for the current prompt, used by plan identity. */
+  turnId?: string;
   provider: RuntimeProviderConfig;
   thinkingLevel: ThinkingLevel;
   systemPrompt?: string;
@@ -433,6 +446,7 @@ export class DesktopAgentRuntime {
   private models: Models;
   private model: Model<Api>;
   private turnId?: string;
+  private hostTurnId?: string;
   private disposed = false;
   readonly sessionId: string;
   private mode: Mode;
@@ -440,6 +454,9 @@ export class DesktopAgentRuntime {
   private thinkingLevel: ThinkingLevel;
   private host: HostClient;
   private onEvent: (envelope: AgentEventEnvelope) => void;
+  private baseSystemPrompt: string;
+  private planningState: PlanningState;
+  private pendingPlanId?: string;
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
   private scratchDir?: string;
@@ -465,13 +482,35 @@ export class DesktopAgentRuntime {
 
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
+    this.hostTurnId = opts.turnId;
     this.mode = opts.mode;
+    this.planningState = this.mode === "plan" ? "planning" : "inactive";
     this.provider = opts.provider;
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
     this.host = opts.host;
     this.onEvent = opts.onEvent;
     this.pluginTools = opts.pluginTools ?? [];
     this.scratchDir = opts.scratchDir;
+    this.baseSystemPrompt =
+      opts.systemPrompt ??
+      [
+        DEFAULT_RUNTIME_SYSTEM_PROMPT,
+        // Work panel browser preview (D100): workspace HTML files render
+        // in the embedded browser with live reload on file changes.
+        "When you create or edit an HTML page in the workspace, call the BrowserPreview tool with its workspace-relative path (e.g. `index.html` or `demo/index.html`) to show it in PI-Desktop's built-in browser panel. The preview live-reloads as you keep editing, so one call per page is enough — no external browser or manual refresh needed.",
+        // Shell dialect (host-core D084): commands run through bash on
+        // every platform — Git Bash on Windows, bash on macOS/Linux.
+        process.platform === "win32"
+          ? "Shell commands run in Git Bash (POSIX bash on Windows). Always write bash/POSIX syntax with forward-slash paths — never cmd.exe or PowerShell syntax."
+          : "Shell commands run in bash. Write bash/POSIX syntax.",
+        // Session scratch directory (D114): temp files must not dirty
+        // the user's workspace or its git status.
+        ...(this.scratchDir
+          ? [
+              `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
+            ]
+          : []),
+      ].join("\n\n");
     this.compactionSettings = normalizeCompactionSettings(
       opts.compactionSettings,
     );
@@ -520,34 +559,86 @@ export class DesktopAgentRuntime {
       prepareNextTurnWithContext: (context, signal) =>
         this.prepareNextTurn(context, signal),
       initialState: {
-        systemPrompt:
-          opts.systemPrompt ??
-          [
-            "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
-            // Work panel browser preview (D100): workspace HTML files render
-            // in the embedded browser with live reload on file changes.
-            "When you create or edit an HTML page in the workspace, call the BrowserPreview tool with its workspace-relative path (e.g. `index.html` or `demo/index.html`) to show it in PI-Desktop's built-in browser panel. The preview live-reloads as you keep editing, so one call per page is enough — no external browser or manual refresh needed.",
-            // Shell dialect (host-core D084): commands run through bash on
-            // every platform — Git Bash on Windows, bash on macOS/Linux.
-            process.platform === "win32"
-              ? "Shell commands run in Git Bash (POSIX bash on Windows). Always write bash/POSIX syntax with forward-slash paths — never cmd.exe or PowerShell syntax."
-              : "Shell commands run in bash. Write bash/POSIX syntax.",
-            // Session scratch directory (D114): temp files must not dirty
-            // the user's workspace or its git status.
-            ...(this.scratchDir
-              ? [
-                  `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
-                ]
-              : []),
-          ].join("\n\n"),
+        systemPrompt: composeModeSystemPrompt(this.mode, this.baseSystemPrompt),
         model,
         tools,
         thinkingLevel: this.thinkingLevel,
         messages: buildSessionContext(this.entriesWithCompaction()).messages,
       },
+      // Plan transitions must be the only tool call in an assistant batch.
+      // Sequential execution also makes the host-confirmed mode change visible
+      // before the next model request in the same run.
+      beforeToolCall: (context) => this.beforeToolCall(context),
+      toolExecution: "sequential",
     });
 
     this.agent.subscribe((event) => this.handleAgentEvent(event));
+  }
+
+  /** Switch the planning state on this Agent without creating another Agent. */
+  setMode(mode: Mode): void {
+    if (this.disposed) throw new Error("runtime disposed");
+    if (this.mode === mode) {
+      this.setPlanningState(mode === "plan" ? "planning" : "inactive");
+      return;
+    }
+    this.mode = mode;
+    this.agent.state.systemPrompt = composeModeSystemPrompt(
+      mode,
+      this.baseSystemPrompt,
+    );
+    this.agent.state.tools = this.buildTools();
+    this.setPlanningState(mode === "plan" ? "planning" : "inactive");
+  }
+
+  getMode(): Mode {
+    return this.mode;
+  }
+
+  private async beforeToolCall(
+    context: BeforeToolCallContext,
+  ): Promise<BeforeToolCallResult | undefined> {
+    const toolCalls = (context.assistantMessage.content as Array<{ type?: string }>).filter(
+      (block) => block.type === "toolCall",
+    );
+    const transition =
+      context.toolCall.name === "EnterPlanMode" ||
+      context.toolCall.name === "ExitPlanMode";
+    const transitionInBatch = toolCalls.some(
+      (block) =>
+        (block as { name?: string }).name === "EnterPlanMode" ||
+        (block as { name?: string }).name === "ExitPlanMode",
+    );
+    if (transitionInBatch && toolCalls.length !== 1) {
+      return {
+        block: true,
+        reason:
+          "EnterPlanMode and ExitPlanMode must be the only tool call in the assistant message.",
+      };
+    }
+    if (!transition) return undefined;
+    if (context.toolCall.name === "EnterPlanMode" && this.mode !== "agent") {
+      return { block: true, reason: "EnterPlanMode is available only in Agent mode." };
+    }
+    if (context.toolCall.name === "ExitPlanMode" && this.mode !== "plan") {
+      return { block: true, reason: "ExitPlanMode is available only in Plan mode." };
+    }
+    return undefined;
+  }
+
+  private setPlanningState(
+    state: PlanningState,
+    details: {
+      proposalId?: string;
+      plan?: string;
+      feedback?: string;
+      action?: "approve" | "request_changes" | "reject";
+      targetPermissionMode?: "ask" | "accept-edits" | "auto";
+    } = {},
+  ): void {
+    this.planningState = state;
+    this.pendingPlanId = details.proposalId;
+    this.emit({ type: "planning_state", state, ...details });
   }
 
   /** True when this runtime can be reused for a prompt with the given config. */
@@ -583,7 +674,6 @@ export class DesktopAgentRuntime {
       .join(",");
     return (
       !this.disposed &&
-      this.mode === mode &&
       this.provider.id === provider.id &&
       this.provider.modelId === provider.modelId &&
       (this.provider.baseUrl ?? "") === (provider.baseUrl ?? "") &&
@@ -815,6 +905,12 @@ export class DesktopAgentRuntime {
           args: params,
           mode: this.mode,
           timeoutMs: 60_000,
+          ...(toolName.startsWith("plugin_")
+            ? {
+                declaredRisk: this.pluginTools.find((tool) => tool.name === toolName)
+                  ?.risk,
+              }
+            : {}),
         });
         // hostRttMs spans approval + execution + IPC. Compare it against the
         // host's own "tool timing" line for the same toolCallId: the gap is
@@ -835,6 +931,7 @@ export class DesktopAgentRuntime {
         return {
           content: [{ type: "text", text }],
           details: result.content,
+          isError: result.isError === true || result.ok === false,
         };
       },
     });
@@ -844,23 +941,179 @@ export class DesktopAgentRuntime {
     const tools = ["Read", "Glob", "Grep", "BrowserPreview"];
     if (this.mode === "agent") {
       tools.push("Write", "Edit", "Bash");
+    } else {
+      tools.push("Bash");
     }
     const builtins = tools.map(exec);
 
-    const hostExecute = (toolName: string) =>
-      exec(toolName).execute;
-    const pluginTools: AgentTool[] = this.pluginTools.map((def) => ({
-      name: def.name,
-      label: def.name,
-      description: def.description || `${def.name} plugin tool`,
-      parameters: (def.parameters ??
-        Type.Object({})) as AgentTool["parameters"],
-      execute: hostExecute(def.name),
-    }));
+    const pluginTools: AgentTool[] =
+      this.mode === "agent"
+        ? this.pluginTools.map((def) => ({
+            name: def.name,
+            label: def.name,
+            description: def.description || `${def.name} plugin tool`,
+            parameters: (def.parameters ??
+              Type.Object({})) as AgentTool["parameters"],
+            executionMode: "sequential" as const,
+            execute: exec(def.name).execute,
+          }))
+        : [];
     const contextTools = this.compactionSettings.enabled
       ? [this.buildContextCompactionTool()]
       : [];
-    return [...builtins, ...pluginTools, ...contextTools];
+    const modeTools =
+      this.mode === "agent"
+        ? [this.buildEnterPlanModeTool()]
+        : [this.buildExitPlanModeTool()];
+    return [...builtins, ...pluginTools, ...contextTools, ...modeTools];
+  }
+
+  private buildEnterPlanModeTool(): AgentTool {
+    return {
+      name: "EnterPlanMode",
+      label: "Enter Plan Mode",
+      description:
+        "Switch this same agent into Plan mode after the host confirms the durable session transition.",
+      parameters: Type.Object({}),
+      executionMode: "sequential",
+      execute: async (toolCallId) => {
+        await this.host.call("plans.enter", {
+          sessionId: this.sessionId,
+          turnId: this.turnId,
+          toolCallId,
+        });
+        // The host is authoritative. Rebuild the live prompt and tool set only
+        // after plans.enter has committed mode=plan.
+        this.setMode("plan");
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Plan mode is active. Inspect the workspace, formulate the plan, then call ExitPlanMode for approval.",
+            },
+          ],
+          details: { mode: "plan", planningState: "planning" },
+        };
+      },
+    };
+  }
+
+  private buildExitPlanModeTool(): AgentTool {
+    return {
+      name: "ExitPlanMode",
+      label: "Exit Plan Mode",
+      description:
+        "Submit the complete implementation plan for user approval. Do not use this until the plan is concrete.",
+      parameters: Type.Object({
+        plan: Type.String({
+          description:
+            "The complete implementation plan, including files, behavior, and validation.",
+        }),
+      }),
+      executionMode: "sequential",
+      execute: async (toolCallId, params) => {
+        const plan = isRecord(params) && typeof params.plan === "string"
+          ? params.plan.trim()
+          : "";
+        if (!plan) {
+          return {
+            content: [{ type: "text", text: "ExitPlanMode requires a non-empty plan." }],
+            details: { errorCode: "PLAN_INVALID_ARGUMENT" },
+            isError: true,
+          };
+        }
+        let result: {
+          status:
+            | "approved"
+            | "changes_requested"
+            | "rejected"
+            | "expired"
+            | "interrupted";
+          proposal?: PlanProposal;
+          feedback?: string;
+          targetPermissionMode?: "ask" | "accept-edits" | "auto";
+        };
+        try {
+          this.setPlanningState("awaiting_approval", { plan });
+          result = await this.host.call("plans.submit", {
+            sessionId: this.sessionId,
+            // This is the durable host turn ID passed into the runtime for the
+            // current prompt, not a newly generated provider-side identifier.
+            turnId: this.turnId,
+            toolCallId,
+            plan,
+          });
+        } catch (error) {
+          this.setPlanningState("planning", { plan });
+          const errorCode =
+            (error as { data?: { errorCode?: string } })?.data?.errorCode ??
+            "PLAN_APPROVAL_INTERRUPTED";
+          return {
+            content: [{ type: "text", text: `Plan approval failed: ${errorCode}` }],
+            details: { errorCode },
+            isError: true,
+            terminate: true,
+          };
+        }
+
+        if (result.status === "approved") {
+          this.setMode("agent");
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Plan approved. Continue implementation in Agent mode${result.targetPermissionMode ? ` (${result.targetPermissionMode} permission mode)` : ""}.`,
+              },
+            ],
+            details: result,
+          };
+        }
+        if (result.status === "changes_requested") {
+          this.setPlanningState("planning", {
+            proposalId: result.proposal?.id,
+            plan,
+            feedback: result.feedback,
+            action: "request_changes",
+          });
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Plan feedback from the user: ${result.feedback || "Please revise the plan and resubmit it."}`,
+              },
+            ],
+            details: result,
+          };
+        }
+        this.setPlanningState("planning", {
+          proposalId: result.proposal?.id,
+          plan,
+          action: result.status === "rejected" ? "reject" : undefined,
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                result.status === "rejected"
+                  ? "The plan was rejected. Remain in Plan mode and wait for a new user request."
+                  : `Plan approval ended with ${result.status}. Remain in Plan mode.`,
+            },
+          ],
+          details: {
+            ...result,
+            errorCode:
+              result.status === "rejected"
+                ? "PLAN_REJECTED"
+                : result.status === "expired"
+                  ? "PLAN_APPROVAL_TIMEOUT"
+                  : "PLAN_APPROVAL_INTERRUPTED",
+          },
+          isError: true,
+          terminate: true,
+        };
+      },
+    };
   }
 
   private buildContextCompactionTool(): AgentTool {
@@ -1589,9 +1842,14 @@ export class DesktopAgentRuntime {
     this.emit({ type: "error", error });
   }
 
-  async prompt(content: string, userMessageId?: string): Promise<{ turnId: string }> {
+  async prompt(
+    content: string,
+    userMessageId?: string,
+    durableTurnId?: string,
+  ): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
-    this.turnId = randomUUID();
+    this.hostTurnId = durableTurnId || this.hostTurnId;
+    this.turnId = this.hostTurnId || randomUUID();
     this.pendingUserMessageId = userMessageId;
     this.pendingOverflow = false;
     this.overflowRecoveryAttempted = false;
@@ -1679,6 +1937,8 @@ export class DesktopAgentRuntime {
       currentTurnId: this.turnId,
       modelId: this.provider.modelId,
       pendingToolConfirmations: 0,
+      planningState: this.planningState,
+      ...(this.pendingPlanId ? { pendingPlanId: this.pendingPlanId } : {}),
     };
   }
 

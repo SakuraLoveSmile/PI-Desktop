@@ -69,12 +69,22 @@ Install or develop local plugins for commands/panels/tools.
 - Billing systems
 - Computer Use browser takeover
 
-## 6. Modes
+## 6. Operating modes
 
-| Mode | Behavior |
+| Product selector | Behavior |
 |---|---|
-| Chat | Prefer read-only behavior; high-risk tools restricted |
-| Agent | Tools available under permission policy |
+| Agent | The pi Agent runs with the full execution tool set under the selected permission policy. |
+| Plan | The same pi Agent runs in planning state. It can inspect with Read/Glob/Grep/BrowserPreview, run Bash under the selected permission policy, use plan/context controls, and submit a structured plan for separate approval. Write/Edit/plugin tools are denied. |
+
+Plan is a planning intent, not a strict read-only security profile: Bash under
+`ask` or `accept-edits` prompts, while Bash under `auto` runs without
+confirmation and may mutate the workspace or scratch directory. The Plan
+selector and `EnterPlanMode` both address the same Agent; approval transitions
+that Agent into Agent execution without creating a second planner.
+
+Existing persisted `Chat` mode values migrate to `Plan`. New sessions and new
+scheduled tasks default to Agent. The conversation surface may continue to use
+the internal `page = "chat"` route value; that value is not an operating mode.
 
 ## 7. Success criteria
 
@@ -84,6 +94,8 @@ Install or develop local plugins for commands/panels/tools.
 4. Sessions survive restart
 5. Renderer never has direct Node/FS privileges
 6. UI is fully usable in English
+7. A submitted plan cannot cross into execution without a separate matching
+   approval
 
 ## 8. Naming
 

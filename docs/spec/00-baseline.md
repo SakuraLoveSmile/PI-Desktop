@@ -1,8 +1,8 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.12`
-- Date: `2026-07-28`
-- Status: `Frozen for implementation details (icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
+- Baseline Version: `0.4.13`
+- Date: `2026-07-30`
+- Status: `Frozen for implementation details (Plan operating state + plan approval boundary + protocol v7 + schema v8 + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -34,6 +34,12 @@
 > `0.4.12` standardizes home and thread-docked composer prompt rows without a
 > leading brand mark through D160 / ADR 0031 while preserving shell branding
 > elsewhere.
+> `0.4.13` replaces the Chat operating profile with the Plan operating state
+> through D166 / ADR 0033. Plan is the same pi Agent in planning state, keeps
+> permission-mode selection, exposes Bash subject to that policy, denies
+> Write/Edit/plugin tools, and submits structured plans through a separate
+> host-owned approval transition. The host protocol is v7 and storage schema
+> v8; persisted Chat values migrate to Plan while Agent remains the default.
 
 ## Frozen Decisions
 
@@ -51,8 +57,10 @@
 12. Storage ownership: **Rust host-core owns SQLite exclusively**
 13. MVP domain: **local coding agent**
 14. Default mode: **Agent**
-15. Chat mode tools: **read-only** (`Read` / `Glob` / `Grep`)
-16. MVP Agent tools: **Read / Glob / Grep / Write / Edit / Bash**
+15. Product operating selector: **Agent | Plan**; the internal `page = "chat"`
+    value remains a conversation-surface implementation detail, not an
+    operating mode
+16. Agent tools: **Read / Glob / Grep / Write / Edit / Bash**
 17. Permission timeout: **120s → deny**
 18. Session grant scope: **by toolName**
 19. `~/.pi` auto-import: **not in MVP**
@@ -86,8 +94,16 @@
 42. Project activation: **one visible host workspace via existing
     `project.set`; tool roots remain bound to the originating session project**
 43. Context management: **pi-native checkpoint summaries with PI-Desktop-owned
-    per-`turn_end` soft guidance, deterministic pre-request hard guards,
-    durable host checkpoints, and one overflow retry**
+     per-`turn_end` soft guidance, deterministic pre-request hard guards,
+     durable host checkpoints, and one overflow retry**
+44. Plan tools and policy: **Read / Glob / Grep / BrowserPreview / Bash plus
+    `CompactContext` and `ExitPlanMode`; Write/Edit/plugin tools are denied.
+    Bash follows `ask`, `accept-edits`, or `auto`, so Plan is planning intent,
+    not a strict read-only security profile.**
+45. Plan approval: **the same Agent submits a structured plan, waits for a
+    separate host-authenticated approval, receives feedback in Plan, or enters
+    Agent atomically with the selected permission mode; reject, timeout, and
+    crash fail closed.**
 
 ## Source of Truth
 
@@ -99,11 +115,11 @@
 
 ## Next Action
 
-Start **M1** against these frozen details:
+Start **M6 — Plan** against these frozen details:
 
-1. pnpm monorepo + Electron app skeleton
-2. Rust host-core crate + handshake/health RPC
-3. English i18n source catalog
-4. shared protocol types (typebox)
-5. reserved plugin interfaces
-6. provider settings contracts + model catalog scaffolding
+1. shared Plan/session contracts and protocol v7
+2. schema v8 migration and host-owned approval records
+3. Rust-authoritative Plan tool policy and approval transition
+4. one-Agent pi runtime state transitions
+5. renderer approval projection and EN/zh-CN UX
+6. focused migration, policy, protocol, and recovery verification

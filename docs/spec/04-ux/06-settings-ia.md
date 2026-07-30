@@ -68,7 +68,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ### Model configuration (`agent` tab)
 - **Studio hero**: provider count, ready count, and current default provider/model summary
 - **Defaults** card:
-  - default mode via segmented control (Agent / Chat)
+  - default operating mode via segmented control (Agent / Plan), with Agent
+    selected for new sessions and new scheduled tasks
+  - persisted legacy `Chat` default values are displayed and stored as Plan
   - default model id
   - Enter to send as a switch (local preference; not on Codex General gold)
 - **Providers** studio:
@@ -80,6 +82,12 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     not editable here
   - empty state with primary add action
   - API keys are never shown raw after save
+
+The permission-mode selector remains available in the composer while the
+session is in either Agent or Plan. In Plan it controls Bash confirmation only:
+Ask and Accept edits prompt, while Auto may run a mutating Bash command without
+confirmation. The Defaults card must describe that Plan is planning intent,
+not a strict read-only security profile.
 
 ### Import
 - Scan supported local agent stores and review candidates through
@@ -156,7 +164,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     across restart, and disabling it closes an open console
 17. Context management defaults to automatic protection, persists all three
     settings, and cannot configure a retained tail that prevents compaction on
-    a small-window model because runtime limits remain model-aware
+     a small-window model because runtime limits remain model-aware
+18. The default operating-mode selector contains only Agent and Plan; legacy
+    Chat values migrate to Plan and do not reappear as a selectable option
 
 ## 5. Basics chrome metrics
 

@@ -107,9 +107,12 @@ destination, chat as the home surface, tools and permissions inline.
   reservation (D163, ADR 0032).
   Replaces the former context-panel overlay; workspace/model/status info lives
   in the composer chips and Settings instead.
-- **Composer**: workspace-agnostic floating pill anchored to the chat
+- **Composer**: workspace-agnostic floating pill anchored to the conversation
   destination — scrollable centered stack on the empty home (D111),
   bottom-docked in a transcript, with no project / Local / branch rail (D095).
+  Its operating-mode selector contains exactly **Agent** and **Plan**. Plan
+  shows the same Agent's planning state, keeps the permission-mode chip, and
+  exposes a structured approval surface after `ExitPlanMode`.
 - **Backend status capsule**: appears under the titlebar while the backend
   restarts or is fatally degraded (D080), with an Open-logs action.
 
@@ -172,6 +175,11 @@ title, status badge, branch meta, external link, and "Review with agent"
 ### 3.4 Scheduled
 Create card + task rows (cadence/enabled badges, prompt preview, last run,
 Run now / toggle / Delete). Run now opens a session seeded with the prompt.
+New tasks default to Agent. A migrated Plan task is allowed to remain stored,
+but an unattended run fails before the provider request with
+`PLAN_REQUIRES_INTERACTIVE_SESSION`; it cannot display or auto-approve a plan.
+The user must explicitly switch it to Agent before enabling unattended
+execution.
 
 ### 3.5 Plugins
 Installed plugin list (enable/disable/uninstall), dev-load entry, permission
@@ -204,7 +212,8 @@ Plugins destination described in §3.5.
 
 ## 5. Navigation model
 
-- `page` state: `chat | pulls | scheduled | plugins | settings`; the project
+- `page` state: `chat | pulls | scheduled | plugins | settings`; `chat` is the
+  conversation-surface route, not an operating mode. The project
   archive is the `projects` settings tab rather than a standalone page.
 - Destination history is linear; `Cmd/Ctrl+[` and `Cmd/Ctrl+]` traverse it
   without persistent back/forward chrome.

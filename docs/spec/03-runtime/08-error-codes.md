@@ -78,8 +78,14 @@ Rules:
 | `SHELL_NOT_FOUND` | no | no usable bash on the machine; message carries install guidance |
 | `PERMISSION_TIMEOUT` | no | permission prompt timed out (mapped to deny) |
 | `PERMISSION_REQUIRED` | no | waiting for user decision |
-| `BASH_DISABLED_IN_CHAT` | no | chat mode hard-deny for bash |
-| `WRITE_DISABLED_IN_CHAT` | no | chat mode hard-deny for write/edit |
+| `WRITE_DISABLED_IN_PLAN` | no | Plan hard-deny for Write |
+| `EDIT_DISABLED_IN_PLAN` | no | Plan hard-deny for Edit |
+| `PLUGIN_DISABLED_IN_PLAN` | no | Plan hard-deny for every plugin tool |
+| `PLAN_APPROVAL_REQUIRED` | no | ExitPlanMode is waiting for a separate plan approval |
+| `PLAN_APPROVAL_TIMEOUT` | no | plan approval deadline expired and execution was not granted |
+| `PLAN_APPROVAL_STALE` | no | response does not match the live request/session/turn |
+| `PLAN_APPROVAL_INTERRUPTED` | no | abort, crash, or persistence failure closed approval |
+| `PLAN_REQUIRES_INTERACTIVE_SESSION` | no | unattended/scheduled Plan run cannot request approval |
 
 ### 3.4 Secrets / settings
 
@@ -177,5 +183,7 @@ Examples:
 
 1. Every IPC failure returns `AppError.code`
 2. No raw untyped string-only failures on main paths
-3. Chat hard-denies use explicit mode codes
+3. Plan hard-denies use explicit tool-specific codes; Bash is never denied by
+   Plan solely because of the operating mode and instead follows permission
+   policy
 4. Host numeric codes map to stable string codes

@@ -5,11 +5,12 @@ use anyhow::Result;
 
 use crate::db::Database;
 use crate::permissions::PermissionManager;
+use crate::plans::PlanManager;
 use crate::plugins::PluginManager;
 use crate::secrets::SecretStore;
 use crate::workspace::WorkspaceState;
 
-pub const PROTOCOL_VERSION: u32 = 6;
+pub const PROTOCOL_VERSION: u32 = 7;
 pub const HOST_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub struct AppState {
@@ -18,6 +19,7 @@ pub struct AppState {
     pub secrets: SecretStore,
     pub workspace: WorkspaceState,
     pub permissions: PermissionManager,
+    pub plans: PlanManager,
     pub plugins: PluginManager,
     pub started_at: Instant,
     pub handshook: bool,
@@ -39,6 +41,7 @@ impl AppState {
             secrets,
             workspace: WorkspaceState::default(),
             permissions: PermissionManager::default(),
+            plans: PlanManager::default(),
             plugins,
             started_at: Instant::now(),
             handshook: false,

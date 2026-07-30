@@ -66,9 +66,18 @@ Required (all **implemented**):
   (`workspace::tests::blocks_escape` covers escape attempts)
 - Symlink targets outside the root are rejected when detectable
 
+Plan is not itself the workspace security boundary. Host-core resolves the
+durable session mode for every `tools.execute` call and applies the Plan matrix
+before permission modes, grants, plugin risk, or renderer/sidecar state. Plan
+denies Write/Edit/plugin/unknown tools, while BrowserPreview is the explicit
+read-only UI inspection exception. Bash remains available in Plan: Ask and
+Accept edits prompt, and Auto runs without confirmation and may mutate the
+workspace or scratch directory. The UI must state this tradeoff.
+
 ## 5. Command execution
 
-- Bash requires confirmation by default (risk-tiered permission cards)
+- Bash requires confirmation by default (risk-tiered permission cards); in
+  either Agent or Plan, explicit Auto may run it without confirmation
 - Timeouts are mandatory; output truncated at 256KB / 4000 lines with the
   `[truncated: output exceeded 256KB or 4000 lines]` marker
 - Full command line recorded in the audit log (SQLite, redacted)
@@ -124,14 +133,18 @@ Required (all **implemented**):
 | Threat | Mitigation |
 |---|---|
 | Malicious web content in renderer | no Node, sandbox, navigation lock, CSP |
-| Prompt-injected destructive tool use | permission confirmation, path boundary, secret isolation |
+| Prompt-injected destructive tool use | host-owned durable mode policy, permission confirmation, path boundary, secret isolation |
 | Dependency poisoning | lockfiles, few deps, native-module review |
 | Malicious local plugin | declared permissions, no secret access, process isolation tracked post-MVP (ADR 0008) |
 
 ## 10. Security acceptance gates
 
 1. Renderer cannot `require('fs')` (sandbox + no nodeIntegration) — verified
-2. Write/Edit/Bash cannot run without confirmation — verified (M3)
+2. Plan Write/Edit/plugin calls cannot run under any permission mode; Bash is
+   confirmed under Ask/Accept edits and may run without confirmation only under
+   explicit Auto
 3. Writing outside the workspace fails — verified (host tests)
 4. API keys never appear in plaintext in exports/logs by default — verified
 5. Non-whitelisted IPC channels are rejected — verified (M1)
+6. A forged renderer/sidecar mode cannot override the durable host session mode
+7. Plan approval timeout, rejection, abort, and crash never grant Agent tools

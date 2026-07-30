@@ -150,7 +150,7 @@ button, and settings entry.
 | Element | Default | Running | Error | No workspace |
 |---|---|---|---|---|
 | Model selector | clickable dropdown | disabled during stream | clickable | clickable (no provider warning) |
-| Mode badge | "Agent" or "Chat" badge | same | same | same |
+| Mode badge | "Agent" or "Plan" badge | planning/approval state | same | same |
 | Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
 | Project name | workspace folder name | same | same | "No project" muted |
 
@@ -189,7 +189,7 @@ Expanded (~275px, D034/D070):
 +---------------------------+
 | [lights]          [⌕][◧] |  macOS
 | [π] PI-Desktop    [⌕][◧] |  Windows/Linux
-| [message+ New Chat] button |
+| [message+ New Task] button |
 | Plugins                   |
 | SESSIONS         [msg+][↕]|
 |   • Path-less session   ↕|
@@ -267,7 +267,7 @@ visually distinct from list content.
   transcript prefetch. Selection reuses an in-flight or recent cached result,
   revalidates it in the background, and never waits for an older superseded
   session read before starting the latest read.
-- Click the message-plus New Chat control: create/reuse a draft in the current workspace scope
+- Click the message-plus New Task control: create/reuse a draft in the current workspace scope
 - On Windows/Linux, click the PI-Desktop brand to return the main pane to the
   chat home while preserving the active conversation and workspace; macOS
   intentionally omits this brand control from the sidebar header
@@ -1123,6 +1123,49 @@ Inline transcript card requesting user approval for a high-risk tool call. See
 
 ---
 
+## 10A. PlanApprovalCard
+
+### 10A.1 Purpose
+
+Inline approval surface for a structured Plan submitted by the same pi Agent.
+It is distinct from `PermissionCard`: it approves a Plan → Agent transition
+and an explicit execution permission mode, not an individual tool call.
+
+### 10A.2 Content
+
+The card renders the host-issued request identity and every structured plan
+field: title, summary, ordered steps, affected files, validation, risks, open
+questions, and proposed commands. Proposed commands are visibly display-only;
+they do not authorize Bash.
+
+### 10A.3 Actions and states
+
+| State | Actions | Contract |
+|---|---|---|
+| Pending | Approve, Request changes, Reject, Abort | request is live and session/turn scoped |
+| Resolving | all actions disabled | retain the proposal until host result |
+| Approved | no actions | same Agent continues in Agent with selected permission mode |
+| Changes requested | composer returns to Plan | feedback is delivered to the same Agent |
+| Rejected | no actions | run stops and session remains Plan |
+| Expired / Interrupted | no actions | failed closed; a new plan must be submitted |
+
+Approve opens the explicit Ask / Accept edits / Auto choice with Ask selected.
+Request changes requires non-empty feedback. Renderer reload calls
+`plan/pending` and restores only a request backed by a live host waiter. A full
+restart never restores an actionable stale approval.
+
+### 10A.4 Accessibility
+
+- The card is a session-scoped `region` with a localized plan title.
+- Approval, feedback, reject, and abort controls have explicit labels and
+  keyboard focus.
+- The selected permission mode exposes radio semantics and its Plan Bash
+  consequence is available in the accessible description.
+- Resolution does not navigate to another session or take focus from a
+  different session.
+
+---
+
 ## 11. Composer
 
 ### 11.1 Purpose
@@ -1160,7 +1203,8 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   layer.
 - Border: border-default top
 - Padding: px-4 py-3 inner textarea
-- Font: font-mono text-sm for agent mode; font-sans text-sm for chat mode
+- Font: text-sm for both Agent and Plan; mode changes semantics and tool
+  controls, not the typography
 - Bottom-anchored: fixed at bottom of MainChat area
 
 ### 11.4 States
@@ -1173,6 +1217,9 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | Running | textarea disabled, abort button visible | Abort active, Send hidden |
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
+| Plan / planning | textarea active while idle; Plan badge and permission chip visible | inspect, send, or submit plan |
+| Plan / awaiting approval | transcript shows the structured Plan approval card; composer remains blocked for that session | approve, request changes, reject, or abort |
+| Plan / failed closed | Plan badge remains visible with an actionable failure state | submit a new plan; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
 
 ### 11.5 Interactions
@@ -1194,15 +1241,16 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Runtime chips keep descenders fully visible (D150): mode, thinking,
   permission, and model triggers use compact line-height rather than
   `leading-none` under overflow; the model trigger still ellipsizes long IDs.
-- Chat / Agent and provider/model changes update the active session, not the
-  app default. They are disabled while a turn runs.
+- Agent / Plan and provider/model changes update the active session, not the
+  app default. They are disabled while a turn runs; Plan approval actions are
+  the exception while awaiting approval.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing
   an existing session preserves its durable selection.
 - The model menu lists only enabled, runnable providers with a default model.
 - For a reasoning-capable active model, a separate Thinking trigger appears
-  immediately to the right of Chat / Agent and before the Agent permission
+  immediately to the right of Agent / Plan and before the permission
   control. It shows the current level and opens only the exact model's supported
   levels in a compact single-column list and canonical order; the selected row
   carries a trailing check. The menu width fits its content up to 160px and is
@@ -1217,6 +1265,11 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Switching provider preserves an available level, otherwise uses the nearest
   supported level (upward first, then downward); a non-reasoning provider
   persists `off`.
+- The Plan permission chip remains visible beside the mode selector. It shows
+  the effective Ask / Accept edits / Auto posture. In Plan, its help text says
+  that Bash is confirmed under Ask or Accept edits and may mutate without a
+  confirmation under Auto; it does not imply that Write/Edit/plugin tools are
+  available.
 
 ### 11.6 Accessibility
 
@@ -1385,10 +1438,9 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 
 | Context | Message | Action |
 |---|---|---|
-| No sessions | "Start your first conversation" | "New Chat" button → focus composer |
+| No sessions | "Start your first conversation" | "New Task" button → focus composer |
 | No provider | "No model provider configured" | "Add provider" link → Settings → Agent → Providers |
-| No project (Agent mode) | "No project open — local tools unavailable" | "Open folder" button → ProjectPicker |
-| No project (Chat mode) | "Open a project for context" (muted warning) | "Open folder" button |
+| No project (Agent or Plan) | "No project open — workspace tools unavailable" | "Open folder" button → ProjectPicker |
 | Session empty (first message) | "Ask PI-Desktop to do anything" placeholder (home variant "Ask anything", D094/D066) | N/A |
 
 ### 15.3 Layout
@@ -1425,11 +1477,11 @@ Overlay surface for the command palette (Cmd/Ctrl+Shift+P, per D014). Defined in
 | ───────────────────────────                  |
 | Results list (scrollable)                    |
 |   Category: Session                          |
-|     ▸ New Chat                               |
+   |     ▸ New Task                               |
 |     ▸ Delete Current Session                 |
 |   Category: Mode                             |
-|     ▸ Switch to Chat Mode                    |
-|     ▸ Switch to Agent Mode                   |
+   |     ▸ Switch to Plan                         |
+   |     ▸ Switch to Agent                        |
 | ...                                          |
 +----------------------------------------------+
 ```

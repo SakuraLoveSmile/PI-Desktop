@@ -2,6 +2,7 @@ mod artifacts;
 mod audit;
 mod db;
 mod notifications;
+mod plans;
 mod permissions;
 mod plugins;
 mod providers;

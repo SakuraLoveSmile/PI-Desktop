@@ -24,6 +24,8 @@ pub struct ToolsExecuteParams {
     pub tool_name: String,
     pub args: Value,
     pub mode: String,
+    #[serde(default)]
+    pub declared_risk: Option<String>,
     pub timeout_ms: Option<u64>,
 }
 

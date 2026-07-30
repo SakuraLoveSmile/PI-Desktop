@@ -32,7 +32,7 @@ Before starting implementation, answer these questions:
 - [ ] Does this change affect user-visible or protocol-visible behavior?
 - [ ] Is local validation necessary for this change's risk and regression
   scope? If so, what is the smallest targeted check set?
-- [ ] Which milestone deliverable does this relate to? (M1–M5, or none)
+- [ ] Which milestone deliverable does this relate to? (M1–M6, or none)
 
 Reference the [spec update matrix](03-ai-development-workflow.md#3-spec-update-matrix) to determine required doc updates.
 

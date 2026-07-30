@@ -48,3 +48,4 @@ Each ADR includes:
 | 0030 | Turn-boundary context checkpoint compaction | Accepted |
 | 0031 | Keep composer prompt rows free of brand icons | Accepted |
 | 0032 | Reserve native width for the docked work panel | Accepted |
+| 0033 | Plan operating state and approval boundary | Accepted for implementation |

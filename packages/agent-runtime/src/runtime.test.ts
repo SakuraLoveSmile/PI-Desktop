@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { estimateTokens } from "@earendil-works/pi-agent-core";
-import { DesktopAgentRuntime, type RuntimeProviderConfig } from "./runtime.js";
+import {
+  DesktopAgentRuntime,
+  type PluginToolDef,
+  type RuntimeProviderConfig,
+} from "./runtime.js";
 import type {
   ContextCompactionRecord,
   ContextCompactionSettings,
@@ -37,6 +41,7 @@ function createRuntime(
     history: UiMessage[];
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
+    pluginTools: PluginToolDef[];
     host: { call: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
@@ -50,6 +55,7 @@ function createRuntime(
     history: overrides.history,
     compaction: overrides.compaction,
     compactionSettings: overrides.compactionSettings,
+    pluginTools: overrides.pluginTools,
     onEvent: overrides.onEvent ?? vi.fn(),
   });
 }
@@ -59,7 +65,7 @@ describe("DesktopAgentRuntime configuration matching", () => {
     const runtime = createRuntime();
 
     expect(runtime.matches("agent", provider, "medium")).toBe(true);
-    expect(runtime.matches("chat", provider, "medium")).toBe(false);
+    expect(runtime.matches("plan", provider, "medium")).toBe(true);
     expect(
       runtime.matches("agent", { ...provider, authKind: "api_key" }, "medium"),
     ).toBe(false);
@@ -71,6 +77,138 @@ describe("DesktopAgentRuntime configuration matching", () => {
       ),
     ).toBe(false);
     expect(runtime.matches("agent", provider, "high")).toBe(false);
+
+    await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime mode and tool composition", () => {
+  it("switches one pi Agent between Agent and Plan tool sets", async () => {
+    const runtime = createRuntime({
+      pluginTools: [
+        {
+          name: "plugin_demo_run",
+          description: "demo",
+          parameters: { type: "object", properties: {} },
+        },
+      ],
+    });
+    const agent = (runtime as any).agent;
+    const initialAgent = agent;
+    const agentTools = agent.state.tools.map((tool: any) => tool.name);
+    expect(agentTools).toEqual(
+      expect.arrayContaining([
+        "Read",
+        "Glob",
+        "Grep",
+        "BrowserPreview",
+        "Write",
+        "Edit",
+        "Bash",
+        "CompactContext",
+        "EnterPlanMode",
+        "plugin_demo_run",
+      ]),
+    );
+    expect(agentTools).not.toContain("ExitPlanMode");
+
+    runtime.setMode("plan");
+    expect((runtime as any).agent).toBe(initialAgent);
+    expect(runtime.getMode()).toBe("plan");
+    const planTools = agent.state.tools.map((tool: any) => tool.name);
+    expect(planTools).toEqual(
+      expect.arrayContaining([
+        "Read",
+        "Glob",
+        "Grep",
+        "BrowserPreview",
+        "Bash",
+        "CompactContext",
+        "ExitPlanMode",
+      ]),
+    );
+    expect(planTools).not.toEqual(
+      expect.arrayContaining(["Write", "Edit", "plugin_demo_run"]),
+    );
+    expect(planTools).not.toContain("EnterPlanMode");
+    expect(agent.state.systemPrompt).toContain("ExitPlanMode");
+    expect(agent.state.systemPrompt).toContain("Do not use Write, Edit, plugin tools");
+
+    runtime.setMode("agent");
+    expect((runtime as any).agent).toBe(initialAgent);
+    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("EnterPlanMode");
+    await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime plan transitions", () => {
+  it("guards transition batches and keeps the same Agent alive through approval", async () => {
+    const host = { call: vi.fn() };
+    const runtime = createRuntime({ host });
+    const agent = (runtime as any).agent;
+    const beforeToolCall = agent.beforeToolCall as Function;
+
+    const mixedBatch = {
+      assistantMessage: {
+        content: [
+          { type: "toolCall", id: "enter-call", name: "EnterPlanMode", arguments: {} },
+          { type: "toolCall", id: "read-call", name: "Read", arguments: { path: "a.txt" } },
+        ],
+      },
+      toolCall: { id: "enter-call", name: "EnterPlanMode", arguments: {} },
+      args: {},
+      context: {},
+    };
+    await expect(beforeToolCall(mixedBatch)).resolves.toMatchObject({ block: true });
+
+    host.call.mockResolvedValueOnce({ ok: true, state: "planning" });
+    const enterTool = agent.state.tools.find((tool: any) => tool.name === "EnterPlanMode");
+    const enterResult = await enterTool.execute("enter-call", {});
+    expect(enterResult.terminate).toBeUndefined();
+    expect(runtime.getMode()).toBe("plan");
+    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("ExitPlanMode");
+
+    const proposal = {
+      id: "proposal-1",
+      sessionId: "session-1",
+      turnId: "durable-turn-1",
+      toolCallId: "exit-call-1",
+      plan: "implement it",
+      status: "changes_requested",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    host.call.mockResolvedValueOnce({
+      status: "changes_requested",
+      proposal,
+      feedback: "Include validation.",
+    });
+    let exitTool = agent.state.tools.find((tool: any) => tool.name === "ExitPlanMode");
+    const changesResult = await exitTool.execute("exit-call-1", { plan: "implement it" });
+    expect(changesResult.terminate).toBeUndefined();
+    expect(runtime.getMode()).toBe("plan");
+    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("ExitPlanMode");
+    expect(host.call).toHaveBeenLastCalledWith(
+      "plans.submit",
+      expect.objectContaining({
+        sessionId: "session-1",
+        toolCallId: "exit-call-1",
+        plan: "implement it",
+      }),
+    );
+
+    host.call.mockResolvedValueOnce({
+      status: "approved",
+      proposal: { ...proposal, status: "approved" },
+      targetPermissionMode: "ask",
+    });
+    exitTool = agent.state.tools.find((tool: any) => tool.name === "ExitPlanMode");
+    const approvalResult = await exitTool.execute("exit-call-2", { plan: "implement it" });
+    expect(approvalResult.terminate).toBeUndefined();
+    expect(runtime.getMode()).toBe("agent");
+    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("Write");
+    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("EnterPlanMode");
 
     await runtime.dispose();
   });
