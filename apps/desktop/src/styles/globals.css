@@ -610,7 +610,6 @@ html {
  * old .main-titlebar: an absolute 46px band that is draggable, with the
  * interactive controls opting back into pointer events. */
 .conversation-topbar {
-  pointer-events: none;
   position: absolute;
   inset-inline: 0;
   top: 0;
@@ -628,7 +627,8 @@ html {
 
 .conversation-topbar .ct-left,
 .conversation-topbar .ct-right {
-  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -651,7 +651,8 @@ html {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  pointer-events: none; /* keep the title area draggable */
+  -webkit-app-region: drag; /* keep the title area draggable */
+  app-region: drag;
 }
 
 .conversation-topbar .ct-project {
