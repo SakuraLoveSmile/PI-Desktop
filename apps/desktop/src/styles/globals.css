@@ -6161,7 +6161,7 @@ html {
   justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--ds-accent);
   color: #fff;
   animation: theme-card-check-pop var(--motion-duration-fast) var(--motion-ease-out);
@@ -6193,7 +6193,7 @@ html {
 .settings-theme-preview-bar {
   height: 8px;
   width: 60%;
-  border-radius: 4px;
+  border-radius: var(--radius-3xs);
   background: var(--ds-text-secondary);
   opacity: 0.55;
 }
@@ -6201,7 +6201,7 @@ html {
 .settings-theme-preview-line {
   height: 5px;
   width: 100%;
-  border-radius: 3px;
+  border-radius: var(--radius-3xs);
   background: var(--ds-text-secondary);
   opacity: 0.28;
 }
@@ -6214,7 +6214,7 @@ html {
   margin-top: auto;
   height: 12px;
   width: 40%;
-  border-radius: 4px;
+  border-radius: var(--radius-3xs);
   background: var(--ds-accent);
   opacity: 0.85;
 }
@@ -6279,8 +6279,8 @@ html {
   border-radius: var(--radius-sm);
   background: var(--ds-accent);
   color: #fff;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
 }
 
 .settings-lang-glyph-icon {
@@ -6318,7 +6318,7 @@ html {
 .settings-theme-sub {
   color: var(--ds-text-secondary);
   font-size: var(--text-xs);
-  line-height: 1.35;
+  line-height: var(--leading-compact-plus);
 }
 
 .settings-list {

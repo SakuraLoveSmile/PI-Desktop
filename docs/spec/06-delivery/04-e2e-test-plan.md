@@ -516,8 +516,9 @@ Each scenario is documented in this format:
      confirm it switches back.
 - **Expected**: Theme and Language are card grids (not native selects), each with
   a selected check badge and a per-option description; the Auto language card
-  resolves the OS locale through the main process (`app.getLocale()`) and reflects
-  it inline; switching options updates the live UI without a reload.
+  resolves the OS locale through the main process (`app.getLocale()`), passes it
+  safely through the sandboxed preload bridge, and reflects it inline; switching
+  options updates the live UI without a reload.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/02-i18n-english-first.md`
 - **Acceptance**: A (core shell), H (localization)
 - **Milestone**: M4

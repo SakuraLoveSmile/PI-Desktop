@@ -782,6 +782,10 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Preload runs in a sandbox and cannot import Electron's main-only `app`
+      // module. Pass the display locale at process creation so it remains
+      // available synchronously before the renderer's first paint.
+      additionalArguments: [`--pi-desktop-locale=${app.getLocale()}`],
     },
   });
   const window = mainWindow;

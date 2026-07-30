@@ -1,5 +1,13 @@
-import { app, contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 import { IPC, IPC_WHITELIST } from "@pi-desktop/shared";
+
+const LOCALE_ARGUMENT_PREFIX = "--pi-desktop-locale=";
+
+function readOsLocale(): string | undefined {
+  return process.argv
+    .find((argument) => argument.startsWith(LOCALE_ARGUMENT_PREFIX))
+    ?.slice(LOCALE_ARGUMENT_PREFIX.length);
+}
 
 function assertChannel(channel: string) {
   if (!IPC_WHITELIST.has(channel)) {
@@ -24,12 +32,10 @@ const api = {
   // (traffic lights on macOS vs. controls overlay on Windows/Linux)
   // before first paint, without an IPC round-trip.
   platform: process.platform,
-  // Authoritative OS locale. `app.getLocale()` reads the system display
-  // language, unlike `navigator.language` in the renderer which defaults
-  // to `en-US` regardless of the actual OS language. Surfaced
-  // synchronously so the "auto" language resolves correctly without an
-  // IPC round-trip.
-  locale: app.getLocale(),
+  // `app.getLocale()` is resolved in the main process and passed as a renderer
+  // creation argument. This keeps the locale available before first paint
+  // without importing Electron's main-only `app` module in the sandbox.
+  locale: readOsLocale(),
 };
 
 contextBridge.exposeInMainWorld("piDesktop", api);

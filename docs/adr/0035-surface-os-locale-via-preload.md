@@ -28,9 +28,12 @@ them synchronously before first paint.
 ## Decision
 
 1. Expose the authoritative OS locale from the preload bridge as a synchronous
-   field `window.piDesktop.locale`, backed by `app.getLocale()` in the main
-   process (alongside the existing `platform` field).
-2. Add `locale: string` to the `window.piDesktop` type in `api.ts`.
+   field `window.piDesktop.locale`. The main process resolves `app.getLocale()`
+   while creating the window and passes it through `webPreferences.additionalArguments`;
+   sandboxed preload code reads that argument rather than importing Electron's
+   main-only `app` module (alongside the existing `platform` field).
+2. Add optional `locale?: string` to the `window.piDesktop` type in `api.ts`;
+   non-Electron contexts do not receive a window creation argument.
 3. Resolve "auto" language through a new `resolveOsLocale()` helper in
    `lib/app-language.ts` that prefers `window.piDesktop.locale` and falls back to
    `navigator.language` / `userLanguage` for non-Electron contexts (e.g. tests).
@@ -65,7 +68,10 @@ Surfacing the value synchronously from the bridge is simpler and sufficient.
 
 ## References
 
-- `apps/desktop/electron/preload/index.ts` (`locale: app.getLocale()`)
+- `apps/desktop/electron/main/index.ts` (passes `app.getLocale()` through
+  `additionalArguments`)
+- `apps/desktop/electron/preload/index.ts` (reads the locale argument without
+  importing `app`)
 - `apps/desktop/src/lib/api.ts` (`window.piDesktop.locale` type)
 - `apps/desktop/src/lib/app-language.ts` (`resolveOsLocale`, `resolveAppLanguage`)
 - `apps/desktop/src/main.tsx` (initial `lng` from `resolveOsLocale`)
