@@ -25,7 +25,6 @@ import { Sidebar } from "./components/Sidebar";
 import { ConversationTopbar } from "./components/ConversationTopbar";
 import { WorkPanel } from "./components/workpanel/WorkPanel";
 import { ChatSurface } from "./components/ChatSurface";
-import { CommandPalette } from "./components/CommandPalette";
 import { SearchDialog } from "./components/SearchDialog";
 import { ToastHost } from "./components/Toast";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -161,7 +160,6 @@ function AppShell() {
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
   const workPanelWidth = useAppStore((s) => s.workPanelWidth);
 
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarExiting, setSidebarExiting] = useState(false);
@@ -308,7 +306,7 @@ function AppShell() {
             setSearchOpen(true);
             break;
           case "openCommandPalette":
-            setPaletteOpen(true);
+            setSearchOpen(true);
             break;
           case "toggleSidebar":
             toggleSidebar();
@@ -500,7 +498,7 @@ function AppShell() {
             setSearchOpen(true);
             break;
           case "openCommandPalette":
-            setPaletteOpen(true);
+            setSearchOpen(true);
             break;
           case "toggleSidebar":
             toggleSidebar();
@@ -877,7 +875,6 @@ function AppShell() {
             <SettingsPage />
           </Suspense>
           <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
-          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
           <ToastHost />
           <UpdateBanner />
         </>
@@ -904,7 +901,6 @@ function AppShell() {
                 onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
                 onNewTask={() => void runMenuCommand("newTask")}
                 onOpenSearch={() => setSearchOpen(true)}
-                onOpenCommandPalette={() => setPaletteOpen(true)}
                 onOpenSettings={() => void runMenuCommand("openSettings")}
               />
             ) : (
@@ -969,7 +965,7 @@ function AppShell() {
 
           {(presentedWorkPanelOpen || workPanelExiting) && (
             <WorkPanel
-              browserBlocked={paletteOpen || searchOpen}
+              browserBlocked={searchOpen}
               exiting={workPanelExiting}
               onExitAnimationEnd={() =>
                 finishWorkPanelExit(workPanelExitGeneration.current)
@@ -979,7 +975,6 @@ function AppShell() {
           )}
 
           <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
-          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
           <ToastHost />
         </>
       );

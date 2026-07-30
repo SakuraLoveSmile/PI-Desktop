@@ -98,7 +98,7 @@ test("permission approval is an inline transcript card, never a global dialog", 
   assert.match(cardSource, /showToast/);
   assert.doesNotMatch(cardSource, /<section[^>]*aria-live=/);
   assert.match(cardSource, /permissionSecondsLeft\(permission\.receivedAt\)/);
-  assert.match(browserSource, /palette or search/);
+  assert.match(browserSource, /blocking overlay/);
   assert.doesNotMatch(browserSource, /permission dialog/);
 });
 

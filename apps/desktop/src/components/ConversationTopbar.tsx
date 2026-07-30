@@ -8,7 +8,6 @@ import {
   IconSidebar,
   IconNewSession,
   IconSearch,
-  IconSliders,
   IconSettings,
 } from "./icons";
 
@@ -40,7 +39,6 @@ export function ConversationTopbar({
   onToggleSidebar,
   onNewTask,
   onOpenSearch,
-  onOpenCommandPalette,
   onOpenSettings,
 }: {
   sidebarCollapsed: boolean;
@@ -48,7 +46,6 @@ export function ConversationTopbar({
   onToggleSidebar: () => void;
   onNewTask: () => void;
   onOpenSearch: () => void;
-  onOpenCommandPalette: () => void;
   onOpenSettings: () => void;
 }) {
   const { t } = useTranslation();
@@ -172,15 +169,6 @@ export function ConversationTopbar({
             onClick={onOpenSearch}
           >
             <IconSearch size={15} />
-          </button>
-          <button
-            type="button"
-            className="ct-icon-btn"
-            title={t("nav.commandPalette")}
-            aria-label={t("nav.commandPalette")}
-            onClick={onOpenCommandPalette}
-          >
-            <IconSliders size={15} />
           </button>
           <button
             type="button"

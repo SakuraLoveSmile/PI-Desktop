@@ -77,10 +77,7 @@ export function BrowserTab({
     observer.observe(surface);
     window.addEventListener("resize", report);
     report();
-    // Attach only after the first navigation (an idle view is a blank
-    // rectangle over the empty-state hint) and never while a blocking
-    // A blocking overlay (palette or search) is open — the view always
-    // composites above renderer content.
+    // Attach only after the first navigation (idle view is a blank rectangle over the empty-state hint); never while a blocking overlay (search) is open — the view always composites above renderer content.
     void api.browserSetVisible(started && !blocked);
     return () => {
       observer.disconnect();
