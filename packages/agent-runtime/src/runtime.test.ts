@@ -37,7 +37,7 @@ function createRuntime(
     history: UiMessage[];
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
-    projectInstructions: string;
+    projectInstructions: import("./project-instructions.js").ProjectInstructions;
     host: { call: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
@@ -78,7 +78,10 @@ describe("DesktopAgentRuntime configuration matching", () => {
   });
 
   it("recreates the runtime when project instructions change", async () => {
-    const runtime = createRuntime({ projectInstructions: "Run unit tests." });
+    const projectInstructions = {
+      entries: [{ source: "AGENTS.md", content: "Run unit tests." }],
+    };
+    const runtime = createRuntime({ projectInstructions });
 
     expect((runtime as any).agent.state.systemPrompt).toContain(
       "# Project instructions\n\n",
@@ -86,13 +89,44 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect((runtime as any).agent.state.systemPrompt).toContain(
       "Run unit tests.",
     );
-    expect(runtime.matches("agent", provider, "medium", [], "Run unit tests.")).toBe(
+    expect(runtime.matches("agent", provider, "medium", [], projectInstructions)).toBe(
       true,
     );
-    expect(runtime.matches("agent", provider, "medium", [], "Run lint.")).toBe(
+    expect(runtime.matches("agent", provider, "medium", [], {
+      entries: [{ source: "AGENTS.md", content: "Run lint." }],
+    })).toBe(
       false,
     );
 
+    await runtime.dispose();
+  });
+
+  it("loads newly discovered nested instructions before a file tool runs", async () => {
+    const host = {
+      call: vi
+        .fn()
+        .mockResolvedValueOnce({
+          entries: [
+            {
+              source: "packages/api/AGENTS.md",
+              content: "Run API tests.",
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ ok: true, content: "file contents" }),
+    };
+    const runtime = createRuntime({ host });
+    const read = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Read",
+    );
+
+    await read.execute("tool-1", { path: "packages/api/handler.ts" });
+
+    expect(host.call.mock.calls[0][0]).toBe("project.instructions.resolve");
+    expect((runtime as any).agent.state.systemPrompt).toContain(
+      "packages/api/AGENTS.md",
+    );
+    expect((runtime as any).agent.state.systemPrompt).toContain("Run API tests.");
     await runtime.dispose();
   });
 });

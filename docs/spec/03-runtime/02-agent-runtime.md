@@ -241,17 +241,26 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 + [mode prompt: chat/agent]
 + [workspace info]
 + [tool instructions]
-+ [workspace-root `AGENTS.md` instructions, when present]
++ [project instruction chain, when present]
 + [optional user custom instructions]
 ```
 
-The Electron main process reads `<session projectPath>/AGENTS.md` when a
-session runtime is launched. The trimmed content is passed to the sidecar as
-project instructions and appended under a `# Project instructions` heading.
-The sidecar does not read workspace files directly. A changed instruction file
-recreates the idle session runtime on its next prompt so the new instructions
-take effect. Missing, unreadable, blank, and oversized content are handled
-without failing the turn; retained content is capped at 64,000 characters.
+The Electron main process resolves project instruction files inside the
+session-bound project root when a runtime starts. For each directory it uses at
+most one non-empty file in this order: `AGENTS.override.md`, `AGENTS.md`,
+`CLAUDE.md`, then `.claude/CLAUDE.md`. Entries are concatenated from project
+root to the target directory, so the closest file appears last and takes
+precedence. The initial chain targets the project root. Before a `Read`,
+`Write`, `Edit`, or `BrowserPreview` call, the sidecar asks Electron main to
+resolve the target path; newly discovered nested entries are appended before
+the tool executes.
+
+All discovery stays within the session project root. Empty, unreadable, and
+out-of-root files are skipped. The combined UTF-8 content is capped at 32 KiB
+and source paths are labelled under `# Project instructions`.
+The sidecar never reads workspace instructions directly. A changed root chain
+recreates an idle runtime on its next prompt; nested instructions are resolved
+again when a relevant file tool runs.
 
 ## 8. Concurrency
 

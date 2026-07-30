@@ -12,6 +12,7 @@ import {
   type PluginToolDef,
   type RuntimeProviderConfig,
 } from "./runtime.js";
+import type { ProjectInstructions } from "./project-instructions.js";
 import {
   normalizeSupportedThinkingLevels,
   normalizeThinkingLevel,
@@ -37,7 +38,7 @@ type RuntimeParams = {
   provider: RuntimeProviderConfig;
   pluginTools?: PluginToolDef[];
   scratchDir?: string;
-  projectInstructions?: string;
+  projectInstructions?: ProjectInstructions;
   compactionSettings?: ContextCompactionSettings;
 };
 

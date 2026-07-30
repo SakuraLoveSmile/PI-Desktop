@@ -51,3 +51,4 @@ Each ADR includes:
 | 0033 | Internal-dock work panel (no native window expansion) | Accepted |
 | 0034 | Merge command palette into global search | Accepted |
 | 0035 | Surface the OS locale through the preload bridge | Accepted |
+| 0037 | Resolve project instructions in Electron main | Accepted |
