@@ -17,13 +17,17 @@ workspace file access in Electron main and host-core.
 1. Electron main resolves instructions only inside the session-bound project
    root; it never follows an instruction file whose canonical path escapes that
    root.
-2. For every directory, the first non-empty candidate wins in this order:
+2. The global file `~/.pi/agent/AGENTS.md` is loaded before all project
+   entries. Settings manages this fixed path and the current project's fixed
+   root `AGENTS.md` path through dedicated IPC; renderer input cannot select an
+   arbitrary filesystem location.
+3. For every project directory, the first non-empty candidate wins in this order:
    `AGENTS.override.md`, `AGENTS.md`, `CLAUDE.md`,
    `.claude/CLAUDE.md`.
-3. Sources are concatenated from root to target directory, capped at 32 KiB of
+4. Sources are concatenated from root to target directory, capped at 32 KiB of
    UTF-8 content. Later, closer entries take precedence and each source is
    labelled in the prompt.
-4. The root chain is loaded when the runtime is created. Before a file-path
+5. The root chain is loaded when the runtime is created. Before a file-path
    tool executes, the sidecar may request a path-specific chain through the
    Electron-owned `project.instructions.resolve` local proxy. The sidecar does
    not read instruction files directly.
@@ -31,6 +35,8 @@ workspace file access in Electron main and host-core.
 ## Consequences
 
 - Repository-wide rules load without a recursive workspace scan.
+- Global defaults are editable without a project; project instructions remain
+  reviewable and versionable in the repository root.
 - Nested rules become available only when an agent accesses a matching path,
   limiting irrelevant context in large repositories.
 - Root instruction changes rebuild an idle runtime on the next prompt. Nested

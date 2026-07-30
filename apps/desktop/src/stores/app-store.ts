@@ -286,6 +286,7 @@ export type AppState = {
     | "general"
     | "ai"
     | "shortcuts"
+    | "instructions"
     | "agent"
     | "import"
     | "projects"

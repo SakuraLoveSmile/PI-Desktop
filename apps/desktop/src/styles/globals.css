@@ -5843,6 +5843,23 @@ html {
   padding: 0 14px 14px;
 }
 
+.settings-instruction-path {
+  margin-top: 6px;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}
+
+.settings-instruction-editor {
+  min-height: 180px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
 .settings-form-grid {
   display: grid;
   gap: 12px;

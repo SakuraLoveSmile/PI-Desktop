@@ -10,7 +10,7 @@ import {
   screen,
   shell,
 } from "electron";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
@@ -43,7 +43,8 @@ import {
   resolveThinkingCapabilities,
   expandSlashInvocation,
   loadComposerTemplates,
-  loadProjectInstructions,
+  globalInstructionPath,
+  loadInstructionChain,
   type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
@@ -338,7 +339,7 @@ async function resolveAgentRuntimeLaunch(
     modelId,
     apiStyle: provider.apiStyle,
   });
-  const projectInstructions = await loadProjectInstructions(session.projectPath);
+  const projectInstructions = await loadInstructionChain(session.projectPath);
   return {
     providerId: provider.id,
     modelId,
@@ -1790,7 +1791,7 @@ async function startSidecar(): Promise<void> {
       "session.get",
       { id: sessionId },
     );
-    return loadProjectInstructions(detail?.session?.projectPath, path);
+    return loadInstructionChain(detail?.session?.projectPath, path);
   });
   // Agent-driven work panel preview (D100): open a workspace HTML file in
   // the embedded browser; live reload keeps it current through later edits.
@@ -2190,6 +2191,66 @@ function registerIpc() {
     await host.call("settings.set", { ...settings, onboardingDismissed: true });
     return { ok: true };
   });
+
+  const instructionFile = async (
+    scope: "global" | "project",
+    projectPath?: string | null,
+  ) => {
+    const path =
+      scope === "global"
+        ? globalInstructionPath()
+        : projectPath
+          ? join(projectPath, "AGENTS.md")
+          : null;
+    if (!path) {
+      throw Object.assign(new Error("workspace required"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    const { readFile } = await import("node:fs/promises");
+    try {
+      return { scope, path, content: await readFile(path, "utf8"), exists: true };
+    } catch {
+      return { scope, path, content: "", exists: false };
+    }
+  };
+
+  const activeWorkspacePath = async () => {
+    if (!host) return null;
+    const res = (await host.call("workspace.get")) as {
+      workspace: { path?: string } | null;
+    };
+    return res.workspace?.path ?? null;
+  };
+
+  handle(IPC.invoke.agentInstructionsGet, async () => {
+    const projectPath = await activeWorkspacePath();
+    return {
+      global: await instructionFile("global"),
+      ...(projectPath
+        ? { project: await instructionFile("project", projectPath) }
+        : {}),
+    };
+  });
+
+  handle(
+    IPC.invoke.agentInstructionsSave,
+    async (input: { scope?: "global" | "project"; content?: unknown } = {}) => {
+      if (input.scope !== "global" && input.scope !== "project") {
+        throw Object.assign(new Error("instruction scope required"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
+      }
+      const scope = input.scope;
+      const projectPath = scope === "project" ? await activeWorkspacePath() : null;
+      const file = await instructionFile(scope, projectPath);
+      const content = typeof input.content === "string" ? input.content : "";
+      const { mkdir, writeFile } = await import("node:fs/promises");
+      await mkdir(dirname(file.path), { recursive: true });
+      await writeFile(file.path, content, "utf8");
+      return { file: { ...file, content, exists: true } };
+    },
+  );
 
   handle(IPC.invoke.updatesGetState, async () => updater.getState());
 
