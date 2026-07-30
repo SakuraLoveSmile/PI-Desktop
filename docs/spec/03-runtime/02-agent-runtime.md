@@ -241,8 +241,17 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 + [mode prompt: chat/agent]
 + [workspace info]
 + [tool instructions]
++ [workspace-root `AGENTS.md` instructions, when present]
 + [optional user custom instructions]
 ```
+
+The Electron main process reads `<session projectPath>/AGENTS.md` when a
+session runtime is launched. The trimmed content is passed to the sidecar as
+project instructions and appended under a `# Project instructions` heading.
+The sidecar does not read workspace files directly. A changed instruction file
+recreates the idle session runtime on its next prompt so the new instructions
+take effect. Missing, unreadable, blank, and oversized content are handled
+without failing the turn; retained content is capped at 64,000 characters.
 
 ## 8. Concurrency
 

@@ -37,6 +37,7 @@ function createRuntime(
     history: UiMessage[];
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
+    projectInstructions: string;
     host: { call: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
@@ -50,6 +51,7 @@ function createRuntime(
     history: overrides.history,
     compaction: overrides.compaction,
     compactionSettings: overrides.compactionSettings,
+    projectInstructions: overrides.projectInstructions,
     onEvent: overrides.onEvent ?? vi.fn(),
   });
 }
@@ -71,6 +73,25 @@ describe("DesktopAgentRuntime configuration matching", () => {
       ),
     ).toBe(false);
     expect(runtime.matches("agent", provider, "high")).toBe(false);
+
+    await runtime.dispose();
+  });
+
+  it("recreates the runtime when project instructions change", async () => {
+    const runtime = createRuntime({ projectInstructions: "Run unit tests." });
+
+    expect((runtime as any).agent.state.systemPrompt).toContain(
+      "# Project instructions\n\n",
+    );
+    expect((runtime as any).agent.state.systemPrompt).toContain(
+      "Run unit tests.",
+    );
+    expect(runtime.matches("agent", provider, "medium", [], "Run unit tests.")).toBe(
+      true,
+    );
+    expect(runtime.matches("agent", provider, "medium", [], "Run lint.")).toBe(
+      false,
+    );
 
     await runtime.dispose();
   });
