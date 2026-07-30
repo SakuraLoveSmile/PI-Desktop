@@ -608,11 +608,11 @@ Each scenario is documented in this format:
 - **Milestone**: M4
 - **Status**: Automated (protocol smoke: plugins.loadDev)
 
-#### E2E-023: Plugin command in palette and executes
+#### E2E-023: Plugin command in global search and executes
 
 - **Preconditions**: Plugin loaded and enabled.
-- **Steps**: 1) Open command palette. 2) Find plugin command. 3) Execute.
-- **Expected**: Command appears in palette; execution produces expected result.
+- **Steps**: 1) Open global search (Cmd/Ctrl+K or Cmd/Ctrl+Shift+P). 2) Find the plugin command under the Commands section. 3) Execute.
+- **Expected**: Command appears in global search results; execution produces expected result.
 - **Specs linked**: `07-plugins/09-plugin-command-palette.md`
 - **Acceptance**: G (plugin command appears and executes)
 - **Milestone**: M4
@@ -685,12 +685,12 @@ Each scenario is documented in this format:
 #### E2E-025: Disable plugin removes contributions
 
 - **Preconditions**: Plugin enabled and contributions visible.
-- **Steps**: 1) Disable the plugin on the Plugins page. 2) Check command palette and agent tools.
+- **Steps**: 1) Disable the plugin on the Plugins page. 2) Check global search and agent tools.
 - **Expected**: Commands and tools disappear; no leftover contributions.
 - **Specs linked**: `07-plugins/05-plugin-lifecycle.md`
 - **Acceptance**: G (disable removes contributions)
 - **Milestone**: M4
-- **Status**: Automated (protocol smoke: disable clears enabled flag; palette removal manual)
+- **Status**: Automated (protocol smoke: disable clears enabled flag; global search removal manual)
 
 #### E2E-026: Plugin error does not crash app
 
@@ -1213,7 +1213,7 @@ Each scenario is documented in this format:
 - **Steps**: 1) Activate the artifact, enter `localhost:<port>` without a scheme, and submit.
   2) Navigate site links; use back/forward/reload/stop. 3) Trigger a
   `window.open` popup and a permission-requesting page (e.g. notification
-  prompt). 4) Open the command palette, Search, then Settings. Return to chat
+  prompt). 4) Open global search, then Settings. Return to chat
   and trigger an inline tool permission card. 5) Switch to another panel tab
   and back; close the panel. 6) Use open-external.
 - **Expected**: Scheme-less input normalizes to http; nav state (URL bar,
@@ -1518,14 +1518,14 @@ Each scenario is documented in this format:
 - **Steps**: 1) On macOS, launch both `pnpm dev` and a packaged build. Confirm
   the application-menu title is PI-Desktop, open About PI-Desktop, and inspect
   its name, version, and icon. Then open every system menu and invoke New Task, Open
-  Project, Settings, Command Palette, sidebar toggle, editing,
+  Project, Settings, global search, sidebar toggle, editing,
   zoom/fullscreen, Window, Help, Logs, and Check for Updates actions. Verify
   the update status reports that the current fixture version is up to date.
   2) On Windows/Linux, confirm no File/Edit/View/Window/Help menubar appears
   inside the window and the left-side navigation occupies the reclaimed
   titlebar space. Verify F10 and Shift+F10 are not consumed by shell chrome;
   exercise New Task, Open Project, Settings, close-window, zoom, fullscreen,
-  search, command-palette, sidebar, and standard editing shortcuts. Invoke
+  global search (Cmd/Ctrl+K and Cmd/Ctrl+Shift+P), sidebar, and standard editing shortcuts. Invoke
   Check for Updates from Settings -> Info with the same status result.
   3) Close the macOS window, immediately invoke two native menu
   commands, and acknowledge renderer readiness after the replacement loads.
@@ -1779,7 +1779,7 @@ Each scenario is documented in this format:
   Settings open; no custom shortcut overrides are stored.
 - **Steps**: 1) Open Settings → Basics and inspect Keyboard shortcuts. 2) Change
   Search to an unused modifier chord. 3) invoke the new chord and then the old
-  chord. 4) Attempt to assign that chord to Command palette. 5) Attempt a bare
+  chord. 4) Attempt to assign that chord to the command shortcut (now opened via global search). 5) Attempt a bare
   letter and a reserved editing chord. 6) Restart the app and invoke the custom
   Search chord again. 7) Restore Search, then choose Restore defaults. 8) On
   macOS inspect the corresponding native application-menu accelerator after
@@ -2790,7 +2790,7 @@ This test plan spec is accepted when:
 
 ### US-UI-70 Disable text correction on editable fields (D145)
 - Open empty home, a docked transcript, Settings search, Plugins market search,
-  Projects archive search, command palette, global search, provider model combo,
+  Projects archive search, global search (which now includes commands), provider model combo,
   message-edit textarea, and the work-panel browser URL bar in light and dark.
 - Expect every text `input`/`textarea` to expose `spellcheck="false"` (React
   `spellCheck={false}`) plus `autocorrect="off"` and `autocapitalize="off"`.
