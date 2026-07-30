@@ -265,10 +265,11 @@ The sidecar never reads workspace instructions directly. A changed root chain
 recreates an idle runtime on its next prompt; nested instructions are resolved
 again when a relevant file tool runs.
 
-Settings provides dedicated management for the fixed global path. Project list
-menus provide an `AGENTS.md` editor for their corresponding registered project
-root. Its IPC does not accept arbitrary renderer file paths. Saves affect the
-next prompt without restarting the application.
+Settings provides dedicated management for the fixed global path. The Projects
+view and home sidebar project-list menus provide an `AGENTS.md` editor for
+their corresponding registered project root. Its IPC does not accept arbitrary
+renderer file paths. Saves affect the next prompt without restarting the
+application.
 
 ## 8. Concurrency
 

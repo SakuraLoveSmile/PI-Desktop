@@ -47,6 +47,7 @@ import type {
 import { BrandLogo } from "./BrandLogo";
 import { NotificationCenter } from "./NotificationCenter";
 import { useUpdateState } from "../lib/use-update-state";
+import { ProjectInstructionsDialog } from "./ProjectInstructionsDialog";
 import {
   IconArchive,
   IconArchiveRestore,
@@ -58,6 +59,7 @@ import {
   IconCircleAlert,
   IconNewSession,
   IconFolder,
+  IconFileText,
   IconMonitor,
   IconMoon,
   IconMore,
@@ -230,6 +232,10 @@ export function Sidebar({
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
   const [sectionMenu, setSectionMenu] = useState<"sessions" | "projects" | null>(null);
+  const [instructionsFor, setInstructionsFor] = useState<{
+    name: string;
+    path: string;
+  } | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const [projectPathTooltip, setProjectPathTooltip] = useState<ProjectPathTooltip | null>(null);
   const [visibleTimeGroups, setVisibleTimeGroups] = useState<Record<string, Set<TimeGroup>>>({});
@@ -1321,6 +1327,18 @@ export function Sidebar({
             <button
               type="button"
               role="menuitem"
+              data-action="edit-project-instructions"
+              onClick={() => {
+                closeMenus(false);
+                setInstructionsFor({ name: entry.name, path: entry.path });
+              }}
+            >
+              <IconFileText size={14} />
+              {t("project.editInstructions")}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
               data-action="toggle-project-pin"
               onClick={() => toggleProjectPin(entry)}
             >
@@ -1615,6 +1633,14 @@ export function Sidebar({
       </div>
       {renderFloatingMenu()}
       {renderProjectPathTooltip()}
+      {instructionsFor ? (
+        <ProjectInstructionsDialog
+          project={instructionsFor}
+          onClose={() => setInstructionsFor(null)}
+          onSaved={() => showToast(t("project.instructionsSaved"), { variant: "success" })}
+          onError={reportError}
+        />
+      ) : null}
     </aside>
   );
 }

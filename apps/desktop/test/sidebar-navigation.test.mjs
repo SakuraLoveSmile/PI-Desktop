@@ -157,9 +157,12 @@ test("sidebar section toolbars open create actions from context menus", () => {
   assert.match(sidebarSource, /addEventListener\("pointerdown"/);
 });
 
-test("project rows expose open-folder in the project menu and full-path hover", () => {
+test("project rows expose folder and AGENTS actions in the project menu", () => {
   assert.match(sidebarSource, /data-action="open-project-folder"/);
   assert.match(sidebarSource, /api\.openProjectFolder\(entry\.path\)/);
+  assert.match(sidebarSource, /data-action="edit-project-instructions"/);
+  assert.match(sidebarSource, /<ProjectInstructionsDialog/);
+  assert.match(sidebarSource, /project=\{instructionsFor\}/);
   assert.doesNotMatch(sidebarSource, /data-action="open-session-folder"/);
   assert.doesNotMatch(sidebarSource, /api\.openSessionFolder\(/);
   assert.match(
