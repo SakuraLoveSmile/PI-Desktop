@@ -107,15 +107,17 @@ export function ConversationTopbar({
       aria-label={t("nav.conversation")}
     >
       <div className="ct-left">
-        <button
-          type="button"
-          className="ct-icon-btn"
-          title={t("nav.toggleSidebar")}
-          aria-label={t("nav.toggleSidebar")}
-          onClick={onToggleSidebar}
-        >
-          <IconSidebar size={15} />
-        </button>
+        {sidebarCollapsed ? (
+          <button
+            type="button"
+            className="ct-icon-btn"
+            title={t("nav.toggleSidebar")}
+            aria-label={t("nav.toggleSidebar")}
+            onClick={onToggleSidebar}
+          >
+            <IconSidebar size={15} />
+          </button>
+        ) : null}
         <div className="ct-title-wrap" title={project ? `${project} · ${taskTitle}` : taskTitle}>
           {project ? <span className="ct-project">{project}</span> : null}
           <span className="ct-title">{taskTitle}</span>

@@ -636,11 +636,13 @@ html {
 }
 
 .conversation-topbar .ct-left {
+  flex: 1 1 auto;
+  min-width: 0;
   margin-right: auto;
 }
 
 .conversation-topbar .ct-right {
-  margin-left: auto;
+  flex: 0 0 auto;
   justify-content: flex-end;
 }
 
@@ -648,6 +650,7 @@ html {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -774,6 +777,10 @@ html {
  * when the sidebar is collapsed and the main pane reaches the window edge. */
 :root[data-platform="darwin"] .conversation-topbar.ct-collapsed {
   padding-left: 76px;
+}
+
+:root[data-platform="darwin"][data-fullscreen="true"] .conversation-topbar.ct-collapsed {
+  padding-left: 8px;
 }
 
 /* Frameless Windows/Linux controls occupy the top-right 112px band. */
@@ -1242,7 +1249,7 @@ html {
 .route-page {
   position: relative;
   display: flex;
-  min-width: 0;
+  min-width: 360px;
   min-height: 0;
   flex: 1;
   flex-direction: column;

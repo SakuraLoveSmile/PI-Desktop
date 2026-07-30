@@ -260,17 +260,21 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Provider configured; at least one session exists.
 - **Steps**: 1) Open the chat route. 2) Inspect the 46px bar at the top of the
-  conversation area. 3) Confirm it shows the sidebar toggle, the active project
-  name and session/task title, the Agent|Chat segmented mode toggle, the model
-  picker, and the New task / Search / Commands / Settings action buttons. 4)
-  Switch to the Pull requests, Scheduled, Plugins, or Settings routes and inspect
-  the same top region.
-- **Expected**: On the chat route the conversation top bar renders with all
-  controls; on every other route the frameless drag band renders instead (no
-  top-bar controls). The bar is draggable to move the window; interactive
-  controls do not start a window drag. macOS leaves the left ~76px clear for
-  traffic lights only while the sidebar is collapsed; Windows/Linux leave the
-  right 112px clear for native window controls.
+  conversation area. 3) Confirm it shows the active project name and
+  session/task title, the Agent|Chat segmented mode toggle, the model picker,
+  and the New task / Search / Commands / Settings action buttons; confirm the
+  sidebar toggle appears **only when the sidebar is collapsed** (when expanded,
+  the sidebar owns that control). 4) Switch to the Pull requests, Scheduled,
+  Plugins, or Settings routes and inspect the same top region.
+- **Expected**: On the chat route the conversation top bar renders with its
+  controls; the long task title ellipsizes instead of squeezing the Agent|Chat
+  toggle, model picker, or action buttons. The sidebar toggle is present only in
+  the collapsed state (no duplicate of the sidebar's control). On every other
+  route the frameless drag band renders instead (no top-bar controls). The bar is
+  draggable to move the window; interactive controls do not start a window drag.
+  macOS leaves the left ~76px clear for traffic lights only while the sidebar is
+  collapsed (8px in fullscreen); Windows/Linux leave the right 112px clear for
+  native window controls.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2 Topbar)
 - **Acceptance**: C (send/UI), Quality
 - **Milestone**: M2

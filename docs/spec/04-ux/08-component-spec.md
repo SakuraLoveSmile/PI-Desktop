@@ -135,7 +135,9 @@ button, and settings entry.
 [☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [Agent | Chat] [🤖 Model] [＋ New] [🔍 Search] [⚙ Commands] [⚙ Settings]
 ```
 
-(Icons described functionally; actual render uses Lucide SVGs.)
+(Icons described functionally; actual render uses Lucide SVGs. The `[☰ Sidebar]`
+toggle renders **only when the sidebar is collapsed**; when the sidebar is
+expanded it owns that control, so the top bar does not duplicate it.)
 
 The conversation top bar renders for the chat route only; Pull requests, Scheduled,
 Plugins, and Settings keep the frameless drag band. The Agent/Chat control is a
@@ -153,6 +155,11 @@ and permission triggers remain in the composer (§11).
   `no-drag` on interactive controls; macOS reserves the left ~76px for traffic
   lights (only when the sidebar is collapsed), Windows/Linux reserve the right
   112px for native window controls
+- Title cluster (project ▸ task title) flexes and **ellipsizes**; the right
+  cluster (Agent|Chat toggle, model picker, action icons) is `flex: 0 0 auto`
+  and is never squeezed by a long title. The conversation surface keeps a
+  `min-width` so its content is not crushed on narrow windows.
+- macOS fullscreen resets the left reserve to 8px (mirrors the sidebar header).
 - Sticky: `z-sticky`
 - Items: left-aligned controls, right-aligned actions
 
