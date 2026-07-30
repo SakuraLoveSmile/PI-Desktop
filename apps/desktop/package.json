@@ -84,11 +84,15 @@
       "out/**/*",
       "package.json",
       "!**/*.map",
-      "!**/node_modules/*/{test,tests,__tests__,powered-test,example,examples}/**"
+      "!**/node_modules/*/{test,tests,__tests__,powered-test,example,examples}/**",
+      "!**/node_modules/**/*.{test,spec}.{js,cjs,mjs}",
+      "!**/node_modules/node-pty/{deps,prebuilds,scripts,src,typings}/**",
+      "!**/node_modules/node-addon-api/tools/**",
+      "!**/node_modules/node-addon-api/*.{c,gyp,gypi,h,js,json}",
+      "!**/node_modules/node-addon-api/README.md"
     ],
     "asarUnpack": [
-      "**/node_modules/node-pty/build/{Release,Debug}/**",
-      "**/node_modules/node-pty/prebuilds/**"
+      "**/node_modules/node-pty/build/{Release,Debug}/**"
     ],
     "electronLanguages": [
       "en-US",
@@ -99,6 +103,10 @@
       {
         "from": "../../packages/agent-runtime/dist-bundle",
         "to": "agent-runtime"
+      },
+      {
+        "from": "node_modules/node-pty/deps/winpty/LICENSE",
+        "to": "licenses/node-pty-winpty.LICENSE"
       }
     ],
     "mac": {

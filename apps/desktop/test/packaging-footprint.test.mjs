@@ -54,17 +54,55 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
     ),
   );
   assert.ok(
+    packageJson.build.files.includes(
+      "!**/node_modules/**/*.{test,spec}.{js,cjs,mjs}",
+    ),
+  );
+  assert.ok(
+    packageJson.build.files.includes(
+      "!**/node_modules/node-pty/{deps,prebuilds,scripts,src,typings}/**",
+    ),
+  );
+  assert.ok(
+    packageJson.build.files.includes(
+      "!**/node_modules/node-addon-api/tools/**",
+    ),
+  );
+  assert.ok(
+    packageJson.build.files.includes(
+      "!**/node_modules/node-addon-api/*.{c,gyp,gypi,h,js,json}",
+    ),
+  );
+  assert.ok(
+    packageJson.build.files.includes(
+      "!**/node_modules/node-addon-api/README.md",
+    ),
+  );
+  assert.ok(
+    !packageJson.build.files.includes("!**/node_modules/node-addon-api/**"),
+    "node-addon-api license must not be removed with its build-only files",
+  );
+  assert.ok(
     packageJson.build.files.every(
       (pattern) => !/LICENSE|NOTICE|\*\.md/.test(pattern),
     ),
     "third-party license and notice files must remain packageable",
   );
+  assert.deepEqual(packageJson.build.extraResources, [
+    {
+      from: "../../packages/agent-runtime/dist-bundle",
+      to: "agent-runtime",
+    },
+    {
+      from: "node_modules/node-pty/deps/winpty/LICENSE",
+      to: "licenses/node-pty-winpty.LICENSE",
+    },
+  ]);
 });
 
 test("node-pty unpacks native payloads without unpacking its full source tree", () => {
   assert.deepEqual(packageJson.build.asar, { smartUnpack: false });
   assert.deepEqual(packageJson.build.asarUnpack, [
     "**/node_modules/node-pty/build/{Release,Debug}/**",
-    "**/node_modules/node-pty/prebuilds/**",
   ]);
 });
