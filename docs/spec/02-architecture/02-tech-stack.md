@@ -65,6 +65,24 @@
 - marketplace backend
 - custom LLM provider SDK replacing pi-ai
 
+### Production packaging boundary
+
+- Renderer-only libraries are development/build dependencies because Vite
+  bundles their runtime code and lazy assets into `out/renderer`.
+- Electron Main bundles pure-JS workspace packages. Packages that require
+  runtime module resolution or a native ABI remain production dependencies;
+  the current external set includes `electron-updater` and `node-pty`.
+- `Resources/agent-runtime/sidecar.js` is the only independent pi sidecar
+  bundle. The complete `@pi-desktop/agent-runtime` package tree must not be
+  copied into ASAR as a second runtime.
+- Native dependencies are rebuilt on the target runner. `node-pty` ships that
+  target `build/Release` output rather than its cross-platform prebuild catalog
+  or build-only `node-addon-api` package.
+- Dependency source maps, tests, examples, and declarations are build inputs,
+  not release assets. License and notice files remain distributable.
+- Lazy renderer capabilities such as Mermaid, KaTeX, and Shiki remain local
+  assets; package-size optimization must not introduce runtime CDN fetches.
+
 ## 6. Build matrix (MVP)
 
 - JS workspace build (`pnpm`)

@@ -985,9 +985,19 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   source code so a collapsed reasoning trace cannot start diagram layout.
 - **Syntax highlighting**: Shiki singleton with the JavaScript regex engine
   (no wasm), themes `one-light`/`one-dark-pro` following `data-theme`.
-  Languages lazy-load per fence tag with a plain-mono fallback until ready.
-  Streaming code re-tokenizes only changed lines by chaining GrammarState
-  (per-line cache), so per-frame cost is constant regardless of block size.
+  A coding-focused local catalog exposes 48 canonical grammars plus common
+  aliases; each grammar lazy-loads on its first matching fence tag with a
+  plain-mono fallback until ready. Tags outside that catalog remain readable
+  plain text instead of pulling the full Shiki language distribution into the
+  application. The canonical catalog is `astro`, `bat`, `c`, `cpp`, `csharp`,
+  `css`, `dart`, `diff`, `docker`, `dotenv`, `go`, `graphql`, `groovy`, `hcl`,
+  `html`, `ini`, `java`, `javascript`, `json`, `jsonc`, `jsonl`, `jsx`,
+  `kotlin`, `lua`, `make`, `markdown`, `mdx`, `mermaid`, `nginx`, `php`,
+  `powershell`, `prisma`, `proto`, `python`, `ruby`, `rust`, `scala`,
+  `shellscript`, `sql`, `svelte`, `swift`, `terraform`, `toml`, `tsx`,
+  `typescript`, `vue`, `xml`, and `yaml`. Streaming code re-tokenizes only
+  changed lines by chaining GrammarState (per-line cache), so per-frame cost
+  is constant regardless of block size.
 - **Code block chrome**: `.code-block` single-surface card (radius-md-plus,
   hairline border; dark `#282c34`, light `#fafafa` — matching One Dark Pro /
   One Light editor bg). Header is transparent (language tag left, copy right);

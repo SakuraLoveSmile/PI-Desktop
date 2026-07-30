@@ -134,6 +134,18 @@ Dev mode may colocate some services, but contracts stay the same.
 Desktop package must ship:
 
 - Electron app
-- Rust host binary
-- Node runtime assets for pi sidecar (strategy implementation-defined)
-- English locale pack (default)
+- one target-native Rust host binary
+- one bundled pi sidecar entry under `Resources/agent-runtime/sidecar.js`, run
+  by the Electron binary with `ELECTRON_RUN_AS_NODE=1`
+- English and Simplified Chinese product locale catalogs, plus only the
+  Chromium locale packs needed for those product languages
+- target-native runtime modules that cannot be bundled safely, including
+  `node-pty`
+
+Renderer-only libraries are build inputs. Vite must emit their executable
+code and lazy assets under `out/renderer`; electron-builder must not also copy
+their original production `node_modules` trees into ASAR. Electron Main may
+inline pure-JS workspace helpers while native or runtime-resolved modules stay
+external. Release packages exclude dependency source maps, tests, examples,
+declarations, and non-target native prebuilds without replacing local assets
+with network fetches.

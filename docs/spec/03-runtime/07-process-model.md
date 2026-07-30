@@ -85,6 +85,12 @@ sidecar/host shutdown sequence runs before the updater replaces the app.
 - agent sidecar runs the bundled `agent-runtime/sidecar.js` on the Electron
   binary itself with `ELECTRON_RUN_AS_NODE=1` — no separate Node runtime is
   shipped (resolves **D008**)
+- `Resources/agent-runtime/sidecar.js` is the sidecar's only independent
+  release entry. ASAR does not carry a second complete
+  `@pi-desktop/agent-runtime` package tree; Electron Main may inline the
+  pure-JS helpers it calls without changing process or protocol ownership
+- renderer dependencies ship through Vite output rather than duplicate raw
+  package trees; `node-pty` remains external and unpacked for its native ABI
 - packaged builds use the Main-owned update controller. macOS and non-AppImage
   Linux are manual-delivery modes; Windows NSIS and Linux AppImage use the
   in-app feeds published by D126 tag releases
