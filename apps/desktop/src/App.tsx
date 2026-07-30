@@ -901,7 +901,6 @@ function AppShell() {
                 onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
                 onNewTask={() => void runMenuCommand("newTask")}
                 onOpenSearch={() => setSearchOpen(true)}
-                onOpenSettings={() => void runMenuCommand("openSettings")}
               />
             ) : (
               <div

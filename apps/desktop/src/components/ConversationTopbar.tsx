@@ -8,7 +8,6 @@ import {
   IconSidebar,
   IconNewSession,
   IconSearch,
-  IconSettings,
 } from "./icons";
 
 function isThinkingLevel(value: unknown): value is ThinkingLevel {
@@ -39,14 +38,12 @@ export function ConversationTopbar({
   onToggleSidebar,
   onNewTask,
   onOpenSearch,
-  onOpenSettings,
 }: {
   sidebarCollapsed: boolean;
   workPanelOpen: boolean;
   onToggleSidebar: () => void;
   onNewTask: () => void;
   onOpenSearch: () => void;
-  onOpenSettings: () => void;
 }) {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((s) => s.activeSessionId);
@@ -169,15 +166,6 @@ export function ConversationTopbar({
             onClick={onOpenSearch}
           >
             <IconSearch size={15} />
-          </button>
-          <button
-            type="button"
-            className="ct-icon-btn"
-            title={t("nav.settings")}
-            aria-label={t("nav.settings")}
-            onClick={onOpenSettings}
-          >
-            <IconSettings size={15} />
           </button>
         </div>
       </div>
