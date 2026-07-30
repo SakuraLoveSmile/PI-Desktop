@@ -6,10 +6,6 @@ const sidebarSource = await readFile(
   new URL("../src/components/Sidebar.tsx", import.meta.url),
   "utf8",
 );
-const projectInstructionsDialogSource = await readFile(
-  new URL("../src/components/ProjectInstructionsDialog.tsx", import.meta.url),
-  "utf8",
-);
 const globalStyles = await readFile(
   new URL("../src/styles/globals.css", import.meta.url),
   "utf8",
@@ -173,17 +169,11 @@ test("sidebar session and project context menus open to the pointer's right", ()
   assert.match(sidebarSource, /left: menuPosition\.left/);
 });
 
-test("project instructions dialog renders outside the sidebar container", () => {
-  assert.match(projectInstructionsDialogSource, /import \{ createPortal \} from "react-dom"/);
-  assert.match(projectInstructionsDialogSource, /createPortal\(dialog, document\.body\)/);
-});
-
-test("project rows expose folder and AGENTS actions in the project menu", () => {
+test("project rows expose folder actions and full-path hover", () => {
   assert.match(sidebarSource, /data-action="open-project-folder"/);
   assert.match(sidebarSource, /api\.openProjectFolder\(entry\.path\)/);
-  assert.match(sidebarSource, /data-action="edit-project-instructions"/);
-  assert.match(sidebarSource, /<ProjectInstructionsDialog/);
-  assert.match(sidebarSource, /project=\{instructionsFor\}/);
+  assert.doesNotMatch(sidebarSource, /data-action="edit-project-instructions"/);
+  assert.doesNotMatch(sidebarSource, /<ProjectInstructionsDialog/);
   assert.doesNotMatch(sidebarSource, /data-action="open-session-folder"/);
   assert.doesNotMatch(sidebarSource, /api\.openSessionFolder\(/);
   assert.match(
