@@ -6,6 +6,10 @@ const sidebarSource = await readFile(
   new URL("../src/components/Sidebar.tsx", import.meta.url),
   "utf8",
 );
+const projectInstructionsDialogSource = await readFile(
+  new URL("../src/components/ProjectInstructionsDialog.tsx", import.meta.url),
+  "utf8",
+);
 const globalStyles = await readFile(
   new URL("../src/styles/globals.css", import.meta.url),
   "utf8",
@@ -167,6 +171,11 @@ test("sidebar session and project context menus open to the pointer's right", ()
   assert.match(pointPlacement, /FLOATING_MENU_WIDTH/);
   assert.match(sidebarSource, /placeMenuAtPoint\(event\.clientX, event\.clientY\)/);
   assert.match(sidebarSource, /left: menuPosition\.left/);
+});
+
+test("project instructions dialog renders outside the sidebar container", () => {
+  assert.match(projectInstructionsDialogSource, /import \{ createPortal \} from "react-dom"/);
+  assert.match(projectInstructionsDialogSource, /createPortal\(dialog, document\.body\)/);
 });
 
 test("project rows expose folder and AGENTS actions in the project menu", () => {
