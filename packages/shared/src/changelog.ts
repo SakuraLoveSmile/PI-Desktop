@@ -23,8 +23,21 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.2.11",
+    date: "2026-07-31",
+    highlights: [
+      "Global Search now finds chats, pages, Settings, and built-in or plugin commands in one place.",
+      "Appearance controls now use theme and language preview cards, with automatic language correctly following the OS locale.",
+      "Settings now has dedicated AI and Shortcuts sections for clearer navigation.",
+      "The agent now loads layered AGENTS.md/CLAUDE.md project instructions, with editors for global and project AGENTS.md.",
+      "Project archive now searches session titles and shows newest-first activity, session counts, timestamps, and expandable history.",
+      "Fix a desktop startup failure caused by the sandboxed preload regression.",
+      "Reduce the audited macOS unpacked app footprint by about 55% while retaining offline syntax highlighting and native terminal support.",
+    ],
+  },
+  {
     version: "0.2.10",
-    date: "2025-07-30",
+    date: "2026-07-30",
     highlights: [
       "Add Codex/WorkBuddy-style conversation top bar with improved controls.",
       "Refresh chat transcript and markdown prose styling for better readability.",
@@ -139,8 +152,21 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
+    version: "0.2.11",
+    date: "2026-07-31",
+    highlights: [
+      "全局搜索现可同时查找聊天、页面、设置，以及内置和插件命令。",
+      "外观设置改用主题与语言预览卡片，自动语言会正确跟随操作系统。",
+      "设置页新增独立的“全局 AI”和“快捷键”分区，导航更清晰。",
+      "智能体可自动加载分层的 AGENTS.md/CLAUDE.md 项目指令，并支持编辑全局与项目 AGENTS.md。",
+      "项目归档支持按会话标题搜索，并按最新活动展示会话数量、更新时间和更多历史。",
+      "修复沙箱化预加载回归导致的桌面应用启动故障。",
+      "将审计后的 macOS 应用解压体积缩减约 55%，同时保留离线语法高亮与原生终端能力。",
+    ],
+  },
+  {
     version: "0.2.10",
-    date: "2025-07-30",
+    date: "2026-07-30",
     highlights: [
       "添加 Codex/WorkBuddy 风格对话顶栏，改进控制按钮。",
       "刷新聊天记录和 Markdown 样式，提升可读性。",
