@@ -828,8 +828,8 @@ Single message render — either user (plaintext) or assistant (markdown streami
 
 - Max content band: 760px thread column; assistant body max 720px
 - User: right-aligned, theme-neutral soft plate (`color-mix` on primary ink,
-  never a fixed accent tint), with a subtle primary-ink border,
-  `radius-lg-plus`, capped at `min(78%, 560px)` so short prompts read as
+  never a fixed accent tint), borderless, `radius-lg-plus` with a tighter
+  bottom-right corner, capped at `min(82%, 600px)` so short prompts read as
   chat turns rather than full-width blocks. User body is plaintext with
   preserved hard newlines (`white-space: pre-wrap`);
   only trailing/leading composer trim is applied, never internal newline
@@ -876,8 +876,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
   (D157).
 - Assistant meta: optional model badge + token-usage chip under the answer
   (collapsed summary with hover breakdown for input/output/cache/reasoning)
-- Gap: 10px vertical padding between consecutive message rows (denser than
-  consumer chat, closer to WorkBuddy task transcript)
+- Gap: 12px vertical padding between consecutive message rows (denser than
+  consumer chat, closer to WorkBuddy task transcript); assistant turns add a
+  little extra bottom air so a completed answer separates from the next prompt
 - Font: text-base (14px) for body; text-sm (13px) mono for code
 - Tool activity: tool-name classification selects a semantic 15px icon;
   `fork`, `fork_agent`, `fork_task`, and `fork_session` use the GitFork branch
@@ -887,7 +888,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
 
 | State | Appearance |
 |---|---|
-| Streaming | accent left rule on the answer surface; content grows |
+| Streaming | accent left rail along the whole assistant turn (fragments + tool rows); the rail's space is always reserved so it fading in/out never reflows text; content grows |
 | Thinking streaming | disclosure open; answer bubble omitted until answer text exists |
 | Complete | no streaming rule; full rendered markdown |
 | Error | assistant error card in transcript; localized summary + stable code; details disclosure opens to redacted provider response, provider/model IDs, and copy action; retriable failures show Retry and configuration failures show Open settings |

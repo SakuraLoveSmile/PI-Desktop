@@ -1023,18 +1023,17 @@ html {
   width: fit-content;
   max-width: 100%;
   border-radius: var(--radius-lg-plus);
-  border-bottom-right-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
-  border: 1px solid color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
-  padding: 9px 14px;
+  border-bottom-right-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  padding: 10px 15px;
   color: var(--ds-text-primary);
   font-size: var(--text-base);
   line-height: var(--leading-chat);
 }
 
 .message-row.assistant {
-  padding-top: 4px;
-  padding-bottom: 10px;
+  padding-top: 6px;
+  padding-bottom: 14px;
 }
 
 
@@ -1875,7 +1874,7 @@ html {
 .message-row {
   display: flex;
   gap: 12px;
-  padding: 10px 0;
+  padding: 12px 0;
   /* Skip layout/paint for far-offscreen rows in long transcripts. */
   content-visibility: auto;
   contain-intrinsic-size: auto 60px;
@@ -2328,9 +2327,17 @@ html {
   box-shadow: none;
 }
 
-.message-row.assistant .message-bubble.streaming {
-  border-left: 2px solid color-mix(in oklab, var(--ds-text-primary) 24%, transparent);
-  padding-left: 12px;
+/* Live-turn rail: the whole assistant turn (prose fragments + tool rows)
+   shares one soft rail while streaming. Space is always reserved, so the
+   rail fading in/out never reflows the text. */
+.message-row.assistant-turn .message-col {
+  border-left: 2px solid transparent;
+  padding-left: 14px;
+  transition: border-color var(--motion-duration-slow) var(--motion-ease-out);
+}
+
+.message-row.assistant-turn.streaming .message-col {
+  border-left-color: color-mix(in oklab, var(--ds-text-primary) 30%, transparent);
 }
 
 .message-error {
@@ -2443,13 +2450,15 @@ html {
   align-items: center;
   gap: 5px;
   border-radius: var(--radius-sm);
-  padding: 2px 3px;
+  margin: 0 -3px;
+  padding: 2px 5px;
   color: var(--ds-text-secondary);
   font-size: var(--text-sm-plus);
   text-align: left;
 }
 
 .tool-activity-header:hover {
+  background: var(--ds-bg-hover);
   color: var(--ds-text-primary);
 }
 
@@ -2533,7 +2542,7 @@ html {
 
 .tool-activity-body {
   margin: 3px 0 6px 7px;
-  border-left: 1px solid var(--ds-border-default);
+  border-left: 1px solid var(--ds-border-subtle);
   padding: 2px 0 2px 12px;
 }
 
@@ -2548,7 +2557,8 @@ html {
   align-items: center;
   min-height: 24px;
   gap: 4px;
-  padding: 2px 0;
+  margin: 0 -4px;
+  padding: 2px 4px;
   border-radius: var(--radius-sm);
   color: var(--ds-text-secondary);
   font-size: var(--text-sm-plus);
@@ -2560,6 +2570,7 @@ html {
 }
 
 .tool-row-header:hover {
+  background: var(--ds-bg-hover);
   color: var(--ds-text-primary);
 }
 
@@ -2654,7 +2665,7 @@ html {
 .tool-row-body {
   margin: 4px 0 6px 24px;
   padding: 4px 0 8px 12px;
-  border-left: 2px solid var(--ds-border-default);
+  border-left: 1px solid var(--ds-border-subtle);
   color: var(--ds-text-secondary);
 }
 
@@ -2690,13 +2701,13 @@ html {
 }
 
 .tool-row-content {
-  max-height: 220px;
+  max-height: 260px;
   margin: 0;
   overflow: auto;
   border: 1px solid var(--ds-border-subtle);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--ds-text-primary) 2.5%, transparent);
-  padding: 9px 11px;
+  padding: 10px 12px;
   color: var(--ds-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
@@ -2713,8 +2724,9 @@ html {
 
 /*
   Chat prose — refined markdown typography for the assistant transcript.
-  Goal: denser, calmer reading surface with clearer hierarchy, quieter chrome,
-  and code/table shells that sit in the same family as the rest of the UI.
+  Goal: calm reading surface with clear hierarchy — headings without rules,
+  links always discoverable, borderless inline code, quiet quote rails, and
+  code/table shells that sit in the same family as the rest of the UI.
   Blocks render as direct children of .prose-chat.
 */
 .prose-chat {
@@ -2735,14 +2747,14 @@ html {
   margin-bottom: 0 !important;
 }
 
-/* Body rhythm: slightly tighter than document prose so multi-block answers
-   scan like a chat, not a blog post. */
+/* Body rhythm: breathing room between blocks so multi-part answers read as
+   distinct thoughts, while consecutive paragraphs stay conversational. */
 .prose-chat p {
-  margin: 0.55em 0;
+  margin: 0.65em 0;
 }
 
 .prose-chat p + p {
-  margin-top: 0.7em;
+  margin-top: 0.8em;
 }
 
 .prose-chat strong {
@@ -2761,38 +2773,57 @@ html {
   text-decoration-thickness: 1px;
 }
 
-/* Heading ramp: h1 stays prominent but no longer dominates the bubble;
-   lower levels keep a clear step without jumping too far from body size. */
+/* Superscript refs keep the line box from stretching. */
+.prose-chat sup {
+  line-height: 0;
+}
+
+/* GFM footnotes: quiet appendix with our own top rule (their <hr> is hidden). */
+.prose-chat .footnotes {
+  margin: 1.2em 0 0;
+  padding-top: 0.55em;
+  border-top: 1px solid var(--ds-border-subtle);
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm-plus);
+}
+
+.prose-chat .footnotes hr {
+  display: none;
+}
+
+.prose-chat .footnotes ol {
+  margin: 0.3em 0;
+  padding-left: 1.3em;
+}
+
+.prose-chat .footnotes li {
+  margin: 0.15em 0;
+}
+
+/* Heading ramp: clear size steps without rules or boxes — hierarchy comes
+   from weight, tracking, and the space above, not from chrome. */
 .prose-chat h1,
 .prose-chat h2,
 .prose-chat h3,
 .prose-chat h4,
 .prose-chat h5,
 .prose-chat h6 {
-  margin: 1.05em 0 0.4em;
+  margin: 1.25em 0 0.45em;
   color: var(--ds-text-primary);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-tight);
-  line-height: var(--leading-compact);
+  line-height: var(--leading-tight);
   text-wrap: balance;
 }
 
 .prose-chat h1 {
   font-size: var(--text-xl);
   letter-spacing: var(--tracking-tighter);
-  padding-bottom: 0.28em;
-  border-bottom: 1px solid var(--ds-border-subtle);
+  line-height: var(--leading-tighter);
 }
 
 .prose-chat h2 {
   font-size: var(--text-lg-plus);
-  padding-bottom: 0.18em;
-  border-bottom: 1px solid color-mix(in oklab, var(--ds-border-subtle) 70%, transparent);
-}
-
-:root[data-theme="light"] .prose-chat h1,
-:root[data-theme="light"] .prose-chat h2 {
-  border-bottom-color: color-mix(in oklab, #1a1c1f 8%, transparent);
 }
 
 :root[data-theme="light"] .prose-chat h5,
@@ -2806,6 +2837,7 @@ html {
 
 .prose-chat h4 {
   font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-medium-plus);
 }
 
 .prose-chat h5,
@@ -2822,13 +2854,23 @@ html {
 .prose-chat h4 + *,
 .prose-chat h5 + *,
 .prose-chat h6 + * {
-  margin-top: 0.35em;
+  margin-top: 0.4em;
+}
+
+/* Consecutive headings stack tighter — the second one belongs to the same
+   section, not a new one. */
+.prose-chat h1 + h2,
+.prose-chat h2 + h3,
+.prose-chat h3 + h4,
+.prose-chat h4 + h5,
+.prose-chat h5 + h6 {
+  margin-top: 0.75em;
 }
 
 .prose-chat ul,
 .prose-chat ol {
-  margin: 0.55em 0;
-  padding-left: 1.35em;
+  margin: 0.65em 0;
+  padding-left: 1.4em;
 }
 
 .prose-chat ul {
@@ -2841,7 +2883,7 @@ html {
 }
 
 .prose-chat li {
-  margin: 0.22em 0;
+  margin: 0.28em 0;
   padding-left: 0.15em;
 }
 
@@ -2855,12 +2897,12 @@ html {
 }
 
 .prose-chat li > p {
-  margin: 0.2em 0;
+  margin: 0.25em 0;
 }
 
 .prose-chat li > ul,
 .prose-chat li > ol {
-  margin: 0.2em 0 0.25em;
+  margin: 0.25em 0 0.3em;
 }
 
 .prose-chat .contains-task-list {
@@ -2892,19 +2934,18 @@ html {
   min-width: 0;
 }
 
+/* Blockquote: a quiet rail plus muted text — no fill, so long citations don't
+   read as heavy boxes in the transcript. */
 .prose-chat blockquote {
   position: relative;
-  margin: 0.75em 0;
-  padding: 0.45em 0 0.45em 0.95em;
-  border-left: 3px solid color-mix(in oklab, var(--ds-text-primary) 28%, var(--ds-border-strong));
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: color-mix(in oklab, var(--ds-text-primary) 2.5%, transparent);
+  margin: 0.85em 0;
+  padding: 0.15em 0 0.15em 1em;
+  border-left: 2px solid color-mix(in oklab, var(--ds-text-primary) 30%, transparent);
   color: var(--ds-text-secondary);
 }
 
 :root[data-theme="light"] .prose-chat blockquote {
   border-left-color: color-mix(in oklab, #1a1c1f 22%, transparent);
-  background: #f6f6f6;
   color: color-mix(in oklab, #1a1c1f 72%, transparent);
 }
 
@@ -2917,12 +2958,12 @@ html {
 }
 
 .prose-chat blockquote blockquote {
-  margin: 0.45em 0;
-  background: color-mix(in oklab, var(--ds-text-primary) 2%, transparent);
+  margin: 0.5em 0;
+  border-left-color: var(--ds-border-default);
 }
 
 .prose-chat hr {
-  margin: 1.15em 0;
+  margin: 1.35em 0;
   border: 0;
   height: 1px;
   background: linear-gradient(
@@ -2944,18 +2985,20 @@ html {
   );
 }
 
+/* Links stay monochrome but are always discoverable: a soft permanent
+   underline that firms up on hover, instead of relying on color alone. */
 .prose-chat a {
-  color: var(--ds-accent-soft);
-  text-decoration: none;
-  text-underline-offset: 2.5px;
+  color: var(--ds-text-primary);
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 32%, transparent);
+  text-underline-offset: 3px;
   text-decoration-thickness: 1px;
   transition: color var(--motion-duration-fast) var(--motion-ease-out), text-decoration-color var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .prose-chat a:hover {
   color: var(--ds-text-primary);
-  text-decoration: underline;
-  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 35%, transparent);
+  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 85%, transparent);
 }
 
 .prose-chat a:focus-visible {
@@ -2964,15 +3007,12 @@ html {
 }
 
 :root[data-theme="light"] .prose-chat a {
-  /* Soft ink link — full black accent reads harsh on white paper. */
-  color: color-mix(in oklab, var(--ds-text-primary) 72%, var(--ds-text-muted));
-  text-decoration: underline;
-  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 18%, transparent);
+  color: var(--ds-text-primary);
+  text-decoration-color: color-mix(in oklab, #1a1c1f 30%, transparent);
 }
 
 :root[data-theme="light"] .prose-chat a:hover {
-  color: var(--ds-text-primary);
-  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 42%, transparent);
+  text-decoration-color: color-mix(in oklab, #1a1c1f 80%, transparent);
 }
 
 .prose-chat img,
@@ -3013,20 +3053,20 @@ html {
   box-shadow: 0 1px 0 color-mix(in oklab, #1a1c1f 8%, transparent);
 }
 
+/* Inline code: borderless soft chip — the hairline frame used to add noise
+   around every token in dense technical answers. */
 .prose-chat code {
   font-family: var(--font-mono);
   font-size: var(--text-sm-plus);
   font-variant-ligatures: none;
   background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
-  border: 1px solid color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
   border-radius: var(--radius-3xs);
-  padding: 0.12em 0.38em;
+  padding: 0.14em 0.4em;
   color: color-mix(in oklab, var(--ds-text-primary) 94%, var(--ds-accent-soft));
 }
 
 :root[data-theme="light"] .prose-chat code {
-  background: #f2f2f2;
-  border-color: color-mix(in oklab, #1a1c1f 8%, transparent);
+  background: color-mix(in oklab, #1a1c1f 6%, transparent);
   color: #1a1c1f;
 }
 
@@ -3038,9 +3078,9 @@ html {
   background: #282c34;
   border: 1px solid color-mix(in oklab, #000 28%, transparent);
   border-radius: var(--radius-md-plus);
-  padding: 12px 14px;
+  padding: 14px 16px;
   overflow: auto;
-  margin: 0.8em 0;
+  margin: 0.85em 0;
   box-shadow: none;
   color: #abb2bf;
 }
@@ -3061,35 +3101,30 @@ html {
   border-radius: 0;
 }
 
-/* GFM tables: card shell with zebra-quiet rows and sticky-feel header */
+/* GFM tables: quiet card shell, assertive header, row hover instead of zebra
+   striping — chat tables are small enough that stripes only add noise. */
 .prose-chat .table-wrap {
-  margin: 0.8em 0;
+  margin: 0.9em 0;
   max-width: 100%;
   width: fit-content;
   overflow-x: auto;
   border: 1px solid var(--ds-border-default);
   border-radius: var(--radius-md-plus);
   background: color-mix(in oklab, var(--ds-text-primary) 1.5%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--ds-text-primary) 2.5%, transparent);
 }
 
 :root[data-theme="light"] .prose-chat .table-wrap {
   background: #ffffff;
   border-color: color-mix(in oklab, #1a1c1f 10%, transparent);
-  box-shadow: none;
 }
 
 :root[data-theme="light"] .prose-chat th {
-  background: #f3f3f3;
-  color: color-mix(in oklab, #1a1c1f 70%, transparent);
-}
-
-:root[data-theme="light"] .prose-chat tbody tr:nth-child(even) td {
-  background: #fafafa;
+  background: color-mix(in oklab, #1a1c1f 4%, transparent);
+  color: #1a1c1f;
 }
 
 :root[data-theme="light"] .prose-chat tbody tr:hover td {
-  background: #f3f3f3;
+  background: color-mix(in oklab, #1a1c1f 4%, transparent);
 }
 
 :root[data-theme="light"] .prose-chat th,
@@ -3109,7 +3144,7 @@ html {
 
 .prose-chat th,
 .prose-chat td {
-  padding: 8px 12px;
+  padding: 9px 14px;
   text-align: left;
   vertical-align: top;
   border-bottom: 1px solid var(--ds-border-subtle);
@@ -3117,19 +3152,19 @@ html {
 
 .prose-chat th {
   font-weight: var(--font-weight-medium);
-  color: var(--ds-text-secondary);
-  background: color-mix(in oklab, var(--ds-text-primary) 4.5%, transparent);
+  color: var(--ds-text-primary);
+  background: color-mix(in oklab, var(--ds-text-primary) 4%, transparent);
   font-size: var(--text-sm-plus);
   letter-spacing: var(--tracking-wide);
   white-space: nowrap;
 }
 
-.prose-chat tbody tr:nth-child(even) td {
-  background: color-mix(in oklab, var(--ds-text-primary) 1.8%, transparent);
+.prose-chat tbody tr {
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .prose-chat tbody tr:hover td {
-  background: color-mix(in oklab, var(--ds-text-primary) 3.5%, transparent);
+  background: color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
 }
 
 .prose-chat tr:last-child td {
@@ -3167,8 +3202,8 @@ html {
 */
 .code-block {
   --code-block-bg: #282c34; /* one-dark-pro editor background */
-  margin: 0.85em 0;
-  border: 1px solid color-mix(in oklab, #000 28%, transparent);
+  margin: 0.9em 0;
+  border: 1px solid color-mix(in oklab, #000 30%, transparent);
   border-radius: var(--radius-md-plus);
   background: var(--code-block-bg);
   overflow: hidden;
@@ -3187,15 +3222,15 @@ html {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 30px;
-  padding: 2px 6px 2px 12px;
-  border-bottom: 1px solid color-mix(in oklab, #fff 8%, transparent);
-  background: transparent;
+  min-height: 32px;
+  padding: 3px 6px 3px 14px;
+  border-bottom: 1px solid color-mix(in oklab, #fff 7%, transparent);
+  background: color-mix(in oklab, #fff 3%, transparent);
 }
 
 :root[data-theme="light"] .code-block-head {
-  border-bottom-color: color-mix(in oklab, #1a1c1f 8%, transparent);
-  background: transparent;
+  border-bottom-color: color-mix(in oklab, #1a1c1f 7%, transparent);
+  background: color-mix(in oklab, #1a1c1f 3%, transparent);
 }
 
 :root[data-theme="light"] .code-block-lang {
@@ -3214,7 +3249,7 @@ html {
 
 .code-block-lang {
   color: color-mix(in oklab, #abb2bf 72%, transparent);
-  font-size: var(--text-xs);
+  font-size: var(--text-xs-plus);
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--tracking-wide);
   text-transform: lowercase;
@@ -3232,7 +3267,7 @@ html {
   border-radius: var(--radius-xs);
   color: color-mix(in oklab, #abb2bf 72%, transparent);
   transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out), opacity var(--motion-duration-fast) var(--motion-ease-out);
-  opacity: 0.8;
+  opacity: 0.75;
 }
 
 .code-block:hover .code-copy-btn,
@@ -3252,7 +3287,7 @@ html {
 
 .prose-chat .code-block pre {
   margin: 0;
-  padding: 12px 14px 14px;
+  padding: 13px 16px 15px;
   border: 0;
   border-radius: 0;
   background: transparent !important;
@@ -3317,8 +3352,8 @@ html {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 34px;
-  padding: 2px 5px 2px 12px;
+  min-height: 32px;
+  padding: 3px 6px 3px 14px;
   border-bottom: 1px solid var(--ds-border-subtle);
   background: color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
 }
@@ -3514,22 +3549,25 @@ html {
 .thinking-prose h5,
 .thinking-prose h6 {
   color: var(--ds-text-secondary);
-  border-bottom-color: color-mix(in oklab, var(--ds-border-subtle) 70%, transparent);
 }
 
 .thinking-prose a {
-  color: color-mix(in oklab, var(--ds-accent-soft) 80%, var(--ds-text-secondary));
+  color: var(--ds-text-secondary);
+  text-decoration-color: color-mix(in oklab, var(--ds-text-secondary) 45%, transparent);
+}
+
+.thinking-prose a:hover {
+  color: var(--ds-text-primary);
+  text-decoration-color: color-mix(in oklab, var(--ds-text-primary) 70%, transparent);
 }
 
 .thinking-prose code {
-  background: color-mix(in oklab, var(--ds-text-primary) 4%, transparent);
-  border-color: transparent;
+  background: color-mix(in oklab, var(--ds-text-primary) 4.5%, transparent);
   color: var(--ds-text-secondary);
 }
 
 .thinking-prose blockquote {
-  background: color-mix(in oklab, var(--ds-text-primary) 1.5%, transparent);
-  border-left-color: var(--ds-border-strong);
+  border-left-color: var(--ds-border-default);
 }
 
 /* Codex-style shimmering status line */
