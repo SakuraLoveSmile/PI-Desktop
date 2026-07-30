@@ -357,9 +357,13 @@ visually distinct from list content.
 
 - The visible shell name is `PI-Desktop`; Codex is not used as the renderer
   identity.
-- `BrandLogo` imports canonical `build/icon_1024.png` through Vite. The
-  empty-home hero renders it at 56px, the expanded/collapsed sidebar at
-  20px/18px. Home and thread-docked composer prompt rows do not render a
+- `BrandLogo` imports canonical `build/icon_1024.png` through Vite for light
+  mode, and `build/logo_dark.png` for dark mode. The component subscribes to
+  `document.documentElement[data-theme]` via a `MutationObserver` and swaps the
+  source at runtime, so the logo matches the active theme in the sidebar,
+  empty-home hero, and startup splash without a reload. The empty-home hero
+  renders it at 56px, the expanded/collapsed sidebar at 20px/18px, the startup
+  splash at 64px. Home and thread-docked composer prompt rows do not render a
   leading brand icon.
 - The expanded/collapsed New task control and project/Temporary session
   creation controls render the dedicated message-plus session icon. Generic

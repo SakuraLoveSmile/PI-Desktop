@@ -1724,7 +1724,9 @@ Each scenario is documented in this format:
   Windows/Linux render the canonical 20px logo beside the 15px shell name; the
   complete brand has a localized Home accessible name, visible hover/focus
   feedback, and returns the main pane to chat without clearing the active
-  conversation or workspace. Collapse remains immediately after Search.
+  conversation or workspace. Collapse remains immediately after Search. The
+  logo itself is theme-aware: light mode shows `build/icon_1024.png`, dark mode
+  shows `build/logo_dark.png`, swapping live with `data-theme` (no reload).
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`
 - **Acceptance**: Quality
@@ -1892,7 +1894,7 @@ Each scenario is documented in this format:
   3. Wait until sessions/settings bootstrap finishes.
   4. Repeat with OS `prefers-reduced-motion: reduce` when available.
 - **Expected**:
-  - Before ready: full-window splash with brand mark, shell name, tagline, and accessible starting status (`data-testid="startup-splash"`).
+  - Before ready: full-window splash with brand mark, shell name, tagline, and accessible starting status (`data-testid="startup-splash"`). The brand mark is theme-aware: `build/logo_dark.png` in dark mode, `build/icon_1024.png` in light mode.
   - After ready: splash exits with a short fade (or instantly under reduced motion) and the main shell (or settings page) is interactive underneath.
   - No plain unbranded “Starting…” centered text as the only boot UI.
   - Overlay/dialog enter motion uses shared tokens; reduced motion keeps state changes without decorative duration.
@@ -1900,6 +1902,27 @@ Each scenario is documented in this format:
 - **Acceptance**: A (app startup), Quality
 - **Milestone**: M5
 
+
+
+#### E2E-087: Brand logo follows the active theme
+- **Status**: Draft
+- **Priority**: P3
+- **Covers**: Quality / US-UI shell polish
+- **Preconditions**: App running; theme can switch between light and dark (and system) without restart.
+- **Steps**:
+  1. In light mode, open the app shell, an empty chat home, and the expanded sidebar (Windows/Linux) or startup splash.
+  2. Inspect the rendered `BrandLogo` source in each surface.
+  3. Switch the theme to dark (Settings → Basics → Appearance, or system appearance change).
+  4. Re-inspect the same surfaces without reloading.
+  5. Switch back to light and re-inspect.
+- **Expected**:
+  - Light mode everywhere renders `build/icon_1024.png` (the canonical light logo).
+  - Dark mode everywhere renders `build/logo_dark.png` (the dark logo variant).
+  - The swap is live: changing `data-theme` updates the logo source in the sidebar, empty-home hero, and startup splash without a window reload.
+  - Sizes are unchanged (sidebar 20px, hero 56px, splash 64px) and the logo stays decorative with no change to click/keyboard/focus behavior.
+- **Specs linked**: `04-ux/08-component-spec.md` §3.7, `04-ux/07-ui-design-system.md`
+- **Acceptance**: Quality
+- **Milestone**: M5
 
 
 #### E2E-077: Theme-aware selection and CJK section labels
@@ -2330,6 +2353,8 @@ This test plan spec is accepted when:
 ### US-UI-17 PI-Desktop home hero logo
 - On empty chat home, the canonical PI-Desktop PNG renders at 56px above the
   title with its native colors and no decorative hover state.
+- The hero logo is theme-aware: light mode shows `build/icon_1024.png`, dark
+  mode shows `build/logo_dark.png`, and the swap tracks `data-theme` live.
 - Title is 28px / weight 400; active project name uses dotted underline (1px, offset 4px).
 - Composer does not render attachment or appshot controls before their payload
   reaches pi end to end.
