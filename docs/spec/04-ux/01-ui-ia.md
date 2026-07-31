@@ -19,7 +19,7 @@ destination, chat as the home surface, tools and permissions inline.
 | Sidebar (~275px) | Main pane (active destination) | Work panel       |
 |  New task        |  chat home / transcript        |  (optional,      |
 |  Plugins         |  or Plugins page               |   resizable      |
-|                  |                                |   364–720px)     |
+|                  |                                |   244–720px)     |
 |  Sessions     +↕ |                                | surface          |
 |   Recent rows ↕  |                                |                  |
 |  Projects      + |                                | ◫ | App.tsx  ⌄ × |
@@ -84,7 +84,7 @@ destination, chat as the home surface, tools and permissions inline.
   manual panel entry point. A
   successful active-session workspace Write/Edit artifact opens Review;
   scratch, failed, and background-session writes never steal focus. Width is
-  drag-resizable from 364px to 720px and remains at
+  drag-resizable from 244px to 720px and remains at
   its fixed committed width while open. The sole panel-level control collapses
   the panel;
   each session retains its own runtime open state, tab set, active tab, and

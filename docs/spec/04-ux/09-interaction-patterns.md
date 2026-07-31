@@ -572,7 +572,7 @@ Work-panel width resizing is implemented in MVP:
 
 - The 10px left-edge separator anchors to the press position and starting
   width, then follows pointer delta without jumping.
-- The committed width clamps to the fixed `364px–720px` range.
+- The committed width clamps to the fixed `244px–720px` range.
 - Pointer movement is frame-coalesced. Pointer release persists one committed
   preferred width; Escape, pointer cancellation, and lost capture roll back both.
 - The renderer always requests a native reservation width of 0, so the OS window

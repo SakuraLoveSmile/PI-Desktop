@@ -29,7 +29,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ```text
 +------------------+------------------------------+------------------+
 | Sidebar          | MainChat                     | WorkPanel        |
-| (275px / 48px)   | (flex-1)                     | (364–720px /     |
+| (275px / 48px)   | (flex-1)                     | (244–720px /     |
 |                  |                              |  hidden)         |
 +------------------+------------------------------+------------------+
 | Titlebar row: 46px, traffic lights at {x:16,y:16} (D034/D070)      |
@@ -536,7 +536,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 | State | Behavior |
 |---|---|
 | Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only in a session that produced a successful workspace Write/Edit while that Git working tree remains dirty. |
-| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 364–720px (default 420px), preserving at least 320px of content beside the rail. It occupies client-area space and never expands the OS window (ADR 0033). |
+| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 244–720px (default 280px). It occupies client-area space and never expands the OS window (ADR 0033). |
 | Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded switcher lists resources in first-open order with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows anchored pointer delta or keyboard input. Pointer changes preview once per animation frame and commit width plus reservation only on release; Escape, pointer cancellation, or lost capture restores both. Native window-edge resize changes MainChat only. |
@@ -594,7 +594,7 @@ preview), and Files (workspace browser). Codex-parity surface.
   file and Browser resources are never reinterpreted against another workspace.
 - Resize: pointer drag on the left-edge handle; `ArrowLeft` / `ArrowRight`
   adjust it in 16px steps (`Shift` uses 32px), `Home` / `End` reach the current
-  fixed 364px / 720px limits, and double-click restores the default width.
+  fixed 244px / 720px limits, and double-click restores the default width.
   Pointer math is anchored to the press position and starting committed width,
   so grabbing the handle cannot jump the divider. Move events are
   frame-coalesced; release

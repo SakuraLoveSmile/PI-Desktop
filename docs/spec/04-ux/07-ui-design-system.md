@@ -697,7 +697,7 @@ Codex parity decisions (D034/D070) supersede any older value here.
 | Sidebar width (expanded) | ~275px | Codex sidebar width (D034/D070) |
 | Main pane minimum readable width | 360px | Target while the fixed window can fit panel + chat; constrained windows reflow chat below it (D163, ADR 0033) |
 | Work panel width (closed) | 0px | Hidden by default |
-| Work panel width (open) | `364px–720px` (default 420px), fixed at the committed width | the combined create trigger keeps the full panel width on content; the panel is an in-flow column and never expands the OS window (D154/D163, ADR 0033) |
+| Work panel width (open) | `244px–720px` (default 280px), fixed at the committed width | the combined create trigger keeps the full panel width on content; the panel is an in-flow column and never expands the OS window (D154/D163, ADR 0033) |
 | Composer shell minimum | ~80px | One-line draft + toolbar padding |
 | Composer draft height | 1–7 text lines | Auto-grow; internal scroll beyond line 7 |
 | Chat message max width | 720px assistant / 560px user plate | Prevent eye-span over-stretch; user turns stay compact |
@@ -717,7 +717,7 @@ Linux retain the fade-and-slide exit.
 ### 10.1 Responsive collapse
 
 - The work panel never participates in responsive collapse. It keeps its
-  committed `364..720px` width (default 420px) while visible.
+  committed `244..720px` width (default 280px) while visible.
 - Native window and sidebar changes reflow MainChat. The 360px chat target holds
   when the fixed window can fit panel + chat; otherwise chat reflows below it.
 - Panel open/collapse/final close and divider commit update the committed

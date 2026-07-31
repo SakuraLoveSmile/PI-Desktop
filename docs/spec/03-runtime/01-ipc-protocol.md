@@ -620,7 +620,7 @@ window/setWorkPanelReservation({ width: 0 | number })
 ```
 
 `width` must be a finite integer JSON number equal to `0` or inside the
-inclusive `364..720` range. Strings, booleans, null, fractional values, and
+inclusive `244..720` range. Strings, booleans, null, fractional values, and
 other malformed payloads fail with `INVALID_ARGUMENT` rather than being
 coerced. Zero is the closed/collapsed target, and a positive value is the
 visible panel's committed fixed width. `requested` is the accepted current target.

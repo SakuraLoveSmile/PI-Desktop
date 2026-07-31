@@ -1095,7 +1095,7 @@ Each scenario is documented in this format:
   tabs and a Browser resource; switch to session B, create a different tab set,
   then switch repeatedly between A and B and select a project without an active
   conversation. Generate a background artifact in the non-visible session.
-  7) Drag the left-edge handle below 364px and above 720px; verify pointer-down
+  7) Drag the left-edge handle below 244px and above 720px; verify pointer-down
   does not jump the divider, cancel one gesture with Escape, then focus the
   handle and exercise Arrow/Shift+Arrow/Home/End. Commit a different width with
   Browser active. 8) On a display with enough work area, record MainChat width,
@@ -1130,7 +1130,7 @@ Each scenario is documented in this format:
   Active close selects the right neighbor then left; closing the last tab hides
   the panel. Collapse retains runtime
   tabs but hides the panel until another artifact reopens it. Width clamps to
-  the fixed `364px–720px` range, exposes those current/minimum/maximum values to
+  the fixed `244px–720px` range, exposes those current/minimum/maximum values to
   assistive technology, and supports the documented keyboard steps.
   Pointer-down preserves the starting width, movement follows the pointer
   continuously, and release commits once only when the width changed. A

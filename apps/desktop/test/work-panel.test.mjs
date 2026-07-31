@@ -166,7 +166,7 @@ test("work panel starts closed with no tabs and persists width only", () => {
 
 test("work panel resizing is independent from the chat viewport", () => {
   assert.equal(MAIN_PANE_MIN_WIDTH, 360);
-  assert.equal(WORK_PANEL_MIN_WIDTH, 364);
+  assert.equal(WORK_PANEL_MIN_WIDTH, 244);
   assert.equal(WORK_PANEL_MAX_WIDTH, 720);
   assert.match(panelSource, /clampWorkPanelWidth\(width\)/);
   assert.match(panelSource, /workPanelWidthLimits\(\)/);
