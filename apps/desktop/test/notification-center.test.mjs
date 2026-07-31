@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
 const componentSource = await readFile(
   new URL("../src/components/NotificationCenter.tsx", import.meta.url),
   "utf8",
 );
-const globalStyles = await readFile(
-  new URL("../src/styles/globals.css", import.meta.url),
-  "utf8",
-);
+const globalStyles = await loadStyles();
 const englishCatalog = await readFile(
   new URL("../../../packages/i18n/src/locales/en/index.ts", import.meta.url),
   "utf8",

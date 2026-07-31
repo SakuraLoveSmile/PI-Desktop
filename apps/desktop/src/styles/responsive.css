@@ -1,0 +1,80 @@
+/*
+  Responsive and reduced-motion tails that must stay last so they override the
+  section rules above.
+*/
+
+@media (max-width: 720px) {
+  .plugins-hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 14px;
+  }
+
+  .plugins-stat:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .plugins-toolbar-end {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .plugins-search-wrap {
+    flex: 1 1 auto;
+  }
+
+  .plugins-row-controls {
+    align-self: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plugins-menu,
+  .plugins-sheet,
+  .plugins-sheet-scrim,
+  .plugins-modal,
+  .plugins-modal-backdrop,
+  .plugins-skeleton-line {
+    animation: none;
+  }
+
+  .plugins-card:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-surface,
+  .settings-shell-full,
+  .jump-latest-btn,
+  .chat-error-notice,
+  .work-panel,
+  .work-panel.is-exiting {
+    /* Near-zero (not none): exit unmount listens for animationend. */
+    animation-duration: 0.01ms !important;
+  }
+
+  .route-pending-indicator {
+    animation: none;
+    border-color: var(--ds-text-muted);
+  }
+
+  .session-switch-progress > span {
+    width: 100%;
+    animation: none;
+    opacity: 0.55;
+    transform: none;
+  }
+
+  .composer-shell,
+  .composer-shell:focus-within,
+  .icon-btn,
+  .title-nav-btn,
+  .nav-item,
+  .copy-btn,
+  .sidebar-toolbar-button,
+  .sidebar-session-group-add {
+    transform: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}

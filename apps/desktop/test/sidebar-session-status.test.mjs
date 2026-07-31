@@ -5,6 +5,7 @@ import {
   latestSessionOutcomes,
   sidebarSessionStatus,
 } from "../src/lib/sidebar-session-status.ts";
+import { loadStylesSync } from "./helpers/styles.mjs";
 
 function notification(overrides) {
   return {
@@ -80,10 +81,7 @@ test("renders semantic, shape-distinct sidebar status indicators", () => {
     new URL("../src/components/Sidebar.tsx", import.meta.url),
     "utf8",
   );
-  const styles = fs.readFileSync(
-    new URL("../src/styles/globals.css", import.meta.url),
-    "utf8",
-  );
+  const styles = loadStylesSync();
   const app = fs.readFileSync(
     new URL("../src/App.tsx", import.meta.url),
     "utf8",

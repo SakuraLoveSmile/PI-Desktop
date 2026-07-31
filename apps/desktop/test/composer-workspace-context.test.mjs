@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
 const composerSource = await readFile(
   new URL("../src/components/Composer.tsx", import.meta.url),
   "utf8",
 );
-const globalStyles = await readFile(
-  new URL("../src/styles/globals.css", import.meta.url),
-  "utf8",
-);
+const globalStyles = await loadStyles();
 
 test("composer omits the workspace context rail", () => {
   assert.match(composerSource, /className="composer-shell"/);

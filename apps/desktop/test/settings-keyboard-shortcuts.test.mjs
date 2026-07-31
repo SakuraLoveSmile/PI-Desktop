@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
 const shortcutSource = await readFile(
   new URL("../../../packages/shared/src/keyboard-shortcuts.ts", import.meta.url),
@@ -31,10 +32,7 @@ const searchSource = await readFile(
   new URL("../src/lib/settings-search.ts", import.meta.url),
   "utf8",
 );
-const stylesSource = await readFile(
-  new URL("../src/styles/globals.css", import.meta.url),
-  "utf8",
-);
+const stylesSource = await loadStyles();
 
 test("shared shortcut map drives renderer dispatch and native menu accelerators", () => {
   for (const id of [

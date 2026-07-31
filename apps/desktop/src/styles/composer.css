@@ -1,0 +1,234 @@
+/*
+  Composer — dock, shell, textarea, toolbar, and the send/stop/nav controls.
+  Light/dark surface overrides live in theme-overrides.css; the menus that open
+  from the toolbar live in composer-menus.css.
+*/
+
+.composer-dock {
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* Thread mode: floating bottom dock with fade */
+.composer-dock-docked {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  padding: 0 24px 16px;
+  background: linear-gradient(
+    to top,
+    var(--ds-bg-primary) 52%,
+    color-mix(in oklab, var(--ds-bg-primary) 72%, transparent) 78%,
+    transparent
+  );
+}
+
+/* Home mode: part of centered stack — no absolute dock, no bottom gradient veil */
+.composer-dock-home {
+  position: relative;
+  padding: 0;
+  background: transparent;
+}
+
+.composer-dock-home .composer-stack {
+  width: 100%;
+  max-width: 100%;
+  gap: 0;
+  overflow: visible;
+}
+
+.composer-stack {
+  pointer-events: auto;
+  width: min(100%, 768px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.composer-shell {
+  /* Positioning context for the autocomplete panel (D123–D125, ADR 0024). */
+  position: relative;
+  width: 100%;
+  border-radius: var(--ds-composer-radius, var(--radius-2xl));
+  background: var(--ds-bg-composer);
+  box-shadow: var(--ds-shadow-composer);
+  isolation: isolate;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-normal) var(--motion-ease-out),
+    transform var(--motion-duration-normal) var(--motion-ease-out);
+}
+
+.composer-shell:focus-within {
+  box-shadow:
+    var(--ds-elevation-stroke),
+    0 7px 24px color-mix(in oklab, var(--ds-text-primary) 9%, transparent);
+}
+
+.composer-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  padding: 10px 12px 0;
+  min-height: 44px;
+}
+
+.composer-input {
+  width: 100%;
+  min-height: 28px;
+  max-height: 7lh;
+  overflow-y: hidden;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+}
+
+.composer-input::placeholder {
+  color: var(--ds-text-secondary);
+  -webkit-text-fill-color: var(--ds-text-secondary);
+  opacity: 0.72;
+}
+
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px 8px;
+}
+
+.composer-left,
+.composer-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.icon-btn {
+  display: inline-flex;
+  height: 28px;
+  min-width: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  padding: 0 8px;
+  color: var(--ds-text-secondary);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.icon-btn:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.icon-btn.active {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+.send-btn {
+  display: inline-flex;
+  height: 28px;
+  width: 28px; /* Codex spacing-token-button-composer = 28px */
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--gray-0);
+  color: var(--gray-1000);
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out), transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+:root[data-theme="light"] .send-btn {
+  background: var(--gray-1000);
+  color: var(--gray-0);
+}
+
+.send-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.send-btn:disabled {
+  opacity: 1;
+  background: color-mix(in oklab, var(--ds-text-primary) 18%, transparent);
+  color: color-mix(in oklab, var(--ds-bg-primary) 92%, transparent);
+}
+
+:root[data-theme="light"] .send-btn:disabled {
+  /* Gold empty-home disabled send ~#8e8e90 solid chip + white arrow */
+  background: #8e8e90;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .send-btn:disabled {
+  background: color-mix(in oklab, var(--gray-0) 18%, transparent);
+  color: color-mix(in oklab, var(--gray-900) 70%, transparent);
+}
+
+.stop-btn {
+  display: inline-flex;
+  height: 28px;
+  width: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 16%, transparent);
+  color: var(--ds-text-primary);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.stop-btn:hover {
+  background: color-mix(in oklab, var(--ds-text-primary) 22%, transparent);
+}
+
+.nav-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  min-height: 32px; /* Codex nav ~31-32px pitch */
+  color: var(--ds-text-secondary);
+  font-size: var(--text-base); /* readable primary sidebar nav */
+  text-align: left;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.nav-item:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.nav-item.active {
+  background: var(--ds-bg-active);
+  color: var(--ds-text-primary);
+}
+
+.new-task-btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  /* Codex gold: ghost New task in both themes */
+  background: transparent;
+  padding: 5px 8px;
+  min-height: 30px;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base); /* match primary sidebar actions */
+  font-weight: var(--font-weight-normal);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.new-task-btn:hover {
+  background: var(--ds-bg-hover);
+}

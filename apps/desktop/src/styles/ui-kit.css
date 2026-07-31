@@ -1,0 +1,142 @@
+/*
+  Shared primitives — panel cards, form fields, button variants, badges, and
+  the overlay/dialog base used by every floating surface.
+*/
+
+.panel-card {
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
+}
+
+.field-input,
+.field-select,
+.field-textarea {
+  width: 100%;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
+  padding: 8px 10px;
+  color: var(--ds-text-primary);
+  outline: none;
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-ease-out),
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.field-input:focus,
+.field-select:focus,
+.field-textarea:focus {
+  border-color: color-mix(in oklab, var(--ds-accent) 55%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 16%, transparent);
+}
+
+:root[data-theme="light"] .field-input,
+:root[data-theme="light"] .field-select,
+:root[data-theme="light"] .field-textarea {
+  background: #f5f5f5;
+  border-color: transparent;
+  box-shadow: 0 0 0 0.5px color-mix(in oklab, #1a1c1f 8%, transparent);
+}
+
+:root[data-theme="light"] .field-input:focus,
+:root[data-theme="light"] .field-select:focus,
+:root[data-theme="light"] .field-textarea:focus {
+  background: #ffffff;
+  border-color: transparent;
+  box-shadow:
+    0 0 0 0.5px color-mix(in oklab, #1a1c1f 12%, transparent),
+    0 0 0 2px color-mix(in oklab, #1a1c1f 12%, transparent);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  padding: 7px 12px;
+  font-size: var(--text-md);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out), opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.btn-primary {
+  background: var(--gray-0);
+  color: var(--gray-1000);
+}
+:root[data-theme="light"] .btn-primary {
+  background: var(--gray-1000);
+  color: var(--gray-0);
+}
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-primary);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--ds-text-primary) 12%, transparent);
+}
+
+.btn-ghost {
+  color: var(--ds-text-secondary);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+.badge-neutral {
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-secondary);
+}
+.badge-success {
+  background: color-mix(in oklab, var(--ds-success) 16%, transparent);
+  color: var(--ds-success);
+}
+.badge-error {
+  background: color-mix(in oklab, var(--ds-error) 16%, transparent);
+  color: var(--ds-error);
+}
+.badge-warning {
+  background: color-mix(in oklab, var(--ds-warning) 16%, transparent);
+  color: var(--ds-warning);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, #000 45%, transparent);
+  padding: 24px;
+  animation: overlay-in var(--motion-duration-normal) var(--motion-ease-out) both;
+}
+
+:root[data-theme="light"] .overlay {
+  /* Lighter scrim keeps elevated white dialogs readable without a heavy veil. */
+  background: color-mix(in oklab, #1a1c1f 28%, transparent);
+}
+
+.dialog {
+  width: min(100%, 440px);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-lg-plus);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-dialog);
+  padding: 18px;
+  animation: surface-in var(--motion-duration-normal) var(--motion-ease-out) both;
+}

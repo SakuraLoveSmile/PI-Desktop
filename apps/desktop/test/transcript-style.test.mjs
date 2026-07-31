@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
-const stylesSource = await readFile(
-  new URL("../src/styles/globals.css", import.meta.url),
-  "utf8",
-);
+const stylesSource = await loadStyles();
 const transcriptSource = await readFile(
   new URL("../src/components/ChatTranscript.tsx", import.meta.url),
   "utf8",

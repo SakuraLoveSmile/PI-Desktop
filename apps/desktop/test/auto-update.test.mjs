@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -32,7 +33,7 @@ const [
   read("../src/components/ReleaseNotesDialog.tsx"),
   read("../src/pages/SettingsPage.tsx"),
   read("../src/App.tsx"),
-  read("../src/styles/globals.css"),
+  loadStyles(),
   read("../package.json"),
   read("../../../.github/workflows/release.yml"),
   read("../../../packages/i18n/src/locales/en/index.ts"),

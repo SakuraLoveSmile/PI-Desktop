@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 import {
   MAIN_PANE_MIN_WIDTH,
   WORK_PANEL_MAX_WIDTH,
@@ -35,10 +36,7 @@ const storeSource = await readFile(
   new URL("../src/stores/app-store.ts", import.meta.url),
   "utf8",
 );
-const globalStyles = await readFile(
-  new URL("../src/styles/globals.css", import.meta.url),
-  "utf8",
-);
+const globalStyles = await loadStyles();
 
 test("work panel replaces the context panel overlay", async () => {
   await assert.rejects(

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -9,7 +10,7 @@ const [app, chatSurface, transcript, minimap, styles] = await Promise.all([
   read("../src/components/ChatSurface.tsx"),
   read("../src/components/ChatTranscript.tsx"),
   read("../src/components/ConversationMinimap.tsx"),
-  read("../src/styles/globals.css"),
+  loadStyles(),
 ]);
 
 test("streaming state stays inside the chat render boundary", () => {

@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
-const styles = await readFile(
-  new URL("../src/styles/globals.css", import.meta.url),
-  "utf8",
-);
+const styles = await loadStyles();
 
 test("high-traffic chrome uses shared motion tokens on hover fills", () => {
   for (const selector of [

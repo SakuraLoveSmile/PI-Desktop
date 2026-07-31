@@ -1,0 +1,434 @@
+/*
+  Chat shell — main pane, chat surface and route transitions, thread scroll
+  region, conversation minimap, jump-to-latest, and the empty-home stack.
+*/
+
+/*
+  User bubble. The wrap constraint lives on the column alone — the bubble
+  fills up to 100% of it. Stacking percentage max-widths on both (78% × 78%)
+  is what previously wrapped short prompts at ~60% of the thread width.
+*/
+.message-row.user .message-bubble {
+  width: fit-content;
+  max-width: 100%;
+  border-radius: var(--radius-lg-plus);
+  border-bottom-right-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  padding: 10px 15px;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base);
+  line-height: var(--leading-chat);
+}
+
+.message-row.assistant {
+  padding-top: 6px;
+  padding-bottom: 14px;
+}
+
+.drag {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+.main-pane {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  background: var(--ds-bg-primary);
+}
+
+.chat-surface,
+.route-page {
+  position: relative;
+  display: flex;
+  min-width: 360px;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.chat-surface > .thread-wrap,
+.chat-surface > .home-main-content,
+.chat-surface > .composer-dock {
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.chat-surface.session-switching > .thread-wrap,
+.chat-surface.session-switching > .home-main-content,
+.chat-surface.session-switching > .composer-dock {
+  pointer-events: none;
+  opacity: 0.82;
+}
+
+.session-switch-progress {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 30;
+  height: 2px;
+  overflow: hidden;
+  background: var(--ds-border-subtle);
+  pointer-events: none;
+}
+
+.session-switch-progress > span {
+  display: block;
+  width: 28%;
+  height: 100%;
+  background: var(--ds-accent);
+  animation: session-switch-progress 720ms var(--motion-ease-standard) infinite;
+  transform: translateX(-110%);
+}
+
+@keyframes session-switch-progress {
+  to {
+    transform: translateX(460%);
+  }
+}
+
+.route-pending {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-text-muted);
+}
+
+.route-pending-indicator {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--ds-border-default);
+  border-top-color: var(--ds-text-secondary);
+  border-radius: var(--radius-round);
+  animation: route-pending-spin 700ms linear infinite;
+}
+
+@keyframes route-pending-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.route-surface,
+.settings-shell-full {
+  animation: route-surface-in var(--motion-duration-normal) var(--motion-ease-out)
+    both;
+}
+
+@keyframes route-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.thread-wrap {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.thread-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  /* Pinned-follow drives the scroll position; native anchoring fights it. */
+  overflow-anchor: none;
+}
+
+/* Floats above the docked composer fade when the user scrolls away from latest */
+.jump-latest-btn {
+  position: absolute;
+  bottom: calc(var(--composer-dock-height, 168px) + 12px);
+  left: 50%;
+  translate: -50% 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-round);
+  border: 1px solid var(--ds-border-default);
+  background: var(--ds-bg-secondary);
+  color: var(--ds-text-secondary);
+  box-shadow:
+    0 3px 7.5px rgba(0, 0, 0, 0.039),
+    0 0 20px rgba(0, 0, 0, 0.051);
+  animation: jump-latest-in var(--motion-duration-normal) var(--motion-ease-out)
+    both;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out), border-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+@keyframes jump-latest-in {
+  from {
+    opacity: 0;
+    scale: 0.88;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+.jump-latest-btn:hover {
+  background: var(--ds-bg-tertiary);
+  color: var(--ds-text-primary);
+}
+
+.thread-content {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  /* Reserve exactly the composer's real height (+ a small gap) so the last
+   * message sits just above the box instead of far below it. The variable is
+   * published by Composer.tsx from the docked composer's measured height. */
+  padding: 20px 28px calc(var(--composer-dock-height, 228px) + 16px);
+}
+
+/* Frameless Windows/Linux controls occupy the 46px titlebar band. macOS keeps
+ * the absolute conversation top bar there too, so all three platforms reserve
+ * the band so the first transcript row never paints under it. */
+:root[data-platform="win32"] .thread-content,
+:root[data-platform="linux"] .thread-content,
+:root[data-platform="darwin"] .thread-content {
+  padding-top: 46px;
+}
+
+/* Conversation minimap: packed stack of dashes on the thread's left edge,
+ * centered inside the safe span between titlebar and docked composer. Dense
+ * stacks reduce their gap and marker pitch instead of escaping that span.
+ * Dashes grow horizontally with a Dock-style falloff driven by --magnify (set
+ * from JS), so magnification never reflows the stack. */
+.minimap-rail {
+  position: absolute;
+  left: 8px;
+  top: var(--ds-toolbar-height);
+  bottom: calc(var(--composer-dock-height, 200px) + 16px);
+  z-index: 6;
+  display: flex;
+  width: 26px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(
+    0px,
+    calc(4px - var(--minimap-marker-count) * 0.05px),
+    2px
+  );
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.minimap-marker {
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  width: 100%;
+  height: 8px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.minimap-marker::before {
+  content: "";
+  height: min(2px, 100%);
+  width: calc(var(--dash-w) * var(--magnify, 1));
+  border-radius: var(--radius-full);
+  background: var(--ds-border-strong);
+  transition: width 90ms var(--motion-ease-out),
+    background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.minimap-marker.user {
+  --dash-w: 13px;
+}
+
+.minimap-marker.assistant {
+  --dash-w: 8px;
+}
+
+.minimap-marker:hover::before,
+.minimap-marker:focus-visible::before {
+  background: var(--ds-text-secondary);
+}
+
+.minimap-marker.active::before {
+  background: var(--ds-text-primary);
+}
+
+.minimap-popover {
+  position: absolute;
+  left: 34px;
+  z-index: 7;
+  width: 248px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--ds-border-default);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-composer);
+  pointer-events: none;
+}
+
+.minimap-popover-role {
+  margin-bottom: 4px;
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--ds-text-muted);
+}
+
+.minimap-popover-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--ds-text-secondary);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* Empty chat home: one scrollable stack keeps optional onboarding above the composer. */
+.home-main-content {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  container-type: size;
+  container-name: home-main-content;
+}
+
+.home-scroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.home-stack-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: min(100%, 768px);
+  max-width: 100%;
+  /* Auto block margins center the stack when it fits and degrade to
+     top-aligned scrolling when it overflows (unlike justify-content:center,
+     which clips the top of overflowing content). */
+  margin: auto;
+  padding: 40px 12px 28px;
+  box-sizing: border-box;
+}
+
+.home-composer-wrap {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 0;
+}
+
+/* legacy alias kept for capture hooks */
+.home-stack {
+  display: contents;
+}
+
+.empty-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  min-height: 0;
+  padding: 0;
+  text-align: center;
+  width: 100%;
+}
+
+.empty-hero-icon {
+  display: flex;
+  height: 56px; /* Codex size-14 */
+  width: 56px;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-text-primary);
+  opacity: 1;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.empty-hero h1 {
+  margin: 0;
+  max-width: min(100%, 42rem);
+  font-size: var(--text-2xl); /* Codex --text-xl / heading-xl */
+  font-weight: var(--font-weight-normal);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tighter);
+  color: var(--ds-text-primary);
+  white-space: pre-wrap;
+}
+
+:root[data-theme="light"] .empty-hero h1 {
+  color: #1a1c1f;
+}
+
+.empty-hero .project-underline {
+  display: inline-block;
+  max-width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--ds-text-faint);
+}
+
+.empty-hero .project-underline:hover {
+  color: var(--ds-text-secondary);
+}
+
+.home-onboarding-checklist {
+  margin-top: 0;
+  max-width: 100%;
+}
+
+@media (max-height: 760px) {
+  .home-stack-inner {
+    padding-top: 28px;
+    gap: 20px;
+  }
+}
+
+@media (max-height: 640px) {
+  .home-stack-inner {
+    padding-top: 20px;
+    padding-bottom: 20px;
+    gap: 16px;
+  }
+}
