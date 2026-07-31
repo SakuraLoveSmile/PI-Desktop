@@ -19,8 +19,8 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
 ### R2 — Agent Extension (partial ✅)
 - Full agentTools pipeline ✅
 - Unified namespace and audit ✅
-- Skills contribution metadata is accepted, but skills are not activated by the
-  runtime yet
+- Skills contribution ✅ — the catalog reaches the system prompt and the agent
+  loads a body on demand through the `Skill` tool (D171)
 - Per-plugin settings API is implemented; a dedicated settings UI is not
   implemented
 - Plugin log panel remains planned; runtime audit logs exist without a dedicated
@@ -46,12 +46,14 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
 - Auto-update policy ✅
 - Malicious-version yank response (still planned)
 
-### R6 — Advanced Ecosystem
-- MCP plugin type
-- Background service plugins
-- Enterprise private sources
-- Inter-plugin message bus
-- Marketplace reviews / quality score (optional)
+### R6 — Advanced Ecosystem (partial ✅)
+- MCP plugin type ✅ — `contributes.mcpServers` over stdio and remote HTTP (D173)
+- Background service plugins ✅ — `contributes.services` with supervised
+  restarts (D174)
+- Inter-plugin message bus ✅ — declared topics, `pi.bus.*` (D175)
+- Theme plugins ✅ — plugins ship CSS files (D172)
+- Enterprise private sources (still planned)
+- Marketplace reviews / quality score (optional, still planned)
 
 ## 3. Mapping to product milestones
 

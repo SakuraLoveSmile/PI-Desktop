@@ -53,3 +53,5 @@ Each ADR includes:
 | 0035 | Surface the OS locale through the preload bridge | Accepted |
 | 0036 | Split Settings into AI and Shortcuts destinations | Accepted |
 | 0037 | Resolve project instructions in Electron main | Accepted |
+| 0038 | Bridge plugin-declared MCP servers in Electron main | Accepted |
+| 0039 | Resident plugin services and the inter-plugin message bus | Accepted |

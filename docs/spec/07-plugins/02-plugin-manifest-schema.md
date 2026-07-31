@@ -60,9 +60,12 @@ type PluginUiConfig = {
 type PluginContributes = {
  commands?: PluginCommandContrib[];
  agentTools?: PluginAgentToolContrib[];
- skills?: string[]; // relative paths
+ skills?: Array<string | PluginSkillContrib>; // relative paths, or metadata overrides
  settings?: PluginSettingContrib[];
  themes?: PluginThemeContrib[];
+ mcpServers?: PluginMcpServerContrib[];
+ services?: PluginServiceContrib[];
+ bus?: PluginBusContrib;
 };
 
 type PluginCommandContrib = {
@@ -94,9 +97,41 @@ type PluginSettingContrib = {
 };
 
 type PluginThemeContrib = {
- id: string;
+ id: string; // ^[a-zA-Z][a-zA-Z0-9_-]{0,63}$
  label: string;
- path: string; // json/css tokens
+ path: string; // relative `.css` file
+ base?: "light" | "dark"; // palette the overrides layer on, default `dark`
+};
+
+type PluginSkillContrib = {
+ id?: string; // defaults to the file name without its extension
+ path: string; // relative path to the skill document
+ name?: string; // overrides the front-matter `name`
+ description?: string; // overrides the front-matter `description`
+};
+
+type PluginMcpServerContrib = {
+ id: string; // ^[a-zA-Z][a-zA-Z0-9_-]{0,63}$
+ label?: string;
+ transport: "stdio" | "http";
+ // stdio only
+ command?: string; // bare PATH name, or plugin-relative executable
+ args?: string[];
+ env?: Record<string, string | { setting: string }>;
+ // http only
+ url?: string; // https, or http when the host is loopback
+ headers?: Record<string, string | { setting: string }>;
+};
+
+type PluginServiceContrib = {
+ id: string; // ^[a-zA-Z][a-zA-Z0-9_-]{0,63}$
+ label?: string;
+ autoRestart?: boolean; // default true
+};
+
+type PluginBusContrib = {
+ publish?: string[]; // concrete topics, e.g. `build.done`
+ subscribe?: string[]; // patterns, e.g. `build.*` / `build.**`
 };
 ```
 
@@ -105,6 +140,7 @@ type PluginThemeContrib = {
 ```ts
 type PluginPermission =
  | "ui.panel"
+ | "ui.theme"
  | "clipboard.read"
  | "clipboard.write"
  | "notify"
@@ -113,10 +149,31 @@ type PluginPermission =
  | "agent.tool.register"
  | "agent.prompt.inject"
  | "net.fetch"
- | "shell.openExternal";
+ | "shell.openExternal"
+ | "mcp.server.local"
+ | "mcp.server.remote"
+ | "background.service"
+ | "bus.publish"
+ | "bus.subscribe";
 ```
 
 Unknown permission = validation failure.
+
+## 5.1 Bus topic grammar
+
+Topics are dot-separated segments matching `[a-zA-Z0-9][a-zA-Z0-9_-]*`, at most
+8 segments and 128 characters. `contributes.bus.publish` lists concrete topics;
+`contributes.bus.subscribe` lists patterns where `*` matches exactly one segment
+and `**` matches one or more trailing segments (final segment only).
+
+```json
+{
+ "bus": {
+ "publish": ["build.done"],
+ "subscribe": ["build.*", "deploy.**"]
+ }
+}
+```
 
 ## 6. activationEvents (optional)
 
@@ -140,6 +197,23 @@ MVP may implement only:
 5. Path fields must not use absolute paths or `..`
 6. `main` / `ui.panel` / skills paths must exist
 7. tool `name` allows only `[a-zA-Z][a-zA-Z0-9_]*`
+8. Contribution ids (`themes`, `mcpServers`, `services`) must match
+   `[a-zA-Z][a-zA-Z0-9_-]{0,63}` and be unique within their own list
+9. `themes[].path` must exist and end in `.css`; `themes[].base` may only be
+   `light` or `dark`
+10. `mcpServers[]` must set exactly one transport's fields: `stdio` requires
+   `command` (bare PATH name or plugin-relative, never absolute) and rejects
+   `url`/`headers`; `http` requires `url` (`https`, or `http` only for loopback)
+   and rejects `command`/`args`/`env`
+11. `bus.publish` entries must be concrete topics and `bus.subscribe` entries
+   valid patterns (§5.1)
+12. A contribution that needs a permission fails validation when the permission
+   is missing: `themes` → `ui.theme`, stdio servers → `mcp.server.local`, remote
+   servers → `mcp.server.remote`, `services` → `background.service`,
+   `bus.publish` → `bus.publish`, `bus.subscribe` → `bus.subscribe`.
+   `skills` is the exception — it predates the permission gate, so a manifest
+   without `agent.prompt.inject` still validates and the runtime simply skips
+   the skills
 
 ## 8. Example: minimal plugin
 
@@ -194,6 +268,53 @@ MVP may implement only:
  "permissions": ["agent.tool.register"]
 }
 ```
+
+## 9.1 Example: capability contributions
+
+```json
+{
+ "schemaVersion": 1,
+ "id": "demo.capabilities",
+ "name": "Capabilities",
+ "version": "0.1.0",
+ "main": "main.js",
+ "contributes": {
+ "skills": [{ "path": "skills/release.md", "id": "release-notes" }],
+ "themes": [
+ { "id": "midnight", "label": "Midnight", "path": "themes/midnight.css", "base": "dark" }
+ ],
+ "mcpServers": [
+ {
+ "id": "docs",
+ "transport": "stdio",
+ "command": "npx",
+ "args": ["-y", "@example/docs-mcp"],
+ "env": { "DOCS_TOKEN": { "setting": "docsToken" } }
+ },
+ {
+ "id": "issues",
+ "transport": "http",
+ "url": "https://mcp.example.com/issues",
+ "headers": { "Authorization": { "setting": "issuesAuth" } }
+ }
+ ],
+ "services": [{ "id": "watcher", "label": "Repo watcher" }],
+ "bus": { "publish": ["demo.build.done"], "subscribe": ["demo.**"] }
+ },
+ "permissions": [
+ "agent.prompt.inject",
+ "ui.theme",
+ "mcp.server.local",
+ "mcp.server.remote",
+ "background.service",
+ "bus.publish",
+ "bus.subscribe"
+ ]
+}
+```
+
+`{ "setting": "<key>" }` reads the plugin's own settings; the host environment is
+never passed through (D018).
 
 ## 10. Compatibility strategy
 

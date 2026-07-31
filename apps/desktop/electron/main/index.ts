@@ -380,7 +380,7 @@ async function resolveAgentRuntimeLaunch(
         description: tool.description,
         parameters: tool.schema ?? { type: "object", properties: {} },
       })),
-      // Plugin skills (D170): only the catalog crosses to the sidecar; the
+      // Plugin skills (D171): only the catalog crosses to the sidecar; the
       // document body is fetched on demand through the local `Skill` tool.
       pluginSkills: plugins.getSkills().map((skill) => ({
         id: skill.id,
@@ -1864,7 +1864,7 @@ async function startSidecar(): Promise<void> {
       content: `Previewing ${raw} in the built-in browser panel. Live reload is active — subsequent edits to the file or sibling assets re-render automatically.`,
     };
   });
-  // Plugin skills (D170): the model loads a declared skill document by id.
+  // Plugin skills (D171): the model loads a declared skill document by id.
   // Served in main because the plugin runtime — and the plugin directories —
   // live here, not in host-core.
   s.setLocalTool("Skill", async ({ args }) => {

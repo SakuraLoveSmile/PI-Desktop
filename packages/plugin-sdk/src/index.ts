@@ -118,10 +118,15 @@ export type PluginToolExecContext = {
   log: (msg: string) => void;
 };
 
+export type PluginServiceContext = {
+  /** Appends a line to the plugin's host log. */
+  log: (msg: string) => void;
+};
+
 export type PluginService = {
   /** Must match a `contributes.services[].id` entry. */
   id: string;
-  start: () => Promise<void> | void;
+  start: (ctx: PluginServiceContext) => Promise<void> | void;
   stop?: () => Promise<void> | void;
 };
 
@@ -169,8 +174,13 @@ export type PluginHostApi = {
     unregisterTool: (name: string) => Promise<void>;
   };
   services: {
-    /** Register a resident service declared in `contributes.services`. */
-    register: (service: PluginService) => Promise<void>;
+    /**
+     * Register a resident service declared in `contributes.services`. Local
+     * bookkeeping only — the host decides when `start` runs.
+     */
+    register: (service: PluginService) => void;
+    /** Drops the registration, stopping the service first if it is running. */
+    unregister: (id: string) => Promise<void>;
   };
   bus: {
     publish: (topic: string, payload?: unknown) => Promise<void>;

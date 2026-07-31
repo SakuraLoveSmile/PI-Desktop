@@ -58,17 +58,54 @@ discovered
 - A hook exception must not crash the host
 - If `onLoad` fails, enter `load_error` and automatically roll back the contribution points already registered
 
+## 3.1 Resident services
+
+A service declared in `contributes.services` is driven by the host, not by the
+plugin's own hooks, so its window is strictly inside the plugin's lifetime:
+
+1. `onLoad` completes and contribution points are registered
+2. For each declared service (at most 4 per plugin, gated on
+   `background.service`), the broker calls `service.start` in the plugin process
+   with a 5s budget. A start failure marks that one service `failed` and leaves
+   the rest of the plugin loaded.
+3. On unload / disable / reload, `service.stop` runs **before** `onUnload`, so
+   the service is quiet while the plugin still has its API
+
+Status per service is `starting` | `running` | `stopped` | `failed` plus a
+restart count, readable over the plugin IPC surface and shown on the Plugins
+page.
+
+### Restart policy
+
+The service lives in the plugin's host process, so a crash takes it with the
+process. The supervisor then restarts the whole plugin:
+
+- Backoff `1s, 2s, 4s, 8s, 16s`, capped at 30s
+- At most 5 restarts; after that the plugin stays down in `failed` so the user
+  sees the failure instead of a silent crash loop
+- A process that survives 60s is considered healthy and the backoff resets to
+  zero
+- `autoRestart: false` on a service opts its plugin out of restarts entirely
+- Restarts are skipped when the user re-enabled or removed the plugin while the
+  backoff timer was pending
+
+Manual enable / disable always wins over the supervisor: an explicit action
+clears the pending timer and the attempt counter.
+
 ## 4. Enable / disable semantics
 
 ### enable
 - Set state to enabled
 - Attempt load
-- Success: register commands / tools / skills
+- Success: register commands / tools / skills / themes / MCP servers, then start
+  resident services
 - Failure: automatically fall back to disabled and surface the error to the user. This is frozen by D017 (enable→load failure auto-disables the plugin).
 
 ### disable
 - Unregister commands / tools
 - Close panel
+- Stop resident services and disconnect MCP servers
+- Cancel any pending restart backoff
 - Call `onUnload` / `onDisable`
 - Persist as disabled
 
@@ -103,7 +140,10 @@ begin
  register commands
  register tools
  register skills
+ register themes
+ register MCP servers (lazy connect)
 commit
+ start resident services
 ```
 
 On mid-way failure:
@@ -125,6 +165,9 @@ Record at least:
 - plugin.load.error
 - plugin.unload
 - plugin.crash
+- plugin.service.start / plugin.service.stop
+- plugin.service.restart / plugin.service.restart.scheduled
+- plugin.services.skipped (missing permission or over the per-plugin cap)
 
 Fields:
 - pluginId
@@ -132,6 +175,7 @@ Fields:
 - source (`installed` | `dev` | `marketplace`)
 - ts
 - errorCode?
+- attempt? / delayMs? (service restarts)
 
 ## 9. Uninstall strategy
 

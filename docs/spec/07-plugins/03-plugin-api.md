@@ -91,6 +91,45 @@ pi.clipboard.writeText(text: string): Promise<void>
 pi.shell.openExternal(url: string): Promise<void>
 ```
 
+### services (requires `background.service`)
+```ts
+pi.services.register(service: {
+ id: string // must match a contributes.services[].id
+ start: (ctx: { log: (msg: string) => void }) => Promise<void> | void
+ stop?: () => Promise<void> | void
+}): void
+
+pi.services.unregister(id: string): Promise<void>
+```
+
+Registration is local bookkeeping: it records the handlers so the broker can
+call them. The host calls `start` after `onLoad` and `stop` before unload, and
+restarts a crashed plugin per [05-plugin-lifecycle.md](05-plugin-lifecycle.md).
+`start` is idempotent within one process — a second start on an already-running
+service is a no-op.
+
+### bus (requires `bus.publish` / `bus.subscribe`)
+```ts
+pi.bus.publish(topic: string, payload?: unknown): Promise<void>
+pi.bus.subscribe(
+ pattern: string,
+ handler: (message: PluginBusMessage) => void,
+): Promise<() => Promise<void>> // resolves to unsubscribe
+```
+
+```ts
+type PluginBusMessage = {
+ topic: string
+ from: string // publisher plugin id
+ payload?: unknown
+ at: string // ISO timestamp assigned by the host
+}
+```
+
+`topic` must appear in `contributes.bus.publish`; `pattern` must appear in
+`contributes.bus.subscribe`. A publisher is excluded from its own fan-out. Caps
+and the threat model are in [04-plugin-security.md](04-plugin-security.md) §5.1.
+
 ### net
 ```ts
 pi.net.fetch(input: {
@@ -112,6 +151,8 @@ type PluginApiError = {
  | "INVALID_ARGUMENT"
  | "TIMEOUT"
  | "UNSUPPORTED"
+ | "LIMIT_EXCEEDED" // a per-plugin cap is full (e.g. bus subscriptions)
+ | "RATE_LIMITED" // a rolling window is exhausted (e.g. bus publishes)
  | "INTERNAL"
  message: string
 }
@@ -119,15 +160,22 @@ type PluginApiError = {
 
 All API failures throw an error carrying a `code`.
 
-## 5. Events (host -> plugin, planned)
+## 5. Events (host -> plugin)
 
 ```ts
 pi.events.on(event, handler)
 pi.events.off(event, handler)
 ```
 
-The SDK reserves this shape, but the current host delivers no events; `on` and
-`off` are no-ops in the plugin process. Planned events include:
+The host pushes events to the plugin process as one-way frames. Delivered today:
+
+- `bus.message` — a bus delivery, with the `PluginBusMessage` as the single
+  argument. `pi.bus.subscribe` is the normal way to receive these; `events.on`
+  sees the raw stream of every subscription the plugin holds.
+
+A throwing handler is logged and does not affect other listeners or the plugin.
+
+Planned events:
 - `workspace:changed`
 - `session:activated`
 - `plugin:settingsChanged`
@@ -149,10 +197,13 @@ The plugin's own preload/main forwards to the plugin runtime.
 Any of the following calls must be logged for audit:
 
 - fs.writeText
-- execute after agent.registerTool
+- execute after agent.registerTool (including tools discovered from a plugin's
+  MCP servers)
 - net.fetch
 - shell.openExternal
 - clipboard.read/write (may be sampled)
+- bus.publish / bus.subscribe / bus.unsubscribe (with the topic and fan-out size)
+- service start / stop / restart
 
 Log fields:
 - pluginId
@@ -176,6 +227,11 @@ The desktop plugin runtime now implements the MVP host API surface used by local
 - `fs.readText` / `fs.writeText` / `fs.glob` (workspace-bound)
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
+- `services.register` / `unregister`, `bus.publish` / `subscribe`, `events.on` / `off`
+
+Declarative contributions have no `pi.*` counterpart on purpose: skills, themes,
+and MCP servers are read from the manifest by the host, so a plugin cannot add
+one at runtime.
 
 All high-risk entry points assert declared+granted permissions and emit audit log lines.
 Plugin panels no longer receive the full `pi` object; they use `window.pluginBridge.invoke`.

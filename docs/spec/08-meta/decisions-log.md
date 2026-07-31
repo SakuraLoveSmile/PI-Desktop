@@ -624,3 +624,112 @@ section mirrors only marketplace/catalog items still blocking nothing.
   `scripts/check-style-tokens.mjs` walks the whole `src` tree and is unaffected.
 - Decision D170; the single-file layout assumed by `04-ux/07-ui-design-system.md`
   §Typography and `04-ux/08-component-spec.md` no longer holds.
+
+## 2026-07-31 — Plugin skills are model-invoked
+
+- `contributes.skills` is activated at load time behind `agent.prompt.inject`.
+  Each entry may be a path or `{ path, id?, name?, description? }`; front matter
+  in the document supplies `name` / `description` when the manifest does not.
+- The base system prompt carries only a catalog — skill id, name, and a
+  description trimmed to 240 chars. Bodies are not in the prompt; the model
+  fetches one through a built-in `Skill` tool that Electron main serves locally
+  against `plugins.loadSkillBody(id)`, so the sidecar never holds skill text.
+- Caps: 32 skills per plugin, 128KB per document. A manifest without
+  `agent.prompt.inject` still validates — skills predate the permission gate — and
+  the runtime simply skips them.
+- Skill ids join the runtime-reuse key in `packages/agent-runtime/src/runtime.ts`,
+  so enabling or disabling a plugin rebuilds the runtime instead of serving a
+  stale catalog.
+- Rejected: user-facing slash commands. A skill is guidance the agent should
+  reach for when a task calls for it, not a command the user has to know exists.
+- Decision D171; closes the "parsed but never activated" gap in
+  `07-plugins/14-plugin-roadmap.md` R2.
+
+## 2026-07-31 — Plugin themes ship CSS files
+
+- `contributes.themes` declares `{ id, label, path, base? }` and requires
+  `ui.theme`. `path` is a plugin-relative `.css` file; `base` (`light` | `dark`,
+  default `dark`) names the palette the overrides layer on.
+- The main process reads the file and runs `sanitizeThemeCss()`: no `@import`, no
+  `url()` outside `data:`, no unparseable `url(`, no `javascript:` /
+  `expression(`, no markup sequences, 256KB cap, 8 themes per plugin. The
+  renderer receives finished text over `plugin/themes` and injects it into one
+  `<style id="pi-plugin-theme">` appended after the app's own stylesheets.
+- `AppSettings.theme` widens to `plugin:<pluginId>:<themeId>`. When the providing
+  plugin is disabled, uninstalled, or fails to load, the app falls back to
+  `system` rather than rendering an unstyled shell.
+- Rejected: a token-JSON contribution. It would have been safer to validate, but
+  it can only express the tokens we thought to enumerate; a stylesheet lets a
+  theme reach a surface the token list forgot, and the sanitizer plus
+  append-order rule bound the risk to appearance.
+- Decision D172.
+
+## 2026-07-31 — Plugin MCP servers over stdio and remote HTTP
+
+- `contributes.mcpServers` declares `{ id, label?, transport }` plus exactly one
+  transport's fields: `stdio` takes `command` / `args` / `env`, `http` takes
+  `url` / `headers`. Permissions are separate: `mcp.server.local` for stdio,
+  `mcp.server.remote` for HTTP.
+- `apps/desktop/electron/main/plugin-mcp.ts` speaks protocol `2025-06-18` —
+  `initialize`, `tools/list`, `tools/call` — as NDJSON over stdio or streamable
+  HTTP/SSE. Budgets: 10s connect, 100s per call, 8 `tools/list` pages, 4MB per
+  stdio line, 64 tools per server, 8 servers per plugin. Connection is lazy;
+  teardown follows unload.
+- Discovered tools register as `plugin_<pluginIdSafe>_<serverId>_<toolName>` in
+  the existing plugin tool map, so they inherit the audit trail, the timeout, and
+  the disable switch with no new routing. They are always `risk: "medium"`: the
+  schema and description come from a third party, so a self-declared risk level
+  is not trustworthy.
+- `env` and `headers` resolve only from the plugin's own settings via
+  `{ "setting": "<key>" }`; the host environment is never passed through (D018).
+  A stdio child gets `PATH`, temp/locale vars, and the declared values — nothing
+  else. `command` must be a bare PATH name or plugin-relative; `url` must be
+  `https` unless the host is loopback.
+- Both transports ship rather than stdio alone: a hosted MCP endpoint is common
+  enough that stdio-only would have pushed plugins to wrap it in a local shim,
+  which is strictly worse — an extra process and an unreviewable proxy.
+- Decision D173; ADR [0038](../../adr/0038-plugin-mcp-bridge.md).
+
+## 2026-07-31 — Resident plugin services and their restart policy
+
+- `contributes.services` declares `{ id, label?, autoRestart? }` behind
+  `background.service`, at most 4 per plugin. The plugin calls
+  `pi.services.register({ id, start, stop })`; the broker calls `start` after
+  `onLoad` (5s budget) and `stop` before `onUnload`, so a service is never live
+  outside the plugin's own lifetime.
+- A service lives in the plugin's `utilityProcess`, so a crash takes it down with
+  the process and the supervisor restarts the whole plugin: backoff 1s, 2s, 4s,
+  8s, 16s capped at 30s; at most 5 attempts; a process that survives 60s is
+  healthy and the counter resets. `autoRestart: false` opts out. After the last
+  attempt the plugin stays `failed` — a visible failure beats a silent crash
+  loop.
+- Per-service state (`starting` | `running` | `stopped` | `failed`) and the
+  restart count are read over `plugin/services` and rendered as chips on the
+  Plugins page; every transition emits `pluginChanged` with `reason: "service"`
+  and a `plugin.service.*` audit entry.
+- Manual enable / disable outranks the supervisor: an explicit action cancels the
+  pending timer and clears the attempt counter.
+- Decision D174; ADR
+  [0039](../../adr/0039-plugin-resident-services-and-message-bus.md).
+
+## 2026-07-31 — Inter-plugin message bus routes declared topics only
+
+- `pi.bus.publish` / `subscribe` require `bus.publish` / `bus.subscribe` **and** a
+  matching entry in `contributes.bus`: publishers list concrete topics,
+  subscribers list patterns. A granted permission alone routes nothing, so the
+  manifest stays a complete description of what a plugin says and hears.
+- Topics are dot-separated segments (`[a-zA-Z0-9][a-zA-Z0-9_-]*`, ≤8 segments,
+  ≤128 chars). `*` matches one segment; `**` matches one or more trailing
+  segments and may appear only last.
+- Routing lives in the broker. A message carries `topic`, `from`, `payload`, and
+  a host-assigned `at`; the publisher is excluded from its own fan-out; delivery
+  is fire-and-forget over a new one-way `{ t: "event" }` frame, so a wedged
+  subscriber cannot stall the sender. That frame also makes the previously
+  stubbed `pi.events.on` / `off` real.
+- Caps: 64KB per payload, 16 subscriptions per plugin, 100 publishes per rolling
+  10s window, failing with `LIMIT_EXCEEDED` / `RATE_LIMITED` and an audit line.
+- A payload conveys data, never capability: receiving a message grants the
+  subscriber nothing it did not already hold, so a topic should be treated as
+  public within the app.
+- Decision D175; ADR
+  [0039](../../adr/0039-plugin-resident-services-and-message-bus.md).

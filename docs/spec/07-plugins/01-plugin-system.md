@@ -47,13 +47,17 @@ In one sentence:
 2. **Panel plugins**: open a plugin UI panel (iframe / webview sandboxed page)
 3. **AgentTool plugins**: provide new tools to the agent
 4. **Skill plugins**: provide loadable skill documents/flows
-5. **Theme plugins (optional, lightweight)**: theme token overrides
+5. **Theme plugins**: ship a CSS file that overrides the design tokens
+
+### Beyond the MVP scope (implemented)
+6. **MCP server plugins**: declare stdio or remote HTTP MCP servers whose tools
+   join the agent's tool set
+7. **Background service plugins**: keep a supervised resident worker alive
+8. **Inter-plugin message bus**: publish/subscribe over declared topics
 
 ### Later
-- MCP Server packaging and distribution
-- Background resident service plugins
-- Inter-plugin message bus
 - Billing / signed plugins
+- Enterprise private plugin sources
 
 **Current implementation:** the Plugins page can browse and install packages
 from the official marketplace provider. Per-plugin auto-update is opt-in and
@@ -75,6 +79,7 @@ my-plugin/
 │ ├── index.html
 │ └── assets/
 ├── skills/ # optional
+├── themes/ # optional (`.css` files declared in contributes.themes)
 ├── tools/ # optional (declarative tool schema)
 ├── icon.png
 └── README.md
@@ -225,13 +230,29 @@ Namespace: `pi.plugin.*`
 - `pi.agent.registerTool(tool)`
 - `pi.agent.unregisterTool(name)`
 
-Planned, not currently exposed: `pi.agent.invokeSkill(id)` and
-`pi.agent.appendSystemHint(text)`.
+Skills are contributed declaratively (`contributes.skills` + `agent.prompt.inject`),
+not invoked by the plugin: the host puts the catalog in the system prompt and the
+model loads a body through the built-in `Skill` tool (D171). Planned, not
+currently exposed: `pi.agent.appendSystemHint(text)`.
+
+### Background services (requires `background.service`)
+- `pi.services.register({ id, start, stop? })`
+- `pi.services.unregister(id)`
+
+Registration is local bookkeeping; the broker starts a service only when the
+manifest declared it and the permission was granted, and supervises restarts.
+
+### Message bus (requires permission)
+- `pi.bus.publish(topic, payload)` // `bus.publish`
+- `pi.bus.subscribe(pattern, handler)` → `unsubscribe()` // `bus.subscribe`
+- `pi.events.on(event, handler)` / `pi.events.off(event, handler)` // host pushes,
+  including the raw `bus.message` stream
 
 ### Clipboard / system (requires permission)
 - `pi.clipboard.readText()`
 - `pi.clipboard.writeText(text)`
 - `pi.shell.openExternal(url)` // confirmation by default
+- `pi.net.fetch(input)`
 
 ### Explicitly not provided directly
 - Arbitrary host-internal Electron objects
@@ -249,15 +270,25 @@ therefore applies only to brokered APIs until runtime sandboxing is delivered.
 | permission | Risk | Description |
 |---|---|---|
 | `ui.panel` | low | Show panel |
+| `ui.theme` | low | Contribute a theme CSS file |
 | `clipboard.read` | medium | Read clipboard |
 | `clipboard.write` | medium | Write clipboard |
 | `notify` | low | System notification |
 | `fs.read.workspace` | medium | Read workspace |
 | `fs.write.workspace` | high | Write workspace |
 | `agent.tool.register` | high | Register agent tool |
-| `agent.prompt.inject` | high | Inject prompt |
+| `agent.prompt.inject` | high | Inject prompt; activates `contributes.skills` |
 | `net.fetch` | high | Network request |
 | `shell.openExternal` | medium | Open external link |
+| `mcp.server.local` | high | Spawn a stdio MCP server |
+| `mcp.server.remote` | high | Connect a remote HTTP MCP server |
+| `background.service` | medium | Keep a resident service running |
+| `bus.publish` | medium | Publish to declared bus topics |
+| `bus.subscribe` | medium | Subscribe to declared bus patterns |
+
+Themes, MCP servers, services, and bus topics are declared in the manifest, so
+their permission is checked at validation time as well as at runtime — see
+[13-plugin-permissions-matrix.md](13-plugin-permissions-matrix.md).
 
 ### Authorization timing
 1. Show the declared permission list at install or upgrade review time
@@ -381,7 +412,7 @@ Plugins → Load Development Plugin → choose directory
 |---|---|
 | pi Skills | Can be distributed / managed by skill plugins |
 | pi Extensions | Not directly equivalent; needs an adapter layer |
-| MCP | Can later become a special plugin type `type: mcp` |
+| MCP | A plugin declares MCP servers in `contributes.mcpServers`; their tools join the agent's tool set |
 | Agent Tools | One of the most important plugin extension surfaces |
 
 Principles:

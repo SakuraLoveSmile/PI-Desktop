@@ -15,8 +15,12 @@ PluginManager
  ├─ ContributionRegistry
  │ ├─ CommandRegistry
  │ ├─ AgentToolRegistry
- │ └─ SkillRegistry
+ │ ├─ SkillRegistry
+ │ ├─ ThemeRegistry
+ │ └─ McpServerRegistry
  ├─ PluginRuntimeBroker
+ │ ├─ ServiceSupervisor
+ │ └─ MessageBus
  ├─ PluginPanelHostService
  └─ MarketClient
 ```
@@ -41,6 +45,10 @@ PluginManager
 - `plugin/openInstallDir`
 - `plugin/openPanel`
 - `plugin/setAutoUpdate`
+- `plugin/themes` ✅ — every loaded plugin's sanitized theme CSS, for the theme
+  picker and the injected `<style>` element
+- `plugin/services` ✅ — resident service status (`starting` | `running` |
+  `stopped` | `failed`) plus the restart count, for the Plugins page chips
 
 ### commandPalette domain
 - `commandPalette/search`
@@ -62,6 +70,27 @@ PluginManager
 - `plugin/event/permissionRequired`
 - `market/event/updateAvailable`
 
+The shipped `pluginChanged` event carries a `reason` so the renderer can decide
+what to refetch: `install`, `loadDev`, `enable`, `disable`, `uninstall`, `crash`,
+`service`, `market.install`, `market.applyUpdates`. `service` fires on every
+supervision transition and is the cheapest of them — only the service list needs
+a reload.
+
+## 4.1 Events (host → plugin process)
+
+The broker also pushes one-way frames down to a plugin's `utilityProcess`:
+
+```text
+{ t: "event", event: "bus.message", subscriptionId, message }
+```
+
+There is no reply frame and no backpressure: delivery is fire-and-forget so a
+wedged subscriber cannot stall the publisher. The child dispatches to the handler
+registered for `subscriptionId` and to any `pi.events.on` listener; a throwing
+handler is logged, never fatal. This is the same channel that finally makes
+`pi.events.on` / `off` real (see
+[03-plugin-api.md](03-plugin-api.md) §5).
+
 ## 5. ContributionRegistry behavior
 
 ### Registration
@@ -74,7 +103,9 @@ PluginManager
 - The Agent only sees registered tools
 
 ### Deregistration
-- Remove everything on disable/unload/uninstall
+- Remove everything on disable/unload/uninstall, including stopping resident
+  services, disconnecting MCP servers, dropping bus subscriptions, and removing
+  the plugin's themes from the picker
 
 ## 6. RuntimeBroker call chain
 
@@ -136,3 +167,12 @@ The model-facing toolset gains plugin tools per prompt: main passes
 registered defs (`fullName`, description, JSON-schema parameters) to
 `agent.prompt`, and the runtime appends them to the built-in six.
 Covered by protocol smoke scenario E2E-024.
+
+Tools discovered from a plugin's MCP servers enter the same registry under
+`plugin_<pluginIdSafe>_<serverId>_<toolName>`, so steps 1–4 above are unchanged;
+only step 3 differs internally, forwarding to the MCP client instead of plugin JS.
+
+Skills use a separate, simpler path. The catalog (id, name, description) is part
+of the base system prompt, and the body is fetched by a local `Skill` tool that
+Electron main serves directly — the sidecar never holds skill text, and a skill
+document reaches the model only when it asks for it (D171).
