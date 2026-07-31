@@ -372,6 +372,16 @@ export type PluginUiMeta = {
   title?: string;
 };
 
+export type PluginCapability =
+  | "panel"
+  | "commands"
+  | "tools"
+  | "skills"
+  | "themes"
+  | "mcp"
+  | "services"
+  | "bus";
+
 export type PluginSummary = {
   id: string;
   name: string;
@@ -382,6 +392,8 @@ export type PluginSummary = {
   errorMessage?: string;
   permissions: string[];
   path?: string;
+  /** Derived from the manifest by the host: which contribution kinds exist. */
+  capabilities?: PluginCapability[];
   description?: string;
   author?: string;
   installedAt?: string;

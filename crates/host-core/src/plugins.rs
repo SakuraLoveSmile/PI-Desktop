@@ -25,6 +25,8 @@ pub struct PluginSummary {
     pub permissions: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    #[serde(default)]
+    pub capabilities: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -354,6 +356,7 @@ impl PluginManager {
                 }
             }
         }
+        validate_contributions(path, &manifest)?;
         Ok(manifest)
     }
 
@@ -378,6 +381,7 @@ impl PluginManager {
             error_message: None,
             permissions: manifest.permissions.clone(),
             path: Some(path.to_string_lossy().to_string()),
+            capabilities: derive_capabilities(&manifest),
             description: manifest.description.clone(),
             author: manifest.author.clone(),
             installed_at: Some(now.clone()),
@@ -493,6 +497,7 @@ impl PluginManager {
                 error_message: None,
                 permissions: granted,
                 path: Some(target.to_string_lossy().to_string()),
+                capabilities: derive_capabilities(&manifest),
                 description: manifest.description.clone(),
                 author: manifest.author.clone(),
                 installed_at: existing
@@ -1599,6 +1604,351 @@ fn safe_join(base: &Path, rel: &str) -> Result<PathBuf> {
     Ok(out)
 }
 
+/// Validate the contribution kinds the host activates.
+///
+/// Paths must stay inside the plugin directory and exist, MCP endpoints must be
+/// launchable/reachable without shell interpretation, and every new capability
+/// must be backed by its declared permission. `skills` predates the permission
+/// gate, so a missing `agent.prompt.inject` only stops activation at runtime.
+fn validate_contributions(root: &Path, manifest: &PluginManifest) -> Result<()> {
+    let Some(contributes) = manifest.contributes.as_ref() else {
+        return Ok(());
+    };
+    if contributes.is_null() {
+        return Ok(());
+    }
+    let Some(map) = contributes.as_object() else {
+        bail!("PLUGIN_INVALID: contributes must be an object");
+    };
+
+    if let Some(skills) = map.get("skills") {
+        let entries = array_of(skills, "contributes.skills")?;
+        for entry in entries {
+            let path = match entry {
+                Value::String(s) => s.as_str(),
+                Value::Object(obj) => obj
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| anyhow!("PLUGIN_INVALID: contributes.skills entry needs path"))?,
+                _ => bail!("PLUGIN_INVALID: contributes.skills entry must be a string or object"),
+            };
+            let resolved = safe_join(root, path)?;
+            if !resolved.exists() {
+                bail!("PLUGIN_INVALID: skill file missing: {path}");
+            }
+        }
+    }
+
+    if let Some(themes) = map.get("themes") {
+        let entries = array_of(themes, "contributes.themes")?;
+        if !entries.is_empty() {
+            require_permission(manifest, "ui.theme", "themes")?;
+        }
+        let mut seen: Vec<&str> = Vec::new();
+        for entry in entries {
+            let obj = entry
+                .as_object()
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: contributes.themes entry must be an object"))?;
+            let id = obj
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|id| is_contrib_id(id))
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: theme id is missing or invalid"))?;
+            if seen.contains(&id) {
+                bail!("PLUGIN_INVALID: duplicate theme id {id}");
+            }
+            seen.push(id);
+            if obj
+                .get("label")
+                .and_then(Value::as_str)
+                .map(|l| l.trim().is_empty())
+                .unwrap_or(true)
+            {
+                bail!("PLUGIN_INVALID: theme {id} requires a label");
+            }
+            let path = obj
+                .get("path")
+                .and_then(Value::as_str)
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: theme {id} requires a path"))?;
+            if !path.to_ascii_lowercase().ends_with(".css") {
+                bail!("PLUGIN_INVALID: theme {id} path must be a .css file");
+            }
+            let resolved = safe_join(root, path)?;
+            if !resolved.exists() {
+                bail!("PLUGIN_INVALID: theme css missing: {path}");
+            }
+            match obj.get("base").and_then(Value::as_str) {
+                None | Some("light") | Some("dark") => {}
+                Some(other) => bail!("PLUGIN_INVALID: theme {id} base {other} is not supported"),
+            }
+        }
+    }
+
+    if let Some(servers) = map.get("mcpServers") {
+        let entries = array_of(servers, "contributes.mcpServers")?;
+        let mut seen: Vec<&str> = Vec::new();
+        for entry in entries {
+            let obj = entry.as_object().ok_or_else(|| {
+                anyhow!("PLUGIN_INVALID: contributes.mcpServers entry must be an object")
+            })?;
+            let id = obj
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|id| is_contrib_id(id))
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: mcp server id is missing or invalid"))?;
+            if seen.contains(&id) {
+                bail!("PLUGIN_INVALID: duplicate mcp server id {id}");
+            }
+            seen.push(id);
+            match obj.get("transport").and_then(Value::as_str) {
+                Some("stdio") => {
+                    require_permission(manifest, "mcp.server.local", "stdio mcp servers")?;
+                    if obj.contains_key("url") || obj.contains_key("headers") {
+                        bail!("PLUGIN_INVALID: mcp server {id} must not set url or headers");
+                    }
+                    let command = obj
+                        .get("command")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|c| !c.is_empty())
+                        .ok_or_else(|| anyhow!("PLUGIN_INVALID: mcp server {id} requires command"))?;
+                    if command.contains('/') || command.contains('\\') {
+                        let resolved = safe_join(root, command)?;
+                        if !resolved.exists() {
+                            bail!("PLUGIN_INVALID: mcp server {id} command missing: {command}");
+                        }
+                    } else if !command
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '+' | '-'))
+                    {
+                        bail!("PLUGIN_INVALID: mcp server {id} command is not an executable name");
+                    }
+                    if let Some(args) = obj.get("args") {
+                        for arg in array_of(args, "mcp server args")? {
+                            if !arg.is_string() {
+                                bail!("PLUGIN_INVALID: mcp server {id} args must be strings");
+                            }
+                        }
+                    }
+                }
+                Some("http") => {
+                    require_permission(manifest, "mcp.server.remote", "remote mcp servers")?;
+                    if obj.contains_key("command") || obj.contains_key("args") || obj.contains_key("env")
+                    {
+                        bail!("PLUGIN_INVALID: mcp server {id} must not set command, args or env");
+                    }
+                    let url = obj
+                        .get("url")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| anyhow!("PLUGIN_INVALID: mcp server {id} requires url"))?;
+                    validate_mcp_url(id, url)?;
+                }
+                _ => bail!("PLUGIN_INVALID: mcp server {id} transport must be stdio or http"),
+            }
+        }
+    }
+
+    if let Some(services) = map.get("services") {
+        let entries = array_of(services, "contributes.services")?;
+        if !entries.is_empty() {
+            require_permission(manifest, "background.service", "background services")?;
+        }
+        let mut seen: Vec<&str> = Vec::new();
+        for entry in entries {
+            let obj = entry.as_object().ok_or_else(|| {
+                anyhow!("PLUGIN_INVALID: contributes.services entry must be an object")
+            })?;
+            let id = obj
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|id| is_contrib_id(id))
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: service id is missing or invalid"))?;
+            if seen.contains(&id) {
+                bail!("PLUGIN_INVALID: duplicate service id {id}");
+            }
+            seen.push(id);
+        }
+    }
+
+    if let Some(bus) = map.get("bus") {
+        let obj = bus
+            .as_object()
+            .ok_or_else(|| anyhow!("PLUGIN_INVALID: contributes.bus must be an object"))?;
+        let publish = obj.get("publish").map(|v| array_of(v, "contributes.bus.publish")).transpose()?;
+        let subscribe = obj
+            .get("subscribe")
+            .map(|v| array_of(v, "contributes.bus.subscribe"))
+            .transpose()?;
+        if publish.map(|p| !p.is_empty()).unwrap_or(false) {
+            require_permission(manifest, "bus.publish", "bus publishing")?;
+        }
+        if subscribe.map(|s| !s.is_empty()).unwrap_or(false) {
+            require_permission(manifest, "bus.subscribe", "bus subscriptions")?;
+        }
+        for topic in publish.unwrap_or(&[]) {
+            let topic = topic
+                .as_str()
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: bus publish topics must be strings"))?;
+            if !is_bus_topic(topic, false) {
+                bail!("PLUGIN_INVALID: bus publish topic {topic} is not a valid topic");
+            }
+        }
+        for pattern in subscribe.unwrap_or(&[]) {
+            let pattern = pattern
+                .as_str()
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: bus subscribe patterns must be strings"))?;
+            if !is_bus_topic(pattern, true) {
+                bail!("PLUGIN_INVALID: bus subscribe pattern {pattern} is not valid");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Capability tokens the UI renders as badges.
+fn derive_capabilities(manifest: &PluginManifest) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    if manifest
+        .ui
+        .as_ref()
+        .and_then(|ui| ui.panel.as_ref())
+        .is_some()
+    {
+        out.push("panel".into());
+    }
+    let map = manifest.contributes.as_ref().and_then(Value::as_object);
+    let has = |key: &str| -> bool {
+        map.and_then(|m| m.get(key))
+            .and_then(Value::as_array)
+            .map(|a| !a.is_empty())
+            .unwrap_or(false)
+    };
+    if has("commands") {
+        out.push("commands".into());
+    }
+    if has("agentTools") {
+        out.push("tools".into());
+    }
+    if has("skills") {
+        out.push("skills".into());
+    }
+    if has("themes") {
+        out.push("themes".into());
+    }
+    if has("mcpServers") {
+        out.push("mcp".into());
+    }
+    if has("services") {
+        out.push("services".into());
+    }
+    let bus_declared = map
+        .and_then(|m| m.get("bus"))
+        .and_then(Value::as_object)
+        .map(|bus| {
+            ["publish", "subscribe"].iter().any(|key| {
+                bus.get(*key)
+                    .and_then(Value::as_array)
+                    .map(|a| !a.is_empty())
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+    if bus_declared {
+        out.push("bus".into());
+    }
+    out
+}
+
+fn array_of<'a>(value: &'a Value, field: &str) -> Result<&'a [Value]> {
+    value
+        .as_array()
+        .map(|a| a.as_slice())
+        .ok_or_else(|| anyhow!("PLUGIN_INVALID: {field} must be an array"))
+}
+
+fn require_permission(manifest: &PluginManifest, permission: &str, what: &str) -> Result<()> {
+    if manifest.permissions.iter().any(|p| p == permission) {
+        return Ok(());
+    }
+    bail!("PLUGIN_INVALID: {what} require the {permission} permission")
+}
+
+fn is_contrib_id(value: &str) -> bool {
+    if value.is_empty() || value.len() > 64 {
+        return false;
+    }
+    let mut chars = value.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
+/// Shares the topic grammar with `matchesBusTopic` in the plugin SDK.
+fn is_bus_topic(value: &str, allow_wildcards: bool) -> bool {
+    if value.is_empty() || value.len() > 128 {
+        return false;
+    }
+    let segments: Vec<&str> = value.split('.').collect();
+    if segments.len() > 8 {
+        return false;
+    }
+    segments.iter().enumerate().all(|(index, segment)| {
+        if allow_wildcards && *segment == "*" {
+            return true;
+        }
+        if allow_wildcards && *segment == "**" {
+            return index == segments.len() - 1;
+        }
+        let mut chars = segment.chars();
+        match chars.next() {
+            Some(c) if c.is_ascii_alphanumeric() => {}
+            _ => return false,
+        }
+        chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    })
+}
+
+fn validate_mcp_url(id: &str, url: &str) -> Result<()> {
+    let lower = url.trim().to_ascii_lowercase();
+    let (rest, plain_http) = if let Some(rest) = lower.strip_prefix("https://") {
+        (rest, false)
+    } else if let Some(rest) = lower.strip_prefix("http://") {
+        (rest, true)
+    } else {
+        bail!("PLUGIN_INVALID: mcp server {id} url must use http or https");
+    };
+    let authority_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let authority = &rest[..authority_end];
+    if authority.is_empty() {
+        bail!("PLUGIN_INVALID: mcp server {id} url is missing a host");
+    }
+    if authority.contains('@') {
+        bail!("PLUGIN_INVALID: mcp server {id} url must not embed credentials");
+    }
+    let host = if let Some(stripped) = authority.strip_prefix('[') {
+        match stripped.find(']') {
+            Some(close) => &stripped[..close],
+            None => bail!("PLUGIN_INVALID: mcp server {id} url host is malformed"),
+        }
+    } else {
+        authority.split(':').next().unwrap_or(authority)
+    };
+    if host.is_empty() {
+        bail!("PLUGIN_INVALID: mcp server {id} url is missing a host");
+    }
+    if plain_http && !is_loopback_host(host) {
+        bail!("PLUGIN_INVALID: mcp server {id} url must use https outside loopback");
+    }
+    Ok(())
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    host == "localhost" || host == "::1" || host == "0:0:0:0:0:0:0:1" || host.starts_with("127.")
+}
+
 fn permission_diff(old: &[String], new: &[String]) -> Vec<String> {
     new.iter()
         .filter(|p| !old.iter().any(|o| o == *p))
@@ -1850,5 +2200,258 @@ mod tests {
             std::env::remove_var("PI_DESKTOP_DATA_DIR");
             std::env::remove_var("PI_DESKTOP_PLUGIN_MARKET_URL");
         }
+    }
+
+    fn write_plugin(root: &Path, manifest: Value, extra: &[(&str, &str)]) {
+        fs::create_dir_all(root).unwrap();
+        fs::write(root.join("main.js"), "export function onLoad() {}").unwrap();
+        fs::write(
+            root.join("manifest.json"),
+            serde_json::to_string_pretty(&manifest).unwrap(),
+        )
+        .unwrap();
+        for (rel, contents) in extra {
+            let path = root.join(rel);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, contents).unwrap();
+        }
+    }
+
+    fn capability_manifest(contributes: Value, permissions: Value) -> Value {
+        json!({
+            "schemaVersion": 1,
+            "id": "demo.caps",
+            "name": "Caps",
+            "version": "0.1.0",
+            "main": "main.js",
+            "contributes": contributes,
+            "permissions": permissions,
+        })
+    }
+
+    fn read_manifest_err(root: &Path) -> String {
+        PluginManager::read_manifest(root)
+            .expect_err("manifest should be rejected")
+            .to_string()
+    }
+
+    #[test]
+    fn accepts_and_summarizes_new_contributions() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("plugin");
+        write_plugin(
+            &root,
+            json!({
+                "schemaVersion": 1,
+                "id": "demo.caps",
+                "name": "Caps",
+                "version": "0.1.0",
+                "main": "main.js",
+                "ui": { "panel": "renderer/index.html" },
+                "contributes": {
+                    "commands": [{ "id": "a", "title": "A" }],
+                    "agentTools": [{ "name": "t", "description": "d" }],
+                    "skills": ["./skills/a.md", { "path": "skills/b.md", "id": "b" }],
+                    "themes": [{ "id": "midnight", "label": "Midnight", "path": "themes/m.css", "base": "dark" }],
+                    "mcpServers": [
+                        { "id": "local", "transport": "stdio", "command": "mcp-files", "args": ["--root", "."] },
+                        { "id": "remote", "transport": "http", "url": "https://example.com/mcp" }
+                    ],
+                    "services": [{ "id": "watcher" }],
+                    "bus": { "publish": ["notes.created"], "subscribe": ["notes.**"] }
+                },
+                "permissions": [
+                    "ui.panel",
+                    "ui.theme",
+                    "agent.tool.register",
+                    "mcp.server.local",
+                    "mcp.server.remote",
+                    "background.service",
+                    "bus.publish",
+                    "bus.subscribe"
+                ],
+            }),
+            &[
+                ("renderer/index.html", "<html></html>"),
+                ("skills/a.md", "---\nname: A\n---\nbody"),
+                ("skills/b.md", "body"),
+                ("themes/m.css", ":root { --ds-bg: #000; }"),
+            ],
+        );
+        let manifest = PluginManager::read_manifest(&root).unwrap();
+        assert_eq!(
+            derive_capabilities(&manifest),
+            vec![
+                "panel", "commands", "tools", "skills", "themes", "mcp", "services", "bus"
+            ]
+        );
+
+        let data = tempdir().unwrap();
+        unsafe {
+            std::env::set_var("PI_DESKTOP_DATA_DIR", data.path());
+        }
+        let mut mgr = PluginManager::new(data.path());
+        let summary = mgr.load_dev(root.to_str().unwrap()).unwrap();
+        assert!(summary.capabilities.contains(&"mcp".to_string()));
+        assert!(summary.capabilities.contains(&"bus".to_string()));
+        unsafe {
+            std::env::remove_var("PI_DESKTOP_DATA_DIR");
+        }
+    }
+
+    #[test]
+    fn missing_contributed_files_are_rejected() {
+        let dir = tempdir().unwrap();
+        let skill_root = dir.path().join("skill");
+        write_plugin(
+            &skill_root,
+            capability_manifest(json!({ "skills": ["skills/gone.md"] }), json!([])),
+            &[],
+        );
+        assert!(read_manifest_err(&skill_root).contains("skill file missing"));
+
+        let theme_root = dir.path().join("theme");
+        write_plugin(
+            &theme_root,
+            capability_manifest(
+                json!({ "themes": [{ "id": "a", "label": "A", "path": "themes/gone.css" }] }),
+                json!(["ui.theme"]),
+            ),
+            &[],
+        );
+        assert!(read_manifest_err(&theme_root).contains("theme css missing"));
+    }
+
+    #[test]
+    fn contributed_paths_must_stay_inside_the_plugin() {
+        let dir = tempdir().unwrap();
+        let root = dir.path().join("plugin");
+        write_plugin(
+            &root,
+            capability_manifest(json!({ "skills": ["../outside.md"] }), json!([])),
+            &[],
+        );
+        assert!(read_manifest_err(&root).contains("traversal"));
+    }
+
+    #[test]
+    fn theme_contributions_require_permission_and_css() {
+        let dir = tempdir().unwrap();
+        let no_perm = dir.path().join("no-perm");
+        write_plugin(
+            &no_perm,
+            capability_manifest(
+                json!({ "themes": [{ "id": "a", "label": "A", "path": "themes/a.css" }] }),
+                json!([]),
+            ),
+            &[("themes/a.css", ":root {}")],
+        );
+        assert!(read_manifest_err(&no_perm).contains("ui.theme permission"));
+
+        let wrong_ext = dir.path().join("wrong-ext");
+        write_plugin(
+            &wrong_ext,
+            capability_manifest(
+                json!({ "themes": [{ "id": "a", "label": "A", "path": "themes/a.json" }] }),
+                json!(["ui.theme"]),
+            ),
+            &[("themes/a.json", "{}")],
+        );
+        assert!(read_manifest_err(&wrong_ext).contains(".css file"));
+    }
+
+    #[test]
+    fn stdio_mcp_commands_may_not_escape_the_plugin() {
+        let dir = tempdir().unwrap();
+        for (name, command, expected) in [
+            ("absolute", "/usr/bin/evil", "absolute"),
+            ("traversal", "../evil.js", "traversal"),
+            ("shell", "sh -c evil", "executable name"),
+        ] {
+            let root = dir.path().join(name);
+            write_plugin(
+                &root,
+                capability_manifest(
+                    json!({ "mcpServers": [{ "id": "s", "transport": "stdio", "command": command }] }),
+                    json!(["mcp.server.local"]),
+                ),
+                &[],
+            );
+            assert!(
+                read_manifest_err(&root).contains(expected),
+                "command {command} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn remote_mcp_urls_must_use_https_outside_loopback() {
+        let dir = tempdir().unwrap();
+        let remote = dir.path().join("remote");
+        write_plugin(
+            &remote,
+            capability_manifest(
+                json!({ "mcpServers": [{ "id": "s", "transport": "http", "url": "http://example.com/mcp" }] }),
+                json!(["mcp.server.remote"]),
+            ),
+            &[],
+        );
+        assert!(read_manifest_err(&remote).contains("https outside loopback"));
+
+        let credentials = dir.path().join("credentials");
+        write_plugin(
+            &credentials,
+            capability_manifest(
+                json!({ "mcpServers": [{ "id": "s", "transport": "http", "url": "https://u:p@example.com/mcp" }] }),
+                json!(["mcp.server.remote"]),
+            ),
+            &[],
+        );
+        assert!(read_manifest_err(&credentials).contains("credentials"));
+
+        let loopback = dir.path().join("loopback");
+        write_plugin(
+            &loopback,
+            capability_manifest(
+                json!({ "mcpServers": [{ "id": "s", "transport": "http", "url": "http://127.0.0.1:8931/mcp" }] }),
+                json!(["mcp.server.remote"]),
+            ),
+            &[],
+        );
+        assert!(PluginManager::read_manifest(&loopback).is_ok());
+    }
+
+    #[test]
+    fn services_and_bus_declarations_are_checked() {
+        let dir = tempdir().unwrap();
+        let service = dir.path().join("service");
+        write_plugin(
+            &service,
+            capability_manifest(json!({ "services": [{ "id": "watcher" }] }), json!([])),
+            &[],
+        );
+        assert!(read_manifest_err(&service).contains("background.service permission"));
+
+        let topic = dir.path().join("topic");
+        write_plugin(
+            &topic,
+            capability_manifest(
+                json!({ "bus": { "publish": ["notes.*"] } }),
+                json!(["bus.publish"]),
+            ),
+            &[],
+        );
+        assert!(read_manifest_err(&topic).contains("not a valid topic"));
+
+        let pattern = dir.path().join("pattern");
+        write_plugin(
+            &pattern,
+            capability_manifest(
+                json!({ "bus": { "subscribe": ["notes.**.x"] } }),
+                json!(["bus.subscribe"]),
+            ),
+            &[],
+        );
+        assert!(read_manifest_err(&pattern).contains("not valid"));
     }
 }
