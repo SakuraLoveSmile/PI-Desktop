@@ -91,6 +91,29 @@ Each scenario is documented in this format:
 
 ## 7. MVP Scenario Catalog
 
+### Runtime Resource Governance
+
+#### E2E-012: Tool burst is bounded and recovers after host restart
+
+- **Preconditions**: Host-core is healthy; one session has a workspace; the
+  supervision probe can terminate the host process.
+- **Steps**: 1) Dispatch a burst larger than the host tool budget containing
+  read tools and shell commands. 2) Observe `app.health` while the burst runs.
+  3) Terminate host-core during active calls. 4) Wait for one supervised
+  restart. 5) Allow the persistence outbox to flush.
+- **Expected**: Active shell processes never exceed the configured global and
+  per-session limits. Excess work returns `HOST_OVERLOADED` or waits in the
+  bounded queue. Only one restart loop runs; stale-generation calls fail fast
+  as `HOST_UNAVAILABLE`; no repeated `ERR_STREAM_DESTROYED` persistence storm
+  is emitted. Completed assistant/tool messages are persisted once after
+  recovery.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/07-process-model.md`, `03-runtime/08-error-codes.md`,
+  `03-runtime/09-logging-and-observability.md`
+- **Acceptance**: A (runtime health), C (tool execution and recovery)
+- **Milestone**: M5
+- **Status**: Documented; automation pending
+
 ### Boot & Healthcheck
 
 #### E2E-001: App launches and shows main window

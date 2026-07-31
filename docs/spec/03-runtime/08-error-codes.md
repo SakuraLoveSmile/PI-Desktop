@@ -40,6 +40,7 @@ Rules:
 |---|---|---|
 | `PROTOCOL_MISMATCH` | no | handshake/protocol version mismatch |
 | `HOST_UNAVAILABLE` | yes | Rust host not running/reachable |
+| `HOST_OVERLOADED` | yes | bounded host RPC/tool capacity is full; retry after backpressure |
 | `AGENT_UNAVAILABLE` | yes | pi sidecar not running/reachable |
 | `APP_DEGRADED` | yes | app running with limited capabilities |
 | `INTERNAL` | maybe | unexpected internal failure |
@@ -75,6 +76,7 @@ Rules:
 | `TOOL_DENIED` | no | permission denied / mode forbidden |
 | `TOOL_TIMEOUT` | yes | tool execution timeout |
 | `TOOL_FAILED` | maybe | tool executed but failed |
+| `PROCESS_RESOURCE_EXHAUSTED` | yes | shell process could not start because the OS temporarily exhausted process resources |
 | `SHELL_NOT_FOUND` | no | no usable bash on the machine; message carries install guidance |
 | `PERMISSION_TIMEOUT` | no | permission prompt timed out (mapped to deny) |
 | `PERMISSION_REQUIRED` | no | waiting for user decision |

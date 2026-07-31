@@ -56,3 +56,4 @@ Each ADR includes:
 | 0038 | Bridge plugin-declared MCP servers in Electron main | Accepted |
 | 0039 | Activate plugin skills and ship plugin authoring as a first-party devkit | Accepted (skill delivery revised by D174) |
 | 0040 | Resident plugin services and the inter-plugin message bus | Accepted |
+| 0041 | Bound host runtime resources and decouple message persistence | Accepted |

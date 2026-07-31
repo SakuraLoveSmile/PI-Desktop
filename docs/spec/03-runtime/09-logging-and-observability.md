@@ -70,6 +70,8 @@ Format MVP: NDJSON files.
 - tool start/end
 - permission request/decision/timeout
 - plugin enable/disable/load/error
+- tool admission rejection, queue depth, active class budgets, and shell spawn
+  resource exhaustion
 
 ### Never
 - API keys / raw secrets
@@ -148,3 +150,5 @@ Not in MVP:
 3. logs folder openable from app/command palette
 4. a slow tool call can be attributed to approval, execution, or the provider
    from the logs alone (D137)
+5. a host resource incident exposes active/queued tool budgets and a single
+   restart generation instead of repeated stale-pipe errors

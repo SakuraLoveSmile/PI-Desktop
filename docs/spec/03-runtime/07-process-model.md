@@ -49,6 +49,11 @@ Supervision parameters (implemented in Electron main):
 - Auto-restart with exponential backoff `0.5s → 1s → 2s` (cap 4s).
 - At most **3 restarts per 2-minute window** per child; beyond that the app
   stays degraded and emits `hostStatus { ok: false, component, fatal: true }`.
+- Restart supervision is single-flight per child. A host process has a unique
+  generation; stale generation requests and notifications are rejected before
+  they reach the current bridge.
+- Host persistence appends are buffered in an Electron-main-owned outbox while
+  the host is unavailable and flushed sequentially after a new handshake.
 - Renderer is notified on every transition via the `hostStatus` event:
   `{ ok, component?: "host" | "sidecar", restarting?, restarted?, fatal?, message? }`.
 - Intentional shutdown (quit/dispose) never triggers restart.
@@ -100,3 +105,5 @@ sidecar/host shutdown sequence runs before the updater replaces the app.
 1. Clean boot path documented and scriptable
 2. Host crash does not silently continue tool execution
 3. Agent crash does not corrupt SQLite
+4. A host crash does not create a persistence error storm or replay a completed
+   message twice.

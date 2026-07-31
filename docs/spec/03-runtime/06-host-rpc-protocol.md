@@ -20,6 +20,25 @@ MVP transport decision (**D001**):
 - Encoding: UTF-8
 - Request/response: JSON-RPC 2.0 style
 
+### 2.1 Runtime admission and backpressure
+
+Host-core does not create an unbounded task or subprocess for every request.
+The RPC dispatcher caps active requests at 32. `tools.execute` then enters a
+bounded execution budget:
+
+- 16 total tool executions
+- 4 concurrent `Bash` processes globally, 2 per session
+- 8 read/search tools globally
+- 2 mutating tools globally, 1 per session
+- 4 plugin tools globally
+- 4 tool executions per session
+- 64 queued tool executions globally
+
+Permission prompts do not consume an execution slot. A full queue returns
+`HOST_OVERLOADED` with retryable semantics in the tool result instead of
+waiting indefinitely or spawning more work. The limits are host-owned so
+Electron and the sidecar cannot independently over-admit the same resources.
+
 ### Request
 
 ```json
@@ -116,6 +135,20 @@ Rules:
 - `app.health`
 - `app.getVersion`
 
+`app.health` returns a diagnostic `toolBudget` object:
+
+```ts
+type ToolBudgetHealth = {
+  active: number
+  queued: number
+  total: number
+  shell: number
+  reads: number
+  mutations: number
+  plugins: number
+}
+```
+
 ### Workspace
 - `workspace.get`
 - `workspace.set`
@@ -194,6 +227,15 @@ than appending it to answer `content`.
 - `tools.list`
 - `tools.execute`
 - `tools.abort`
+
+Tool execution starts only after admission. Shell spawn retries transient
+resource exhaustion (`EAGAIN` / `WouldBlock`) with bounded backoff, never
+retries a command after it has started, and reaps timed-out children before
+releasing the execution slot.
+
+`session.appendMessage` is idempotent by message id. Electron main may keep
+message appends in its application-owned outbox while host-core is restarting;
+the outbox flushes in order after a successful handshake.
 
 ### Permissions
 - `permissions.evaluate`
@@ -367,10 +409,12 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 | 1009 | PLUGIN_INVALID | manifest/validation failure |
 | 1010 | PLUGIN_LOAD_FAILED | enable/load failure |
 | 1011 | PROTOCOL_MISMATCH | handshake version mismatch |
+| -32029 | HOST_OVERLOADED | RPC dispatcher capacity exhausted |
 
 ## 8. Concurrency / ordering
 
-1. Requests may be concurrent, but tools for the same `sessionId` execute serially by default
+1. Requests may be concurrent within the dispatcher cap. Read/search tools may
+   run in parallel; mutating tools are bounded and ordered per session.
 2. Different sessions may continue concurrently across retained project tabs;
    each resolves its own project root and grants
 3. Notifications may arrive anytime after handshake
