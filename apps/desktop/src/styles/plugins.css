@@ -304,6 +304,9 @@
 /* Installed rows share one panel; hairlines separate them. */
 .plugins-list {
   min-width: 0;
+  /* Row overflow menus escape the panel box, so the panel must not clip
+     (.settings-panel hides overflow); the end rows round their own corners. */
+  overflow: visible;
 }
 
 .plugins-row {
@@ -312,6 +315,16 @@
   gap: 12px;
   padding: 12px 14px;
   transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.plugins-row:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+.plugins-row:last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
 }
 
 .plugins-row + .plugins-row {
@@ -618,6 +631,12 @@
   box-shadow: 0 0 0 0.5px var(--ds-border-default), 0 12px 32px rgba(0, 0, 0, 0.2);
   padding: 5px;
   animation: plugins-menu-in var(--motion-duration-fast) var(--motion-ease-out) both;
+}
+
+/* Rows near the viewport bottom open upwards so the menu stays in view. */
+.plugins-menu.is-up {
+  top: auto;
+  bottom: calc(100% + 5px);
 }
 
 @keyframes plugins-menu-in {

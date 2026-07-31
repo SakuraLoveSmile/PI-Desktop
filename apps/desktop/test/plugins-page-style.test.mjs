@@ -49,3 +49,14 @@ test("plugins page styles tier permission risk with semantic tokens", () => {
   assert.match(section, /\.plugins-sheet\s*\{/);
   assert.match(section, /@media \(prefers-reduced-motion: reduce\)/);
 });
+
+// The installed list lives in .settings-panel, which clips overflow for its
+// rounded corners; the row overflow menu must not be clipped with it.
+test("plugins installed list lets row menus escape the panel", () => {
+  const section = pluginsSection(stylesSource);
+
+  assert.match(section, /\.plugins-list\s*\{[\s\S]*?overflow:\s*visible/);
+  assert.match(section, /\.plugins-row:first-child\s*\{[\s\S]*?border-top-left-radius/);
+  assert.match(section, /\.plugins-row:last-child\s*\{[\s\S]*?border-bottom-left-radius/);
+  assert.match(section, /\.plugins-menu\.is-up\s*\{[\s\S]*?bottom:\s*calc\(100% \+ 5px\)/);
+});

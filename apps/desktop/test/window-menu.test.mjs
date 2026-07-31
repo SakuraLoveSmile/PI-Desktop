@@ -227,8 +227,13 @@ test("desktop packaging builds the native host before every local target", () =>
     packageJson.scripts["build:host-release"],
     /cargo build --release .* -p host-core/,
   );
-  for (const script of ["pack", "dist", "dist:mac", "dist:win", "dist:linux"]) {
-    assert.match(packageJson.scripts[script], /^pnpm run build:host-release/);
+  for (const name of ["pack", "dist", "dist:mac", "dist:win", "dist:linux"]) {
+    const script = packageJson.scripts[name];
+    assert.match(script, /pnpm run build:host-release/);
+    assert.ok(
+      script.indexOf("pnpm run build:host-release") < script.indexOf("electron-builder"),
+      `${name} must build the native host before electron-builder packages it`,
+    );
   }
   assert.equal(packageJson.build.win.extraResources[0].to, "bin/pi-desktop-host-core.exe");
   assert.equal(packageJson.build.linux.extraResources[0].to, "bin/pi-desktop-host-core");

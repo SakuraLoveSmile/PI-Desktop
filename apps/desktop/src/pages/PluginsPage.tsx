@@ -40,6 +40,12 @@ type GroupId = "attention" | "updates" | "active" | "disabled";
 
 const GROUP_ORDER: GroupId[] = ["attention", "updates", "active", "disabled"];
 
+/**
+ * Rough height of the row overflow menu (two items plus a separator). When the
+ * trigger sits closer than this to the viewport bottom the menu flips upwards.
+ */
+const ROW_MENU_HEIGHT = 108;
+
 const GROUP_LABEL_KEYS: Record<GroupId, string> = {
   attention: "plugins.groupAttention",
   updates: "plugins.groupUpdates",
@@ -339,6 +345,7 @@ export function PluginsPage() {
   const [marketSource, setMarketSource] = useState("");
   const [headerMenu, setHeaderMenu] = useState(false);
   const [rowMenu, setRowMenu] = useState<string | null>(null);
+  const [rowMenuUp, setRowMenuUp] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<MarketPluginDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -1040,16 +1047,28 @@ export function PluginsPage() {
                                   title={t("plugins.rowActions", { name: plugin.name })}
                                   aria-haspopup="menu"
                                   aria-expanded={menuOpen}
-                                  onClick={() =>
+                                  onClick={(event) => {
+                                    const rect =
+                                      event.currentTarget.getBoundingClientRect();
+                                    setRowMenuUp(
+                                      window.innerHeight - rect.bottom <
+                                        ROW_MENU_HEIGHT,
+                                    );
                                     setRowMenu((cur) =>
                                       cur === plugin.id ? null : plugin.id,
-                                    )
-                                  }
+                                    );
+                                  }}
                                 >
                                   <IconMore size={15} />
                                 </button>
                                 {menuOpen ? (
-                                  <div className="plugins-menu is-end" role="menu">
+                                  <div
+                                    className={cx(
+                                      "plugins-menu is-end",
+                                      rowMenuUp && "is-up",
+                                    )}
+                                    role="menu"
+                                  >
                                     <button
                                       type="button"
                                       role="menuitem"

@@ -1565,6 +1565,24 @@ async function createWindow() {
             await setPage("plugins");
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-plugins-live");
+            // Row overflow menu on the last row of a group: the list panel
+            // clips its rounded corners, so this scene guards the menu against
+            // being cut off by that clip.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const rows = [...document.querySelectorAll('.plugins-row')];
+                const last = rows[rows.length - 1];
+                last?.scrollIntoView({ block: 'center' });
+                const btns = [...(last?.querySelectorAll('.plugins-row-actions .plugins-icon-btn') ?? [])];
+                btns[btns.length - 1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 250));
+            await shot("pi-plugins-row-menu");
+            await mainWindow!.webContents.executeJavaScript(
+              `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
+            );
+            await new Promise((r) => setTimeout(r, 150));
             // Marketplace tab of the same page (D169 segmented control).
             await mainWindow!.webContents.executeJavaScript(`
               (() => {
