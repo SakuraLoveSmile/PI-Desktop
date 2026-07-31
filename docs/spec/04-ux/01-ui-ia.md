@@ -155,6 +155,11 @@ destination, chat as the home surface, tools and permissions inline.
 - **Sort**: user-facing modes are Recently updated, Created date, Oldest
   first, and Name. Pinned rows precede unpinned rows. A legacy persisted
   `manual` value remains readable but does not imply a drag-reorder gesture.
+- **Conversation list**: each group shows the ten most-recent sessions in the
+  active sort order by default; the remainder folds behind a **Load N more…**
+  row that expands the full time-grouped list on click. Pinned rows precede
+  unpinned rows and are never pushed behind the fold; the expansion state is
+  not persisted.
 - **Standalone sessions**: path-less sessions remain in the separate Sessions
   section and never inherit the last active project's workspace.
 - **Concurrency**: the shell selects one visible project at a time, while
