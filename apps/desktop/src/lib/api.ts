@@ -9,6 +9,7 @@ import type {
   AgentStatus,
   AgentInstructionFile,
   AppSettings,
+  CommandShellCatalog,
   AppVersionInfo,
   BrowserAction,
   BrowserState,
@@ -52,7 +53,14 @@ import type {
   UpdateState,
   WindowControlAction,
 } from "@pi-desktop/shared";
-import { IPC, normalizeMode } from "@pi-desktop/shared";
+import {
+  defaultCommandShellForPlatform,
+  IPC,
+  isGlobalPermissionMode,
+  isCommandShellId,
+  normalizeGlobalPermissionMode,
+  normalizeMode,
+} from "@pi-desktop/shared";
 
 export type ImportSource = "claude-code" | "opencode" | "codex" | "pi";
 
@@ -119,11 +127,45 @@ function normalizeSessionDetail(detail: SessionDetail | null): SessionDetail | n
     : null;
 }
 
-function normalizeSettings(settings: AppSettings): AppSettings {
+export function normalizeSettings(settings: AppSettings): AppSettings {
   return {
     ...settings,
     defaultMode: normalizeMode((settings as { defaultMode?: unknown }).defaultMode),
+    defaultCommandShell: isCommandShellId(
+      (settings as { defaultCommandShell?: unknown }).defaultCommandShell,
+    )
+      ? (settings as { defaultCommandShell: AppSettings["defaultCommandShell"] })
+          .defaultCommandShell
+      : defaultCommandShellForPlatform(window.piDesktop?.platform ?? ""),
+    planApprovalPermissionMode: normalizeGlobalPermissionMode(
+      (settings as { planApprovalPermissionMode?: unknown })
+        .planApprovalPermissionMode,
+    ),
   };
+}
+
+export function validateSettingsWrite(settings: AppSettings): AppSettings {
+  const value = settings as AppSettings & {
+    defaultCommandShell?: unknown;
+    planApprovalPermissionMode?: unknown;
+  };
+  if (
+    Object.prototype.hasOwnProperty.call(value, "defaultCommandShell") &&
+    !isCommandShellId(value.defaultCommandShell)
+  ) {
+    throw Object.assign(new Error("defaultCommandShell is invalid"), {
+      errorCode: "COMMAND_SHELL_INVALID",
+    });
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(value, "planApprovalPermissionMode") &&
+    !isGlobalPermissionMode(value.planApprovalPermissionMode)
+  ) {
+    throw Object.assign(new Error("planApprovalPermissionMode is invalid"), {
+      errorCode: "PLAN_PERMISSION_MODE_INVALID",
+    });
+  }
+  return settings;
 }
 
 function normalizePlanProposal(proposal: PlanProposal): PlanProposal {
@@ -206,7 +248,9 @@ export const api = {
     invoke<ImportRunResult>(IPC.invoke.sessionImportRun, items),
   getSettings: () => invoke<AppSettings>(IPC.invoke.settingsGet).then(normalizeSettings),
   setSettings: (settings: AppSettings) =>
-    invoke(IPC.invoke.settingsSet, normalizeSettings(settings)),
+    invoke(IPC.invoke.settingsSet, validateSettingsWrite(settings)),
+  listCommandShells: () =>
+    invoke<CommandShellCatalog>(IPC.invoke.commandShellList),
   listProviders: () =>
     invoke<{ providers: ProviderPublic[] }>(IPC.invoke.providersList),
   createProvider: (input: ProviderCreateInput) =>

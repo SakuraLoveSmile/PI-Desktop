@@ -25,6 +25,7 @@ import type {
 } from "@pi-desktop/shared";
 import {
   highestSupportedThinkingLevel,
+  normalizeGlobalPermissionMode,
   normalizeMode,
   PROTOCOL_VERSION,
 } from "@pi-desktop/shared";
@@ -450,6 +451,18 @@ export type AppState = {
   openTerminalInWorkPanel: () => void;
 };
 
+function openPlanArtifact(
+  proposal: PlanProposal,
+  openWorkPanelTabForSession: AppState["openWorkPanelTabForSession"],
+) {
+  const relativePath = proposal.artifact?.relativePath;
+  if (!relativePath) return;
+  openWorkPanelTabForSession(
+    proposal.sessionId,
+    fileWorkPanelTab(relativePath),
+  );
+}
+
 const initialSidebarPreferences = loadSidebarPreferences();
 const initialWorkPanelWidth = loadWorkPanelWidth();
 
@@ -727,6 +740,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         unreadNotificationCount: notifications.unreadCount,
         sessionOutcomes: latestSessionOutcomes(notifications.notifications),
       });
+      for (const proposal of pendingPlansResult.plans) {
+        openPlanArtifact(proposal, get().openWorkPanelTabForSession);
+      }
       saveSidebarPreferences(preferencesFromState(get()));
       if (currentWorkspace?.path) {
         rememberProject({
@@ -789,6 +805,9 @@ export const useAppStore = create<AppState>((set, get) => ({
               : session,
           ),
         }));
+        if (proposal) {
+          openPlanArtifact(proposal, get().openWorkPanelTabForSession);
+        }
       } catch {
         // A transient host failure must not erase a live approval already held
         // by the renderer; the next host event or activation retries it.
@@ -2147,6 +2166,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         ),
       };
     });
+    if (event.state === "awaiting_approval" && event.proposal?.status === "pending") {
+      openPlanArtifact(event.proposal, get().openWorkPanelTabForSession);
+    }
     if (event.state === "awaiting_approval" && !event.proposal) {
       void get().restorePendingPlan(event.sessionId);
     }
@@ -2213,6 +2235,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         ),
       }));
       if (event.state === "awaiting_approval") {
+        if (event.proposal?.status === "pending") {
+          openPlanArtifact(event.proposal, get().openWorkPanelTabForSession);
+        }
         void get().restorePendingPlan(envelope.sessionId);
       }
     }
@@ -2576,6 +2601,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     const request = (async () => {
       const result = await api.resolvePlan(resolution);
+      if (resolution.action === "approve") {
+        const targetPermissionMode =
+          result.targetPermissionMode ?? resolution.targetPermissionMode;
+        if (targetPermissionMode) {
+          set((state) =>
+            state.settings
+              ? {
+                  settings: {
+                    ...state.settings,
+                    planApprovalPermissionMode: normalizeGlobalPermissionMode(
+                      targetPermissionMode,
+                    ),
+                  },
+                }
+              : {},
+          );
+        }
+      }
       // The response is authoritative host success. The matching
       // plans.changed event is also accepted by handlePlansChanged; neither
       // path clears a proposal before the host has confirmed the action.
@@ -2670,7 +2713,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!sessionId) return;
     set((state) => {
       const affectsVisibleSession =
-        pendingSessionSelection === null && state.activeSessionId === sessionId;
+        state.activeSessionId === sessionId &&
+        (pendingSessionSelection === null ||
+          pendingSessionSelection.id === sessionId);
       const context = affectsVisibleSession
         ? currentWorkPanelContext(state)
         : state.workPanelContexts[sessionId] ?? emptyWorkPanelContext();

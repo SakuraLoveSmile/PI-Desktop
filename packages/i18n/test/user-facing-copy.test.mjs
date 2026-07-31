@@ -46,6 +46,24 @@ test("common setup and marketplace copy avoid developer jargon", () => {
 test("Plan mode and Auto permission copy stay explicit in both locales", () => {
   assert.equal(english["settings.modePlan"], "Plan");
   assert.equal(chinese["settings.modePlan"], "规划");
+  assert.equal(english["plan.approvalRegion"], "Plan approval");
+  assert.equal(
+    english["plan.readyAnnouncement"],
+    "Plan ready. The plan is open in the Work Panel.",
+  );
+  assert.equal(english["plan.approveAsk"], "Approve (Ask)");
+  assert.equal(english["plan.approveAcceptEdits"], "Approve (Accept edits)");
+  assert.equal(english["plan.approveAuto"], "Approve (Auto)");
+  assert.equal(english["plan.chooseApprovalMode"], "Choose approval mode");
+  assert.equal(chinese["plan.approvalRegion"], "规划审批");
+  assert.equal(
+    chinese["plan.readyAnnouncement"],
+    "规划已就绪，已在工作面板中打开。",
+  );
+  assert.equal(chinese["plan.approveAsk"], "批准（每次询问）");
+  assert.equal(chinese["plan.approveAcceptEdits"], "批准（自动接受编辑）");
+  assert.equal(chinese["plan.approveAuto"], "批准（全自动）");
+  assert.equal(chinese["plan.chooseApprovalMode"], "选择批准权限");
   assert.match(english["plan.autoWarning"], /may change files/);
   assert.match(chinese["plan.autoWarning"], /可能修改文件/);
 });

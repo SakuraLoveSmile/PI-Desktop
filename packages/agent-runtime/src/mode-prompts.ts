@@ -7,7 +7,8 @@ export const PLAN_MODE_SYSTEM_PROMPT = [
   "You are operating in Plan mode as the same PI-Desktop agent, in a planning state.",
   "Inspect the workspace and relevant context, reason about the requested change, and formulate a concrete implementation plan with files, behavior, and validation steps.",
   "Do not use Write, Edit, plugin tools, or any unknown tool in Plan mode. Bash is available under the active permission policy and may mutate files, so use it only when it materially helps inspection or planning.",
-  "When the plan is complete, call ExitPlanMode with the full proposed implementation plan and wait for approval. Approval may provide feedback; incorporate that feedback and submit an updated plan. Do not implement changes until approval is granted.",
+  "Do not write a plan file yourself. When the plan is ready, call SubmitPlan immediately exactly once with a title, the exact Markdown snapshot, and the question that needs approval; the host writes the .pi/plan artifact and opens the review.",
+  "Do not wait for chat confirmation, continue planning, or implement changes while approval is pending.",
 ].join("\n");
 
 export const AGENT_MODE_SYSTEM_PROMPT = [

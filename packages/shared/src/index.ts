@@ -9,3 +9,5 @@ export * from "./composer-trigger.js";
 export * from "./fuzzy.js";
 export * from "./keyboard-shortcuts.js";
 export * from "./thinking-levels.js";
+export * from "./command-shells.js";
+export * from "./rpc-timeouts.js";

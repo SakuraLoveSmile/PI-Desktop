@@ -17,12 +17,14 @@ import {
   normalizeSupportedThinkingLevels,
   normalizeThinkingLevel,
 } from "./sidecar-config.js";
-import { normalizeMode } from "@pi-desktop/shared";
+import { isCommandShellOption, normalizeMode } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   ContextCompactionRecord,
   ContextCompactionSettings,
+  CommandShellOption,
   Mode,
+  PlanExecution,
   ThinkingLevel,
   UiMessage,
 } from "@pi-desktop/shared";
@@ -39,6 +41,7 @@ type RuntimeParams = {
   turnId?: string;
   thinkingLevel?: ThinkingLevel;
   provider: RuntimeProviderConfig;
+  commandShell: CommandShellOption;
   pluginTools?: PluginToolDef[];
   scratchDir?: string;
   projectInstructions?: ProjectInstructions;
@@ -64,6 +67,12 @@ async function runtimeFor(
 ): Promise<DesktopAgentRuntime> {
   const sessionId = String(params.sessionId);
   const mode = normalizeMode(params.mode);
+  if (!isCommandShellOption(params.commandShell) || !params.commandShell.available) {
+    throw Object.assign(new Error("active command shell is invalid or unavailable"), {
+      rpcCode: -32000,
+      errorCode: "COMMAND_SHELL_INVALID",
+    });
+  }
   const providerInput = params.provider;
   const provider = {
     ...providerInput,
@@ -96,6 +105,7 @@ async function runtimeFor(
     thinkingLevel,
     pluginToolNames,
     params.projectInstructions,
+    params.commandShell,
   )
     ? existing
     : undefined;
@@ -135,6 +145,7 @@ async function runtimeFor(
     mode,
     turnId: params.turnId,
     provider,
+    commandShell: params.commandShell,
     thinkingLevel,
     history,
     compaction,
@@ -191,6 +202,34 @@ async function handle(method: string, params: any): Promise<unknown> {
         // Rejected-prompt path (pre-flight/transport failures). Streamed
         // provider errors surface via stopReason "error" and are classified
         // and emitted by the runtime itself.
+        notify("agent.event", {
+          sessionId,
+          turnId,
+          ts: Date.now(),
+          event: {
+            type: "error",
+            error: classifiedRuntimeError(err),
+          },
+        });
+      });
+      return { accepted: true, turnId };
+    }
+    case "agent.executeApprovedPlan": {
+      const sessionId = String(params.sessionId ?? "");
+      const turnId = String(params.turnId ?? "").trim();
+      const execution = params.execution as PlanExecution | undefined;
+      if (!sessionId || !turnId || !execution) {
+        throw Object.assign(new Error("approved plan execution parameters required"), {
+          errorCode: "PLAN_EXECUTION_NOT_FOUND",
+        });
+      }
+      const runtime = await runtimeFor({
+        ...params,
+        sessionId,
+        mode: "agent",
+        turnId,
+      });
+      void runtime.executeApprovedPlan(execution, turnId).catch((err) => {
         notify("agent.event", {
           sessionId,
           turnId,

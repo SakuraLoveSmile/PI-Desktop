@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   Mode,
@@ -16,6 +15,7 @@ import {
   useComposerAutocomplete,
 } from "../lib/use-composer-autocomplete";
 import { ComposerAutocomplete } from "./ComposerAutocomplete";
+import { PlanApprovalBar } from "./PlanApprovalBar";
 import {
   IconArrowUp,
   IconShield,
@@ -23,7 +23,6 @@ import {
   IconChevronDown,
   IconCheck,
   IconListChecks,
-  IconSearch,
   IconSparkles,
 } from "./icons";
 
@@ -133,6 +132,9 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const showToast = useAppStore((s) => s.showToast);
   const composerPrefill = useAppStore((s) => s.composerPrefill);
   const clearComposerPrefill = useAppStore((s) => s.clearComposerPrefill);
+  const pendingPlan = useAppStore((s) =>
+    s.activeSessionId ? s.pendingPlans[s.activeSessionId] : undefined,
+  );
   const [value, setValue] = useState("");
   const [cursor, setCursor] = useState(0);
   const [composing, setComposing] = useState(false);
@@ -142,10 +144,14 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const [thinkingOpen, setThinkingOpen] = useState(false);
   const thinkingRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
-  const modelRef = useRef<HTMLDivElement>(null);
-  const modelSearchRef = useRef<HTMLInputElement>(null);
-  const modelListRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
+  const approvalPending = Boolean(pendingPlan);
+
+  useEffect(() => {
+    if (!approvalPending) return;
+    setPermissionOpen(false);
+    setThinkingOpen(false);
+  }, [approvalPending]);
 
   useEffect(() => {
     if (!composerPrefill) return;
@@ -277,7 +283,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
 
   const submit = async () => {
     const content = value.trim();
-    if (!content || isRunning) return;
+    if (!content || isRunning || approvalPending) return;
     // Slash dispatch (D123): builtin/plugin aliases execute locally without
     // a session or a model; templates and unknown /names stay prompt text
     // (main expands templates). Runs before the model-ready gate on purpose.
@@ -306,7 +312,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
     value,
     cursor,
     composing,
-    enabled: !isRunning,
+    enabled: !isRunning && !approvalPending,
   });
 
   const acceptCompletion = (index: number) => {
@@ -348,6 +354,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
       className={`composer-dock composer-dock-${variant}`}
     >
       <div className="composer-stack">
+        {pendingPlan ? <PlanApprovalBar proposal={pendingPlan} /> : null}
         <div className="composer-shell">
           {inputFocused ? (
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
@@ -419,7 +426,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
               <button
                 className="icon-btn mode-chip"
                 title={t("settings.mode")}
-                disabled={isRunning || !activeSession}
+                disabled={isRunning || approvalPending || !activeSession}
                 onClick={async () => {
                   setThinkingOpen(false);
                   setPermissionOpen(false);
@@ -459,7 +466,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                     title={`${t("chat.thinking")} · ${thinkingLabel}`}
                     aria-haspopup="menu"
                     aria-expanded={thinkingOpen}
-                    disabled={isRunning || !activeSession}
+                    disabled={isRunning || approvalPending || !activeSession}
                     onClick={() => {
                       setPermissionOpen(false);
                       setThinkingOpen((open) => !open);
@@ -535,7 +542,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                     }
                     aria-haspopup="menu"
                     aria-expanded={permissionOpen}
-                    disabled={isRunning || !activeSession}
+                    disabled={isRunning || approvalPending || !activeSession}
                     onClick={() => {
                       setThinkingOpen(false);
                       setPermissionOpen((open) => !open);
@@ -555,6 +562,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                             type="button"
                             role="menuitemradio"
                             aria-checked={effectivePermissionMode === candidate}
+                            disabled={isRunning || approvalPending}
                             className={`composer-plus-item ${
                               effectivePermissionMode === candidate ? "active" : ""
                             }`}
@@ -604,6 +612,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                   }
                   disabled={
                     !value.trim() ||
+                    approvalPending ||
                     (!modelReady && !value.trim().startsWith("/"))
                   }
                   onClick={() => void submit()}

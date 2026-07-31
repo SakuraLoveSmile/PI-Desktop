@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { PROTOCOL_VERSION } from "@pi-desktop/shared";
+import { PROTOCOL_VERSION, rpcTimeoutMs } from "@pi-desktop/shared";
 
 export type HostNotificationHandler = (method: string, params: unknown) => void;
 export type ProcessExitHandler = (info: {
@@ -37,11 +37,18 @@ export class HostProcess {
   private child: ChildProcessWithoutNullStreams;
   private pending = new Map<
     string,
-    { resolve: (v: any) => void; reject: (e: Error) => void }
+    {
+      resolve: (v: any) => void;
+      reject: (e: Error) => void;
+      timer?: ReturnType<typeof setTimeout>;
+    }
   >();
   private handlers = new Set<HostNotificationHandler>();
   private exitHandlers = new Set<ProcessExitHandler>();
   private disposed = false;
+  private closed = false;
+  private exitNotified = false;
+  private readline?: ReturnType<typeof createInterface>;
   readonly binaryPath: string;
 
   constructor(dataDir: string, onStderr?: StderrHandler) {
@@ -62,25 +69,48 @@ export class HostProcess {
     });
 
     this.child.on("exit", (code, signal) => {
-      this.rejectAllPending(new Error("host-core exited"));
-      for (const h of this.exitHandlers) {
-        h({ code, signal, intentional: this.disposed });
-      }
+      this.closeTransport(new Error("host-core exited"));
+      this.notifyExit({ code, signal, intentional: this.disposed });
     });
-    this.child.on("error", () => {
-      this.rejectAllPending(new Error("host-core spawn failed"));
+    this.child.on("error", (error) => {
+      this.closeTransport(error instanceof Error ? error : new Error(String(error)));
+      this.notifyExit({ code: null, signal: null, intentional: this.disposed });
     });
 
     const rl = createInterface({ input: this.child.stdout });
+    this.readline = rl;
     rl.on("line", (line) => this.onLine(line));
   }
 
-  private rejectAllPending(error: Error) {
-    for (const [, p] of this.pending) p.reject(error);
+  private closeTransport(error: Error) {
+    if (this.closed) return;
+    this.closed = true;
+    for (const [, p] of this.pending) {
+      if (p.timer) clearTimeout(p.timer);
+      p.reject(error);
+    }
     this.pending.clear();
+    this.handlers.clear();
+    this.readline?.close();
+    this.readline = undefined;
+    this.child.removeAllListeners("exit");
+    this.child.removeAllListeners("error");
+    this.child.stderr.removeAllListeners("data");
+  }
+
+  private notifyExit(info: {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+    intentional: boolean;
+  }) {
+    if (this.exitNotified) return;
+    this.exitNotified = true;
+    for (const h of this.exitHandlers) h(info);
+    this.exitHandlers.clear();
   }
 
   onExit(handler: ProcessExitHandler): () => void {
+    if (this.closed) return () => undefined;
     this.exitHandlers.add(handler);
     return () => this.exitHandlers.delete(handler);
   }
@@ -97,6 +127,7 @@ export class HostProcess {
       const pending = this.pending.get(String(msg.id));
       if (pending) {
         this.pending.delete(String(msg.id));
+        if (pending.timer) clearTimeout(pending.timer);
         if (msg.error) {
           const err = new Error(msg.error.message) as Error & {
             code?: number;
@@ -117,30 +148,45 @@ export class HostProcess {
   }
 
   onNotification(handler: HostNotificationHandler): () => void {
+    if (this.closed) return () => undefined;
     this.handlers.add(handler);
     return () => this.handlers.delete(handler);
   }
 
   async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+    if (this.closed) throw new Error("host-core is unavailable");
     const id = randomUUID();
+    const timeoutMs = rpcTimeoutMs(method, params);
     const payload = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, {
         resolve: resolve as (v: any) => void,
         reject,
       });
+      const settle = (settleWith: (pending: {
+        resolve: (v: any) => void;
+        reject: (e: Error) => void;
+        timer?: ReturnType<typeof setTimeout>;
+      }) => void) => {
+        const pending = this.pending.get(id);
+        if (!pending) return;
+        this.pending.delete(id);
+        if (pending.timer) clearTimeout(pending.timer);
+        settleWith(pending);
+      };
       this.child.stdin.write(payload, (err) => {
         if (err) {
-          this.pending.delete(id);
-          reject(err);
+          this.closeTransport(err);
+          this.notifyExit({ code: null, signal: null, intentional: this.disposed });
         }
       });
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
-          reject(new Error(`host RPC timeout: ${method}`));
-        }
-      }, 130_000);
+      if (timeoutMs !== undefined) {
+        const timer = setTimeout(() => {
+          settle((pending) => pending.reject(new Error(`host RPC timeout: ${method}`)));
+        }, timeoutMs);
+        const pending = this.pending.get(id);
+        if (pending) pending.timer = timer;
+      }
     });
   }
 
@@ -150,7 +196,8 @@ export class HostProcess {
 
   async dispose(): Promise<void> {
     this.disposed = true;
-    this.rejectAllPending(new Error("host-core disposed"));
+    this.closeTransport(new Error("host-core disposed"));
+    this.exitHandlers.clear();
     this.child.kill();
   }
 }

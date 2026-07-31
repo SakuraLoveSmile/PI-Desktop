@@ -11,7 +11,11 @@ describe("mode-specific system prompts", () => {
     expect(prompt).toContain("base instructions");
     expect(prompt).toContain(PLAN_MODE_SYSTEM_PROMPT);
     expect(prompt).toContain("Inspect the workspace");
-    expect(prompt).toContain("ExitPlanMode");
+    expect(prompt).toContain("SubmitPlan");
+    expect(prompt).toContain("exact Markdown snapshot");
+    expect(prompt).toContain("Do not write a plan file yourself");
+    expect(prompt).toContain("host writes the .pi/plan artifact");
+    expect(prompt).toContain("Do not wait for chat confirmation");
     expect(prompt).toContain("Do not use Write, Edit, plugin tools");
     expect(prompt).toContain("Bash is available under the active permission policy");
   });

@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { rpcTimeoutMs } from "@pi-desktop/shared";
+
+export type ParentHostCloseHandler = (error: Error) => void;
 
 /**
  * Host client that proxies RPC calls to the Electron main process
@@ -7,16 +10,57 @@ import { randomUUID } from "node:crypto";
 export class ParentHostProxy {
   private pending = new Map<
     string,
-    { resolve: (v: any) => void; reject: (e: Error) => void }
+    {
+      resolve: (v: any) => void;
+      reject: (e: Error) => void;
+      timer?: ReturnType<typeof setTimeout>;
+    }
   >();
   private notificationHandlers = new Set<(method: string, params: unknown) => void>();
+  private closeHandlers = new Set<ParentHostCloseHandler>();
+  private closed = false;
+
+  constructor() {
+    process.stdin.on("end", this.handleParentClose);
+    process.stdin.on("close", this.handleParentClose);
+    process.stdin.on("error", this.handleParentClose);
+    process.stdout.on("error", this.handleParentClose);
+  }
+
+  private handleParentClose = (cause?: unknown) => {
+    const error = cause instanceof Error ? cause : new Error("parent host process closed");
+    this.close(error);
+  };
+
+  private close(error: Error) {
+    if (this.closed) return;
+    this.closed = true;
+    for (const [, pending] of this.pending) {
+      if (pending.timer) clearTimeout(pending.timer);
+      pending.reject(error);
+    }
+    this.pending.clear();
+    this.notificationHandlers.clear();
+    for (const handler of this.closeHandlers) handler(error);
+    this.closeHandlers.clear();
+    process.stdin.off("end", this.handleParentClose);
+    process.stdin.off("close", this.handleParentClose);
+    process.stdin.off("error", this.handleParentClose);
+    process.stdout.off("error", this.handleParentClose);
+  }
 
   /** Handle a response/notification line coming from parent on stdin. */
   handleParentMessage(msg: any) {
-    if (msg.id !== undefined && msg.id !== null && (msg.result !== undefined || msg.error)) {
+    if (this.closed) return true;
+    if (
+      msg.id !== undefined &&
+      msg.id !== null &&
+      (Object.prototype.hasOwnProperty.call(msg, "result") || msg.error)
+    ) {
       const pending = this.pending.get(String(msg.id));
       if (pending) {
         this.pending.delete(String(msg.id));
+        if (pending.timer) clearTimeout(pending.timer);
         if (msg.error) {
           const err = new Error(msg.error.message) as Error & { data?: unknown };
           err.data = msg.error.data;
@@ -37,12 +81,21 @@ export class ParentHostProxy {
   }
 
   onNotification(handler: (method: string, params: unknown) => void): () => void {
+    if (this.closed) return () => undefined;
     this.notificationHandlers.add(handler);
     return () => this.notificationHandlers.delete(handler);
   }
 
+  onClose(handler: ParentHostCloseHandler): () => void {
+    if (this.closed) return () => undefined;
+    this.closeHandlers.add(handler);
+    return () => this.closeHandlers.delete(handler);
+  }
+
   async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+    if (this.closed) throw new Error("parent host process is unavailable");
     const id = randomUUID();
+    const timeoutMs = rpcTimeoutMs(method, params);
     const payload =
       JSON.stringify({
         jsonrpc: "2.0",
@@ -55,22 +108,33 @@ export class ParentHostProxy {
         resolve: resolve as (v: any) => void,
         reject,
       });
+      const settle = (settleWith: (pending: {
+        resolve: (v: any) => void;
+        reject: (e: Error) => void;
+        timer?: ReturnType<typeof setTimeout>;
+      }) => void) => {
+        const pending = this.pending.get(id);
+        if (!pending) return;
+        this.pending.delete(id);
+        if (pending.timer) clearTimeout(pending.timer);
+        settleWith(pending);
+      };
       process.stdout.write(payload, (err) => {
-        if (err) {
-          this.pending.delete(id);
-          reject(err);
-        }
+        if (err) this.handleParentClose(err);
       });
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
-          reject(new Error(`parent host proxy timeout: ${method}`));
-        }
-      }, 130_000);
+      if (timeoutMs !== undefined) {
+        const timer = setTimeout(() => {
+          settle((pending) =>
+            pending.reject(new Error(`parent host proxy timeout: ${method}`)),
+          );
+        }, timeoutMs);
+        const pending = this.pending.get(id);
+        if (pending) pending.timer = timer;
+      }
     });
   }
 
   async dispose(): Promise<void> {
-    // parent owns the real host process
+    this.close(new Error("parent host proxy disposed"));
   }
 }

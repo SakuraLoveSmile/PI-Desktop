@@ -1,13 +1,13 @@
 use anyhow::{anyhow, Context, Result};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use serde_json::Value;
 use std::path::Path;
 
-/// Storage schema v8: SQLite holds
+/// Storage schema v9: SQLite holds
 /// index data only; transcript content lives in per-session JSONL files
 /// (D119, `transcripts.rs`).
-pub const SCHEMA_VERSION: i64 = 8;
+pub const SCHEMA_VERSION: i64 = 9;
 
 /// Audit rows older than this are pruned at boot.
 const AUDIT_RETENTION_MS: i64 = 90 * 24 * 3600 * 1000;
@@ -281,8 +281,8 @@ CREATE INDEX idx_audit_session ON audit_log(session_id, ts) WHERE session_id IS 
 
 "#;
 
-/// Approval storage is kept in one batch so fresh databases and v7 -> v8
-/// migrations cannot drift in table names, checks, or indexes.
+/// Approval storage is kept in one batch so fresh databases and migrations
+/// cannot drift in table names, checks, or indexes.
 const PLAN_APPROVALS_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS plan_approvals (
   request_id             TEXT PRIMARY KEY,
@@ -290,6 +290,8 @@ CREATE TABLE IF NOT EXISTS plan_approvals (
   turn_id               TEXT NOT NULL,
   tool_call_id          TEXT NOT NULL UNIQUE,
   plan_json             TEXT NOT NULL,
+  title                 TEXT NOT NULL DEFAULT '',
+  question              TEXT NOT NULL DEFAULT '',
   status                TEXT NOT NULL CHECK (status IN (
     'pending', 'approved', 'changes_requested', 'rejected',
     'expired', 'interrupted'
@@ -298,16 +300,30 @@ CREATE TABLE IF NOT EXISTS plan_approvals (
   target_permission_mode TEXT CHECK (target_permission_mode IN ('ask', 'accept-edits', 'auto')),
   feedback              TEXT,
   created_at            INTEGER NOT NULL,
-  expires_at            INTEGER NOT NULL,
+  updated_at            INTEGER NOT NULL,
+  expires_at            INTEGER,
   resolved_at           INTEGER,
-  error_code            TEXT
+  error_code            TEXT,
+  artifact_relative_path TEXT,
+  artifact_sha256       TEXT,
+  artifact_size_bytes   INTEGER,
+  version               INTEGER NOT NULL DEFAULT 1,
+  execution_id          TEXT UNIQUE,
+  execution_state       TEXT CHECK (execution_state IN (
+    'queued', 'running', 'completed', 'interrupted'
+  ))
 );
 CREATE INDEX IF NOT EXISTS idx_plan_approvals_session
   ON plan_approvals(session_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_plan_approvals_pending
-  ON plan_approvals(status, expires_at DESC);
+  ON plan_approvals(status, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_approvals_one_pending_session
   ON plan_approvals(session_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_plan_approvals_execution_queue
+  ON plan_approvals(execution_state, created_at DESC)
+  WHERE execution_state IN ('queued', 'running');
+CREATE INDEX IF NOT EXISTS idx_plan_approvals_execution_id
+  ON plan_approvals(execution_id) WHERE execution_id IS NOT NULL;
 "#;
 
 pub struct Database {
@@ -389,6 +405,10 @@ impl Database {
             }
             7 => {
                 migrate_v7_to_v8(&conn)?;
+                migrate_v8_to_v9(&conn)?;
+            }
+            8 => {
+                migrate_v8_to_v9(&conn)?;
             }
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
@@ -424,16 +444,43 @@ impl Database {
             "UPDATE task_runs SET status = 'aborted', ended_at = ?1 WHERE status = 'running'",
             params![now],
         )?;
-        // A pending approval is process-local: after a full host restart the
-        // sidecar that was waiting on it no longer exists, so it must never
-        // become actionable through a stale renderer request.
-        self.conn.execute(
+        // Pending approvals and queued executions are durable user work. A
+        // running execution cannot be safely resumed after a host restart, so
+        // only that state is made terminal here.
+        let tx = self.conn.unchecked_transaction()?;
+        let running: Vec<(String, String, String)> = {
+            let mut stmt = tx.prepare_cached(
+                "SELECT request_id, session_id, COALESCE(execution_id, '')
+                 FROM plan_approvals WHERE execution_state = 'running'",
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        tx.execute(
             "UPDATE plan_approvals
-             SET status = 'interrupted', resolved_at = ?1,
-                 error_code = 'PLAN_APPROVAL_INTERRUPTED'
-             WHERE status = 'pending'",
+             SET execution_state = 'interrupted', updated_at = ?1,
+                 version = version + 1,
+                 error_code = COALESCE(error_code, 'PLAN_EXECUTION_INTERRUPTED')
+             WHERE execution_state = 'running'",
             params![now],
         )?;
+        for (proposal_id, session_id, execution_id) in running {
+            crate::audit::append_tx(
+                &tx,
+                "plan_execution_interrupted",
+                Some(&session_id),
+                serde_json::json!({
+                    "proposalId": proposal_id,
+                    "sessionId": session_id,
+                    "executionId": execution_id,
+                    "errorCode": "PLAN_EXECUTION_INTERRUPTED",
+                    "reason": "host_restart"
+                }),
+            )?;
+        }
+        tx.commit()?;
         self.conn.execute(
             "DELETE FROM audit_log WHERE ts < ?1",
             params![now - AUDIT_RETENTION_MS],
@@ -638,6 +685,112 @@ fn migrate_v7_to_v8(conn: &Connection) -> Result<()> {
     }
 
     tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
+    tx.pragma_update(None, "user_version", 8i64)?;
+    tx.commit()?;
+    Ok(())
+}
+
+fn ensure_plan_approval_permission_setting_tx(
+    tx: &rusqlite::Transaction<'_>,
+) -> Result<()> {
+    let existing: Option<String> = tx
+        .query_row(
+            "SELECT value_json FROM kv WHERE ns = 'app' AND key = 'app'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let had_object = existing
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
+        .and_then(|value| value.as_object().cloned());
+    let mut settings = had_object.unwrap_or_else(|| {
+        serde_json::Map::from_iter([
+            ("defaultMode".into(), Value::String("agent".into())),
+            ("theme".into(), Value::String("dark".into())),
+            ("enterToSend".into(), Value::Bool(true)),
+            (
+                "contextCompaction".into(),
+                serde_json::json!({
+                    "enabled": true,
+                    "reserveTokens": 16384,
+                    "keepRecentTokens": 20000
+                }),
+            ),
+            ("onboardingDismissed".into(), Value::Bool(false)),
+        ])
+    });
+    let valid = settings
+        .get("planApprovalPermissionMode")
+        .and_then(Value::as_str)
+        .is_some_and(|mode| matches!(mode, "ask" | "accept-edits" | "auto"));
+    if !valid {
+        settings.insert(
+            "planApprovalPermissionMode".into(),
+            Value::String("auto".into()),
+        );
+        tx.execute(
+            "INSERT INTO kv (ns, key, value_json, updated_at)
+             VALUES ('app', 'app', ?1, ?2)
+             ON CONFLICT(ns, key) DO UPDATE SET
+               value_json = excluded.value_json,
+               updated_at = excluded.updated_at",
+            params![Value::Object(settings).to_string(), now_ms()],
+        )?;
+    }
+    Ok(())
+}
+
+fn migrate_v8_to_v9(conn: &Connection) -> Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    let has_approvals: bool = tx.query_row(
+        "SELECT EXISTS(
+             SELECT 1 FROM sqlite_master
+             WHERE type = 'table' AND name = 'plan_approvals'
+         )",
+        [],
+        |row| row.get(0),
+    )?;
+
+    if has_approvals {
+        for index in [
+            "idx_plan_approvals_session",
+            "idx_plan_approvals_pending",
+            "idx_plan_approvals_one_pending_session",
+            "idx_plan_approvals_execution_queue",
+            "idx_plan_approvals_execution_id",
+        ] {
+            tx.execute_batch(&format!("DROP INDEX IF EXISTS {index};"))?;
+        }
+        tx.execute_batch("ALTER TABLE plan_approvals RENAME TO plan_approvals_v8;")?;
+    }
+    tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
+    if has_approvals {
+        let now = now_ms();
+        tx.execute(
+            "INSERT INTO plan_approvals (
+                 request_id, session_id, turn_id, tool_call_id, plan_json,
+                 title, question, status, action, target_permission_mode,
+                 feedback, created_at, updated_at, expires_at, resolved_at,
+                 error_code, version
+             )
+             SELECT request_id, session_id, turn_id, tool_call_id, plan_json,
+                    '', '',
+                    CASE WHEN status = 'pending' THEN 'interrupted' ELSE status END,
+                    action, target_permission_mode, feedback, created_at,
+                    CASE WHEN status = 'pending' THEN ?1
+                         ELSE COALESCE(resolved_at, created_at) END,
+                    expires_at,
+                    CASE WHEN status = 'pending' THEN ?1 ELSE resolved_at END,
+                    CASE WHEN status = 'pending' THEN 'PLAN_APPROVAL_INTERRUPTED'
+                         ELSE error_code END,
+                    CASE WHEN status = 'pending' THEN 2 ELSE 1 END
+             FROM plan_approvals_v8",
+            params![now],
+        )?;
+        tx.execute_batch("DROP TABLE plan_approvals_v8;")?;
+    }
+    ensure_plan_approval_permission_setting_tx(&tx)?;
     tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     tx.commit()?;
     Ok(())
@@ -704,13 +857,15 @@ mod tests {
                  WHERE type = 'index' AND name IN (
                    'idx_plan_approvals_session',
                    'idx_plan_approvals_pending',
-                   'idx_plan_approvals_one_pending_session'
+                   'idx_plan_approvals_one_pending_session',
+                   'idx_plan_approvals_execution_queue',
+                   'idx_plan_approvals_execution_id'
                  )",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(index_count, 3);
+        assert_eq!(index_count, 5);
 
         // v7: transcript payloads live in per-session files, not columns.
         for (table, column) in [
@@ -829,7 +984,7 @@ mod tests {
             .conn()
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 8);
+        assert_eq!(version, 9);
         let mode: String = db
             .conn()
             .query_row("SELECT mode FROM sessions WHERE id = 'legacy-session'", [], |row| {
@@ -858,13 +1013,164 @@ mod tests {
                  WHERE type = 'index' AND name IN (
                    'idx_plan_approvals_session',
                    'idx_plan_approvals_pending',
-                   'idx_plan_approvals_one_pending_session'
+                   'idx_plan_approvals_one_pending_session',
+                   'idx_plan_approvals_execution_queue',
+                   'idx_plan_approvals_execution_id'
                  )",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(index_count, 3);
+        assert_eq!(index_count, 5);
+    }
+
+    #[test]
+    fn migrates_v8_approvals_without_expiring_new_work() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, mode, created_at, updated_at)
+                     VALUES ('v8-session', 'plan', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.conn().execute_batch("DROP TABLE plan_approvals;").unwrap();
+            db.conn()
+                .execute_batch(
+                    "CREATE TABLE plan_approvals (
+                       request_id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+                       turn_id TEXT NOT NULL,
+                       tool_call_id TEXT NOT NULL UNIQUE,
+                       plan_json TEXT NOT NULL,
+                       status TEXT NOT NULL CHECK (status IN (
+                         'pending', 'approved', 'changes_requested', 'rejected',
+                         'expired', 'interrupted'
+                       )),
+                       action TEXT CHECK (action IN ('approve', 'request_changes', 'reject')),
+                       target_permission_mode TEXT CHECK (
+                         target_permission_mode IN ('ask', 'accept-edits', 'auto')
+                       ),
+                       feedback TEXT,
+                       created_at INTEGER NOT NULL,
+                       expires_at INTEGER NOT NULL,
+                       resolved_at INTEGER,
+                       error_code TEXT
+                     );
+                     INSERT INTO plan_approvals (
+                       request_id, session_id, turn_id, tool_call_id, plan_json,
+                       status, created_at, expires_at
+                     ) VALUES
+                       ('terminal-v8', 'v8-session', 'turn-terminal', 'call-terminal',
+                        'terminal plan', 'approved', 10, 20),
+                       ('pending-v8', 'v8-session', 'turn-pending', 'call-pending',
+                        'pending plan', 'pending', 11, 21);",
+                )
+                .unwrap();
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        let version: i64 = db
+            .conn()
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 9);
+        let terminal: (String, Option<String>, i64) = db
+            .conn()
+            .query_row(
+                "SELECT status, error_code, version FROM plan_approvals
+                 WHERE request_id = 'terminal-v8'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(terminal, ("approved".into(), None, 1));
+        let pending: (String, Option<String>, Option<String>, i64) = db
+            .conn()
+            .query_row(
+                "SELECT status, error_code, artifact_relative_path, version
+                 FROM plan_approvals WHERE request_id = 'pending-v8'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            pending,
+            (
+                "interrupted".into(),
+                Some("PLAN_APPROVAL_INTERRUPTED".into()),
+                None,
+                2
+            )
+        );
+        assert_eq!(
+            db.get_setting("app").unwrap().unwrap()["planApprovalPermissionMode"],
+            "auto"
+        );
+    }
+
+    #[test]
+    fn boot_interrupts_running_plan_execution_but_leaves_queued_work() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, mode, permission_mode, created_at, updated_at)
+                     VALUES ('execution-session', 'agent', 'auto', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO plan_approvals (
+                       request_id, session_id, turn_id, tool_call_id, plan_json,
+                       title, question, status, created_at, updated_at,
+                       artifact_relative_path, artifact_sha256, artifact_size_bytes,
+                       version, execution_id, execution_state, target_permission_mode
+                     ) VALUES
+                       ('running-proposal', 'execution-session', 'turn-1', 'call-1',
+                        'running', 'Running', '?', 'approved', 1, 1,
+                        '.pi/plan/running.md', 'hash', 7, 1, 'running-execution', 'running', 'auto'),
+                       ('queued-proposal', 'execution-session', 'turn-2', 'call-2',
+                        'queued', 'Queued', '?', 'approved', 2, 2,
+                        '.pi/plan/queued.md', 'hash', 6, 1, 'queued-execution', 'queued', 'auto')",
+                    [],
+                )
+                .unwrap();
+        }
+        let db = Database::open(&path).unwrap();
+        let running: (String, Option<String>) = db
+            .conn()
+            .query_row(
+                "SELECT execution_state, error_code FROM plan_approvals
+                 WHERE execution_id = 'running-execution'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            running,
+            (
+                "interrupted".into(),
+                Some("PLAN_EXECUTION_INTERRUPTED".into())
+            )
+        );
+        let queued: String = db
+            .conn()
+            .query_row(
+                "SELECT execution_state FROM plan_approvals
+                 WHERE execution_id = 'queued-execution'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(queued, "queued");
     }
 
     #[test]

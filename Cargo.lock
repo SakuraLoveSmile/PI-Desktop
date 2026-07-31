@@ -415,6 +415,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "walkdir",
+ "windows-sys",
 ]
 
 [[package]]

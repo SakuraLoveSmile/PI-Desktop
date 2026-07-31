@@ -9,6 +9,8 @@ import type { ProjectInstructions } from "./project-instructions.js";
 import type {
   ContextCompactionRecord,
   ContextCompactionSettings,
+  CommandShellOption,
+  PlanExecution,
   ThinkingLevel,
   UiMessage,
 } from "@pi-desktop/shared";
@@ -35,6 +37,14 @@ const provider: RuntimeProviderConfig = {
   },
 };
 
+const commandShell: CommandShellOption = {
+  id: "bash",
+  label: "Bash",
+  dialect: "posix",
+  available: true,
+  isDefault: true,
+};
+
 function createRuntime(
   overrides: Partial<{
     provider: RuntimeProviderConfig;
@@ -44,7 +54,8 @@ function createRuntime(
     compactionSettings: ContextCompactionSettings;
     pluginTools: PluginToolDef[];
     projectInstructions: ProjectInstructions;
-    host: { call: ReturnType<typeof vi.fn> };
+    commandShell: CommandShellOption;
+    host: { call: ReturnType<typeof vi.fn>; onNotification?: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
 ) {
@@ -53,6 +64,7 @@ function createRuntime(
     sessionId: "session-1",
     mode: "agent",
     provider: overrides.provider ?? provider,
+    commandShell: overrides.commandShell ?? commandShell,
     thinkingLevel: overrides.thinkingLevel ?? "medium",
     history: overrides.history,
     compaction: overrides.compaction,
@@ -199,6 +211,231 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect((runtime as any).agent.state.systemPrompt).not.toContain("Use A rules.");
     await runtime.dispose();
   });
+
+  it("uses the active shell dialect in prompts and runtime reuse", async () => {
+    const powershell: CommandShellOption = {
+      id: "windows-powershell",
+      label: "Windows PowerShell",
+      dialect: "powershell",
+      available: true,
+      isDefault: true,
+    };
+    const runtime = createRuntime({ commandShell: powershell });
+    const systemPrompt = (runtime as any).agent.state.systemPrompt as string;
+    const bash = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Bash",
+    );
+
+    expect(systemPrompt).toContain("Windows PowerShell");
+    expect(systemPrompt).toContain("$env:PI_SCRATCH_DIR");
+    expect(systemPrompt).not.toContain("Git Bash (POSIX bash on Windows)");
+    expect(bash.description).toContain("Windows PowerShell");
+    expect((bash.parameters as any).properties.timeout).toMatchObject({
+      type: "number",
+      exclusiveMinimum: 0,
+    });
+    expect(
+      runtime.matches("agent", provider, "medium", [], undefined, powershell),
+    ).toBe(true);
+    expect(
+      runtime.matches("agent", provider, "medium", [], undefined, commandShell),
+    ).toBe(false);
+
+    await runtime.dispose();
+  });
+
+  it("sends an explicit Bash timeout and omits default transport fields", async () => {
+    const host = {
+      call: vi.fn().mockResolvedValue({ ok: true, content: "done" }),
+    };
+    const runtime = createRuntime({ host });
+    const bash = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Bash",
+    );
+
+    await bash.execute("bash-default", { command: "printf default" });
+    const defaultCall = host.call.mock.calls.at(-1)!;
+    expect(defaultCall[0]).toBe("tools.execute");
+    expect(defaultCall[1]).toMatchObject({
+      toolName: "Bash",
+      expectedCommandShellId: "bash",
+    });
+    expect(defaultCall[1]).not.toHaveProperty("timeoutMs");
+
+    await bash.execute("bash-timeout", { command: "printf timed", timeout: 1.25 });
+    const timedCall = host.call.mock.calls.at(-1)!;
+    expect(timedCall[1]).toMatchObject({
+      expectedCommandShellId: "bash",
+      timeoutMs: 1_250,
+    });
+
+    await runtime.dispose();
+  });
+
+  it("routes matching Bash output through throttled progress and aborts", async () => {
+    vi.useFakeTimers();
+    try {
+      const listeners = new Set<(method: string, params: unknown) => void>();
+      let finishExecution!: (value: unknown) => void;
+      const execution = new Promise((resolve) => {
+        finishExecution = resolve;
+      });
+      const host = {
+        call: vi.fn((method: string) =>
+          method === "tools.execute"
+            ? execution
+            : Promise.resolve({ ok: true, content: "abort requested" }),
+        ),
+        onNotification: vi.fn((handler: (method: string, params: unknown) => void) => {
+          listeners.add(handler);
+          return () => listeners.delete(handler);
+        }),
+      };
+      const updates: unknown[] = [];
+      const runtime = createRuntime({ host });
+      const bash = (runtime as any).agent.state.tools.find(
+        (tool: any) => tool.name === "Bash",
+      );
+      const controller = new AbortController();
+      const pending = bash.execute(
+        "bash-progress",
+        { command: "printf progress" },
+        controller.signal,
+        (update: unknown) => updates.push(update),
+      );
+      await vi.advanceTimersByTimeAsync(0);
+
+      for (const listener of listeners) {
+        listener("tools.output", {
+          sessionId: "other-session",
+          toolCallId: "bash-progress",
+          commandShellId: "bash",
+          stream: "stdout",
+          chunk: "ignored",
+        });
+        listener("tools.output", {
+          sessionId: "session-1",
+          toolCallId: "bash-progress",
+          commandShellId: "bash",
+          stream: "stdout",
+          chunk: "progress ",
+        });
+        listener("tools.output", {
+          sessionId: "session-1",
+          toolCallId: "bash-progress",
+          commandShellId: "bash",
+          stream: "stderr",
+          chunk: "warning",
+        });
+      }
+      expect(updates).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(99);
+      expect(updates).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(updates).toHaveLength(1);
+      expect((updates[0] as any).content[0].text).toBe("progress warning");
+
+      controller.abort();
+      expect(host.call).toHaveBeenCalledWith("tools.abort", {
+        sessionId: "session-1",
+        toolCallId: "bash-progress",
+      });
+      expect(listeners.size).toBe(0);
+      finishExecution({
+        ok: false,
+        isError: true,
+        errorCode: "TOOL_ABORTED",
+        content: { code: "TOOL_ABORTED" },
+      });
+      await expect(pending).resolves.toMatchObject({
+        isError: true,
+        details: { code: "TOOL_ABORTED" },
+      });
+      expect(listeners.size).toBe(0);
+
+      await runtime.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("removes streamed-output resources when the host dies or runtime is disposed", async () => {
+    vi.useFakeTimers();
+    try {
+      const listeners = new Set<(method: string, params: unknown) => void>();
+      let closeHost!: () => void;
+      let finishExecution!: (value: unknown) => void;
+      const execution = new Promise((resolve) => {
+        finishExecution = resolve;
+      });
+      const host = {
+        call: vi.fn((method: string) =>
+          method === "tools.execute"
+            ? execution
+            : Promise.resolve({ ok: true, content: "done" }),
+        ),
+        onNotification: vi.fn((handler: (method: string, params: unknown) => void) => {
+          listeners.add(handler);
+          return () => listeners.delete(handler);
+        }),
+        onClose: vi.fn((handler: () => void) => {
+          closeHost = handler;
+          return () => undefined;
+        }),
+      };
+      const updates: unknown[] = [];
+      const runtime = createRuntime({ host });
+      const bash = (runtime as any).agent.state.tools.find(
+        (tool: any) => tool.name === "Bash",
+      );
+      const pending = bash.execute(
+        "bash-host-death",
+        { command: "printf progress" },
+        undefined,
+        (update: unknown) => updates.push(update),
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(listeners.size).toBe(1);
+      closeHost();
+      expect(listeners.size).toBe(0);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(updates).toHaveLength(0);
+      finishExecution({ ok: true, content: "done" });
+      await pending;
+
+      await runtime.dispose();
+      expect((runtime as any).activeToolProgressCleanups.size).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("propagates a tools.abort protocol error instead of hiding it", async () => {
+    const execution = new Promise<{ ok: boolean; content: unknown }>((resolve) => {
+      setTimeout(() => resolve({ ok: false, content: { code: "TOOL_ABORTED" } }), 0);
+    });
+    const host = {
+      call: vi.fn((method: string) =>
+        method === "tools.execute"
+          ? execution
+          : Promise.reject(new Error("tools.abort protocol failure")),
+      ),
+      onNotification: vi.fn(() => () => undefined),
+    };
+    const runtime = createRuntime({ host });
+    const bash = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Bash",
+    );
+    const controller = new AbortController();
+    const pending = bash.execute(
+      "bash-abort-error",
+      { command: "printf progress" },
+      controller.signal,
+    );
+    controller.abort();
+    await expect(pending).rejects.toThrow("tools.abort protocol failure");
+    await runtime.dispose();
+  });
 });
 
 describe("DesktopAgentRuntime mode and tool composition", () => {
@@ -229,7 +466,7 @@ describe("DesktopAgentRuntime mode and tool composition", () => {
         "plugin_demo_run",
       ]),
     );
-    expect(agentTools).not.toContain("ExitPlanMode");
+    expect(agentTools).not.toContain("SubmitPlan");
 
     runtime.setMode("plan");
     expect((runtime as any).agent).toBe(initialAgent);
@@ -243,14 +480,14 @@ describe("DesktopAgentRuntime mode and tool composition", () => {
         "BrowserPreview",
         "Bash",
         "CompactContext",
-        "ExitPlanMode",
+        "SubmitPlan",
       ]),
     );
     expect(planTools).not.toEqual(
       expect.arrayContaining(["Write", "Edit", "plugin_demo_run"]),
     );
     expect(planTools).not.toContain("EnterPlanMode");
-    expect(agent.state.systemPrompt).toContain("ExitPlanMode");
+    expect(agent.state.systemPrompt).toContain("SubmitPlan");
     expect(agent.state.systemPrompt).toContain("Do not use Write, Edit, plugin tools");
 
     runtime.setMode("agent");
@@ -261,7 +498,7 @@ describe("DesktopAgentRuntime mode and tool composition", () => {
 });
 
 describe("DesktopAgentRuntime plan transitions", () => {
-  it("guards transition batches and keeps the same Agent alive through approval", async () => {
+  it("guards transition batches and terminates after durable plan submission", async () => {
     const host = { call: vi.fn() };
     const runtime = createRuntime({ host });
     const agent = (runtime as any).agent;
@@ -285,49 +522,95 @@ describe("DesktopAgentRuntime plan transitions", () => {
     const enterResult = await enterTool.execute("enter-call", {});
     expect(enterResult.terminate).toBeUndefined();
     expect(runtime.getMode()).toBe("plan");
-    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("ExitPlanMode");
+    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("SubmitPlan");
 
     const proposal = {
       id: "proposal-1",
       sessionId: "session-1",
       turnId: "durable-turn-1",
-      toolCallId: "exit-call-1",
-      plan: "implement it",
-      status: "changes_requested",
+      toolCallId: "submit-call-1",
+      title: "Implement it",
+      markdown: "# Implement it\n\n1. Make the change.",
+      plan: "# Implement it\n\n1. Make the change.",
+      question: "Approve implementation?",
+      artifact: {
+        relativePath: ".pi/plans/proposal-1.md",
+        sha256: "abc123",
+        sizeBytes: 31,
+      },
+      version: 1,
+      status: "pending",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
     };
-    host.call.mockResolvedValueOnce({
-      status: "changes_requested",
-      proposal,
-      feedback: "Include validation.",
+    host.call.mockResolvedValueOnce({ status: "pending", proposal });
+    const submitTool = agent.state.tools.find((tool: any) => tool.name === "SubmitPlan");
+    const submitResult = await submitTool.execute("submit-call-1", {
+      title: proposal.title,
+      markdown: proposal.markdown,
+      question: proposal.question,
     });
-    let exitTool = agent.state.tools.find((tool: any) => tool.name === "ExitPlanMode");
-    const changesResult = await exitTool.execute("exit-call-1", { plan: "implement it" });
-    expect(changesResult.terminate).toBeUndefined();
+    expect(submitResult.terminate).toBe(true);
     expect(runtime.getMode()).toBe("plan");
-    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("ExitPlanMode");
+    expect(runtime.getStatus().planningState).toBe("awaiting_approval");
+    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("SubmitPlan");
     expect(host.call).toHaveBeenLastCalledWith(
       "plans.submit",
       expect.objectContaining({
         sessionId: "session-1",
-        toolCallId: "exit-call-1",
-        plan: "implement it",
+        toolCallId: "submit-call-1",
+        title: proposal.title,
+        markdown: proposal.markdown,
+        question: proposal.question,
       }),
     );
+    expect(host.call).toHaveBeenCalledTimes(2);
 
-    host.call.mockResolvedValueOnce({
-      status: "approved",
-      proposal: { ...proposal, status: "approved" },
-      targetPermissionMode: "ask",
-    });
-    exitTool = agent.state.tools.find((tool: any) => tool.name === "ExitPlanMode");
-    const approvalResult = await exitTool.execute("exit-call-2", { plan: "implement it" });
-    expect(approvalResult.terminate).toBeUndefined();
+    await runtime.dispose();
+  });
+
+  it("executes an approved plan in the same runtime without a visible user event", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const originalAgent = agent;
+    agent.continue = vi.fn(async () => undefined);
+    agent.waitForIdle = vi.fn(async () => undefined);
+    runtime.setMode("plan");
+
+    const execution: PlanExecution = {
+      id: "execution-1",
+      proposalId: "proposal-1",
+      sessionId: "session-1",
+      plan: "# Approved\n\nUse the exact snapshot.",
+      title: "Approved plan",
+      question: "Proceed?",
+      artifact: {
+        relativePath: ".pi/plans/proposal-1.md",
+        sha256: "abc123",
+        sizeBytes: 31,
+      },
+      targetPermissionMode: "auto",
+      state: "running",
+    };
+
+    const result = await runtime.executeApprovedPlan(execution, "execution-turn-1");
+
+    expect(result).toEqual({ turnId: "execution-turn-1" });
+    expect((runtime as any).agent).toBe(originalAgent);
     expect(runtime.getMode()).toBe("agent");
-    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("Write");
-    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("EnterPlanMode");
+    expect(runtime.getStatus().planningState).toBe("inactive");
+    expect(agent.continue).toHaveBeenCalledOnce();
+    const internal = (runtime as any).fullEntries.at(-1).message;
+    expect(internal.role).toBe("user");
+    expect(internal.content).toContain(execution.artifact.relativePath);
+    expect(internal.content).toContain(execution.plan);
+    expect(
+      onEvent.mock.calls.some(
+        ([envelope]) => (envelope as any).event?.message?.role === "user",
+      ),
+    ).toBe(false);
 
     await runtime.dispose();
   });

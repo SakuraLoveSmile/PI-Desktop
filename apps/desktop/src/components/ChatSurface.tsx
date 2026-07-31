@@ -63,7 +63,7 @@ export const ChatSurface = memo(function ChatSurface() {
       messages,
       isRunning,
       pendingPermission: activePermission,
-      pendingPlan: activePlan,
+      approvalPending: Boolean(activePlan),
       planningState: activePlanningState,
     }),
     [
@@ -91,7 +91,7 @@ export const ChatSurface = memo(function ChatSurface() {
   }, [activeSessionId, currentTranscriptView, deferredSessionId]);
 
   const hasTranscript =
-    Boolean(transcriptView.pendingPlan) ||
+    transcriptView.approvalPending ||
     Boolean(transcriptView.pendingPermission) ||
     (transcriptView.isRunning && transcriptView.planningState === "planning") ||
     transcriptView.messages.some((message) => {
@@ -153,7 +153,6 @@ export const ChatSurface = memo(function ChatSurface() {
             messages={transcriptView.messages}
             isRunning={transcriptView.isRunning}
             pendingPermission={transcriptView.pendingPermission}
-            pendingPlan={transcriptView.pendingPlan}
             planningState={transcriptView.planningState}
           />
           <StableComposer variant="docked" />

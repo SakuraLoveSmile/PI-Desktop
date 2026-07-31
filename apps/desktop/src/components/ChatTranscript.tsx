@@ -11,7 +11,6 @@ import {
 import { useTranslation } from "react-i18next";
 import type {
   MessageUsage,
-  PlanProposal,
   PlanningState,
   UiMessage,
 } from "@pi-desktop/shared";
@@ -67,7 +66,6 @@ import {
 import { useAppStore } from "../stores/app-store";
 import type { PendingPermission } from "../lib/pending-permissions";
 import { PermissionCard } from "./PermissionCard";
-import { PlanApprovalCard } from "./PlanApprovalCard";
 
 const WorkspaceChangesEntry = memo(function WorkspaceChangesEntry() {
   const { t } = useTranslation();
@@ -1115,17 +1113,18 @@ export const ChatTranscript = memo(function ChatTranscript({
   messages,
   isRunning,
   pendingPermission,
-  pendingPlan,
   planningState,
 }: {
   sessionId: string | undefined;
   messages: UiMessage[];
   isRunning: boolean;
   pendingPermission?: PendingPermission;
-  pendingPlan?: PlanProposal;
   planningState?: PlanningState;
 }) {
   const { t } = useTranslation();
+  const approvalPending = useAppStore((state) =>
+    Boolean(sessionId && state.pendingPlans[sessionId]),
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -1202,7 +1201,7 @@ export const ChatTranscript = memo(function ChatTranscript({
     messages,
     isRunning,
     pendingPermission?.requestId,
-    pendingPlan?.id,
+    approvalPending,
     planningState,
     scheduleFollowScroll,
   ]);
@@ -1232,12 +1231,12 @@ export const ChatTranscript = memo(function ChatTranscript({
   const showWorking =
     isRunning &&
     !pendingPermission &&
-    !pendingPlan &&
+    !approvalPending &&
     planningState !== "planning" &&
     !activeToolGroup &&
     !assistantIsAnswering;
   const showPlanning =
-    isRunning && planningState === "planning" && !pendingPlan && !pendingPermission;
+    isRunning && planningState === "planning" && !approvalPending && !pendingPermission;
 
   return (
     <div className="thread-wrap">
@@ -1266,9 +1265,6 @@ export const ChatTranscript = memo(function ChatTranscript({
             ),
           )}
           <WorkspaceChangesEntry />
-          {pendingPlan ? (
-            <PlanApprovalCard key={pendingPlan.id} proposal={pendingPlan} />
-          ) : null}
           {pendingPermission ? (
             <PermissionCard
               key={pendingPermission.requestId}

@@ -1,5 +1,6 @@
 import type { AppError } from "./errors.js";
 import type { KeybindingOverrides } from "./keyboard-shortcuts.js";
+import type { CommandShellId } from "./command-shells.js";
 
 export type Mode = "plan" | "agent";
 
@@ -12,8 +13,8 @@ export function normalizeMode(value: unknown, fallback: Mode = "agent"): Mode {
 }
 
 export type PlanningState = "inactive" | "planning" | "awaiting_approval";
-export type PlanApprovalAction = "approve" | "request_changes" | "reject";
-export type PlanApprovalPermissionMode = Exclude<PermissionMode, "inherit">;
+export type PlanApprovalAction = "approve" | "reject";
+export type LegacyPlanApprovalAction = "request_changes";
 export type PlanApprovalStatus =
   | "pending"
   | "approved"
@@ -25,33 +26,86 @@ export type PlanApprovalStatus =
 /** Compatibility name for the proposal-shaped approval wire record. */
 export type PlanProposalStatus = PlanApprovalStatus;
 
+export type PlanArtifact = {
+  /** Workspace-relative path of the host-created plan artifact. */
+  relativePath: string;
+  sha256: string;
+  sizeBytes: number;
+};
+
+export type PlanExecutionState =
+  | "queued"
+  | "running"
+  | "completed"
+  | "interrupted";
+
+export type PlanExecutionFinishStatus = Extract<
+  PlanExecutionState,
+  "completed" | "interrupted"
+>;
+
 export type PlanProposal = {
+  /** Durable approval/proposal identity. */
   id: string;
   sessionId: string;
-  /** Durable host turn ID owning the ExitPlanMode call. */
+  /** Durable host turn ID owning the SubmitPlan call. */
   turnId: string;
-  /** Exact ExitPlanMode tool-call ID used to create this approval. */
+  /** Exact SubmitPlan tool-call ID used to create this approval. */
   toolCallId: string;
-  plan: string;
+  title: string;
+  /** Exact Markdown snapshot submitted for approval. */
+  markdown: string;
+  question: string;
+  artifact?: PlanArtifact;
+  /** Host schema/version for this proposal snapshot. */
+  version: number;
   status: PlanProposalStatus;
   createdAt: string;
   updatedAt: string;
-  expiresAt: string;
+  expiresAt?: string;
   resolvedAt?: string;
-  action?: PlanApprovalAction;
-  targetPermissionMode?: PlanApprovalPermissionMode;
+  action?: PlanApprovalAction | LegacyPlanApprovalAction;
+  targetPermissionMode?: GlobalPermissionMode;
   feedback?: string;
   errorCode?: string;
+  executionId?: string;
+  executionState?: PlanExecutionState;
+  /** Persisted snapshot alias retained by the host for compatibility. */
+  plan: string;
 };
+
+/** Descriptor persisted by the host after approval and consumed by Main. */
+export type PlanExecution = {
+  id: string;
+  proposalId: string;
+  sessionId: string;
+  /** Exact approved Markdown snapshot. */
+  plan: string;
+  title: string;
+  question: string;
+  artifact: PlanArtifact;
+  targetPermissionMode: GlobalPermissionMode;
+  state: PlanExecutionState;
+};
+
+export type PlanExecutionDescriptor = PlanExecution;
+export type ApprovedPlanExecution = PlanExecution;
 
 export type PlanningStateEvent = {
   sessionId: string;
   state: PlanningState;
   proposalId?: string;
+  title?: string;
+  markdown?: string;
+  question?: string;
+  artifact?: PlanArtifact;
+  version?: number;
   plan?: string;
   feedback?: string;
-  action?: PlanApprovalAction;
-  targetPermissionMode?: PlanApprovalPermissionMode;
+  action?: PlanApprovalAction | LegacyPlanApprovalAction;
+  targetPermissionMode?: GlobalPermissionMode;
+  executionId?: string;
+  executionState?: PlanExecutionState;
   proposal?: PlanProposal;
 };
 
@@ -60,14 +114,21 @@ export type PlansPendingResult = {
   state?: PlanningState;
 };
 
+export type PlansQueuedExecutionsResult = {
+  executions: PlanExecution[];
+};
+
 export type PlanResolveRequest = {
   proposalId: string;
   /** Identity fields must match the live host approval row exactly. */
   sessionId: string;
   turnId: string;
   toolCallId: string;
-  action: PlanApprovalAction;
-  targetPermissionMode?: PlanApprovalPermissionMode;
+  version?: number;
+  /** `request_changes` is accepted only for legacy renderer compilation;
+   * current Main/host resolution accepts approve or reject. */
+  action: PlanApprovalAction | LegacyPlanApprovalAction;
+  targetPermissionMode?: GlobalPermissionMode;
   feedback?: string;
 };
 
@@ -75,9 +136,10 @@ export type PlanResolutionResult = {
   ok: boolean;
   proposal: PlanProposal;
   state: PlanningState;
-  action?: PlanApprovalAction;
-  targetPermissionMode?: PlanApprovalPermissionMode;
+  action?: PlanApprovalAction | LegacyPlanApprovalAction;
+  targetPermissionMode?: GlobalPermissionMode;
   feedback?: string;
+  execution?: PlanExecution;
 };
 export const THINKING_LEVELS = [
   "off",
@@ -97,6 +159,22 @@ export const PERMISSION_MODES = ["inherit", "ask", "accept-edits", "auto"] as co
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 /** Global default: `inherit` is not meaningful at the settings level. */
 export type GlobalPermissionMode = Exclude<PermissionMode, "inherit">;
+/** Compatibility alias for existing Plan approval consumers. */
+export type PlanApprovalPermissionMode = GlobalPermissionMode;
+export const DEFAULT_PLAN_APPROVAL_PERMISSION_MODE: GlobalPermissionMode = "auto";
+
+export function isGlobalPermissionMode(
+  value: unknown,
+): value is GlobalPermissionMode {
+  return value === "ask" || value === "accept-edits" || value === "auto";
+}
+
+export function normalizeGlobalPermissionMode(
+  value: unknown,
+  fallback: GlobalPermissionMode = DEFAULT_PLAN_APPROVAL_PERMISSION_MODE,
+): GlobalPermissionMode {
+  return isGlobalPermissionMode(value) ? value : fallback;
+}
 
 export type UiMessageRole = "user" | "assistant" | "system" | "tool";
 
@@ -226,6 +304,17 @@ export type AgentPromptRequest = {
 };
 
 export type AgentPromptResponse = {
+  accepted: boolean;
+  turnId: string;
+};
+
+export type AgentExecuteApprovedPlanRequest = {
+  sessionId: string;
+  turnId: string;
+  execution: PlanExecution;
+};
+
+export type AgentExecuteApprovedPlanResponse = {
   accepted: boolean;
   turnId: string;
 };
@@ -416,8 +505,12 @@ export type AppSettings = {
   defaultProviderId?: string;
   defaultModelId?: string;
   defaultMode: Mode;
+  /** Configured command shell for the agent Bash protocol tool. */
+  defaultCommandShell?: CommandShellId;
   /** Global permission mode default; sessions with `inherit` follow this. */
   defaultPermissionMode?: GlobalPermissionMode;
+  /** Permission mode applied when an approved plan starts execution. */
+  planApprovalPermissionMode?: GlobalPermissionMode;
   theme: "system" | "light" | "dark";
   /** UI language; `auto` (and absent) follows the OS locale. */
   language?: "auto" | "en" | "zh-CN";

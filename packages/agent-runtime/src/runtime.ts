@@ -41,16 +41,22 @@ import { DEFAULT_CONTEXT_COMPACTION_SETTINGS } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   AgentStatus,
+  CommandShellOption,
   ContextCompactionReason,
   ContextCompactionRecord,
   ContextCompactionSettings,
   MessageUsage,
   Mode,
+  PlanExecution,
   PlanProposal,
   PlanningState,
   Risk,
   ThinkingLevel,
   UiMessage,
+} from "@pi-desktop/shared";
+import {
+  isCommandShellOption,
+  isToolsOutputParams,
 } from "@pi-desktop/shared";
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
@@ -233,6 +239,8 @@ export type AgentRuntimeOptions = {
   compactionSettings?: ContextCompactionSettings;
   /** Plugin agent tools to expose to the model this session. */
   pluginTools?: PluginToolDef[];
+  /** Effective command shell selected by host-core for this session. */
+  commandShell: CommandShellOption;
   /** Absolute per-session scratch directory for temporary files (D114).
    * Advertised to the model in the system prompt; host-core enforces it as
    * a second containment root. */
@@ -316,6 +324,98 @@ function safeJson(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+const MAX_COMMAND_TIMEOUT_MS = 2_147_483_647;
+const MAX_COMMAND_TIMEOUT_SECONDS = MAX_COMMAND_TIMEOUT_MS / 1000;
+const TOOL_OUTPUT_UPDATE_THROTTLE_MS = 100;
+const MAX_TOOL_PROGRESS_CHARS = 64 * 1024;
+const TOOL_PROGRESS_TRUNCATION_MARKER =
+  "\n\n[tool output progress truncated]\n\n";
+
+function shellScratchVariable(shell: CommandShellOption): string {
+  switch (shell.dialect) {
+    case "powershell":
+      return "$env:PI_SCRATCH_DIR";
+    case "cmd":
+      return "%PI_SCRATCH_DIR%";
+    case "posix":
+      return "$PI_SCRATCH_DIR";
+  }
+}
+
+function shellSyntaxGuidance(shell: CommandShellOption): string {
+  switch (shell.dialect) {
+    case "powershell":
+      return "Use native Windows PowerShell syntax and Windows paths such as `C:\\work\\file.txt` or `.\\file.txt`.";
+    case "cmd":
+      return "Use native cmd.exe syntax and Windows paths such as `C:\\work\\file.txt` or `.\\file.txt`.";
+    case "posix":
+      return "Use native POSIX shell syntax and forward-slash paths such as `/work/file.txt` or `./file.txt`.";
+  }
+}
+
+export function commandShellGuidance(
+  shell: CommandShellOption,
+  scratchDir?: string,
+): string {
+  const scratchVariable = shellScratchVariable(shell);
+  const scratch = scratchDir
+    ? `The session scratch directory is \`${scratchDir}\`; use ${scratchVariable} for it and keep temporary files there.`
+    : `When PI_SCRATCH_DIR is available, use ${scratchVariable} for the session scratch directory and keep temporary files there.`;
+  return [
+    `Shell commands run through ${shell.label} (${shell.id}). The protocol tool remains named Bash for compatibility, even when the active shell is PowerShell or cmd.`,
+    shellSyntaxGuidance(shell),
+    scratch,
+  ].join(" ");
+}
+
+function commandShellToolDescription(
+  shell: CommandShellOption,
+  scratchDir?: string,
+): string {
+  return [
+    `Run a non-interactive command through ${shell.label} in the workspace root.`,
+    "The protocol tool remains named Bash for compatibility; write commands for the active shell dialect.",
+    shellSyntaxGuidance(shell),
+    `The session scratch directory variable is ${shellScratchVariable(shell)}.`,
+    "An optional timeout may be supplied in seconds; without it, the command has no command timeout.",
+    ...(scratchDir ? [`The session scratch directory is ${scratchDir}.`] : []),
+  ].join(" ");
+}
+
+function commandTimeoutMs(params: unknown): number | undefined {
+  const timeout = isRecord(params) ? params.timeout : undefined;
+  if (timeout === undefined) return undefined;
+  if (typeof timeout !== "number" || !Number.isFinite(timeout) || timeout <= 0) {
+    throw Object.assign(
+      new Error("Invalid timeout: must be a finite number of seconds greater than zero"),
+      { errorCode: "INVALID_ARGUMENT" },
+    );
+  }
+  const timeoutMs = Math.ceil(timeout * 1000);
+  if (!Number.isFinite(timeoutMs) || timeoutMs > MAX_COMMAND_TIMEOUT_MS) {
+    throw Object.assign(
+      new Error(
+        `Invalid timeout: maximum is ${MAX_COMMAND_TIMEOUT_SECONDS} seconds`,
+      ),
+      { errorCode: "INVALID_ARGUMENT" },
+    );
+  }
+  return timeoutMs;
+}
+
+function appendToolProgress(current: string, chunk: string): string {
+  const combined = `${current}${chunk}`;
+  if (combined.length <= MAX_TOOL_PROGRESS_CHARS) return combined;
+  const codePoints = Array.from(combined);
+  const marker = Array.from(TOOL_PROGRESS_TRUNCATION_MARKER);
+  const remaining = Math.max(0, MAX_TOOL_PROGRESS_CHARS - marker.length);
+  const head = Math.ceil(remaining * 0.6);
+  const tail = remaining - head;
+  return `${codePoints.slice(0, head).join("")}${TOOL_PROGRESS_TRUNCATION_MARKER}${
+    tail > 0 ? codePoints.slice(-tail).join("") : ""
+  }`;
 }
 
 function fairToolResultTokenBudgets(
@@ -469,6 +569,7 @@ export class DesktopAgentRuntime {
   private pendingPlanId?: string;
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
+  private commandShell: CommandShellOption;
   private scratchDir?: string;
   private baseProjectInstructions?: ProjectInstructions;
   private projectInstructions?: ProjectInstructions;
@@ -491,6 +592,8 @@ export class DesktopAgentRuntime {
   private compactionInProgress = false;
   private pendingModelCompaction?: { instructions?: string };
   private nudgeCooldownTurns = 0;
+  private activeToolProgressCleanups = new Set<(flush: boolean) => void>();
+  private hostCloseUnsubscribe?: () => void;
 
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
@@ -500,8 +603,17 @@ export class DesktopAgentRuntime {
     this.provider = opts.provider;
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
     this.host = opts.host;
+    this.hostCloseUnsubscribe = this.host.onClose?.(() => {
+      this.cleanupActiveToolProgress();
+    });
     this.onEvent = opts.onEvent;
     this.pluginTools = opts.pluginTools ?? [];
+    if (!isCommandShellOption(opts.commandShell) || !opts.commandShell.available) {
+      throw Object.assign(new Error("active command shell is invalid or unavailable"), {
+        errorCode: "COMMAND_SHELL_INVALID",
+      });
+    }
+    this.commandShell = opts.commandShell;
     this.scratchDir = opts.scratchDir;
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
@@ -512,18 +624,8 @@ export class DesktopAgentRuntime {
         // Work panel browser preview (D100): workspace HTML files render
         // in the embedded browser with live reload on file changes.
         "When you create or edit an HTML page in the workspace, call the BrowserPreview tool with its workspace-relative path (e.g. `index.html` or `demo/index.html`) to show it in PI-Desktop's built-in browser panel. The preview live-reloads as you keep editing, so one call per page is enough — no external browser or manual refresh needed.",
-        // Shell dialect (host-core D084): commands run through bash on
-        // every platform — Git Bash on Windows, bash on macOS/Linux.
-        process.platform === "win32"
-          ? "Shell commands run in Git Bash (POSIX bash on Windows). Always write bash/POSIX syntax with forward-slash paths — never cmd.exe or PowerShell syntax."
-          : "Shell commands run in bash. Write bash/POSIX syntax.",
-        // Session scratch directory (D114): temp files must not dirty
-        // the user's workspace or its git status.
-        ...(this.scratchDir
-          ? [
-              `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
-            ]
-          : []),
+        // Shell dialect and scratch variable are selected by host-core.
+        commandShellGuidance(this.commandShell, this.scratchDir),
       ].join("\n\n");
     this.compactionSettings = normalizeCompactionSettings(
       opts.compactionSettings,
@@ -623,25 +725,25 @@ export class DesktopAgentRuntime {
     );
     const transition =
       context.toolCall.name === "EnterPlanMode" ||
-      context.toolCall.name === "ExitPlanMode";
+      context.toolCall.name === "SubmitPlan";
     const transitionInBatch = toolCalls.some(
       (block) =>
         (block as { name?: string }).name === "EnterPlanMode" ||
-        (block as { name?: string }).name === "ExitPlanMode",
+        (block as { name?: string }).name === "SubmitPlan",
     );
     if (transitionInBatch && toolCalls.length !== 1) {
       return {
         block: true,
         reason:
-          "EnterPlanMode and ExitPlanMode must be the only tool call in the assistant message.",
+          "EnterPlanMode and SubmitPlan must be the only tool call in the assistant message.",
       };
     }
     if (!transition) return undefined;
     if (context.toolCall.name === "EnterPlanMode" && this.mode !== "agent") {
       return { block: true, reason: "EnterPlanMode is available only in Agent mode." };
     }
-    if (context.toolCall.name === "ExitPlanMode" && this.mode !== "plan") {
-      return { block: true, reason: "ExitPlanMode is available only in Plan mode." };
+    if (context.toolCall.name === "SubmitPlan" && this.mode !== "plan") {
+      return { block: true, reason: "SubmitPlan is available only in Plan mode." };
     }
     return undefined;
   }
@@ -650,10 +752,18 @@ export class DesktopAgentRuntime {
     state: PlanningState,
     details: {
       proposalId?: string;
+      title?: string;
+      markdown?: string;
+      question?: string;
+      artifact?: PlanProposal["artifact"];
+      version?: number;
       plan?: string;
       feedback?: string;
-      action?: "approve" | "request_changes" | "reject";
+      action?: "approve" | "reject";
       targetPermissionMode?: "ask" | "accept-edits" | "auto";
+      executionId?: string;
+      executionState?: PlanProposal["executionState"];
+      proposal?: PlanProposal;
     } = {},
   ): void {
     this.planningState = state;
@@ -665,22 +775,56 @@ export class DesktopAgentRuntime {
   matches(
     mode: Mode,
     provider: RuntimeProviderConfig,
-    thinkingLevelOrPluginToolNames: ThinkingLevel | string[] = this.thinkingLevel,
-    pluginToolNames: string[] = [],
-    projectInstructions?: ProjectInstructions,
+    thinkingLevelOrPluginToolNames:
+      | ThinkingLevel
+      | string[]
+      | CommandShellOption = this.thinkingLevel,
+    pluginToolNamesOrThinkingLevel: string[] | ThinkingLevel = [],
+    projectInstructionsOrPluginToolNames?: ProjectInstructions | string[],
+    projectInstructionsOrCommandShell?: ProjectInstructions | CommandShellOption,
+    commandShell?: CommandShellOption,
   ): boolean {
-    // Keep the pre-thinking overload usable for callers that passed plugin
-    // names as the third argument. New callers pass the selected level.
-    const legacyPluginToolNames = Array.isArray(thinkingLevelOrPluginToolNames)
-      ? thinkingLevelOrPluginToolNames
-      : undefined;
-    const thinkingLevel: ThinkingLevel = Array.isArray(
-      thinkingLevelOrPluginToolNames,
-    )
-      ? this.thinkingLevel
-      : thinkingLevelOrPluginToolNames;
-    const effectivePluginToolNames =
-      legacyPluginToolNames ?? pluginToolNames;
+    let requestedShell = this.commandShell;
+    let thinkingLevel = this.thinkingLevel;
+    let effectivePluginToolNames: string[] = [];
+    let projectInstructions: ProjectInstructions | undefined;
+
+    // Keep both the existing `(level, plugins, instructions, shell)` call shape
+    // and a shell-first shape usable while the runtime contract evolves.
+    if (isCommandShellOption(thinkingLevelOrPluginToolNames)) {
+      requestedShell = thinkingLevelOrPluginToolNames;
+      if (typeof pluginToolNamesOrThinkingLevel === "string") {
+        thinkingLevel = pluginToolNamesOrThinkingLevel;
+      } else if (Array.isArray(pluginToolNamesOrThinkingLevel)) {
+        effectivePluginToolNames = pluginToolNamesOrThinkingLevel;
+      }
+      if (Array.isArray(projectInstructionsOrPluginToolNames)) {
+        effectivePluginToolNames = projectInstructionsOrPluginToolNames;
+      } else if (isRecord(projectInstructionsOrPluginToolNames)) {
+        projectInstructions = projectInstructionsOrPluginToolNames as ProjectInstructions;
+      }
+      if (isRecord(projectInstructionsOrCommandShell)) {
+        projectInstructions = projectInstructionsOrCommandShell as ProjectInstructions;
+      }
+    } else {
+      if (typeof thinkingLevelOrPluginToolNames === "string") {
+        thinkingLevel = thinkingLevelOrPluginToolNames;
+      } else if (Array.isArray(thinkingLevelOrPluginToolNames)) {
+        effectivePluginToolNames = thinkingLevelOrPluginToolNames;
+      }
+      if (Array.isArray(pluginToolNamesOrThinkingLevel)) {
+        effectivePluginToolNames = pluginToolNamesOrThinkingLevel;
+      }
+      if (isRecord(projectInstructionsOrPluginToolNames)) {
+        projectInstructions = projectInstructionsOrPluginToolNames as ProjectInstructions;
+      }
+      if (isCommandShellOption(projectInstructionsOrCommandShell)) {
+        requestedShell = projectInstructionsOrCommandShell;
+      } else if (isRecord(projectInstructionsOrCommandShell)) {
+        projectInstructions = projectInstructionsOrCommandShell as ProjectInstructions;
+      }
+    }
+    if (isCommandShellOption(commandShell)) requestedShell = commandShell;
     const current = this.pluginTools.map((t) => t.name).sort().join(",");
     const next = [...effectivePluginToolNames].sort().join(",");
     const currentThinkingLevels = [
@@ -707,6 +851,7 @@ export class DesktopAgentRuntime {
         safeJson(provider.modelConfig ?? null) &&
       this.thinkingLevel === clampThinkingLevel(provider, thinkingLevel) &&
       current === next &&
+      safeJson(this.commandShell) === safeJson(requestedShell) &&
       safeJson(this.baseProjectInstructions ?? null) ===
         safeJson(projectInstructions ?? null)
     );
@@ -881,9 +1026,7 @@ export class DesktopAgentRuntime {
         case "Edit":
           return `Replace text in a file (first occurrence of old_string).${scratchPathHint}`;
         case "Bash":
-          return this.scratchDir
-            ? "Run a non-interactive shell command in the workspace root. $PI_SCRATCH_DIR points at the session scratch directory for temporary files."
-            : "Run a non-interactive shell command in the workspace root.";
+          return commandShellToolDescription(this.commandShell, this.scratchDir);
         default:
           return `${toolName} tool via PI-Desktop host-core`;
       }
@@ -910,32 +1053,155 @@ export class DesktopAgentRuntime {
                       old_string: Type.String(),
                       new_string: Type.String(),
                     }
-                  : { command: Type.String() },
+                  : toolName === "Bash"
+                    ? {
+                        command: Type.String(),
+                        timeout: Type.Optional(
+                          Type.Number({
+                            exclusiveMinimum: 0,
+                            description: "Optional command timeout in seconds.",
+                          }),
+                        ),
+                      }
+                    : { command: Type.String() },
       ),
-      execute: async (toolCallId, params) => {
+      execute: async (
+        toolCallId,
+        params,
+        signal,
+        onUpdate,
+      ) => {
         await this.loadPathInstructions(toolName, params);
         const startedAt = Date.now();
-        const result = await this.host.call<{
+        const isBash = toolName === "Bash";
+        const timeoutMs = isBash ? commandTimeoutMs(params) : undefined;
+        let progress = "";
+        let progressDirty = false;
+        let progressTimer: ReturnType<typeof setTimeout> | undefined;
+        let settled = false;
+        let abortRequested = false;
+        let cleaned = false;
+        let abortError: unknown;
+        let abortPromise: Promise<void> | undefined;
+        let cleanup: (flush: boolean) => void = () => undefined;
+        const flushProgress = () => {
+          progressTimer = undefined;
+          if (!onUpdate || !progress || !progressDirty) return;
+          progressDirty = false;
+          try {
+            onUpdate({
+              content: [{ type: "text", text: progress }],
+              details: { output: progress },
+            });
+          } catch {
+            // Progress is advisory; a renderer callback must not fail the tool.
+          }
+        };
+        const scheduleProgress = () => {
+          if (!onUpdate || progressTimer || settled) return;
+          progressTimer = setTimeout(flushProgress, TOOL_OUTPUT_UPDATE_THROTTLE_MS);
+        };
+        const unsubscribeOutput = isBash && this.host.onNotification
+          ? this.host.onNotification((method, params) => {
+              if (
+                settled ||
+                method !== "tools.output" ||
+                !isToolsOutputParams(params) ||
+                params.sessionId !== this.sessionId ||
+                params.toolCallId !== toolCallId ||
+                params.commandShellId !== this.commandShell.id
+              ) {
+                return;
+              }
+              progress = appendToolProgress(progress, params.chunk);
+              progressDirty = true;
+              scheduleProgress();
+            })
+          : undefined;
+        const abort = () => {
+          if (!isBash || abortRequested || settled) return;
+          abortRequested = true;
+          abortPromise = this.host
+            .call("tools.abort", {
+              sessionId: this.sessionId,
+              toolCallId,
+            })
+            .then(
+              () => undefined,
+              (error) => {
+                abortError = error;
+              },
+            );
+          cleanup(true);
+        };
+
+        cleanup = (flush: boolean) => {
+          if (cleaned) return;
+          cleaned = true;
+          settled = true;
+          if (progressTimer) clearTimeout(progressTimer);
+          if (flush) flushProgress();
+          unsubscribeOutput?.();
+          signal?.removeEventListener("abort", abort);
+          this.activeToolProgressCleanups.delete(cleanup);
+        };
+        this.activeToolProgressCleanups.add(cleanup);
+        if (signal?.aborted) {
+          cleanup(false);
+          throw Object.assign(new Error("tool execution aborted before it started"), {
+            errorCode: "TOOL_ABORTED",
+          });
+        }
+        if (signal) {
+          signal.addEventListener("abort", abort, { once: true });
+        }
+
+        let result: {
           ok: boolean;
           content: unknown;
           isError?: boolean;
           errorCode?: string;
           denied?: boolean;
-        }>("tools.execute", {
-          sessionId: this.sessionId,
-          turnId: this.turnId,
-          toolCallId,
-          toolName,
-          args: params,
-          mode: this.mode,
-          timeoutMs: 60_000,
-          ...(toolName.startsWith("plugin_")
-            ? {
-                declaredRisk: this.pluginTools.find((tool) => tool.name === toolName)
-                  ?.risk,
-              }
-            : {}),
-        });
+        } | undefined;
+        let executionError: unknown;
+        let executionFailed = false;
+        try {
+          result = await this.host.call<{
+              ok: boolean;
+              content: unknown;
+              isError?: boolean;
+              errorCode?: string;
+              denied?: boolean;
+            }>("tools.execute", {
+              sessionId: this.sessionId,
+              turnId: this.turnId,
+              toolCallId,
+              toolName,
+              args: params,
+              mode: this.mode,
+              ...(isBash
+                ? {
+                    expectedCommandShellId: this.commandShell.id,
+                    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+                  }
+                : {}),
+              ...(toolName.startsWith("plugin_")
+                ? {
+                    declaredRisk: this.pluginTools.find((tool) => tool.name === toolName)
+                      ?.risk,
+                  }
+                : {}),
+            });
+        } catch (error) {
+          executionFailed = true;
+          executionError = error;
+        } finally {
+          cleanup(true);
+        }
+        if (abortPromise) await abortPromise;
+        if (abortError) throw abortError;
+        if (executionFailed) throw executionError;
+        if (!result) throw new Error("tool execution returned no result");
         // hostRttMs spans approval + execution + IPC. Compare it against the
         // host's own "tool timing" line for the same toolCallId: the gap is
         // the stdio hops, and permissionWaitMs there explains a large value.
@@ -988,7 +1254,7 @@ export class DesktopAgentRuntime {
     const modeTools =
       this.mode === "agent"
         ? [this.buildEnterPlanModeTool()]
-        : [this.buildExitPlanModeTool()];
+        : [this.buildSubmitPlanTool()];
     return [...builtins, ...pluginTools, ...contextTools, ...modeTools];
   }
 
@@ -1013,7 +1279,7 @@ export class DesktopAgentRuntime {
           content: [
             {
               type: "text",
-              text: "Plan mode is active. Inspect the workspace, formulate the plan, then call ExitPlanMode for approval.",
+              text: "Plan mode is active. Inspect the workspace, formulate the plan, then call SubmitPlan for approval.",
             },
           ],
           details: { mode: "plan", planningState: "planning" },
@@ -1022,118 +1288,115 @@ export class DesktopAgentRuntime {
     };
   }
 
-  private buildExitPlanModeTool(): AgentTool {
+  private buildSubmitPlanTool(): AgentTool {
     return {
-      name: "ExitPlanMode",
-      label: "Exit Plan Mode",
+      name: "SubmitPlan",
+      label: "Submit plan",
       description:
-        "Submit the complete implementation plan for user approval. Do not use this until the plan is concrete.",
+        "Submit a complete Markdown implementation plan for user approval. Do not use this until the plan is concrete.",
       parameters: Type.Object({
-        plan: Type.String({
+        title: Type.String({
+          description: "A concise title for the implementation plan.",
+        }),
+        markdown: Type.String({
           description:
-            "The complete implementation plan, including files, behavior, and validation.",
+            "The exact Markdown implementation plan, including files, behavior, and validation.",
+        }),
+        question: Type.String({
+          description:
+            "The question or decision the user should answer when approving this plan.",
         }),
       }),
       executionMode: "sequential",
       execute: async (toolCallId, params) => {
-        const plan = isRecord(params) && typeof params.plan === "string"
-          ? params.plan.trim()
-          : "";
-        if (!plan) {
+        const title =
+          isRecord(params) && typeof params.title === "string"
+            ? params.title.trim()
+            : "";
+        const markdown =
+          isRecord(params) && typeof params.markdown === "string"
+            ? params.markdown.trim()
+            : "";
+        const question =
+          isRecord(params) && typeof params.question === "string"
+            ? params.question.trim()
+            : "";
+        if (!title || !markdown || !question) {
           return {
-            content: [{ type: "text", text: "ExitPlanMode requires a non-empty plan." }],
+            content: [
+              {
+                type: "text",
+                text: "SubmitPlan requires non-empty title, markdown, and question.",
+              },
+            ],
             details: { errorCode: "PLAN_INVALID_ARGUMENT" },
             isError: true,
           };
         }
-        let result: {
-          status:
-            | "approved"
-            | "changes_requested"
-            | "rejected"
-            | "expired"
-            | "interrupted";
-          proposal?: PlanProposal;
-          feedback?: string;
-          targetPermissionMode?: "ask" | "accept-edits" | "auto";
-        };
+        let result: { status?: string; proposal?: PlanProposal };
         try {
-          this.setPlanningState("awaiting_approval", { plan });
           result = await this.host.call("plans.submit", {
             sessionId: this.sessionId,
             // This is the durable host turn ID passed into the runtime for the
             // current prompt, not a newly generated provider-side identifier.
             turnId: this.turnId,
             toolCallId,
-            plan,
+            title,
+            markdown,
+            question,
           });
         } catch (error) {
-          this.setPlanningState("planning", { plan });
           const errorCode =
             (error as { data?: { errorCode?: string } })?.data?.errorCode ??
-            "PLAN_APPROVAL_INTERRUPTED";
+            "PLAN_SUBMIT_FAILED";
           return {
-            content: [{ type: "text", text: `Plan approval failed: ${errorCode}` }],
+            content: [{ type: "text", text: `Plan submission failed: ${errorCode}` }],
             details: { errorCode },
             isError: true,
             terminate: true,
           };
         }
 
-        if (result.status === "approved") {
-          this.setMode("agent");
+        const proposal = result.proposal;
+        if (
+          result.status !== "pending" ||
+          !proposal ||
+          typeof proposal.id !== "string" ||
+          !proposal.artifact ||
+          typeof proposal.artifact.relativePath !== "string" ||
+          typeof proposal.artifact.sha256 !== "string" ||
+          typeof proposal.artifact.sizeBytes !== "number"
+        ) {
           return {
             content: [
-              {
-                type: "text",
-                text: `Plan approved. Continue implementation in Agent mode${result.targetPermissionMode ? ` (${result.targetPermissionMode} permission mode)` : ""}.`,
-              },
+              { type: "text", text: "Plan submission returned an invalid proposal." },
             ],
-            details: result,
+            details: { errorCode: "PLAN_SUBMIT_FAILED" },
+            isError: true,
+            terminate: true,
           };
         }
-        if (result.status === "changes_requested") {
-          this.setPlanningState("planning", {
-            proposalId: result.proposal?.id,
-            plan,
-            feedback: result.feedback,
-            action: "request_changes",
-          });
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Plan feedback from the user: ${result.feedback || "Please revise the plan and resubmit it."}`,
-              },
-            ],
-            details: result,
-          };
-        }
-        this.setPlanningState("planning", {
-          proposalId: result.proposal?.id,
-          plan,
-          action: result.status === "rejected" ? "reject" : undefined,
+
+        this.setPlanningState("awaiting_approval", {
+          proposalId: proposal.id,
+          title: proposal.title || title,
+          markdown: proposal.markdown || markdown,
+          question: proposal.question || question,
+          artifact: proposal.artifact,
+          version: proposal.version,
+          plan: proposal.markdown || markdown,
+          executionId: proposal.executionId,
+          executionState: proposal.executionState,
+          proposal,
         });
         return {
           content: [
             {
               type: "text",
-              text:
-                result.status === "rejected"
-                  ? "The plan was rejected. Remain in Plan mode and wait for a new user request."
-                  : `Plan approval ended with ${result.status}. Remain in Plan mode.`,
+              text: "Plan submitted for approval. Execution will begin only after approval.",
             },
           ],
-          details: {
-            ...result,
-            errorCode:
-              result.status === "rejected"
-                ? "PLAN_REJECTED"
-                : result.status === "expired"
-                  ? "PLAN_APPROVAL_TIMEOUT"
-                  : "PLAN_APPROVAL_INTERRUPTED",
-          },
-          isError: true,
+          details: { proposal },
           terminate: true,
         };
       },
@@ -1209,6 +1472,11 @@ export class DesktopAgentRuntime {
       ts: Date.now(),
       event,
     });
+  }
+
+  private cleanupActiveToolProgress(): void {
+    for (const cleanup of [...this.activeToolProgressCleanups]) cleanup(false);
+    this.activeToolProgressCleanups.clear();
   }
 
   setCompactionSettings(settings?: ContextCompactionSettings): void {
@@ -1894,6 +2162,66 @@ export class DesktopAgentRuntime {
     this.emit({ type: "error", error });
   }
 
+  /**
+   * Start execution for a host-approved plan without creating a visible user
+   * turn. pi-agent-core needs a user message before `continue()`, so the
+   * instruction is appended only to this runtime's in-memory context. Main
+   * never receives a user event for it and therefore cannot persist or render
+   * it as a transcript row.
+   */
+  async executeApprovedPlan(
+    execution: PlanExecution,
+    durableTurnId: string,
+  ): Promise<{ turnId: string }> {
+    if (this.disposed) throw new Error("runtime disposed");
+    if (execution.sessionId !== this.sessionId) {
+      throw Object.assign(new Error("approved plan belongs to another session"), {
+        errorCode: "PLAN_EXECUTION_NOT_FOUND",
+      });
+    }
+    if (!durableTurnId.trim()) {
+      throw Object.assign(new Error("execution turn id required"), {
+        errorCode: "TURN_NOT_FOUND",
+      });
+    }
+
+    this.hostTurnId = durableTurnId;
+    this.turnId = durableTurnId;
+    this.pendingUserMessageId = undefined;
+    this.pendingOverflow = false;
+    this.overflowRecoveryAttempted = false;
+    this.suppressOverflowRunEnd = false;
+    this.turnHadError = false;
+    this.currentAssistant = undefined;
+    this.requestStartedAt = Date.now();
+    this.setMode("agent");
+
+    const instruction = [
+      "Execute the approved implementation plan now.",
+      `Use the host-created plan artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
+      `Approved plan title: ${execution.title}`,
+      `Approval question: ${execution.question}`,
+      "Treat the following Markdown as the exact approved snapshot. Do not replace it with a new plan or ask for approval again.",
+      "<approved-plan-markdown>",
+      execution.plan,
+      "</approved-plan-markdown>",
+      "Implement the approved plan with the normal Agent tools, then report the result.",
+    ].join("\n");
+    const internalId = `approved-plan:${execution.id}`;
+    const internalMessage: AgentMessage = {
+      role: "user",
+      content: instruction,
+      timestamp: Date.now(),
+    };
+    this.appendLiveEntry(internalId, internalMessage);
+    this.agent.state.messages = buildSessionContext(
+      this.entriesWithCompaction(),
+    ).messages;
+    await this.agent.continue();
+    await this.agent.waitForIdle();
+    return { turnId: this.turnId };
+  }
+
   async prompt(
     content: string,
     userMessageId?: string,
@@ -1996,7 +2324,10 @@ export class DesktopAgentRuntime {
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.hostCloseUnsubscribe?.();
+    this.hostCloseUnsubscribe = undefined;
     this.agent.abort();
+    this.cleanupActiveToolProgress();
     this.compactionAbort?.abort();
   }
 }

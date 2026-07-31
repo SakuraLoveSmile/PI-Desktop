@@ -925,6 +925,15 @@ pub fn configure_session_with_thinking(
     if let Some(mode) = permission_mode {
         validate_permission_mode(mode)?;
     }
+    crate::plans::gate_session_configure(
+        db,
+        id,
+        &mode,
+        provider_id,
+        model_id,
+        thinking_level,
+        permission_mode,
+    )?;
     let changed = db
         .conn()
         .prepare_cached(

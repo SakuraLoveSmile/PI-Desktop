@@ -62,11 +62,15 @@ pub struct PermissionRequest {
     pub args_preview: serde_json::Value,
     pub reason: String,
     pub timeout_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command_shell_id: Option<String>,
 }
 
 #[derive(Debug)]
 struct Pending {
     created_at: Instant,
+    session_id: String,
+    tool_call_id: String,
     tx: Option<tokio::sync::oneshot::Sender<PermissionDecision>>,
 }
 
@@ -205,6 +209,30 @@ impl PermissionManager {
         PermissionRequest,
         tokio::sync::oneshot::Receiver<PermissionDecision>,
     ) {
+        self.create_request_with_risk_and_shell(
+            session_id,
+            tool_call_id,
+            tool_name,
+            args_preview,
+            reason,
+            declared_risk,
+            None,
+        )
+    }
+
+    pub fn create_request_with_risk_and_shell(
+        &mut self,
+        session_id: &str,
+        tool_call_id: &str,
+        tool_name: &str,
+        args_preview: serde_json::Value,
+        reason: &str,
+        declared_risk: Option<&str>,
+        command_shell_id: Option<&str>,
+    ) -> (
+        PermissionRequest,
+        tokio::sync::oneshot::Receiver<PermissionDecision>,
+    ) {
         let request_id = Uuid::new_v4().to_string();
         let request = PermissionRequest {
             request_id: request_id.clone(),
@@ -215,12 +243,15 @@ impl PermissionManager {
             args_preview: preview_value(&args_preview),
             reason: reason.to_string(),
             timeout_ms: PERMISSION_TIMEOUT_MS,
+            command_shell_id: command_shell_id.map(str::to_string),
         };
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.pending.insert(
             request_id,
             Pending {
                 created_at: Instant::now(),
+                session_id: session_id.to_string(),
+                tool_call_id: tool_call_id.to_string(),
                 tx: Some(tx),
             },
         );
@@ -246,6 +277,30 @@ impl PermissionManager {
             let _ = tx.send(decision);
         }
         Ok(())
+    }
+
+    /// Remove a request because its tool call was aborted. Sending deny also
+    /// wakes a waiter that raced the cancellation signal; the caller still
+    /// returns TOOL_ABORTED because cancellation is authoritative.
+    pub fn cancel(&mut self, request_id: &str) -> bool {
+        let Some(mut pending) = self.pending.remove(request_id) else {
+            return false;
+        };
+        if let Some(tx) = pending.tx.take() {
+            let _ = tx.send(PermissionDecision::Deny);
+        }
+        true
+    }
+
+    pub fn cancel_for_tool(&mut self, session_id: &str, tool_call_id: &str) -> bool {
+        let request_id = self
+            .pending
+            .iter()
+            .find(|(_, pending)| {
+                pending.session_id == session_id && pending.tool_call_id == tool_call_id
+            })
+            .map(|(request_id, _)| request_id.clone());
+        request_id.is_some_and(|request_id| self.cancel(&request_id))
     }
 
     pub fn expire_stale(&mut self) {
