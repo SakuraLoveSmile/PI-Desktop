@@ -23,6 +23,15 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.3.0",
+    date: "2026-07-31",
+    highlights: [
+      "Settings project archive now shows grouped sections (Pinned / All / Archived) with per-section counts, live search, and sort controls.",
+      "Work panel dock width is narrower for better layout proportions.",
+      "Fix switch on-track styling in light theme.",
+    ],
+  },
+  {
     version: "0.2.11",
     date: "2026-07-31",
     highlights: [
@@ -151,6 +160,15 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.3.0",
+    date: "2026-07-31",
+    highlights: [
+      "设置页项目归档改用分组布局（置顶 / 全部 / 已归档），每组显示计数，并支持实时搜索与排序。",
+      "工作面板停靠宽度收窄，布局更协调。",
+      "修复浅色主题下开关控件样式异常。",
+    ],
+  },
   {
     version: "0.2.11",
     date: "2026-07-31",
