@@ -683,11 +683,12 @@ export const zhCN = {
     installPackageDone: "插件包已安装",
     newFromTemplate: "从模板新建插件",
     newFromTemplateTitle: "开始写插件",
-    newFromTemplateBody: "选择一个起点。文件会写入你指定的文件夹，插件随即加载，下一次编辑即时生效。",
+    newFromTemplateBody: "选择一个起点。文件会写入你指定的文件夹，插件随即加载，文件夹也会作为项目打开，下一次编辑即时生效。",
     newFromTemplateHint: "下一步会让你选择一个空文件夹。",
     newFromTemplateCreate: "选择文件夹…",
     newFromTemplateCreating: "正在创建…",
     newFromTemplateDone: "{{name}} 已创建并加载",
+    newFromTemplateOpened: "{{name}} 已创建并加载，文件夹已打开以便开发",
     templateName: {
       "panel-basic": "面板",
       "agent-tool-basic": "智能体工具",

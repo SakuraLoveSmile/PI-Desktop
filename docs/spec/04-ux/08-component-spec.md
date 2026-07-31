@@ -534,7 +534,7 @@ preview), and Files (workspace browser). Codex-parity surface.
   active row, never color alone; the trailing close slot is always reserved so
   labels and open dots never shift between rows. The menu fades in over ≤4px with
   `--motion-duration-fast` / `--motion-ease-out` and is static under
-  `prefers-reduced-motion` (D172)
+  `prefers-reduced-motion` (D173)
 - The 46px header follows a "context left, actions right" model: the unified
   context trigger anchors the left and shows the active tool icon and ellipsized
   label; a right action cluster is pinned to the right edge behind a thin

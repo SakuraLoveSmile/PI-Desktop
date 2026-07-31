@@ -663,6 +663,25 @@ section mirrors only marketplace/catalog items still blocking nothing.
   not move to `load_error`. Closes roadmap gap R3's hot-reload item.
 - Decision D171; recorded as ADR 0039.
 
+## 2026-07-31 — Creating a plugin from a template opens the folder
+
+- Creating a plugin from a template now also opens the chosen folder as the
+  active project (`workspace.set`, which registers the project and switches to
+  chat), not just as a loaded development plugin. Loading only makes the plugin
+  run; development needs the sources inside the workspace the agent, the file
+  panel and the built-in `plugin-development` skill all read, and requiring the
+  user to re-pick the same folder through Open folder was pure friction.
+- The activation runs in the renderer through the existing `activateProject`
+  action rather than from the template IPC handler, so project state, the sidebar
+  project list and the navigation intent guard keep their single owner.
+- The success toast distinguishes the two outcomes: if the folder cannot be
+  opened as a project the plugin stays loaded and the toast says only that,
+  instead of claiming a workspace that is not there.
+- Loading an existing local plugin folder (Load local plugin) deliberately keeps
+  its current behavior: running someone else's plugin is not a reason to switch
+  the user's project.
+- Decision D172; no ADR — this completes the flow ADR 0039 describes.
+
 ## 2026-07-31 — Work panel header menu: tools first, no duplicated entries
 
 - The unified header menu lists the four tools (Review, Terminal, Browser,
@@ -688,5 +707,5 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Missing `panel.tabs.file` was the reason a bare Files tab showed a literal
   `file` label; the catalogs now carry it plus `panel.tools`, and the obsolete
   `panel.openTool` is removed.
-- Decision D172; no ADR — presentation and input handling only, inside the
+- Decision D173; no ADR — presentation and input handling only, inside the
   existing work-panel architecture (ADR 0033).
