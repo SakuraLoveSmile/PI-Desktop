@@ -131,6 +131,11 @@ may be retained while exactly one workspace supplies the visible shell context.
   Oldest first (`oldest`), and Name (`name`). Missing/invalid values fall back
   to `recent`. A persisted `manual` value is accepted for compatibility, but
   no drag or manual-reorder interaction is promised in this baseline.
+- Each project group shows the ten most-recent rows in the active sort order
+  by default; the remaining sessions fold behind a **Load N more…** control
+  (the same affordance used for time-grouped overflow). Selecting it expands
+  the full time-grouped list, and the expanded state is per-group, for the
+  current session only, and not persisted.
 - Presentation changes are saved best-effort. Storage failure must not block
   project activation, session selection, or agent execution.
 

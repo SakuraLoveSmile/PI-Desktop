@@ -30,6 +30,8 @@ function getTimeGroup(dateStr?: string): TimeGroup {
 }
 
 const TIME_GROUP_ORDER: TimeGroup[] = ["today", "yesterday", "thisWeek", "older14d", "archived"];
+/** Default number of most-recent sessions shown per project group before the rest fold. */
+const MAX_VISIBLE_SESSIONS = 10;
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
@@ -239,7 +241,7 @@ export function Sidebar({
     right?: number;
   } | null>(null);
   const [projectPathTooltip, setProjectPathTooltip] = useState<ProjectPathTooltip | null>(null);
-  const [visibleTimeGroups, setVisibleTimeGroups] = useState<Record<string, Set<TimeGroup>>>({});
+  const [expandedProjectSessions, setExpandedProjectSessions] = useState<Record<string, boolean>>({});
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuFirstItemRef = useRef<HTMLButtonElement | null>(null);
   const sessionPrefetchTimerRef = useRef<number | undefined>(undefined);
@@ -744,13 +746,8 @@ export function Sidebar({
     closeMenus();
   };
 
-  const showTimeGroup = (projectKey: string, group: TimeGroup) => {
-    setVisibleTimeGroups((prev) => {
-      const current = prev[projectKey] || new Set<TimeGroup>();
-      const next = new Set(current);
-      next.add(group);
-      return { ...prev, [projectKey]: next };
-    });
+  const expandProjectSessions = (projectKey: string) => {
+    setExpandedProjectSessions((prev) => ({ ...prev, [projectKey]: true }));
   };
 
   const toggleSessionPin = (session: SessionSummary) => {
@@ -1006,36 +1003,27 @@ export function Sidebar({
     const projectId = projectDomId(entry.key);
     const isMenuOpen = projectMenu === entry.key;
 
-    // Group sessions by time
-    const groupedSessions = new Map<TimeGroup, SessionSummary[]>();
-    for (const session of entry.sessions) {
-      const group = getTimeGroup(session.updatedAt);
-      if (!groupedSessions.has(group)) groupedSessions.set(group, []);
-      groupedSessions.get(group)!.push(session);
-    }
+    // Show the most recent MAX_VISIBLE_SESSIONS rows by default; the remaining
+    // sessions stay folded behind the same load-more affordance used for the
+    // time-grouped overflow and expand on click.
+    const sessionsExpanded = expandedProjectSessions[entry.key] ?? false;
+    const visibleSessions = sessionsExpanded
+      ? entry.sessions
+      : entry.sessions.slice(0, MAX_VISIBLE_SESSIONS);
+    const hiddenCount = entry.sessions.length - visibleSessions.length;
 
-    const visibleGroups = visibleTimeGroups[entry.key] || new Set<TimeGroup>();
-    // By default show today, yesterday, thisWeek, older14d; hide archived
-    const defaultVisibleGroups = new Set<TimeGroup>(["today", "yesterday", "thisWeek", "older14d"]);
-    const allVisible = new Set([...defaultVisibleGroups, ...visibleGroups]);
-
-    // Count sessions in hidden groups
-    let hiddenCount = 0;
-    for (const [group, sessions] of groupedSessions) {
-      if (!allVisible.has(group)) hiddenCount += sessions.length;
-    }
-
-    // Find the next hidden group (the first one not in allVisible)
-    const nextHiddenGroup = TIME_GROUP_ORDER.find(
-      (g) => groupedSessions.has(g) && !allVisible.has(g)
-    );
-
-    const renderTimeGroupedSessions = () => {
+    const renderTimeGroupedSessions = (sessions: SessionSummary[]) => {
+      // Group the visible slice by time, preserving recency order.
+      const grouped = new Map<TimeGroup, SessionSummary[]>();
+      for (const session of sessions) {
+        const group = getTimeGroup(session.updatedAt);
+        if (!grouped.has(group)) grouped.set(group, []);
+        grouped.get(group)!.push(session);
+      }
       const result: React.ReactNode[] = [];
       for (const group of TIME_GROUP_ORDER) {
-        const sessions = groupedSessions.get(group);
-        if (!sessions || sessions.length === 0) continue;
-        if (!allVisible.has(group)) continue;
+        const groupSessions = grouped.get(group);
+        if (!groupSessions || groupSessions.length === 0) continue;
 
         // For today, don't show header (as per requirement)
         if (group !== "today") {
@@ -1050,23 +1038,16 @@ export function Sidebar({
             </div>
           );
         }
-        result.push(...renderSessionRows(sessions, { projectPath: entry.path }));
+        result.push(...renderSessionRows(groupSessions, { projectPath: entry.path }));
       }
       // Add "load more" button if there are hidden sessions
-      if (hiddenCount > 0 && nextHiddenGroup) {
+      if (hiddenCount > 0) {
         result.push(
           <button
             key="load-more"
             type="button"
             className="sidebar-load-more"
-            onClick={() => {
-              // Show all hidden groups when clicking load more
-              for (const g of TIME_GROUP_ORDER) {
-                if (groupedSessions.has(g) && !allVisible.has(g)) {
-                  showTimeGroup(entry.key, g);
-                }
-              }
-            }}
+            onClick={() => expandProjectSessions(entry.key)}
           >
             {t("nav.loadMoreCount", { count: hiddenCount })}
           </button>
@@ -1167,7 +1148,7 @@ export function Sidebar({
           role="region"
           aria-hidden={collapsedProject}
         >
-          {entry.sessions.length > 0 ? renderTimeGroupedSessions() : (
+          {entry.sessions.length > 0 ? renderTimeGroupedSessions(visibleSessions) : (
             <div className="sidebar-session-empty">{t("nav.noProjectSessions")}</div>
           )}
         </div>
