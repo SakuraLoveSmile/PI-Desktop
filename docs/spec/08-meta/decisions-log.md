@@ -664,8 +664,55 @@ section mirrors only marketplace/catalog items still blocking nothing.
   not move to `load_error`. Closes roadmap gap R3's hot-reload item.
 - Decision D171; recorded as ADR 0039.
 - The prompt-injection half of this decision was replaced the same day by
-  D172: skills now reach the model as a catalog plus a `Skill` tool. The devkit,
+  D174: skills now reach the model as a catalog plus a `Skill` tool. The devkit,
   hot-reload and workspace-gate clauses stand unchanged.
+
+## 2026-07-31 — Creating a plugin from a template opens the folder
+
+- Creating a plugin from a template now also opens the chosen folder as the
+  active project (`workspace.set`, which registers the project and switches to
+  chat), not just as a loaded development plugin. Loading only makes the plugin
+  run; development needs the sources inside the workspace the agent, the file
+  panel and the built-in `plugin-development` skill all read, and requiring the
+  user to re-pick the same folder through Open folder was pure friction.
+- The activation runs in the renderer through the existing `activateProject`
+  action rather than from the template IPC handler, so project state, the sidebar
+  project list and the navigation intent guard keep their single owner.
+- The success toast distinguishes the two outcomes: if the folder cannot be
+  opened as a project the plugin stays loaded and the toast says only that,
+  instead of claiming a workspace that is not there.
+- Loading an existing local plugin folder (Load local plugin) deliberately keeps
+  its current behavior: running someone else's plugin is not a reason to switch
+  the user's project.
+- Decision D172; no ADR — this completes the flow ADR 0039 describes.
+
+## 2026-07-31 — Work panel header menu: tools first, no duplicated entries
+
+- The unified header menu lists the four tools (Review, Terminal, Browser,
+  Files) first, in a fixed order, and only then — after a divider, and only when
+  they exist — the resources the transcript opened. The previous layout listed
+  every open tool twice: once in the resource switcher and again in the
+  create-new section, which made "open" and "switch to" indistinguishable.
+  Each tool row now carries its own open state and its own close control, so a
+  single row is the whole affordance for that tool.
+- Activating a tool that is already open activates its existing tab instead of
+  replacing it with a fresh singleton, so the Browser keeps its URL. The header
+  action cluster is pinned right (`margin-left: auto`) so the close/collapse
+  controls no longer slide with the label length, and the trailing close slot in
+  each row is always reserved so labels and open dots never shift.
+- Menu rows own real DOM focus (WAI-ARIA menu pattern) rather than a roving
+  highlight: the trigger's ArrowDown/ArrowUp opens on the active or last row,
+  Arrow/Home/End walk rows only, Delete/Backspace closes the focused row while
+  the menu stays open with focus on its neighbor, and Escape/Tab/selection
+  return focus to the trigger. Only a session switch dismisses the menu
+  implicitly — selecting a row closes it explicitly, so the previous
+  active-tab-keyed auto-dismiss (which fired whenever a background artifact
+  changed the active tab) is gone.
+- Missing `panel.tabs.file` was the reason a bare Files tab showed a literal
+  `file` label; the catalogs now carry it plus `panel.tools`, and the obsolete
+  `panel.openTool` is removed.
+- Decision D173; no ADR — presentation and input handling only, inside the
+  existing work-panel architecture (ADR 0033).
 
 ## 2026-07-31 — Plugin skills are model-invoked
 
@@ -684,7 +731,7 @@ section mirrors only marketplace/catalog items still blocking nothing.
   stale catalog.
 - Rejected: user-facing slash commands. A skill is guidance the agent should
   reach for when a task calls for it, not a command the user has to know exists.
-- Decision D172; closes the "parsed but never activated" gap in
+- Decision D174; closes the "parsed but never activated" gap in
   `07-plugins/14-plugin-roadmap.md` R2.
 
 ## 2026-07-31 — Plugin themes ship CSS files
@@ -704,7 +751,7 @@ section mirrors only marketplace/catalog items still blocking nothing.
   it can only express the tokens we thought to enumerate; a stylesheet lets a
   theme reach a surface the token list forgot, and the sanitizer plus
   append-order rule bound the risk to appearance.
-- Decision D173.
+- Decision D175.
 
 ## 2026-07-31 — Plugin MCP servers over stdio and remote HTTP
 
@@ -730,7 +777,7 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Both transports ship rather than stdio alone: a hosted MCP endpoint is common
   enough that stdio-only would have pushed plugins to wrap it in a local shim,
   which is strictly worse — an extra process and an unreviewable proxy.
-- Decision D174; ADR [0038](../../adr/0038-plugin-mcp-bridge.md).
+- Decision D176; ADR [0038](../../adr/0038-plugin-mcp-bridge.md).
 
 ## 2026-07-31 — Resident plugin services and their restart policy
 
@@ -751,7 +798,7 @@ section mirrors only marketplace/catalog items still blocking nothing.
   and a `plugin.service.*` audit entry.
 - Manual enable / disable outranks the supervisor: an explicit action cancels the
   pending timer and clears the attempt counter.
-- Decision D175; ADR
+- Decision D177; ADR
   [0040](../../adr/0040-plugin-resident-services-and-message-bus.md).
 
 ## 2026-07-31 — Inter-plugin message bus routes declared topics only
@@ -773,5 +820,5 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - A payload conveys data, never capability: receiving a message grants the
   subscriber nothing it did not already hold, so a topic should be treated as
   public within the app.
-- Decision D176; ADR
+- Decision D178; ADR
   [0040](../../adr/0040-plugin-resident-services-and-message-bus.md).

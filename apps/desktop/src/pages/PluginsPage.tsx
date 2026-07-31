@@ -26,6 +26,7 @@ import type {
   PluginCapability,
   PluginServiceStatus,
   PluginSummary,
+  ProjectWorkspace,
 } from "@pi-desktop/shared";
 
 type TabId = "installed" | "market";
@@ -316,6 +317,7 @@ export function PluginsPage() {
   const refreshPlugins = useAppStore((s) => s.refreshPlugins);
   const showToast = useAppStore((s) => s.showToast);
   const openUrlInWorkPanel = useAppStore((s) => s.openUrlInWorkPanel);
+  const activateProject = useAppStore((s) => s.activateProject);
 
   const [tab, setTab] = useState<TabId>("installed");
   const [installedQuery, setInstalledQuery] = useState("");
@@ -594,9 +596,33 @@ export function PluginsPage() {
       setTemplatePick(null);
       // A canceled folder picker is not a failure: leave the page untouched.
       if (created.canceled) return;
-      showToast(t("plugins.newFromTemplateDone", { name: created.name ?? "" }), {
-        variant: "success",
-      });
+      // Scaffolding only makes the plugin run; development also needs the folder
+      // itself open, so activate it as the project and land on chat with the
+      // plugin sources in the workspace the agent and the file panel read.
+      let opened: ProjectWorkspace | null = null;
+      let openError: unknown = null;
+      try {
+        opened = created.dir ? await activateProject(created.dir) : null;
+      } catch (e) {
+        // The plugin is already created and loaded; a failed open must not erase
+        // that, so it is reported on its own instead of replacing the result.
+        openError = e;
+      }
+      showToast(
+        t(
+          opened
+            ? "plugins.newFromTemplateOpened"
+            : "plugins.newFromTemplateDone",
+          { name: created.name ?? "" },
+        ),
+        { variant: "success" },
+      );
+      if (openError) {
+        showToast(
+          openError instanceof Error ? openError.message : String(openError),
+          { variant: "error" },
+        );
+      }
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e), { variant: "error" });
     } finally {

@@ -3,7 +3,7 @@
  * through `contributes.skills`.
  *
  * Only the catalog — id, name, description — travels into the system prompt;
- * the model loads a body on demand with the `Skill` tool (D172). Reading the
+ * the model loads a body on demand with the `Skill` tool (D174). Reading the
  * files therefore belongs entirely to Electron main, which owns the plugin
  * registry and the permission grants. This module owns the catalog shape and
  * the reuse digest so the sidecar and main agree on both.

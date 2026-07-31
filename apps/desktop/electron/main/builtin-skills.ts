@@ -7,7 +7,7 @@ import type { PluginSkillDef } from "@pi-desktop/agent-runtime";
  * Skills PI-Desktop ships itself.
  *
  * These ride the same catalog-plus-`Skill`-tool path as plugin-contributed
- * skills (D172), so a first-party skill and a third-party one are
+ * skills (D174), so a first-party skill and a third-party one are
  * indistinguishable to the model — but they need no permission grant, because
  * the host is not a plugin.
  */

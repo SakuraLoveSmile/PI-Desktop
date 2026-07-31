@@ -239,7 +239,7 @@ may be retained while exactly one workspace supplies the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
-### 1.8 Artifact-driven work panel resources (D128, D140, D142, D154)
+### 1.8 Artifact-driven work panel resources (D128, D140, D142, D154, D173)
 
 - The shell exposes no empty or unconditional work-panel launcher,
   application-menu command, or global shortcut. An artifact trigger atomically
@@ -248,12 +248,22 @@ may be retained while exactly one workspace supplies the visible shell context.
   Browser are singletons; repeated triggers preserve resource order and
   activate the existing resource.
 - Once open, the panel's unified context trigger anchors the left of the header
-  and opens a single dropdown: its top section is an ordered resource switcher
-  (pointer and keyboard selection plus per-item close controls) and, after a
-  divider, a create-new section that makes Review, Terminal, Browser, and Files
-  one-click actions. A right action cluster groups the close / collapse controls
-  behind a divider.
-- Every resource can be closed from the switcher, and the active resource has
+  and opens a single dropdown. Its top section lists the four tools — Review,
+  Terminal, Browser, Files — in a fixed order, each row carrying its own open
+  state and, once open, its own close control. A second section appears after a
+  divider only when the transcript opened further resources, so no entry is ever
+  listed twice. The right action cluster is pinned to the header's right edge
+  behind a divider and never shifts with the label length (D173).
+- Menu rows own DOM focus. Opening with the trigger's ArrowDown/ArrowUp lands on
+  the active row or the last row respectively; Arrow/Home/End then walk rows
+  only, never their trailing close buttons. Delete/Backspace closes the focused
+  row's resource without dismissing the menu and keeps focus on the neighbor
+  that takes its place. Selecting a row, Escape, or Tab closes the menu and
+  restores focus to the trigger; only a session switch dismisses it implicitly
+  (D173).
+- Activating a tool that is already open activates its existing resource instead
+  of replacing it, so Browser keeps its URL and Files its selection (D173).
+- Every resource can be closed from the menu, and the active resource has
   a direct header close control. Closing the active resource selects the right
   neighbor, then the left; closing the final tab hides the panel. The separate
   panel collapse control in the session pane top-right hides the panel without

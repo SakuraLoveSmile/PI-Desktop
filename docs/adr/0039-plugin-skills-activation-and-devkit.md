@@ -33,7 +33,7 @@ giving them the loop — scaffold, run, inspect, package.
    of one line per skill — id, name, applicability — and the model pulls a body
    on demand with the `Skill` tool, served from Electron main because the plugin
    directories live there. A skill document may be 128 KiB and a plugin may
-   teach 32 of them, because an unread document costs nothing (D172, which
+   teach 32 of them, because an unread document costs nothing (D174, which
    supersedes this ADR's original 16 KiB whole-body prompt injection).
 2. **Prompt order is host skills, then plugin skills, then project
    instructions.** Later text carries more weight, so a user's own instruction

@@ -175,4 +175,4 @@ only step 3 differs internally, forwarding to the MCP client instead of plugin J
 Skills use a separate, simpler path. The catalog (id, name, description) is part
 of the base system prompt, and the body is fetched by a local `Skill` tool that
 Electron main serves directly — the sidecar never holds skill text, and a skill
-document reaches the model only when it asks for it (D172).
+document reaches the model only when it asks for it (D174).

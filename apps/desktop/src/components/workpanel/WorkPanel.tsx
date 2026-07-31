@@ -53,6 +53,11 @@ function headerToolTab(kind: HeaderToolKind): WorkPanelTab {
   return toolWorkPanelTab(kind);
 }
 
+/** Tool tabs are singletons keyed by kind; every other tab carries a resource. */
+function isToolTab(tab: WorkPanelTab) {
+  return tab.id === tab.kind;
+}
+
 function clampWidth(width: number) {
   return clampWorkPanelWidth(width);
 }
@@ -60,7 +65,7 @@ function clampWidth(width: number) {
 function tabLabel(tab: WorkPanelTab, t: (key: string) => string) {
   if (tab.kind !== "file") return t(`panel.tabs.${tab.kind}`);
   const path = tab.resource ?? "";
-  return path.split("/").filter(Boolean).pop() || path;
+  return path.split("/").filter(Boolean).pop() || t("panel.tabs.file");
 }
 
 export function WorkPanel({
@@ -86,6 +91,8 @@ export function WorkPanel({
   const setWidth = useAppStore((s) => s.setWorkPanelWidth);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
   const terminalOpen = tabs.some((tab) => tab.kind === "terminal");
+  /** Resources opened from the transcript; the tool singletons list above. */
+  const resourceTabs = tabs.filter((tab) => !isToolTab(tab));
 
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const dragState = useRef<{
@@ -97,10 +104,26 @@ export function WorkPanel({
   } | null>(null);
   const contextRef = useRef<HTMLDivElement | null>(null);
   const contextButtonRef = useRef<HTMLButtonElement | null>(null);
-  const contextFirstItemRef = useRef<HTMLButtonElement | null>(null);
+  /** Where focus lands when the menu opens: the active row, or its last row. */
+  const contextOpenFocus = useRef<"active" | "last">("active");
   const [contextOpen, setContextOpen] = useState(false);
   const [nativeSurfaceReadyForExit, setNativeSurfaceReadyForExit] =
     useState(false);
+
+  const menuItems = useCallback(
+    () =>
+      Array.from(
+        contextRef.current?.querySelectorAll<HTMLButtonElement>(
+          "[data-work-panel-menu-item]",
+        ) ?? [],
+      ),
+    [],
+  );
+
+  const closeContext = useCallback(() => {
+    setContextOpen(false);
+    contextButtonRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (!exiting) {
@@ -130,8 +153,7 @@ export function WorkPanel({
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      setContextOpen(false);
-      contextButtonRef.current?.focus();
+      closeContext();
     };
     const onViewportChange = () => setContextOpen(false);
     window.addEventListener("pointerdown", onPointer);
@@ -142,33 +164,92 @@ export function WorkPanel({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("resize", onViewportChange);
     };
-  }, [contextOpen]);
+  }, [closeContext, contextOpen]);
 
+  // Menu rows own focus (ARIA menu pattern), and the row that is already
+  // active is the one the pointer or keyboard most likely wants next.
   useEffect(() => {
     if (!contextOpen) return;
-    requestAnimationFrame(() => contextFirstItemRef.current?.focus());
-  }, [contextOpen]);
+    const target = contextOpenFocus.current;
+    contextOpenFocus.current = "active";
+    requestAnimationFrame(() => {
+      const items = menuItems();
+      if (!items.length) return;
+      if (target === "last") {
+        items[items.length - 1]?.focus();
+        return;
+      }
+      const checked = items.find(
+        (item) => item.getAttribute("aria-checked") === "true",
+      );
+      (checked ?? items[0])?.focus();
+    });
+  }, [contextOpen, menuItems]);
 
+  // Selecting a resource closes the menu explicitly; only a context switch
+  // dismisses it behind the user's back.
   useEffect(() => {
     setContextOpen(false);
-  }, [activeTabId]);
+  }, [activeSessionId]);
+
+  /** Close a tab from the menu without dismissing it, keeping focus in place. */
+  const closeTabFromMenu = useCallback(
+    (tabId: string, index: number) => {
+      closeTab(tabId);
+      requestAnimationFrame(() => {
+        const items = menuItems();
+        if (!items.length) return;
+        items[Math.min(index, items.length - 1)]?.focus();
+      });
+    },
+    [closeTab, menuItems],
+  );
+
+  const selectTab = useCallback(
+    (tabId: string) => {
+      activateTab(tabId);
+      closeContext();
+    },
+    [activateTab, closeContext],
+  );
+
+  const openTool = useCallback(
+    (kind: HeaderToolKind) => {
+      // Reuse the singleton tab so an open tool keeps its resource instead of
+      // being replaced by a blank one.
+      const existing = tabs.find((tab) => tab.id === kind);
+      if (existing) activateTab(existing.id);
+      else openWorkPanelTab(headerToolTab(kind));
+      closeContext();
+    },
+    [activateTab, closeContext, openWorkPanelTab, tabs],
+  );
+
+  const onTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    contextOpenFocus.current = event.key === "ArrowUp" ? "last" : "active";
+    setContextOpen(true);
+  };
 
   const onContextKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" || event.key === "Tab") {
       event.preventDefault();
-      setContextOpen(false);
-      contextButtonRef.current?.focus();
+      closeContext();
+      return;
+    }
+    const items = menuItems();
+    if (!items.length) return;
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (event.key === "Delete" || event.key === "Backspace") {
+      const closable = items[current]?.dataset.workPanelCloseId;
+      if (!closable) return;
+      event.preventDefault();
+      closeTabFromMenu(closable, current);
       return;
     }
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-    const items = Array.from(
-      event.currentTarget.querySelectorAll<HTMLButtonElement>(
-        '[data-work-panel-menu-item]:not(:disabled)',
-      ),
-    );
-    if (!items.length) return;
     event.preventDefault();
-    const current = items.indexOf(document.activeElement as HTMLButtonElement);
     let next = current;
     if (event.key === "Home") next = 0;
     else if (event.key === "End") next = items.length - 1;
@@ -323,11 +404,12 @@ export function WorkPanel({
               ref={contextButtonRef}
               type="button"
               className="work-panel-switcher-trigger"
-              aria-label={t("panel.openItems")}
               aria-haspopup="menu"
               aria-expanded={contextOpen}
+              aria-controls="work-panel-context-menu"
               title={activeTab?.resource ?? activeLabel}
               onClick={() => setContextOpen((open) => !open)}
+              onKeyDown={onTriggerKeyDown}
             >
               <span className="work-panel-current-icon" aria-hidden>
                 <ActiveIcon size={15} />
@@ -345,87 +427,130 @@ export function WorkPanel({
             </button>
             {contextOpen && (
               <div
+                id="work-panel-context-menu"
                 className="work-panel-context-menu"
                 role="menu"
-                aria-label={t("panel.openItems")}
+                aria-label={t("panel.title")}
                 onKeyDown={onContextKeyDown}
               >
-                <div className="work-panel-switcher-title">{t("panel.openItems")}</div>
-                <div className="work-panel-switcher-list">
-                  {tabs.map((tab, index) => {
-                    const label = tabLabel(tab, t);
-                    const Icon = TAB_ICONS[tab.kind];
-                    const selected = tab.id === activeTabId;
+                {/* Tools keep fixed positions so switching stays muscle
+                    memory; open tools carry their own close control here
+                    instead of repeating in a second list. */}
+                <div
+                  className="work-panel-menu-group"
+                  role="group"
+                  aria-labelledby="work-panel-menu-tools"
+                >
+                  <div className="work-panel-menu-title" id="work-panel-menu-tools">
+                    {t("panel.tools")}
+                  </div>
+                  {HEADER_TOOLS.map(({ kind, Icon }, index) => {
+                    const tab = tabs.find((candidate) => candidate.id === kind);
+                    const selected = tab?.id === activeTabId;
+                    const label = t(`panel.tabs.${kind}`);
                     return (
                       <div
-                        key={tab.id}
-                        className={cx("work-panel-switcher-row", selected && "active")}
-                        data-work-panel-tab={tab.id}
+                        className={cx("work-panel-menu-row", selected && "active")}
+                        role="none"
+                        key={kind}
                       >
                         <button
-                          ref={index === 0 ? contextFirstItemRef : undefined}
                           type="button"
                           role="menuitemradio"
                           aria-checked={selected}
-                          data-work-panel-switch-item=""
+                          tabIndex={-1}
                           data-work-panel-menu-item=""
-                          className="work-panel-switcher-item"
-                          title={tab.resource ?? label}
-                          onClick={() => {
-                            activateTab(tab.id);
-                            setContextOpen(false);
-                            requestAnimationFrame(() => contextButtonRef.current?.focus());
-                          }}
+                          data-work-panel-close-id={tab ? tab.id : undefined}
+                          data-action={`open-work-panel-${kind}`}
+                          className="work-panel-menu-item"
+                          title={label}
+                          onClick={() => openTool(kind)}
                         >
-                          <Icon size={14} />
-                          <span>{label}</span>
+                          <Icon size={15} />
+                          <span className="work-panel-menu-label">{label}</span>
+                          {tab && !selected && (
+                            <span className="work-panel-open-dot" aria-hidden />
+                          )}
                         </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          data-work-panel-menu-item=""
-                          className="work-panel-switcher-close"
-                          title={t("panel.closeTab", { name: label })}
-                          aria-label={t("panel.closeTab", { name: label })}
-                          onClick={() => closeTab(tab.id)}
-                        >
-                          <IconClose size={12} />
-                        </button>
+                        <span className="work-panel-menu-slot">
+                          {tab && (
+                            <button
+                              type="button"
+                              tabIndex={-1}
+                              data-work-panel-menu-close=""
+                              className="work-panel-menu-close"
+                              title={t("panel.closeTab", { name: label })}
+                              aria-label={t("panel.closeTab", { name: label })}
+                              onClick={() => closeTabFromMenu(tab.id, index)}
+                            >
+                              <IconClose size={12} />
+                            </button>
+                          )}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
-                <div className="work-panel-context-divider" />
-                <div className="work-panel-create-title">{t("panel.openTool")}</div>
-                <div className="work-panel-create-list">
-                  {HEADER_TOOLS.map(({ kind, Icon }) => {
-                    const selected = activeTab?.kind === kind;
-                    const open = tabs.some((tab) => tab.kind === kind);
-                    const label = t(`panel.tabs.${kind}`, { defaultValue: kind });
-                    return (
-                      <button
-                        key={kind}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={selected}
-                        data-work-panel-menu-item=""
-                        data-action={`open-work-panel-${kind}`}
-                        className={cx("work-panel-create-item", selected && "active")}
-                        title={label}
-                        aria-label={label}
-                        onClick={() => {
-                          openWorkPanelTab(headerToolTab(kind));
-                          setContextOpen(false);
-                          requestAnimationFrame(() => contextButtonRef.current?.focus());
-                        }}
+                {resourceTabs.length > 0 && (
+                  <>
+                    <div className="work-panel-context-divider" />
+                    <div
+                      className="work-panel-menu-group"
+                      role="group"
+                      aria-labelledby="work-panel-menu-resources"
+                    >
+                      <div
+                        className="work-panel-menu-title"
+                        id="work-panel-menu-resources"
                       >
-                        <Icon size={15} />
-                        <span>{label}</span>
-                        {open && !selected && <span className="work-panel-open-dot" aria-hidden />}
-                      </button>
-                    );
-                  })}
-                </div>
+                        {t("panel.openItems")}
+                      </div>
+                      {resourceTabs.map((tab, index) => {
+                        const label = tabLabel(tab, t);
+                        const Icon = TAB_ICONS[tab.kind];
+                        const selected = tab.id === activeTabId;
+                        const itemIndex = HEADER_TOOLS.length + index;
+                        return (
+                          <div
+                            className={cx("work-panel-menu-row", selected && "active")}
+                            role="none"
+                            key={tab.id}
+                            data-work-panel-tab={tab.id}
+                          >
+                            <button
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={selected}
+                              tabIndex={-1}
+                              data-work-panel-switch-item=""
+                              data-work-panel-menu-item=""
+                              data-work-panel-close-id={tab.id}
+                              className="work-panel-menu-item"
+                              title={tab.resource ?? label}
+                              onClick={() => selectTab(tab.id)}
+                            >
+                              <Icon size={15} />
+                              <span className="work-panel-menu-label">{label}</span>
+                            </button>
+                            <span className="work-panel-menu-slot">
+                              <button
+                                type="button"
+                                tabIndex={-1}
+                                data-work-panel-menu-close=""
+                                className="work-panel-menu-close"
+                                title={t("panel.closeTab", { name: label })}
+                                aria-label={t("panel.closeTab", { name: label })}
+                                onClick={() => closeTabFromMenu(tab.id, itemIndex)}
+                              >
+                                <IconClose size={12} />
+                              </button>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

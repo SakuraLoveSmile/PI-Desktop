@@ -20,7 +20,7 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
 - Full agentTools pipeline ✅
 - Skills contribution is activated: declared skills reach the model as a `# Skills`
   catalog in the system prompt when `agent.prompt.inject` is granted, and the model
-  loads a body on demand through the `Skill` tool ✅ (ADR 0039, D172)
+  loads a body on demand through the `Skill` tool ✅ (ADR 0039, D174)
 - Unified namespace and audit ✅
 - Per-plugin settings API is implemented; a dedicated settings UI is not
   implemented
@@ -50,11 +50,11 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
 - Malicious-version yank response (still planned)
 
 ### R6 — Advanced Ecosystem (partial ✅)
-- MCP plugin type ✅ — `contributes.mcpServers` over stdio and remote HTTP (D174)
+- MCP plugin type ✅ — `contributes.mcpServers` over stdio and remote HTTP (D176)
 - Background service plugins ✅ — `contributes.services` with supervised
-  restarts (D175)
-- Inter-plugin message bus ✅ — declared topics, `pi.bus.*` (D176)
-- Theme plugins ✅ — plugins ship CSS files (D173)
+  restarts (D177)
+- Inter-plugin message bus ✅ — declared topics, `pi.bus.*` (D178)
+- Theme plugins ✅ — plugins ship CSS files (D175)
 - Enterprise private sources (still planned)
 - Marketplace reviews / quality score (optional, still planned)
 

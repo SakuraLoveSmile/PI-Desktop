@@ -637,11 +637,11 @@ Each scenario is documented in this format:
 
 - **Preconditions**: App running; an empty folder available.
 - **Steps**: 1) Open Plugins. 2) Choose New plugin from template in the header overflow menu (or use the empty-state button). 3) Pick each of the four templates in turn and read its description. 4) Choose the folder. 5) Cancel the folder picker on a second attempt.
-- **Expected**: The picker lists exactly `panel-basic`, `agent-tool-basic`, `skill-pack`, `full-demo`, each named and described in the active locale; choosing a folder writes the template files, loads the plugin as a development plugin, refreshes the list, and reports "<name> created and loaded"; the plugin's contributions are immediately usable; a canceled folder picker changes nothing and reports no error.
+- **Expected**: The picker lists exactly `panel-basic`, `agent-tool-basic`, `skill-pack`, `full-demo`, each named and described in the active locale; choosing a folder writes the template files, loads the plugin as a development plugin, refreshes the list, then opens that folder as the active project — the app lands on chat with the new folder as the workspace, it appears in the sidebar project list, and the toast reads "<name> created, loaded, and opened for development"; the plugin's contributions are immediately usable and the built-in plugin-development skill is active in the new workspace; a canceled folder picker changes nothing and reports no error.
 - **Specs linked**: `07-plugins/10-plugin-devex.md`, ADR 0039
 - **Acceptance**: G (create plugin from template)
 - **Milestone**: Post-MVP
-- **Status**: Automated in part (`apps/desktop/test/plugin-template-action.test.mjs`: channel, template-id parity with the devkit, locale coverage, canceled-pick ordering); UI walk-through Documented
+- **Status**: Automated in part (`apps/desktop/test/plugin-template-action.test.mjs`: channel, template-id parity with the devkit, locale coverage, canceled-pick ordering, project activation); UI walk-through Documented
 
 #### E2E-022B: Development plugin hot reload
 
@@ -751,7 +751,7 @@ Each scenario is documented in this format:
 - **Preconditions**: `examples/plugins/hello` enabled with `agent.prompt.inject` granted; a second copy of the manifest without that permission available; one workspace that is a plugin directory and one that is not.
 - **Steps**: 1) Start a session and ask the agent what skills it has. 2) Ask it to follow the Hello demo skill so it calls the `Skill` tool. 3) Edit the skill document and repeat step 2. 4) Disable the plugin and start a new turn. 5) Load the variant without `agent.prompt.inject` and repeat step 1. 6) Declare a document larger than the per-skill cap. 7) Open each of the two workspaces in turn.
 - **Expected**: The catalog lists the skill id, name, and trimmed description but no body, after the built-in skills and before the project instruction chain; the body arrives only through the `Skill` tool call, reading the edited file without a restart; disabling the plugin rebuilds the runtime so the skill disappears from the next turn; the variant without the permission loads normally and contributes no skills; the oversized document is skipped with an audit line rather than clamped into the prompt; the built-in `plugin-development` skill is catalogued in the plugin workspace and absent in the other, while `PluginCheck` is offered in both.
-- **Specs linked**: `07-plugins/02-plugin-manifest-schema.md`, `07-plugins/04-plugin-security.md` §7.1, `07-plugins/10-plugin-devex.md`, ADR 0039, ADR 0037, D172
+- **Specs linked**: `07-plugins/02-plugin-manifest-schema.md`, `07-plugins/04-plugin-security.md` §7.1, `07-plugins/10-plugin-devex.md`, ADR 0039, ADR 0037, D174
 - **Acceptance**: G (skill activation) + E (tools & permissions) + D (high-risk permission gating)
 - **Status**: Unit-covered (`plugin-skills.test.mjs`, agent-runtime prompt/digest tests); agent-facing scenario Draft
 
@@ -760,7 +760,7 @@ Each scenario is documented in this format:
 - **Preconditions**: `examples/plugins/hello` enabled with `ui.theme` granted; a plugin whose CSS uses `@import` or a remote `url()` available for the rejection case.
 - **Steps**: 1) Open Settings → General → Theme and pick `Hello Midnight`. 2) Restart the app. 3) Disable the providing plugin. 4) Re-enable it, then uninstall it. 5) Load the plugin with unsafe CSS.
 - **Expected**: The plugin theme appears in the picker alongside the built-ins and applies immediately; the choice survives restart as `plugin:demo.hello:midnight`; disabling or uninstalling the provider falls back to `system` instead of an unstyled shell; unsafe CSS is refused at load with the reason logged and no `<style>` element injected.
-- **Specs linked**: `07-plugins/04-plugin-security.md` §3.1, `04-ux/07-ui-design-system.md`, D173
+- **Specs linked**: `07-plugins/04-plugin-security.md` §3.1, `04-ux/07-ui-design-system.md`, D175
 - **Acceptance**: G (theme contribution) + Security
 - **Status**: Unit-covered (`plugin-themes.test.mjs`, `theme-css` SDK tests); visual scenario Draft
 
@@ -769,7 +769,7 @@ Each scenario is documented in this format:
 - **Preconditions**: A plugin declaring one `stdio` and one `http` MCP server against local stubs; `mcp.server.local` and `mcp.server.remote` granted; a settings key holding the stub credential.
 - **Steps**: 1) Enable the plugin and confirm no server process starts yet. 2) Ask the agent to call a discovered tool. 3) Inspect the stub's received environment/headers. 4) Make the stub fail a call and time one out. 5) Disable the plugin.
 - **Expected**: Servers connect lazily on first use; tools appear as `plugin_demo_*_<serverId>_<tool>` at `risk: "medium"` with per-call audit; the stdio child receives only the declared `env` values plus PATH/temp/locale, never host provider keys; failures and timeouts return tool errors without crashing the plugin or the host; disable disconnects both servers.
-- **Specs linked**: `07-plugins/02-plugin-manifest-schema.md`, `07-plugins/04-plugin-security.md` §8.1, ADR 0038, D174
+- **Specs linked**: `07-plugins/02-plugin-manifest-schema.md`, `07-plugins/04-plugin-security.md` §8.1, ADR 0038, D176
 - **Acceptance**: G (MCP bridge) + E (tools & permissions) + Security
 - **Status**: Unit-covered (`plugin-mcp.test.mjs` stdio + HTTP stubs); agent-facing scenario Draft
 
@@ -778,7 +778,7 @@ Each scenario is documented in this format:
 - **Preconditions**: `examples/plugins/hello` enabled with `background.service` granted.
 - **Steps**: 1) Open Plugins → Installed and read the `Greeter heartbeat` chip. 2) Kill the plugin's utility process and watch the chip. 3) Kill it repeatedly past the restart ceiling. 4) Disable and re-enable the plugin. 5) Revoke `background.service` and reload.
 - **Expected**: The chip reports `running` after load; a kill shows `failed` then `running` again with an incremented restart count and backoff between attempts; past five attempts the plugin stays `failed` and stops retrying; manual disable/enable cancels the pending timer and resets the counter; without the permission the service never starts and the skip is audited.
-- **Specs linked**: `07-plugins/05-plugin-lifecycle.md` §3.1, ADR 0040, D175
+- **Specs linked**: `07-plugins/05-plugin-lifecycle.md` §3.1, ADR 0040, D177
 - **Acceptance**: G (resident services)
 - **Status**: Unit-covered (`plugin-services.test.mjs` supervision + backoff); manual kill scenario Draft
 
@@ -787,7 +787,7 @@ Each scenario is documented in this format:
 - **Preconditions**: Two plugins enabled — one publishing `demo.*` topics, one subscribing `demo.**` — with `bus.publish` / `bus.subscribe` granted.
 - **Steps**: 1) Run the publisher's command and watch the subscriber. 2) Publish a topic absent from `contributes.bus.publish`. 3) Subscribe to a pattern absent from `contributes.bus.subscribe`. 4) Publish a payload over 64KB and exceed 100 publishes in 10s. 5) Unload the subscriber and publish again.
 - **Expected**: The subscriber receives `{ topic, from, payload, at }` and the publisher never receives its own message; undeclared publish and subscribe both fail `PERMISSION_DENIED` with an audit line naming the topic; the oversized payload and the rate burst fail `LIMIT_EXCEEDED` / `RATE_LIMITED`; publishing to a departed subscriber succeeds with a smaller fan-out and no host error.
-- **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §5.1, `07-plugins/04-plugin-security.md` §5.1, ADR 0040, D176
+- **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §5.1, `07-plugins/04-plugin-security.md` §5.1, ADR 0040, D178
 - **Acceptance**: G (message bus) + Security
 - **Status**: Unit-covered (`plugin-bus.test.mjs` delivery, filtering, caps); two-plugin manual scenario Draft
 
@@ -1169,11 +1169,16 @@ Each scenario is documented in this format:
 - **Preconditions**: App running with any workspace state.
 - **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
   Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
-  a URL preview, and a completed command artifact. 3) Use the work-panel
-  create trigger dropdown to open/select Review, Terminal, Browser, and Files; verify active and
-  open-inactive states. Open the current-resource switcher, select file and tool
-  resources with pointer and keyboard, close an inactive item inside it, then
-  close the active item from the header. 4) Close active middle and edge items
+  a URL preview, and a completed command artifact. 3) Open the header's unified
+  context menu: verify the four tools appear once, in a fixed order, with active,
+  open-inactive, and closed states, and that transcript-opened resources appear
+  only in the second section. Open/select each tool with pointer and keyboard,
+  reopen a Browser that already has a URL and confirm the URL survives, walk the
+  rows with ArrowDown/ArrowUp/Home/End (focus must skip the close buttons), close
+  an inactive row with Delete and confirm the menu stays open with focus on the
+  neighbor, press Escape and confirm focus returns to the trigger, then close the
+  active item from the header. Confirm the right action cluster stays at the
+  header's right edge for both the shortest and longest labels. 4) Close active middle and edge items
   and verify neighbor selection. 5) Use the sole session-pane collapse control and
   trigger another artifact. 6) In session A, leave the panel open with multiple
   tabs and a Browser resource; switch to session B, create a different tab set,
@@ -1203,11 +1208,19 @@ Each scenario is documented in this format:
   are path-keyed and repeated resources deduplicate. Opening, collapse, and
   divider commit never change the OS window size — only MainChat reflows inside
   the fixed client area (ADR 0033). Once the panel is open, a single unified
-  context trigger opens one dropdown whose top section is the ordered resource
-  switcher (full-path tooltips, per-item close, Arrow/Home/End/Escape, focus
-  restored to the trigger) and, after a divider, a create-new section exposing
-  one-click Review/Terminal/Browser/Files actions with a fill plus edge marker
-  for the active tool and a dot for open inactive tools. Opening the menu
+  context trigger opens one dropdown that lists the four tools first, in a fixed
+  order, with a fill plus 2px edge marker for the active row and a dot for open
+  inactive ones, each open row carrying its own close control in an
+  always-reserved trailing slot; a second section appears after a divider only
+  for transcript-opened resources (full-path tooltips, per-item close), so no
+  entry is listed twice. The menu fades in over ≤4px and is static under
+  reduced motion. Arrow/Home/End move focus across rows only and skip the close
+  buttons, ArrowDown/ArrowUp on the trigger open on the active/last row,
+  Delete/Backspace closes the focused row while the menu stays open with focus on
+  its neighbor, and Escape/Tab/selection restore focus to the trigger. Reopening
+  an already-open tool activates it and preserves its Browser URL. The right
+  action cluster stays pinned to the header's right edge regardless of label
+  length. Opening the menu
   temporarily hides the native Browser preview so it is never occluded. The
   sole
   collapse control sits in the session pane top-right rather than the content header.

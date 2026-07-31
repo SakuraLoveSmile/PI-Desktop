@@ -367,7 +367,7 @@ async function resolveAgentRuntimeLaunch(
     apiStyle: provider.apiStyle,
   });
   const projectInstructions = await loadInstructionChain(session.projectPath);
-  // Skill catalog (D172): only id/name/description cross to the sidecar; the
+  // Skill catalog (D174): only id/name/description cross to the sidecar; the
   // document body is fetched on demand through the local `Skill` tool. Host
   // skills come first so a plugin's entry reads as a refinement of them.
   const pluginSkills = [
@@ -409,7 +409,7 @@ async function resolveAgentRuntimeLaunch(
         description: tool.description,
         parameters: tool.schema ?? { type: "object", properties: {} },
       })),
-      // Plugin skills (D172): only the catalog crosses to the sidecar; the
+      // Plugin skills (D174): only the catalog crosses to the sidecar; the
       // document body is fetched on demand through the local `Skill` tool.
       pluginSkills,
     },
@@ -1347,6 +1347,20 @@ async function createWindow() {
             await openPanelArtifact("file", "apps/desktop/src/App.tsx");
             await new Promise((r) => setTimeout(r, 500));
             await shot("pi-panel-files");
+            // The unified header menu (D173): tools first, then the file
+            // resource this run opened above.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const btn = document.querySelector('.work-panel-switcher-trigger');
+                if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 300));
+            await shot("pi-panel-menu");
+            await mainWindow!.webContents.executeJavaScript(`
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            `);
+            await new Promise((r) => setTimeout(r, 200));
             await mainWindow!.webContents.executeJavaScript(
               `window.__PI_DESKTOP__?.collapseWorkPanel()`,
             );
@@ -1594,7 +1608,7 @@ async function createWindow() {
             );
             await setPage("settings");
             // The general tab carries the theme grid, including plugin themes
-            // (D172); earlier scenes leave the sidebar on the archive tab.
+            // (D175); earlier scenes leave the sidebar on the archive tab.
             await setSettingsTab("general");
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-settings-live");
@@ -1924,7 +1938,7 @@ async function startSidecar(): Promise<void> {
       content: `Previewing ${raw} in the built-in browser panel. Live reload is active — subsequent edits to the file or sibling assets re-render automatically.`,
     };
   });
-  // Plugin skills (D172): the model loads a declared skill document by id.
+  // Plugin skills (D174): the model loads a declared skill document by id.
   // Served in main because the plugin runtime — and the plugin directories —
   // live here, not in host-core.
   s.setLocalTool("Skill", async ({ args }) => {

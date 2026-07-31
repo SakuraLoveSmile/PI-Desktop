@@ -54,5 +54,5 @@ Each ADR includes:
 | 0036 | Split Settings into AI and Shortcuts destinations | Accepted |
 | 0037 | Resolve project instructions in Electron main | Accepted |
 | 0038 | Bridge plugin-declared MCP servers in Electron main | Accepted |
-| 0039 | Activate plugin skills and ship plugin authoring as a first-party devkit | Accepted (skill delivery revised by D172) |
+| 0039 | Activate plugin skills and ship plugin authoring as a first-party devkit | Accepted (skill delivery revised by D174) |
 | 0040 | Resident plugin services and the inter-plugin message bus | Accepted |

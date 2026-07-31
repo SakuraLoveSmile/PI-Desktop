@@ -551,7 +551,7 @@ export class DesktopAgentRuntime {
               `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
             ]
           : []),
-        // Plugin skills (D172): the catalog rides in the base prompt so a
+        // Plugin skills (D174): the catalog rides in the base prompt so a
         // path-scoped instruction reload never drops it, and it stays ahead of
         // the instruction chain so the user's own AGENTS.md keeps the last word.
         ...(skillsPrompt ? [skillsPrompt] : []),

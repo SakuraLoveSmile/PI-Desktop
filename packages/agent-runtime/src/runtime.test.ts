@@ -1319,7 +1319,7 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
   });
 });
 
-describe("DesktopAgentRuntime plugin skills (D172)", () => {
+describe("DesktopAgentRuntime plugin skills (D174)", () => {
   const pluginSkills = [
     {
       id: "demo.hello/release-notes",

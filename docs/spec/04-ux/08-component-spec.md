@@ -500,16 +500,25 @@ preview), and Files (workspace browser). Codex-parity surface.
 ### 5.2 Anatomy
 
 ```text
-+----+---------------------------------+
-| ◫  | App.tsx                  [⌄][×] |  current resource, 46px
-| >  +---------------------------------+
-| ◎  | Active resource body            |
-|    |  Review: file cards + diff      |
-|    |  Terminal: xterm host           |
-|    |  Browser: URL bar + preview     |
-|    |  Files: tree + file viewer      |
-+----+---------------------------------+
- create trigger
++---------------------------------------+
+| ◫ App.tsx ⌄        drag      | [×][>] |  header, 46px
++---------------------------------------+
+| Tools                       ¦ menu    |
+|  ▌◫ Review               [×]¦         |
+|   > Terminal            •   ¦         |
+|   ◎ Browser                 ¦         |
+|   ▤ Files                   ¦         |
+|  ------------------------   ¦         |
+| Open items                  ¦         |
+|   ▤ App.tsx              [×]¦         |
++---------------------------------------+
+| Active resource body                  |
+|  Review: file cards + diff            |
+|  Terminal: xterm host                 |
+|  Browser: URL bar + preview           |
+|  Files: tree + file viewer            |
++---------------------------------------+
+ ▌ active row edge marker   • open, inactive
 ^ 10px transparent resize hit area on the left edge
 ```
 
@@ -517,15 +526,21 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 - Panel body uses quiet inset paper (`#fafafa`); the 46px header band and tool
   chrome (review toolbar, browser chrome, file viewer header) stay white
-- The header exposes one unified context trigger whose menu lists the open
-  resources and, after a divider, the create-new tools (Review, Terminal,
-  Browser, Files); dropdown items use a neutral fill with a 2px edge marker for
-  the active tool, never color alone
+- The header exposes one unified context trigger. Its menu lists the four tools
+  (Review, Terminal, Browser, Files) in a fixed order first — each row showing
+  its own open state and, once open, its own close control — and, after a
+  divider, only the further resources the transcript opened. No entry appears
+  twice. Rows use a neutral fill with a straight 2px left edge marker for the
+  active row, never color alone; the trailing close slot is always reserved so
+  labels and open dots never shift between rows. The menu fades in over ≤4px with
+  `--motion-duration-fast` / `--motion-ease-out` and is static under
+  `prefers-reduced-motion` (D173)
 - The 46px header follows a "context left, actions right" model: the unified
   context trigger anchors the left and shows the active tool icon and ellipsized
-  label; a right action cluster groups the close / collapse controls behind a
-  thin divider. The collapse control uses a right chevron so it reads as "push
-  the panel away", not "open a panel"
+  label; a right action cluster is pinned to the right edge behind a thin
+  divider, so the close / collapse controls never shift with the label length.
+  The gap between the two remains a window-drag region. The collapse control
+  uses a right chevron so it reads as "push the panel away", not "open a panel"
 - Active tabs, file-tree rows, diff headers, and the resize handle ease hover
   fills with `--motion-duration-fast` / `--motion-ease-out`
 - Browser URL and empty-tool chrome share the light inset field treatment used
@@ -537,7 +552,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 |---|---|
 | Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only in a session that produced a successful workspace Write/Edit while that Git working tree remains dirty. |
 | Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 244–720px (default 280px). It occupies client-area space and never expands the OS window (ADR 0033). |
-| Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded switcher lists resources in first-open order with full-path tooltips and independent close controls |
+| Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded menu lists the tools first and then the transcript-opened resources in first-open order, with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows anchored pointer delta or keyboard input. Pointer changes preview once per animation frame and commit width plus reservation only on release; Escape, pointer cancellation, or lost capture restores both. Native window-edge resize changes MainChat only. |
 | No workspace | Each tab renders its own "open a project" empty state |
@@ -619,12 +634,15 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 ### 5.5 Accessibility
 
-- `<aside>` landmark; the create trigger uses a localized label and
-  `aria-expanded`, while its dropdown items use `menuitemradio` / `aria-checked`.
-  The current-resource control exposes
-  `aria-haspopup="menu"` / `aria-expanded`; switcher rows use
-  `menuitemradio` / `aria-checked`, and each resource body remains a
-  `role="tabpanel"`
+- `<aside>` landmark. The current-resource control exposes
+  `aria-haspopup="menu"` / `aria-expanded` / `aria-controls`, keeps its visible
+  label as its accessible name, and its `role="menu"` dropdown groups rows under
+  labelled `role="group"` sections. Rows are `menuitemradio` / `aria-checked`
+  buttons that take real DOM focus (`tabIndex={-1}`) inside `role="none"`
+  wrappers, so ArrowDown/ArrowUp/Home/End move focus across rows only and never
+  through the trailing close buttons; Delete/Backspace closes the focused row.
+  Escape and Tab close the menu and return focus to the trigger. Each resource
+  body remains a `role="tabpanel"`
 - Resize handle: focusable `role="separator"` with
   `aria-orientation="vertical"`, a localized label, dynamic
   `aria-valuemin` / `aria-valuemax` / `aria-valuenow`, visible focus, and
