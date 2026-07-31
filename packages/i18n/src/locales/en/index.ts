@@ -680,11 +680,12 @@ export const en = {
     installPackageDone: "Plugin package installed",
     newFromTemplate: "New plugin from template",
     newFromTemplateTitle: "Start a plugin",
-    newFromTemplateBody: "Pick a starting point. The files are written into a folder you choose and the plugin loads immediately, so your next edit is already live.",
+    newFromTemplateBody: "Pick a starting point. The files are written into a folder you choose, the plugin loads immediately, and the folder opens as your project so your next edit is already live.",
     newFromTemplateHint: "You will be asked for an empty folder next.",
     newFromTemplateCreate: "Choose folder…",
     newFromTemplateCreating: "Creating…",
     newFromTemplateDone: "{{name}} created and loaded",
+    newFromTemplateOpened: "{{name}} created, loaded, and opened for development",
     templateName: {
       "panel-basic": "Panel",
       "agent-tool-basic": "Agent tool",
