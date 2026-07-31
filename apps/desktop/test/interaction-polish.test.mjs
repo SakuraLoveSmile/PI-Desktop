@@ -17,8 +17,11 @@ test("high-traffic chrome uses shared motion tokens on hover fills", () => {
     ".notification-item",
     ".work-panel-current-close",
   ]) {
+    // Match the selector anywhere in a rule's selector list, and require the
+    // transition inside that rule's own body — a shared list is as valid as a
+    // standalone block.
     const re = new RegExp(
-      `${selector.replace(/\./g, "\\.")}\\s*\\{[\\s\\S]*?transition:[^;]*var\\(--motion-duration-fast\\)`,
+      `${selector.replace(/\./g, "\\.")}[^{}]*\\{[^}]*transition:[^;]*var\\(--motion-duration-fast\\)`,
     );
     assert.match(styles, re, `${selector} should transition with motion tokens`);
   }
