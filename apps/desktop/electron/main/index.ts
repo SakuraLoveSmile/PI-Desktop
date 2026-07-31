@@ -49,6 +49,7 @@ import {
   type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
+import { isTemplateName, scaffold } from "@pi-desktop/plugin-devkit";
 import { HostProcess } from "./host-process";
 import { AgentSidecar } from "./agent-sidecar";
 import { PluginRuntime } from "./plugin-runtime";
@@ -3715,6 +3716,40 @@ function registerIpc() {
     }
     return loaded;
   });
+
+  // Scaffold a starter plugin and load it as a dev plugin in one step (D171),
+  // so "I want to write a plugin" never starts with an empty folder.
+  handle(
+    IPC.invoke.pluginCreateFromTemplate,
+    async (req: { template?: string }) => {
+      if (!host) throw new Error("host unavailable");
+      const template = req?.template;
+      if (!isTemplateName(template)) {
+        throw new Error(`unknown plugin template: ${String(template)}`);
+      }
+      const picked = await dialog.showOpenDialog({
+        properties: ["openDirectory", "createDirectory"],
+      });
+      if (picked.canceled || !picked.filePaths[0]) {
+        return { canceled: true };
+      }
+      const dir = picked.filePaths[0];
+      const created = await scaffold({ dir, template });
+      const loaded = await host.call<{ plugin: any }>("plugins.loadDev", {
+        path: dir,
+      });
+      await plugins.loadFromPath(dir, loaded.plugin?.permissions ?? []);
+      for (const toast of plugins.drainToasts()) {
+        sendToRenderer(IPC.event.toast, { message: toast });
+      }
+      return {
+        id: created.id,
+        name: created.name,
+        dir: created.dir,
+        files: created.files,
+      };
+    },
+  );
 
   handle(IPC.invoke.pluginInstallFromPath, async () => {
     if (!host) throw new Error("host unavailable");

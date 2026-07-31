@@ -10706,6 +10706,61 @@ html {
   overflow-y: auto;
 }
 
+/* Template picker: the selectable-row language of the version history, reused
+   for the four starter plugins. */
+.plugins-template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plugins-template {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: var(--radius-2xs);
+  padding: 9px 10px;
+  text-align: left;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.plugins-template:hover {
+  background: var(--ds-bg-hover);
+}
+
+.plugins-template.active {
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+}
+
+.plugins-template-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex: 0 0 auto;
+  padding-top: 3px;
+  color: var(--ds-accent);
+}
+
+.plugins-template-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plugins-template-name {
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+}
+
+.plugins-template-body {
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
 /* Permission review dialog: the last stop before granting capabilities. */
 .plugins-modal-backdrop {
   position: fixed;
