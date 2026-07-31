@@ -287,7 +287,7 @@ Implementation note: Tailwind v4 supports CSS-first configuration. The `@theme` 
 
 ### 5.2 Type scale
 
-All font sizes come from the `--text-*` ramp defined in the `@theme` block of `globals.css`. Raw px literals for `font-size`, `font-weight`, `line-height`, and `letter-spacing` are **forbidden** in component CSS and TSX arbitrary utilities (`text-[13px]` etc.) — enforced by `scripts/check-style-tokens.mjs` (runs in `pnpm lint`). `-plus` suffixed tokens are the Codex half-steps between named sizes.
+All font sizes come from the `--text-*` ramp defined in the `@theme` block of `styles/tokens.css` (imported first by `styles/globals.css`, which is now only an import sequence — see D170). Raw px literals for `font-size`, `font-weight`, `line-height`, and `letter-spacing` are **forbidden** in component CSS and TSX arbitrary utilities (`text-[13px]` etc.) — enforced by `scripts/check-style-tokens.mjs` (runs in `pnpm lint`). `-plus` suffixed tokens are the Codex half-steps between named sizes.
 
 | Token | Size | Usage |
 |---|---|---|

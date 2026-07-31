@@ -598,3 +598,29 @@ section mirrors only marketplace/catalog items still blocking nothing.
   renderer performs no remote image loads.
 - Decision D169; supersedes the flat list, pill tabs, and inline detail pane of
   `07-plugins/07-plugin-marketplace.md` §7/§14.
+
+## 2026-07-31 — Renderer stylesheet split into per-surface partials
+
+- `apps/desktop/src/styles/globals.css` becomes an import-only entry point. The
+  rules move into 22 partials in the same directory, each owning one surface:
+  `tokens`, `base`, `chrome`, `chat-shell`, `composer`, `sidebar-threads`,
+  `messages`, `prose`, `ui-kit`, `overlays`, `theme-overrides`,
+  `composer-menus`, `settings`, `destinations`, `projects`, `sessions`,
+  `work-panel`, `providers`, `chat-links`, `composer-autocomplete`, `plugins`,
+  `responsive`.
+- Import order **is** the cascade and must not be reordered: tokens and base
+  first, feature layers in build order, the responsive / reduced-motion tail
+  last so it can still override what precedes it.
+- The split is contiguous — no rule changed position relative to another. The
+  joined partials reproduce the pre-split file byte for byte, and the built
+  renderer CSS is byte-identical before and after, so Tailwind v4 resolves the
+  `@theme` block from `tokens.css` unchanged.
+- Style assertions load the effective cascade through
+  `apps/desktop/test/helpers/styles.mjs`, which inlines the local `@import`
+  lines in declaration order. Tests must not read a partial directly.
+- Sidebar session styles live in both `sidebar-threads.css` and `sessions.css`
+  because the original file interleaved them; the file headers cross-reference.
+- The design-token scales now live in `styles/tokens.css`; the guard in
+  `scripts/check-style-tokens.mjs` walks the whole `src` tree and is unaffected.
+- Decision D170; the single-file layout assumed by `04-ux/07-ui-design-system.md`
+  §Typography and `04-ux/08-component-spec.md` no longer holds.
