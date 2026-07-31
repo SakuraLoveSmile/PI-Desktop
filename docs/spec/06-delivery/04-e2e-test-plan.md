@@ -626,8 +626,8 @@ Each scenario is documented in this format:
 #### E2E-022: Load local plugin
 
 - **Preconditions**: App running; sample plugin available at local path.
-- **Steps**: 1) Open Plugins from the app sidebar. 2) Add plugin from local directory. 3) Enable.
-- **Expected**: Plugin loads; manifest validated; contributions registered.
+- **Steps**: 1) Open Plugins from the app sidebar. 2) Choose Load local plugin from the header overflow menu. 3) Enable it with the row switch.
+- **Expected**: Plugin loads; manifest validated; contributions registered; the row appears under Active with a Local tag.
 - **Specs linked**: `07-plugins/01-plugin-system.md`, `07-plugins/05-plugin-lifecycle.md`
 - **Acceptance**: G (load local plugin)
 - **Milestone**: M4
@@ -653,11 +653,11 @@ Each scenario is documented in this format:
 - **Milestone**: M4
 - **Status**: Automated (protocol smoke: dispatch roundtrip host->runner->host; in-app JS execution via PluginRuntime)
 
-#### E2E-024G: Marketplace detail pane shows README, changelog, versions
+#### E2E-024G: Marketplace detail sheet shows README, permissions, versions
 
 - **Preconditions**: Official marketplace catalog available.
-- **Steps**: 1) Open Plugins → Marketplace. 2) Open details for `demo.workspace-summary`. 3) Inspect README / versions / changelog. 4) Install selected version after permission review.
-- **Expected**: Detail pane loads via `market.getDetail`; README and version metadata render; install uses selected version permissions.
+- **Steps**: 1) Open Plugins → Marketplace. 2) Open details for `demo.workspace-summary`. 3) Inspect README / risk-grouped permissions / version rows. 4) Pick a version and install after permission review. 5) Dismiss the sheet with Escape and by clicking the scrim.
+- **Expected**: Detail sheet loads via `market.getDetail`; README, safety notes, and per-risk permission explanations render; the picked version drives the sticky install action; Escape and scrim both close the sheet without closing the permission dialog underneath.
 - **Specs linked**: `07-plugins/07-plugin-marketplace.md`
 - **Acceptance**: G (marketplace detail UX)
 - **Status**: Documented
@@ -665,8 +665,8 @@ Each scenario is documented in this format:
 #### E2E-024F: Refresh official remote marketplace repository
 
 - **Preconditions**: Network available to GitHub raw content.
-- **Steps**: 1) Open Plugins → Marketplace. 2) Click refresh-from-repo. 3) Confirm source points at `vastsa/pi-desktop-plugins`.
-- **Expected**: Catalog refreshes from the remote official repo; plugins list updates; offline fallback still works if fetch fails.
+- **Steps**: 1) Open Plugins → Marketplace. 2) Use the header Refresh marketplace action. 3) Confirm the source line points at `vastsa/pi-desktop-plugins`.
+- **Expected**: Catalog refreshes from the remote official repo; card grid updates; offline fallback still works if fetch fails.
 - **Specs linked**: `07-plugins/07-plugin-marketplace.md`
 - **Acceptance**: G (remote marketplace source)
 - **Status**: Documented / host-core unit covered
@@ -674,8 +674,8 @@ Each scenario is documented in this format:
 #### E2E-024B: Marketplace install with permission review
 
 - **Preconditions**: App running; official market catalog available.
-- **Steps**: 1) Open Plugins → Marketplace. 2) Install `demo.workspace-notes`. 3) Accept high-risk permissions.
-- **Expected**: Plugin installed from marketplace package, checksum verified, permissions granted, panel/tools available.
+- **Steps**: 1) Open Plugins → Marketplace. 2) Install `demo.workspace-notes`. 3) Read the risk-tiered permission dialog. 4) Accept high-risk permissions.
+- **Expected**: Permissions are grouped High / Medium / Low with plain-language explanations before any download; plugin installed from the marketplace package, checksum verified, permissions granted, panel/tools available; the overview band's high-risk counter increases.
 - **Specs linked**: `07-plugins/07-plugin-marketplace.md`, `07-plugins/13-plugin-permissions-matrix.md`
 - **Acceptance**: G (marketplace install + permission review)
 - **Status**: Documented / host-core covered by unit tests + protocol methods
@@ -683,10 +683,19 @@ Each scenario is documented in this format:
 #### E2E-024C: Plugin package install and auto-update path
 
 - **Preconditions**: Marketplace catalog has a newer version or local `.piplug`.
-- **Steps**: 1) Install package. 2) Enable auto-update. 3) Check updates / apply auto-updates.
-- **Expected**: Update metadata appears; auto-update applies only when permission diff is empty or pre-granted.
+- **Steps**: 1) Install package from the header overflow menu. 2) Enable auto-update from the row overflow menu. 3) Run Check for updates, then Apply automatic updates.
+- **Expected**: The row moves to Updates available and the update banner reports the count; permissions the new version adds are tagged New in the review dialog; auto-update applies only when the permission diff is empty or pre-granted.
 - **Specs linked**: `07-plugins/06-plugin-packaging.md`, `07-plugins/08-plugin-signing-updates.md`
 - **Acceptance**: G (package install + update policy)
+- **Status**: Documented
+
+#### E2E-024H: Installed plugins surface state, risk, and failures
+
+- **Preconditions**: At least one enabled plugin, one disabled plugin, and one plugin whose load failed.
+- **Steps**: 1) Open Plugins → Installed. 2) Read the overview band counters. 3) Confirm the failed plugin sits under Needs attention with its error message. 4) Search by author and by permission. 5) Clear the search.
+- **Expected**: Rows group as Needs attention / Updates available / Active / Turned off with counts; `status: "error" | "load_error"` renders the error message inline instead of being silent; permission chips are tinted by risk tier with overflow collapsed; the result count reflects the filtered subset and clearing restores every group.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `07-plugins/13-plugin-permissions-matrix.md`
+- **Acceptance**: G (installed plugin management)
 - **Status**: Documented
 
 #### E2E-024D: Isolated plugin panel host bridge
@@ -2314,7 +2323,7 @@ Each scenario is documented in this format:
 | D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
 | E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049, E2E-074 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-AGENTS-001 |
-| G — Plugins | E2E-022, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-025, E2E-026 |
+| G — Plugins | E2E-022, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068, E2E-086 |
 | Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-AGENTS-001 |

@@ -137,21 +137,33 @@ Strategy:
 
 ```text
 Plugins
+├─ Overview band (installed / enabled / updates / high-risk access)
 ├─ Installed
+│ ├─ Search + result count
+│ └─ Groups: Needs attention · Updates available · Active · Turned off
 ├─ Marketplace
 │ ├─ Search
 │ ├─ Categories
-│ └─ Detail
-└─ Updates
+│ └─ Card grid
+├─ Detail sheet (shared by both tabs)
+└─ Permission dialog (install / upgrade)
 ```
 
-The Detail page must show:
-- Permissions
+Both tabs live under one segmented control that carries per-tab counts. The
+header keeps a single contextual primary action (Browse marketplace / Refresh
+marketplace) and moves Check for updates, Apply automatic updates, Install
+package, and Load local plugin into an overflow menu (D169).
+
+The Detail sheet must show:
+- Permissions, grouped and labeled by risk tier
 - Author
-- Version
+- Version (selectable version list)
 - Update time
-- Risk description
+- Risk description (safety notes callout)
 - Install button
+
+Marketplace cards render a monogram glyph rather than fetching `iconUrl`; the
+renderer performs no remote image loads (D169).
 
 ## 8. Trust model
 
@@ -255,12 +267,21 @@ PI_DESKTOP_PLUGIN_MARKET_URL=https://raw.githubusercontent.com/<owner>/<repo>/<r
 
 ## 14. Marketplace detail UX
 
-The Plugins page marketplace supports a detail pane that loads `market.getDetail` and shows:
+The Plugins page opens details as a right-side sheet (scrim + Escape + outside
+click dismiss) that loads `market.getDetail` and shows:
 
+- about text, author, and repository / homepage links (opened in the work
+  panel browser, never the system browser)
+- safety notes as a warning callout
+- permissions grouped by risk tier, each with its plain-language explanation
+- version list as selectable rows, with the picked version driving the sticky
+  install / update action
 - README markdown
-- safety notes
-- version list with changelog / size / checksum
-- install or update for the selected version
+
+Installing from either tab routes through the permission dialog, which groups
+requests into High / Medium / Low risk sections and tags entries that are new
+relative to the installed version, so an upgrade cannot silently widen access
+(D169).
 
 Contribution docs live in the official warehouse:
 

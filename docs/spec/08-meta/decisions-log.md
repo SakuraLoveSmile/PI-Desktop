@@ -574,3 +574,27 @@ section mirrors only marketplace/catalog items still blocking nothing.
   matching, batch-of-eight session reveal, and activation semantics are
   unchanged.
 - Decision D168; supersedes D133's flat-list presentation.
+
+## 2026-07-31 — Plugins page redesign
+
+- The Plugins page is rebuilt as four bands: an overview band with four derived
+  counters (installed, enabled, updates, high-risk access), a header that keeps
+  one contextual primary action and moves check-updates / apply-auto-updates /
+  install-package / load-local into an overflow menu, a segmented
+  Installed / Marketplace switch carrying counts, and the tab body.
+- Installed rows group by state as Needs attention / Updates available /
+  Active / Turned off inside one hairline-separated panel. `status: "error" |
+  "load_error"` and `errorMessage` are now surfaced instead of dropped; row
+  actions collapse to a hover-revealed panel button plus an overflow menu
+  (auto-update, Uninstall as a danger item) beside an always-visible switch.
+- Permissions are tiered from the risk column of
+  `07-plugins/13-plugin-permissions-matrix.md`: risk-tinted chips with collapsed
+  overflow on rows, and High / Medium / Low sections in the detail sheet and the
+  install dialog. Upgrade reviews tag permissions the new version adds as New,
+  and the install queue deduplicates the declared set against the diff.
+- Details move from a nested sidebar to a right-side sheet (scrim, Escape and
+  outside-press dismiss, sticky install action, selectable version rows).
+  Marketplace cards render a monogram glyph and never fetch `iconUrl`, so the
+  renderer performs no remote image loads.
+- Decision D169; supersedes the flat list, pill tabs, and inline detail pane of
+  `07-plugins/07-plugin-marketplace.md` §7/§14.

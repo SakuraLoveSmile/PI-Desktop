@@ -173,8 +173,17 @@ Create card + task rows (cadence/enabled badges, prompt preview, last run,
 Run now / toggle / Delete). Run now opens a session seeded with the prompt.
 
 ### 3.5 Plugins
-Installed plugin list (enable/disable/uninstall), dev-load entry, permission
-declarations.
+Overview band (installed / enabled / updates / high-risk access) above a
+segmented Installed / Marketplace switch carrying counts (D169). Installed
+groups rows by state — Needs attention / Updates available / Active /
+Turned off — inside one hairline-separated panel; each row shows the plugin
+glyph, name, version, state tags, author meta, risk-tinted permission chips,
+and reveals quiet icon actions on hover (open panel, overflow menu with
+auto-update and Uninstall) beside an always-visible enable switch. Marketplace
+is a card grid with category chips and skeleton placeholders. Details open in a
+right-side sheet (about, links, safety notes, risk-labeled permissions, version
+picker, readme). Installing opens a permission dialog that groups requests by
+risk tier and marks permissions new to an upgrade.
 
 ### 3.6 Settings (full-page takeover)
 Settings replaces the whole shell (D063): back-to-app + search + a compact
