@@ -13,6 +13,7 @@
     "preview": "pnpm --filter @pi-desktop/desktop run preview",
     "pack": "pnpm --filter @pi-desktop/desktop run pack",
     "dist": "pnpm --filter @pi-desktop/desktop run dist",
+    "pi-plugin": "pi-plugin",
     "build": "pnpm -r --if-present build && cargo build --release -p host-core",
     "build:js": "pnpm -r --if-present build",
     "build:host": "cargo build --release -p host-core",
@@ -25,5 +26,8 @@
     "lint": "pnpm -r --if-present lint",
     "host:dev": "cargo run -p host-core",
     "clean": "pnpm -r --if-present clean && cargo clean"
+  },
+  "devDependencies": {
+    "@pi-desktop/plugin-devkit": "workspace:*"
   }
 }
