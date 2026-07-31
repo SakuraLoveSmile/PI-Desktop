@@ -93,6 +93,11 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       from: "../../packages/agent-runtime/dist-bundle",
       to: "agent-runtime",
     },
+    // Built-in skills stay outside the asar so they read as plain files.
+    {
+      from: "resources/skills",
+      to: "skills",
+    },
     {
       from: "node_modules/node-pty/deps/winpty/LICENSE",
       to: "licenses/node-pty-winpty.LICENSE",

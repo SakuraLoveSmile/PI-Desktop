@@ -124,6 +124,66 @@ type LoadedPlugin = {
 
 type PluginApiError = Error & { code?: string };
 
+/** One resolved skill document, ready to hand to the agent sidecar. */
+export type PluginSkillDoc = {
+  pluginId: string;
+  pluginName: string;
+  id: string;
+  name?: string;
+  description?: string;
+  body: string;
+};
+
+/**
+ * A `contributes.skills` entry is a path string; tolerate the richer
+ * `{ path, name }` object form too so a manifest written against a newer
+ * schema still loads here.
+ */
+function skillEntryPath(entry: unknown): string | undefined {
+  if (typeof entry === "string") return entry.trim() || undefined;
+  const path = (entry as { path?: unknown })?.path;
+  return typeof path === "string" && path.trim() ? path.trim() : undefined;
+}
+
+function skillEntryName(entry: unknown): string | undefined {
+  const name = (entry as { name?: unknown })?.name;
+  return typeof name === "string" && name.trim() ? name.trim() : undefined;
+}
+
+/** `skills/release-notes.md` -> `release-notes`, so ids stay readable. */
+function skillIdFromPath(relative: string): string {
+  const base = relative.split(/[\\/]/).pop() ?? relative;
+  return base.replace(/\.md$/i, "") || base;
+}
+
+/**
+ * Split optional `---` front matter off a skill document. Only `name` and
+ * `description` are read; anything else is metadata this host does not use.
+ */
+export function parseSkillDoc(raw: string): {
+  name?: string;
+  description?: string;
+  body: string;
+} {
+  const normalized = raw.replace(/^﻿/, "").replace(/\r\n/g, "\n");
+  if (!normalized.startsWith("---\n")) return { body: normalized.trim() };
+  const end = normalized.indexOf("\n---", 3);
+  if (end === -1) return { body: normalized.trim() };
+  const header = normalized.slice(4, end);
+  const body = normalized.slice(end + 4).replace(/^\n/, "");
+  let name: string | undefined;
+  let description: string | undefined;
+  for (const line of header.split("\n")) {
+    const match = /^(name|description)\s*:\s*(.*)$/.exec(line.trim());
+    if (!match) continue;
+    const value = match[2].trim().replace(/^["']|["']$/g, "");
+    if (!value) continue;
+    if (match[1] === "name") name = value;
+    else description = value;
+  }
+  return { name, description, body: body.trim() };
+}
+
 function apiError(code: string, message: string): PluginApiError {
   const err = new Error(message) as PluginApiError;
   err.code = code;
@@ -217,6 +277,61 @@ export class PluginRuntime {
 
   getTools(): RegisteredPluginTool[] {
     return [...this.tools.values()];
+  }
+
+  /**
+   * Skill documents contributed through `contributes.skills`, read fresh so an
+   * edited file takes effect on the next prompt rather than at the next load.
+   *
+   * A skill is prompt injection by definition, so it only counts when
+   * `agent.prompt.inject` was granted. Missing or unreadable files are logged
+   * and skipped: a broken skill must not take the plugin down with it.
+   */
+  getSkills(): PluginSkillDoc[] {
+    const docs: PluginSkillDoc[] = [];
+    for (const loaded of this.loaded.values()) {
+      const declared = loaded.manifest.contributes?.skills ?? [];
+      if (!declared.length) continue;
+      if (!loaded.permissions.has("agent.prompt.inject")) {
+        this.services.audit?.({
+          pluginId: loaded.manifest.id,
+          api: "plugin.skills.denied",
+          ok: false,
+          errorCode: "PERMISSION_DENIED",
+          ts: Date.now(),
+        });
+        continue;
+      }
+      for (const entry of declared) {
+        const relative = skillEntryPath(entry);
+        if (!relative) continue;
+        try {
+          // Same containment guard as fs.readText: a skill path may not point
+          // outside the plugin it came from.
+          const full = ensureWithinRoot(loaded.path, relative);
+          const raw = readFileSync(full, "utf8");
+          const parsed = parseSkillDoc(raw);
+          if (!parsed.body) continue;
+          docs.push({
+            pluginId: loaded.manifest.id,
+            pluginName: loaded.manifest.name,
+            id: `${loaded.manifest.id}/${skillIdFromPath(relative)}`,
+            name: skillEntryName(entry) ?? parsed.name,
+            description: parsed.description,
+            body: parsed.body,
+          });
+        } catch (error) {
+          this.services.audit?.({
+            pluginId: loaded.manifest.id,
+            api: "plugin.skills.error",
+            ok: false,
+            message: `${relative}: ${(error as Error).message}`,
+            ts: Date.now(),
+          });
+        }
+      }
+    }
+    return docs;
   }
 
   getLoaded(pluginId: string): LoadedPlugin | undefined {

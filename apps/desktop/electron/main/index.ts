@@ -45,12 +45,15 @@ import {
   loadComposerTemplates,
   globalInstructionPath,
   loadInstructionChain,
+  clampPluginSkills,
   type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
 import { HostProcess } from "./host-process";
 import { AgentSidecar } from "./agent-sidecar";
 import { PluginRuntime } from "./plugin-runtime";
+import { builtinSkills } from "./builtin-skills";
+import { registerPluginDevTools } from "./plugin-dev-tools";
 import { PluginPanelHost } from "./plugin-panel-host";
 import { Logger } from "./logger";
 import { collectWorkspaceDiff } from "./git-diff";
@@ -340,6 +343,15 @@ async function resolveAgentRuntimeLaunch(
     apiStyle: provider.apiStyle,
   });
   const projectInstructions = await loadInstructionChain(session.projectPath);
+  // Host skills first, plugin skills after: later entries carry more weight, so
+  // an installed plugin can refine the built-in guidance but not the reverse.
+  const pluginSkills = clampPluginSkills([
+    ...builtinSkills({
+      workspacePath: session.projectPath,
+      pluginPaths: plugins.listLoaded().map((loaded) => loaded.path),
+    }),
+    ...plugins.getSkills(),
+  ]);
   return {
     providerId: provider.id,
     modelId,
@@ -349,6 +361,7 @@ async function resolveAgentRuntimeLaunch(
       thinkingLevel,
       scratchDir: join(dataDir, "scratch", sessionId),
       projectInstructions,
+      pluginSkills,
       compactionSettings: settings.contextCompaction,
       provider: {
         id: provider.id,
@@ -1844,6 +1857,35 @@ async function startSidecar(): Promise<void> {
       ok: true,
       content: `Previewing ${raw} in the built-in browser panel. Live reload is active — subsequent edits to the file or sibling assets re-render automatically.`,
     };
+  });
+  // Plugin authoring (D171): scaffold, validate and package a plugin without
+  // leaving the session. Paths stay inside the open workspace.
+  registerPluginDevTools(s, {
+    resolveWorkspace: async (sessionId) => {
+      try {
+        const res = (await host?.call("session.get", { id: sessionId })) as
+          | { session: { projectPath?: string } | null }
+          | undefined;
+        return res?.session?.projectPath?.trim() || null;
+      } catch {
+        return null;
+      }
+    },
+    registerDevPlugin: async (path) => {
+      if (!host) throw new Error("host unavailable");
+      const loaded = await host.call<{ plugin?: { permissions?: string[] } }>(
+        "plugins.loadDev",
+        { path },
+      );
+      return loaded.plugin?.permissions ?? [];
+    },
+    loadPlugin: async (path, permissions) => {
+      await plugins.loadFromPath(path, permissions ?? []);
+      for (const toast of plugins.drainToasts()) {
+        sendToRenderer(IPC.event.toast, { message: toast });
+      }
+      sendToRenderer(IPC.event.pluginChanged, { reason: "scaffold" });
+    },
   });
   sidecar = s;
   if (host) s.setHost(host);

@@ -3,7 +3,7 @@
  "id": "demo.hello",
  "name": "Hello",
  "version": "0.1.0",
- "description": "PI-Desktop 示例插件：命令面板 + 面板 + Echo Tool",
+ "description": "PI-Desktop example plugin: command palette, panel, echo tool and a skill",
  "author": "PI-Desktop",
  "main": "main.js",
  "icon": "icon.png",
@@ -48,7 +48,8 @@
  },
  "permissions": [
  "ui.panel",
- "agent.tool.register"
+ "agent.tool.register",
+ "agent.prompt.inject"
  ],
  "engines": {
  "piDesktop": ">=0.1.0"

@@ -1,3 +1,8 @@
-# Hello Skill
+---
+name: Hello demo
+description: the user is trying out PI-Desktop's plugin system and wants to see a plugin work
+---
 
-当用户在演示插件能力时，优先使用 `echo_text` 工具回显文本，并提示这是 PI-Desktop 插件系统示例。
+Call the `echo_text` tool to echo the user's text back, and say the response came from the
+`demo.hello` example plugin — this skill exists to show that `contributes.skills` really
+reaches the model.

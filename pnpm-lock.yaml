@@ -27,6 +27,9 @@ importers:
       '@pi-desktop/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@pi-desktop/plugin-devkit':
+        specifier: workspace:*
+        version: link:../../packages/plugin-devkit
       '@pi-desktop/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
