@@ -23,6 +23,20 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.4.0",
+    date: "2026-08-01",
+    highlights: [
+      "Plugins can now contribute skills, themes, MCP servers, resident services, and an inter-plugin message bus.",
+      "The plugin SDK declares all new capability types so authors can activate them from manifest.",
+      "Host core validates capability contributions and derives per-plugin permissions automatically.",
+      "Agent system prompt now includes plugin-declared skills for tool-aware conversations.",
+      "Plugins page redesigned with a template picker, hot reload on save, and authoring tools.",
+      "Creating a plugin from a template now opens the scaffolded folder as the project.",
+      "Unified work panel header menu with cleaner controls and context actions.",
+      "Styles split into per-surface partials; duplicate and dead CSS removed.",
+    ],
+  },
+  {
     version: "0.3.0",
     date: "2026-07-31",
     highlights: [
@@ -160,6 +174,20 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.4.0",
+    date: "2026-08-01",
+    highlights: [
+      "插件现可贡献技能、主题、MCP 服务器、常驻服务以及插件间消息总线。",
+      "插件 SDK 声明所有新增能力类型，作者可通过清单激活。",
+      "宿主核心校验能力贡献并自动派生每插件权限。",
+      "智能体系统提示词现包含插件声明的技能，支持工具感知对话。",
+      "插件页面重新设计，新增模板选择器、保存时热重载与开发工具。",
+      "从模板创建插件后会自动将脚手架文件夹作为项目打开。",
+      "统一工作面板头部菜单，控件与上下文操作更清晰。",
+      "样式拆分为按表面分文件，清理重复与无用 CSS。",
+    ],
+  },
   {
     version: "0.3.0",
     date: "2026-07-31",
