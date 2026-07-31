@@ -14,6 +14,7 @@
  *                                                        lifecycle.unload
  *   child  -> parent { t: "call", id, api, args }         host API request
  *   *      -> *      { t: "res", id, ok, value } | { t: "res", id, ok: false, error: { code, message } }
+ *   parent -> child  { t: "event", event, ... }           push, no reply (bus.message, host events)
  *   child  -> parent { t: "log", level, message }         diagnostics, fire and forget
  */
 import { createRequire } from "node:module";
@@ -74,6 +75,10 @@ const tools = new Map();
 // Resident services declared in the manifest. The broker decides when they run;
 // this map only holds the callables and whether they are currently up.
 const services = new Map();
+// Bus subscriptions keyed by the id the broker handed out, plus the `pi.events`
+// listeners. Both are driven by the parent's push frames.
+const busHandlers = new Map();
+const eventListeners = new Map();
 
 function buildApi() {
   return {
@@ -184,6 +189,26 @@ function buildApi() {
         if (entry?.running && entry.stop) await entry.stop();
       },
     },
+    /**
+     * Inter-plugin message bus (spec 07 §3). Topics must be declared in
+     * `contributes.bus`; the broker owns the routing table, so this side only
+     * keeps the handler for each subscription it was given.
+     */
+    bus: {
+      publish: (topic, payload) => call("bus.publish", [topic, payload]),
+      subscribe: async (topic, handler) => {
+        if (typeof handler !== "function") {
+          throw new Error("bus.subscribe handler must be a function");
+        }
+        const result = await call("bus.subscribe", [topic]);
+        const id = String(result?.subscriptionId ?? "");
+        busHandlers.set(id, handler);
+        return async () => {
+          busHandlers.delete(id);
+          await call("bus.unsubscribe", [id]);
+        };
+      },
+    },
     clipboard: {
       readText: () => call("clipboard.readText"),
       writeText: (text) => call("clipboard.writeText", [text]),
@@ -194,12 +219,43 @@ function buildApi() {
     net: {
       fetch: (input) => call("net.fetch", [input]),
     },
-    // Host events are not brokered yet; keep the SDK shape callable.
+    // Fed by the parent's `event` frames; bus deliveries also arrive as
+    // `bus.message` here, so a plugin can watch the raw stream if it wants to.
     events: {
-      on: () => undefined,
-      off: () => undefined,
+      on: (event, handler) => {
+        if (typeof handler !== "function") return;
+        const listeners = eventListeners.get(event) ?? new Set();
+        listeners.add(handler);
+        eventListeners.set(event, listeners);
+      },
+      off: (event, handler) => {
+        eventListeners.get(event)?.delete(handler);
+      },
     },
   };
+}
+
+/** Dispatch one parent push frame; a throwing handler must not kill the plugin. */
+function handleHostEvent(message) {
+  const event = String(message.event ?? "");
+  if (event === "bus.message") {
+    const handler = busHandlers.get(String(message.subscriptionId ?? ""));
+    if (handler) {
+      try {
+        handler(message.message);
+      } catch (error) {
+        log("warn", `bus handler failed for ${message.message?.topic}: ${error?.message ?? error}`);
+      }
+    }
+  }
+  const args = message.args ?? [message.message];
+  for (const listener of [...(eventListeners.get(event) ?? [])]) {
+    try {
+      listener(...args);
+    } catch (error) {
+      log("warn", `event handler failed for ${event}: ${error?.message ?? error}`);
+    }
+  }
 }
 
 async function loadPluginModule(entry) {
@@ -286,6 +342,8 @@ async function handleParentCall(method, payload) {
       commands.clear();
       tools.clear();
       services.clear();
+      busHandlers.clear();
+      eventListeners.clear();
       return { ok: true };
     }
     default: {
@@ -300,6 +358,10 @@ onHostMessage((message) => {
   if (!message || typeof message !== "object") return;
   if (message.t === "res") {
     settle(message);
+    return;
+  }
+  if (message.t === "event") {
+    handleHostEvent(message);
     return;
   }
   if (message.t === "init") {

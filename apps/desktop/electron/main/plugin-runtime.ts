@@ -2,6 +2,10 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, statSy
 import { join, dirname, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import {
+  busTopicAllowed,
+  isValidBusTopic,
+  isValidBusTopicPattern,
+  matchesBusTopic,
   parseSkillFrontmatter,
   pluginMcpToolKey,
   pluginSkillId,
@@ -145,6 +149,9 @@ const HOST_API_ALLOWLIST = new Set([
   "clipboard.writeText",
   "shell.openExternal",
   "net.fetch",
+  "bus.publish",
+  "bus.subscribe",
+  "bus.unsubscribe",
 ]);
 
 /** Load must finish (module eval + onLoad) inside this budget. */
@@ -176,6 +183,13 @@ const SERVICE_RESTART_MAX_DELAY_MS = 30_000;
 const MAX_SERVICE_RESTARTS = 5;
 /** A host process that stays up this long is healthy; the backoff resets. */
 const SERVICE_HEALTHY_MS = 60_000;
+/** Bus payloads are messages, not file transfers. */
+const MAX_BUS_PAYLOAD_BYTES = 64 * 1024;
+/** A plugin may hold at most this many live subscriptions. */
+const MAX_BUS_SUBSCRIPTIONS_PER_PLUGIN = 16;
+/** Publish budget per plugin, so a hot loop cannot flood every other plugin. */
+const MAX_BUS_PUBLISH_PER_WINDOW = 100;
+const BUS_RATE_WINDOW_MS = 10_000;
 
 type PendingCall = {
   resolve: (value: unknown) => void;
@@ -213,6 +227,24 @@ function apiError(code: string, message: string): PluginApiError {
 /** Key for the per-service supervision map. */
 function serviceStateKey(pluginId: string, serviceId: string): string {
   return `${pluginId}:${serviceId}`;
+}
+
+/** One live bus subscription; the handler itself lives in the plugin process. */
+type BusSubscription = {
+  id: string;
+  pluginId: string;
+  pattern: string;
+};
+
+/**
+ * A runtime subscription is allowed when the manifest declared exactly that
+ * pattern, or declared a wider one that covers it — narrowing `a.*` down to
+ * `a.b` at runtime is fine, widening is not.
+ */
+function busSubscribeAllowed(declared: string[] | undefined, pattern: string): boolean {
+  if (!declared?.length) return false;
+  if (declared.includes(pattern)) return true;
+  return isValidBusTopic(pattern) && busTopicAllowed(declared, pattern);
 }
 
 function ensureWithinRoot(root: string, candidate: string): string {
@@ -283,6 +315,9 @@ export class PluginRuntime {
   private mcpClients = new Map<string, McpServerClient[]>();
   private serviceStates = new Map<string, PluginServiceStatus>();
   private restarts = new Map<string, RestartRecord>();
+  private busSubscriptions = new Map<string, BusSubscription>();
+  private busRate = new Map<string, { windowStart: number; count: number }>();
+  private nextBusSubscription = 1;
   /** Plugins being reloaded by the supervisor; their backoff must survive. */
   private restarting = new Set<string>();
   private loaded = new Map<string, LoadedPlugin>();
@@ -877,6 +912,12 @@ export class PluginRuntime {
       }
     }
     this.mcpClients.delete(pluginId);
+    // A gone plugin cannot receive: drop its routes so publishers stop paying
+    // the fan-out cost, and reset its publish window.
+    for (const [id, subscription] of this.busSubscriptions) {
+      if (subscription.pluginId === pluginId) this.busSubscriptions.delete(id);
+    }
+    this.busRate.delete(pluginId);
   }
 
   /**
@@ -1353,6 +1394,149 @@ export class PluginRuntime {
     this.restarts.delete(pluginId);
   }
 
+  /**
+   * Fan one message out to the plugins subscribed to its topic (spec 07 §3).
+   *
+   * The publisher is excluded: a plugin talking to itself needs no bus, and
+   * echoing its own messages back is a surprising default. Delivery is
+   * fire-and-forget — a slow or wedged subscriber must never stall the sender.
+   */
+  private async busPublish(
+    loaded: LoadedPlugin,
+    topic: unknown,
+    payload?: unknown,
+  ): Promise<{ ok: true; delivered: number }> {
+    const pluginId = loaded.manifest.id;
+    this.assertPermission(loaded, "bus.publish");
+    const name = String(topic ?? "");
+    if (!isValidBusTopic(name)) {
+      throw apiError("INVALID_ARGUMENT", `invalid bus topic: ${name}`);
+    }
+    if (!busTopicAllowed(loaded.manifest.contributes?.bus?.publish, name)) {
+      this.auditBus(pluginId, "bus.publish", false, name, "TOPIC_NOT_DECLARED");
+      throw apiError("PERMISSION_DENIED", `topic not declared for publish: ${name}`);
+    }
+    let encoded: string;
+    try {
+      encoded = JSON.stringify(payload ?? null);
+    } catch {
+      throw apiError("INVALID_ARGUMENT", "bus payload is not serializable");
+    }
+    if (Buffer.byteLength(encoded, "utf8") > MAX_BUS_PAYLOAD_BYTES) {
+      this.auditBus(pluginId, "bus.publish", false, name, "PAYLOAD_TOO_LARGE");
+      throw apiError("INVALID_ARGUMENT", "bus payload too large");
+    }
+    if (this.busRateExceeded(pluginId)) {
+      this.auditBus(pluginId, "bus.publish", false, name, "RATE_LIMITED");
+      throw apiError("RATE_LIMITED", "bus publish rate exceeded");
+    }
+
+    const message = {
+      topic: name,
+      from: pluginId,
+      payload: payload ?? undefined,
+      at: new Date().toISOString(),
+    };
+    let delivered = 0;
+    for (const subscription of this.busSubscriptions.values()) {
+      if (subscription.pluginId === pluginId) continue;
+      if (!matchesBusTopic(subscription.pattern, name)) continue;
+      const target = this.loaded.get(subscription.pluginId);
+      if (!target?.child || target.disposing) continue;
+      try {
+        target.child.postMessage({
+          t: "event",
+          event: "bus.message",
+          subscriptionId: subscription.id,
+          message,
+        });
+        delivered += 1;
+      } catch {
+        // The subscriber is going away; its subscription dies with it.
+      }
+    }
+    this.services.audit?.({
+      pluginId,
+      api: "plugin.bus.publish",
+      ok: true,
+      topic: name,
+      delivered,
+      ts: Date.now(),
+    });
+    return { ok: true, delivered };
+  }
+
+  private async busSubscribe(
+    loaded: LoadedPlugin,
+    pattern: unknown,
+  ): Promise<{ subscriptionId: string; pattern: string }> {
+    const pluginId = loaded.manifest.id;
+    this.assertPermission(loaded, "bus.subscribe");
+    const name = String(pattern ?? "");
+    if (!isValidBusTopicPattern(name)) {
+      throw apiError("INVALID_ARGUMENT", `invalid bus topic pattern: ${name}`);
+    }
+    if (!busSubscribeAllowed(loaded.manifest.contributes?.bus?.subscribe, name)) {
+      this.auditBus(pluginId, "bus.subscribe", false, name, "TOPIC_NOT_DECLARED");
+      throw apiError("PERMISSION_DENIED", `topic not declared for subscribe: ${name}`);
+    }
+    let held = 0;
+    for (const subscription of this.busSubscriptions.values()) {
+      if (subscription.pluginId === pluginId) held += 1;
+    }
+    if (held >= MAX_BUS_SUBSCRIPTIONS_PER_PLUGIN) {
+      this.auditBus(pluginId, "bus.subscribe", false, name, "LIMIT_EXCEEDED");
+      throw apiError("LIMIT_EXCEEDED", "too many bus subscriptions");
+    }
+    const id = `bus${this.nextBusSubscription++}`;
+    this.busSubscriptions.set(id, { id, pluginId, pattern: name });
+    this.auditBus(pluginId, "bus.subscribe", true, name);
+    return { subscriptionId: id, pattern: name };
+  }
+
+  private async busUnsubscribe(
+    loaded: LoadedPlugin,
+    subscriptionId: unknown,
+  ): Promise<{ ok: true }> {
+    const id = String(subscriptionId ?? "");
+    const subscription = this.busSubscriptions.get(id);
+    // Only the owner may drop a subscription, and dropping twice is fine.
+    if (subscription && subscription.pluginId === loaded.manifest.id) {
+      this.busSubscriptions.delete(id);
+      this.auditBus(loaded.manifest.id, "bus.unsubscribe", true, subscription.pattern);
+    }
+    return { ok: true };
+  }
+
+  /** Rolling publish window per plugin; the first publish opens the window. */
+  private busRateExceeded(pluginId: string): boolean {
+    const now = Date.now();
+    const record = this.busRate.get(pluginId);
+    if (!record || now - record.windowStart >= BUS_RATE_WINDOW_MS) {
+      this.busRate.set(pluginId, { windowStart: now, count: 1 });
+      return false;
+    }
+    record.count += 1;
+    return record.count > MAX_BUS_PUBLISH_PER_WINDOW;
+  }
+
+  private auditBus(
+    pluginId: string,
+    api: string,
+    ok: boolean,
+    topic: string,
+    errorCode?: string,
+  ): void {
+    this.services.audit?.({
+      pluginId,
+      api: `plugin.${api}`,
+      ok,
+      topic,
+      ...(errorCode ? { errorCode } : {}),
+      ts: Date.now(),
+    });
+  }
+
   private assertPermission(loaded: LoadedPlugin, perm: string): void {
     if (!loaded.permissions.has(perm)) {
       this.services.audit?.({
@@ -1588,6 +1772,12 @@ export class PluginRuntime {
             clearTimeout(timer);
           }
         },
+      },
+      bus: {
+        publish: async (topic: string, payload?: unknown) => this.busPublish(loaded, topic, payload),
+        subscribe: async (pattern: string) => this.busSubscribe(loaded, pattern),
+        unsubscribe: async (subscriptionId: string) =>
+          this.busUnsubscribe(loaded, subscriptionId),
       },
     };
   }
