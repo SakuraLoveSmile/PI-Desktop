@@ -52,6 +52,11 @@ import { classifyAgentError } from "./agent-errors.js";
 import { clampThinkingLevel, type PiModelConfig } from "./thinking-level.js";
 import type { ProjectInstructions } from "./project-instructions.js";
 import { projectInstructionsPrompt } from "./project-instructions-prompt.js";
+import {
+  pluginSkillsPrompt,
+  SKILL_TOOL_NAME,
+  type PluginSkillDef,
+} from "./plugin-skills-prompt.js";
 import { logTiming } from "./timing.js";
 
 
@@ -220,6 +225,8 @@ export type AgentRuntimeOptions = {
   compactionSettings?: ContextCompactionSettings;
   /** Plugin agent tools to expose to the model this session. */
   pluginTools?: PluginToolDef[];
+  /** Plugin skills advertised in the system prompt and loaded via `Skill`. */
+  pluginSkills?: PluginSkillDef[];
   /** Absolute per-session scratch directory for temporary files (D114).
    * Advertised to the model in the system prompt; host-core enforces it as
    * a second containment root. */
@@ -452,6 +459,7 @@ export class DesktopAgentRuntime {
   private onEvent: (envelope: AgentEventEnvelope) => void;
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
+  private pluginSkills: PluginSkillDef[];
   private scratchDir?: string;
   private baseSystemPrompt: string;
   private baseProjectInstructions?: ProjectInstructions;
@@ -484,6 +492,7 @@ export class DesktopAgentRuntime {
     this.host = opts.host;
     this.onEvent = opts.onEvent;
     this.pluginTools = opts.pluginTools ?? [];
+    this.pluginSkills = opts.pluginSkills ?? [];
     this.scratchDir = opts.scratchDir;
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
@@ -521,6 +530,7 @@ export class DesktopAgentRuntime {
     const projectInstructions = projectInstructionsPrompt(
       this.projectInstructions,
     );
+    const skillsPrompt = pluginSkillsPrompt(this.pluginSkills);
     const baseSystemPrompt =
       opts.systemPrompt ??
       [
@@ -540,6 +550,9 @@ export class DesktopAgentRuntime {
               `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
             ]
           : []),
+        // Plugin skills (D170): the catalog rides in the base prompt so a
+        // path-scoped instruction reload never drops it.
+        ...(skillsPrompt ? [skillsPrompt] : []),
       ].join("\n\n");
     this.baseSystemPrompt = baseSystemPrompt;
 
@@ -580,6 +593,7 @@ export class DesktopAgentRuntime {
     thinkingLevelOrPluginToolNames: ThinkingLevel | string[] = this.thinkingLevel,
     pluginToolNames: string[] = [],
     projectInstructions?: ProjectInstructions,
+    pluginSkillIds: string[] = [],
   ): boolean {
     // Keep the pre-thinking overload usable for callers that passed plugin
     // names as the third argument. New callers pass the selected level.
@@ -595,6 +609,10 @@ export class DesktopAgentRuntime {
       legacyPluginToolNames ?? pluginToolNames;
     const current = this.pluginTools.map((t) => t.name).sort().join(",");
     const next = [...effectivePluginToolNames].sort().join(",");
+    // Skills change the system prompt and the presence of the Skill tool, so a
+    // different catalog has to rebuild the runtime.
+    const currentSkills = this.pluginSkills.map((s) => s.id).sort().join(",");
+    const nextSkills = [...pluginSkillIds].sort().join(",");
     const currentThinkingLevels = [
       ...(this.provider.supportedThinkingLevels ?? ["off"]),
     ]
@@ -620,6 +638,7 @@ export class DesktopAgentRuntime {
         safeJson(provider.modelConfig ?? null) &&
       this.thinkingLevel === clampThinkingLevel(provider, thinkingLevel) &&
       current === next &&
+      currentSkills === nextSkills &&
       safeJson(this.baseProjectInstructions ?? null) ===
         safeJson(projectInstructions ?? null)
     );
@@ -887,7 +906,25 @@ export class DesktopAgentRuntime {
     const contextTools = this.compactionSettings.enabled
       ? [this.buildContextCompactionTool()]
       : [];
-    return [...builtins, ...pluginTools, ...contextTools];
+    // Only offered when a plugin actually taught a skill; Electron main serves
+    // it locally (host-core never sees the skill documents).
+    const skillTools: AgentTool[] = this.pluginSkills.length
+      ? [
+          {
+            name: SKILL_TOOL_NAME,
+            label: "Skill",
+            description:
+              "Load the full instructions of one skill listed in the Skills section of your system prompt. Pass its exact id (for example \"demo.hello/release-notes\"). Returns the skill document; follow it for the current task.",
+            parameters: Type.Object({
+              id: Type.String({
+                description: "Skill id exactly as listed in the Skills section.",
+              }),
+            }),
+            execute: hostExecute(SKILL_TOOL_NAME),
+          },
+        ]
+      : [];
+    return [...builtins, ...pluginTools, ...skillTools, ...contextTools];
   }
 
   private async loadPathInstructions(

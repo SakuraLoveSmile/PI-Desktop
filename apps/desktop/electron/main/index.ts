@@ -368,6 +368,13 @@ async function resolveAgentRuntimeLaunch(
         description: tool.description,
         parameters: tool.schema ?? { type: "object", properties: {} },
       })),
+      // Plugin skills (D170): only the catalog crosses to the sidecar; the
+      // document body is fetched on demand through the local `Skill` tool.
+      pluginSkills: plugins.getSkills().map((skill) => ({
+        id: skill.id,
+        name: skill.name,
+        description: skill.description,
+      })),
     },
   };
 }
@@ -1844,6 +1851,38 @@ async function startSidecar(): Promise<void> {
       ok: true,
       content: `Previewing ${raw} in the built-in browser panel. Live reload is active — subsequent edits to the file or sibling assets re-render automatically.`,
     };
+  });
+  // Plugin skills (D170): the model loads a declared skill document by id.
+  // Served in main because the plugin runtime — and the plugin directories —
+  // live here, not in host-core.
+  s.setLocalTool("Skill", async ({ args }) => {
+    const id = String((args as { id?: unknown })?.id ?? "").trim();
+    if (!id) {
+      return {
+        ok: false,
+        isError: true,
+        content: "Skill: `id` is required. Use an id from the Skills section.",
+      };
+    }
+    try {
+      const skill = plugins.loadSkillBody(id);
+      return {
+        ok: true,
+        content: `# Skill: ${skill.name} (${skill.id})\n\n${skill.body}`,
+      };
+    } catch (error) {
+      const available = plugins
+        .getSkills()
+        .map((skill) => skill.id)
+        .join(", ");
+      return {
+        ok: false,
+        isError: true,
+        content: `Skill: ${error instanceof Error ? error.message : String(error)}.${
+          available ? ` Available skills: ${available}.` : ""
+        }`,
+      };
+    }
   });
   sidecar = s;
   if (host) s.setHost(host);

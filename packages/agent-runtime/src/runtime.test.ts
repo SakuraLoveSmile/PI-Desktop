@@ -38,6 +38,7 @@ function createRuntime(
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
     projectInstructions: import("./project-instructions.js").ProjectInstructions;
+    pluginSkills: import("./plugin-skills-prompt.js").PluginSkillDef[];
     host: { call: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
@@ -52,6 +53,7 @@ function createRuntime(
     compaction: overrides.compaction,
     compactionSettings: overrides.compactionSettings,
     projectInstructions: overrides.projectInstructions,
+    pluginSkills: overrides.pluginSkills,
     onEvent: overrides.onEvent ?? vi.fn(),
   });
 }
@@ -1313,6 +1315,97 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
         error: expect.objectContaining({ code: "CONTEXT_COMPACTION_FAILED" }),
       }),
     );
+    await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime plugin skills (D170)", () => {
+  const pluginSkills = [
+    {
+      id: "demo.hello/release-notes",
+      name: "Release notes",
+      description: "Draft release notes from the changelog.",
+    },
+  ];
+
+  it("advertises the catalog and offers the Skill tool", async () => {
+    const runtime = createRuntime({ pluginSkills });
+    const agent = (runtime as any).agent;
+
+    expect(agent.state.systemPrompt).toContain("# Skills");
+    expect(agent.state.systemPrompt).toContain("`demo.hello/release-notes`");
+    // Only the catalog line travels up front; the body loads on demand.
+    expect(agent.state.systemPrompt).not.toContain("Skill: Release notes");
+    expect(agent.state.tools.some((tool: any) => tool.name === "Skill")).toBe(true);
+
+    await runtime.dispose();
+  });
+
+  it("omits the Skill tool and section when no plugin taught a skill", async () => {
+    const runtime = createRuntime();
+    const agent = (runtime as any).agent;
+
+    expect(agent.state.systemPrompt).not.toContain("# Skills");
+    expect(agent.state.tools.some((tool: any) => tool.name === "Skill")).toBe(false);
+
+    await runtime.dispose();
+  });
+
+  it("keeps the catalog through a nested instruction reload", async () => {
+    const host = {
+      call: vi.fn().mockResolvedValue({
+        entries: [{ source: "src/AGENTS.md", content: "Use tabs." }],
+      }),
+    };
+    const runtime = createRuntime({ pluginSkills, host });
+
+    await (runtime as any).loadPathInstructions("Read", { path: "src/a.ts" });
+
+    const prompt = (runtime as any).agent.state.systemPrompt;
+    expect(prompt).toContain("# Skills");
+    expect(prompt).toContain("Use tabs.");
+
+    await runtime.dispose();
+  });
+
+  it("does not reuse a runtime whose skill catalog changed", async () => {
+    const runtime = createRuntime({ pluginSkills });
+    const ids = pluginSkills.map((skill) => skill.id);
+
+    expect(runtime.matches("agent", provider, "medium", [], undefined, ids)).toBe(true);
+    expect(runtime.matches("agent", provider, "medium", [], undefined, [])).toBe(false);
+    expect(
+      runtime.matches("agent", provider, "medium", [], undefined, [
+        ...ids,
+        "demo.hello/other",
+      ]),
+    ).toBe(false);
+
+    await runtime.dispose();
+  });
+
+  it("routes a Skill call to the host tool bridge", async () => {
+    const host = {
+      call: vi.fn().mockResolvedValue({ ok: true, content: "# Skill: Release notes" }),
+    };
+    const runtime = createRuntime({ pluginSkills, host });
+    const tool = (runtime as any).agent.state.tools.find(
+      (entry: any) => entry.name === "Skill",
+    );
+
+    const result = await tool.execute("call-1", { id: "demo.hello/release-notes" });
+
+    expect(host.call).toHaveBeenCalledWith(
+      "tools.execute",
+      expect.objectContaining({
+        toolName: "Skill",
+        args: { id: "demo.hello/release-notes" },
+      }),
+    );
+    expect(result.content).toEqual([
+      { type: "text", text: "# Skill: Release notes" },
+    ]);
+
     await runtime.dispose();
   });
 });

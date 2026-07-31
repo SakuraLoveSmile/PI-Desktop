@@ -2,9 +2,13 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, statSy
 import { join, dirname, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import {
+  parseSkillFrontmatter,
+  pluginSkillId,
   pluginToolName,
+  skillIdFromPath,
   validateManifest,
   type PluginManifest,
+  type PluginSkillContrib,
 } from "@pi-desktop/plugin-sdk";
 
 export type RegisteredCommand = {
@@ -24,6 +28,22 @@ export type RegisteredPluginTool = {
   risk?: string;
   schema?: unknown;
   execute: (args: unknown) => Promise<unknown>;
+};
+
+/**
+ * A skill document a plugin taught the agent (spec 07 §3). Only the metadata
+ * travels into the system prompt; the body is loaded on demand by the model.
+ */
+export type RegisteredPluginSkill = {
+  /** `<pluginId>/<skillId>` — what the model passes to the Skill tool. */
+  id: string;
+  pluginId: string;
+  skillId: string;
+  name: string;
+  description: string;
+  /** Absolute path to the skill document inside the plugin directory. */
+  path: string;
+  bytes: number;
 };
 
 export type PluginPanelRequest = {
@@ -105,6 +125,12 @@ const PLUGIN_HOOK_TIMEOUT_MS = 5_000;
 const PLUGIN_COMMAND_TIMEOUT_MS = 30_000;
 /** Kept under host-core's 120s tool budget so the plugin-side error wins. */
 const PLUGIN_TOOL_TIMEOUT_MS = 110_000;
+/** A plugin may teach at most this many skills; the rest are ignored. */
+const MAX_SKILLS_PER_PLUGIN = 32;
+/** Skill documents above this size are refused (prompt budget, not disk). */
+const MAX_SKILL_BYTES = 128 * 1024;
+/** Catalog lines stay short — the body carries the detail. */
+const MAX_SKILL_DESCRIPTION_CHARS = 240;
 
 type PendingCall = {
   resolve: (value: unknown) => void;
@@ -138,6 +164,18 @@ function ensureWithinRoot(root: string, candidate: string): string {
     throw apiError("INVALID_ARGUMENT", "path escapes workspace root");
   }
   return resolved;
+}
+
+/**
+ * Resolve a plugin-relative path, or null when it would leave the plugin
+ * directory. Manifest validation already rejects `..`, so this is defense in
+ * depth against symlinked or oddly-cased contributions.
+ */
+function resolveInsidePlugin(pluginPath: string, relative: string): string | null {
+  const root = resolve(pluginPath);
+  const target = resolve(root, relative);
+  const prefix = root.endsWith(sep) ? root : root + sep;
+  return target !== root && target.startsWith(prefix) ? target : null;
 }
 
 /**
@@ -181,6 +219,7 @@ const spawnUtilityProcess: PluginProcessSpawner = async ({ pluginId, entry }) =>
 export class PluginRuntime {
   private commands = new Map<string, RegisteredCommand>();
   private tools = new Map<string, RegisteredPluginTool>();
+  private skills = new Map<string, RegisteredPluginSkill>();
   private loaded = new Map<string, LoadedPlugin>();
   private toasts: Array<{ message: string; level?: string }> = [];
   private services: PluginHostServices;
@@ -217,6 +256,46 @@ export class PluginRuntime {
 
   getTools(): RegisteredPluginTool[] {
     return [...this.tools.values()];
+  }
+
+  /** Catalog of active plugin skills, ordered by id for a stable prompt. */
+  getSkills(): RegisteredPluginSkill[] {
+    return [...this.skills.values()].sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  /**
+   * Read one skill document on demand (the model asks for it by id through the
+   * `Skill` tool). Front matter is stripped so the model sees instructions
+   * only, and the size cap is re-checked because the file may have changed
+   * since load.
+   */
+  loadSkillBody(id: string): { id: string; name: string; body: string } {
+    const skill = this.skills.get(id);
+    if (!skill) throw apiError("NOT_FOUND", `unknown skill: ${id}`);
+    if (!this.loaded.has(skill.pluginId)) {
+      throw apiError("NOT_FOUND", `plugin not loaded: ${skill.pluginId}`);
+    }
+    let raw: string;
+    try {
+      raw = readFileSync(skill.path, "utf8");
+    } catch {
+      throw apiError("NOT_FOUND", `skill document missing: ${id}`);
+    }
+    if (Buffer.byteLength(raw, "utf8") > MAX_SKILL_BYTES) {
+      throw apiError("INVALID_ARGUMENT", `skill document too large: ${id}`);
+    }
+    const parsed = parseSkillFrontmatter(raw);
+    if (!parsed.body) {
+      throw apiError("INVALID_ARGUMENT", `skill document is empty: ${id}`);
+    }
+    this.services.audit?.({
+      pluginId: skill.pluginId,
+      api: "plugin.skill.load",
+      ok: true,
+      skillId: skill.id,
+      ts: Date.now(),
+    });
+    return { id: skill.id, name: skill.name, body: parsed.body };
   }
 
   getLoaded(pluginId: string): LoadedPlugin | undefined {
@@ -320,6 +399,7 @@ export class PluginRuntime {
       throw error;
     }
 
+    this.registerSkills(loaded);
     this.services.audit?.({
       pluginId: manifest.id,
       api: "plugin.load.success",
@@ -613,6 +693,115 @@ export class PluginRuntime {
     for (const [name, tool] of this.tools) {
       if (tool.pluginId === pluginId) this.tools.delete(name);
     }
+    for (const [id, skill] of this.skills) {
+      if (skill.pluginId === pluginId) this.skills.delete(id);
+    }
+  }
+
+  /**
+   * Index `contributes.skills` after the plugin loaded. Skills are declarative
+   * (no code runs), so the manifest is the whole source of truth; the child
+   * process is not consulted.
+   *
+   * Skills predate the permission gate, so a plugin that declares them without
+   * `agent.prompt.inject` still loads — it just teaches the agent nothing.
+   */
+  private registerSkills(loaded: LoadedPlugin): void {
+    const declared = loaded.manifest.contributes?.skills ?? [];
+    if (!declared.length) return;
+    const pluginId = loaded.manifest.id;
+    if (!loaded.permissions.has("agent.prompt.inject")) {
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.skills.skipped",
+        ok: false,
+        errorCode: "PERMISSION_DENIED",
+        count: declared.length,
+        ts: Date.now(),
+      });
+      return;
+    }
+
+    let accepted = 0;
+    for (const entry of declared) {
+      if (accepted >= MAX_SKILLS_PER_PLUGIN) {
+        this.services.audit?.({
+          pluginId,
+          api: "plugin.skills.skipped",
+          ok: false,
+          errorCode: "LIMIT_EXCEEDED",
+          count: declared.length - accepted,
+          ts: Date.now(),
+        });
+        break;
+      }
+      const contrib: PluginSkillContrib =
+        typeof entry === "string" ? { path: entry } : entry;
+      const relative = String(contrib.path ?? "").trim();
+      if (!relative) continue;
+      const skillPath = resolveInsidePlugin(loaded.path, relative);
+      if (!skillPath || !existsSync(skillPath)) {
+        this.skipSkill(pluginId, relative, "NOT_FOUND");
+        continue;
+      }
+      let raw: string;
+      try {
+        const stats = statSync(skillPath);
+        if (stats.size > MAX_SKILL_BYTES) {
+          this.skipSkill(pluginId, relative, "TOO_LARGE");
+          continue;
+        }
+        raw = readFileSync(skillPath, "utf8");
+      } catch {
+        this.skipSkill(pluginId, relative, "READ_FAILED");
+        continue;
+      }
+      const parsed = parseSkillFrontmatter(raw);
+      if (!parsed.body) {
+        this.skipSkill(pluginId, relative, "EMPTY");
+        continue;
+      }
+      const skillId = String(contrib.id ?? "").trim() || skillIdFromPath(relative);
+      const id = pluginSkillId(pluginId, skillId);
+      if (this.skills.has(id)) {
+        this.skipSkill(pluginId, relative, "DUPLICATE");
+        continue;
+      }
+      const description = (contrib.description ?? parsed.description ?? "").trim();
+      this.skills.set(id, {
+        id,
+        pluginId,
+        skillId,
+        name: (contrib.name ?? parsed.name ?? skillId).trim() || skillId,
+        description:
+          description.length > MAX_SKILL_DESCRIPTION_CHARS
+            ? `${description.slice(0, MAX_SKILL_DESCRIPTION_CHARS - 1).trimEnd()}…`
+            : description,
+        path: skillPath,
+        bytes: Buffer.byteLength(raw, "utf8"),
+      });
+      accepted += 1;
+    }
+    if (accepted) {
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.skills.register",
+        ok: true,
+        count: accepted,
+        ts: Date.now(),
+      });
+    }
+  }
+
+  private skipSkill(pluginId: string, path: string, errorCode: string): void {
+    this.services.audit?.({
+      pluginId,
+      api: "plugin.skills.skipped",
+      ok: false,
+      errorCode,
+      path,
+      ts: Date.now(),
+    });
   }
 
   private assertPermission(loaded: LoadedPlugin, perm: string): void {

@@ -12,6 +12,7 @@ import {
   type PluginToolDef,
   type RuntimeProviderConfig,
 } from "./runtime.js";
+import type { PluginSkillDef } from "./plugin-skills-prompt.js";
 import type { ProjectInstructions } from "./project-instructions.js";
 import {
   normalizeSupportedThinkingLevels,
@@ -37,6 +38,7 @@ type RuntimeParams = {
   thinkingLevel?: ThinkingLevel;
   provider: RuntimeProviderConfig;
   pluginTools?: PluginToolDef[];
+  pluginSkills?: PluginSkillDef[];
   scratchDir?: string;
   projectInstructions?: ProjectInstructions;
   compactionSettings?: ContextCompactionSettings;
@@ -73,6 +75,8 @@ async function runtimeFor(
   const thinkingLevel = normalizeThinkingLevel(params.thinkingLevel);
   const pluginTools = params.pluginTools ?? [];
   const pluginToolNames = pluginTools.map((tool) => tool.name);
+  const pluginSkills = params.pluginSkills ?? [];
+  const pluginSkillIds = pluginSkills.map((skill) => skill.id);
   if (!provider?.modelId || (!provider.apiKey && provider.authKind !== "none")) {
     throw Object.assign(new Error("model/provider not configured"), {
       rpcCode: -32000,
@@ -93,6 +97,7 @@ async function runtimeFor(
     thinkingLevel,
     pluginToolNames,
     params.projectInstructions,
+    pluginSkillIds,
   )
     ? existing
     : undefined;
@@ -135,6 +140,7 @@ async function runtimeFor(
     compaction,
     compactionSettings: params.compactionSettings,
     pluginTools,
+    pluginSkills,
     projectInstructions: params.projectInstructions,
     scratchDir:
       typeof params.scratchDir === "string" && params.scratchDir
