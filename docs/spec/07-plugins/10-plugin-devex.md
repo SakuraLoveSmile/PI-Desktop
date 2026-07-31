@@ -7,7 +7,7 @@ Let a developer create and load a local plugin within 10 minutes.
 ## 2. Developer path
 
 ```text
-Create from template
+Create from template            (the folder opens as the project)
  → edit manifest / main / panel   (hot reload keeps it live)
  → verify in the command palette
  → check
@@ -19,8 +19,12 @@ The first step has three entry points, all calling the same
 
 - **Plugins page** — the overflow menu's "New plugin from template", or the
   button on the empty state. Picks a template, asks for a folder, writes the
-  files, and loads the result as a development plugin in one step.
+  files, loads the result as a development plugin, and then opens that folder as
+  the active project so the sources are already in the workspace the agent and
+  the file panel read. If the folder cannot be opened as a project the plugin
+  still stays loaded, and the toast says only that it was created and loaded.
 - **Agent** — `PluginScaffold`, in a conversation ("write me a plugin that …").
+  It writes inside the current workspace, which is already open.
 - **CLI** — `pnpm pi-plugin init <template> <dir>`.
 
 ## 3. Template types
@@ -101,7 +105,8 @@ this loop. It activates only when the session workspace looks like plugin
 development — a plugin `manifest.json` at the workspace root, or a loaded
 development plugin inside it — so ordinary sessions pay only for the three tool
 descriptions. Scaffolding writes a manifest, which turns the full skill on from
-the next prompt.
+the next prompt; creating from a template on the plugins page also opens the new
+folder as the project, so the workspace test passes right away.
 
 ## 7. Hot reload
 
