@@ -58,9 +58,14 @@ In one sentence:
 ### Later
 - MCP Server packaging and distribution
 - Background resident service plugins
-- Marketplace install / auto-update
 - Inter-plugin message bus
 - Billing / signed plugins
+
+**Current implementation:** the Plugins page can browse and install packages
+from the official marketplace provider. Per-plugin auto-update is opt-in and
+refuses silent permission expansion. This is not a capability-sandboxed runtime:
+plugin main processes retain raw Node built-ins, so marketplace packages are
+unrestricted user-privileged code until the planned sandbox is implemented.
 
 ## 4. Plugin shape
 
@@ -225,8 +230,9 @@ Namespace: `pi.plugin.*`
 ### Agent (requires permission)
 - `pi.agent.registerTool(tool)`
 - `pi.agent.unregisterTool(name)`
-- `pi.agent.invokeSkill(id)`
-- `pi.agent.appendSystemHint(text)` (controlled)
+
+Planned, not currently exposed: `pi.agent.invokeSkill(id)` and
+`pi.agent.appendSystemHint(text)`.
 
 ### Clipboard / system (requires permission)
 - `pi.clipboard.readText()`
@@ -234,14 +240,17 @@ Namespace: `pi.plugin.*`
 - `pi.shell.openExternal(url)` // confirmation by default
 
 ### Explicitly not provided directly
-- Arbitrary `child_process`
-- Arbitrary absolute-path fs
-- Arbitrary Electron native modules
-- Arbitrary dynamic require of host internal objects
+- Arbitrary host-internal Electron objects
+- Arbitrary absolute-path access through the brokered `pi.fs` APIs
+
+The broker does not provide Node capabilities directly. However, the current
+utility-process plugin runtime is not a Node capability sandbox: plugin code can
+reach raw Node built-ins independently of `pi.*`. The permission model below
+therefore applies only to brokered APIs until runtime sandboxing is delivered.
 
 ## 8. Permission model
 
-### Permission list (draft)
+### Permission list
 
 | permission | Risk | Description |
 |---|---|---|
@@ -257,9 +266,13 @@ Namespace: `pi.plugin.*`
 | `shell.openExternal` | medium | Open external link |
 
 ### Authorization timing
-1. Show the permission list at install time
-2. First use of a high-risk API may require a second confirmation
-3. Users can revoke permissions on the plugin management page (after revocation, the corresponding capability must be disabled)
+1. Show the declared permission list at install or upgrade review time
+2. Only granted permissions are passed to the brokered runtime; missing grants
+   fail the corresponding `pi.*` call
+3. Users can revoke permissions on the plugin management page; a reload is
+   required for a running plugin to observe the changed grant set
+
+Per-call confirmation and any policy for direct Node access are not implemented.
 
 ## 9. Command palette
 

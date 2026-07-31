@@ -165,9 +165,15 @@ Neutral gray scale only — no blue-slate surfaces. Chrome components must consu
 
 Light-surface polish (D148):
 
-- Docked work panel uses quiet inset paper (`#fafafa`) with a white header band and a slightly deeper 44px activity rail so the tool column separates from white chat paper without a heavy divider.
+- Docked work panel uses quiet inset paper (`#fafafa`) with a white header band and a combined create trigger in the header so the tool column stays on content without a heavy divider.
 - Shared form fields, browser URL, settings segment tracks, and shortcut keycaps use `#f5f5f5` inset fills with a 0.5px ink stroke; focus lifts to white with a neutral ring.
 - Settings toggles keep a near-black on-track and force a white knob in light mode.
+  Off/on track and knob colours come from the `--ds-switch-*` theme tokens; a
+  per-theme `:root[data-theme="…"] .settings-toggle` background override
+  out-specifies `.settings-toggle.on` and strands the on-state on the off fill.
+- Switch off-state carries a dim fill plus a 1px inset ring so an empty track
+  still reads as a control; the dark-theme off knob stays light (`--gray-300`)
+  so the knob does not disappear into the track.
 - Dialog scrim softens to ~28% ink so elevated white dialogs remain readable.
 
 ### 4.4 System theme behavior
@@ -314,8 +320,8 @@ Letter-spacing tokens: `--tracking-tighter` −0.03em, `--tracking-tight` −0.0
 ### 5.3 Code text sizing
 
 - Code blocks and tool output: `--text-sm`/`--text-sm-plus` with `font-mono`
-- Inline code within messages: `--text-sm-plus` `font-mono`, soft text-tint background + hairline border, rounded
-- Chat prose (`.prose-chat`) uses `--text-base` / `--leading-prose` for body, with a heading ramp of `text-xl` → `text-lg-plus` → `text-lg` → `text-base-plus` → `text-base` so multi-block answers stay scannable without document-scale drama
+- Inline code within messages: `--text-sm-plus` `font-mono`, soft text-tint background, borderless, rounded
+- Chat prose (`.prose-chat`) uses `--text-base` / `--leading-prose` for body, with a heading ramp of `text-xl` → `text-lg-plus` → `text-lg` → `text-base-plus` → `text-base` so multi-block answers stay scannable without document-scale drama. Headings carry no rules/borders (hierarchy comes from size, weight, and space above); links keep a soft permanent underline that firms up on hover instead of relying on color alone; blockquotes are a quiet 2px left rail without a background fill
 
 ### 5.4 Weight rules
 
@@ -690,36 +696,33 @@ Codex parity decisions (D034/D070) supersede any older value here.
 | Titlebar row height | 46px | Codex toolbar rhythm (D034); traffic lights {x:16,y:16} |
 | Sidebar width (collapsed) | 48px | Icon-only rail |
 | Sidebar width (expanded) | ~275px | Codex sidebar width (D034/D070) |
-| Main pane minimum readable width | 360px | Preserved while the display work area can supply the complete native panel reservation; constrained work areas assign the unavoidable shortfall to MainChat (D163) |
+| Main pane minimum readable width | 360px | Target while the fixed window can fit panel + chat; constrained windows reflow chat below it (D163, ADR 0033) |
 | Work panel width (closed) | 0px | Hidden by default |
-| Work panel width (open) | `364px–720px`, fixed at the committed width | 44px activity rail preserves the prior 320px content minimum; native window and sidebar changes never compress the panel (D154/D163) |
+| Work panel width (open) | `244px–720px` (default 280px), fixed at the committed width | the combined create trigger keeps the full panel width on content; the panel is an in-flow column and never expands the OS window (D154/D163, ADR 0033) |
 | Composer shell minimum | ~80px | One-line draft + toolbar padding |
 | Composer draft height | 1–7 text lines | Auto-grow; internal scroll beyond line 7 |
 | Chat message max width | 720px assistant / 560px user plate | Prevent eye-span over-stretch; user turns stay compact |
-| Window min width | 1040px | Enforced by Electron as the base chat-shell minimum; a docked work panel raises the native minimum when the display has room, while constrained displays may reduce the chat pane below its 360px readability target |
+| Window min width | 1040px | Enforced by Electron as the base chat-shell minimum; an open work panel reflows chat inside the fixed window and may reduce the chat pane below its 360px readability target |
 | Window min height | 700px | Enforced by Electron |
 
-An open work panel requests native width equal to its committed width. The
-normal window expands within the display work area so chat width stays stable;
-collapse and final close reclaim that width, and a divider commit updates it.
-If the complete reservation does not fit, the panel remains fixed while chat
-absorbs the difference. Native window edges resize chat only. Persisted normal
-bounds exclude the reservation and its induced x shift (D163, ADR 0032).
-Before collapse motion starts, any native Browser preview surface is detached
-because it cannot participate in renderer CSS animation. Windows keeps the
-exiting dock opaque during its bounded slide so a frameless native resize never
-exposes a full-panel background flash; macOS and Linux retain the fade-and-slide
-exit.
+An open work panel is a fixed-width in-flow column; it reflows MainChat and
+never expands the OS window (ADR 0033). The renderer requests a native
+reservation width of 0, so chat width changes by reflow only. The native
+browser view follows the renderer-measured panel rect. Persisted normal bounds
+are the user's window size. Before collapse motion starts, any native Browser
+preview surface is detached because it cannot participate in renderer CSS
+animation. Windows keeps the exiting dock opaque during its bounded slide so a
+frameless native resize never exposes a full-panel background flash; macOS and
+Linux retain the fade-and-slide exit.
 
 ### 10.1 Responsive collapse
 
 - The work panel never participates in responsive collapse. It keeps its
-  committed `364..720px` width while visible.
-- Native window and sidebar changes assign their layout delta to MainChat. The
-  360px chat target is guaranteed only when the current work area can supply the
-  complete panel reservation.
-- Panel open/collapse/final close and divider commit update the target native
-  reservation. Native edges resize base bounds while reservation stays fixed.
+  committed `244..720px` width (default 280px) while visible.
+- Native window and sidebar changes reflow MainChat. The 360px chat target holds
+  when the fixed window can fit panel + chat; otherwise chat reflows below it.
+- Panel open/collapse/final close and divider commit update the committed
+  preferred width. Native edges resize the window and reflow MainChat.
 - Width < 1040px or height < 700px is unsupported and prevented by Electron.
 
 ## 11. Component foundations
@@ -921,8 +924,8 @@ Full component contract and usage rules: [08-component-spec.md §17](08-componen
   is embedded in Settings with no duplicate page title or outer page padding;
   the earlier standalone Projects destination and card grid (D042) are
   superseded by D133
-- **Settings**: full-page Codex shell per D063/D090/D133 (275px compact
-  five-destination rail, `#f4f4f4` light, elevated content cards, Back to app);
+- **Settings**: full-page Codex shell per D063/D090/D133/D166 (275px compact
+  seven-destination rail, `#f4f4f4` light, elevated content cards, Back to app);
   per D092, the content cards fill the pane width available from the current
   window instead of retaining D070's fixed 720px cap — the earlier in-shell
   200px rail and broad grouped directory are superseded

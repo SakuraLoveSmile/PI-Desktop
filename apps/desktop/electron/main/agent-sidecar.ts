@@ -21,6 +21,11 @@ export type LocalToolHandler = (input: {
   args: unknown;
 }) => Promise<LocalToolResult>;
 
+export type ProjectInstructionResolver = (input: {
+  sessionId: string;
+  path: string;
+}) => Promise<unknown>;
+
 // The sidecar runs model-directed code paths; it must not be able to pull
 // secrets or mutate configuration through the parent proxy. Tight allowlist
 // of host methods the agent loop legitimately needs.
@@ -36,6 +41,7 @@ const HOST_PROXY_ALLOWED = new Set([
   "plans.submit",
   "plans.pending",
   "plans.abort",
+  "project.instructions.resolve",
   "app.health",
 ]);
 
@@ -65,6 +71,7 @@ export class AgentSidecar {
   // Tools served by Electron main itself (e.g. BrowserPreview drives the
   // work panel's WebContentsView) — host-core never sees these.
   private localTools = new Map<string, LocalToolHandler>();
+  private projectInstructionResolver: ProjectInstructionResolver | null = null;
 
   constructor(onStderr?: StderrHandler) {
     const entry = resolveSidecarEntry();
@@ -112,6 +119,10 @@ export class AgentSidecar {
     this.localTools.set(name, handler);
   }
 
+  setProjectInstructionResolver(resolver: ProjectInstructionResolver): void {
+    this.projectInstructionResolver = resolver;
+  }
+
   setHost(host: HostProcess) {
     this.host = host;
     this.unsubscribeHost?.();
@@ -151,6 +162,19 @@ export class AgentSidecar {
           );
         }
         const params = (msg.params?.params ?? {}) as Record<string, unknown>;
+        if (method === "project.instructions.resolve") {
+          if (!this.projectInstructionResolver) {
+            throw new Error("project instruction resolver unavailable");
+          }
+          const result = await this.projectInstructionResolver({
+            sessionId: String(params.sessionId ?? ""),
+            path: String(params.path ?? ""),
+          });
+          this.child.stdin.write(
+            JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
+          );
+          return;
+        }
         // Main-local tools short-circuit before host-core (which doesn't
         // know them); everything else proxies through unchanged.
         const localTool =

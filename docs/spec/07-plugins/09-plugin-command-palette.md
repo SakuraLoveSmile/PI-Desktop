@@ -1,15 +1,17 @@
 # 09. Plugin Command Palette
 
+> **Status — merged into global search.** The standalone command palette overlay was removed. Plugin (and built-in) commands now appear in the **Commands** section of the global search dialog, opened with `Cmd/Ctrl+Shift+P` (or `Cmd/Ctrl+K`). All rules below still apply to that section.
+
 ## 1. Goals
 
 Provide a fast command entry point that unifies discovery and execution of built-in and plugin capabilities in a single searchable surface.
 
 ## 2. Entry point
 
-Suggested shortcut:
+Commands are surfaced inside the global search dialog (the "Commands" section). The same shortcut opens global search with the command list pre-populated:
 
-- macOS: `Command + Shift + P`
-- Windows/Linux: `Ctrl + Shift + P`
+- macOS: `Command + Shift + P` (also `Command + K`)
+- Windows/Linux: `Ctrl + Shift + P` (also `Ctrl + K`)
 
 Also configurable:
 - Custom shortcut
@@ -55,13 +57,13 @@ type PaletteCommand = {
 ## 6. Execution flow
 
 ```text
-open palette
+open global search (Commands section)
  → input query
  → select command
  → execute
  → builtin handler
  → or plugin command bridge
- → close palette / keep open (optional)
+ → close search / keep open (optional)
 ```
 
 If the command needs a panel:
@@ -76,7 +78,7 @@ If the command needs a permission:
 -------------------------------------------------
 [ search input ]
 -------------------------------------------------
-Builtin
+Commands
  New Task
  Open Project
 Demo
@@ -84,7 +86,7 @@ Demo
 Tools
  ...
 -------------------------------------------------
-Enter to run · Esc to close · Tab to preview source
+Enter to run · Esc to close
 -------------------------------------------------
 ```
 
@@ -101,7 +103,7 @@ Each item shows:
 
 ## 9. Relationship to the Agent
 
-The command palette is not a replacement for the chat composer.
+The command surface (now part of global search) is not a replacement for the chat composer.
 It is responsible for "launching actions"; chat is responsible for "conversational tasks".
 
 Possible command to support:
@@ -109,7 +111,7 @@ Possible command to support:
 
 ## 10. Acceptance
 
-1. Shortcut opens it
+1. Shortcut opens global search with the Commands section
 2. Built-in and plugin commands are searchable
 3. Executing a plugin command succeeds
 4. Commands disappear after a plugin is disabled

@@ -98,7 +98,7 @@ pi.clipboard.writeText(text: string): Promise<void>
 pi.shell.openExternal(url: string): Promise<void>
 ```
 
-### net (high risk by default, can be deferred)
+### net
 ```ts
 pi.net.fetch(input: {
  url: string
@@ -126,14 +126,15 @@ type PluginApiError = {
 
 All API failures throw an error carrying a `code`.
 
-## 5. Events (host -> plugin)
+## 5. Events (host -> plugin, planned)
 
 ```ts
 pi.events.on(event, handler)
 pi.events.off(event, handler)
 ```
 
-MVP events:
+The SDK reserves this shape, but the current host delivers no events; `on` and
+`off` are no-ops in the plugin process. Planned events include:
 - `workspace:changed`
 - `session:activated`
 - `plugin:settingsChanged`

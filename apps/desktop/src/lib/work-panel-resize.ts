@@ -1,6 +1,7 @@
-// Preserve the original 320px tool-content minimum beside the 44px activity rail.
-export const WORK_PANEL_MIN_WIDTH = 364;
-export const WORK_PANEL_DEFAULT_WIDTH = 420;
+// Narrower dock: the default opens a third slimmer than the original 420px, and
+// the floor scales with it so that default stays reachable.
+export const WORK_PANEL_MIN_WIDTH = 244;
+export const WORK_PANEL_DEFAULT_WIDTH = 280;
 export const WORK_PANEL_MAX_WIDTH = 720;
 export const MAIN_PANE_MIN_WIDTH = 360;
 

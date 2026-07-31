@@ -64,6 +64,12 @@ These four rules govern every change to the PI-Desktop codebase and documentatio
   the request branch. If
   authentication, permissions, required remote checks, or required reviews prevent
   the merge, report the blocker; the request is not Done.
+- Worktree cleanup is mandatory and immediate. As soon as the request branch is
+  integrated into `main` — including a local `main` merge when the request is
+  delivered without a remote PR/MR — remove the worktree and delete the merged
+  branch. A merged request must not leave a worktree on disk. Remove only your
+  own worktree and branch, and only after verifying the merge commits are
+  present in `main`.
 
 ---
 
@@ -207,7 +213,8 @@ The repository uses a mandatory request-branch and worktree workflow:
   not develop, commit, or push directly on it.
 - **Request branches and worktrees** are mandatory for every new request,
   including docs, chores, and small fixes. Create each branch and worktree from
-  an up-to-date `main`, then remove both after merge.
+  an up-to-date `main`, then remove both immediately after the branch is merged
+  into `main`.
 - **Branch names** use `<type>/<short-description>` with a lowercase,
   kebab-case description. Allowed type prefixes mirror §4.1.
 - **No long-lived development branch** exists. Each request gets a new branch;
@@ -254,6 +261,24 @@ git branch -d <type>/<short-description>
 git push origin --delete <type>/<short-description>
 ```
 
+Request cleanup when the request is integrated by merging into local `main`
+instead of a remote PR/MR (run from the primary checkout):
+
+```bash
+git switch main
+git merge <type>/<short-description>
+git log --oneline -1
+git worktree remove <worktree-path>
+git branch -d <type>/<short-description>
+git worktree prune
+```
+
+The worktree must be clean before removal; commit or discard the request's own
+leftover changes first. Use `git branch -d` rather than `-D` so an unmerged
+branch refuses to delete. If `git worktree remove` reports the worktree as dirty
+or locked, resolve that state instead of forcing removal, and never remove
+another request's worktree.
+
 ---
 
 ## 6. Definition of Done
@@ -299,6 +324,7 @@ and D164. GitHub release notes are not a substitute.
 | Developing a new request in the primary checkout or another request's worktree | Violates R4; mixes task files and local state |
 | Reusing a request branch for unrelated work | Mixes request scope and weakens traceability |
 | Marking work Done before its PR/MR is merged | Violates R4; change is not integrated into `main` |
+| Leaving a merged request worktree on disk | Violates R4; stale worktrees accumulate and invite cross-request contamination |
 | Modifying baseline frozen decisions without ADR + version bump | Baseline is frozen; changes need formal process |
 | Committing generated artifacts that CI should rebuild | Repo bloat, merge conflicts |
 | Mixing multiple logical changes in one commit without clear message | Loss of history granularity |
@@ -319,6 +345,8 @@ This workflow spec itself is accepted when:
 - [ ] Request worktrees reuse the primary checkout's environment where safe
       without committing local environment state.
 - [ ] PR/MR creation, remote gates, merge, and branch cleanup are mandatory.
+- [ ] Worktree removal and branch deletion are required immediately after the
+      request branch is merged into `main`, including local-merge delivery.
 - [ ] E2E execution is opt-in and requires an explicit user request, while E2E
       scenario documentation remains mandatory under R3.
 - [ ] Local validation is risk-based; unnecessary checks may be skipped without

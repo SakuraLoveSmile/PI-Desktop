@@ -3,7 +3,13 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
 
 concurrency:
@@ -31,8 +37,9 @@ jobs:
       - name: Build workspace packages
         run: pnpm build:js
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Typecheck Desktop
+        # Workspace dependency builds already run tsc; Vite does not check the app.
+        run: pnpm --filter @pi-desktop/desktop typecheck
 
       - name: Lint
         run: pnpm lint

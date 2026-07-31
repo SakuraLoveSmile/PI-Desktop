@@ -714,6 +714,13 @@ export type FsReadResult = {
   size: number;
 };
 
+export type AgentInstructionFile = {
+  scope: "global" | "project";
+  path: string;
+  content: string;
+  exists: boolean;
+};
+
 /** Workspace-relative entry of the `fs/index` snapshot for the "@" menu (D124). */
 export type FsIndexEntry = {
   path: string;

@@ -107,7 +107,9 @@ pnpm dev
 PI_DESKTOP_TEST_API_KEY=... pnpm test:e2e
 ```
 
-CI runs JS build / typecheck / lint / unit tests plus `cargo test` on every PR. Releases are cut by tag:
+CI runs JS build / typecheck / lint / unit tests plus `cargo test` for
+code-related pull requests and pushes to `main`; documentation-only changes are
+skipped. Releases are cut by tag:
 
 ```bash
 node scripts/release.mjs 0.2.0 --tag   # bump versions + commit + tag v0.2.0

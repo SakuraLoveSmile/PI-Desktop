@@ -13,7 +13,7 @@
 > updated values: sidebar ~275px (not 240px), toolbar 46px (not 44px),
 > composer placeholder per D094/D066, home empty stack per D111,
 > Projects index table per D066/D133, settings full-page shell per D063 with the
-> compact five-destination directory from D090/D133, and retained path-keyed
+> compact seven-destination directory from D090/D133/D166, and retained path-keyed
 > project groups per D093 (which preserves D088's Temporary/exact-path boundary
 > while restoring scoped project and conversation organization actions), and
 > product branding/icon contract per D094/D160.
@@ -29,7 +29,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ```text
 +------------------+------------------------------+------------------+
 | Sidebar          | MainChat                     | WorkPanel        |
-| (275px / 48px)   | (flex-1)                     | (364–720px /     |
+| (275px / 48px)   | (flex-1)                     | (244–720px /     |
 |                  |                              |  hidden)         |
 +------------------+------------------------------+------------------+
 | Titlebar row: 46px, traffic lights at {x:16,y:16} (D034/D070)      |
@@ -48,7 +48,11 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ### 1.4 Interactions
 
 - Sidebar toggle: keyboard shortcut + icon button beside Search in the expanded
-  sidebar header; the button moves to the main titlebar while collapsed
+  sidebar header; the button moves to the main titlebar while collapsed. The
+  collapse and expand use a mounted-then-animated dock transition (entrance
+  `sidebar-in`, exit `sidebar-out` keyframes) that mirrors the work-panel dock:
+  the aside stays in the tree through the exit keyframe, then unmounts
+  (`is-exiting` flag + `animationend` guard, with a timeout fallback)
 - Work panel collapse: sole control lives in the session pane titlebar top-right
   while the panel is open, with its outer edge flush against the divider
   between the session pane and work panel so the work-panel content header is
@@ -105,7 +109,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   Check for Updates actions. Windows/Linux expose equivalent product actions
   through in-app controls and keyboard shortcuts, with update checks in
   Settings -> Info.
-- When Settings -> Basics -> Developer mode is enabled, the macOS View menu
+- When Settings -> Info -> Developer mode is enabled, the macOS View menu
   additionally exposes the native developer-tools role. All platforms expose
   F12, and Windows/Linux also expose Ctrl+Shift+I; the commands and Settings
   Open console action are unavailable while the mode is disabled.
@@ -127,21 +131,40 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ### 2.1 Purpose
 
 Global controls bar: project identity, model selection, mode indicator, abort
-button, and settings entry.
+button. (Settings is reached from the command palette / application menu, not the
+top bar.)
 
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [📁 Project name] [🤖 Model: provider/model] [🛡 Mode badge] [⏹ Abort] [⚙ Settings]
+[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [Agent | Plan] [🤖 Model] [＋ New] [🔍 Search] [⚙ Commands]
 ```
 
-(Icons described functionally; actual render uses Lucide SVGs.)
+(Icons described functionally; actual render uses Lucide SVGs. The `[☰ Sidebar]`
+toggle renders **only when the sidebar is collapsed**; when the sidebar is
+expanded it owns that control, so the top bar does not duplicate it.)
+
+The conversation top bar renders for the chat route only; Pull requests, Scheduled,
+Plugins, and Settings keep the frameless drag band. The Agent/Plan control is a
+segmented toggle (not a badge) and writes the session `mode`; the model picker
+opens **downward** because the bar anchors the top of the viewport. The composer
+no longer carries the mode chip or model selector — both moved here. The Thinking
+and permission triggers remain in the composer (§11).
 
 ### 2.3 Layout
 
 - Height: 46px (Codex toolbar rhythm, D034; supersedes the old 44px)
-- Background: bg-secondary
+- Background: bg-primary
 - Border: border-subtle bottom
+- Position: absolute 46px frameless band; `-webkit-app-region: drag` with
+  `no-drag` on interactive controls; macOS reserves the left ~76px for traffic
+  lights (only when the sidebar is collapsed), Windows/Linux reserve the right
+  112px for native window controls
+- Title cluster (project ▸ task title) flexes and **ellipsizes**; the right
+  cluster (Agent|Plan toggle, model picker, action icons) is `flex: 0 0 auto`
+  and is never squeezed by a long title. The conversation surface keeps a
+  `min-width` so its content is not crushed on narrow windows.
+- macOS fullscreen resets the left reserve to 8px (mirrors the sidebar header).
 - Sticky: `z-sticky`
 - Items: left-aligned controls, right-aligned actions
 
@@ -149,8 +172,10 @@ button, and settings entry.
 
 | Element | Default | Running | Error | No workspace |
 |---|---|---|---|---|
+| Task title | session title (or untitled) | same, plus a "Running" pill with a pulsing dot | same | same |
 | Model selector | clickable dropdown | disabled during stream | clickable | clickable (no provider warning) |
-| Mode badge | "Agent" or "Plan" badge | planning/approval state | same | same |
+| Mode toggle | "Agent" or "Plan" highlighted | planning/approval state, disabled while running | same | same |
+| New task / Search / Commands | icon buttons | same | same | same |
 | Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
 | Project name | workspace folder name | same | same | "No project" muted |
 
@@ -334,9 +359,13 @@ visually distinct from list content.
 
 - The visible shell name is `PI-Desktop`; Codex is not used as the renderer
   identity.
-- `BrandLogo` imports canonical `build/icon_1024.png` through Vite. The
-  empty-home hero renders it at 56px, the expanded/collapsed sidebar at
-  20px/18px. Home and thread-docked composer prompt rows do not render a
+- `BrandLogo` imports canonical `build/icon_1024.png` through Vite for light
+  mode, and `build/logo_dark.png` for dark mode. The component subscribes to
+  `document.documentElement[data-theme]` via a `MutationObserver` and swaps the
+  source at runtime, so the logo matches the active theme in the sidebar,
+  empty-home hero, and startup splash without a reload. The empty-home hero
+  renders it at 56px, the expanded/collapsed sidebar at 20px/18px, the startup
+  splash at 64px. Home and thread-docked composer prompt rows do not render a
   leading brand icon.
 - The expanded/collapsed New task control and project/Temporary session
   creation controls render the dedicated message-plus session icon. Generic
@@ -424,6 +453,13 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
   regenerate re-pins and jumps to bottom
 - Destination entry uses one short opacity/translate transition. Streaming
   updates occur inside the mounted surface and never replay this transition.
+- The transcript's bottom reserve is **height-aware**, not a fixed gap. The
+  docked composer measures its real rendered height (it grows with multi-line
+  drafts) and publishes it as the `--composer-dock-height` custom property on
+  `:root`; `.thread-content` reserves `calc(var(--composer-dock-height) + 16px)`
+  so the last message sits ~16px above the box and is never overlapped even as
+  the draft grows. `.jump-latest-btn` and `.minimap-rail` anchor to the same
+  variable so they stay just above the composer.
 
 ### 4.4 States
 
@@ -474,7 +510,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 |    |  Browser: URL bar + preview     |
 |    |  Files: tree + file viewer      |
 +----+---------------------------------+
- 44px activity rail
+ create trigger
 ^ 10px transparent resize hit area on the left edge
 ```
 
@@ -482,8 +518,15 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 - Panel body uses quiet inset paper (`#fafafa`); the 46px header band and tool
   chrome (review toolbar, browser chrome, file viewer header) stay white
-- The 44px activity rail uses a slightly deeper neutral surface with a subtle
-  divider; selected state uses an edge marker plus fill, never color alone
+- The header exposes one unified context trigger whose menu lists the open
+  resources and, after a divider, the create-new tools (Review, Terminal,
+  Browser, Files); dropdown items use a neutral fill with a 2px edge marker for
+  the active tool, never color alone
+- The 46px header follows a "context left, actions right" model: the unified
+  context trigger anchors the left and shows the active tool icon and ellipsized
+  label; a right action cluster groups the close / collapse controls behind a
+  thin divider. The collapse control uses a right chevron so it reads as "push
+  the panel away", not "open a panel"
 - Active tabs, file-tree rows, diff headers, and the resize handle ease hover
   fills with `--motion-duration-fast` / `--motion-ease-out`
 - Browser URL and empty-tool chrome share the light inset field treatment used
@@ -494,12 +537,12 @@ preview), and Files (workspace browser). Codex-parity surface.
 | State | Behavior |
 |---|---|
 | Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only in a session that produced a successful workspace Write/Edit while that Git working tree remains dirty. |
-| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 364–720px, preserving at least 320px of content beside the rail. The normal native window reserves that width when its work area permits. |
+| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 244–720px (default 280px). It occupies client-area space and never expands the OS window (ADR 0033). |
 | Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded switcher lists resources in first-open order with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows anchored pointer delta or keyboard input. Pointer changes preview once per animation frame and commit width plus reservation only on release; Escape, pointer cancellation, or lost capture restores both. Native window-edge resize changes MainChat only. |
 | No workspace | Each tab renders its own "open a project" empty state |
-| Constrained work area | The panel stays at its committed width; Main reserves available native width and MainChat absorbs the unavoidable shortfall |
+| Constrained work area | The panel stays at its committed width; MainChat reflows to absorb it and may fall below its 360px target on small windows (ADR 0033) |
 
 ### 5.4 Interactions
 
@@ -524,19 +567,20 @@ preview), and Files (workspace browser). Codex-parity surface.
   failed-refresh states hide the transcript entry. Session ownership is
   renderer-memory state and is discarded on relaunch with D142's work-panel
   contexts.
-- Tool activity rail: while the panel is visible, Review, Terminal, and Browser
-  are stable 32px icon buttons inside a 44px rail. Activating a closed tool
-  creates it through `openWorkPanelTab`; activating an open tool selects its
-  singleton tab. Selected state combines a neutral fill with a 2px edge marker,
-  and open inactive tools show a small status dot. The rail disappears with the
-  panel and therefore does not replace D128's artifact-driven entry point.
-- Resource switcher: the 46px header shows the active resource icon and
-  ellipsized label. Its chevron opens a bounded menu containing every current
-  session resource in first-open order; rows select resources, expose full
-  paths in tooltips, and retain per-resource close controls. The header's
-  trailing close button closes the current resource directly. Arrow keys,
-  Home, End, and Escape operate the menu; opening the switcher hides the native
-  Browser preview until it closes.
+- Unified context menu: while the panel is visible, one context trigger in the
+  header opens a single dropdown. Its top section lists the open resources in
+  first-open order (rows select a resource and retain per-resource close
+  controls); a divider separates it from the create-new section listing Review,
+  Terminal, Browser, and Files as stable items. Activating a closed tool creates
+  it through `openWorkPanelTab`; activating an open tool selects its singleton
+  tab. The active tool combines a neutral fill with a 2px edge marker, and open
+  inactive tools show a small status dot. The trigger disappears with the panel
+  and therefore does not replace D128's artifact-driven entry point.
+- Resource header: the 46px header shows the active resource icon and
+  ellipsized label. Its context chevron opens the bounded unified menu described
+  above; the header's trailing close button closes the current resource
+  directly. Arrow keys, Home, End, and Escape operate the menu; opening the menu
+  hides the native Browser preview until it closes.
 - Tab close: closing an active tab selects its right neighbor, then its left;
   closing the last tab hides the panel. The panel-level collapse control lives
   in the session pane top-right (not the work-panel content header) and hides the
@@ -551,35 +595,34 @@ preview), and Files (workspace browser). Codex-parity surface.
   file and Browser resources are never reinterpreted against another workspace.
 - Resize: pointer drag on the left-edge handle; `ArrowLeft` / `ArrowRight`
   adjust it in 16px steps (`Shift` uses 32px), `Home` / `End` reach the current
-  fixed 364px / 720px limits, and double-click restores the default width.
+  fixed 244px / 720px limits, and double-click restores the default width.
   Pointer math is anchored to the press position and starting committed width,
   so grabbing the handle cannot jump the divider. Move events are
   frame-coalesced; release
   commits once, while Escape, pointer cancellation, and lost capture cancel.
   The 10px hit area keeps a global column-resize cursor and suppresses text
   selection during the gesture. The live preview changes renderer columns only;
-  a successful commit updates the Main-owned native reservation to the committed
-  fixed width. Native window edges remain independent and resize MainChat only,
-  never the panel or its preference.
+  a successful commit updates the committed preferred width. Native window edges
+  resize MainChat by reflow only, never the panel or its preference (ADR 0033).
 - Persistence: all session contexts are renderer runtime state only. On app
   startup, open state, tabs, active-tab selection, file requests, and Browser
   resources reset; only the committed preferred `{width}` remains in
-  localStorage `pi.desktop.workPanel`. Opening the visible panel reserves its
-  committed width in the normal native window; collapse and final-tab close
-  request zero, and a divider commit updates the target. Target updates are
-  idempotent. If the current work area cannot supply the full target, Electron
-  reserves available width while the panel stays fixed and MainChat absorbs the
-  shortfall. Maximized/fullscreen geometry waits until normal. Electron persists
-  base bounds excluding the reservation and its induced x shift. Background
-  session artifacts never update the visible reservation. The renderer changes
-  panel presentation only after the latest reservation request succeeds; a
-  rejected or superseded request keeps the last confirmed presentation state
+  localStorage `pi.desktop.workPanel`. The renderer always requests a native
+  reservation width of 0, so the OS window never expands (ADR 0033). Collapse
+  and final-tab close and a divider commit update only the committed preferred
+  width. Target updates are idempotent. The panel reflows MainChat inside the
+  fixed window; on constrained work areas chat may fall below its 360px target.
+  Maximized/fullscreen geometry is unaffected. Background session artifacts
+  never update the visible panel. The renderer changes panel presentation only
+  after the latest (zero-width) reservation request succeeds; a rejected or
+  superseded request keeps the last confirmed presentation state
   (D163, ADR 0032).
 
 ### 5.5 Accessibility
 
-- `<aside>` landmark; the activity rail uses a localized `<nav>` label and
-  pressed state on each tool button. The current-resource control exposes
+- `<aside>` landmark; the create trigger uses a localized label and
+  `aria-expanded`, while its dropdown items use `menuitemradio` / `aria-checked`.
+  The current-resource control exposes
   `aria-haspopup="menu"` / `aria-expanded`; switcher rows use
   `menuitemradio` / `aria-checked`, and each resource body remains a
   `role="tabpanel"`
@@ -652,6 +695,9 @@ SESSIONS                                      [msg+][↕]
 - Selecting a conversation with a different project first activates that
   project's workspace. A running turn in the previously selected session is
   not aborted.
+- Right-click menus for sessions, projects, and sidebar sections open to the
+  pointer's right. When that side lacks room, the menu is clamped within the
+  viewport instead of overflowing.
 - Keyboard: arrow up/down, Enter to select
 - Delete: row menu or command palette `builtin.session.delete`
 
@@ -828,8 +874,8 @@ Single message render — either user (plaintext) or assistant (markdown streami
 
 - Max content band: 760px thread column; assistant body max 720px
 - User: right-aligned, theme-neutral soft plate (`color-mix` on primary ink,
-  never a fixed accent tint), with a subtle primary-ink border,
-  `radius-lg-plus`, capped at `min(78%, 560px)` so short prompts read as
+  never a fixed accent tint), borderless, `radius-lg-plus` with a tighter
+  bottom-right corner, capped at `min(82%, 600px)` so short prompts read as
   chat turns rather than full-width blocks. User body is plaintext with
   preserved hard newlines (`white-space: pre-wrap`);
   only trailing/leading composer trim is applied, never internal newline
@@ -876,8 +922,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
   (D157).
 - Assistant meta: optional model badge + token-usage chip under the answer
   (collapsed summary with hover breakdown for input/output/cache/reasoning)
-- Gap: 10px vertical padding between consecutive message rows (denser than
-  consumer chat, closer to WorkBuddy task transcript)
+- Gap: 12px vertical padding between consecutive message rows (denser than
+  consumer chat, closer to WorkBuddy task transcript); assistant turns add a
+  little extra bottom air so a completed answer separates from the next prompt
 - Font: text-base (14px) for body; text-sm (13px) mono for code
 - Tool activity: tool-name classification selects a semantic 15px icon;
   `fork`, `fork_agent`, `fork_task`, and `fork_session` use the GitFork branch
@@ -887,7 +934,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
 
 | State | Appearance |
 |---|---|
-| Streaming | accent left rule on the answer surface; content grows |
+| Streaming | accent left rail along the whole assistant turn (fragments + tool rows); the rail's space is always reserved so it fading in/out never reflows text; content grows |
 | Thinking streaming | disclosure open; answer bubble omitted until answer text exists |
 | Complete | no streaming rule; full rendered markdown |
 | Error | assistant error card in transcript; localized summary + stable code; details disclosure opens to redacted provider response, provider/model IDs, and copy action; retriable failures show Retry and configuration failures show Open settings |
@@ -939,9 +986,19 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   source code so a collapsed reasoning trace cannot start diagram layout.
 - **Syntax highlighting**: Shiki singleton with the JavaScript regex engine
   (no wasm), themes `one-light`/`one-dark-pro` following `data-theme`.
-  Languages lazy-load per fence tag with a plain-mono fallback until ready.
-  Streaming code re-tokenizes only changed lines by chaining GrammarState
-  (per-line cache), so per-frame cost is constant regardless of block size.
+  A coding-focused local catalog exposes 48 canonical grammars plus common
+  aliases; each grammar lazy-loads on its first matching fence tag with a
+  plain-mono fallback until ready. Tags outside that catalog remain readable
+  plain text instead of pulling the full Shiki language distribution into the
+  application. The canonical catalog is `astro`, `bat`, `c`, `cpp`, `csharp`,
+  `css`, `dart`, `diff`, `docker`, `dotenv`, `go`, `graphql`, `groovy`, `hcl`,
+  `html`, `ini`, `java`, `javascript`, `json`, `jsonc`, `jsonl`, `jsx`,
+  `kotlin`, `lua`, `make`, `markdown`, `mdx`, `mermaid`, `nginx`, `php`,
+  `powershell`, `prisma`, `proto`, `python`, `ruby`, `rust`, `scala`,
+  `shellscript`, `sql`, `svelte`, `swift`, `terraform`, `toml`, `tsx`,
+  `typescript`, `vue`, `xml`, and `yaml`. Streaming code re-tokenizes only
+  changed lines by chaining GrammarState (per-line cache), so per-frame cost
+  is constant regardless of block size.
 - **Code block chrome**: `.code-block` single-surface card (radius-md-plus,
   hairline border; dark `#282c34`, light `#fafafa` — matching One Dark Pro /
   One Light editor bg). Header is transparent (language tag left, copy right);
@@ -1244,6 +1301,15 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Agent / Plan and provider/model changes update the active session, not the
   app default. They are disabled while a turn runs; Plan approval actions are
   the exception while awaiting approval.
+- Runtime chips keep descenders fully visible (D150): the Thinking and
+  permission triggers in the composer use compact line-height rather than
+  `leading-none` under overflow. The Agent/Plan mode toggle and provider/model
+  picker now live in the conversation top bar (§2); the top bar's model trigger
+  still ellipsizes long IDs.
+- Agent / Plan mode and provider/model changes (made from the conversation top
+  bar, §2) update the active session, not the app default. They are disabled
+  while a turn runs; Plan approval actions are the exception while awaiting
+  approval.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing
@@ -1467,7 +1533,7 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 
 ### 16.1 Purpose
 
-Overlay surface for the command palette (Cmd/Ctrl+Shift+P, per D014). Defined in [04-builtin-commands.md](04-builtin-commands.md).
+**Status: merged into the global search surface.** The command palette overlay was removed; its command list (built-in + plugin commands) now renders as the "Commands" section inside `SearchDialog` (opened with Cmd/Ctrl+K or Cmd/Ctrl+Shift+P). Defined in [04-builtin-commands.md](04-builtin-commands.md) and surfaced by the global search component spec.
 
 ### 16.2 Anatomy
 
@@ -1489,7 +1555,7 @@ Overlay surface for the command palette (Cmd/Ctrl+Shift+P, per D014). Defined in
 ### 16.3 Layout
 
 - Position: centered overlay, max-width 480px, max-height 360px
-- Background: bg-secondary, radius-lg, shadow-lg (light)
+- Background: bg-elevated-opaque (elevated floating surface, consistent with `.dialog` / `.search-dialog`), radius-lg-plus, shadow-dialog
 - Z-index: `z-command-palette` (60)
 - Backdrop: semi-transparent bg-primary (0.5 opacity)
 
@@ -1501,10 +1567,9 @@ Overlay surface for the command palette (Cmd/Ctrl+Shift+P, per D014). Defined in
 
 ### 16.5 Accessibility
 
-- `role="dialog"` with `aria-label="Command palette"`
-- Focus trapped within palette while open
-- Search input auto-focused on open
-- Results: `role="listbox"` with `role="option"` per item
+- The standalone palette overlay no longer exists; commands are part of the global search dialog (`role="dialog"`, `aria-label` from `nav.search`).
+- The "Commands" section uses the same `role="listbox"` / `role="option"` semantics as the other search result groups.
+- Search input auto-focused on open; arrow up/down navigate, Enter executes, Escape closes.
 
 ### 16.6 MVP constraints
 
@@ -1803,8 +1868,8 @@ Sidebar footer                                        Popover (360px max)
 17. NotificationInbox exposes All/Unread views, exact unread badge semantics,
     row activation, mark-all-read and clear actions; it is keyboard-operable
     and never treats a visible-current or aborted turn as a notification
-18. Native edges resize MainChat without compressing the fixed work panel;
-    panel visibility and divider commits update an idempotent native reservation,
-    and cancelled divider gestures restore the prior width and reservation
+18. Native edges resize MainChat by reflow without compressing the fixed work panel;
+    panel visibility and divider commits update the committed preferred width,
+    and cancelled divider gestures restore the prior width (ADR 0033)
 19. Expanded sidebar session titles, project/group titles, and empty-state copy
     use the 13px compact token while primary sidebar actions remain at 14px

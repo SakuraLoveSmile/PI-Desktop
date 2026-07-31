@@ -16,12 +16,15 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
 - hello example plugin
 - permission declaration display
 
-### R2 — Agent Extension ✅ (core)
-- Full agentTools pipeline
-- skills contribution
-- Per-plugin settings within the app shell's Plugins destination
-- Plugin log panel (host audit channel)
-- Unified namespace and audit
+### R2 — Agent Extension (partial ✅)
+- Full agentTools pipeline ✅
+- Unified namespace and audit ✅
+- Skills contribution metadata is accepted, but skills are not activated by the
+  runtime yet
+- Per-plugin settings API is implemented; a dedicated settings UI is not
+  implemented
+- Plugin log panel remains planned; runtime audit logs exist without a dedicated
+  plugin-log surface
 
 ### R3 — DX & Packaging (partial ✅)
 - plugin-sdk
@@ -59,7 +62,7 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
 | M3 Tools | ToolHost reserves contribution hooks |
 | M4 Plugin Foundation | R1 complete |
 | M5 Hardening | Plugin isolation and stability |
-| Post-MVP | R2–R6 in phases |
+| Post-MVP | Complete R2 and progress R3–R6 in phases |
 
 ## 4. Success metrics (ecosystem)
 

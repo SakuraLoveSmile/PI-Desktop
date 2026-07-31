@@ -205,7 +205,7 @@ test("same-display observation uses the last actual outer bounds as its baseline
 
 test("reservation width parsing rejects coerced and malformed IPC input", () => {
   assert.equal(parseWorkPanelReservationWidth({ width: 0 }), 0);
-  assert.equal(parseWorkPanelReservationWidth({ width: 364 }), 364);
+  assert.equal(parseWorkPanelReservationWidth({ width: 244 }), 244);
   assert.equal(parseWorkPanelReservationWidth({ width: 720 }), 720);
 
   for (const input of [
@@ -216,7 +216,7 @@ test("reservation width parsing rejects coerced and malformed IPC input", () => 
     {},
     { width: "420" },
     { width: false },
-    { width: 363 },
+    { width: 243 },
     { width: 720.5 },
     { width: 721 },
     { width: Number.NaN },

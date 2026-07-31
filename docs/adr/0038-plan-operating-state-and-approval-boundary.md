@@ -1,4 +1,4 @@
-# ADR 0033: Plan operating state and approval boundary
+# ADR 0038: Plan operating state and approval boundary
 
 - Status: Accepted for implementation
 - Date: 2026-07-30
@@ -201,4 +201,4 @@ denials remain exact tool policy.
 - `docs/spec/05-security/01-security.md`
 - `docs/spec/07-plugins/04-plugin-security.md`
 - `docs/spec/06-delivery/04-e2e-test-plan.md`
-- `docs/spec/08-meta/decisions-log.md` (D166)
+- `docs/spec/08-meta/decisions-log.md` (D169)

@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { defineConfig, externalizeDepsPlugin } from "electron-vite";
+import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import type { Plugin } from "vite";
@@ -22,9 +22,11 @@ function tightenCsp(): Plugin {
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
+        // Bundle JS workspace packages into Main. Only runtime modules that
+        // must resolve from the packaged node_modules stay external.
+        external: ["electron-updater", "node-pty"],
         input: {
           index: resolve(__dirname, "electron/main/index.ts"),
           // Forked per plugin by PluginRuntime (ADR 0008); must stay a
@@ -35,8 +37,8 @@ export default defineConfig({
     },
   },
   preload: {
-    // No externalizeDepsPlugin here: the preload must be a fully bundled CJS
-    // file so it can run in a sandboxed renderer (no Node module resolution).
+    // The preload must be a fully bundled CJS file so it can run in a
+    // sandboxed renderer without Node module resolution.
     build: {
       rollupOptions: {
         input: {

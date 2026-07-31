@@ -7,6 +7,7 @@ import type {
   MessageRevisionSummary,
   AgentPromptResponse,
   AgentStatus,
+  AgentInstructionFile,
   AppSettings,
   AppVersionInfo,
   BrowserAction,
@@ -79,6 +80,8 @@ declare global {
       on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
       channels: typeof IPC;
       platform: NodeJS.Platform;
+      /** Authoritative OS locale passed from the main process at window creation. */
+      locale?: string;
     };
   }
 }
@@ -291,6 +294,21 @@ export const api = {
     invoke(IPC.invoke.agentAbort, { sessionId }),
   getStatus: (sessionId: string) =>
     invoke<{ status: AgentStatus }>(IPC.invoke.agentGetStatus, sessionId),
+  getAgentInstructions: (projectPath?: string) =>
+    invoke<{ global: AgentInstructionFile; project?: AgentInstructionFile }>(
+      IPC.invoke.agentInstructionsGet,
+      projectPath === undefined ? {} : { projectPath },
+    ),
+  saveAgentInstructions: (
+    scope: AgentInstructionFile["scope"],
+    content: string,
+    projectPath?: string,
+  ) =>
+    invoke<{ file: AgentInstructionFile }>(IPC.invoke.agentInstructionsSave, {
+      scope,
+      content,
+      ...(projectPath === undefined ? {} : { projectPath }),
+    }),
   resolvePermission: (resolution: ToolPermissionResolution) =>
     invoke(IPC.invoke.toolResolvePermission, resolution),
   pendingPlans: (sessionId?: string) =>

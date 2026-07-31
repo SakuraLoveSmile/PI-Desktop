@@ -89,7 +89,15 @@ workspace or scratch directory. The UI must state this tradeoff.
 - Dependency versions locked via `pnpm-lock.yaml` / `Cargo.lock` committed
   to the repo; upgrades are explicit commits
 - Prefer official pi packages
-- No remote script execution for plugins in MVP (local install only, D009)
+- Marketplace package installation is remote-capable. Current SHA-256 checks
+  verify transfer integrity against the catalog value, but signatures and
+  publisher provenance are not yet enforced; see the plugin trust limitation
+  in `07-plugins/08-plugin-signing-updates.md` before treating marketplace code
+  as trusted.
+- A plugin main currently runs with raw Node built-ins in its own
+  `utilityProcess`. The brokered `pi.*` permission gate does not constrain
+  direct Node access, so marketplace plugins must be treated as unrestricted
+  user-privileged code until capability sandboxing is implemented.
 
 ## 7. Application update security (D120)
 

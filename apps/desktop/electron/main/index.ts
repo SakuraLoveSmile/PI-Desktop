@@ -10,7 +10,7 @@ import {
   screen,
   shell,
 } from "electron";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
@@ -48,6 +48,8 @@ import {
   resolveThinkingCapabilities,
   expandSlashInvocation,
   loadComposerTemplates,
+  globalInstructionPath,
+  loadInstructionChain,
   type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
@@ -342,6 +344,7 @@ async function resolveAgentRuntimeLaunch(
     modelId,
     apiStyle: provider.apiStyle,
   });
+  const projectInstructions = await loadInstructionChain(session.projectPath);
   return {
     providerId: provider.id,
     modelId,
@@ -350,6 +353,7 @@ async function resolveAgentRuntimeLaunch(
       mode: normalizeMode(session.mode || settings.defaultMode || "agent"),
       thinkingLevel,
       scratchDir: join(dataDir, "scratch", sessionId),
+      projectInstructions,
       compactionSettings: settings.contextCompaction,
       provider: {
         id: provider.id,
@@ -790,6 +794,10 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Preload runs in a sandbox and cannot import Electron's main-only `app`
+      // module. Pass the display locale at process creation so it remains
+      // available synchronously before the renderer's first paint.
+      additionalArguments: [`--pi-desktop-locale=${app.getLocale()}`],
     },
   });
   const window = mainWindow;
@@ -1799,6 +1807,13 @@ function wireSidecar(s: AgentSidecar) {
 async function startSidecar(): Promise<void> {
   const s = new AgentSidecar((text) => logger.child("agent", text));
   wireSidecar(s);
+  s.setProjectInstructionResolver(async ({ sessionId, path }) => {
+    const detail = await host?.call<{ session?: { projectPath?: string } | null }>(
+      "session.get",
+      { id: sessionId },
+    );
+    return loadInstructionChain(detail?.session?.projectPath, path);
+  });
   // Agent-driven work panel preview (D100): open a workspace HTML file in
   // the embedded browser; live reload keeps it current through later edits.
   s.setLocalTool("BrowserPreview", async ({ args, sessionId }) => {
@@ -2197,6 +2212,97 @@ function registerIpc() {
     await host.call("settings.set", { ...settings, onboardingDismissed: true });
     return { ok: true };
   });
+
+  const instructionFile = async (
+    scope: "global" | "project",
+    projectPath?: string | null,
+  ) => {
+    const path =
+      scope === "global"
+        ? globalInstructionPath()
+        : projectPath
+          ? join(projectPath, "AGENTS.md")
+          : null;
+    if (!path) {
+      throw Object.assign(new Error("workspace required"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    const { readFile } = await import("node:fs/promises");
+    try {
+      return { scope, path, content: await readFile(path, "utf8"), exists: true };
+    } catch {
+      return { scope, path, content: "", exists: false };
+    }
+  };
+
+  const managedProjectPath = async (input: unknown): Promise<string> => {
+    if (!host) throw new Error("host unavailable");
+    const requestedPath = typeof input === "string" ? input.trim() : "";
+    if (!requestedPath) {
+      throw Object.assign(new Error("project path required"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    const projectPath = resolve(requestedPath);
+    const listed = (await host.call("projects.list")) as {
+      projects?: Array<{ path?: string }>;
+    };
+    const known = (listed.projects ?? []).some((project) => {
+      const candidate = String(project?.path ?? "").trim();
+      return candidate && resolve(candidate) === projectPath;
+    });
+    if (!known) {
+      throw Object.assign(new Error("project not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    if (!existsSync(projectPath) || !statSync(projectPath).isDirectory()) {
+      throw Object.assign(new Error("project folder not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    return projectPath;
+  };
+
+  handle(
+    IPC.invoke.agentInstructionsGet,
+    async (input: { projectPath?: unknown } = {}) => {
+      const projectPath = input.projectPath === undefined
+        ? null
+        : await managedProjectPath(input.projectPath);
+    return {
+      global: await instructionFile("global"),
+      ...(projectPath
+        ? { project: await instructionFile("project", projectPath) }
+        : {}),
+    };
+  });
+
+  handle(
+    IPC.invoke.agentInstructionsSave,
+    async (input: {
+      scope?: "global" | "project";
+      content?: unknown;
+      projectPath?: unknown;
+    } = {}) => {
+      if (input.scope !== "global" && input.scope !== "project") {
+        throw Object.assign(new Error("instruction scope required"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
+      }
+      const scope = input.scope;
+      const projectPath = scope === "project"
+        ? await managedProjectPath(input.projectPath)
+        : null;
+      const file = await instructionFile(scope, projectPath);
+      const content = typeof input.content === "string" ? input.content : "";
+      const { mkdir, writeFile } = await import("node:fs/promises");
+      await mkdir(dirname(file.path), { recursive: true });
+      await writeFile(file.path, content, "utf8");
+      return { file: { ...file, content, exists: true } };
+    },
+  );
 
   handle(IPC.invoke.updatesGetState, async () => updater.getState());
 

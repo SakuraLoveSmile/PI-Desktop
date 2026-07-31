@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const composerSource = await readFile(
-  new URL("../src/components/Composer.tsx", import.meta.url),
+const modelSelectSource = await readFile(
+  new URL("../src/components/ModelSelect.tsx", import.meta.url),
   "utf8",
 );
 const styles = await readFile(
@@ -27,9 +27,9 @@ function ruleBlock(source, selector) {
 }
 
 test("model chip label avoids leading-none under truncation", () => {
-  assert.match(composerSource, /className="model-chip-label text-sm"/);
+  assert.match(modelSelectSource, /className="model-chip-label text-sm"/);
   assert.doesNotMatch(
-    composerSource,
+    modelSelectSource,
     /model-chip-label[^"]*leading-none|truncate text-sm leading-none/,
   );
 });

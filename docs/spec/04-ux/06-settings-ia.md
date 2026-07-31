@@ -9,11 +9,13 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - The 46px top band across both the rail and content pane is a native window
   drag region; interactive controls remain explicitly non-draggable
 - A compact navigation directory with icons, in this exact order:
-  1. **Basics** — Lucide `SlidersHorizontal` (appearance, defaults, shortcuts)
-  2. **Model configuration** — Lucide `Bot` (providers and default model)
-  3. **Import** — Lucide `Download` (bring sessions in from other tools)
-  4. **Project archive** — Lucide `Archive` (durable project index)
-  5. **Info** — Lucide `Info` (versions, logs, updates)
+  1. **Basics** — Lucide `SlidersHorizontal` (appearance, defaults)
+  2. **全局 AI / AI** — Lucide `Sparkles` (permissions, context management)
+  3. **Shortcuts** — Lucide `Keyboard` (keyboard shortcuts)
+  4. **Model configuration** — Lucide `Bot` (providers and default model)
+  5. **Import** — Lucide `Download` (bring sessions in from other tools)
+  6. **Project archive** — Lucide `Archive` (durable project index)
+  7. **Info** — Lucide `Info` (versions, logs, updates, developer)
   Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
   with the rail label; do not reuse refresh/rotate glyphs here.
 - No additional settings destinations or placeholder navigation rows are shown
@@ -25,11 +27,25 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 
 ### Basics
 - **Appearance** card:
-  - theme system/light/dark (select + theme cards)
+  - **Theme**: three selectable preview cards (System / Light / Dark, System
+    first) with a live mini-window mockup, a per-option description, and a
+    selected check badge; selection updates `settings.theme`
+  - **Language**: three selectable preview cards (Auto / 简体中文 / English) with
+    a sample-text preview, a per-option description, and a selected check badge;
+    selection updates `settings.language`
+  - **Auto language detection** resolves the OS locale through the main process
+    (`app.getLocale()`) rather than the renderer's `navigator.language`, and the
+    Auto card shows the detected language inline (e.g. "当前：简体中文")
   - native select triggers and their opened option lists use the active theme's
     readable foreground/background pairing on macOS, Windows, and Linux
-- **Defaults** and **Permissions** cards retain the host-backed default mode,
-  Enter-to-send, and global permission-mode controls.
+- **Defaults** card retains the host-backed default mode and Enter-to-send
+  controls.
+- File-open target, menu-bar behavior, and bottom-panel behavior are not
+  rendered until their host-backed settings schemas and runtime effects exist.
+
+### 全局 AI (`ai` tab)
+- **Permissions** card: the global permission-mode control
+  (ask / accept-edits / auto) that governs how autonomously the agent acts.
 - **Context management** card:
   - automatic compaction is enabled by default
   - the switch controls per-`turn_end` soft guidance, deterministic threshold
@@ -41,6 +57,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     a 1024 minimum; the runtime further clamps unsafe values to the active
     model's context window as specified by D158
   - the card and all three controls are indexed by Settings search
+
+### Shortcuts (`shortcuts` tab)
 - **Keyboard shortcuts** card:
   - lists navigation, agent, and window actions from one shared shortcut map
   - renders platform-native modifier labels (`⌘` on macOS, `Ctrl` on
@@ -53,17 +71,6 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     restored together
   - overrides persist in optional `AppSettings.keybindings`; macOS native-menu
     accelerators and renderer-owned shortcuts update from the same map
-- **Developer** card:
-  - developer mode is off unless the optional persisted
-    `AppSettings.developerMode` value is `true`
-  - the developer mode switch unlocks the Open console button, F12 on every
-    platform, Ctrl+Shift+I on Windows/Linux, and the macOS View-menu developer
-    tools item
-  - disabling developer mode closes an open console and disables or removes
-    every entry point; Settings search indexes the card, switch, and console
-    action
-- File-open target, menu-bar behavior, and bottom-panel behavior are not
-  rendered until their host-backed settings schemas and runtime effects exist.
 
 ### Model configuration (`agent` tab)
 - **Studio hero**: provider count, ready count, and current default provider/model summary
@@ -97,9 +104,30 @@ not a strict read-only security profile.
 
 ### Project archive
 - Reuses the durable Projects index as a settings-scale management surface
-- Always includes archived records and keeps archived rows visually muted
+- Always includes archived records; archived rows are grouped, never hidden, so
+  the destination still has no visibility toggle
 - Supports project search, add, activate, project-session expansion, pin,
   archive/restore, and close
+- Layout is three stacked bands (D168):
+  1. **Overview banner** — one sentence of intent, the primary Add project
+     action, and four live counters (projects, open, archived, sessions) whose
+     totals are derived from the same pass that builds the list below
+  2. **Toolbar** — search field with a clear affordance and a match count while
+     searching, plus a two-option sort segmented control (Recent, Name)
+  3. **Grouped index** — always-visible sections in the order Pinned, All
+     projects, Archived; each section shows its label and row count and renders
+     its rows inside one settings panel with hairline separators. Empty sections
+     are omitted
+- Row anatomy: disclosure control, color glyph, project name with state tags
+  (Active, Open, pinned glyph, Archived), one meta line carrying the shortened
+  monospace path, branch, and session count, a relative last-active time, and a
+  hover/focus-revealed action pair (New task, row menu)
+- The row menu groups create/edit actions above pin, archive/restore, and the
+  destructive Close action, and closes on Escape or any outside press
+- Project search also matches session titles. Matching a session retains and
+  expands its owning project; expanded sessions are ordered by latest activity,
+  show a count and relative update time, and reveal additional rows in batches
+  of eight rather than silently truncating the history
 - Activating a project or project session returns to chat; archive and close
   actions keep Project archive open even when the active workspace changes
 
@@ -107,6 +135,15 @@ not a strict read-only security profile.
 - app/host/protocol versions + open logs
 - Updates row with the current delivery state and one applicable action:
   Check for updates, View release, or Restart to update
+- **Developer** card:
+  - developer mode is off unless the optional persisted
+    `AppSettings.developerMode` value is `true`
+  - the developer mode switch unlocks the Open console button, F12 on every
+    platform, Ctrl+Shift+I on Windows/Linux, and the macOS View-menu developer
+    tools item
+  - disabling developer mode closes an open console and disables or removes
+    every entry point; Settings search indexes the card, switch, and console
+    action
 - The Updates row always exposes a Release notes action. It opens a modal
   containing the complete shipped stable changelog in newest-first order,
   localized to the product language and marking the current and available
@@ -132,15 +169,16 @@ not a strict read-only security profile.
 ## 4. Acceptance
 
 1. Opening Settings hides the coding app sidebar (full-page takeover)
-2. Rail shows search + back and exactly Basics, Model configuration, Import,
-   Project archive, and Info in that order
+2. Rail shows search + back and exactly Basics, 全局 AI/AI, Shortcuts, Model
+   configuration, Import, Project archive, and Info in that order
 3. Appearance is part of Basics and has no standalone rail destination
 4. Providers is part of Agent and has no standalone rail destination
 5. Plugins has no Settings destination; the app-shell Plugins page supports
    load, enable, disable, and uninstall
-6. Basics shows host-backed Appearance, Defaults, Context management,
-   Permissions, and Keyboard shortcuts cards without adding another settings
-   destination
+6. Basics shows host-backed Appearance and Defaults cards only; the AI
+   destination shows Permissions and Context management; the Shortcuts
+   destination shows the Keyboard shortcuts card; Info shows the Developer card.
+   No additional settings destinations are rendered
 7. Provider secrets never display raw key values
 8. Model configuration shows the provider studio (hero + defaults + add dialog + cards) rather than a dense always-on form dump
 9. Row descriptions use semantic secondary text and maintain at least 4.5:1
@@ -152,17 +190,21 @@ not a strict read-only security profile.
     the page does not gain horizontal overflow
 12. Project archive always exposes archived records and can restore them without
     duplicating the index in the app shell
-13. Info renders disabled, checking, up-to-date, available, downloading,
+13. Project archive renders the overview counters, search + sort toolbar, and the
+    Pinned / All projects / Archived sections; the counters agree with the
+    rendered row counts, sorting reorders rows inside every section without
+    hiding any, and clearing the search restores the complete index
+14. Info renders disabled, checking, up-to-date, available, downloading,
     downloaded, and error update states without adding another destination
-14. Native select option lists remain readable in both light and dark themes,
+15. Native select option lists remain readable in both light and dark themes,
     including when Chromium delegates the opened list surface to Windows
-15. Shortcut recording rejects modifier-free non-function keys, reserved
+16. Shortcut recording rejects modifier-free non-function keys, reserved
     editor/OS chords, and conflicts; successful overrides immediately drive
     app behavior and macOS menu accelerators and survive restart
-16. Developer tools remain unavailable by default; enabling developer mode
+17. Developer tools remain unavailable by default; enabling developer mode
     unlocks the localized Settings action and platform shortcuts, persists
     across restart, and disabling it closes an open console
-17. Context management defaults to automatic protection, persists all three
+18. Context management defaults to automatic protection, persists all three
     settings, and cannot configure a retained tail that prevents compaction on
      a small-window model because runtime limits remain model-aware
 18. The default operating-mode selector contains only Agent and Plan; legacy

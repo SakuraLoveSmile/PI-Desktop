@@ -5,6 +5,7 @@ import {
   type PluginToolDef,
   type RuntimeProviderConfig,
 } from "./runtime.js";
+import type { ProjectInstructions } from "./project-instructions.js";
 import type {
   ContextCompactionRecord,
   ContextCompactionSettings,
@@ -42,6 +43,7 @@ function createRuntime(
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
     pluginTools: PluginToolDef[];
+    projectInstructions: ProjectInstructions;
     host: { call: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
@@ -56,6 +58,7 @@ function createRuntime(
     compaction: overrides.compaction,
     compactionSettings: overrides.compactionSettings,
     pluginTools: overrides.pluginTools,
+    projectInstructions: overrides.projectInstructions,
     onEvent: overrides.onEvent ?? vi.fn(),
   });
 }
@@ -78,6 +81,122 @@ describe("DesktopAgentRuntime configuration matching", () => {
     ).toBe(false);
     expect(runtime.matches("agent", provider, "high")).toBe(false);
 
+    await runtime.dispose();
+  });
+
+  it("recreates the runtime when project instructions change", async () => {
+    const projectInstructions = {
+      entries: [{ source: "AGENTS.md", content: "Run unit tests." }],
+    };
+    const runtime = createRuntime({ projectInstructions });
+
+    expect((runtime as any).agent.state.systemPrompt).toContain(
+      "# Project instructions\n\n",
+    );
+    expect((runtime as any).agent.state.systemPrompt).toContain(
+      "Run unit tests.",
+    );
+    expect(runtime.matches("agent", provider, "medium", [], projectInstructions)).toBe(
+      true,
+    );
+    expect(runtime.matches("agent", provider, "medium", [], {
+      entries: [{ source: "AGENTS.md", content: "Run lint." }],
+    })).toBe(
+      false,
+    );
+
+    await runtime.dispose();
+  });
+
+  it("loads newly discovered nested instructions before a file tool runs", async () => {
+    const host = {
+      call: vi
+        .fn()
+        .mockResolvedValueOnce({
+          entries: [
+            {
+              source: "packages/api/AGENTS.md",
+              content: "Run API tests.",
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ ok: true, content: "file contents" }),
+    };
+    const runtime = createRuntime({ host });
+    const read = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Read",
+    );
+
+    await read.execute("tool-1", { path: "packages/api/handler.ts" });
+
+    expect(host.call.mock.calls[0][0]).toBe("project.instructions.resolve");
+    expect((runtime as any).agent.state.systemPrompt).toContain(
+      "packages/api/AGENTS.md",
+    );
+    expect((runtime as any).agent.state.systemPrompt).toContain("Run API tests.");
+    await runtime.dispose();
+  });
+
+  it.each([
+    ["Read", { path: "packages/api/handler.ts" }],
+    ["Write", { path: "packages/api/handler.ts", content: "export {};" }],
+    ["Edit", {
+      path: "packages/api/handler.ts",
+      old_string: "before",
+      new_string: "after",
+    }],
+    ["BrowserPreview", { path: "packages/api/index.html" }],
+  ])("resolves path-scoped instructions before %s", async (toolName, params) => {
+    const host = {
+      call: vi
+        .fn()
+        .mockResolvedValueOnce({
+          entries: [{ source: "packages/api/AGENTS.md", content: "Use API rules." }],
+        })
+        .mockResolvedValueOnce({ ok: true, content: "done" }),
+    };
+    const runtime = createRuntime({ host });
+    const tool = (runtime as any).agent.state.tools.find(
+      (candidate: any) => candidate.name === toolName,
+    );
+
+    await tool.execute(`tool-${toolName}`, params);
+
+    expect(host.call.mock.calls[0][0]).toBe("project.instructions.resolve");
+    expect((runtime as any).agent.state.systemPrompt).toContain("Use API rules.");
+    await runtime.dispose();
+  });
+
+  it("replaces sibling-directory instructions for each file path", async () => {
+    const host = {
+      call: vi
+        .fn()
+        .mockResolvedValueOnce({
+          entries: [
+            { source: "AGENTS.md", content: "Use root rules." },
+            { source: "packages/a/AGENTS.md", content: "Use A rules." },
+          ],
+        })
+        .mockResolvedValueOnce({ ok: true, content: "A contents" })
+        .mockResolvedValueOnce({
+          entries: [
+            { source: "AGENTS.md", content: "Use root rules." },
+            { source: "packages/b/AGENTS.md", content: "Use B rules." },
+          ],
+        })
+        .mockResolvedValueOnce({ ok: true, content: "B contents" }),
+    };
+    const runtime = createRuntime({ host });
+    const read = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Read",
+    );
+
+    await read.execute("tool-a", { path: "packages/a/file.ts" });
+    expect((runtime as any).agent.state.systemPrompt).toContain("Use A rules.");
+
+    await read.execute("tool-b", { path: "packages/b/file.ts" });
+    expect((runtime as any).agent.state.systemPrompt).toContain("Use B rules.");
+    expect((runtime as any).agent.state.systemPrompt).not.toContain("Use A rules.");
     await runtime.dispose();
   });
 });

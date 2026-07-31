@@ -55,6 +55,16 @@ overwriting the canonical source.
 - `Resources/bin/pi-desktop-host-core` — Rust host binary (release build).
 - `Resources/agent-runtime/` — bundled sidecar, executed with
   `ELECTRON_RUN_AS_NODE=1` (no separate Node shipped).
+- `Resources/licenses/` — notices that must remain distributable when the
+  corresponding dependency's build-only source tree is pruned.
+- `Resources/app.asar` — Electron Main, preload, renderer output, and only the
+  runtime-resolved production modules. Renderer libraries are already present
+  in Vite output and are not copied again as raw package trees.
+- Target-native `node-pty` assets under `app.asar.unpacked`; other platform and
+  architecture prebuilds are excluded when the package layout supports a
+  reliable target filter.
+- Chromium locale packs for English and Simplified Chinese only. Product
+  `en`/`zh-CN` catalogs remain bundled independently of Chromium locales.
 - App icon `build/icon.icns` (derived from canonical `build/icon_1024.png` by
   `scripts/make-icon.py`).
 
@@ -110,6 +120,27 @@ scripts/release-macos.sh
 
 Artifacts land in `apps/desktop/release/` (DMG + blockmap).
 
+### 4.3 GitHub tag workflow
+
+The GitHub Release workflow starts all native platform runners without a
+separate validation-job barrier. Each runner validates that the pushed tag
+matches `apps/desktop/package.json` immediately after checkout, before package
+inputs are prepared.
+
+On every platform, the release preparation step starts the locked Rust host
+build in parallel with pnpm installation and native dependency rebuilding. It
+then builds only the workspace dependencies selected by
+`@pi-desktop/desktop^...`, failing if that dependency selection is unexpectedly
+empty. The platform `dist:*` command remains responsible for bundling the agent
+runtime, verifying the host build, building the Desktop application once, and
+invoking electron-builder. This avoids a redundant Desktop build without
+changing the package scripts or release artifacts.
+
+DMG, ZIP, NSIS, AppImage, deb, blockmap, and updater feed outputs are already
+compressed or compression-insensitive. The workflow therefore uploads their
+temporary Actions artifacts with compression level zero before the publish job
+assembles the GitHub Release.
+
 ## 5. Verification gates
 
 Run after every release build:
@@ -121,6 +152,52 @@ codesign --verify --deep --strict "$APP" # signature integrity
 spctl -a -vv "$APP"                      # Gatekeeper assessment (notarized builds)
 xcrun stapler validate "$APP"            # notarization staple (if notarized)
 ```
+
+### 5.1 Package footprint gate
+
+Inspect every native-runner package before publication and record all
+compressed artifact formats, unpacked application, ASAR, Electron
+framework/runtime, locale, and unpacked-native sizes. Compare them with the
+previous stable release; an unexplained increase above 15% blocks publication
+until reviewed.
+
+The package inventory must confirm:
+
+- exactly one `Resources/agent-runtime/sidecar.js` and one target-native Rust
+  host binary
+- no raw renderer packages such as Mermaid, Shiki, React, KaTeX, or Lucide
+  under packaged `node_modules`
+- no dependency `*.map`, test, example, declaration, or second agent-runtime
+  tree in ASAR
+- required third-party license and notice files remain in ASAR or
+  `Resources/licenses` when their non-runtime package trees are pruned
+- only the configured English and Simplified Chinese Chromium locale packs
+- a loadable target-native `node-pty` binary and no reliably excludable
+  non-target prebuilds
+
+The first audited optimized package establishes the platform baseline. Keep
+per-platform measurements rather than applying one budget to different
+Electron target layouts.
+
+The first macOS arm64 baseline was captured on 2026-07-30 from an unsigned
+`electron-builder --dir` package. Sizes below sum regular-file bytes so they
+remain comparable across filesystems; the compressed artifact is not
+applicable to this directory-only validation build.
+
+| Inventory | Bytes | MiB |
+|---|---:|---:|
+| Unpacked application | 251,724,810 | 240.1 |
+| `Contents/Frameworks` | 218,567,792 | 208.4 |
+| `Contents/Resources` | 33,102,807 | 31.6 |
+| `Resources/app.asar` | 20,944,962 | 20.0 |
+| `Resources/app.asar.unpacked` native payload | 137,336 | 0.1 |
+| English and Simplified Chinese Chromium locale packs | 1,033,673 | 1.0 |
+| Agent sidecar | 3,258,983 | 3.1 |
+| Rust host | 7,160,000 | 6.8 |
+
+The pre-optimization unpacked regular-file total was 559,355,716 bytes
+(533.4 MiB). The audited package is 307,630,906 bytes smaller, a 55.0%
+reduction. Its curated renderer output is 14.1 MiB, down from 20.5 MiB.
 
 Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
 
@@ -136,6 +213,9 @@ Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
 5. One permissioned tool call (Write) allow + deny paths.
 6. Quit/relaunch → session history restored, window bounds restored.
 7. `~/.pi-desktop/logs/` contains `app.log` / `host.log` / `agent.log`.
+8. With network access disabled, the shell still starts; English/Chinese
+   switching, syntax highlighting, KaTeX, Mermaid fallback/rendering, terminal,
+   host health, and sidecar health continue to use packaged local assets.
 
 ## 6. Windows/Linux release packages
 

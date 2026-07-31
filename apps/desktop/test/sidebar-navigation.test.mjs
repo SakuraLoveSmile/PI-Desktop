@@ -57,8 +57,8 @@ test("sidebar header retains non-mac branding and keeps collapse beside search",
 
 test("work panel collapse control lives in the switcher menu", () => {
   assert.match(panelSource, /onCollapse/);
-  assert.match(panelSource, /work-panel-rail-collapse/);
-  assert.match(panelSource, /IconPanel/);
+  assert.match(panelSource, /work-panel-toolbar-collapse/);
+  assert.match(panelSource, /IconChevronRight/);
   assert.match(appSource, /collapseWorkPanel\(\)/);
   assert.doesNotMatch(panelSource, /work-panel-collapse/);
   assert.doesNotMatch(panelSource, /collapsePanel/);
@@ -157,9 +157,23 @@ test("sidebar section toolbars open create actions from context menus", () => {
   assert.match(sidebarSource, /addEventListener\("pointerdown"/);
 });
 
-test("project rows expose open-folder in the project menu and full-path hover", () => {
+test("sidebar session and project context menus open to the pointer's right", () => {
+  const pointPlacement = sidebarSource.match(
+    /const placeMenuAtPoint = useCallback\([\s\S]*?\n  }, \[\]\);/,
+  )?.[0] ?? "";
+
+  assert.match(pointPlacement, /left:\s*Math\.max\(/);
+  assert.match(pointPlacement, /x \+ 4/);
+  assert.match(pointPlacement, /FLOATING_MENU_WIDTH/);
+  assert.match(sidebarSource, /placeMenuAtPoint\(event\.clientX, event\.clientY\)/);
+  assert.match(sidebarSource, /left: menuPosition\.left/);
+});
+
+test("project rows expose folder actions and full-path hover", () => {
   assert.match(sidebarSource, /data-action="open-project-folder"/);
   assert.match(sidebarSource, /api\.openProjectFolder\(entry\.path\)/);
+  assert.doesNotMatch(sidebarSource, /data-action="edit-project-instructions"/);
+  assert.doesNotMatch(sidebarSource, /<ProjectInstructionsDialog/);
   assert.doesNotMatch(sidebarSource, /data-action="open-session-folder"/);
   assert.doesNotMatch(sidebarSource, /api\.openSessionFolder\(/);
   assert.match(

@@ -12,6 +12,7 @@ import {
   type PluginToolDef,
   type RuntimeProviderConfig,
 } from "./runtime.js";
+import type { ProjectInstructions } from "./project-instructions.js";
 import {
   normalizeSupportedThinkingLevels,
   normalizeThinkingLevel,
@@ -40,6 +41,7 @@ type RuntimeParams = {
   provider: RuntimeProviderConfig;
   pluginTools?: PluginToolDef[];
   scratchDir?: string;
+  projectInstructions?: ProjectInstructions;
   compactionSettings?: ContextCompactionSettings;
 };
 
@@ -93,6 +95,7 @@ async function runtimeFor(
     provider,
     thinkingLevel,
     pluginToolNames,
+    params.projectInstructions,
   )
     ? existing
     : undefined;
@@ -137,6 +140,7 @@ async function runtimeFor(
     compaction,
     compactionSettings: params.compactionSettings,
     pluginTools,
+    projectInstructions: params.projectInstructions,
     scratchDir:
       typeof params.scratchDir === "string" && params.scratchDir
         ? params.scratchDir

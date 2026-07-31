@@ -1,6 +1,6 @@
 # ADR 0026: Move the Projects Index into Settings as an Archive
 
-- Status: Accepted
+- Status: Superseded in part by ADR 0036 (destination count/order)
 - Date: 2026-07-27
 - Deciders: PI-Desktop core
 - Related: D066, D090, D093, D133, ADR 0013, ADR 0016
