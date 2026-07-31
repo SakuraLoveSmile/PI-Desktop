@@ -1,15 +1,12 @@
-export type PluginSkillDef = {
-  /** `<pluginId>/<skillId>` — the exact id the Skill tool expects. */
-  id: string;
-  name: string;
-  description?: string;
-};
+import type { PluginSkillDef } from "./plugin-skills.js";
+
+export type { PluginSkillDef };
 
 /** Tool the model calls to pull a skill document into context on demand. */
 export const SKILL_TOOL_NAME = "Skill";
 
 /**
- * Render the skill catalog for the system prompt (D171: skills are
+ * Render the skill catalog for the system prompt (D172: skills are
  * model-invoked). Only id/name/description ship up front — the body is loaded
  * through the `Skill` tool when the model decides a skill applies, so a long
  * document costs nothing until it is needed.

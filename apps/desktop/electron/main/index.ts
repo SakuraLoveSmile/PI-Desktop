@@ -48,9 +48,12 @@ import {
   type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
+import { isTemplateName, scaffold } from "@pi-desktop/plugin-devkit";
 import { HostProcess } from "./host-process";
 import { AgentSidecar } from "./agent-sidecar";
 import { PluginRuntime } from "./plugin-runtime";
+import { builtinSkills, loadBuiltinSkillBody } from "./builtin-skills";
+import { registerPluginDevTools } from "./plugin-dev-tools";
 import { PluginPanelHost } from "./plugin-panel-host";
 import { Logger } from "./logger";
 import { collectWorkspaceDiff } from "./git-diff";
@@ -191,6 +194,18 @@ const plugins = new PluginRuntime({
       reason: "service",
       pluginId: status.pluginId,
     });
+  },
+  // Hot reload happens without anyone asking for it, so it has to report
+  // itself: the plugins page reads status from the host, not from the edit.
+  onPluginReloaded: ({ pluginId, name, ok, message }) => {
+    logger.app(ok ? "info" : "error", "development plugin reloaded", {
+      pluginId,
+      data: { ok, message },
+    });
+    sendToRenderer(IPC.event.toast, {
+      message: ok ? `Reloaded ${name}` : `Reload failed: ${name} — ${message ?? ""}`,
+    });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "reload", pluginId });
   },
 });
 const ptys = new PtyManager({
@@ -352,6 +367,20 @@ async function resolveAgentRuntimeLaunch(
     apiStyle: provider.apiStyle,
   });
   const projectInstructions = await loadInstructionChain(session.projectPath);
+  // Skill catalog (D172): only id/name/description cross to the sidecar; the
+  // document body is fetched on demand through the local `Skill` tool. Host
+  // skills come first so a plugin's entry reads as a refinement of them.
+  const pluginSkills = [
+    ...builtinSkills({
+      workspacePath: session.projectPath,
+      pluginPaths: plugins.listLoaded().map((loaded) => loaded.path),
+    }),
+    ...plugins.getSkills().map((skill) => ({
+      id: skill.id,
+      name: skill.name,
+      description: skill.description,
+    })),
+  ];
   return {
     providerId: provider.id,
     modelId,
@@ -380,13 +409,9 @@ async function resolveAgentRuntimeLaunch(
         description: tool.description,
         parameters: tool.schema ?? { type: "object", properties: {} },
       })),
-      // Plugin skills (D171): only the catalog crosses to the sidecar; the
+      // Plugin skills (D172): only the catalog crosses to the sidecar; the
       // document body is fetched on demand through the local `Skill` tool.
-      pluginSkills: plugins.getSkills().map((skill) => ({
-        id: skill.id,
-        name: skill.name,
-        description: skill.description,
-      })),
+      pluginSkills,
     },
   };
 }
@@ -1535,6 +1560,34 @@ async function createWindow() {
             `);
             await new Promise((r) => setTimeout(r, 900));
             await shot("pi-plugins-market");
+            // Template picker behind the overflow menu (D171). Selecting a
+            // template only sets state, so no folder dialog opens here.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const tabs = [...document.querySelectorAll('.plugins-segment-btn')];
+                tabs[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                document
+                  .querySelector('.plugins-menu-wrap .plugins-icon-btn')
+                  ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 250));
+            await shot("pi-plugins-menu");
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const items = [...document.querySelectorAll('.plugins-menu [role="menuitem"]')];
+                items[items.length - 1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 300));
+            await shot("pi-plugins-template");
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const cancel = document.querySelector('.plugins-modal-actions button');
+                cancel?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 200));
             await mainWindow!.webContents.executeJavaScript(
               `window.__PI_DESKTOP__?.seedPlugins?.(0);
                window.__PI_DESKTOP__?.seedPluginThemes?.(2)`,
@@ -1871,7 +1924,7 @@ async function startSidecar(): Promise<void> {
       content: `Previewing ${raw} in the built-in browser panel. Live reload is active — subsequent edits to the file or sibling assets re-render automatically.`,
     };
   });
-  // Plugin skills (D171): the model loads a declared skill document by id.
+  // Plugin skills (D172): the model loads a declared skill document by id.
   // Served in main because the plugin runtime — and the plugin directories —
   // live here, not in host-core.
   s.setLocalTool("Skill", async ({ args }) => {
@@ -1884,7 +1937,8 @@ async function startSidecar(): Promise<void> {
       };
     }
     try {
-      const skill = plugins.loadSkillBody(id);
+      // Bundled skills answer first; they are not owned by any plugin.
+      const skill = loadBuiltinSkillBody(id) ?? plugins.loadSkillBody(id);
       return {
         ok: true,
         content: `# Skill: ${skill.name} (${skill.id})\n\n${skill.body}`,
@@ -1902,6 +1956,36 @@ async function startSidecar(): Promise<void> {
         }`,
       };
     }
+  });
+  // Plugin authoring (D171): scaffold, validate and package a plugin without
+  // leaving the session. Paths stay inside the open workspace.
+  registerPluginDevTools(s, {
+    resolveWorkspace: async (sessionId) => {
+      try {
+        const res = (await host?.call("session.get", { id: sessionId })) as
+          | { session: { projectPath?: string } | null }
+          | undefined;
+        return res?.session?.projectPath?.trim() || null;
+      } catch {
+        return null;
+      }
+    },
+    registerDevPlugin: async (path) => {
+      if (!host) throw new Error("host unavailable");
+      const loaded = await host.call<{ plugin?: { permissions?: string[] } }>(
+        "plugins.loadDev",
+        { path },
+      );
+      return loaded.plugin?.permissions ?? [];
+    },
+    loadPlugin: async (path, permissions) => {
+      const manifest = await plugins.loadFromPath(path, permissions ?? []);
+      plugins.watchDevPlugin(manifest.id);
+      for (const toast of plugins.drainToasts()) {
+        sendToRenderer(IPC.event.toast, { message: toast });
+      }
+      sendToRenderer(IPC.event.pluginChanged, { reason: "scaffold" });
+    },
   });
   sidecar = s;
   if (host) s.setHost(host);
@@ -2206,6 +2290,9 @@ async function bootBackends() {
       if (p.enabled && p.path) {
         try {
           await plugins.loadFromPath(p.path, p.permissions ?? []);
+          // Dev plugins keep hot reload across restarts: the folder was picked
+          // once, and the edit loop should not have to pick it again.
+          if (p.source === "dev") plugins.watchDevPlugin(p.id);
           logger.app("info", "plugin restored", { pluginId: p.id });
         } catch (e) {
           logger.app("error", "plugin restore failed", {
@@ -3726,6 +3813,7 @@ function registerIpc() {
     const path = result.filePaths[0];
     const loaded = await host.call<{ plugin: any }>("plugins.loadDev", { path });
     await plugins.loadFromPath(path, loaded.plugin?.permissions ?? []);
+    if (loaded.plugin?.id) plugins.watchDevPlugin(loaded.plugin.id);
     for (const toast of plugins.drainToasts()) {
       sendToRenderer(IPC.event.toast, { message: toast });
     }
@@ -3735,6 +3823,41 @@ function registerIpc() {
     });
     return loaded;
   });
+
+  // Scaffold a starter plugin and load it as a dev plugin in one step (D171),
+  // so "I want to write a plugin" never starts with an empty folder.
+  handle(
+    IPC.invoke.pluginCreateFromTemplate,
+    async (req: { template?: string }) => {
+      if (!host) throw new Error("host unavailable");
+      const template = req?.template;
+      if (!isTemplateName(template)) {
+        throw new Error(`unknown plugin template: ${String(template)}`);
+      }
+      const picked = await dialog.showOpenDialog({
+        properties: ["openDirectory", "createDirectory"],
+      });
+      if (picked.canceled || !picked.filePaths[0]) {
+        return { canceled: true };
+      }
+      const dir = picked.filePaths[0];
+      const created = await scaffold({ dir, template });
+      const loaded = await host.call<{ plugin: any }>("plugins.loadDev", {
+        path: dir,
+      });
+      await plugins.loadFromPath(dir, loaded.plugin?.permissions ?? []);
+      plugins.watchDevPlugin(created.id);
+      for (const toast of plugins.drainToasts()) {
+        sendToRenderer(IPC.event.toast, { message: toast });
+      }
+      return {
+        id: created.id,
+        name: created.name,
+        dir: created.dir,
+        files: created.files,
+      };
+    },
+  );
 
   handle(IPC.invoke.pluginInstallFromPath, async () => {
     if (!host) throw new Error("host unavailable");
@@ -3802,6 +3925,7 @@ function registerIpc() {
     const res = await host.call<{ plugin: any }>("plugins.enable", { id });
     if (res.plugin?.path) {
       await plugins.loadFromPath(res.plugin.path, res.plugin.permissions ?? []);
+      if (res.plugin.source === "dev") plugins.watchDevPlugin(id);
     }
     logger.app("info", "plugin enabled", { pluginId: id });
     sendToRenderer(IPC.event.pluginChanged, { reason: "enable", pluginId: id });
@@ -4113,6 +4237,7 @@ app.on("before-quit", () => {
   updater.dispose();
   logger.app("info", "app shutdown");
   ptys.disposeAll();
+  plugins.disposeWatchers();
   browserPane.dispose();
   void host?.dispose();
   void sidecar?.dispose();

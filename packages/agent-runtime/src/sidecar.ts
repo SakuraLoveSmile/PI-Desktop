@@ -76,7 +76,6 @@ async function runtimeFor(
   const pluginTools = params.pluginTools ?? [];
   const pluginToolNames = pluginTools.map((tool) => tool.name);
   const pluginSkills = params.pluginSkills ?? [];
-  const pluginSkillIds = pluginSkills.map((skill) => skill.id);
   if (!provider?.modelId || (!provider.apiKey && provider.authKind !== "none")) {
     throw Object.assign(new Error("model/provider not configured"), {
       rpcCode: -32000,
@@ -97,7 +96,7 @@ async function runtimeFor(
     thinkingLevel,
     pluginToolNames,
     params.projectInstructions,
-    pluginSkillIds,
+    pluginSkills,
   )
     ? existing
     : undefined;

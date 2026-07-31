@@ -1,4 +1,4 @@
-# ADR 0039: Resident plugin services and the inter-plugin message bus
+# ADR 0040: Resident plugin services and the inter-plugin message bus
 
 - Status: Accepted
 - Date: 2026-07-31

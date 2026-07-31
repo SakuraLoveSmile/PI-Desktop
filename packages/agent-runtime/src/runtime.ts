@@ -57,6 +57,7 @@ import {
   SKILL_TOOL_NAME,
   type PluginSkillDef,
 } from "./plugin-skills-prompt.js";
+import { pluginSkillsDigest } from "./plugin-skills.js";
 import { logTiming } from "./timing.js";
 
 
@@ -550,8 +551,9 @@ export class DesktopAgentRuntime {
               `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
             ]
           : []),
-        // Plugin skills (D171): the catalog rides in the base prompt so a
-        // path-scoped instruction reload never drops it.
+        // Plugin skills (D172): the catalog rides in the base prompt so a
+        // path-scoped instruction reload never drops it, and it stays ahead of
+        // the instruction chain so the user's own AGENTS.md keeps the last word.
         ...(skillsPrompt ? [skillsPrompt] : []),
       ].join("\n\n");
     this.baseSystemPrompt = baseSystemPrompt;
@@ -593,7 +595,7 @@ export class DesktopAgentRuntime {
     thinkingLevelOrPluginToolNames: ThinkingLevel | string[] = this.thinkingLevel,
     pluginToolNames: string[] = [],
     projectInstructions?: ProjectInstructions,
-    pluginSkillIds: string[] = [],
+    pluginSkills: PluginSkillDef[] = [],
   ): boolean {
     // Keep the pre-thinking overload usable for callers that passed plugin
     // names as the third argument. New callers pass the selected level.
@@ -609,10 +611,6 @@ export class DesktopAgentRuntime {
       legacyPluginToolNames ?? pluginToolNames;
     const current = this.pluginTools.map((t) => t.name).sort().join(",");
     const next = [...effectivePluginToolNames].sort().join(",");
-    // Skills change the system prompt and the presence of the Skill tool, so a
-    // different catalog has to rebuild the runtime.
-    const currentSkills = this.pluginSkills.map((s) => s.id).sort().join(",");
-    const nextSkills = [...pluginSkillIds].sort().join(",");
     const currentThinkingLevels = [
       ...(this.provider.supportedThinkingLevels ?? ["off"]),
     ]
@@ -638,9 +636,12 @@ export class DesktopAgentRuntime {
         safeJson(provider.modelConfig ?? null) &&
       this.thinkingLevel === clampThinkingLevel(provider, thinkingLevel) &&
       current === next &&
-      currentSkills === nextSkills &&
       safeJson(this.baseProjectInstructions ?? null) ===
-        safeJson(projectInstructions ?? null)
+        safeJson(projectInstructions ?? null) &&
+      // Enabling a plugin, revoking agent.prompt.inject or renaming a skill
+      // changes the catalog digest, which retires the runtime and its stale
+      // prompt. Bodies are excluded: the Skill tool always reads them fresh.
+      pluginSkillsDigest(this.pluginSkills) === pluginSkillsDigest(pluginSkills)
     );
   }
 
@@ -816,34 +817,47 @@ export class DesktopAgentRuntime {
           return this.scratchDir
             ? "Run a non-interactive shell command in the workspace root. $PI_SCRATCH_DIR points at the session scratch directory for temporary files."
             : "Run a non-interactive shell command in the workspace root.";
+        case "PluginScaffold":
+          return "Create a PI-Desktop plugin from a template and load it for development. `directory` is workspace-relative and must be empty or new; `template` is one of panel-basic, agent-tool-basic, skill-pack, full-demo. Use this instead of hand-writing plugin files.";
+        case "PluginCheck":
+          return "Validate a PI-Desktop plugin directory against every rule the installer enforces (manifest, entry file, panel, skills, permissions, package limits). `directory` is workspace-relative. Run this before packaging.";
+        case "PluginPack":
+          return "Package a PI-Desktop plugin directory into an installable dist/<id>-<version>.piplug. `directory` is workspace-relative. Runs the same validation as PluginCheck first and refuses to package a plugin with errors. Never build a .piplug with shell tools — the installer only accepts uncompressed archives.";
         default:
           return `${toolName} tool via PI-Desktop host-core`;
       }
+    };
+    // One entry per tool: the shapes diverge enough that a chain of ternaries
+    // stopped being readable.
+    const parameters: Record<string, Parameters<typeof Type.Object>[0]> = {
+      Read: { path: Type.String() },
+      BrowserPreview: { path: Type.String() },
+      Glob: { pattern: Type.String() },
+      Grep: {
+        pattern: Type.String(),
+        caseInsensitive: Type.Optional(Type.Boolean()),
+      },
+      Write: { path: Type.String(), content: Type.String() },
+      Edit: {
+        path: Type.String(),
+        old_string: Type.String(),
+        new_string: Type.String(),
+      },
+      Bash: { command: Type.String() },
+      PluginScaffold: {
+        template: Type.String(),
+        directory: Type.String(),
+        id: Type.Optional(Type.String()),
+        name: Type.Optional(Type.String()),
+      },
+      PluginCheck: { directory: Type.String() },
+      PluginPack: { directory: Type.String() },
     };
     const exec = (toolName: string): AgentTool => ({
       name: toolName,
       label: toolName,
       description: describe(toolName),
-      parameters: Type.Object(
-        toolName === "Read" || toolName === "BrowserPreview"
-          ? { path: Type.String() }
-          : toolName === "Glob"
-            ? { pattern: Type.String() }
-            : toolName === "Grep"
-              ? {
-                  pattern: Type.String(),
-                  caseInsensitive: Type.Optional(Type.Boolean()),
-                }
-              : toolName === "Write"
-                ? { path: Type.String(), content: Type.String() }
-                : toolName === "Edit"
-                  ? {
-                      path: Type.String(),
-                      old_string: Type.String(),
-                      new_string: Type.String(),
-                    }
-                  : { command: Type.String() },
-      ),
+      parameters: Type.Object(parameters[toolName] ?? { command: Type.String() }),
       execute: async (toolCallId, params) => {
         await this.loadPathInstructions(toolName, params);
         const startedAt = Date.now();
@@ -886,10 +900,12 @@ export class DesktopAgentRuntime {
     });
 
     // BrowserPreview is non-mutating (renders an existing workspace file in
-    // the work panel browser), so it ships in every mode.
-    const tools = ["Read", "Glob", "Grep", "BrowserPreview"];
+    // the work panel browser), so it ships in every mode. PluginCheck only
+    // reads a directory; PluginScaffold and PluginPack write, so they follow
+    // Write/Edit/Bash into agent mode only.
+    const tools = ["Read", "Glob", "Grep", "BrowserPreview", "PluginCheck"];
     if (this.mode === "agent") {
-      tools.push("Write", "Edit", "Bash");
+      tools.push("Write", "Edit", "Bash", "PluginScaffold", "PluginPack");
     }
     const builtins = tools.map(exec);
 
@@ -953,8 +969,10 @@ export class DesktopAgentRuntime {
     // and edits to an existing instruction file take effect immediately.
     this.projectInstructions = resolved;
     const prompt = projectInstructionsPrompt(resolved);
+    const skills = pluginSkillsPrompt(this.pluginSkills);
     this.agent.state.systemPrompt = [
       this.baseSystemPrompt,
+      ...(skills ? [skills] : []),
       ...(prompt ? [prompt] : []),
     ].join("\n\n");
   }

@@ -232,7 +232,7 @@ Namespace: `pi.plugin.*`
 
 Skills are contributed declaratively (`contributes.skills` + `agent.prompt.inject`),
 not invoked by the plugin: the host puts the catalog in the system prompt and the
-model loads a body through the built-in `Skill` tool (D171). Planned, not
+model loads a body through the built-in `Skill` tool (D172). Planned, not
 currently exposed: `pi.agent.appendSystemHint(text)`.
 
 ### Background services (requires `background.service`)

@@ -625,6 +625,48 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Decision D170; the single-file layout assumed by `04-ux/07-ui-design-system.md`
   §Typography and `04-ux/08-component-spec.md` no longer holds.
 
+
+## 2026-07-31 — Plugin skills activation and the plugin devkit
+
+- `contributes.skills` is activated. `PluginRuntime.getSkills()` reads each
+  declared skill file at prompt time, only for plugins granted
+  `agent.prompt.inject`, and only through the containment guard the gated `fs`
+  APIs use. The agent runtime renders a `# Plugin skills` section capped at
+  16 KiB total and 8 KiB per skill — its own budget, not the 32 KiB instruction
+  chain of ADR 0037 — and orders it after the built-in skills but before
+  project instructions, so a user's own files keep the last word. Runtime reuse
+  keys on a skills digest, so enabling a plugin, revoking the permission, or
+  editing a skill file retires the idle runtime instead of reusing a stale
+  prompt. Closes roadmap gap R2.
+- Plugin authoring ships as a first-party package, `@pi-desktop/plugin-devkit`,
+  which owns `scaffold` / `check` / `pack` over one implementation shared by the
+  `pi-plugin` CLI, the `PluginScaffold` / `PluginCheck` / `PluginPack` agent
+  tools served from Electron main, and the plugins page's New plugin from
+  template action. `check` reproduces the rules host-core enforces, so passing
+  it implies install will pass; `pack` writes store-only (method 0) `.piplug`
+  entries because `extract_zip_bytes` accepts nothing else. Closes roadmap gap
+  R3's template and `check`/`pack` items.
+- A bundled plugin was rejected as the delivery vehicle: a plugin cannot produce
+  a `.piplug` (no archive API in `HOST_API_ALLOWLIST`) and scaffolding would
+  need high-risk `fs.write.workspace` for a capability the application should
+  provide itself.
+- The built-in `plugin-development` skill activates only for plugin workspaces —
+  a plugin `manifest.json` at the workspace root, or a loaded development plugin
+  inside it — so an ordinary session pays only for three tool descriptions.
+- Development plugins are watched and hot reload on save, debounced 300 ms,
+  ignoring `node_modules` / `.git` / `dist` / `target`, capped at 16 plugins, and
+  re-armed across restarts. A reload can never widen a permission set: the
+  manifest is compared against the set approved when the folder was picked and a
+  new permission stops the reload with `PERMISSION_DENIED`, while removed
+  permissions do take effect. A failed reload keeps the watch so the fixing save
+  recovers the plugin, and reports through a toast plus `pluginChanged` —
+  host-core has no RPC for a runtime-side load failure, so the registry row does
+  not move to `load_error`. Closes roadmap gap R3's hot-reload item.
+- Decision D171; recorded as ADR 0039.
+- The prompt-injection half of this decision was replaced the same day by
+  D172: skills now reach the model as a catalog plus a `Skill` tool. The devkit,
+  hot-reload and workspace-gate clauses stand unchanged.
+
 ## 2026-07-31 — Plugin skills are model-invoked
 
 - `contributes.skills` is activated at load time behind `agent.prompt.inject`.
@@ -642,7 +684,7 @@ section mirrors only marketplace/catalog items still blocking nothing.
   stale catalog.
 - Rejected: user-facing slash commands. A skill is guidance the agent should
   reach for when a task calls for it, not a command the user has to know exists.
-- Decision D171; closes the "parsed but never activated" gap in
+- Decision D172; closes the "parsed but never activated" gap in
   `07-plugins/14-plugin-roadmap.md` R2.
 
 ## 2026-07-31 — Plugin themes ship CSS files
@@ -662,7 +704,7 @@ section mirrors only marketplace/catalog items still blocking nothing.
   it can only express the tokens we thought to enumerate; a stylesheet lets a
   theme reach a surface the token list forgot, and the sanitizer plus
   append-order rule bound the risk to appearance.
-- Decision D172.
+- Decision D173.
 
 ## 2026-07-31 — Plugin MCP servers over stdio and remote HTTP
 
@@ -688,7 +730,7 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Both transports ship rather than stdio alone: a hosted MCP endpoint is common
   enough that stdio-only would have pushed plugins to wrap it in a local shim,
   which is strictly worse — an extra process and an unreviewable proxy.
-- Decision D173; ADR [0038](../../adr/0038-plugin-mcp-bridge.md).
+- Decision D174; ADR [0038](../../adr/0038-plugin-mcp-bridge.md).
 
 ## 2026-07-31 — Resident plugin services and their restart policy
 
@@ -709,8 +751,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
   and a `plugin.service.*` audit entry.
 - Manual enable / disable outranks the supervisor: an explicit action cancels the
   pending timer and clears the attempt counter.
-- Decision D174; ADR
-  [0039](../../adr/0039-plugin-resident-services-and-message-bus.md).
+- Decision D175; ADR
+  [0040](../../adr/0040-plugin-resident-services-and-message-bus.md).
 
 ## 2026-07-31 — Inter-plugin message bus routes declared topics only
 
@@ -731,5 +773,5 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - A payload conveys data, never capability: receiving a message grants the
   subscriber nothing it did not already hold, so a topic should be treated as
   public within the app.
-- Decision D175; ADR
-  [0039](../../adr/0039-plugin-resident-services-and-message-bus.md).
+- Decision D176; ADR
+  [0040](../../adr/0040-plugin-resident-services-and-message-bus.md).

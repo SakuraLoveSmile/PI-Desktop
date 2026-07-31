@@ -1,0 +1,250 @@
+import { readFile, stat } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import {
+  PLUGIN_PERMISSIONS,
+  validateManifest,
+  type PluginManifest,
+} from "@pi-desktop/plugin-sdk";
+import { MAX_PACKAGE_BYTES, MAX_PACKAGE_FILES, walkPluginDir } from "./walk.js";
+
+/**
+ * Permissions the permission dialog surfaces as high risk. Kept in sync with
+ * `RISK_BY_PERMISSION` in apps/desktop/src/pages/PluginsPage.tsx.
+ */
+export const HIGH_RISK_PERMISSIONS = [
+  "net.fetch",
+  "fs.write.workspace",
+  "agent.prompt.inject",
+  "agent.tool.register",
+] as const;
+
+/** Host API surface each permission unlocks, used for the unused-permission hint. */
+const PERMISSION_API_HINTS: Record<string, string[]> = {
+  "ui.panel": ["ui.openPanel", "ui.closePanel"],
+  notify: ["ui.notify"],
+  "clipboard.read": ["clipboard.readText"],
+  "clipboard.write": ["clipboard.writeText"],
+  "fs.read.workspace": ["fs.readText", "fs.glob"],
+  "fs.write.workspace": ["fs.writeText"],
+  "agent.tool.register": ["agent.registerTool"],
+  "net.fetch": ["net.fetch"],
+  "shell.openExternal": ["shell.openExternal"],
+};
+
+export type CheckIssue = {
+  /** Stable machine code, e.g. `manifest.missing` or `permission.unknown`. */
+  code: string;
+  message: string;
+};
+
+export type CheckResult = {
+  ok: boolean;
+  dir: string;
+  manifest?: PluginManifest;
+  errors: CheckIssue[];
+  warnings: CheckIssue[];
+  fileCount: number;
+  totalBytes: number;
+};
+
+/** Skill entries are either a bare path or an object carrying one. */
+function skillPaths(manifest: PluginManifest): string[] {
+  const entries = (manifest.contributes?.skills ?? []) as Array<unknown>;
+  const paths: string[] = [];
+  for (const entry of entries) {
+    if (typeof entry === "string") paths.push(entry);
+    else if (entry && typeof entry === "object") {
+      const path = (entry as { path?: unknown }).path;
+      if (typeof path === "string") paths.push(path);
+    }
+  }
+  return paths;
+}
+
+function isEscapingPath(value: string): boolean {
+  if (/^[a-zA-Z]:[\\/]/.test(value) || value.startsWith("/") || value.startsWith("\\")) {
+    return true;
+  }
+  return value.split(/[\\/]/).includes("..");
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate a plugin directory against every rule host-core enforces at install
+ * time, so a clean `check` means `install` will not reject the package.
+ *
+ * Errors block packaging; warnings are advice a plugin author should read
+ * before publishing but that will still install.
+ */
+export async function check(dirInput: string): Promise<CheckResult> {
+  const dir = resolve(dirInput);
+  const errors: CheckIssue[] = [];
+  const warnings: CheckIssue[] = [];
+  const fail = (code: string, message: string): CheckResult => ({
+    ok: false,
+    dir,
+    errors: [...errors, { code, message }],
+    warnings,
+    fileCount: 0,
+    totalBytes: 0,
+  });
+
+  let raw: string;
+  try {
+    raw = await readFile(join(dir, "manifest.json"), "utf8");
+  } catch {
+    return fail("manifest.missing", "manifest.json is missing");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return fail("manifest.invalid-json", `manifest.json is not valid JSON: ${String(error)}`);
+  }
+
+  const validated = validateManifest(parsed);
+  if (!validated.ok || !validated.manifest) {
+    return fail("manifest.invalid", validated.error ?? "manifest is invalid");
+  }
+  const manifest = validated.manifest;
+
+  if (!(await fileExists(join(dir, manifest.main)))) {
+    errors.push({
+      code: "main.missing",
+      message: `manifest.main "${manifest.main}" does not exist`,
+    });
+  }
+
+  const panel = manifest.ui?.panel;
+  if (panel && !(await fileExists(join(dir, panel)))) {
+    errors.push({ code: "panel.missing", message: `ui.panel "${panel}" does not exist` });
+  }
+
+  for (const path of skillPaths(manifest)) {
+    if (isEscapingPath(path)) {
+      errors.push({
+        code: "skill.escapes",
+        message: `contributes.skills path "${path}" must be relative and must not contain ".."`,
+      });
+      continue;
+    }
+    if (!(await fileExists(join(dir, path)))) {
+      errors.push({ code: "skill.missing", message: `skill file "${path}" does not exist` });
+      continue;
+    }
+    const doc = await readFile(join(dir, path), "utf8");
+    if (!doc.trim()) {
+      errors.push({ code: "skill.empty", message: `skill file "${path}" is empty` });
+    } else if (!/^---[ \t]*\r?\n/.test(doc.replace(/^﻿/, ""))) {
+      warnings.push({
+        code: "skill.no-frontmatter",
+        message: `skill "${path}" has no "name"/"description" front matter, so the agent gets no summary of when to apply it`,
+      });
+    }
+  }
+
+  const permissions = manifest.permissions ?? [];
+  const known = new Set<string>(PLUGIN_PERMISSIONS);
+  for (const permission of permissions) {
+    if (!known.has(permission)) {
+      errors.push({
+        code: "permission.unknown",
+        message: `permission "${permission}" is not a known PI-Desktop permission`,
+      });
+    }
+  }
+  const highRisk = permissions.filter((p) =>
+    (HIGH_RISK_PERMISSIONS as readonly string[]).includes(p),
+  );
+  if (highRisk.length) {
+    warnings.push({
+      code: "permission.high-risk",
+      message: `high-risk permissions require an explicit user grant: ${highRisk.join(", ")}`,
+    });
+  }
+  if (skillPaths(manifest).length && !permissions.includes("agent.prompt.inject")) {
+    warnings.push({
+      code: "permission.skills-inert",
+      message:
+        'contributes.skills is declared without "agent.prompt.inject", so the skills are never sent to the agent',
+    });
+  }
+  if (manifest.contributes?.agentTools?.length && !permissions.includes("agent.tool.register")) {
+    errors.push({
+      code: "permission.tools-missing",
+      message:
+        'contributes.agentTools requires the "agent.tool.register" permission',
+    });
+  }
+  if (panel && !permissions.includes("ui.panel")) {
+    errors.push({
+      code: "permission.panel-missing",
+      message: 'ui.panel requires the "ui.panel" permission',
+    });
+  }
+
+  const walk = await walkPluginDir(dir);
+  if (walk.symlinks.length) {
+    errors.push({
+      code: "package.symlink",
+      message: `symlinks are not allowed in a plugin package: ${walk.symlinks.slice(0, 5).join(", ")}`,
+    });
+  }
+  if (walk.truncated) {
+    errors.push({
+      code: "package.too-many-files",
+      message: `a plugin package may contain at most ${MAX_PACKAGE_FILES} files`,
+    });
+  }
+  if (walk.totalBytes > MAX_PACKAGE_BYTES) {
+    errors.push({
+      code: "package.too-large",
+      message: `a plugin package may not exceed ${MAX_PACKAGE_BYTES / (1024 * 1024)}MB`,
+    });
+  }
+
+  // Entry-source hints: a declared permission that the code never exercises is
+  // a needless prompt for the user, and the reverse is a runtime denial.
+  const mainSource = await readFile(join(dir, manifest.main), "utf8").catch(() => "");
+  if (mainSource) {
+    for (const permission of permissions) {
+      const apis = PERMISSION_API_HINTS[permission];
+      if (!apis) continue;
+      if (!apis.some((api) => mainSource.includes(api))) {
+        warnings.push({
+          code: "permission.unused",
+          message: `permission "${permission}" is declared but ${manifest.main} never calls ${apis.join(" / ")}`,
+        });
+      }
+    }
+  }
+
+  const contributes = manifest.contributes ?? {};
+  const hasContribution = Object.values(contributes).some((value) =>
+    Array.isArray(value) ? value.length > 0 : Boolean(value),
+  );
+  if (!hasContribution) {
+    warnings.push({
+      code: "contributes.empty",
+      message: "the manifest contributes nothing, so the plugin has no visible effect",
+    });
+  }
+
+  return {
+    ok: errors.length === 0,
+    dir,
+    manifest,
+    errors,
+    warnings,
+    fileCount: walk.files.length,
+    totalBytes: walk.totalBytes,
+  };
+}

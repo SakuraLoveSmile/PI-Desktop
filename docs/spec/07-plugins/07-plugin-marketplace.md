@@ -122,6 +122,19 @@ browse/search
 
 On any validation failure: abort and optionally clean up the cache.
 
+`.piplug` packages are now producible locally: `pnpm pi-plugin pack <dir>`
+(equally, the `PluginPack` agent tool) writes `dist/<id>-<version>.piplug` and
+prints its sha256, and the plugins page installs that file through the same
+validation and permission review as a marketplace download. Distribution through
+the marketplace is therefore optional — a plugin written for personal use never
+has to leave the machine. See
+[Plugin developer experience](10-plugin-devex.md).
+
+A catalog entry whose plugin declares `contributes.skills` must also declare
+`agent.prompt.inject` in `permissions`; without it the skills are inert and the
+permission review will not mention them. `pi-plugin check` warns on that
+combination.
+
 ## 6. Update path
 
 1. `checkUpdates` after startup or on a schedule

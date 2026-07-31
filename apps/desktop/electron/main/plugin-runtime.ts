@@ -22,6 +22,7 @@ import {
 } from "@pi-desktop/plugin-sdk";
 import type { PluginServiceStatus } from "@pi-desktop/shared";
 import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
+import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
 
 export type RegisteredCommand = {
   id: string;
@@ -128,6 +129,13 @@ export type PluginHostServices = {
   onPluginCrash?: (info: { pluginId: string; name: string; exitCode: number }) => void;
   /** Fired when a resident service changes supervision state. */
   onServiceChange?: (status: PluginServiceStatus) => void;
+  /** Fired after a development plugin was reloaded from disk, or failed to. */
+  onPluginReloaded?: (info: {
+    pluginId: string;
+    name: string;
+    ok: boolean;
+    message?: string;
+  }) => void;
 };
 
 /** Host APIs a plugin process may reach. Anything else does not exist (spec 04 §2). */
@@ -247,6 +255,22 @@ function busSubscribeAllowed(declared: string[] | undefined, pattern: string): b
   return isValidBusTopic(pattern) && busTopicAllowed(declared, pattern);
 }
 
+/**
+ * Permissions a plugin directory currently declares. Throws on a manifest that
+ * is missing or unparseable, which is what a reload wants: nothing is granted
+ * against a manifest nobody can read.
+ */
+function readDeclaredPermissions(pluginPath: string): string[] {
+  const manifestPath = join(pluginPath, "manifest.json");
+  if (!existsSync(manifestPath)) {
+    throw new Error("PLUGIN_INVALID: manifest.json missing");
+  }
+  const raw = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const declared = (raw as { permissions?: unknown }).permissions;
+  if (!Array.isArray(declared)) return [];
+  return declared.filter((entry): entry is string => typeof entry === "string");
+}
+
 function ensureWithinRoot(root: string, candidate: string): string {
   const resolvedRoot = resolve(root);
   const resolved = resolve(resolvedRoot, candidate);
@@ -323,8 +347,20 @@ export class PluginRuntime {
   private loaded = new Map<string, LoadedPlugin>();
   private toasts: Array<{ message: string; level?: string }> = [];
   private services: PluginHostServices;
+  /**
+   * Development plugins under watch, with the permission ceiling the user
+   * approved when they picked the folder. Survives a failed reload so the fix
+   * that follows a syntax error still gets picked up.
+   */
+  private devPlugins = new Map<string, { path: string; permissions: string[] }>();
+  /** Plugin ids inside `reloadDevPlugin`, whose watch must outlive the unload. */
+  private reloading = new Set<string>();
+  private watcher: DevPluginWatcher;
 
-  constructor(services?: Partial<PluginHostServices>) {
+  constructor(
+    services?: Partial<PluginHostServices>,
+    watcherOptions?: Pick<DevPluginWatcherDeps, "watch" | "debounceMs" | "max">,
+  ) {
     this.services = {
       getWorkspacePath: () => null,
       showToast: (message, level) => {
@@ -344,6 +380,19 @@ export class PluginRuntime {
       closePanel: async () => undefined,
       ...services,
     };
+    this.watcher = new DevPluginWatcher({
+      ...watcherOptions,
+      reload: (pluginId) => this.reloadDevPlugin(pluginId),
+      onProblem: (pluginId, message) => {
+        this.services.audit?.({
+          pluginId,
+          api: "plugin.watch.error",
+          ok: false,
+          message,
+          ts: Date.now(),
+        });
+      },
+    });
   }
 
   setServices(services: Partial<PluginHostServices>): void {
@@ -553,9 +602,90 @@ export class PluginRuntime {
     }
     this.clearContributions(pluginId);
     this.loaded.delete(pluginId);
+    // A reload unloads before it loads; its watch has to outlive that, and so
+    // does the permission ceiling it reloads against.
+    if (!this.reloading.has(pluginId)) {
+      this.watcher.remove(pluginId);
+      this.devPlugins.delete(pluginId);
+    }
     await this.services.closePanel(pluginId);
     if (loaded) {
       this.services.audit?.({ pluginId, api: "plugin.unload", ok: true, ts: Date.now() });
+    }
+  }
+
+  /**
+   * Watch a loaded development plugin so source edits reload it in place.
+   *
+   * The permission set recorded here is the ceiling for every later reload:
+   * grants were approved against the manifest as it looked when the user chose
+   * the folder, and no file edit may widen them.
+   */
+  watchDevPlugin(pluginId: string): void {
+    const loaded = this.loaded.get(pluginId);
+    if (!loaded) return;
+    this.devPlugins.set(pluginId, {
+      path: loaded.path,
+      permissions: [...loaded.permissions],
+    });
+    this.watcher.add(pluginId, loaded.path);
+  }
+
+  isWatchingDevPlugin(pluginId: string): boolean {
+    return this.watcher.isWatching(pluginId);
+  }
+
+  /** Stop every watch; called on app quit alongside the other subsystems. */
+  disposeWatchers(): void {
+    this.watcher.disposeAll();
+    this.devPlugins.clear();
+  }
+
+  /**
+   * Re-run a watched development plugin from disk.
+   *
+   * A manifest that now declares permissions outside the recorded ceiling stops
+   * here: hot reload must never widen a permission set behind the gateway. The
+   * plugin stays watched either way, so the edit that fixes a broken reload is
+   * picked up like any other.
+   */
+  async reloadDevPlugin(pluginId: string): Promise<void> {
+    const dev = this.devPlugins.get(pluginId);
+    if (!dev) return;
+    const name = this.loaded.get(pluginId)?.manifest.name ?? pluginId;
+    this.reloading.add(pluginId);
+    try {
+      const declared = readDeclaredPermissions(dev.path);
+      const ceiling = new Set(dev.permissions);
+      const added = declared.filter((permission) => !ceiling.has(permission));
+      if (added.length) {
+        throw new Error(
+          `PERMISSION_DENIED: manifest now requests ${added.join(", ")}; load the plugin again to review`,
+        );
+      }
+      // Grants follow the manifest downwards, never upwards: a permission the
+      // author removed stops being available on the next reload.
+      const manifest = await this.loadFromPath(dev.path, declared);
+      this.devPlugins.set(pluginId, { path: dev.path, permissions: dev.permissions });
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.reload.success",
+        ok: true,
+        ts: Date.now(),
+      });
+      this.services.onPluginReloaded?.({ pluginId, name: manifest.name, ok: true });
+    } catch (error) {
+      const message = (error as Error).message;
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.reload.error",
+        ok: false,
+        message,
+        ts: Date.now(),
+      });
+      this.services.onPluginReloaded?.({ pluginId, name, ok: false, message });
+    } finally {
+      this.reloading.delete(pluginId);
     }
   }
 

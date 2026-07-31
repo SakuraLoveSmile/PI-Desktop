@@ -14,6 +14,7 @@ import {
   IconPlug,
   IconSearch,
   IconShield,
+  IconSparkles,
   IconTrash,
   IconTriangleAlert,
   IconX,
@@ -44,6 +45,16 @@ const GROUP_LABEL_KEYS: Record<GroupId, string> = {
   active: "plugins.groupActive",
   disabled: "plugins.groupDisabled",
 };
+
+/** Mirrors TEMPLATE_NAMES in @pi-desktop/plugin-devkit; main rejects anything else. */
+const TEMPLATE_IDS = [
+  "panel-basic",
+  "agent-tool-basic",
+  "skill-pack",
+  "full-demo",
+] as const;
+
+type TemplateId = (typeof TEMPLATE_IDS)[number];
 
 type RiskTier = "high" | "medium" | "low";
 
@@ -321,6 +332,8 @@ export function PluginsPage() {
     version?: string;
   } | null>(null);
   const [autoUpdate, setAutoUpdate] = useState(true);
+  const [templatePick, setTemplatePick] = useState<TemplateId | null>(null);
+  const [creating, setCreating] = useState(false);
   const [marketSource, setMarketSource] = useState("");
   const [headerMenu, setHeaderMenu] = useState(false);
   const [rowMenu, setRowMenu] = useState<string | null>(null);
@@ -573,6 +586,24 @@ export function PluginsPage() {
       showToast(t("plugins.installPackageDone"), { variant: "success" });
     });
 
+  const createFromTemplate = async (template: TemplateId) => {
+    setCreating(true);
+    try {
+      const created = await api.createPluginFromTemplate(template);
+      await refreshPlugins();
+      setTemplatePick(null);
+      // A canceled folder picker is not a failure: leave the page untouched.
+      if (created.canceled) return;
+      showToast(t("plugins.newFromTemplateDone", { name: created.name ?? "" }), {
+        variant: "success",
+      });
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : String(e), { variant: "error" });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const checkUpdates = () =>
     run(async () => {
       const res = await api.marketCheckUpdates();
@@ -641,6 +672,12 @@ export function PluginsPage() {
     { key: "applyAutoUpdates", run: applyAutoUpdates },
     { key: "installPackage", run: installPackage },
     { key: "loadDev", run: loadDev },
+    {
+      key: "newFromTemplate",
+      run: async () => {
+        setTemplatePick(TEMPLATE_IDS[0]);
+      },
+    },
   ];
 
   const summary = [
@@ -827,6 +864,12 @@ export function PluginsPage() {
                   </Button>
                   <Button variant="secondary" onClick={() => void loadDev()}>
                     {t("plugins.loadDev")}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setTemplatePick(TEMPLATE_IDS[0])}
+                  >
+                    {t("plugins.newFromTemplate")}
                   </Button>
                 </div>
               </div>
@@ -1565,6 +1608,85 @@ export function PluginsPage() {
                 {busyId === pendingInstall.id
                   ? t("plugins.installing")
                   : t("plugins.acceptInstall")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {templatePick ? (
+        <div className="plugins-modal-backdrop" role="presentation">
+          <div
+            className="plugins-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("plugins.newFromTemplateTitle")}
+          >
+            <header className="plugins-modal-head">
+              <span className="plugins-modal-icon" aria-hidden>
+                <IconSparkles size={17} />
+              </span>
+              <div>
+                <h2 className="plugins-modal-title">
+                  {t("plugins.newFromTemplateTitle")}
+                </h2>
+                <p className="plugins-modal-subtitle">
+                  {t("plugins.newFromTemplateHint")}
+                </p>
+              </div>
+            </header>
+
+            <div className="plugins-modal-body">
+              <p className="plugins-modal-lede">{t("plugins.newFromTemplateBody")}</p>
+              <div
+                className="plugins-template-list"
+                role="radiogroup"
+                aria-label={t("plugins.newFromTemplateTitle")}
+              >
+                {TEMPLATE_IDS.map((template) => {
+                  const active = templatePick === template;
+                  return (
+                    <button
+                      key={template}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      className={cx("plugins-template", active && "active")}
+                      onClick={() => setTemplatePick(template)}
+                    >
+                      <span className="plugins-template-mark" aria-hidden>
+                        {active ? <IconCheck size={13} /> : null}
+                      </span>
+                      <span className="plugins-template-copy">
+                        <strong className="plugins-template-name">
+                          {t(`plugins.templateName.${template}`)}
+                        </strong>
+                        <span className="plugins-template-body">
+                          {t(`plugins.templateBody.${template}`)}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="plugins-modal-actions">
+              <Button
+                variant="secondary"
+                disabled={creating}
+                onClick={() => setTemplatePick(null)}
+              >
+                {t("plugins.cancel")}
+              </Button>
+              <Button
+                variant="primary"
+                disabled={creating}
+                onClick={() => void createFromTemplate(templatePick)}
+              >
+                {creating
+                  ? t("plugins.newFromTemplateCreating")
+                  : t("plugins.newFromTemplateCreate")}
               </Button>
             </div>
           </div>

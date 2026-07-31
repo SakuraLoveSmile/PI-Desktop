@@ -102,14 +102,13 @@ test("renderer routes browser preview events to the originating session", () => 
 });
 
 test("agent runtime exposes BrowserPreview in every mode and prompts for it", () => {
-  assert.match(
-    runtimeSource,
-    /const tools = \["Read", "Glob", "Grep", "BrowserPreview"\];/,
+  // Listed with the read-only tools, before the agent-mode additions.
+  const baseline = runtimeSource.slice(
+    runtimeSource.indexOf("const tools = ["),
+    runtimeSource.indexOf("if (this.mode === \"agent\") {"),
   );
-  assert.match(
-    runtimeSource,
-    /toolName === "Read" \|\| toolName === "BrowserPreview"/,
-  );
+  assert.match(baseline, /"BrowserPreview"/);
+  assert.match(runtimeSource, /BrowserPreview: \{ path: Type\.String\(\) \}/);
   // Default system prompt teaches the live-reload contract: one call per page.
   assert.match(runtimeSource, /call the BrowserPreview tool/);
   assert.match(runtimeSource, /live-reloads/);

@@ -269,6 +269,14 @@ export const api = {
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
   loadDevPlugin: () => invoke(IPC.invoke.pluginLoadDev),
+  createPluginFromTemplate: (template: string) =>
+    invoke<{
+      canceled?: boolean;
+      id?: string;
+      name?: string;
+      dir?: string;
+      files?: string[];
+    }>(IPC.invoke.pluginCreateFromTemplate, { template }),
   installPluginFromPath: () => invoke(IPC.invoke.pluginInstallFromPath),
   installPluginFromPackage: () => invoke(IPC.invoke.pluginInstallFromPackage),
   enablePlugin: (id: string) => invoke(IPC.invoke.pluginEnable, id),

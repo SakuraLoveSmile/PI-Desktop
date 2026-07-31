@@ -1319,7 +1319,7 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
   });
 });
 
-describe("DesktopAgentRuntime plugin skills (D171)", () => {
+describe("DesktopAgentRuntime plugin skills (D172)", () => {
   const pluginSkills = [
     {
       id: "demo.hello/release-notes",
@@ -1329,14 +1329,24 @@ describe("DesktopAgentRuntime plugin skills (D171)", () => {
   ];
 
   it("advertises the catalog and offers the Skill tool", async () => {
-    const runtime = createRuntime({ pluginSkills });
+    const runtime = createRuntime({
+      pluginSkills,
+      projectInstructions: {
+        entries: [{ source: "AGENTS.md", content: "Run unit tests." }],
+      },
+    });
     const agent = (runtime as any).agent;
+    const prompt = agent.state.systemPrompt as string;
 
-    expect(agent.state.systemPrompt).toContain("# Skills");
-    expect(agent.state.systemPrompt).toContain("`demo.hello/release-notes`");
+    expect(prompt).toContain("# Skills");
+    expect(prompt).toContain("`demo.hello/release-notes`");
     // Only the catalog line travels up front; the body loads on demand.
-    expect(agent.state.systemPrompt).not.toContain("Skill: Release notes");
+    expect(prompt).not.toContain("Skill: Release notes");
     expect(agent.state.tools.some((tool: any) => tool.name === "Skill")).toBe(true);
+    // The user's own instructions come last, so they keep the final word.
+    expect(prompt.indexOf("# Skills")).toBeLessThan(
+      prompt.indexOf("# Project instructions"),
+    );
 
     await runtime.dispose();
   });
@@ -1370,14 +1380,22 @@ describe("DesktopAgentRuntime plugin skills (D171)", () => {
 
   it("does not reuse a runtime whose skill catalog changed", async () => {
     const runtime = createRuntime({ pluginSkills });
-    const ids = pluginSkills.map((skill) => skill.id);
 
-    expect(runtime.matches("agent", provider, "medium", [], undefined, ids)).toBe(true);
+    expect(
+      runtime.matches("agent", provider, "medium", [], undefined, pluginSkills),
+    ).toBe(true);
+    // Revoking agent.prompt.inject empties the catalog.
     expect(runtime.matches("agent", provider, "medium", [], undefined, [])).toBe(false);
     expect(
       runtime.matches("agent", provider, "medium", [], undefined, [
-        ...ids,
-        "demo.hello/other",
+        ...pluginSkills,
+        { id: "demo.hello/other", name: "Other" },
+      ]),
+    ).toBe(false);
+    // A renamed skill rewrites the catalog line the model reads.
+    expect(
+      runtime.matches("agent", provider, "medium", [], undefined, [
+        { ...pluginSkills[0], name: "Renamed" },
       ]),
     ).toBe(false);
 

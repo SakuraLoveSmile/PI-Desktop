@@ -9,7 +9,14 @@ const desktopRoot = join(here, "..");
 const repoRoot = join(desktopRoot, "../..");
 
 const runtimeSrc = readFileSync(join(desktopRoot, "electron/main/plugin-runtime.ts"), "utf8");
+const builtinSrc = readFileSync(join(desktopRoot, "electron/main/builtin-skills.ts"), "utf8");
+const devToolsSrc = readFileSync(join(desktopRoot, "electron/main/plugin-dev-tools.ts"), "utf8");
 const mainSrc = readFileSync(join(desktopRoot, "electron/main/index.ts"), "utf8");
+const packageJson = JSON.parse(readFileSync(join(desktopRoot, "package.json"), "utf8"));
+const skillDoc = readFileSync(
+  join(desktopRoot, "resources/skills/plugin-development.md"),
+  "utf8",
+);
 const agentRuntimeSrc = readFileSync(
   join(repoRoot, "packages/agent-runtime/src/runtime.ts"),
   "utf8",
@@ -53,8 +60,17 @@ test("loading a skill body strips front matter and re-checks the cap", () => {
   assert.match(load, /plugin\.skill\.load/);
 });
 
+test("a reloaded plugin re-indexes its skills, so an edit needs no restart", () => {
+  // Hot reload runs unload/load; the catalog must be rebuilt from disk there,
+  // and the body is read on every Skill call regardless.
+  assert.match(runtimeSrc, /this\.registerSkills\(loaded\)/);
+  assert.match(runtimeSrc.slice(runtimeSrc.indexOf("loadSkillBody(")), /readFileSync\(skill\.path/);
+});
+
 test("main forwards the skill catalog and serves the Skill tool locally", () => {
-  assert.match(mainSrc, /pluginSkills: plugins\.getSkills\(\)/);
+  assert.match(mainSrc, /const pluginSkills = \[/);
+  assert.match(mainSrc, /\.\.\.plugins\.getSkills\(\)\.map\(/);
+  assert.match(mainSrc, /\n\s+pluginSkills,\n/);
   assert.match(mainSrc, /setLocalTool\("Skill"/);
   assert.match(mainSrc, /loadSkillBody\(id\)/);
 });
@@ -62,7 +78,70 @@ test("main forwards the skill catalog and serves the Skill tool locally", () => 
 test("the agent runtime advertises skills and rebuilds when the catalog changes", () => {
   assert.match(agentRuntimeSrc, /pluginSkillsPrompt/);
   assert.match(agentRuntimeSrc, /SKILL_TOOL_NAME/);
-  assert.match(agentRuntimeSrc, /pluginSkillIds/);
+  assert.match(agentRuntimeSrc, /pluginSkillsDigest/);
   assert.match(sidecarSrc, /pluginSkills/);
-  assert.match(sidecarSrc, /pluginSkillIds/);
+});
+
+test("the built-in plugin skill only activates for plugin workspaces", () => {
+  assert.match(builtinSrc, /isPluginWorkspace/);
+  assert.match(builtinSrc, /schemaVersion.*number/s);
+  assert.match(builtinSrc, /pluginPaths\.some/);
+  assert.match(builtinSrc, /if \(!isPluginWorkspace\(input\.workspacePath, input\.pluginPaths\)\) return \[\]/);
+  assert.match(mainSrc, /builtinSkills\(\{/);
+});
+
+test("the built-in skill body loads through the same Skill tool", () => {
+  // Host-owned skills are not in the plugin registry, so main tries them first.
+  assert.match(builtinSrc, /export function loadBuiltinSkillBody/);
+  assert.match(mainSrc, /loadBuiltinSkillBody\(id\) \?\? plugins\.loadSkillBody\(id\)/);
+});
+
+test("the built-in skill ships as a packaged resource with a dev fallback", () => {
+  const resources = packageJson.build.extraResources.map((entry) => entry.to);
+  assert.ok(resources.includes("skills"), "resources/skills must be packaged");
+  assert.match(builtinSrc, /process\.resourcesPath/);
+  assert.match(builtinSrc, /resources\/skills/);
+});
+
+test("the built-in skill documents the constraints a plugin author will hit", () => {
+  assert.match(skillDoc, /^---\n/);
+  assert.match(skillDoc, /description: /);
+  for (const token of [
+    "PluginScaffold",
+    "PluginCheck",
+    "PluginPack",
+    "agent.prompt.inject",
+    "store-only",
+    "schemaVersion",
+  ]) {
+    assert.ok(skillDoc.includes(token), `built-in skill must mention ${token}`);
+  }
+});
+
+test("plugin dev tools resolve paths inside the workspace and report failures", () => {
+  assert.match(devToolsSrc, /resolveWithinRoot\(root, value\)/);
+  assert.match(devToolsSrc, /no workspace is open/);
+  assert.match(devToolsSrc, /isError: true/);
+  // Scaffolding loads the plugin so the first edit is already a hot reload.
+  assert.match(devToolsSrc, /registerDevPlugin\(target\.path\)/);
+  assert.match(devToolsSrc, /loadPlugin\(target\.path, permissions\)/);
+});
+
+test("only PluginCheck is available outside agent mode", () => {
+  const builder = agentRuntimeSrc.slice(agentRuntimeSrc.indexOf("const tools = ["));
+  const baseline = builder.slice(0, builder.indexOf("\n    if (this.mode"));
+  assert.match(baseline, /"PluginCheck"/);
+  assert.doesNotMatch(baseline, /PluginScaffold|PluginPack/);
+  const agentOnly = builder.slice(builder.indexOf("if (this.mode"));
+  assert.match(agentOnly, /"PluginScaffold", "PluginPack"/);
+});
+
+test("main registers the three plugin dev tools as local tools", () => {
+  assert.match(mainSrc, /registerPluginDevTools\(s, \{/);
+  for (const name of ["PluginScaffold", "PluginCheck", "PluginPack"]) {
+    assert.ok(
+      devToolsSrc.includes(`setLocalTool("${name}"`),
+      `${name} must be served by main, not host-core`,
+    );
+  }
 });
