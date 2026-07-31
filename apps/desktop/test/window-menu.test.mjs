@@ -51,7 +51,7 @@ test("macOS installs a standard application menu before window creation", () => 
     assert.match(menuSource, new RegExp(`role: "${role}"`));
   }
   for (const topLevel of ["file", "edit", "view", "window"]) {
-    assert.match(menuSource, new RegExp(`label: labels\\\\.menu\\\\.${topLevel}`));
+    assert.match(menuSource, new RegExp(`label: labels\\.menu\\.${topLevel}`));
   }
   assert.match(menuSource, /role:\s*"help"/);
   assert.match(menuSource, /resolveLocale\(locale\)/);
@@ -78,8 +78,8 @@ test("macOS application menu routes shell commands and preserves native roles", 
     ["openSearch", "Mod+K"],
     ["toggleSidebar", "Mod+B"],
   ]) {
-    assert.match(menuSource, new RegExp(`accelerator\\\\("${id}"\\\\)`));
-    assert.match(shortcutSource, new RegExp(`defaultBinding: "${binding.replace("+", "\\\\+")}"`));
+    assert.match(menuSource, new RegExp(`accelerator\\("${id}"\\)`));
+    assert.match(shortcutSource, new RegExp(`defaultBinding: "${binding.replace("+", "\\+")}"`));
   }
   for (const role of [
     "undo",
