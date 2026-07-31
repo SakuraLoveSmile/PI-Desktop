@@ -3,15 +3,19 @@ import { join, dirname, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import {
   parseSkillFrontmatter,
+  pluginMcpToolKey,
   pluginSkillId,
   pluginThemeId,
   pluginToolName,
+  resolveMcpRefs,
   sanitizeThemeCss,
   skillIdFromPath,
   validateManifest,
+  validateMcpServer,
   type PluginManifest,
   type PluginSkillContrib,
 } from "@pi-desktop/plugin-sdk";
+import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
 
 export type RegisteredCommand = {
   id: string;
@@ -109,6 +113,11 @@ export type PluginHostServices = {
   hostEntry?: string;
   /** Overrides how a plugin host process is created; defaults to Electron utilityProcess. */
   spawnProcess?: PluginProcessSpawner;
+  /** Transport overrides for plugin-declared MCP servers; tests inject stubs. */
+  mcp?: Pick<
+    McpServerClientOptions,
+    "spawnImpl" | "fetchImpl" | "connectTimeoutMs" | "callTimeoutMs"
+  >;
   /** Fired when a plugin host process dies on its own (crash, OOM, hard exit). */
   onPluginCrash?: (info: { pluginId: string; name: string; exitCode: number }) => void;
 };
@@ -150,6 +159,8 @@ const MAX_SKILL_BYTES = 128 * 1024;
 const MAX_SKILL_DESCRIPTION_CHARS = 240;
 /** A plugin may contribute at most this many themes. */
 const MAX_THEMES_PER_PLUGIN = 8;
+/** A plugin may bring at most this many MCP servers. */
+const MAX_MCP_SERVERS_PER_PLUGIN = 8;
 
 type PendingCall = {
   resolve: (value: unknown) => void;
@@ -240,6 +251,7 @@ export class PluginRuntime {
   private tools = new Map<string, RegisteredPluginTool>();
   private skills = new Map<string, RegisteredPluginSkill>();
   private themes = new Map<string, RegisteredPluginTheme>();
+  private mcpClients = new Map<string, McpServerClient[]>();
   private loaded = new Map<string, LoadedPlugin>();
   private toasts: Array<{ message: string; level?: string }> = [];
   private services: PluginHostServices;
@@ -426,6 +438,7 @@ export class PluginRuntime {
 
     this.registerSkills(loaded);
     this.registerThemes(loaded);
+    await this.registerMcpServers(loaded);
     this.services.audit?.({
       pluginId: manifest.id,
       api: "plugin.load.success",
@@ -725,6 +738,16 @@ export class PluginRuntime {
     for (const [id, theme] of this.themes) {
       if (theme.pluginId === pluginId) this.themes.delete(id);
     }
+    // Closing the client kills the stdio child / drops the HTTP session, so a
+    // disabled plugin leaves no process behind.
+    for (const client of this.mcpClients.get(pluginId) ?? []) {
+      try {
+        client.close();
+      } catch {
+        // Teardown is best effort; a wedged transport must not block unload.
+      }
+    }
+    this.mcpClients.delete(pluginId);
   }
 
   /**
@@ -925,6 +948,112 @@ export class PluginRuntime {
       ok: false,
       errorCode,
       themeId,
+      ...(message ? { message } : {}),
+      ts: Date.now(),
+    });
+  }
+
+  /**
+   * Connect the plugin's declared MCP servers and publish their tools under the
+   * plugin's own namespace, so they travel the existing `plugin_*` tool path
+   * with no extra routing (ADR 0038).
+   *
+   * A server that fails to answer is audited and contributes no tools; the
+   * plugin still loads, and the next tool call retries the handshake.
+   */
+  private async registerMcpServers(loaded: LoadedPlugin): Promise<void> {
+    const declared = loaded.manifest.contributes?.mcpServers ?? [];
+    if (!declared.length) return;
+    const pluginId = loaded.manifest.id;
+    // Credentials come from the plugin's own settings, never from host env.
+    let settings: Record<string, unknown> = {};
+    try {
+      settings = await this.hostApi(loaded).plugin.getSettings();
+    } catch {
+      settings = {};
+    }
+
+    const clients: McpServerClient[] = [];
+    for (const raw of declared) {
+      if (clients.length >= MAX_MCP_SERVERS_PER_PLUGIN) {
+        this.services.audit?.({
+          pluginId,
+          api: "plugin.mcp.skipped",
+          ok: false,
+          errorCode: "LIMIT_EXCEEDED",
+          count: declared.length - clients.length,
+          ts: Date.now(),
+        });
+        break;
+      }
+      const parsed = validateMcpServer(raw);
+      if (!parsed.ok) {
+        this.skipMcpServer(pluginId, String((raw as { id?: unknown })?.id ?? ""), "PLUGIN_INVALID", parsed.error);
+        continue;
+      }
+      const server = parsed.server;
+      const permission =
+        server.transport === "stdio" ? "mcp.server.local" : "mcp.server.remote";
+      if (!loaded.permissions.has(permission)) {
+        this.skipMcpServer(pluginId, server.id, "PERMISSION_DENIED", `missing ${permission}`);
+        continue;
+      }
+      const refs = resolveMcpRefs(
+        server.transport === "stdio" ? server.env : server.headers,
+        settings,
+      );
+      if (!refs.ok) {
+        this.skipMcpServer(pluginId, server.id, "CONFIG_MISSING", refs.error);
+        continue;
+      }
+
+      const client = new McpServerClient({
+        pluginId,
+        pluginPath: loaded.path,
+        server,
+        values: refs.values,
+        audit: this.services.audit,
+        ...this.services.mcp,
+      });
+      clients.push(client);
+      let tools: Awaited<ReturnType<McpServerClient["connect"]>> = [];
+      try {
+        tools = await client.connect();
+      } catch {
+        // The client already audited the failure; leave the server toolless.
+        continue;
+      }
+      for (const tool of tools) {
+        const name = pluginMcpToolKey(server.id, tool.name);
+        const fullName = pluginToolName(pluginId, name);
+        this.tools.set(fullName, {
+          fullName,
+          pluginId,
+          name,
+          description:
+            tool.description ?? `${server.label ?? server.id} tool "${tool.name}" (MCP)`,
+          // Remote code the desktop cannot inspect; never silently auto-approved.
+          risk: "medium",
+          schema: tool.inputSchema,
+          execute: async (toolArgs) => client.callTool(tool.name, toolArgs),
+        });
+      }
+    }
+    if (clients.length) this.mcpClients.set(pluginId, clients);
+  }
+
+  private skipMcpServer(
+    pluginId: string,
+    serverId: string,
+    errorCode: string,
+    message?: string,
+  ): void {
+    this.services.audit?.({
+      pluginId,
+      api: "plugin.mcp.skipped",
+      ok: false,
+      errorCode,
+      serverId,
       ...(message ? { message } : {}),
       ts: Date.now(),
     });
