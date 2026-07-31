@@ -164,7 +164,12 @@ may be retained while exactly one workspace supplies the visible shell context.
   A project/tab switch does not abort a background turn or copy its events into
   the visible transcript. Background message, tool, completion, and permission
   events never activate their session, change the visible project/page, or move
-  focus. Their work-panel artifacts and Browser resource update only the
+  focus. Creating a new session or switching to one that is not running returns
+  the composer to its idle Send state immediately: a turn still streaming in the
+  previously selected session never leaves the destination session's send button
+  stuck in the Abort/stop state, and that background turn's later completion
+  does not alter the destination composer. Their work-panel artifacts and
+  Browser resource update only the
   originating session's retained renderer context and do not reveal or resize
   the visible panel. Only an explicit session/notification activation navigates
   and projects the destination session's retained panel context.
@@ -770,6 +775,10 @@ This does not prevent state changes — it makes them instant.
    requests remain independently actionable in their originating transcripts,
    and background artifacts update only their session's retained work-panel
    context
+9a. Creating a new session or switching to a non-running session returns the
+    composer to its idle Send state even while another session is still
+    streaming; the destination session's own run state alone decides the
+    send/abort button
 10. Focus rings visible on `focus-visible` only, 2px accent offset 2px
 11. Command palette traps focus; Escape returns to previous focus
 12. All animations respect `prefers-reduced-motion: reduce` — state changes are instant, no decorative motion

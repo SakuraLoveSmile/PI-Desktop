@@ -904,6 +904,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         page: "chat" as const,
         navStack: nextStack,
         navIndex: nextStack.length - 1,
+        // The composer follows the visible session's own run state: a turn
+        // still streaming in the previously selected session must not leave
+        // the fresh session's send button stuck in the stop/abort state
+        // (the old session's agent_end is a cross-session event and never
+        // clears the active flag).
+        isRunning: s.runningSessions[created.session.id] ?? false,
       };
     });
   },

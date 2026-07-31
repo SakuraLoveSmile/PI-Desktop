@@ -1244,6 +1244,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | Idle (no model) | textarea active, send button disabled + tooltip "Configure a model first" | Agent link remains available in model menu |
 | Idle (ready) | textarea active, send button enabled | Send active |
 | New session (reasoning model) | Thinking trigger shows the model's highest published level | User may select any published level, including Off when supported |
+| New session / switch while another session is running | textarea active, send button enabled for the destination session's own run state | Send active, Abort hidden unless the destination session itself is running |
 | Running | textarea disabled, abort button visible | Abort active, Send hidden |
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |

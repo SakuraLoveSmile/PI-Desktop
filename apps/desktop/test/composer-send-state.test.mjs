@@ -1,0 +1,55 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
+
+const [store, composer] = await Promise.all([
+  read("../src/stores/app-store.ts"),
+  read("../src/components/Composer.tsx"),
+]);
+
+test("composer send/stop button follows the visible session's run state", () => {
+  const composerRight = composer.match(/<div className="composer-right">[\s\S]*?<\/div>\s*<\/div>/)?.[0] ?? "";
+  assert.match(composerRight, /\{isRunning \? \(/);
+  assert.match(composerRight, /stop-btn/);
+  assert.match(composerRight, /send-btn/);
+  assert.match(composerRight, /onClick=\{\(\) => void abort\(\)\}/);
+});
+
+test("creating a session resets the run flag to the new session's own state", () => {
+  const newSession = store.match(
+    /newSession: async [\s\S]*?\n  forkSession: async/,
+  )?.[0] ?? "";
+  assert.ok(newSession.length > 0, "newSession implementation not found");
+  // A draft reuse delegates to selectSession, which already derives
+  // isRunning from the destination session's run state.
+  assert.match(
+    newSession,
+    /await get\(\)\.selectSession\(session\.id, \{ navigationIntent: intent \}\)/,
+  );
+  // A fresh session commits with its own run state (false when the created
+  // session is not running), so a turn still streaming in the previous
+  // session cannot leave the new session stuck on the stop button.
+  assert.match(
+    newSession,
+    /isRunning: s\.runningSessions\[created\.session\.id\] \?\? false/,
+  );
+});
+
+test("cross-session agent_end cannot clear the active session's running flag", () => {
+  const handleEvents = store.match(
+    /handleAgentEvent: \(envelope\) => \{[\s\S]*?\n  setPage:/,
+  )?.[0] ?? "";
+  assert.match(handleEvents, /envelope\.sessionId !== get\(\)\.activeSessionId/);
+  // The cross-session branch returns before the active-session switch that
+  // sets `isRunning: false` on agent_end, so only the session-scoped
+  // runningSessions entry is updated for other sessions.
+  const crossSession = handleEvents.match(
+    /if \(envelope\.sessionId !== get\(\)\.activeSessionId\) \{[\s\S]*?\n    \}/,
+  )?.[0] ?? "";
+  assert.ok(crossSession.length > 0);
+  assert.match(crossSession, /return;/);
+  const agentEnd = handleEvents.match(/case "agent_end":\s*set\(\{ isRunning: false \}\)/);
+  assert.ok(agentEnd, "active-session agent_end clears isRunning");
+});
