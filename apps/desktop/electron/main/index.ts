@@ -1329,6 +1329,20 @@ async function createWindow() {
             await openPanelArtifact("file", "apps/desktop/src/App.tsx");
             await new Promise((r) => setTimeout(r, 500));
             await shot("pi-panel-files");
+            // The unified header menu (D172): tools first, then the file
+            // resource this run opened above.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const btn = document.querySelector('.work-panel-switcher-trigger');
+                if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 300));
+            await shot("pi-panel-menu");
+            await mainWindow!.webContents.executeJavaScript(`
+              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            `);
+            await new Promise((r) => setTimeout(r, 200));
             await mainWindow!.webContents.executeJavaScript(
               `window.__PI_DESKTOP__?.collapseWorkPanel()`,
             );

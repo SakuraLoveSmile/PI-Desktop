@@ -20,7 +20,7 @@ test("work panel uses a quiet light-theme inset surface", () => {
   );
   assert.match(
     styles,
-    /\.work-panel-create-item\.active\s*\{[\s\S]*?background:\s*var\(--ds-bg-active\)/,
+    /\.work-panel-menu-row\.active::before\s*\{[\s\S]*?background:\s*var\(--ds-text-primary\)/,
   );
 });
 

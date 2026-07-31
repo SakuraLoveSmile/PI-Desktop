@@ -102,7 +102,7 @@ test("work panel is an internal dock that never expands the OS window", () => {
   );
 });
 
-test("work panel activity rail exposes tools and keeps resources in a switcher", () => {
+test("work panel header exposes one unified menu with no duplicated entries", () => {
   const headerIndex = panelSource.indexOf('className="work-panel-header"');
   const contextIndex = panelSource.indexOf('className="work-panel-context no-drag"');
   const actionsIndex = panelSource.indexOf('className="work-panel-actions no-drag"');
@@ -110,14 +110,13 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
 
   assert.ok(contextIndex > headerIndex);
   assert.ok(actionsIndex > contextIndex && bodyIndex > actionsIndex);
-  assert.match(panelSource, /HEADER_TOOLS\.map\(\(\{ kind, Icon \}/);
-  assert.match(panelSource, /"work-panel-create-item"/);
+  assert.match(panelSource, /HEADER_TOOLS\.map\(\(\{ kind, Icon \}, index\)/);
   assert.match(panelSource, /aria-expanded=\{contextOpen\}/);
+  assert.match(panelSource, /aria-controls="work-panel-context-menu"/);
   assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
   assert.match(panelSource, /function headerToolTab\(kind: HeaderToolKind\): WorkPanelTab/);
   assert.match(panelSource, /if \(kind === "file"\) return \{ id: "file", kind \}/);
   assert.match(panelSource, /openWorkPanelTab\(headerToolTab\(kind\)\)/);
-  assert.match(panelSource, /tabs\.map\(\(tab, index\) =>/);
   assert.match(panelSource, /className="work-panel-context-menu"/);
   assert.match(panelSource, /id=\{activeTab \? `work-panel-title-\$\{activeTab\.id\}`/);
   assert.match(panelSource, /role="menuitemradio"/);
@@ -126,15 +125,31 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
   assert.match(panelSource, /data-work-panel-menu-item/);
   assert.match(panelSource, /role="tabpanel"/);
   assert.match(panelSource, /className="work-panel-current-close"/);
-  assert.match(panelSource, /className="work-panel-switcher-close"/);
-  assert.match(panelSource, /closeTab\(tab\.id\)/);
+  assert.match(panelSource, /className="work-panel-menu-close"/);
+  // The tools section lists each singleton once with its own close control, so
+  // the second section may only carry transcript-opened resources.
+  assert.match(panelSource, /function isToolTab\(tab: WorkPanelTab\)/);
+  assert.match(panelSource, /return tab\.id === tab\.kind/);
+  assert.match(
+    panelSource,
+    /const resourceTabs = tabs\.filter\(\(tab\) => !isToolTab\(tab\)\)/,
+  );
+  assert.match(panelSource, /\{resourceTabs\.length > 0 && \(/);
+  assert.match(panelSource, /resourceTabs\.map\(\(tab, index\) =>/);
+  assert.doesNotMatch(panelSource, /tabs\.map\(\(tab, index\) =>/);
+  // Reopening an already-open tool must reuse its tab so the browser keeps its
+  // resource instead of being replaced by a blank singleton.
+  assert.match(panelSource, /const existing = tabs\.find\(\(tab\) => tab\.id === kind\)/);
+  assert.match(panelSource, /if \(existing\) activateTab\(existing\.id\)/);
   assert.doesNotMatch(panelSource, /collapsePanel/);
   assert.doesNotMatch(panelSource, /work-panel-collapse/);
   assert.match(panelSource, /onCollapse/);
   assert.match(panelSource, /work-panel-toolbar-collapse/);
   assert.match(panelSource, /data-work-panel-section="current"/);
-  assert.match(panelSource, /panel\.openTool/);
+  assert.match(panelSource, /panel\.tools/);
   assert.match(panelSource, /panel\.openItems/);
+  assert.match(panelSource, /panel\.tabs\.file/);
+  assert.doesNotMatch(panelSource, /panel\.openTool/);
   assert.match(
     panelSource,
     /blocked=\{[\s\S]*exiting \|\| browserBlocked \|\| contextOpen \|\| dragWidth !== null[\s\S]*\}/,
@@ -148,7 +163,57 @@ test("work panel activity rail exposes tools and keeps resources in a switcher",
     globalStyles,
     /\.work-panel-context-menu \{[^}]*position:\s*absolute;[^}]*max-height:/s,
   );
+  // Header actions are pinned right so they never shift with the label length.
+  assert.match(globalStyles, /\.work-panel-actions \{[^}]*margin-left:\s*auto;/s);
   assert.doesNotMatch(globalStyles, /\.work-panel-tabs\s*\{/);
+  assert.doesNotMatch(
+    globalStyles,
+    /\.work-panel-create-item|\.work-panel-switcher-(?:row|item|close|list|title)/,
+  );
+});
+
+test("work panel menu keeps focus, layout, and motion stable while it is open", () => {
+  // Arrow keys walk rows only; close buttons stay reachable by pointer and by
+  // Delete/Backspace on the focused row.
+  assert.match(panelSource, /"\[data-work-panel-menu-item\]"/);
+  assert.match(panelSource, /const contextOpenFocus = useRef<"active" \| "last">/);
+  assert.match(panelSource, /event\.key === "ArrowUp" \? "last" : "active"/);
+  assert.match(
+    panelSource,
+    /item\.getAttribute\("aria-checked"\) === "true"/,
+  );
+  assert.match(panelSource, /\(checked \?\? items\[0\]\)\?\.focus\(\)/);
+  assert.match(
+    panelSource,
+    /if \(event\.key === "Delete" \|\| event\.key === "Backspace"\)/,
+  );
+  assert.match(panelSource, /items\[current\]\?\.dataset\.workPanelCloseId/);
+  // Closing a row keeps the menu open and focus on a neighbouring row.
+  assert.match(panelSource, /const closeTabFromMenu = useCallback\(/);
+  assert.match(panelSource, /items\[Math\.min\(index, items\.length - 1\)\]\?\.focus\(\)/);
+  // Dismissal on a context switch only — selecting a row closes it explicitly.
+  assert.match(panelSource, /setContextOpen\(false\);\n  \}, \[activeSessionId\]\)/);
+  assert.match(panelSource, /const closeContext = useCallback\(/);
+  assert.match(panelSource, /contextButtonRef\.current\?\.focus\(\)/);
+  // Trailing close slot is always reserved so labels never shift between rows.
+  assert.match(globalStyles, /\.work-panel-menu-slot \{[^}]*width:\s*26px;/s);
+  assert.match(globalStyles, /\.work-panel-menu-item:focus-visible \{[^}]*outline:/s);
+  // Only the label absorbs slack; an element selector here stretched the open
+  // dot into a bar, so the label must be targeted by class.
+  assert.match(panelSource, /className="work-panel-menu-label"/);
+  assert.match(globalStyles, /\.work-panel-menu-label \{[^}]*flex:\s*1 1 auto;/s);
+  assert.doesNotMatch(globalStyles, /\.work-panel-menu-item span\s*\{/);
+  assert.match(globalStyles, /\.work-panel-open-dot \{[^}]*width:\s*4px;[^}]*flex:\s*0 0 auto;/s);
+  // Active row: neutral fill plus a straight 2px edge marker, never color alone.
+  assert.match(
+    globalStyles,
+    /\.work-panel-menu-row\.active::before \{[^}]*width:\s*2px;[^}]*background:\s*var\(--ds-text-primary\)/s,
+  );
+  assert.match(globalStyles, /@keyframes work-panel-menu-in/);
+  assert.match(
+    globalStyles,
+    /@media \(prefers-reduced-motion: reduce\) \{\s*\.work-panel-context-menu \{\s*animation:\s*none;/,
+  );
 });
 
 test("work panel starts closed with no tabs and persists width only", () => {
