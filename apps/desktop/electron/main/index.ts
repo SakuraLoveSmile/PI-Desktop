@@ -1542,6 +1542,34 @@ async function createWindow() {
             `);
             await new Promise((r) => setTimeout(r, 900));
             await shot("pi-plugins-market");
+            // Template picker behind the overflow menu (D171). Selecting a
+            // template only sets state, so no folder dialog opens here.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const tabs = [...document.querySelectorAll('.plugins-segment-btn')];
+                tabs[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                document
+                  .querySelector('.plugins-menu-wrap .plugins-icon-btn')
+                  ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 250));
+            await shot("pi-plugins-menu");
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const items = [...document.querySelectorAll('.plugins-menu [role="menuitem"]')];
+                items[items.length - 1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 300));
+            await shot("pi-plugins-template");
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const cancel = document.querySelector('.plugins-modal-actions button');
+                cancel?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 200));
             await mainWindow!.webContents.executeJavaScript(
               `window.__PI_DESKTOP__?.seedPlugins?.(0)`,
             );
