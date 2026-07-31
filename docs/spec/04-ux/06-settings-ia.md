@@ -96,9 +96,26 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 
 ### Project archive
 - Reuses the durable Projects index as a settings-scale management surface
-- Always includes archived records and keeps archived rows visually muted
+- Always includes archived records; archived rows are grouped, never hidden, so
+  the destination still has no visibility toggle
 - Supports project search, add, activate, project-session expansion, pin,
   archive/restore, and close
+- Layout is three stacked bands (D168):
+  1. **Overview banner** — one sentence of intent, the primary Add project
+     action, and four live counters (projects, open, archived, sessions) whose
+     totals are derived from the same pass that builds the list below
+  2. **Toolbar** — search field with a clear affordance and a match count while
+     searching, plus a two-option sort segmented control (Recent, Name)
+  3. **Grouped index** — always-visible sections in the order Pinned, All
+     projects, Archived; each section shows its label and row count and renders
+     its rows inside one settings panel with hairline separators. Empty sections
+     are omitted
+- Row anatomy: disclosure control, color glyph, project name with state tags
+  (Active, Open, pinned glyph, Archived), one meta line carrying the shortened
+  monospace path, branch, and session count, a relative last-active time, and a
+  hover/focus-revealed action pair (New task, row menu)
+- The row menu groups create/edit actions above pin, archive/restore, and the
+  destructive Close action, and closes on Escape or any outside press
 - Project search also matches session titles. Matching a session retains and
   expands its owning project; expanded sessions are ordered by latest activity,
   show a count and relative update time, and reveal additional rows in batches
@@ -165,17 +182,21 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     the page does not gain horizontal overflow
 12. Project archive always exposes archived records and can restore them without
     duplicating the index in the app shell
-13. Info renders disabled, checking, up-to-date, available, downloading,
+13. Project archive renders the overview counters, search + sort toolbar, and the
+    Pinned / All projects / Archived sections; the counters agree with the
+    rendered row counts, sorting reorders rows inside every section without
+    hiding any, and clearing the search restores the complete index
+14. Info renders disabled, checking, up-to-date, available, downloading,
     downloaded, and error update states without adding another destination
-14. Native select option lists remain readable in both light and dark themes,
+15. Native select option lists remain readable in both light and dark themes,
     including when Chromium delegates the opened list surface to Windows
-15. Shortcut recording rejects modifier-free non-function keys, reserved
+16. Shortcut recording rejects modifier-free non-function keys, reserved
     editor/OS chords, and conflicts; successful overrides immediately drive
     app behavior and macOS menu accelerators and survive restart
-16. Developer tools remain unavailable by default; enabling developer mode
+17. Developer tools remain unavailable by default; enabling developer mode
     unlocks the localized Settings action and platform shortcuts, persists
     across restart, and disabling it closes an open console
-17. Context management defaults to automatic protection, persists all three
+18. Context management defaults to automatic protection, persists all three
     settings, and cannot configure a retained tail that prevents compaction on
     a small-window model because runtime limits remain model-aware
 

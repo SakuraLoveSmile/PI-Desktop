@@ -493,8 +493,8 @@ Each scenario is documented in this format:
 #### E2E-038: Settings owns the project archive destination
 
 - **Preconditions**: App running with at least one configured provider, one supported local session store, one retained project, and one archived project.
-- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card using the theme preview cards. 4) Open 全局 AI and inspect the Permissions and Context management cards. 5) Open Shortcuts and inspect the Keyboard shortcuts card. 6) Open Model configuration and inspect the provider studio. 7) Open Import, Project archive, and Info in order. 8) Search Settings for "project" or "archive". 9) In Project archive, search for a known session title, inspect its expanded project row, then reveal more than eight sessions. 10) Restore the archived project, then activate it. 11) Return to the app shell and open Plugins.
-- **Expected**: The rail contains exactly Basics, 全局 AI/AI, Shortcuts, Model configuration, Import, Project archive, and Info in that order, each with its semantic Lucide icon (SlidersHorizontal / Sparkles / Keyboard / Bot / Download / Archive / Info); Appearance and Providers remain merged into their owning destinations; Permissions and Context management live under 全局 AI; Keyboard shortcuts has its own destination; Developer lives under Info; Project archive shows active, closed, and archived durable rows without a visibility toggle. Its search matches project fields and session titles; a session-title result expands its owning project, lists sessions by latest activity with relative update times, and reveals history in batches of eight. Restore keeps the archive open and activation returns to chat with the restored project retained in the sidebar; the home sidebar and global page results have no standalone Projects destination; Settings search finds Project archive; Plugins remains an independent app-shell destination.
+- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card using the theme preview cards. 4) Open 全局 AI and inspect the Permissions and Context management cards. 5) Open Shortcuts and inspect the Keyboard shortcuts card. 6) Open Model configuration and inspect the provider studio. 7) Open Import, Project archive, and Info in order. 8) Search Settings for "project" or "archive". 9) In Project archive, read the overview counters and compare them with the rendered sections. 10) Switch the sort control from Recent to Name. 11) Search for a known session title, inspect its expanded project row, then reveal more than eight sessions; clear the search with the clear affordance. 12) Open a row menu, dismiss it with Escape and with an outside press. 13) Restore the archived project, then activate it. 14) Return to the app shell and open Plugins.
+- **Expected**: The rail contains exactly Basics, 全局 AI/AI, Shortcuts, Model configuration, Import, Project archive, and Info in that order, each with its semantic Lucide icon (SlidersHorizontal / Sparkles / Keyboard / Bot / Download / Archive / Info); Appearance and Providers remain merged into their owning destinations; Permissions and Context management live under 全局 AI; Keyboard shortcuts has its own destination; Developer lives under Info; Project archive shows active, closed, and archived durable rows without a visibility toggle, grouping them under the always-visible Pinned / All projects / Archived sections (D168) with per-section counts. The overview banner's projects, open, archived, and session counters agree with the rendered rows; sorting by Name reorders rows inside every section without hiding any; search matches project fields and session titles and reports a match count, a session-title result expands its owning project, lists sessions by latest activity with relative update times, and reveals history in batches of eight; clearing the search restores the complete index. The row menu closes on Escape and on an outside press. Restore keeps the archive open and activation returns to chat with the restored project retained in the sidebar; the home sidebar and global page results have no standalone Projects destination; Settings search finds Project archive; Plugins remains an independent app-shell destination.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/01-ui-ia.md`, `03-runtime/11-provider-model-system.md`
 - **Acceptance**: B (model configuration), F (session import)
 - **Milestone**: M4
@@ -2518,12 +2518,23 @@ This test plan spec is accepted when:
 
 ### US-UI-23 Project archive index
 - Open Settings → Project archive.
-- Expect the Settings title "Project archive", primary "Add project", and
-  either an empty state or a project index with colored glyph, path, durable
-  pinned indicator where supplied by the host, archived rows, and active highlight.
+- Expect the Settings title "Project archive" plus three stacked bands (D168):
+  an overview banner with one intent sentence, the primary "Add project", and
+  four counters (projects, open, archived, sessions); a toolbar with a search
+  field, clear affordance, live match count, and a Recent / Name sort segmented
+  control; and a grouped index in the order Pinned, All projects, Archived where
+  each present section shows its label and row count. With no project at all the
+  grouped index is replaced by one empty-state card with its own primary action.
+- Expect each row to carry a colored glyph, the project name with its Active /
+  Open / pinned / Archived tags, one meta line with the shortened monospace
+  path, branch, and session count, a relative last-active time, and the
+  hover-revealed New task and row-menu actions. Archived rows stay listed and
+  softened rather than hidden.
 - Expand a non-active project and open one of its sessions; expect the app to
   activate that project before selecting the session, so workspace tools and
   session scope use the same project.
+- Switch the sort to Name and expect rows to reorder inside every section with
+  no row hidden; clear the search and expect the complete index back.
 
 ### US-UI-24 Settings full-page shell
 - Open Settings (footer profile → Settings).
