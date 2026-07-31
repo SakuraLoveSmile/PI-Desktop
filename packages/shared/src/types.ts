@@ -400,6 +400,21 @@ export type PluginTheme = {
   css: string;
 };
 
+export type PluginServiceState = "starting" | "running" | "stopped" | "failed";
+
+/** Supervision state of one resident plugin service (spec 07 §5). */
+export type PluginServiceStatus = {
+  pluginId: string;
+  serviceId: string;
+  label: string;
+  state: PluginServiceState;
+  /** Host-process restarts this service survived since it was last started. */
+  restarts: number;
+  /** Why the service is `failed`. */
+  message?: string;
+  updatedAt: number;
+};
+
 export type PluginSummary = {
   id: string;
   name: string;

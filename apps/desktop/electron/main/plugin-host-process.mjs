@@ -9,7 +9,9 @@
  *
  * Wire protocol (both directions, one JSON message per frame):
  *   parent -> child  { t: "init", id, pluginId, pluginPath, main, manifest }
- *   parent -> child  { t: "call", id, method, payload }   command.run | tool.execute | lifecycle.unload
+ *   parent -> child  { t: "call", id, method, payload }   command.run | tool.execute |
+ *                                                        service.start | service.stop |
+ *                                                        lifecycle.unload
  *   child  -> parent { t: "call", id, api, args }         host API request
  *   *      -> *      { t: "res", id, ok, value } | { t: "res", id, ok: false, error: { code, message } }
  *   child  -> parent { t: "log", level, message }         diagnostics, fire and forget
@@ -69,6 +71,9 @@ function settle(message) {
 // the broker only ever holds the descriptor plus a proxy back into this process.
 const commands = new Map();
 const tools = new Map();
+// Resident services declared in the manifest. The broker decides when they run;
+// this map only holds the callables and whether they are currently up.
+const services = new Map();
 
 function buildApi() {
   return {
@@ -153,6 +158,32 @@ function buildApi() {
         await call("agent.unregisterTool", [name]);
       },
     },
+    /**
+     * Resident background workers (spec 07 §3). Registration is local: the
+     * manifest already declared the service, and the broker starts it only when
+     * `background.service` was granted — so a plugin that registers without the
+     * permission simply never runs.
+     */
+    services: {
+      register: (service) => {
+        if (!service || typeof service.id !== "string" || !service.id) {
+          throw new Error("service.id is required");
+        }
+        if (typeof service.start !== "function") {
+          throw new Error("service.start must be a function");
+        }
+        services.set(service.id, {
+          start: service.start,
+          stop: typeof service.stop === "function" ? service.stop : undefined,
+          running: false,
+        });
+      },
+      unregister: async (id) => {
+        const entry = services.get(String(id ?? ""));
+        services.delete(String(id ?? ""));
+        if (entry?.running && entry.stop) await entry.stop();
+      },
+    },
     clipboard: {
       readText: () => call("clipboard.readText"),
       writeText: (text) => call("clipboard.writeText", [text]),
@@ -223,6 +254,28 @@ async function handleParentCall(method, payload) {
       });
       return result ?? null;
     }
+    case "service.start": {
+      const id = String(payload?.id ?? "");
+      const entry = services.get(id);
+      if (!entry) {
+        const error = new Error(`service not registered: ${id}`);
+        error.code = "NOT_FOUND";
+        throw error;
+      }
+      // Idempotent: a restart of the host process re-runs start, but a second
+      // start inside one process must not spawn a duplicate worker.
+      if (entry.running) return { ok: true, alreadyRunning: true };
+      await entry.start({ log: (msg) => log("info", msg) });
+      entry.running = true;
+      return { ok: true };
+    }
+    case "service.stop": {
+      const entry = services.get(String(payload?.id ?? ""));
+      if (!entry?.running) return { ok: true };
+      entry.running = false;
+      if (entry.stop) await entry.stop();
+      return { ok: true };
+    }
     case "lifecycle.unload": {
       // Best effort: a throwing onUnload must not block teardown.
       try {
@@ -232,6 +285,7 @@ async function handleParentCall(method, payload) {
       }
       commands.clear();
       tools.clear();
+      services.clear();
       return { ok: true };
     }
     default: {

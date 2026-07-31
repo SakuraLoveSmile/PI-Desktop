@@ -13,8 +13,10 @@ import {
   validateManifest,
   validateMcpServer,
   type PluginManifest,
+  type PluginServiceContrib,
   type PluginSkillContrib,
 } from "@pi-desktop/plugin-sdk";
+import type { PluginServiceStatus } from "@pi-desktop/shared";
 import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
 
 export type RegisteredCommand = {
@@ -120,6 +122,8 @@ export type PluginHostServices = {
   >;
   /** Fired when a plugin host process dies on its own (crash, OOM, hard exit). */
   onPluginCrash?: (info: { pluginId: string; name: string; exitCode: number }) => void;
+  /** Fired when a resident service changes supervision state. */
+  onServiceChange?: (status: PluginServiceStatus) => void;
 };
 
 /** Host APIs a plugin process may reach. Anything else does not exist (spec 04 §2). */
@@ -161,6 +165,17 @@ const MAX_SKILL_DESCRIPTION_CHARS = 240;
 const MAX_THEMES_PER_PLUGIN = 8;
 /** A plugin may bring at most this many MCP servers. */
 const MAX_MCP_SERVERS_PER_PLUGIN = 8;
+/** A plugin may keep at most this many resident services alive. */
+const MAX_SERVICES_PER_PLUGIN = 4;
+/** A resident service starts inside the hook budget or is marked failed. */
+const SERVICE_START_TIMEOUT_MS = PLUGIN_HOOK_TIMEOUT_MS;
+/** Restart backoff: 1s, 2s, 4s … so a crash loop cannot busy-spin the app. */
+const SERVICE_RESTART_BASE_MS = 1_000;
+const SERVICE_RESTART_MAX_DELAY_MS = 30_000;
+/** After this many failed restarts the plugin is left down for the user to fix. */
+const MAX_SERVICE_RESTARTS = 5;
+/** A host process that stays up this long is healthy; the backoff resets. */
+const SERVICE_HEALTHY_MS = 60_000;
 
 type PendingCall = {
   resolve: (value: unknown) => void;
@@ -180,10 +195,24 @@ type LoadedPlugin = {
 
 type PluginApiError = Error & { code?: string };
 
+/** Crash-restart bookkeeping for one plugin's resident services. */
+type RestartRecord = {
+  attempts: number;
+  /** Pending restart, so an explicit unload can cancel it. */
+  timer?: ReturnType<typeof setTimeout>;
+  /** Clears `attempts` once the process has stayed up long enough. */
+  healthy?: ReturnType<typeof setTimeout>;
+};
+
 function apiError(code: string, message: string): PluginApiError {
   const err = new Error(message) as PluginApiError;
   err.code = code;
   return err;
+}
+
+/** Key for the per-service supervision map. */
+function serviceStateKey(pluginId: string, serviceId: string): string {
+  return `${pluginId}:${serviceId}`;
 }
 
 function ensureWithinRoot(root: string, candidate: string): string {
@@ -252,6 +281,10 @@ export class PluginRuntime {
   private skills = new Map<string, RegisteredPluginSkill>();
   private themes = new Map<string, RegisteredPluginTheme>();
   private mcpClients = new Map<string, McpServerClient[]>();
+  private serviceStates = new Map<string, PluginServiceStatus>();
+  private restarts = new Map<string, RestartRecord>();
+  /** Plugins being reloaded by the supervisor; their backoff must survive. */
+  private restarting = new Set<string>();
   private loaded = new Map<string, LoadedPlugin>();
   private toasts: Array<{ message: string; level?: string }> = [];
   private services: PluginHostServices;
@@ -298,6 +331,14 @@ export class PluginRuntime {
   /** Themes contributed by loaded plugins, ordered by id for a stable list. */
   getThemes(): RegisteredPluginTheme[] {
     return [...this.themes.values()].sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  /** Supervision state of every resident service, ordered for a stable list. */
+  getServiceStates(): PluginServiceStatus[] {
+    return [...this.serviceStates.values()].sort(
+      (a, b) =>
+        a.pluginId.localeCompare(b.pluginId) || a.serviceId.localeCompare(b.serviceId),
+    );
   }
 
   /**
@@ -439,6 +480,7 @@ export class PluginRuntime {
     this.registerSkills(loaded);
     this.registerThemes(loaded);
     await this.registerMcpServers(loaded);
+    await this.startServices(loaded);
     this.services.audit?.({
       pluginId: manifest.id,
       api: "plugin.load.success",
@@ -451,6 +493,11 @@ export class PluginRuntime {
   /** Deregister contributions, run `onUnload` in the child, then stop it. */
   async unload(pluginId: string): Promise<void> {
     const loaded = this.loaded.get(pluginId);
+    if (loaded) {
+      // An explicit stop ends supervision; a supervisor-driven reload keeps it.
+      if (!this.restarting.has(pluginId)) this.cancelRestarts(pluginId);
+      await this.stopServices(loaded);
+    }
     if (loaded?.child) {
       loaded.disposing = true;
       try {
@@ -715,6 +762,88 @@ export class PluginRuntime {
     });
     this.services.showToast(`Plugin stopped unexpectedly: ${loaded.manifest.name}`, "error");
     this.services.onPluginCrash?.({ pluginId, name: loaded.manifest.name, exitCode: code });
+    this.superviseCrash(loaded);
+  }
+
+  /**
+   * A crashed host process takes its resident services down with it. Restart it
+   * with exponential backoff, and after `MAX_SERVICE_RESTARTS` leave the plugin
+   * down rather than spin forever — the failed state is what the user sees.
+   */
+  private superviseCrash(loaded: LoadedPlugin): void {
+    const pluginId = loaded.manifest.id;
+    const declared = this.declaredServices(loaded);
+    if (!declared.length) return;
+    const record = this.restarts.get(pluginId) ?? { attempts: 0 };
+    if (record.healthy) clearTimeout(record.healthy);
+    record.healthy = undefined;
+    this.markServices(loaded, "failed", record.attempts, "plugin host process exited");
+
+    const restartable =
+      loaded.permissions.has("background.service") &&
+      declared.some((service) => service.autoRestart !== false);
+    if (!restartable) return;
+
+    record.attempts += 1;
+    this.restarts.set(pluginId, record);
+    if (record.attempts > MAX_SERVICE_RESTARTS) {
+      this.markServices(loaded, "failed", record.attempts - 1, "restart limit reached");
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.service.restart",
+        ok: false,
+        errorCode: "LIMIT_EXCEEDED",
+        attempts: record.attempts - 1,
+        ts: Date.now(),
+      });
+      return;
+    }
+    const delayMs = Math.min(
+      SERVICE_RESTART_BASE_MS * 2 ** (record.attempts - 1),
+      SERVICE_RESTART_MAX_DELAY_MS,
+    );
+    this.services.audit?.({
+      pluginId,
+      api: "plugin.service.restart.scheduled",
+      ok: true,
+      attempt: record.attempts,
+      delayMs,
+      ts: Date.now(),
+    });
+    record.timer = setTimeout(() => {
+      record.timer = undefined;
+      void this.restartAfterCrash(loaded, record.attempts);
+    }, delayMs);
+  }
+
+  private async restartAfterCrash(loaded: LoadedPlugin, attempt: number): Promise<void> {
+    const pluginId = loaded.manifest.id;
+    // The user may have re-enabled or removed the plugin while we waited.
+    if (this.loaded.has(pluginId) || !existsSync(loaded.path)) return;
+    this.restarting.add(pluginId);
+    try {
+      await this.loadFromPath(loaded.path, [...loaded.permissions]);
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.service.restart",
+        ok: true,
+        attempt,
+        ts: Date.now(),
+      });
+    } catch (error) {
+      this.markServices(loaded, "failed", attempt, (error as Error).message);
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.service.restart",
+        ok: false,
+        attempt,
+        errorCode: (error as PluginApiError).code ?? "PLUGIN_LOAD_FAILED",
+        message: (error as Error).message,
+        ts: Date.now(),
+      });
+    } finally {
+      this.restarting.delete(pluginId);
+    }
   }
 
   private rejectPending(loaded: LoadedPlugin, error: Error): void {
@@ -1057,6 +1186,171 @@ export class PluginRuntime {
       ...(message ? { message } : {}),
       ts: Date.now(),
     });
+  }
+
+  /** Declared resident services, capped so one plugin cannot hold many workers. */
+  private declaredServices(loaded: LoadedPlugin): PluginServiceContrib[] {
+    const declared = loaded.manifest.contributes?.services ?? [];
+    return declared.slice(0, MAX_SERVICES_PER_PLUGIN);
+  }
+
+  /**
+   * Start the plugin's resident services once `onLoad` returned, so the plugin
+   * has had its chance to call `pi.services.register` (spec 07 §5).
+   *
+   * A service that refuses to start is marked failed and left alone: the plugin
+   * itself stays loaded, because its commands and tools may still work.
+   */
+  private async startServices(loaded: LoadedPlugin): Promise<void> {
+    const all = loaded.manifest.contributes?.services ?? [];
+    if (!all.length) return;
+    const pluginId = loaded.manifest.id;
+    if (!loaded.permissions.has("background.service")) {
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.services.skipped",
+        ok: false,
+        errorCode: "PERMISSION_DENIED",
+        count: all.length,
+        ts: Date.now(),
+      });
+      return;
+    }
+    if (all.length > MAX_SERVICES_PER_PLUGIN) {
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.services.skipped",
+        ok: false,
+        errorCode: "LIMIT_EXCEEDED",
+        count: all.length - MAX_SERVICES_PER_PLUGIN,
+        ts: Date.now(),
+      });
+    }
+    const restarts = this.restarts.get(pluginId)?.attempts ?? 0;
+    for (const service of this.declaredServices(loaded)) {
+      const label = service.label || service.id;
+      this.setServiceState({
+        pluginId,
+        serviceId: service.id,
+        label,
+        state: "starting",
+        restarts,
+      });
+      try {
+        await this.sendToChild(
+          loaded,
+          { t: "call", method: "service.start", payload: { id: service.id } },
+          SERVICE_START_TIMEOUT_MS,
+        );
+        this.setServiceState({
+          pluginId,
+          serviceId: service.id,
+          label,
+          state: "running",
+          restarts,
+        });
+        this.services.audit?.({
+          pluginId,
+          api: "plugin.service.start",
+          ok: true,
+          serviceId: service.id,
+          ts: Date.now(),
+        });
+      } catch (error) {
+        this.setServiceState({
+          pluginId,
+          serviceId: service.id,
+          label,
+          state: "failed",
+          restarts,
+          message: (error as Error).message,
+        });
+        this.services.audit?.({
+          pluginId,
+          api: "plugin.service.start",
+          ok: false,
+          serviceId: service.id,
+          errorCode: (error as PluginApiError).code ?? "SERVICE_START_FAILED",
+          message: (error as Error).message,
+          ts: Date.now(),
+        });
+      }
+    }
+    // Surviving the grace window means the backoff can start from zero again.
+    if (restarts > 0) this.scheduleHealthyReset(pluginId);
+  }
+
+  /** Ask the child to stop its services, then forget them: the plugin is going. */
+  private async stopServices(loaded: LoadedPlugin): Promise<void> {
+    const pluginId = loaded.manifest.id;
+    for (const service of this.declaredServices(loaded)) {
+      const key = serviceStateKey(pluginId, service.id);
+      const current = this.serviceStates.get(key);
+      if (!current) continue;
+      if (current.state === "running" || current.state === "starting") {
+        try {
+          await this.sendToChild(
+            loaded,
+            { t: "call", method: "service.stop", payload: { id: service.id } },
+            PLUGIN_HOOK_TIMEOUT_MS,
+          );
+        } catch {
+          // The child is killed right after this; a stuck stop must not block.
+        }
+      }
+      this.serviceStates.delete(key);
+      this.services.onServiceChange?.({ ...current, state: "stopped", updatedAt: Date.now() });
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.service.stop",
+        ok: true,
+        serviceId: service.id,
+        ts: Date.now(),
+      });
+    }
+  }
+
+  private markServices(
+    loaded: LoadedPlugin,
+    state: PluginServiceStatus["state"],
+    restarts: number,
+    message?: string,
+  ): void {
+    for (const service of this.declaredServices(loaded)) {
+      this.setServiceState({
+        pluginId: loaded.manifest.id,
+        serviceId: service.id,
+        label: service.label || service.id,
+        state,
+        restarts,
+        ...(message ? { message } : {}),
+      });
+    }
+  }
+
+  private setServiceState(status: Omit<PluginServiceStatus, "updatedAt">): void {
+    const next: PluginServiceStatus = { ...status, updatedAt: Date.now() };
+    this.serviceStates.set(serviceStateKey(status.pluginId, status.serviceId), next);
+    this.services.onServiceChange?.(next);
+  }
+
+  private scheduleHealthyReset(pluginId: string): void {
+    const record = this.restarts.get(pluginId);
+    if (!record) return;
+    if (record.healthy) clearTimeout(record.healthy);
+    record.healthy = setTimeout(() => {
+      this.restarts.delete(pluginId);
+    }, SERVICE_HEALTHY_MS);
+    // Supervision must never be the reason the process stays alive.
+    record.healthy.unref?.();
+  }
+
+  private cancelRestarts(pluginId: string): void {
+    const record = this.restarts.get(pluginId);
+    if (!record) return;
+    if (record.timer) clearTimeout(record.timer);
+    if (record.healthy) clearTimeout(record.healthy);
+    this.restarts.delete(pluginId);
   }
 
   private assertPermission(loaded: LoadedPlugin, perm: string): void {

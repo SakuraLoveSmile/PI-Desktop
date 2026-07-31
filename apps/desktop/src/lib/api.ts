@@ -22,6 +22,7 @@ import type {
   ModelInfo,
   OnboardingState,
   PluginSummary,
+  PluginServiceStatus,
   PluginTheme,
   MarketPluginSummary,
   MarketPluginDetail,
@@ -277,6 +278,7 @@ export const api = {
     invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
   openPluginPanel: (id: string) => invoke(IPC.invoke.pluginOpenPanel, id),
   listPluginThemes: () => invoke<PluginTheme[]>(IPC.invoke.pluginThemes),
+  listPluginServices: () => invoke<PluginServiceStatus[]>(IPC.invoke.pluginServices),
   marketRefresh: (force = true) =>
     invoke<{
       providerId: string;

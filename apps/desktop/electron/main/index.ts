@@ -180,6 +180,18 @@ const plugins = new PluginRuntime({
     });
     sendToRenderer(IPC.event.pluginChanged, { reason: "crash", pluginId });
   },
+  // Supervision state is UI-only: the runtime owns restarts, the renderer just
+  // reflects what happened.
+  onServiceChange: (status) => {
+    logger.app("info", "plugin.service", {
+      pluginId: status.pluginId,
+      data: { serviceId: status.serviceId, state: status.state, restarts: status.restarts },
+    });
+    sendToRenderer(IPC.event.pluginChanged, {
+      reason: "service",
+      pluginId: status.pluginId,
+    });
+  },
 });
 const ptys = new PtyManager({
   onData: (termId, data) =>
@@ -3836,6 +3848,9 @@ function registerIpc() {
   // Plugin themes: the renderer needs the sanitized CSS itself, so this
   // channel returns the payload rather than only the catalog.
   handle(IPC.invoke.pluginThemes, async () => plugins.getThemes());
+
+  // Resident service supervision state; refreshed on the pluginChanged event.
+  handle(IPC.invoke.pluginServices, async () => plugins.getServiceStates());
 
   handle(IPC.invoke.marketRefresh, async (payload?: { force?: boolean }) => {
     if (!host) throw new Error("host unavailable");

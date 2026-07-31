@@ -115,6 +115,7 @@ export const IPC = {
     pluginSetAutoUpdate: "pi-desktop/plugin/setAutoUpdate",
     pluginOpenPanel: "pi-desktop/plugin/openPanel",
     pluginThemes: "pi-desktop/plugin/themes",
+    pluginServices: "pi-desktop/plugin/services",
     marketRefresh: "pi-desktop/market/refresh",
     marketSearch: "pi-desktop/market/search",
     marketGetDetail: "pi-desktop/market/getDetail",

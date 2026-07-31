@@ -479,6 +479,77 @@
   font-size: var(--text-3xs);
 }
 
+/* Capability badges: what the plugin adds, stated before what it may access. */
+.plugins-cap-chips,
+.plugins-service-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.plugins-cap-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border-radius: var(--radius-2xs);
+  padding: 1px 6px;
+  font-size: var(--text-3xs);
+  line-height: var(--leading-relaxed);
+  color: var(--ds-text-secondary);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-strong);
+}
+
+/* A resident service reads as a status pill: dot, name, state, restart count. */
+.plugins-service-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  padding: 1px 8px 1px 6px;
+  font-size: var(--text-3xs);
+  line-height: var(--leading-relaxed);
+  color: var(--ds-text-secondary);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-subtle);
+}
+
+.plugins-service-dot {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--ds-text-faint);
+}
+
+.plugins-service-chip.is-running .plugins-service-dot {
+  background: var(--ds-success);
+}
+
+.plugins-service-chip.is-starting .plugins-service-dot {
+  background: var(--ds-warning);
+}
+
+.plugins-service-chip.is-failed {
+  color: var(--ds-error);
+  box-shadow: inset 0 0 0 0.5px color-mix(in oklab, var(--ds-error) 40%, transparent);
+}
+
+.plugins-service-chip.is-failed .plugins-service-dot {
+  background: var(--ds-error);
+}
+
+.plugins-service-state,
+.plugins-service-restarts {
+  color: var(--ds-text-muted);
+}
+
+.plugins-service-chip.is-failed .plugins-service-state,
+.plugins-service-chip.is-failed .plugins-service-restarts {
+  color: inherit;
+}
+
 .plugins-row-controls {
   display: flex;
   align-items: center;

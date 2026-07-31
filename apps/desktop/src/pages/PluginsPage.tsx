@@ -22,6 +22,8 @@ import { Markdown } from "../components/Markdown";
 import type {
   MarketPluginDetail,
   MarketPluginSummary,
+  PluginCapability,
+  PluginServiceStatus,
   PluginSummary,
 } from "@pi-desktop/shared";
 
@@ -55,9 +57,27 @@ const PERMISSION_RISK: Record<string, RiskTier> = {
   "clipboard.read": "medium",
   "clipboard.write": "medium",
   "shell.openExternal": "medium",
+  "mcp.server.local": "high",
+  "mcp.server.remote": "high",
+  "background.service": "high",
+  "bus.publish": "medium",
+  "bus.subscribe": "medium",
   "ui.panel": "low",
+  "ui.theme": "low",
   notify: "low",
 };
+
+/** Display order for capability badges: what it adds before what it runs. */
+const CAPABILITY_ORDER: PluginCapability[] = [
+  "panel",
+  "commands",
+  "tools",
+  "skills",
+  "themes",
+  "mcp",
+  "services",
+  "bus",
+];
 
 const RISK_TIERS: RiskTier[] = ["high", "medium", "low"];
 
@@ -179,6 +199,54 @@ function PermissionChips({
   );
 }
 
+/** What the plugin contributes, in a fixed order so rows stay comparable. */
+function CapabilityChips({ capabilities }: { capabilities: readonly PluginCapability[] | undefined }) {
+  const { t } = useTranslation();
+  const ordered = CAPABILITY_ORDER.filter((cap) => capabilities?.includes(cap));
+  if (ordered.length === 0) return null;
+  return (
+    <span className="plugins-cap-chips">
+      {ordered.map((cap) => (
+        <span key={cap} className="plugins-cap-chip">
+          {t(`plugins.capabilities.${cap}`, { defaultValue: cap })}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * Supervision state of the plugin's resident services. Restart counts are shown
+ * because a service that keeps coming back is a different problem from one that
+ * is simply running.
+ */
+function ServiceChips({ statuses }: { statuses: readonly PluginServiceStatus[] | undefined }) {
+  const { t } = useTranslation();
+  if (!statuses?.length) return null;
+  return (
+    <span className="plugins-service-chips">
+      {statuses.map((status) => (
+        <span
+          key={status.serviceId}
+          className={cx("plugins-service-chip", `is-${status.state}`)}
+          title={status.message || undefined}
+        >
+          <span className="plugins-service-dot" aria-hidden />
+          <span className="plugins-service-name">{status.label}</span>
+          <span className="plugins-service-state">
+            {t(`plugins.serviceState.${status.state}`)}
+          </span>
+          {status.restarts > 0 ? (
+            <span className="plugins-service-restarts">
+              {t("plugins.serviceRestarts", { count: status.restarts })}
+            </span>
+          ) : null}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** Pill search field with a leading icon and a clear affordance. */
 function SearchField({
   value,
@@ -259,6 +327,7 @@ export function PluginsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<MarketPluginDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [services, setServices] = useState<PluginServiceStatus[]>([]);
   const [selectedVersion, setSelectedVersion] = useState("");
   const headerMenuRef = useRef<HTMLDivElement | null>(null);
   const rowMenuRef = useRef<HTMLDivElement | null>(null);
@@ -380,6 +449,29 @@ export function PluginsPage() {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [pendingInstall]);
+
+  // Service state changes arrive as pluginChanged events, so the list stays
+  // truthful while the supervisor restarts a crashed worker.
+  useEffect(() => {
+    const refresh = () => {
+      void api
+        .listPluginServices()
+        .then(setServices)
+        .catch(() => setServices([]));
+    };
+    refresh();
+    return api.onPluginChanged(refresh);
+  }, []);
+
+  const servicesByPlugin = useMemo(() => {
+    const map = new Map<string, PluginServiceStatus[]>();
+    for (const status of services) {
+      const list = map.get(status.pluginId);
+      if (list) list.push(status);
+      else map.set(status.pluginId, [status]);
+    }
+    return map;
+  }, [services]);
 
   const installedById = useMemo(() => {
     const map = new Map<string, PluginSummary>();
@@ -827,6 +919,8 @@ export function PluginsPage() {
                             {plugin.errorMessage ? (
                               <p className="plugins-row-error">{plugin.errorMessage}</p>
                             ) : null}
+                            <CapabilityChips capabilities={plugin.capabilities} />
+                            <ServiceChips statuses={servicesByPlugin.get(plugin.id)} />
                             <PermissionChips permissions={plugin.permissions} />
                           </div>
                           <div className="plugins-row-controls">
