@@ -99,10 +99,30 @@ test("the template action is reachable from the menu and the empty state", () =>
     "newFromTemplateCreate",
     "newFromTemplateCreating",
     "newFromTemplateDone",
+    "newFromTemplateOpened",
   ]) {
     assert.ok(enSrc.includes(`${key}:`), `en must define plugins.${key}`);
     assert.ok(zhSrc.includes(`${key}:`), `zh-CN must define plugins.${key}`);
   }
+});
+
+test("the scaffolded folder is opened as the project", () => {
+  const create = pageSrc.slice(
+    pageSrc.indexOf("const createFromTemplate ="),
+    pageSrc.indexOf("const checkUpdates ="),
+  );
+  // Loading the plugin is not enough: development needs the folder open, which
+  // is what activateProject does (workspace.set plus a switch to chat).
+  assert.match(create, /await activateProject\(created\.dir\)/);
+  assert.match(pageSrc, /const activateProject = useAppStore\(\(s\) => s\.activateProject\)/);
+  // The success toast tells the truth about whether the folder actually opened.
+  assert.ok(
+    create.indexOf("activateProject(created.dir)") <
+      create.indexOf("plugins.newFromTemplateOpened"),
+  );
+  assert.match(create, /plugins\.newFromTemplateOpened[\s\S]*plugins\.newFromTemplateDone/);
+  // A folder that refuses to open must not erase the created-and-loaded result.
+  assert.match(create, /openError = e/);
 });
 
 test("a canceled folder picker is not reported as a success", () => {
