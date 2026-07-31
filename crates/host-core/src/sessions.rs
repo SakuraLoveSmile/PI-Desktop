@@ -962,6 +962,19 @@ pub fn append_message(
 ) -> Result<()> {
     let session_created = session_created_at(db, session_id)?;
     let (record, text) = ui_to_record(message);
+    // Electron may replay an outbox entry after a host restart. Message ids
+    // are globally unique, so an existing row is already the durable result.
+    let already_appended: Option<i64> = db
+        .conn()
+        .query_row(
+            "SELECT mid FROM messages WHERE id = ?1 AND session_id = ?2",
+            params![record.id, session_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if already_appended.is_some() {
+        return Ok(());
+    }
     // File first: the transcript is the source of truth. A crash before the
     // index commit costs one derived row (self-healed by the next rewrite),
     // never message content.
@@ -1780,6 +1793,9 @@ mod tests {
             tool_duration_ms: Some(1_000),
             is_error: None,
         };
+        append_message(&db, &session.id, &tool, None).unwrap();
+        // Host recovery may replay the Electron persistence outbox; a message
+        // id must make that replay a no-op.
         append_message(&db, &session.id, &tool, None).unwrap();
 
         let detail = get_session(&db, &session.id).unwrap().unwrap();

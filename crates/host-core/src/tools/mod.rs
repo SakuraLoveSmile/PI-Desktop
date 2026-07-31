@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::Path;
 use std::process::Stdio;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::Command;
 
 use crate::workspace::{resolve_tool_path, ToolRoot};
@@ -58,6 +59,24 @@ pub fn truncate_output(text: &str) -> (String, bool) {
         out.push_str("\n\n[truncated: output exceeded 256KB or 4000 lines]");
     }
     (out, truncated)
+}
+
+async fn read_capped<R: AsyncRead + Unpin>(reader: &mut R, cap: usize) -> Vec<u8> {
+    let mut output = Vec::with_capacity(cap.min(8192));
+    let mut buffer = [0_u8; 8192];
+    while let Ok(read) = reader.read(&mut buffer).await {
+        if read == 0 {
+            break;
+        }
+        if output.len() < cap {
+            let remaining = cap - output.len();
+            output.extend_from_slice(&buffer[..read.min(remaining)]);
+        }
+        // Continue draining after the cap so the child cannot block on a full
+        // OS pipe. The retained prefix is enough for truncate_output to mark
+        // the result without allowing command output to exhaust host memory.
+    }
+    output
 }
 
 pub async fn execute_tool(
@@ -355,9 +374,42 @@ async fn tool_bash(
         // CREATE_NO_WINDOW: bash.exe must not flash a console over the GUI.
         cmd.creation_flags(0x0800_0000);
     }
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| ("TOOL_FAILED".into(), format!("spawn failed: {e}")))?;
+    let mut child = None;
+    let backoffs = [50_u64, 100, 250];
+    let mut last_spawn_error = None;
+    for (attempt, delay_ms) in backoffs.iter().copied().enumerate() {
+        match cmd.spawn() {
+            Ok(process) => {
+                child = Some(process);
+                break;
+            }
+            Err(error)
+                if (error.kind() == std::io::ErrorKind::WouldBlock
+                    || error.raw_os_error() == Some(35)
+                    || error.raw_os_error() == Some(11))
+                    && attempt + 1 < backoffs.len() =>
+            {
+                last_spawn_error = Some(error);
+                tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+            }
+            Err(error) => {
+                last_spawn_error = Some(error);
+                break;
+            }
+        }
+    }
+    let mut child = child.ok_or_else(|| {
+        let error = last_spawn_error.expect("spawn failure must have an error");
+        let resource_error = error.kind() == std::io::ErrorKind::WouldBlock
+            || error.raw_os_error() == Some(35)
+            || error.raw_os_error() == Some(11);
+        let code = if resource_error {
+            "PROCESS_RESOURCE_EXHAUSTED"
+        } else {
+            "TOOL_FAILED"
+        };
+        (code.into(), format!("spawn failed: {error}"))
+    })?;
 
     // Drain pipes concurrently with waiting: a child producing more than the
     // OS pipe buffer (~64KB) would otherwise block forever on write and only
@@ -365,20 +417,16 @@ async fn tool_bash(
     let mut stdout_pipe = child.stdout.take();
     let mut stderr_pipe = child.stderr.take();
     let stdout_task = tokio::spawn(async move {
-        use tokio::io::AsyncReadExt;
-        let mut buf = Vec::new();
         if let Some(out) = stdout_pipe.as_mut() {
-            let _ = out.read_to_end(&mut buf).await;
+            return read_capped(out, MAX_RESULT_BYTES + 1).await;
         }
-        buf
+        Vec::new()
     });
     let stderr_task = tokio::spawn(async move {
-        use tokio::io::AsyncReadExt;
-        let mut buf = Vec::new();
         if let Some(err) = stderr_pipe.as_mut() {
-            let _ = err.read_to_end(&mut buf).await;
+            return read_capped(err, MAX_RESULT_BYTES + 1).await;
         }
-        buf
+        Vec::new()
     });
 
     let wait =
@@ -402,6 +450,9 @@ async fn tool_bash(
         Ok(Err(e)) => Err(("TOOL_FAILED".into(), format!("bash failed: {e}"))),
         Err(_) => {
             let _ = child.start_kill();
+            // Reap the child before releasing the tool permit. This avoids
+            // accumulating zombie/process-table entries during timeout bursts.
+            let _ = tokio::time::timeout(Duration::from_secs(1), child.wait()).await;
             stdout_task.abort();
             stderr_task.abort();
             Err(("TOOL_TIMEOUT".into(), "bash timed out".into()))

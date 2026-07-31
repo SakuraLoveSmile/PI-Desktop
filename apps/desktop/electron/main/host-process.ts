@@ -42,7 +42,9 @@ export class HostProcess {
   private handlers = new Set<HostNotificationHandler>();
   private exitHandlers = new Set<ProcessExitHandler>();
   private disposed = false;
+  private available = true;
   readonly binaryPath: string;
+  readonly generation = randomUUID();
 
   constructor(dataDir: string, onStderr?: StderrHandler) {
     this.binaryPath = resolveHostBinary();
@@ -62,13 +64,15 @@ export class HostProcess {
     });
 
     this.child.on("exit", (code, signal) => {
-      this.rejectAllPending(new Error("host-core exited"));
+      this.available = false;
+      this.rejectAllPending(this.unavailableError("host-core exited"));
       for (const h of this.exitHandlers) {
         h({ code, signal, intentional: this.disposed });
       }
     });
-    this.child.on("error", () => {
-      this.rejectAllPending(new Error("host-core spawn failed"));
+    this.child.on("error", (error) => {
+      this.available = false;
+      this.rejectAllPending(this.unavailableError(`host-core process error: ${error.message}`));
     });
 
     const rl = createInterface({ input: this.child.stdout });
@@ -78,6 +82,14 @@ export class HostProcess {
   private rejectAllPending(error: Error) {
     for (const [, p] of this.pending) p.reject(error);
     this.pending.clear();
+  }
+
+  private unavailableError(message: string): Error & { errorCode: string } {
+    return Object.assign(new Error(message), { errorCode: "HOST_UNAVAILABLE" });
+  }
+
+  isAvailable(): boolean {
+    return this.available && this.child.exitCode === null && !this.child.killed;
   }
 
   onExit(handler: ProcessExitHandler): () => void {
@@ -122,25 +134,49 @@ export class HostProcess {
   }
 
   async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+    if (!this.isAvailable()) {
+      throw this.unavailableError(`host RPC unavailable: ${method}`);
+    }
     const id = randomUUID();
     const payload = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
     return new Promise<T>((resolve, reject) => {
-      this.pending.set(id, {
-        resolve: resolve as (v: any) => void,
-        reject,
-      });
-      this.child.stdin.write(payload, (err) => {
-        if (err) {
-          this.pending.delete(id);
-          reject(err);
-        }
-      });
-      setTimeout(() => {
+      if (!this.isAvailable()) {
+        reject(this.unavailableError(`host RPC unavailable: ${method}`));
+        return;
+      }
+      const timeout = setTimeout(() => {
         if (this.pending.has(id)) {
           this.pending.delete(id);
           reject(new Error(`host RPC timeout: ${method}`));
         }
       }, 130_000);
+      this.pending.set(id, {
+        resolve: (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        reject: (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        },
+      });
+      try {
+        this.child.stdin.write(payload, (err) => {
+          if (err) {
+            this.pending.delete(id);
+            clearTimeout(timeout);
+            reject(this.unavailableError(`host RPC write failed: ${err.message}`));
+          }
+        });
+      } catch (error) {
+        this.pending.delete(id);
+        clearTimeout(timeout);
+        reject(
+          this.unavailableError(
+            `host RPC write failed: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+      }
     });
   }
 
@@ -150,7 +186,10 @@ export class HostProcess {
 
   async dispose(): Promise<void> {
     this.disposed = true;
-    this.rejectAllPending(new Error("host-core disposed"));
-    this.child.kill();
+    this.available = false;
+    this.rejectAllPending(this.unavailableError("host-core disposed"));
+    if (!this.child.killed && this.child.exitCode === null) {
+      this.child.kill();
+    }
   }
 }

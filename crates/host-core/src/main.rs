@@ -13,6 +13,7 @@ mod sessions;
 mod state;
 mod tools;
 mod transcripts;
+mod tool_budget;
 mod workspace;
 
 use std::sync::Arc;

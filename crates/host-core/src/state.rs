@@ -7,6 +7,7 @@ use crate::db::Database;
 use crate::permissions::PermissionManager;
 use crate::plugins::PluginManager;
 use crate::secrets::SecretStore;
+use crate::tool_budget::ToolBudget;
 use crate::workspace::WorkspaceState;
 
 pub const PROTOCOL_VERSION: u32 = 6;
@@ -26,6 +27,7 @@ pub struct AppState {
     /// executionId -> responder for plugin tool dispatches awaiting the
     /// desktop runner (Electron main executes the plugin JS and resolves).
     pub plugin_execs: HashMap<String, tokio::sync::oneshot::Sender<serde_json::Value>>,
+    pub tool_budget: ToolBudget,
 }
 
 impl AppState {
@@ -44,6 +46,7 @@ impl AppState {
             handshook: false,
             session_grants: HashMap::new(),
             plugin_execs: HashMap::new(),
+            tool_budget: ToolBudget::new(),
         })
     }
 

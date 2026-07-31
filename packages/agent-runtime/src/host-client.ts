@@ -15,6 +15,8 @@ export class HostClient {
   >();
   private notificationHandlers = new Set<(method: string, params: unknown) => void>();
   private ready: Promise<void>;
+  private available = true;
+  readonly generation = randomUUID();
 
   constructor(binaryPath: string, env: Record<string, string | undefined> = {}) {
     this.child = spawn(binaryPath, [], {
@@ -25,6 +27,15 @@ export class HostClient {
     this.child.stderr.on("data", (buf) => {
       const text = buf.toString("utf8").trim();
       if (text) console.error(`[host-core] ${text}`);
+    });
+
+    this.child.on("exit", () => {
+      this.available = false;
+      this.rejectAllPending(this.unavailableError("host-core exited"));
+    });
+    this.child.on("error", (error) => {
+      this.available = false;
+      this.rejectAllPending(this.unavailableError(`host-core process error: ${error.message}`));
     });
 
     const rl = createInterface({ input: this.child.stdout });
@@ -62,22 +73,49 @@ export class HostClient {
 
   async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
     await this.ready;
+    if (!this.available || this.child.exitCode !== null || this.child.killed) {
+      throw this.unavailableError(`host RPC unavailable: ${method}`);
+    }
     const id = randomUUID();
     const payload = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
     const result = await new Promise<JsonRpcResult>((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.child.stdin.write(payload, (err) => {
-        if (err) {
-          this.pending.delete(id);
-          reject(err);
-        }
-      });
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         if (this.pending.has(id)) {
           this.pending.delete(id);
           reject(new Error(`host RPC timeout: ${method}`));
         }
       }, 130_000);
+      this.pending.set(id, { resolve, reject });
+      try {
+        this.child.stdin.write(payload, (err) => {
+          if (err) {
+            this.pending.delete(id);
+            clearTimeout(timeout);
+            reject(this.unavailableError(`host RPC write failed: ${err.message}`));
+          }
+        });
+      } catch (error) {
+        this.pending.delete(id);
+        clearTimeout(timeout);
+        reject(
+          this.unavailableError(
+            `host RPC write failed: ${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+      }
+      const pending = this.pending.get(id);
+      if (pending) {
+        const resolveResult = pending.resolve;
+        const rejectResult = pending.reject;
+        pending.resolve = (value) => {
+          clearTimeout(timeout);
+          resolveResult(value);
+        };
+        pending.reject = (error) => {
+          clearTimeout(timeout);
+          rejectResult(error);
+        };
+      }
     });
     if (result.error) {
       const err = new Error(result.error.message) as Error & {
@@ -92,6 +130,17 @@ export class HostClient {
   }
 
   async dispose(): Promise<void> {
-    this.child.kill();
+    this.available = false;
+    this.rejectAllPending(this.unavailableError("host-core disposed"));
+    if (!this.child.killed && this.child.exitCode === null) this.child.kill();
+  }
+
+  private rejectAllPending(error: Error) {
+    for (const [, pending] of this.pending) pending.reject(error);
+    this.pending.clear();
+  }
+
+  private unavailableError(message: string): Error & { errorCode: string } {
+    return Object.assign(new Error(message), { errorCode: "HOST_UNAVAILABLE" });
   }
 }

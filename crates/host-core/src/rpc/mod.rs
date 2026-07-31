@@ -5,7 +5,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex, Semaphore};
 
 use crate::artifacts;
 use crate::audit;
@@ -64,6 +64,11 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
     let mut reader = BufReader::new(stdin);
     let mut line = String::new();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+    // Keep request tasks bounded as well as tool executions. Tool calls have
+    // their own class/session budgets below; this cap protects the host from
+    // non-tool RPC bursts and prevents an unbounded tokio task fan-out.
+    const MAX_IN_FLIGHT_RPC: usize = 32;
+    let request_slots = Arc::new(Semaphore::new(MAX_IN_FLIGHT_RPC));
 
     // Writer task — serializes all stdout writes
     let writer = tokio::spawn(async move {
@@ -116,8 +121,28 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
         let params = req.params.unwrap_or(json!({}));
         let state = state.clone();
         let tx = tx.clone();
+        let permit = match request_slots.clone().try_acquire_owned() {
+            Ok(permit) => permit,
+            Err(_) => {
+                let response = JsonRpcResponse {
+                    jsonrpc: "2.0",
+                    id,
+                    result: None,
+                    error: Some(rpc_err(
+                        -32029,
+                        "host RPC capacity is exhausted",
+                        "HOST_OVERLOADED",
+                    )),
+                };
+                if let Ok(raw) = serde_json::to_string(&response) {
+                    let _ = tx.send(format!("{raw}\n"));
+                }
+                continue;
+            }
+        };
 
         tokio::spawn(async move {
+            let _permit = permit;
             let out = match handle_request(state, &method, params, tx.clone()).await {
                 Ok(result) => JsonRpcResponse {
                     jsonrpc: "2.0",
@@ -349,11 +374,21 @@ async fn handle_request(
         }
         "app.health" => {
             let st = state.lock().await;
+            let budget = st.tool_budget.snapshot();
             Ok(json!({
                 "ok": true,
                 "protocolVersion": PROTOCOL_VERSION,
                 "version": HOST_VERSION,
-                "uptimeMs": st.uptime_ms()
+                "uptimeMs": st.uptime_ms(),
+                "toolBudget": {
+                    "active": budget.active,
+                    "queued": budget.queued,
+                    "total": budget.total,
+                    "shell": budget.shell,
+                    "reads": budget.reads,
+                    "mutations": budget.mutations,
+                    "plugins": budget.plugins
+                }
             }))
         }
         "app.getVersion" => Ok(json!({
@@ -1247,6 +1282,37 @@ async fn handle_request(
                     .or_default()
                     .push(p.tool_name.clone());
             }
+
+            // Admission happens after permission so a user waiting on a prompt
+            // cannot occupy an execution slot. The permit is held through the
+            // complete tool lifecycle and is released on every return path.
+            let tool_budget = {
+                let st = state.lock().await;
+                st.tool_budget.clone()
+            };
+            let _tool_permit = match tool_budget.acquire(&p.session_id, &p.tool_name).await {
+                Ok(permit) => permit,
+                Err(error) => {
+                    tracing::warn!(
+                        tool = %p.tool_name,
+                        session_id = %p.session_id,
+                        error_code = error.code(),
+                        "tool admission rejected"
+                    );
+                    return Ok(json!({
+                        "toolCallId": p.tool_call_id,
+                        "ok": false,
+                        "isError": true,
+                        "content": {
+                            "error": error.message(),
+                            "code": error.code()
+                        },
+                        "durationMs": call_started.elapsed().as_millis() as u64,
+                        "denied": false,
+                        "errorCode": error.code()
+                    }));
+                }
+            };
 
             let ws_path = workspace_path.map(PathBuf::from);
             let timeout = p.timeout_ms.unwrap_or(60_000);

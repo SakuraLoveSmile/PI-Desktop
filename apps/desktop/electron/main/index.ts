@@ -50,6 +50,7 @@ import {
 } from "@pi-desktop/agent-runtime";
 import { isTemplateName, scaffold } from "@pi-desktop/plugin-devkit";
 import { HostProcess } from "./host-process";
+import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
 import { PluginRuntime } from "./plugin-runtime";
 import { builtinSkills, loadBuiltinSkillBody } from "./builtin-skills";
@@ -232,6 +233,9 @@ const logger = new Logger(
   dataDir,
   process.env.NODE_ENV === "production" ? "info" : "debug",
 );
+const persistenceOutbox = new PersistenceOutbox(dataDir, (level, message, data) => {
+  logger.app(level, message, { data });
+});
 
 /** Product UI locale for dual-locale update notes (mirrored from settings). */
 let updaterLocale = "en";
@@ -1762,9 +1766,17 @@ const restartState = {
   host: { count: 0, windowStart: 0 },
   sidecar: { count: 0, windowStart: 0 },
 };
+type RestartKind = "host" | "sidecar";
+const restartInFlight: Record<RestartKind, Promise<void> | null> = {
+  host: null,
+  sidecar: null,
+};
 
 function wireHost(h: HostProcess) {
   h.onNotification((method, params) => {
+    // Notifications from a previous host generation must never reach the
+    // current plugin/renderer bridge after a restart.
+    if (host !== h) return;
     if (method === "permissions.request") {
       logger.app("info", "permission requested", {
         sessionId: (params as any).sessionId,
@@ -1842,6 +1854,8 @@ function wireHost(h: HostProcess) {
     }
   });
   h.onExit(({ code, signal, intentional }) => {
+    if (host !== h) return;
+    host = null;
     if (intentional || quitting) return;
     logger.app("error", "host-core exited unexpectedly", {
       code: ErrorCodes.HOST_UNAVAILABLE,
@@ -1860,9 +1874,18 @@ async function startHost(): Promise<void> {
   const h = new HostProcess(dataDir, (text) => logger.child("host", text));
   wireHost(h);
   host = h;
-  await h.handshake();
-  logger.app("info", "host-core handshake ok");
-  void importLegacyScheduled();
+  try {
+    await h.handshake();
+    logger.app("info", "host-core handshake ok", {
+      data: { generation: h.generation },
+    });
+    void importLegacyScheduled();
+    void persistenceOutbox.flush(() => host);
+  } catch (error) {
+    if (host === h) host = null;
+    await h.dispose();
+    throw error;
+  }
 }
 
 function wireSidecar(s: AgentSidecar) {
@@ -1890,6 +1913,8 @@ function wireSidecar(s: AgentSidecar) {
     // sidecar no longer relays it (agent-sidecar.setHost filters it out).
   });
   s.onExit(({ code, signal, intentional }) => {
+    if (sidecar !== s) return;
+    sidecar = null;
     if (intentional || quitting) return;
     logger.app("error", "agent sidecar exited unexpectedly", {
       data: { exitCode: code, signal },
@@ -2079,7 +2104,6 @@ function finishTurn(
 }
 
 function persistAgentEvent(envelope: AgentEventEnvelope) {
-  if (!host) return;
   const event = envelope.event;
   const turnId = activeTurns.get(envelope.sessionId);
   if (event.type === "tool_start") {
@@ -2195,14 +2219,18 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
       !(event.message.content || "").trim() &&
       !(event.message.thinking || "").trim();
     if (failed && empty && !event.message.error) return;
-    void host
-      .call("session.appendMessage", {
-        sessionId: envelope.sessionId,
-        message: event.message,
-        turnId,
-      })
+    void persistenceOutbox
+      .enqueue(
+        {
+          key: `message:${envelope.sessionId}:${event.message.id}`,
+          sessionId: envelope.sessionId,
+          message: event.message,
+          turnId,
+        },
+        () => host,
+      )
       .catch((e) =>
-        logger.app("warn", "assistant message persistence failed", {
+        logger.app("warn", "assistant message persistence enqueue failed", {
           sessionId: envelope.sessionId,
           data: String(e),
         }),
@@ -2212,33 +2240,37 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
     const key = activeToolCallKey(envelope.sessionId, event.toolCallId);
     const started = activeToolCalls.get(key);
     activeToolCalls.delete(key);
-    void host
-      .call("session.appendMessage", {
-        sessionId: envelope.sessionId,
-        message: {
-          id: event.toolCallId,
-          role: "tool",
-          content:
-            typeof event.result === "string"
-              ? event.result
-              : JSON.stringify(event.result),
-          createdAt: started?.createdAt ?? new Date(envelope.ts).toISOString(),
-          toolCallId: event.toolCallId,
-          toolName: started?.toolName,
-          toolArgs: started?.args,
-          toolStatus: event.isError ? "error" : "success",
-          toolResult: event.result,
-          toolCompletedAt: new Date(envelope.ts).toISOString(),
-          toolDurationMs: started
-            ? Math.max(0, envelope.ts - Date.parse(started.createdAt))
-            : undefined,
-          isError: event.isError,
-          status: "complete",
+    void persistenceOutbox
+      .enqueue(
+        {
+          key: `message:${envelope.sessionId}:${event.toolCallId}`,
+          sessionId: envelope.sessionId,
+          message: {
+            id: event.toolCallId,
+            role: "tool",
+            content:
+              typeof event.result === "string"
+                ? event.result
+                : JSON.stringify(event.result),
+            createdAt: started?.createdAt ?? new Date(envelope.ts).toISOString(),
+            toolCallId: event.toolCallId,
+            toolName: started?.toolName,
+            toolArgs: started?.args,
+            toolStatus: event.isError ? "error" : "success",
+            toolResult: event.result,
+            toolCompletedAt: new Date(envelope.ts).toISOString(),
+            toolDurationMs: started
+              ? Math.max(0, envelope.ts - Date.parse(started.createdAt))
+              : undefined,
+            isError: event.isError,
+            status: "complete",
+          },
+          turnId,
         },
-        turnId,
-      })
+        () => host,
+      )
       .catch((e) =>
-        logger.app("warn", "tool message persistence failed", {
+        logger.app("warn", "tool message persistence enqueue failed", {
           sessionId: envelope.sessionId,
           toolCallId: (event as any).toolCallId,
           data: String(e),
@@ -2247,44 +2279,56 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
   }
 }
 
-async function superviseRestart(kind: "host" | "sidecar"): Promise<void> {
+function superviseRestart(kind: RestartKind): Promise<void> {
+  const existing = restartInFlight[kind];
+  if (existing) return existing;
+  const run = superviseRestartLoop(kind).finally(() => {
+    if (restartInFlight[kind] === run) restartInFlight[kind] = null;
+  });
+  restartInFlight[kind] = run;
+  return run;
+}
+
+async function superviseRestartLoop(kind: RestartKind): Promise<void> {
   const st = restartState[kind];
-  const now = Date.now();
-  if (now - st.windowStart > RESTART_WINDOW_MS) {
-    st.windowStart = now;
-    st.count = 0;
-  }
-  st.count += 1;
-  if (st.count > MAX_RESTARTS_PER_WINDOW) {
-    logger.app("error", `${kind} restart limit reached; giving up`, {
-      code: ErrorCodes.HOST_UNAVAILABLE,
-    });
-    sendToRenderer(IPC.event.hostStatus, {
-      ok: false,
-      component: kind,
-      fatal: true,
-    });
-    return;
-  }
-  const delay = Math.min(500 * 2 ** (st.count - 1), 4000);
-  await new Promise((r) => setTimeout(r, delay));
-  if (quitting) return;
-  try {
-    if (kind === "host") {
-      await startHost();
-      if (sidecar && host) sidecar.setHost(host);
-    } else {
-      await startSidecar();
+  while (!quitting) {
+    const now = Date.now();
+    if (now - st.windowStart > RESTART_WINDOW_MS) {
+      st.windowStart = now;
+      st.count = 0;
     }
-    logger.app("warn", `${kind} restarted after crash`);
-    sendToRenderer(IPC.event.hostStatus, {
-      ok: true,
-      component: kind,
-      restarted: true,
-    });
-  } catch (e) {
-    logger.app("error", `${kind} restart failed`, { data: String(e) });
-    void superviseRestart(kind);
+    st.count += 1;
+    if (st.count > MAX_RESTARTS_PER_WINDOW) {
+      logger.app("error", `${kind} restart limit reached; giving up`, {
+        code: ErrorCodes.HOST_UNAVAILABLE,
+      });
+      sendToRenderer(IPC.event.hostStatus, {
+        ok: false,
+        component: kind,
+        fatal: true,
+      });
+      return;
+    }
+    const delay = Math.min(500 * 2 ** (st.count - 1), 4000);
+    await new Promise((r) => setTimeout(r, delay));
+    if (quitting) return;
+    try {
+      if (kind === "host") {
+        await startHost();
+        if (sidecar && host) sidecar.setHost(host);
+      } else {
+        await startSidecar();
+      }
+      logger.app("warn", `${kind} restarted after crash`);
+      sendToRenderer(IPC.event.hostStatus, {
+        ok: true,
+        component: kind,
+        restarted: true,
+      });
+      return;
+    } catch (e) {
+      logger.app("error", `${kind} restart failed`, { data: String(e) });
+    }
   }
 }
 
