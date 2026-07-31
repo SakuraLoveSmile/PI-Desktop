@@ -52,6 +52,8 @@ import { classifyAgentError } from "./agent-errors.js";
 import { clampThinkingLevel, type PiModelConfig } from "./thinking-level.js";
 import type { ProjectInstructions } from "./project-instructions.js";
 import { projectInstructionsPrompt } from "./project-instructions-prompt.js";
+import { pluginSkillsPrompt } from "./plugin-skills-prompt.js";
+import { pluginSkillsDigest, type PluginSkills } from "./plugin-skills.js";
 import { logTiming } from "./timing.js";
 
 
@@ -220,6 +222,8 @@ export type AgentRuntimeOptions = {
   compactionSettings?: ContextCompactionSettings;
   /** Plugin agent tools to expose to the model this session. */
   pluginTools?: PluginToolDef[];
+  /** Skill documents contributed by enabled plugins (`contributes.skills`). */
+  pluginSkills?: PluginSkills;
   /** Absolute per-session scratch directory for temporary files (D114).
    * Advertised to the model in the system prompt; host-core enforces it as
    * a second containment root. */
@@ -452,6 +456,7 @@ export class DesktopAgentRuntime {
   private onEvent: (envelope: AgentEventEnvelope) => void;
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
+  private pluginSkills?: PluginSkills;
   private scratchDir?: string;
   private baseSystemPrompt: string;
   private baseProjectInstructions?: ProjectInstructions;
@@ -484,6 +489,7 @@ export class DesktopAgentRuntime {
     this.host = opts.host;
     this.onEvent = opts.onEvent;
     this.pluginTools = opts.pluginTools ?? [];
+    this.pluginSkills = opts.pluginSkills;
     this.scratchDir = opts.scratchDir;
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
@@ -521,6 +527,7 @@ export class DesktopAgentRuntime {
     const projectInstructions = projectInstructionsPrompt(
       this.projectInstructions,
     );
+    const pluginSkills = pluginSkillsPrompt(this.pluginSkills);
     const baseSystemPrompt =
       opts.systemPrompt ??
       [
@@ -561,6 +568,10 @@ export class DesktopAgentRuntime {
       initialState: {
         systemPrompt: [
           baseSystemPrompt,
+          // Plugin skills sit ahead of the instruction chain so the user's own
+          // AGENTS.md keeps the last word, matching how the chain itself gives
+          // later entries precedence.
+          ...(pluginSkills ? [pluginSkills] : []),
           ...(projectInstructions ? [projectInstructions] : []),
         ].join("\n\n"),
         model,
@@ -580,6 +591,7 @@ export class DesktopAgentRuntime {
     thinkingLevelOrPluginToolNames: ThinkingLevel | string[] = this.thinkingLevel,
     pluginToolNames: string[] = [],
     projectInstructions?: ProjectInstructions,
+    pluginSkills?: PluginSkills,
   ): boolean {
     // Keep the pre-thinking overload usable for callers that passed plugin
     // names as the third argument. New callers pass the selected level.
@@ -621,7 +633,10 @@ export class DesktopAgentRuntime {
       this.thinkingLevel === clampThinkingLevel(provider, thinkingLevel) &&
       current === next &&
       safeJson(this.baseProjectInstructions ?? null) ===
-        safeJson(projectInstructions ?? null)
+        safeJson(projectInstructions ?? null) &&
+      // Enabling a plugin, revoking agent.prompt.inject or editing a skill file
+      // changes the digest, which retires the runtime and its stale prompt.
+      pluginSkillsDigest(this.pluginSkills) === pluginSkillsDigest(pluginSkills)
     );
   }
 
@@ -916,8 +931,10 @@ export class DesktopAgentRuntime {
     // and edits to an existing instruction file take effect immediately.
     this.projectInstructions = resolved;
     const prompt = projectInstructionsPrompt(resolved);
+    const skills = pluginSkillsPrompt(this.pluginSkills);
     this.agent.state.systemPrompt = [
       this.baseSystemPrompt,
+      ...(skills ? [skills] : []),
       ...(prompt ? [prompt] : []),
     ].join("\n\n");
   }

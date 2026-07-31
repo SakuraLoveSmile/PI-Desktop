@@ -38,6 +38,7 @@ function createRuntime(
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
     projectInstructions: import("./project-instructions.js").ProjectInstructions;
+    pluginSkills: import("./plugin-skills.js").PluginSkills;
     host: { call: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
@@ -52,6 +53,7 @@ function createRuntime(
     compaction: overrides.compaction,
     compactionSettings: overrides.compactionSettings,
     projectInstructions: overrides.projectInstructions,
+    pluginSkills: overrides.pluginSkills,
     onEvent: overrides.onEvent ?? vi.fn(),
   });
 }
@@ -190,6 +192,105 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await read.execute("tool-b", { path: "packages/b/file.ts" });
     expect((runtime as any).agent.state.systemPrompt).toContain("Use B rules.");
     expect((runtime as any).agent.state.systemPrompt).not.toContain("Use A rules.");
+    await runtime.dispose();
+  });
+
+  it("injects plugin skills and keeps project instructions after them", async () => {
+    const runtime = createRuntime({
+      projectInstructions: {
+        entries: [{ source: "AGENTS.md", content: "Run unit tests." }],
+      },
+      pluginSkills: {
+        entries: [
+          {
+            pluginId: "demo.notes",
+            pluginName: "Notes",
+            id: "demo.notes/summarise",
+            name: "Summarise notes",
+            description: "the user asks for a note digest",
+            body: "Group notes by tag before summarising.",
+          },
+        ],
+      },
+    });
+    const prompt = (runtime as any).agent.state.systemPrompt as string;
+
+    expect(prompt).toContain("# Plugin skills");
+    expect(prompt).toContain("## Summarise notes (Notes)");
+    expect(prompt).toContain("Use when: the user asks for a note digest");
+    expect(prompt).toContain("Group notes by tag before summarising.");
+    // The user's own instructions come last, so they keep the final word.
+    expect(prompt.indexOf("# Plugin skills")).toBeLessThan(
+      prompt.indexOf("# Project instructions"),
+    );
+
+    await runtime.dispose();
+  });
+
+  it("omits the plugin skills section when no plugin contributes one", async () => {
+    const runtime = createRuntime();
+    expect((runtime as any).agent.state.systemPrompt).not.toContain("# Plugin skills");
+    await runtime.dispose();
+  });
+
+  it("recreates the runtime when the contributed skills change", async () => {
+    const pluginSkills = {
+      entries: [
+        {
+          pluginId: "demo.notes",
+          pluginName: "Notes",
+          id: "demo.notes/summarise",
+          body: "Group notes by tag.",
+        },
+      ],
+    };
+    const runtime = createRuntime({ pluginSkills });
+
+    expect(
+      runtime.matches("agent", provider, "medium", [], undefined, pluginSkills),
+    ).toBe(true);
+    expect(
+      runtime.matches("agent", provider, "medium", [], undefined, {
+        entries: [{ ...pluginSkills.entries[0], body: "Group notes by date." }],
+      }),
+    ).toBe(false);
+    // Revoking agent.prompt.inject drops the skill set entirely.
+    expect(runtime.matches("agent", provider, "medium", [], undefined)).toBe(false);
+
+    await runtime.dispose();
+  });
+
+  it("keeps plugin skills when path-scoped instructions load mid-turn", async () => {
+    const host = {
+      call: vi
+        .fn()
+        .mockResolvedValueOnce({
+          entries: [{ source: "packages/api/AGENTS.md", content: "Use API rules." }],
+        })
+        .mockResolvedValueOnce({ ok: true, content: "file contents" }),
+    };
+    const runtime = createRuntime({
+      host,
+      pluginSkills: {
+        entries: [
+          {
+            pluginId: "demo.notes",
+            pluginName: "Notes",
+            id: "demo.notes/summarise",
+            body: "Group notes by tag.",
+          },
+        ],
+      },
+    });
+    const read = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Read",
+    );
+
+    await read.execute("tool-1", { path: "packages/api/handler.ts" });
+
+    const prompt = (runtime as any).agent.state.systemPrompt as string;
+    expect(prompt).toContain("# Plugin skills");
+    expect(prompt).toContain("Use API rules.");
     await runtime.dispose();
   });
 });
