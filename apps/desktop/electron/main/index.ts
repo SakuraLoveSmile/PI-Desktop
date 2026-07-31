@@ -3710,6 +3710,10 @@ function registerIpc() {
     for (const toast of plugins.drainToasts()) {
       sendToRenderer(IPC.event.toast, { message: toast });
     }
+    sendToRenderer(IPC.event.pluginChanged, {
+      reason: "loadDev",
+      pluginId: loaded.plugin?.id,
+    });
     return loaded;
   });
 
@@ -3735,6 +3739,10 @@ function registerIpc() {
     for (const toast of plugins.drainToasts()) {
       sendToRenderer(IPC.event.toast, { message: toast });
     }
+    sendToRenderer(IPC.event.pluginChanged, {
+      reason: "install",
+      pluginId: installed.result?.plugin?.id,
+    });
     return installed;
   });
 
@@ -3763,6 +3771,10 @@ function registerIpc() {
     for (const toast of plugins.drainToasts()) {
       sendToRenderer(IPC.event.toast, { message: toast });
     }
+    sendToRenderer(IPC.event.pluginChanged, {
+      reason: "install",
+      pluginId: installed.result?.plugin?.id,
+    });
     return installed;
   });
 
@@ -3773,6 +3785,7 @@ function registerIpc() {
       await plugins.loadFromPath(res.plugin.path, res.plugin.permissions ?? []);
     }
     logger.app("info", "plugin enabled", { pluginId: id });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "enable", pluginId: id });
     return res;
   });
 
@@ -3780,14 +3793,18 @@ function registerIpc() {
     if (!host) throw new Error("host unavailable");
     await plugins.unload(id);
     logger.app("info", "plugin disabled", { pluginId: id });
-    return host.call("plugins.disable", { id });
+    const res = await host.call("plugins.disable", { id });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "disable", pluginId: id });
+    return res;
   });
 
   handle(IPC.invoke.pluginUninstall, async (id: string) => {
     if (!host) throw new Error("host unavailable");
     await plugins.unload(id);
     logger.app("info", "plugin uninstalled", { pluginId: id });
-    return host.call("plugins.uninstall", { id });
+    const res = await host.call("plugins.uninstall", { id });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "uninstall", pluginId: id });
+    return res;
   });
 
   handle(IPC.invoke.pluginSetAutoUpdate, async (payload: { id: string; enabled: boolean }) => {
@@ -3815,6 +3832,10 @@ function registerIpc() {
     });
     return { ok: true };
   });
+
+  // Plugin themes: the renderer needs the sanitized CSS itself, so this
+  // channel returns the payload rather than only the catalog.
+  handle(IPC.invoke.pluginThemes, async () => plugins.getThemes());
 
   handle(IPC.invoke.marketRefresh, async (payload?: { force?: boolean }) => {
     if (!host) throw new Error("host unavailable");

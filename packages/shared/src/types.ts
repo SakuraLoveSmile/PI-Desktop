@@ -332,13 +332,19 @@ export type ModelInfo = {
   source: "bundled" | "discovered" | "user";
 };
 
+/**
+ * Built-in themes, or `plugin:<pluginId>:<themeId>` for a theme contributed by
+ * a plugin. The shell falls back to `system` when the provider goes away.
+ */
+export type ThemePreference = "system" | "light" | "dark" | `plugin:${string}`;
+
 export type AppSettings = {
   defaultProviderId?: string;
   defaultModelId?: string;
   defaultMode: Mode;
   /** Global permission mode default; sessions with `inherit` follow this. */
   defaultPermissionMode?: GlobalPermissionMode;
-  theme: "system" | "light" | "dark";
+  theme: ThemePreference;
   /** UI language; `auto` (and absent) follows the OS locale. */
   language?: "auto" | "en" | "zh-CN";
   enterToSend: boolean;
@@ -381,6 +387,18 @@ export type PluginCapability =
   | "mcp"
   | "services"
   | "bus";
+
+/** A theme contributed by a loaded plugin, with its sanitized CSS payload. */
+export type PluginTheme = {
+  /** `plugin:<pluginId>:<themeId>`; matches `AppSettings.theme`. */
+  id: `plugin:${string}`;
+  pluginId: string;
+  themeId: string;
+  label: string;
+  /** Palette the overrides layer on; drives the `data-theme` attribute. */
+  base: "light" | "dark";
+  css: string;
+};
 
 export type PluginSummary = {
   id: string;

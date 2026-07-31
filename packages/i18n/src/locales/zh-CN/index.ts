@@ -399,6 +399,7 @@ export const zhCN = {
     themeSystemDesc: "跟随系统设置，自动切换浅色或深色。",
     themeLightDesc: "明亮清爽，适合日间使用。",
     themeDarkDesc: "暗色护眼，适合夜间使用。",
+    themeFromPlugin: "由插件 {{plugin}} 提供。",
     defaultPermissions: "默认权限",
     defaultPermissionsDesc: "默认情况下，PI-Desktop 可以读取和修改当前项目中的文件；更高风险操作会先征求你的同意。",
     permissionMode: "权限模式",

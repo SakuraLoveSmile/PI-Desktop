@@ -397,6 +397,7 @@ export const en = {
     themeSystemDesc: "Follow the system setting and switch automatically.",
     themeLightDesc: "Bright and clean, best for daytime.",
     themeDarkDesc: "Dark and easy on the eyes, best at night.",
+    themeFromPlugin: "Provided by the {{plugin}} plugin.",
     defaultPermissions: "Default permissions",
     defaultPermissionsDesc: "By default, PI-Desktop can read and edit files in your project. It will ask before doing anything riskier.",
     permissionMode: "Permission mode",

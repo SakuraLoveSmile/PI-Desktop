@@ -4,7 +4,9 @@ import { homedir } from "node:os";
 import {
   parseSkillFrontmatter,
   pluginSkillId,
+  pluginThemeId,
   pluginToolName,
+  sanitizeThemeCss,
   skillIdFromPath,
   validateManifest,
   type PluginManifest,
@@ -44,6 +46,21 @@ export type RegisteredPluginSkill = {
   /** Absolute path to the skill document inside the plugin directory. */
   path: string;
   bytes: number;
+};
+
+/**
+ * A theme a plugin contributed (spec 07 §3). The CSS is read and sanitized once
+ * at load time; the renderer injects the stored text verbatim.
+ */
+export type RegisteredPluginTheme = {
+  /** `plugin:<pluginId>:<themeId>` — the value stored in `AppSettings.theme`. */
+  id: string;
+  pluginId: string;
+  themeId: string;
+  label: string;
+  /** Palette the overrides layer on; drives `data-theme` in the renderer. */
+  base: "light" | "dark";
+  css: string;
 };
 
 export type PluginPanelRequest = {
@@ -131,6 +148,8 @@ const MAX_SKILLS_PER_PLUGIN = 32;
 const MAX_SKILL_BYTES = 128 * 1024;
 /** Catalog lines stay short — the body carries the detail. */
 const MAX_SKILL_DESCRIPTION_CHARS = 240;
+/** A plugin may contribute at most this many themes. */
+const MAX_THEMES_PER_PLUGIN = 8;
 
 type PendingCall = {
   resolve: (value: unknown) => void;
@@ -220,6 +239,7 @@ export class PluginRuntime {
   private commands = new Map<string, RegisteredCommand>();
   private tools = new Map<string, RegisteredPluginTool>();
   private skills = new Map<string, RegisteredPluginSkill>();
+  private themes = new Map<string, RegisteredPluginTheme>();
   private loaded = new Map<string, LoadedPlugin>();
   private toasts: Array<{ message: string; level?: string }> = [];
   private services: PluginHostServices;
@@ -261,6 +281,11 @@ export class PluginRuntime {
   /** Catalog of active plugin skills, ordered by id for a stable prompt. */
   getSkills(): RegisteredPluginSkill[] {
     return [...this.skills.values()].sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  /** Themes contributed by loaded plugins, ordered by id for a stable list. */
+  getThemes(): RegisteredPluginTheme[] {
+    return [...this.themes.values()].sort((a, b) => a.id.localeCompare(b.id));
   }
 
   /**
@@ -400,6 +425,7 @@ export class PluginRuntime {
     }
 
     this.registerSkills(loaded);
+    this.registerThemes(loaded);
     this.services.audit?.({
       pluginId: manifest.id,
       api: "plugin.load.success",
@@ -696,6 +722,9 @@ export class PluginRuntime {
     for (const [id, skill] of this.skills) {
       if (skill.pluginId === pluginId) this.skills.delete(id);
     }
+    for (const [id, theme] of this.themes) {
+      if (theme.pluginId === pluginId) this.themes.delete(id);
+    }
   }
 
   /**
@@ -800,6 +829,103 @@ export class PluginRuntime {
       ok: false,
       errorCode,
       path,
+      ts: Date.now(),
+    });
+  }
+
+  /**
+   * Index `contributes.themes`. Like skills this is declarative, but the CSS is
+   * read and sanitized here so a bad sheet never reaches the renderer: the
+   * shell injects the stored text with no further filtering.
+   */
+  private registerThemes(loaded: LoadedPlugin): void {
+    const declared = loaded.manifest.contributes?.themes ?? [];
+    if (!declared.length) return;
+    const pluginId = loaded.manifest.id;
+    if (!loaded.permissions.has("ui.theme")) {
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.themes.skipped",
+        ok: false,
+        errorCode: "PERMISSION_DENIED",
+        count: declared.length,
+        ts: Date.now(),
+      });
+      return;
+    }
+
+    let accepted = 0;
+    for (const contrib of declared) {
+      if (accepted >= MAX_THEMES_PER_PLUGIN) {
+        this.services.audit?.({
+          pluginId,
+          api: "plugin.themes.skipped",
+          ok: false,
+          errorCode: "LIMIT_EXCEEDED",
+          count: declared.length - accepted,
+          ts: Date.now(),
+        });
+        break;
+      }
+      const themeId = String(contrib?.id ?? "").trim();
+      const relative = String(contrib?.path ?? "").trim();
+      if (!themeId || !relative) continue;
+      const cssPath = resolveInsidePlugin(loaded.path, relative);
+      if (!cssPath || !existsSync(cssPath)) {
+        this.skipTheme(pluginId, themeId, "NOT_FOUND");
+        continue;
+      }
+      let raw: string;
+      try {
+        raw = readFileSync(cssPath, "utf8");
+      } catch {
+        this.skipTheme(pluginId, themeId, "READ_FAILED");
+        continue;
+      }
+      const sanitized = sanitizeThemeCss(raw);
+      if (!sanitized.ok) {
+        this.skipTheme(pluginId, themeId, "INVALID_CSS", sanitized.error);
+        continue;
+      }
+      const id = pluginThemeId(pluginId, themeId);
+      if (this.themes.has(id)) {
+        this.skipTheme(pluginId, themeId, "DUPLICATE");
+        continue;
+      }
+      this.themes.set(id, {
+        id,
+        pluginId,
+        themeId,
+        label: String(contrib.label ?? "").trim() || themeId,
+        base: contrib.base === "light" ? "light" : "dark",
+        css: sanitized.css,
+      });
+      accepted += 1;
+    }
+    if (accepted) {
+      this.services.audit?.({
+        pluginId,
+        api: "plugin.themes.register",
+        ok: true,
+        count: accepted,
+        ts: Date.now(),
+      });
+    }
+  }
+
+  private skipTheme(
+    pluginId: string,
+    themeId: string,
+    errorCode: string,
+    message?: string,
+  ): void {
+    this.services.audit?.({
+      pluginId,
+      api: "plugin.themes.skipped",
+      ok: false,
+      errorCode,
+      themeId,
+      ...(message ? { message } : {}),
       ts: Date.now(),
     });
   }

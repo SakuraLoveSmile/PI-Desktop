@@ -22,6 +22,7 @@ import type {
   ModelInfo,
   OnboardingState,
   PluginSummary,
+  PluginTheme,
   MarketPluginSummary,
   MarketPluginDetail,
   PluginInstallResult,
@@ -275,6 +276,7 @@ export const api = {
   setPluginAutoUpdate: (id: string, enabled: boolean) =>
     invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
   openPluginPanel: (id: string) => invoke(IPC.invoke.pluginOpenPanel, id),
+  listPluginThemes: () => invoke<PluginTheme[]>(IPC.invoke.pluginThemes),
   marketRefresh: (force = true) =>
     invoke<{
       providerId: string;
@@ -446,6 +448,14 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.updatesState, (payload) =>
       listener(payload as UpdateState),
+    );
+  },
+  onPluginChanged: (
+    listener: (event: { reason?: string; pluginId?: string }) => void,
+  ) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.pluginChanged, (payload) =>
+      listener((payload ?? {}) as { reason?: string; pluginId?: string }),
     );
   },
 };

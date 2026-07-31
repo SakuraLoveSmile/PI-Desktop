@@ -9,6 +9,7 @@ import type {
   ModelInfo,
   OnboardingState,
   PluginSummary,
+  PluginTheme,
   PermissionMode,
   ProjectWorkspace,
   ProviderPublic,
@@ -277,6 +278,8 @@ export type AppState = {
   workspace?: ProjectWorkspace | null;
   onboarding?: OnboardingState;
   plugins: PluginSummary[];
+  /** Themes contributed by loaded plugins, with their sanitized CSS. */
+  pluginThemes: PluginTheme[];
   pendingPermissions: Record<string, PendingPermission>;
   toasts: ToastItem[];
   notifications: AppNotification[];
@@ -361,6 +364,8 @@ export type AppState = {
   /** Load a provider's model list into the cache (no-op when cached). */
   loadProviderModels: (providerId: string) => Promise<void>;
   refreshPlugins: () => Promise<void>;
+  /** Reload contributed themes (plugins may come and go at runtime). */
+  refreshPluginThemes: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
   receiveNotification: (notification: AppNotification) => void;
   markNotificationRead: (id: string) => Promise<void>;
@@ -564,6 +569,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   providers: [],
   providerModels: {},
   plugins: [],
+  pluginThemes: [],
   pendingPermissions: {},
   page: "chat",
   settingsTab: "general",
@@ -1888,6 +1894,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshPlugins: async () => {
     const plugins = await api.listPlugins();
     set({ plugins: plugins.plugins });
+  },
+
+  refreshPluginThemes: async () => {
+    try {
+      set({ pluginThemes: await api.listPluginThemes() });
+    } catch {
+      // A missing channel (older main process) must not break the shell; the
+      // built-in themes keep working.
+      set({ pluginThemes: [] });
+    }
   },
 
   refreshNotifications: async () => {

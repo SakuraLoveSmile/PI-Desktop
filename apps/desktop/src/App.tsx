@@ -71,6 +71,9 @@ const PluginsPage = lazy(() =>
   })),
 );
 
+/** Holds the sanitized CSS of the active plugin theme, appended last in head. */
+const PLUGIN_THEME_STYLE_ID = "pi-plugin-theme";
+
 class ErrorBoundary extends Component<
   { children: ReactNode },
   { error: Error | null }
@@ -160,6 +163,8 @@ function AppShell() {
   const refreshWorkspaceDiff = useAppStore((s) => s.refreshWorkspaceDiff);
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
   const workPanelWidth = useAppStore((s) => s.workPanelWidth);
+  const pluginThemes = useAppStore((s) => s.pluginThemes);
+  const refreshPluginThemes = useAppStore((s) => s.refreshPluginThemes);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -359,25 +364,55 @@ function AppShell() {
   }, [activeSessionId, page]);
 
   useEffect(() => {
-    const theme = settings?.theme ?? "system";
-    const apply = () => {
-      if (theme === "system") {
-        document.documentElement.dataset.theme = window.matchMedia(
-          "(prefers-color-scheme: light)",
-        ).matches
-          ? "light"
-          : "dark";
-      } else {
-        document.documentElement.dataset.theme = theme;
+    if (!ready) return;
+    void refreshPluginThemes();
+    // Enabling, disabling or uninstalling a plugin changes which themes exist.
+    return api.onPluginChanged(() => void refreshPluginThemes());
+  }, [ready, refreshPluginThemes]);
+
+  useEffect(() => {
+    const preference = settings?.theme ?? "system";
+    const pluginTheme = preference.startsWith("plugin:")
+      ? pluginThemes.find((entry) => entry.id === preference)
+      : undefined;
+    // A plugin theme whose provider was disabled or uninstalled falls back to
+    // `system` instead of leaving the shell on a half-applied palette.
+    const base: "system" | "light" | "dark" = pluginTheme
+      ? pluginTheme.base
+      : preference === "light" || preference === "dark"
+        ? preference
+        : "system";
+
+    let style = document.getElementById(PLUGIN_THEME_STYLE_ID) as HTMLStyleElement | null;
+    if (pluginTheme) {
+      if (!style) {
+        style = document.createElement("style");
+        style.id = PLUGIN_THEME_STYLE_ID;
+        // Appended last so plugin overrides win over the base token sheet.
+        document.head.append(style);
       }
+      style.textContent = pluginTheme.css;
+      document.documentElement.dataset.pluginTheme = pluginTheme.id;
+    } else {
+      style?.remove();
+      delete document.documentElement.dataset.pluginTheme;
+    }
+
+    const apply = () => {
+      document.documentElement.dataset.theme =
+        base === "system"
+          ? window.matchMedia("(prefers-color-scheme: light)").matches
+            ? "light"
+            : "dark"
+          : base;
     };
     apply();
-    if (theme !== "system") return;
+    if (base !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: light)");
     const onChange = () => apply();
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, [settings?.theme]);
+  }, [settings?.theme, pluginThemes]);
 
   useEffect(() => {
     if (!ready) return;

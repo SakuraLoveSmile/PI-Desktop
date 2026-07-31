@@ -36,6 +36,7 @@ import {
   IconKeyboard,
   IconMonitor,
   IconMoon,
+  IconPalette,
   IconSearch,
   IconSliders,
   IconSparkles,
@@ -568,6 +569,7 @@ export function SettingsPage() {
   const setSettingsAnchor = useAppStore((s) => s.setSettingsAnchor);
   const setPage = useAppStore((s) => s.setPage);
   const settings = useAppStore((s) => s.settings);
+  const pluginThemes = useAppStore((s) => s.pluginThemes);
   const version = useAppStore((s) => s.version);
   const refreshProviders = useAppStore((s) => s.refreshProviders);
   const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
@@ -877,6 +879,47 @@ export function SettingsPage() {
                             {label}
                           </span>
                           <span className="settings-theme-sub">{sub}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {/* Themes contributed by plugins share the built-in grid. */}
+                  {pluginThemes.map((pluginTheme) => {
+                    const active = settings.theme === pluginTheme.id;
+                    return (
+                      <button
+                        key={pluginTheme.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        className={cx(
+                          "settings-theme-card",
+                          active && "active",
+                          pluginTheme.base,
+                        )}
+                        onClick={() => void saveSettings({ theme: pluginTheme.id })}
+                      >
+                        {active && (
+                          <span className="settings-card-check" aria-hidden="true">
+                            <IconCircleCheck size={16} />
+                          </span>
+                        )}
+                        <span className="settings-theme-preview" aria-hidden="true">
+                          <span className="settings-theme-preview-bar" />
+                          <span className="settings-theme-preview-line" />
+                          <span className="settings-theme-preview-line short" />
+                          <span className="settings-theme-preview-btn" />
+                        </span>
+                        <span className="settings-theme-meta">
+                          <span className="settings-theme-label">
+                            <IconPalette size={15} className="settings-theme-icon" />
+                            {pluginTheme.label}
+                          </span>
+                          <span className="settings-theme-sub">
+                            {t("settings.themeFromPlugin", {
+                              plugin: pluginTheme.pluginId,
+                            })}
+                          </span>
                         </span>
                       </button>
                     );
