@@ -88,7 +88,9 @@ After development:
 6. Return to the primary checkout
 7. Merge the request branch into local `main`
 8. Verify the expected commits are present
-9. Do not push to remote
+9. Remove the request worktree
+10. Delete the merged request branch
+11. Do not push to remote
 
 If another agent has updated `main`, the request branch must be refreshed before merging:
 
@@ -102,6 +104,24 @@ Use merge instead of rebase when repository policy requires it.
 Do not overwrite, reset, or discard changes already merged by another agent.
 
 Remote publishing is the user's responsibility.
+
+### 5. Clean Up the Request Worktree
+
+Once the request branch is merged into local `main`, its worktree has no further
+purpose and must be removed. Never leave a merged worktree on disk.
+
+```bash
+git worktree remove ../worktrees/<request-id>
+git branch -d <type>/<request-id>
+git worktree prune
+```
+
+Requirements:
+
+* Remove the worktree only after verifying the merge commits are present in local `main`
+* The worktree must be clean; commit or discard your own leftover changes first
+* Use `git branch -d` (not `-D`) so an unmerged branch refuses to delete
+* Delete only your own worktree and branch, never another agent's
 
 ## Development Workflow
 
@@ -117,7 +137,8 @@ Remote publishing is the user's responsibility.
 10. Commit each logical change
 11. Refresh the branch against the latest local `main`
 12. Merge into local `main`
-13. Do not push
+13. Remove the request worktree and delete the merged branch
+14. Do not push
 
 Development must not begin before steps 1–3 are complete.
 
@@ -164,6 +185,8 @@ See:
 * [ ] All logical changes were committed
 * [ ] The branch was refreshed against the latest local `main`
 * [ ] Changes were merged into local `main`
+* [ ] The request worktree was removed after the merge
+* [ ] The merged request branch was deleted
 * [ ] Nothing was pushed to remote
 
 ## Final Report
@@ -176,4 +199,5 @@ Report:
 * Validation performed or skipped
 * Commit hashes and messages
 * Merge result
+* Worktree and branch cleanup result
 * Confirmation that nothing was pushed

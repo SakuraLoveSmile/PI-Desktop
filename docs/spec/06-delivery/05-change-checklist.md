@@ -92,9 +92,27 @@ Before marking the request complete:
 - [ ] Required remote checks and reviews pass.
 - [ ] PR/MR is merged into `main` using a permitted merge strategy.
 - [ ] Request worktree is removed after merge.
+- [ ] Merged request branch is deleted locally (`git branch -d`).
 - [ ] Remote request branch is deleted after merge.
 - [ ] Issue reference is included when applicable (e.g. `Refs #12` or
   `Closes #12`).
+
+---
+
+## 6.1 Merge Cleanup Checklist
+
+Run immediately after the request branch is integrated into `main`, whether the
+merge happened remotely via PR/MR or locally in the primary checkout:
+
+- [ ] Expected merge commits are verified present in `main`.
+- [ ] The request worktree is clean — no uncommitted or untracked request files
+  remain.
+- [ ] `git worktree remove <worktree-path>` succeeded without forcing.
+- [ ] `git branch -d <type>/<short-description>` succeeded (no `-D` fallback on
+  an unmerged branch).
+- [ ] `git worktree prune` leaves `git worktree list` free of stale entries for
+  this request.
+- [ ] No other agent's worktree or branch was removed.
 
 ---
 
@@ -132,5 +150,6 @@ Before marking work complete, verify **all** of the following:
 | 7 | BOARD updated if milestone deliverable completed | Step 9 of development loop |
 | 8 | No secrets or local data in commit | [§4.4 Never commit](03-ai-development-workflow.md#44-never-commit) |
 | 9 | PR/MR merged into `main`; request worktree and branch removed | [R4 — Request branch + worktree + merge gate](03-ai-development-workflow.md#r4--request-branch--worktree--merge-gate) |
+| 10 | No merged worktree left on disk; `git worktree list` has no stale entry for this request | [§6.1 Merge Cleanup Checklist](#61-merge-cleanup-checklist) |
 
 If any gate fails, the change is **not Done**.
