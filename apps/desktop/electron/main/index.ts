@@ -1536,11 +1536,18 @@ async function createWindow() {
             await new Promise((r) => setTimeout(r, 900));
             await shot("pi-plugins-market");
             await mainWindow!.webContents.executeJavaScript(
-              `window.__PI_DESKTOP__?.seedPlugins?.(0)`,
+              `window.__PI_DESKTOP__?.seedPlugins?.(0);
+               window.__PI_DESKTOP__?.seedPluginThemes?.(2)`,
             );
             await setPage("settings");
+            // The general tab carries the theme grid, including plugin themes
+            // (D172); earlier scenes leave the sidebar on the archive tab.
+            await setSettingsTab("general");
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-settings-live");
+            await mainWindow!.webContents.executeJavaScript(
+              `window.__PI_DESKTOP__?.seedPluginThemes?.(0)`,
+            );
             // Model configuration tab: provider cards, defaults, edit dialog.
             await mainWindow!.webContents.executeJavaScript(`
               [...document.querySelectorAll('.settings-nav-item')][1]?.dispatchEvent(new MouseEvent('click',{bubbles:true}));

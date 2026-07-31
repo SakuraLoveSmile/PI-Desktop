@@ -40,7 +40,7 @@ import {
   IconNewSession,
   IconSidebar,
 } from "./components/icons";
-import type { PluginSummary } from "@pi-desktop/shared";
+import type { PluginSummary, PluginTheme } from "@pi-desktop/shared";
 
 const MODIFIER_ONLY_KEYS = new Set([
   "Alt",
@@ -579,6 +579,7 @@ function AppShell() {
   useEffect(() => {
     const originalRefreshNotifications =
       useAppStore.getState().refreshNotifications;
+    const originalListPluginServices = api.listPluginServices;
     (window as any).__PI_DESKTOP__ = {
       setPage: (page: string) => useAppStore.getState().setPage(page as any),
       refreshProviders: () => useAppStore.getState().refreshProviders(),
@@ -662,12 +663,33 @@ function AppShell() {
       },
       seedPlugins: (count = 4) => {
         // Capture-only plugins fixture (plugins index scenes); count 0 clears.
-        // One sample per row group so the D169 bands are all exercised.
+        // One sample per row group so the D169 bands are all exercised, and one
+        // sample per new contribution kind so the capability/service chips do.
         if (!(window as any).__PI_CAPTURE__) return;
         if (count <= 0) {
           useAppStore.setState({ plugins: [] });
+          (api as any).listPluginServices = originalListPluginServices;
           return;
         }
+        // The rows read service state straight from IPC, which reports nothing
+        // for a fixture plugin; stand in for the supervisor here.
+        (api as any).listPluginServices = async () => [
+          {
+            pluginId: "pi.git-insights",
+            serviceId: "indexer",
+            label: "Repository indexer",
+            state: "running",
+            restarts: 0,
+          },
+          {
+            pluginId: "pi.markdown-tools",
+            serviceId: "watcher",
+            label: "Document watcher",
+            state: "failed",
+            restarts: 3,
+            message: "start() threw: ENOENT",
+          },
+        ];
         const samples: PluginSummary[] = [
           {
             id: "pi.deploy-preview",
@@ -678,6 +700,7 @@ function AppShell() {
             status: "load_error",
             errorMessage: "Manifest declares net.fetch but the grant is missing.",
             permissions: ["net.fetch", "ui.panel"],
+            capabilities: ["panel", "tools", "mcp"],
             author: "Pi Labs",
             description: "Builds a preview deployment for the current branch.",
           },
@@ -689,6 +712,7 @@ function AppShell() {
             source: "marketplace",
             status: "ready",
             permissions: ["fs.read.workspace", "ui.panel", "notify"],
+            capabilities: ["panel", "commands", "skills", "services", "bus"],
             author: "Pi Labs",
             description: "Summarizes repository activity into a review panel.",
             updateAvailable: {
@@ -705,6 +729,7 @@ function AppShell() {
             source: "marketplace",
             status: "ready",
             permissions: ["clipboard.read", "clipboard.write", "ui.panel"],
+            capabilities: ["commands", "themes", "services"],
             author: "Community",
             description: "Formats tables and normalizes headings on demand.",
             autoUpdate: true,
@@ -722,6 +747,34 @@ function AppShell() {
           },
         ];
         useAppStore.setState({ plugins: samples.slice(0, count) });
+      },
+      seedPluginThemes: (count = 2) => {
+        // Capture-only theme fixture: plugin themes share the built-in grid on
+        // the general settings page, so the rig needs some to render.
+        if (!(window as any).__PI_CAPTURE__) return;
+        if (count <= 0) {
+          useAppStore.setState({ pluginThemes: [] });
+          return;
+        }
+        const samples: PluginTheme[] = [
+          {
+            id: "plugin:pi.markdown-tools:midnight",
+            pluginId: "pi.markdown-tools",
+            themeId: "midnight",
+            label: "Midnight",
+            base: "dark",
+            css: "",
+          },
+          {
+            id: "plugin:pi.markdown-tools:parchment",
+            pluginId: "pi.markdown-tools",
+            themeId: "parchment",
+            label: "Parchment",
+            base: "light",
+            css: "",
+          },
+        ];
+        useAppStore.setState({ pluginThemes: samples.slice(0, count) });
       },
       seedNotifications: (count = 105) => {
         // Capture-only notification fixture; count 0 restores an empty inbox.
