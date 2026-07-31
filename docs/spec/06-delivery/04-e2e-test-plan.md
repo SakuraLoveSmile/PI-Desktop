@@ -633,6 +633,36 @@ Each scenario is documented in this format:
 - **Milestone**: M4
 - **Status**: Automated (protocol smoke: plugins.loadDev)
 
+#### E2E-022A: Create a plugin from a template
+
+- **Preconditions**: App running; an empty folder available.
+- **Steps**: 1) Open Plugins. 2) Choose New plugin from template in the header overflow menu (or use the empty-state button). 3) Pick each of the four templates in turn and read its description. 4) Choose the folder. 5) Cancel the folder picker on a second attempt.
+- **Expected**: The picker lists exactly `panel-basic`, `agent-tool-basic`, `skill-pack`, `full-demo`, each named and described in the active locale; choosing a folder writes the template files, loads the plugin as a development plugin, refreshes the list, and reports "<name> created and loaded"; the plugin's contributions are immediately usable; a canceled folder picker changes nothing and reports no error.
+- **Specs linked**: `07-plugins/10-plugin-devex.md`, ADR 0039
+- **Acceptance**: G (create plugin from template)
+- **Milestone**: Post-MVP
+- **Status**: Automated in part (`apps/desktop/test/plugin-template-action.test.mjs`: channel, template-id parity with the devkit, locale coverage, canceled-pick ordering); UI walk-through Documented
+
+#### E2E-022B: Development plugin hot reload
+
+- **Preconditions**: A plugin loaded from a local folder and enabled.
+- **Steps**: 1) Edit `main.js` to change a command title and save. 2) Save several files at once. 3) Introduce a syntax error and save. 4) Fix the error and save. 5) Add a new permission to `manifest.json` and save. 6) Restart the app and edit again.
+- **Expected**: The single edit reloads the plugin without re-picking the folder and the command palette shows the new title; a save burst produces one reload, and writes under `dist/` or `node_modules/` produce none; the syntax error reports a reload failure without crashing the app, and the fixing save recovers the plugin; the added permission refuses the reload with `PERMISSION_DENIED` and asks the user to load the plugin again, and the plugin keeps its previous grants until they do; after a restart the folder is still watched.
+- **Specs linked**: `07-plugins/10-plugin-devex.md` §7, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0039
+- **Acceptance**: G (hot reload), D (permissions cannot widen without review)
+- **Milestone**: Post-MVP
+- **Status**: Automated in part (`apps/desktop/test/plugin-hot-reload.test.mjs`: debounce, ignore list, permission ceiling, recovery, teardown); manual edit loop Documented
+
+#### E2E-022C: Check, pack, install round-trip
+
+- **Preconditions**: A scaffolded plugin directory.
+- **Steps**: 1) `pnpm pi-plugin check <dir>`. 2) Delete the file named by `main` and run `check` again. 3) Restore it, declare `contributes.skills` without `agent.prompt.inject`, and run `check` again. 4) `pnpm pi-plugin pack <dir>`. 5) Install the resulting `.piplug` from the plugins page. 6) Ask the agent to run `PluginCheck` and `PluginPack` on the same directory.
+- **Expected**: A scaffolded plugin checks clean and reports its file count and size; the missing `main` is an error that blocks `pack`; the inert-skills case is a warning that does not block; `pack` writes `dist/<id>-<version>.piplug` with store-only entries and prints its sha256; the package installs through the normal permission review and appears under Active; the agent tools produce the same verdicts and refuse any directory outside the session workspace.
+- **Specs linked**: `07-plugins/10-plugin-devex.md` §5–§6, `07-plugins/06-plugin-packaging.md`, ADR 0039
+- **Acceptance**: G (local packaging round-trip)
+- **Milestone**: Post-MVP
+- **Status**: Automated in part (`packages/plugin-devkit` vitest: scaffold→check→pack per template, store-method headers, every check rule); install step Documented
+
 #### E2E-023: Plugin command in global search and executes
 
 - **Preconditions**: Plugin loaded and enabled.
@@ -652,6 +682,16 @@ Each scenario is documented in this format:
 - **Acceptance**: G (plugin agent tool)
 - **Milestone**: M4
 - **Status**: Automated (protocol smoke: dispatch roundtrip host->runner->host; in-app JS execution via PluginRuntime)
+
+#### E2E-024I: Plugin skills reach the model only when granted
+
+- **Preconditions**: A plugin declaring `contributes.skills` and `agent.prompt.inject`, enabled; a project with its own `AGENTS.md`.
+- **Steps**: 1) Send a prompt and inspect the sidecar's system prompt. 2) Edit the skill file and send another prompt. 3) Revoke `agent.prompt.inject` and send another prompt. 4) Disable the plugin and send another prompt. 5) Declare a skill file larger than the per-skill budget and repeat. 6) Open a workspace that is a plugin directory, then one that is not.
+- **Expected**: A `# Plugin skills` section appears with the plugin's name and skill text, after the built-in skills and before the project instruction chain; the edit takes effect on the next prompt without restarting; revoking the permission or disabling the plugin removes the section and retires the reused runtime; an oversized skill is clamped and the section stays within its 16 KiB total, leaving the 32 KiB instruction chain untouched; the built-in plugin-development skill is present in the plugin workspace and absent in the other, while `PluginCheck` is offered in both.
+- **Specs linked**: `07-plugins/10-plugin-devex.md`, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0039, ADR 0037
+- **Acceptance**: G (skills contribution), D (high-risk permission gating)
+- **Milestone**: Post-MVP
+- **Status**: Automated in part (`packages/agent-runtime` tests: section shape, budgets, ordering, digest-driven reuse; `apps/desktop/test`: permission gate and workspace activation); prompt inspection Documented
 
 #### E2E-024G: Marketplace detail sheet shows README, permissions, versions
 
@@ -2320,10 +2360,10 @@ Each scenario is documented in this format:
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
 | C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-AGENTS-001 |
-| D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
+| D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
 | E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049, E2E-074 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-AGENTS-001 |
-| G — Plugins | E2E-022, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-025, E2E-026 |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068, E2E-086 |
 | Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-AGENTS-001 |
@@ -2335,6 +2375,7 @@ Each scenario is documented in this format:
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
 | M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-AGENTS-001 (+ packaging scenarios in release runbook) |
+| Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I (plugin roadmap R2/R3) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)

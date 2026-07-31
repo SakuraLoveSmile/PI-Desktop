@@ -598,3 +598,41 @@ section mirrors only marketplace/catalog items still blocking nothing.
   renderer performs no remote image loads.
 - Decision D169; supersedes the flat list, pill tabs, and inline detail pane of
   `07-plugins/07-plugin-marketplace.md` §7/§14.
+
+## 2026-07-31 — Plugin skills activation and the plugin devkit
+
+- `contributes.skills` is activated. `PluginRuntime.getSkills()` reads each
+  declared skill file at prompt time, only for plugins granted
+  `agent.prompt.inject`, and only through the containment guard the gated `fs`
+  APIs use. The agent runtime renders a `# Plugin skills` section capped at
+  16 KiB total and 8 KiB per skill — its own budget, not the 32 KiB instruction
+  chain of ADR 0037 — and orders it after the built-in skills but before
+  project instructions, so a user's own files keep the last word. Runtime reuse
+  keys on a skills digest, so enabling a plugin, revoking the permission, or
+  editing a skill file retires the idle runtime instead of reusing a stale
+  prompt. Closes roadmap gap R2.
+- Plugin authoring ships as a first-party package, `@pi-desktop/plugin-devkit`,
+  which owns `scaffold` / `check` / `pack` over one implementation shared by the
+  `pi-plugin` CLI, the `PluginScaffold` / `PluginCheck` / `PluginPack` agent
+  tools served from Electron main, and the plugins page's New plugin from
+  template action. `check` reproduces the rules host-core enforces, so passing
+  it implies install will pass; `pack` writes store-only (method 0) `.piplug`
+  entries because `extract_zip_bytes` accepts nothing else. Closes roadmap gap
+  R3's template and `check`/`pack` items.
+- A bundled plugin was rejected as the delivery vehicle: a plugin cannot produce
+  a `.piplug` (no archive API in `HOST_API_ALLOWLIST`) and scaffolding would
+  need high-risk `fs.write.workspace` for a capability the application should
+  provide itself.
+- The built-in `plugin-development` skill activates only for plugin workspaces —
+  a plugin `manifest.json` at the workspace root, or a loaded development plugin
+  inside it — so an ordinary session pays only for three tool descriptions.
+- Development plugins are watched and hot reload on save, debounced 300 ms,
+  ignoring `node_modules` / `.git` / `dist` / `target`, capped at 16 plugins, and
+  re-armed across restarts. A reload can never widen a permission set: the
+  manifest is compared against the set approved when the folder was picked and a
+  new permission stops the reload with `PERMISSION_DENIED`, while removed
+  permissions do take effect. A failed reload keeps the watch so the fixing save
+  recovers the plugin, and reports through a toast plus `pluginChanged` —
+  host-core has no RPC for a runtime-side load failure, so the registry row does
+  not move to `load_error`. Closes roadmap gap R3's hot-reload item.
+- Decision D171; recorded as ADR 0039.

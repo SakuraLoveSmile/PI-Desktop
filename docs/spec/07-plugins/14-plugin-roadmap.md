@@ -18,20 +18,23 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
 
 ### R2 — Agent Extension (partial ✅)
 - Full agentTools pipeline ✅
+- Skills contribution is activated: declared skills reach the model as a budgeted
+  `# Plugin skills` prompt section when `agent.prompt.inject` is granted ✅
+  (ADR 0039)
 - Unified namespace and audit ✅
-- Skills contribution metadata is accepted, but skills are not activated by the
-  runtime yet
 - Per-plugin settings API is implemented; a dedicated settings UI is not
   implemented
 - Plugin log panel remains planned; runtime audit logs exist without a dedicated
   plugin-log surface
 
-### R3 — DX & Packaging (partial ✅)
-- plugin-sdk
-- Template generation (still planned)
-- `pi-plugin check/pack` (still planned)
+### R3 — DX & Packaging ✅
+- plugin-sdk ✅
+- Template generation ✅ (`panel-basic`, `agent-tool-basic`, `skill-pack`,
+  `full-demo`, from the plugins page, the agent, or `pi-plugin init`)
+- `pi-plugin check/pack` ✅ (`@pi-desktop/plugin-devkit`, also exposed as the
+  `PluginCheck` / `PluginScaffold` / `PluginPack` agent tools)
 - `.piplug` install ✅
-- dev hot reload (still planned)
+- dev hot reload ✅ (watch + debounce, and a reload can never widen permissions)
 
 ### R4 — Marketplace Read-only ✅
 - market provider abstraction (official remote GitHub catalog provider)

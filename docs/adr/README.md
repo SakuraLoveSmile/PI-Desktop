@@ -53,3 +53,4 @@ Each ADR includes:
 | 0035 | Surface the OS locale through the preload bridge | Accepted |
 | 0036 | Split Settings into AI and Shortcuts destinations | Accepted |
 | 0037 | Resolve project instructions in Electron main | Accepted |
+| 0039 | Activate plugin skills and ship plugin authoring as a first-party devkit | Accepted |
