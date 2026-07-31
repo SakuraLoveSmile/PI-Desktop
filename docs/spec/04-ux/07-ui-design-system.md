@@ -168,6 +168,12 @@ Light-surface polish (D148):
 - Docked work panel uses quiet inset paper (`#fafafa`) with a white header band and a combined create trigger in the header so the tool column stays on content without a heavy divider.
 - Shared form fields, browser URL, settings segment tracks, and shortcut keycaps use `#f5f5f5` inset fills with a 0.5px ink stroke; focus lifts to white with a neutral ring.
 - Settings toggles keep a near-black on-track and force a white knob in light mode.
+  Off/on track and knob colours come from the `--ds-switch-*` theme tokens; a
+  per-theme `:root[data-theme="…"] .settings-toggle` background override
+  out-specifies `.settings-toggle.on` and strands the on-state on the off fill.
+- Switch off-state carries a dim fill plus a 1px inset ring so an empty track
+  still reads as a control; the dark-theme off knob stays light (`--gray-300`)
+  so the knob does not disappear into the track.
 - Dialog scrim softens to ~28% ink so elevated white dialogs remain readable.
 
 ### 4.4 System theme behavior
