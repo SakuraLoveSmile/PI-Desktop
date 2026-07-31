@@ -604,13 +604,14 @@ export const zhCN = {
     title: "工作面板",
     collapse: "收起工作面板",
     resize: "调整工作面板宽度",
-    openTool: "打开工具",
+    tools: "工具",
     openItems: "打开的资源",
     closeTab: "关闭{{name}}",
     tabs: {
       review: "审阅",
       terminal: "终端",
       browser: "浏览器",
+      file: "文件",
     },
     review: {
       noWorkspace: "打开项目后即可查看改动",

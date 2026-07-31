@@ -602,13 +602,14 @@ export const en = {
     title: "Work panel",
     collapse: "Hide work panel",
     resize: "Resize work panel",
-    openTool: "Open tool",
+    tools: "Tools",
     openItems: "Open resources",
     closeTab: "Close {{name}}",
     tabs: {
       review: "Review",
       terminal: "Terminal",
       browser: "Browser",
+      file: "Files",
     },
     review: {
       noWorkspace: "Open a project to see changes",
