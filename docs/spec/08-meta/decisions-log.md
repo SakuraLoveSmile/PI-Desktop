@@ -662,3 +662,31 @@ section mirrors only marketplace/catalog items still blocking nothing.
   host-core has no RPC for a runtime-side load failure, so the registry row does
   not move to `load_error`. Closes roadmap gap R3's hot-reload item.
 - Decision D171; recorded as ADR 0039.
+
+## 2026-07-31 — Work panel header menu: tools first, no duplicated entries
+
+- The unified header menu lists the four tools (Review, Terminal, Browser,
+  Files) first, in a fixed order, and only then — after a divider, and only when
+  they exist — the resources the transcript opened. The previous layout listed
+  every open tool twice: once in the resource switcher and again in the
+  create-new section, which made "open" and "switch to" indistinguishable.
+  Each tool row now carries its own open state and its own close control, so a
+  single row is the whole affordance for that tool.
+- Activating a tool that is already open activates its existing tab instead of
+  replacing it with a fresh singleton, so the Browser keeps its URL. The header
+  action cluster is pinned right (`margin-left: auto`) so the close/collapse
+  controls no longer slide with the label length, and the trailing close slot in
+  each row is always reserved so labels and open dots never shift.
+- Menu rows own real DOM focus (WAI-ARIA menu pattern) rather than a roving
+  highlight: the trigger's ArrowDown/ArrowUp opens on the active or last row,
+  Arrow/Home/End walk rows only, Delete/Backspace closes the focused row while
+  the menu stays open with focus on its neighbor, and Escape/Tab/selection
+  return focus to the trigger. Only a session switch dismisses the menu
+  implicitly — selecting a row closes it explicitly, so the previous
+  active-tab-keyed auto-dismiss (which fired whenever a background artifact
+  changed the active tab) is gone.
+- Missing `panel.tabs.file` was the reason a bare Files tab showed a literal
+  `file` label; the catalogs now carry it plus `panel.tools`, and the obsolete
+  `panel.openTool` is removed.
+- Decision D172; no ADR — presentation and input handling only, inside the
+  existing work-panel architecture (ADR 0033).

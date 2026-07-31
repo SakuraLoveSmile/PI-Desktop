@@ -1134,11 +1134,16 @@ Each scenario is documented in this format:
 - **Preconditions**: App running with any workspace state.
 - **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
   Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
-  a URL preview, and a completed command artifact. 3) Use the work-panel
-  create trigger dropdown to open/select Review, Terminal, Browser, and Files; verify active and
-  open-inactive states. Open the current-resource switcher, select file and tool
-  resources with pointer and keyboard, close an inactive item inside it, then
-  close the active item from the header. 4) Close active middle and edge items
+  a URL preview, and a completed command artifact. 3) Open the header's unified
+  context menu: verify the four tools appear once, in a fixed order, with active,
+  open-inactive, and closed states, and that transcript-opened resources appear
+  only in the second section. Open/select each tool with pointer and keyboard,
+  reopen a Browser that already has a URL and confirm the URL survives, walk the
+  rows with ArrowDown/ArrowUp/Home/End (focus must skip the close buttons), close
+  an inactive row with Delete and confirm the menu stays open with focus on the
+  neighbor, press Escape and confirm focus returns to the trigger, then close the
+  active item from the header. Confirm the right action cluster stays at the
+  header's right edge for both the shortest and longest labels. 4) Close active middle and edge items
   and verify neighbor selection. 5) Use the sole session-pane collapse control and
   trigger another artifact. 6) In session A, leave the panel open with multiple
   tabs and a Browser resource; switch to session B, create a different tab set,
@@ -1168,11 +1173,19 @@ Each scenario is documented in this format:
   are path-keyed and repeated resources deduplicate. Opening, collapse, and
   divider commit never change the OS window size — only MainChat reflows inside
   the fixed client area (ADR 0033). Once the panel is open, a single unified
-  context trigger opens one dropdown whose top section is the ordered resource
-  switcher (full-path tooltips, per-item close, Arrow/Home/End/Escape, focus
-  restored to the trigger) and, after a divider, a create-new section exposing
-  one-click Review/Terminal/Browser/Files actions with a fill plus edge marker
-  for the active tool and a dot for open inactive tools. Opening the menu
+  context trigger opens one dropdown that lists the four tools first, in a fixed
+  order, with a fill plus 2px edge marker for the active row and a dot for open
+  inactive ones, each open row carrying its own close control in an
+  always-reserved trailing slot; a second section appears after a divider only
+  for transcript-opened resources (full-path tooltips, per-item close), so no
+  entry is listed twice. The menu fades in over ≤4px and is static under
+  reduced motion. Arrow/Home/End move focus across rows only and skip the close
+  buttons, ArrowDown/ArrowUp on the trigger open on the active/last row,
+  Delete/Backspace closes the focused row while the menu stays open with focus on
+  its neighbor, and Escape/Tab/selection restore focus to the trigger. Reopening
+  an already-open tool activates it and preserves its Browser URL. The right
+  action cluster stays pinned to the header's right edge regardless of label
+  length. Opening the menu
   temporarily hides the native Browser preview so it is never occluded. The
   sole
   collapse control sits in the session pane top-right rather than the content header.
