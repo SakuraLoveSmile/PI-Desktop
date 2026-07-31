@@ -1,0 +1,228 @@
+/*
+  Composer menus — the dark composer box treatment (DARK_COMPOSER_BOX), the
+  permission-mode chip menu, the model picker and its provider/model groups,
+  and the composer plus menu.
+*/
+
+/* DARK_COMPOSER_BOX — Codex elevated-primary + elevation-prominent */
+:root[data-theme="dark"] .composer-shell {
+  /* Codex elevated-primary: #212121f5 / gray-800 96% (not flat solid) */
+  background: var(--ds-bg-elevated-primary);
+  background-color: #212121f5;
+  box-shadow: var(--ds-shadow-composer);
+  border: 0;
+  outline: 0;
+}
+
+:root[data-theme="dark"] .composer-dock-home .composer-shell {
+  /* Keep the same restrained single-surface treatment in dark mode. */
+  background: var(--ds-bg-elevated-primary);
+  background-color: #212121f5;
+  background-image: none;
+  box-shadow: var(--ds-shadow-composer);
+}
+
+:root[data-theme="dark"] .composer-input::placeholder {
+  /* Codex dark placeholder ~42% white */
+  color: color-mix(in oklab, var(--gray-0) 42%, transparent);
+  -webkit-text-fill-color: color-mix(in oklab, var(--gray-0) 42%, transparent);
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .composer-input {
+  color: var(--gray-0);
+}
+
+:root[data-theme="dark"] .composer-toolbar .icon-btn,
+:root[data-theme="dark"] .mode-chip,
+:root[data-theme="dark"] .model-chip {
+  color: color-mix(in oklab, var(--gray-0) 78%, transparent);
+}
+
+:root[data-theme="dark"] .empty-hero-icon {
+  color: var(--gray-0);
+  opacity: 1;
+}
+
+.composer-model {
+  position: relative;
+}
+
+.composer-thinking {
+  position: relative;
+}
+
+/* Permission-mode chip menu (D115): anchored left above the mode chips. */
+.composer-permission {
+  position: relative;
+}
+
+.composer-permission-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 40;
+  width: min(120px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 92px));
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-dialog);
+  border: 1px solid var(--ds-border-subtle);
+  color: var(--ds-text-primary);
+}
+
+.composer-model-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 40;
+  width: min(240px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 92px));
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: var(--ds-shadow-dialog);
+  border: 1px solid var(--ds-border-subtle);
+  color: var(--ds-text-primary);
+}
+
+.composer-model-menu.composer-thinking-menu {
+  left: 0;
+  right: auto;
+  width: auto;
+  max-width: min(160px, calc(100vw - 24px));
+}
+
+.composer-model-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 6px;
+}
+
+/* Provider→models groups: the list scrolls on its own so the thinking
+   controls above it stay reachable with many discovered models. */
+.composer-model-list {
+  max-height: 264px;
+  overflow-y: auto;
+}
+
+.composer-model-group-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 7px 10px 3px;
+  background: var(--ds-bg-elevated-opaque);
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-weight-strong);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.composer-thinking-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.composer-thinking-list .composer-plus-item > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-chip {
+  height: 28px !important;
+  max-width: 220px;
+  padding: 0 10px !important;
+  gap: 4px !important;
+  border-radius: var(--radius-full) !important;
+  color: var(--ds-text-secondary) !important;
+  line-height: var(--leading-compact);
+  overflow: visible;
+}
+
+/* Horizontal ellipsis only; line-height above preserves glyph descenders. */
+.model-chip-label {
+  display: inline-block;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.model-chip:hover {
+  background: var(--ds-bg-hover) !important;
+  color: var(--ds-text-primary) !important;
+}
+
+.composer-plus-item.active {
+  background: var(--ds-bg-active);
+}
+
+.composer-plus-item.active span:last-child {
+  color: var(--ds-text-primary);
+}
+
+/* Keyboard highlight mirrors hover; both can coexist with .active. */
+.composer-plus-item.kb-active {
+  background: var(--ds-bg-hover);
+}
+
+.composer-plus-item.active.kb-active {
+  background: var(--ds-bg-active);
+}
+
+.composer-model-check {
+  flex: 0 0 auto;
+  color: var(--ds-accent) !important;
+}
+
+.composer-model-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  margin: 6px 4px;
+  padding: 0 9px;
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-inset);
+  color: var(--ds-text-muted);
+}
+
+.composer-model-search svg {
+  flex: 0 0 auto;
+}
+
+.composer-model-search input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm);
+}
+
+.composer-model-search input::placeholder {
+  color: var(--ds-text-muted);
+}
+
+.composer-model-empty {
+  padding: 16px 10px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* Destination pages — Codex-like project grid + settings shell */
+:root[data-theme="light"] .page-card {
+  background: #ffffff;
+  box-shadow: 0 0 0 0.5px color-mix(in oklab, #1a1c1f 10%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.03);
+}

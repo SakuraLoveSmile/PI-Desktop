@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
-const styles = await readFile(
-  new URL("../src/styles/globals.css", import.meta.url),
-  "utf8",
-);
+const styles = await loadStyles();
 
 test("high-traffic chrome uses shared motion tokens on hover fills", () => {
   for (const selector of [
@@ -17,8 +15,11 @@ test("high-traffic chrome uses shared motion tokens on hover fills", () => {
     ".notification-item",
     ".work-panel-current-close",
   ]) {
+    // Match the selector anywhere in a rule's selector list, and require the
+    // transition inside that rule's own body — a shared list is as valid as a
+    // standalone block.
     const re = new RegExp(
-      `${selector.replace(/\./g, "\\.")}\\s*\\{[\\s\\S]*?transition:[^;]*var\\(--motion-duration-fast\\)`,
+      `${selector.replace(/\./g, "\\.")}[^{}]*\\{[^}]*transition:[^;]*var\\(--motion-duration-fast\\)`,
     );
     assert.match(styles, re, `${selector} should transition with motion tokens`);
   }

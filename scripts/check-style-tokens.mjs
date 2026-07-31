@@ -2,7 +2,7 @@
 /**
  * Style token guard: forbids raw typography/radius literals in the desktop
  * renderer. All values must come from the token scales defined in the
- * `@theme` block of globals.css (see docs/spec/04-ux/07-ui-design-system.md).
+ * `@theme` block of styles/tokens.css (see docs/spec/04-ux/07-ui-design-system.md).
  *
  * Checked:
  *  - CSS: font-size / font-weight / line-height / letter-spacing /
@@ -64,7 +64,7 @@ for (const file of walk(srcDir)) {
 
 if (violations.length) {
   console.error("Style token violations:\n" + violations.map((v) => `  ${v}`).join("\n"));
-  console.error(`\n${violations.length} violation(s). Use the scales in globals.css @theme.`);
+  console.error(`\n${violations.length} violation(s). Use the scales in styles/tokens.css @theme.`);
   process.exit(1);
 }
 console.log("style tokens OK");

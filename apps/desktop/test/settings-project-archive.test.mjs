@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
 const settingsPageSource = await readFile(
   new URL("../src/pages/SettingsPage.tsx", import.meta.url),
@@ -22,10 +23,7 @@ const appSource = await readFile(
   new URL("../src/App.tsx", import.meta.url),
   "utf8",
 );
-const projectsStyleSource = await readFile(
-  new URL("../src/styles/globals.css", import.meta.url),
-  "utf8",
-);
+const projectsStyleSource = await loadStyles();
 
 test("settings owns the project archive destination", () => {
   assert.match(settingsSearchSource, /id: "projects"/);

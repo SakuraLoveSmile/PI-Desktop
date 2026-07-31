@@ -955,7 +955,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
 ### 8.7 Markdown & code rendering (implemented)
 
 Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shiki.ts`
-+ prose styles under `.prose-chat` / `.code-block` in `globals.css`.
++ prose styles under `.prose-chat` / `.code-block` in `styles/prose.css`.
 
 - **Streaming without jank**: runtime content chunks render directly, without a
   second renderer-side typewriter or animation-frame state loop. Source splits

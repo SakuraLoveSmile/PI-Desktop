@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
 const modelSelectSource = await readFile(
   new URL("../src/components/ModelSelect.tsx", import.meta.url),
   "utf8",
 );
-const styles = await readFile(
-  new URL("../src/styles/globals.css", import.meta.url),
-  "utf8",
-);
+const styles = await loadStyles();
 
 function ruleBlock(source, selector) {
   const start = source.indexOf(`${selector} {`);

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
 const settingsPageSource = await readFile(
   new URL("../src/pages/SettingsPage.tsx", import.meta.url),
@@ -34,10 +35,7 @@ const sharedTypesSource = await readFile(
   new URL("../../../packages/shared/src/types.ts", import.meta.url),
   "utf8",
 );
-const stylesSource = await readFile(
-  new URL("../src/styles/globals.css", import.meta.url),
-  "utf8",
-);
+const stylesSource = await loadStyles();
 
 test("General and AI tabs expose their respective app and AI controls", () => {
   assert.match(settingsPageSource, /settings\.language/);

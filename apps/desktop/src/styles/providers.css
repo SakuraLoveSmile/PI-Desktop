@@ -1,0 +1,454 @@
+/*
+  Configuration → providers — provider list and rows, the add-provider dialog,
+  the model combobox, project instructions, and the settings segmented control.
+*/
+
+/* Configuration / providers */
+.provider-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.provider-add-btn-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.provider-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.provider-form-grid > :nth-child(5),
+.provider-form-grid > :nth-child(6) {
+  grid-column: 1 / -1;
+}
+
+.provider-list-panel {
+  overflow: hidden;
+}
+
+.provider-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 28px 18px;
+}
+
+.provider-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md-plus);
+  color: var(--ds-accent);
+  background: color-mix(in oklab, var(--ds-accent) 12%, transparent);
+}
+
+.provider-empty-title {
+  color: var(--ds-text-primary);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-strong);
+}
+
+.provider-empty-desc {
+  max-width: 48ch;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+  margin-bottom: 6px;
+}
+
+.provider-row-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.provider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.provider-row:first-child {
+  border-top: 0;
+}
+
+.provider-row.is-disabled .provider-row-info {
+  opacity: 0.55;
+}
+
+.provider-row-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.provider-row-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-row-name {
+  color: var(--ds-text-primary);
+  font-size: var(--text-md-plus);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--leading-compact);
+}
+
+.provider-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.provider-meta-dot {
+  color: var(--ds-text-muted);
+}
+
+.provider-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.provider-icon-btn {
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+  color: var(--ds-text-secondary);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.provider-icon-btn:hover:not(:disabled) {
+  color: var(--ds-text-primary);
+}
+
+.provider-icon-btn-danger:hover:not(:disabled) {
+  color: var(--ds-error);
+  background: color-mix(in oklab, var(--ds-error) 10%, transparent);
+}
+
+.provider-delete-confirm {
+  appearance: none;
+  border: 0;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ds-error) 12%, transparent);
+  color: var(--ds-error);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.provider-delete-confirm:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--ds-error) 20%, transparent);
+}
+
+.settings-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  box-shadow: 0 0 0 0.5px var(--ds-border-subtle);
+}
+
+:root[data-theme="light"] .settings-segment {
+  background: color-mix(in oklab, #1a1c1f 6%, transparent);
+  box-shadow: 0 0 0 0.5px color-mix(in oklab, #1a1c1f 8%, transparent);
+}
+
+.settings-segment-item {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ds-text-secondary);
+  border-radius: var(--radius-full);
+  padding: 6px 12px;
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-tighter);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.settings-segment-item:hover {
+  color: var(--ds-text-primary);
+}
+
+.settings-segment-item.active {
+  background: var(--ds-bg-primary);
+  color: var(--ds-text-primary);
+  box-shadow: 0 0 0 0.5px var(--ds-border-default);
+}
+
+:root[data-theme="light"] .settings-segment-item.active {
+  background: #ffffff;
+}
+
+:root[data-theme="dark"] .settings-segment-item.active {
+  background: color-mix(in oklab, var(--gray-0) 8%, #212121);
+}
+
+@media (max-width: 980px) {
+  .provider-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .provider-form-grid > :nth-child(5),
+  .provider-form-grid > :nth-child(6) {
+    grid-column: auto;
+  }
+
+  .provider-section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .provider-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .provider-row-actions {
+    justify-content: flex-end;
+  }
+}
+
+/* Add-provider dialog */
+.provider-dialog-overlay {
+  z-index: 45;
+}
+
+.provider-dialog {
+  width: min(100%, 640px);
+  max-height: min(86vh, 760px);
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.provider-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.provider-dialog-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-strong);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-heading);
+}
+
+.provider-dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-secondary);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.provider-dialog-close:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.provider-dialog-close:disabled {
+  opacity: 0.5;
+}
+
+.provider-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.provider-dialog .provider-form-grid {
+  margin: 0;
+}
+
+.project-instructions-dialog-overlay {
+  z-index: 45;
+}
+
+.project-instructions-dialog {
+  width: min(100%, 720px);
+  max-height: min(86vh, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  padding: 20px;
+}
+
+.project-instructions-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-instructions-dialog-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--leading-heading);
+}
+
+.project-instructions-dialog-project,
+.project-instructions-dialog-path {
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}
+
+.project-instructions-dialog-project {
+  margin-top: 3px;
+}
+
+.project-instructions-dialog-path {
+  font-family: var(--font-mono);
+}
+
+.project-instructions-dialog-close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-secondary);
+}
+
+.project-instructions-dialog-close:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.project-instructions-dialog-editor {
+  min-height: 260px;
+}
+
+.project-instructions-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Model combobox: plain input that reveals discovered models beneath it. */
+.provider-model-combo {
+  position: relative;
+}
+
+.provider-model-combo .field-input {
+  width: 100%;
+  padding-right: 30px;
+}
+
+.provider-model-spinner {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border-radius: var(--radius-round);
+  border: 1.5px solid color-mix(in oklab, var(--ds-text-muted) 40%, transparent);
+  border-top-color: var(--ds-accent);
+  animation: provider-model-spin 700ms linear infinite;
+}
+
+@keyframes provider-model-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.provider-model-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px;
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-bg-primary);
+  box-shadow:
+    0 0 0 0.5px var(--ds-border-default),
+    0 12px 32px color-mix(in oklab, #000 18%, transparent);
+}
+
+.provider-model-option {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  text-align: left;
+  cursor: pointer;
+}
+
+.provider-model-option.highlighted {
+  background: var(--ds-bg-hover);
+}
+
+.provider-model-option.selected .provider-model-option-id {
+  color: var(--ds-accent);
+}
+
+.provider-model-option-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-model-option-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+}

@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadStylesSync } from "./helpers/styles.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = join(here, "..");
@@ -11,7 +12,7 @@ const repoRoot = join(desktopRoot, "../..");
 const mainSrc = readFileSync(join(desktopRoot, "electron/main/index.ts"), "utf8");
 const apiSrc = readFileSync(join(desktopRoot, "src/lib/api.ts"), "utf8");
 const pageSrc = readFileSync(join(desktopRoot, "src/pages/PluginsPage.tsx"), "utf8");
-const stylesSrc = readFileSync(join(desktopRoot, "src/styles/globals.css"), "utf8");
+const stylesSrc = loadStylesSync();
 const protocolSrc = readFileSync(
   join(repoRoot, "packages/shared/src/protocol.ts"),
   "utf8",

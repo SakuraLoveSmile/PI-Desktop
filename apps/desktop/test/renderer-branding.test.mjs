@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -14,7 +15,7 @@ const [english, chinese, brandLogo, icons, sidebar, app, chatSurface, composer, 
     read("../src/App.tsx"),
     read("../src/components/ChatSurface.tsx"),
     read("../src/components/Composer.tsx"),
-    read("../src/styles/globals.css"),
+    loadStyles(),
   ]);
 
 test("renderer surfaces the PI-Desktop brand instead of the Codex shell brand", () => {
