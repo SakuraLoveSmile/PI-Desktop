@@ -74,6 +74,17 @@ For `fs.*`:
 - tools can be disabled by the user in one click
 - the prompt-injection API is high-risk by default and requires an explicit permission
 
+Plan is an additional host policy boundary for agent tools:
+
+- no plugin tool is visible or executable in Plan;
+- the deny precedes manifest risk, declared/granted permissions, session
+  grants, and the `auto` permission mode;
+- a direct forged `tools.execute` call returns `PLUGIN_DISABLED_IN_PLAN` and is
+  audited; it is not forwarded to the plugin runtime;
+- plugin commands and panels may remain usable as explicit user UI actions,
+  but they cannot become model-callable Plan tools or silently mutate Plan
+  state.
+
 ## 8. Network and external links
 
 - `net.fetch` is not granted by default
@@ -99,6 +110,7 @@ The host should be able to:
 3. A plugin cannot read API keys
 4. A plugin panel cannot call arbitrary host IPC
 5. An uncaught exception from a plugin does not cause the app to exit
+6. A low-risk or granted plugin tool still fails closed in Plan
 
 
 ## 11. Implementation status

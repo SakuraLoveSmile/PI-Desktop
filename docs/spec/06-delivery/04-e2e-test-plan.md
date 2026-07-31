@@ -9,7 +9,7 @@
 ## 1. Goals
 
 - Document every user-visible and protocol-visible behavior that MVP must verify.
-- Provide a scenario catalog that maps to acceptance criteria (A–H) and milestones (M1–M5).
+- Provide a scenario catalog that maps to acceptance criteria (A–H) and milestones (M1–M6).
 - Serve as the traceability backbone: scenario ID ↔ acceptance criterion ↔ spec.
 - Prepare for future automation without requiring implementation now.
 
@@ -83,7 +83,7 @@ Each scenario is documented in this format:
 - **Expected**: observable outcome that proves correctness
 - **Specs linked**: relevant spec file(s)
 - **Acceptance criterion**: which A–H letter(s) this verifies
-- **Milestone**: M1–M5 target
+- **Milestone**: M1–M6 target
 - **Status**: Draft | Documented | Automated | Passed
 ```
 
@@ -124,13 +124,14 @@ Each scenario is documented in this format:
 #### E2E-003: Rust host healthcheck responds
 
 - **Preconditions**: App is running; Rust host-core sidecar started.
-- **Steps**: 1) Electron handshakes with protocol version 6. 2) Call the host
-  healthcheck RPC. 3) Repeat boot with version 5, version 4, and version 3 host
+- **Steps**: 1) Electron handshakes with protocol version 7. 2) Call the host
+  healthcheck RPC. 3) Repeat boot with version 6, version 5, version 4, and
+  version 3 host
   fixtures.
-- **Expected**: The version 6 host returns `ok` and the handshake is logged.
-  Stale version 5 and older hosts are rejected before chat becomes interactive,
-  so context checkpoints and earlier protocol-visible records cannot be
-  silently lost.
+- **Expected**: The version 7 host returns `ok` and the handshake is logged.
+  Stale version 6 and older hosts are rejected before the conversation surface
+  becomes interactive, so Plan approval/state events and context checkpoints
+  cannot be silently lost.
 - **Specs linked**: `03-runtime/05-host-core-rust.md`, `03-runtime/06-host-rpc-protocol.md`
 - **Acceptance**: A (bridge normal)
 - **Milestone**: M1
@@ -180,7 +181,7 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
-### Chat Stream & Abort
+### Conversation Stream & Abort
 
 #### E2E-008: New session and send message
 
@@ -254,6 +255,85 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Source-level regression covered; full visual scenario Draft
 
+### Conversation Top Bar
+
+#### E2E-087: Conversation top bar renders on the chat route
+
+- **Preconditions**: Provider configured; at least one session exists.
+- **Steps**: 1) Open the chat route. 2) Inspect the 46px bar at the top of the
+  conversation area. 3) Confirm it shows the active project name and
+  session/task title, the Agent|Plan segmented mode toggle, the model picker,
+  and the New task / Search / Commands action buttons; confirm the
+  sidebar toggle appears **only when the sidebar is collapsed** (when expanded,
+  the sidebar owns that control). 4) Switch to the Pull requests, Scheduled,
+  Plugins, or Settings routes and inspect the same top region.
+- **Expected**: On the chat route the conversation top bar renders with its
+  controls; the long task title ellipsizes instead of squeezing the Agent|Plan
+  toggle, model picker, or action buttons. The sidebar toggle is present only in
+  the collapsed state (no duplicate of the sidebar's control). On every other
+  route the frameless drag band renders instead (no top-bar controls). The bar is
+  draggable to move the window; interactive controls do not start a window drag.
+  macOS leaves the left ~76px clear for traffic lights only while the sidebar is
+  collapsed (8px in fullscreen); Windows/Linux leave the right 112px clear for
+  native window controls.
+- **Specs linked**: `04-ux/08-component-spec.md` (§2 Topbar)
+- **Acceptance**: C (send/UI), Quality
+- **Milestone**: M2
+- **Status**: Draft
+
+#### E2E-088: Top-bar Agent/Plan mode toggle updates the session
+
+- **Preconditions**: Chat route active; a session selected.
+- **Steps**: 1) Click the Plan segment of the mode toggle. 2) Send a prompt that
+  would normally require Write/Edit and observe behavior. 3) Click the Agent
+  segment. 4) Begin a turn and try to toggle mode mid-run.
+- **Expected**: The toggle updates the active session `mode` (Plan hard-denies
+  Write/Edit and plugin tools while Bash follows the selected permission mode;
+  Agent allows its normal tools per permission settings). The toggle is
+  disabled while a turn runs and re-enables when idle.
+- **Specs linked**: `04-ux/08-component-spec.md` (§2, §11),
+  `03-runtime/03-tools-and-permissions.md`
+- **Acceptance**: C
+- **Milestone**: M2
+- **Status**: Draft
+
+#### E2E-089: Top-bar model picker opens downward and switches model
+
+- **Preconditions**: Chat route active; provider configured.
+- **Steps**: 1) Click the model picker in the top bar. 2) Confirm the dropdown
+  opens downward from the bar. 3) Select a different provider/model. 4) Open
+  Settings from the command palette or application menu (the top bar no longer
+  has a Settings action button).
+- **Expected**: The menu lists enabled runnable providers with a default model
+  and opens downward (anchored to the top bar); selecting updates the active
+  session model; Settings opens from the command palette/menu. The model trigger
+  ellipsizes long IDs.
+- **Specs linked**: `04-ux/08-component-spec.md` (§2, model dropdown),
+  `03-runtime/13-model-catalog-and-selection.md`
+- **Acceptance**: C
+- **Milestone**: M2
+- **Status**: Draft
+
+#### E2E-090: Transcript bottom reserve tracks the docked composer height
+
+- **Preconditions**: Chat route active; a session with a transcript that
+  exceeds one viewport so the last message sits near the docked composer.
+- **Steps**: 1) Scroll the transcript to the latest message. 2) Measure the
+  vertical gap between the last message and the top of the docked composer.
+  3) Type several lines into the composer so the draft grows multi-line. 4)
+  Re-measure the gap and confirm the last message is still fully visible above
+  the composer (not overlapped). 5) Collapse the draft back to a single line and
+  confirm the gap shrinks back toward the tight ~16px reserve.
+- **Expected**: The last message sits close above the composer (a small,
+  consistent gap) rather than far below it; the reserve follows the composer's
+  real height via `--composer-dock-height` so a taller multi-line draft pushes
+  the transcript up instead of covering it. The jump-to-latest button and the
+  minimap stay anchored just above the composer at every draft height.
+- **Specs linked**: `04-ux/08-component-spec.md` (§4.3 MainChat layout)
+- **Acceptance**: C (send/UI), Quality
+- **Milestone**: M2
+- **Status**: Draft
+
 ### Workspace Open
 
 #### E2E-012: Open a project directory
@@ -320,15 +400,21 @@ Each scenario is documented in this format:
 - **Milestone**: M3
 - **Status**: Draft
 
-#### E2E-018: Chat mode cannot run Write/Edit/Bash
+#### E2E-018: Plan denies workspace mutation and plugin tools
 
-- **Preconditions**: Chat mode active.
-- **Steps**: 1) Ask agent to write a file in Chat mode. 2) Observe behavior.
-- **Expected**: Write/Edit/Bash not available in Chat mode; only Read/Glob/Grep work.
+- **Preconditions**: Plan mode active with Auto selected and a plugin agent tool registered.
+- **Steps**: 1) Ask the Agent to call Write, Edit, and the plugin tool. 2) Ask it
+  to run a Bash command that creates a marker file. 3) Repeat the Bash call
+  with Ask selected and inspect the permission card.
+- **Expected**: Write, Edit, and the plugin tool are not visible and direct
+  attempts return `WRITE_DISABLED_IN_PLAN`, `EDIT_DISABLED_IN_PLAN`, or
+  `PLUGIN_DISABLED_IN_PLAN`; no file is changed by those tools. Bash runs
+  without a confirmation under Auto and may mutate; under Ask it waits for the
+  ordinary permission card. No Chat-mode error or command exists.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`
-- **Acceptance**: E (Chat read-only)
+- **Acceptance**: E (Plan policy)
 - **Milestone**: M3
-- **Status**: Automated (protocol smoke: WRITE_DISABLED_IN_CHAT)
+- **Status**: Documented (M6; no E2E execution requested)
 
 #### E2E-019: Workspace-outside paths are rejected
 
@@ -353,8 +439,9 @@ Each scenario is documented in this format:
 #### E2E-019b: Scratch containment matches workspace defenses (D114)
 
 - **Preconditions**: Agent mode; project open.
-- **Steps**: 1) Attempt Write with `..` traversal from the scratch root. 2) Attempt Write through a symlink planted inside scratch pointing outside. 3) Attempt scratch writes in Chat mode.
-- **Expected**: Both escapes return `PATH_OUTSIDE_WORKSPACE`; Chat mode still returns `WRITE_DISABLED_IN_CHAT` even for scratch paths.
+- **Steps**: 1) Attempt Write with `..` traversal from the scratch root. 2) Attempt Write through a symlink planted inside scratch pointing outside. 3) Attempt the same Write calls in Plan.
+- **Expected**: Both escapes return `PATH_OUTSIDE_WORKSPACE`; Plan returns
+  `WRITE_DISABLED_IN_PLAN` before any scratch path can make Write available.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md §4b`
 - **Acceptance**: E (scratch root cannot be escaped)
 - **Milestone**: M5
@@ -363,12 +450,12 @@ Each scenario is documented in this format:
 #### E2E-019c: Permission modes govern high-risk approval (D115/D132)
 
 - **Preconditions**: Agent mode; project open; global default `ask`.
-- **Steps**: 1) With a newly inherited session and global default Ask every time, open the composer menu — expect Ask every time to be selected with no global-default/inherit label — then ask the agent to write a workspace file and expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Create another inherited session after setting the global default to Accept edits in Settings — expect the composer chip and menu selection to display Accept edits directly and Write/Edit to be auto-allowed. 5) Switch the session to Chat mode with Auto set — expect Write denied (`WRITE_DISABLED_IN_CHAT`).
-- **Expected**: Effective mode = session override → global default → ask; chat-mode hard deny outranks every mode; the composer chip and menu always display the effective mode without default/inherit provenance.
+  - **Steps**: 1) With a newly inherited session and global default Ask every time, open the composer menu — expect Ask every time to be selected with no global-default/inherit label — then ask the Agent to write a workspace file and expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Create another inherited session after setting the global default to Accept edits in Settings — expect the composer chip and menu selection to display Accept edits directly and Write/Edit to be auto-allowed. 5) Switch the session to Plan with Auto set — expect Write/Edit/plugin denied but Bash allowed without confirmation.
+  - **Expected**: Effective mode = session override → global default → ask; Plan's Write/Edit/plugin hard deny outranks every mode while Plan Bash follows the selected mode; the composer chip and menu always display the effective mode without default/inherit provenance.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md §6`, `03-runtime/04-data-storage.md`, `08-meta/decisions-log.md` (D115/D132)
 - **Acceptance**: E (permission modes resolve and enforce host-side)
 - **Milestone**: M5
-- **Status**: Partially automated (host-core unit tests: evaluate matrix, chat-deny precedence, session grants under ask; renderer source test: effective-only composer options and selection)
+- **Status**: Partially automated (host-core unit tests: evaluate matrix, Plan policy precedence, session grants under ask; renderer source test: effective-only composer options and selection)
 
 ### Session Persistence
 
@@ -415,12 +502,36 @@ Each scenario is documented in this format:
 #### E2E-038: Settings owns the project archive destination
 
 - **Preconditions**: App running with at least one configured provider, one supported local session store, one retained project, and one archived project.
-- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card. 4) Open Model configuration and inspect the provider studio. 5) Open Import, Project archive, and Info in order. 6) Search Settings for "project" or "archive". 7) Restore the archived project, then activate it. 8) Return to the app shell and open Plugins.
-- **Expected**: The rail contains exactly Basics, Model configuration, Import, Project archive, and Info in that order, each with its semantic Lucide icon (SlidersHorizontal / Bot / Download / Archive / Info); Appearance and Providers remain merged into their owning destinations; Project archive shows active, closed, and archived durable rows without a visibility toggle; restore keeps the archive open and activation returns to chat with the restored project retained in the sidebar; the home sidebar and global page results have no standalone Projects destination; Settings search finds Project archive; Plugins remains an independent app-shell destination.
+- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card using the theme preview cards. 4) Open 全局 AI and inspect the Permissions and Context management cards. 5) Open Shortcuts and inspect the Keyboard shortcuts card. 6) Open Model configuration and inspect the provider studio. 7) Open Import, Project archive, and Info in order. 8) Search Settings for "project" or "archive". 9) In Project archive, read the overview counters and compare them with the rendered sections. 10) Switch the sort control from Recent to Name. 11) Search for a known session title, inspect its expanded project row, then reveal more than eight sessions; clear the search with the clear affordance. 12) Open a row menu, dismiss it with Escape and with an outside press. 13) Restore the archived project, then activate it. 14) Return to the app shell and open Plugins.
+- **Expected**: The rail contains exactly Basics, 全局 AI/AI, Shortcuts, Model configuration, Import, Project archive, and Info in that order, each with its semantic Lucide icon (SlidersHorizontal / Sparkles / Keyboard / Bot / Download / Archive / Info); Appearance and Providers remain merged into their owning destinations; Permissions and Context management live under 全局 AI; Keyboard shortcuts has its own destination; Developer lives under Info; Project archive shows active, closed, and archived durable rows without a visibility toggle, grouping them under the always-visible Pinned / All projects / Archived sections (D168) with per-section counts. The overview banner's projects, open, archived, and session counters agree with the rendered rows; sorting by Name reorders rows inside every section without hiding any; search matches project fields and session titles and reports a match count, a session-title result expands its owning project, lists sessions by latest activity with relative update times, and reveals history in batches of eight; clearing the search restores the complete index. The row menu closes on Escape and on an outside press. Restore keeps the archive open and activation returns to chat with the restored project retained in the sidebar; the home sidebar and global page results have no standalone Projects destination; Settings search finds Project archive; Plugins remains an independent app-shell destination.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/01-ui-ia.md`, `03-runtime/11-provider-model-system.md`
 - **Acceptance**: B (model configuration), F (session import)
 - **Milestone**: M4
 - **Status**: Unit-covered (`settings-project-archive.test.mjs`, `sidebar-navigation.test.mjs`); rendered scenario Draft
+
+#### E2E-091: Appearance card selects theme and language via preview cards
+
+- **Preconditions**: App running on macOS with a Simplified Chinese system locale.
+- **Steps**:
+  1) Open Settings → Basics.
+  2) In the Appearance card, confirm the Theme row shows three preview cards
+     (System, Light, Dark) with the System card first; select Dark and confirm
+     the selected card shows a check badge and the UI switches to dark.
+  3) Select Light and confirm the UI switches to light.
+  4) In the Language row, confirm three preview cards (Auto, 简体中文, English);
+     with the OS locale set to Chinese, the Auto card description reads
+     "当前：简体中文" and selecting Auto applies Simplified Chinese.
+  5) Select English and confirm the UI switches to English; select 简体中文 and
+     confirm it switches back.
+- **Expected**: Theme and Language are card grids (not native selects), each with
+  a selected check badge and a per-option description; the Auto language card
+  resolves the OS locale through the main process (`app.getLocale()`), passes it
+  safely through the sandboxed preload bridge, and reflects it inline; switching
+  options updates the live UI without a reload.
+- **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/02-i18n-english-first.md`
+- **Acceptance**: A (core shell), H (localization)
+- **Milestone**: M4
+- **Status**: Documented
 
 #### E2E-039: Settings titlebar drag moves the window
 
@@ -531,11 +642,11 @@ Each scenario is documented in this format:
 - **Milestone**: M4
 - **Status**: Automated (protocol smoke: plugins.loadDev)
 
-#### E2E-023: Plugin command in palette and executes
+#### E2E-023: Plugin command in global search and executes
 
 - **Preconditions**: Plugin loaded and enabled.
-- **Steps**: 1) Open command palette. 2) Find plugin command. 3) Execute.
-- **Expected**: Command appears in palette; execution produces expected result.
+- **Steps**: 1) Open global search (Cmd/Ctrl+K or Cmd/Ctrl+Shift+P). 2) Find the plugin command under the Commands section. 3) Execute.
+- **Expected**: Command appears in global search results; execution produces expected result.
 - **Specs linked**: `07-plugins/09-plugin-command-palette.md`
 - **Acceptance**: G (plugin command appears and executes)
 - **Milestone**: M4
@@ -608,12 +719,12 @@ Each scenario is documented in this format:
 #### E2E-025: Disable plugin removes contributions
 
 - **Preconditions**: Plugin enabled and contributions visible.
-- **Steps**: 1) Disable the plugin on the Plugins page. 2) Check command palette and agent tools.
+- **Steps**: 1) Disable the plugin on the Plugins page. 2) Check global search and agent tools.
 - **Expected**: Commands and tools disappear; no leftover contributions.
 - **Specs linked**: `07-plugins/05-plugin-lifecycle.md`
 - **Acceptance**: G (disable removes contributions)
 - **Milestone**: M4
-- **Status**: Automated (protocol smoke: disable clears enabled flag; palette removal manual)
+- **Status**: Automated (protocol smoke: disable clears enabled flag; global search removal manual)
 
 #### E2E-026: Plugin error does not crash app
 
@@ -724,12 +835,12 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Documented
 
-#### E2E-035: Bash tool resolves a platform shell or fails with guidance
+#### E2E-035: Bash tool uses the effective catalog shell
 
 - **Preconditions**: Workspace open; agent mode.
-- **Steps**: 1) Run a Bash tool call (e.g. `echo ok`) and observe success on a machine with bash. 2) Set `PI_DESKTOP_BASH` to a non-executable path, restart host-core, run a Bash tool call.
-- **Expected**: With a resolvable bash the command runs (Unix `bash -lc`, Windows Git-for-Windows `bash -c`); with a broken override the tool fails fast with stable `SHELL_NOT_FOUND` and a message naming `PI_DESKTOP_BASH`/Git for Windows; no partial execution.
-- **Specs linked**: `03-runtime/03-tools-and-permissions.md`, `03-runtime/08-error-codes.md`
+- **Steps**: 1) Select an available catalog shell and run `Bash` (e.g. `echo ok`). 2) Make the persisted selection unavailable and inspect the effective catalog before running the next turn. 3) Run with the previous turn snapshot.
+- **Expected**: The unchanged `Bash` protocol call uses the selected catalog entry. A later unavailable persisted choice falls back to the first available platform shell and marks the catalog fallback; the previous turn snapshot is rejected as stale by `COMMAND_SHELL_CHANGED` rather than silently changing shell. No partial execution occurs; E2E-113 covers the stale identity path.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md`, `03-runtime/06-host-rpc-protocol.md`, `03-runtime/08-error-codes.md`, ADR 0040
 - **Acceptance**: H (errors expose stable codes)
 - **Milestone**: M5
 - **Status**: Unit-covered (`tools::shell::tests`); scenario Documented
@@ -873,10 +984,10 @@ Each scenario is documented in this format:
 - **Preconditions**: One catalogued reasoning model, one non-reasoning model,
   and one unknown free-form model id.
 - **Steps**: 1) Select each provider/model in turn. 2) Inspect the composer
-  controls beside Chat / Agent. 3) Open the Thinking trigger and choose multiple
+  controls beside Agent / Plan. 3) Open the Thinking trigger and choose multiple
   supported levels. 4) Inspect the unknown model's menu and Provider Settings.
 - **Expected**: Reasoning models show the current Thinking level immediately to
-  the right of Chat / Agent, expose only their sparse supported levels as a
+  the right of Agent / Plan, expose only their sparse supported levels as a
   single-column list in canonical order, mark the selected row with a trailing
   check, expose no inherit/default row, size the menu to its content without
   exceeding 160px or the available viewport, truncate overlong labels, and close
@@ -896,7 +1007,7 @@ Each scenario is documented in this format:
 #### E2E-051: Thinking level persists with the session
 
 - **Preconditions**: A reasoning-capable session is idle.
-- **Steps**: 1) Select `high`. 2) Change Chat/Agent mode without changing the
+- **Steps**: 1) Select `high`. 2) Change Plan/Agent mode without changing the
   thinking level. 3) Restart the app and reopen the session. 4) Switch to
   another session and back.
 - **Expected**: Every configuration update sends the complete session config;
@@ -984,7 +1095,7 @@ Each scenario is documented in this format:
 - **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
   Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
   a URL preview, and a completed command artifact. 3) Use the work-panel
-  activity rail to open/select Review, Terminal, and Browser; verify active and
+  create trigger dropdown to open/select Review, Terminal, Browser, and Files; verify active and
   open-inactive states. Open the current-resource switcher, select file and tool
   resources with pointer and keyboard, close an inactive item inside it, then
   close the active item from the header. 4) Close active middle and edge items
@@ -993,7 +1104,7 @@ Each scenario is documented in this format:
   tabs and a Browser resource; switch to session B, create a different tab set,
   then switch repeatedly between A and B and select a project without an active
   conversation. Generate a background artifact in the non-visible session.
-  7) Drag the left-edge handle below 364px and above 720px; verify pointer-down
+  7) Drag the left-edge handle below 244px and above 720px; verify pointer-down
   does not jump the divider, cancel one gesture with Escape, then focus the
   handle and exercise Arrow/Shift+Arrow/Home/End. Commit a different width with
   Browser active. 8) On a display with enough work area, record MainChat width,
@@ -1014,19 +1125,21 @@ Each scenario is documented in this format:
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one resource; file resources
-  are path-keyed and repeated resources deduplicate. Once the panel is open, a
-  44px activity rail exposes one-click Review/Terminal/Browser actions with a
-  fill plus edge marker for the active tool and a dot for open inactive tools.
-  The 46px content header keeps the active label readable, closes it directly,
-  and opens a bounded ordered resource switcher with full-path tooltips and
-  per-item close controls. The switcher supports Arrow keys, Home, End, and
-  Escape, restores focus to its trigger, and temporarily hides the native
-  Browser preview so the menu is never occluded. The sole
+  are path-keyed and repeated resources deduplicate. Opening, collapse, and
+  divider commit never change the OS window size — only MainChat reflows inside
+  the fixed client area (ADR 0033). Once the panel is open, a single unified
+  context trigger opens one dropdown whose top section is the ordered resource
+  switcher (full-path tooltips, per-item close, Arrow/Home/End/Escape, focus
+  restored to the trigger) and, after a divider, a create-new section exposing
+  one-click Review/Terminal/Browser/Files actions with a fill plus edge marker
+  for the active tool and a dot for open inactive tools. Opening the menu
+  temporarily hides the native Browser preview so it is never occluded. The
+  sole
   collapse control sits in the session pane top-right rather than the content header.
   Active close selects the right neighbor then left; closing the last tab hides
   the panel. Collapse retains runtime
   tabs but hides the panel until another artifact reopens it. Width clamps to
-  the fixed `364px–720px` range, exposes those current/minimum/maximum values to
+  the fixed `244px–720px` range, exposes those current/minimum/maximum values to
   assistive technology, and supports the documented keyboard steps.
   Pointer-down preserves the starting width, movement follows the pointer
   continuously, and release commits once only when the width changed. A
@@ -1059,9 +1172,9 @@ Each scenario is documented in this format:
   unchanged work area does not reapply geometry. System compression or
   relocation during a display transition does not overwrite the confirmed base
   bounds, and returning to a roomier display restores the prior chat width.
-  Relaunch restores base bounds without reservation width or induced x shift.
-  Malformed reservation payloads fail with `INVALID_ARGUMENT` and never coerce.
-  A rejected reservation keeps
+  Relaunch restores the user's window size (the native reservation is always 0,
+  ADR 0033). Malformed reservation payloads fail with `INVALID_ARGUMENT` and
+  never coerce. A rejected reservation keeps
   the last confirmed panel presentation until a later successful request; a
   superseded success cannot commit stale presentation. No transition produces
   a second resize or position drift.
@@ -1134,7 +1247,7 @@ Each scenario is documented in this format:
 - **Steps**: 1) Activate the artifact, enter `localhost:<port>` without a scheme, and submit.
   2) Navigate site links; use back/forward/reload/stop. 3) Trigger a
   `window.open` popup and a permission-requesting page (e.g. notification
-  prompt). 4) Open the command palette, Search, then Settings. Return to chat
+  prompt). 4) Open global search, then Settings. Return to chat
   and trigger an inline tool permission card. 5) Switch to another panel tab
   and back; close the panel. 6) Use open-external.
 - **Expected**: Scheme-less input normalizes to http; nav state (URL bar,
@@ -1175,7 +1288,7 @@ Each scenario is documented in this format:
 
 ---
 
-#### E2E-059: Transcript message plates follow WorkBuddy density
+#### E2E-059a: Transcript message plates follow WorkBuddy density
 
 - **Preconditions**: A session contains at least one short user prompt, one
   longer user prompt, and a completed assistant answer; light and dark themes
@@ -1217,7 +1330,7 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`neutral-accent.test.mjs`,
   `plugins-page-style.test.mjs`); visual scenario Draft
 
-#### E2E-060: Assistant markdown prose hierarchy and code chrome
+#### E2E-060c: Assistant markdown prose hierarchy and code chrome
 
 - **Preconditions**: A completed assistant answer containing headings, a
   blockquote, a GFM table, a fenced code block with a language tag, inline
@@ -1253,7 +1366,7 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`transcript-style.test.mjs`); full visual scenario Draft
 
-#### E2E-060: Assistant meta chips and retry action
+#### E2E-060d: Assistant meta chips and retry action
 
 - **Preconditions**: A completed assistant message includes modelId and token
   usage; another completed assistant message has content but no usage.
@@ -1271,7 +1384,7 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`transcript-style.test.mjs`, runtime usage mapping); full scenario Draft
 
-#### E2E-061: Regenerate replaces the current turn in place
+#### E2E-061a: Regenerate replaces the current turn in place
 
 - **Preconditions**: A session has user A → assistant A → user B → assistant B.
 - **Steps**: 1) Hover assistant A and click Regenerate. 2) Wait for the new
@@ -1391,7 +1504,7 @@ Each scenario is documented in this format:
 - **Preconditions**: A saved provider has returned at least two models from its
   discovery endpoint and the resulting catalog is stored in `models`.
 - **Steps**: 1) Quit and restart the app. 2) Disconnect the provider endpoint.
-  3) Open the composer model picker. 4) Wait for background refresh to fail.
+  3) Open the top-bar model picker. 4) Wait for background refresh to fail.
   5) Reconnect the endpoint with one renamed model and one additional model,
   then update the provider configuration and reopen the picker.
 - **Expected**: The first picker open renders the prior catalog without starting
@@ -1414,7 +1527,7 @@ Each scenario is documented in this format:
   ^0.82.1+; a custom or Anthropic-compatible provider uses apiStyle
   `anthropic_messages` (or OpenAI-compatible `chat_completions` with
   `anthropic/claude-opus-5`) and model id `claude-opus-5`.
-- **Steps**: 1) Select `claude-opus-5` in the composer model control. 2) Open
+- **Steps**: 1) Select `claude-opus-5` in the top-bar model picker. 2) Open
   the Thinking selector. 3) Start a short turn and inspect the sidecar model
   snapshot / request metadata (or the unit-equivalent resolution path).
 - **Expected**: The id maps to the pinned pi catalog record (1M
@@ -1439,14 +1552,14 @@ Each scenario is documented in this format:
 - **Steps**: 1) On macOS, launch both `pnpm dev` and a packaged build. Confirm
   the application-menu title is PI-Desktop, open About PI-Desktop, and inspect
   its name, version, and icon. Then open every system menu and invoke New Task, Open
-  Project, Settings, Command Palette, sidebar toggle, editing,
+  Project, Settings, global search, sidebar toggle, editing,
   zoom/fullscreen, Window, Help, Logs, and Check for Updates actions. Verify
   the update status reports that the current fixture version is up to date.
   2) On Windows/Linux, confirm no File/Edit/View/Window/Help menubar appears
   inside the window and the left-side navigation occupies the reclaimed
   titlebar space. Verify F10 and Shift+F10 are not consumed by shell chrome;
   exercise New Task, Open Project, Settings, close-window, zoom, fullscreen,
-  search, command-palette, sidebar, and standard editing shortcuts. Invoke
+  global search (Cmd/Ctrl+K and Cmd/Ctrl+Shift+P), sidebar, and standard editing shortcuts. Invoke
   Check for Updates from Settings -> Info with the same status result.
   3) Close the macOS window, immediately invoke two native menu
   commands, and acknowledge renderer readiness after the replacement loads.
@@ -1645,7 +1758,9 @@ Each scenario is documented in this format:
   Windows/Linux render the canonical 20px logo beside the 15px shell name; the
   complete brand has a localized Home accessible name, visible hover/focus
   feedback, and returns the main pane to chat without clearing the active
-  conversation or workspace. Collapse remains immediately after Search.
+  conversation or workspace. Collapse remains immediately after Search. The
+  logo itself is theme-aware: light mode shows `build/icon_1024.png`, dark mode
+  shows `build/logo_dark.png`, swapping live with `data-theme` (no reload).
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`
 - **Acceptance**: Quality
@@ -1676,9 +1791,9 @@ Each scenario is documented in this format:
 
 - **Preconditions**: App running on macOS and on one Windows/Linux target with
   Settings open; no custom shortcut overrides are stored.
-- **Steps**: 1) Open Settings → Basics and inspect Keyboard shortcuts. 2) Change
+- **Steps**: 1) Open Settings → Shortcuts and inspect Keyboard shortcuts. 2) Change
   Search to an unused modifier chord. 3) invoke the new chord and then the old
-  chord. 4) Attempt to assign that chord to Command palette. 5) Attempt a bare
+  chord. 4) Attempt to assign that chord to the command shortcut (now opened via global search). 5) Attempt a bare
   letter and a reserved editing chord. 6) Restart the app and invoke the custom
   Search chord again. 7) Restore Search, then choose Restore defaults. 8) On
   macOS inspect the corresponding native application-menu accelerator after
@@ -1689,8 +1804,8 @@ Each scenario is documented in this format:
   the custom Search chord takes effect immediately, replaces the old chord,
   survives restart, and updates the macOS menu; duplicate, modifier-free, and
   reserved assignments show an inline error without changing either action;
-  individual and global reset restore the shared defaults; the five-item
-  Settings rail remains unchanged and has no Keyboard destination. Modifier-only
+  individual and global reset restore the shared defaults; Keyboard shortcuts is
+  its own Settings destination (the seven-item rail remains unchanged). Modifier-only
   and IME keydowns dispatch nothing, and a held history chord traverses only
   once per physical press.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
@@ -1700,11 +1815,11 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`keyboard-shortcuts.test.ts`,
   `settings-keyboard-shortcuts.test.mjs`); rendered scenario Draft
 
-#### E2E-073: Developer mode gates the developer-tools console
+#### E2E-073a: Developer mode gates the developer-tools console
 
 - **Preconditions**: App running on macOS and on one Windows/Linux target;
   developer mode is absent or false in persisted settings and Settings ->
-  Basics is open.
+  Info is open.
 - **Steps**: 1) Find the Developer card through Settings search. 2) Confirm the
   Open console action is disabled and invoke F12 plus the platform secondary
   shortcut. 3) Enable developer mode and open the console from Settings.
@@ -1778,6 +1893,9 @@ Each scenario is documented in this format:
     folder-plus control.
   - Existing row context menus and heading glyph buttons remain available; the
     section menus stay one-item and theme-matched with other sidebar menus.
+  - Section, session-row, and project-row right-click menus open to the right
+    of the pointer when space permits, and remain fully within the viewport at
+    the right edge.
   - Escape and outside click dismiss the menu without creating anything.
 
 #### E2E-076: Startup splash appears then yields to the main shell
@@ -1798,9 +1916,6 @@ Each scenario is documented in this format:
 - **Specs linked**: `04-ux/07-ui-design-system.md` §8, `04-ux/02-i18n-english-first.md`, decisions-log D146
 - **Acceptance**: A (app startup), Quality
 - **Milestone**: M5
-
-
-
 #### E2E-077: Theme-aware selection and CJK section labels
 
 - **Status**: Partially automated (`user-select.test.mjs`, `interaction-polish.test.mjs`)
@@ -2001,6 +2116,54 @@ Each scenario is documented in this format:
   `context-compaction.test.mjs`, host-core transcript/session unit tests); full
   provider/UI journey Draft
 
+#### E2E-AGENTS-001: Project instruction chain configures an agent session
+
+- **Preconditions**: A project contains root `AGENTS.md`, nested
+  `packages/api/AGENTS.md`, and a provider is configured.
+- **Steps**:
+  1. Start an Agent-mode conversation and submit a task covered by the root
+     instruction.
+  2. Let the agent read or edit `packages/api/handler.ts`.
+  3. Add `packages/api/AGENTS.override.md`, then have the agent access another
+     file in that directory.
+  4. Edit the root instruction while the session is idle, then submit a
+     follow-up task.
+- **Expected**: The initial runtime receives the root chain. Before the file
+  tool executes, the nested instruction is appended after its root source and
+  therefore takes precedence. In one directory, `AGENTS.override.md` wins over
+  `AGENTS.md`; `CLAUDE.md` and `.claude/CLAUDE.md` are fallback names. The idle
+  follow-up uses changed root content rather than reusing the prior runtime.
+  Empty, unreadable, oversized, and out-of-root instruction files do not block
+  the turn; combined UTF-8 content is capped at 32 KiB.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`
+- **Acceptance**: C (chat/stream), F (persistence)
+- **Milestone**: M5
+- **Status**: Partially automated (`project-instructions.test.ts`); full
+  provider/UI journey Draft
+
+#### E2E-AGENTS-002: Global settings and project menus manage instruction files
+
+- **Preconditions**: PI-Desktop is running; a project can be opened.
+- **Steps**:
+  1. Open Settings -> Instructions without an active project and save global
+     content.
+  2. Start a new agent session and verify its instruction context includes the
+     global source.
+  3. Open the Projects view and use a project's more menu to edit and save its
+     displayed `AGENTS.md`.
+  4. Submit a prompt in a new or idle session.
+- **Expected**: The global editor targets only `~/.pi/agent/AGENTS.md`. The
+  project editor is available only from a known project's Projects-view more
+  menu and targets only that project's root `AGENTS.md`. Both editors show
+  their resolved paths, preserve the typed text, and save through the dedicated
+  IPC rather than a general file write API. Global content precedes project
+  content in the next runtime; the saved project content follows it and takes
+  precedence on conflicts. The project editor is a viewport-level dialog.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`, ADR 0037
+- **Acceptance**: C (chat/stream), D (workspace), F (persistence)
+- **Milestone**: M5
+- **Status**: Unit-covered (`project-instructions.test.ts`); UI journey Draft
+
 #### E2E-085: Expanded sidebar typography keeps list content compact
 
 - **Preconditions**: The expanded sidebar contains at least one standalone
@@ -2061,6 +2224,307 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`mermaid-rendering.test.mjs`); rendered security and
   visual scenario Draft
 
+#### E2E-092: Packaged runtime is self-contained without duplicate dependencies
+
+- **Preconditions**: Native macOS arm64, Windows x64, and Linux x64 packages
+  built from clean release-host directories; a clean application profile;
+  English and zh-CN available; external network access can be disabled while
+  loopback remains available; a deterministic loopback OpenAI-compatible
+  fixture provider returns code, KaTeX, Mermaid, and a terminal command.
+- **Steps**:
+  1. Record every compressed artifact format plus the unpacked application,
+     ASAR, Electron runtime, locale, and unpacked-native sizes on each native
+     runner.
+  2. Inspect ASAR and resource inventories for sidecar, host, production
+     modules, source maps, tests/examples/declarations, Chromium locales, and
+     native prebuild targets.
+  3. Configure the loopback fixture provider, disable external egress, and
+     launch from a clean profile. Switch between English and Simplified
+     Chinese, request the deterministic response, render common
+     JavaScript/TypeScript, Python, Rust, shell, Mermaid, and unknown-language
+     fences plus KaTeX and a Mermaid diagram, open Terminal, and verify host
+     and agent-sidecar health.
+- **Expected**: The package contains exactly one bundled agent sidecar, the
+  target-native Rust host and `node-pty`, and only configured Chromium locale
+  packs. Renderer dependencies exist through Vite output rather than duplicate
+  raw `node_modules`; dependency source maps, tests, examples, declarations,
+  a second agent-runtime tree, and reliably excludable non-target native assets
+  are absent. Curated Shiki grammars highlight locally while an unknown fence
+  stays readable as plain text. The offline shell starts and all fixture
+  capabilities use local packaged assets; provider/update network failures do
+  not block startup.
+- **Specs linked**: `02-architecture/01-architecture.md`,
+  `02-architecture/02-tech-stack.md`, `03-runtime/07-process-model.md`,
+  `04-ux/02-i18n-english-first.md`, `05-security/01-security.md`,
+  `06-delivery/06-release-runbook.md`, D008
+- **Acceptance**: A (app startup), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`packaging-footprint.test.mjs` validates static
+  dependency and builder configuration); native inventory and packaged offline
+  launch Draft
+
+## 7A. M6 Plan and shell scenarios
+
+#### E2E-104: Legacy Plan values migrate to schema v10
+
+- **Preconditions**: A schema-v8 fixture contains sessions, app defaults, and
+  scheduled records with legacy `chat` values plus transcripts and permissions.
+- **Steps**: 1) Start host-core and allow the v8→v10 migration. 2) Inspect
+  sessions, settings, scheduled modes, and `plan_approvals` fields/indexes. 3)
+  Restart and inspect the same records.
+- **Expected**: Every legacy mode is `plan`, Agent remains the new-session and
+  new-task default, transcripts/permissions survive, `plan_approvals` retains
+  approval data and has artifact/execution fields, and migration failure leaves
+  schema v8 authoritative.
+- **Specs linked**: `00-baseline.md`, `03-runtime/04-data-storage.md`,
+  `03-runtime/01-ipc-protocol.md`, `04-ux/06-settings-ia.md`, ADR 0039
+- **Acceptance**: F (persistence), H (diagnostics)
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-105: Plan policy remains host-authoritative
+
+- **Preconditions**: A project-bound session is idle in Plan with BrowserPreview,
+  CompactContext, a plugin tool, and a forged `requestedMode = "agent"` fixture.
+- **Steps**: 1) Inspect visible Plan tools. 2) Use Read/Glob/Grep,
+  BrowserPreview, and CompactContext. 3) Attempt Write, Edit, plugin, and
+  unknown tools through the host with every permission mode. 4) Run Bash under
+  Ask, Accept edits, and Auto.
+- **Expected**: Plan denies Write/Edit/plugin/unknown tools regardless of the
+  forged mode, grants, or Auto; Bash follows the selected permission mode. The
+  runtime remains one pi Agent and all denials are audited.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`,
+  `03-runtime/03-tools-and-permissions.md`, `03-runtime/05-host-core-rust.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `05-security/01-security.md`, ADR 0039
+- **Acceptance**: E (tools and permissions), Security
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-106: SubmitPlan preserves a unique artifact and approves or rejects
+
+- **Preconditions**: A project-bound session is idle in Plan with a provider;
+  `.pi/plan/` is absent or empty and the workspace permits host artifact
+  creation.
+- **Steps**: 1) Let the Agent call `SubmitPlan` with fixed title, Markdown, and
+  question. 2) Inspect the new `.pi/plan/*.md` file byte-for-byte and the
+  `plan_approvals` row. 3) Inspect the card's title, question, artifact opener,
+  expiry, and status; confirm only Approve and Reject are offered. 4) Approve
+  one fixture with Ask selected, then submit and reject a second fixture.
+- **Expected**: Host preserves the exact submitted Markdown bytes in a new
+  unique artifact, records its relative path/hash/size with structured
+  title/question, and never lets the renderer or sidecar write or replace it.
+  The card opens the artifact and does not require inline Markdown/hash/size.
+  Approval changes the same Agent to Agent and queues execution with Ask;
+  rejection carries no mode and leaves Plan.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/02-agent-runtime.md`, `03-runtime/04-data-storage.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `04-ux/03-permission-ux.md`,
+  `04-ux/08-component-spec.md`, `05-security/01-security.md`, ADR 0039
+- **Acceptance**: C (conversation/stream), E (permissions), F (persistence)
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-107: Plan approval uses one absolute 30-minute expiry
+
+- **Preconditions**: A pending Plan request exists with a controllable clock.
+- **Steps**: 1) Record `createdAt` and `expiresAt`. 2) Reload the renderer and
+  reopen the request. 3) Advance time to the deadline without resolving. 4)
+  Attempt approval after expiry.
+- **Expected**: The displayed countdown retains the original absolute deadline;
+  expiry records `expired`, leaves the session Plan, returns
+  `PLAN_APPROVAL_TIMEOUT`, and rejects the late response without changing mode
+  or permission.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/08-error-codes.md`, `03-runtime/10-session-state-machine.md`,
+  `04-ux/03-permission-ux.md`, ADR 0039
+- **Acceptance**: E (permissions), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-108: Startup fence interrupts pending Plan work
+
+- **Preconditions**: A Plan request is pending with a live approval waiter and
+  running planning turn; host and renderer can restart independently.
+- **Steps**: 1) Reload the renderer and list the live request. 2) Restart the
+  host/app before resolution. 3) Inspect the `plan_approvals` row, turn, and
+  session after startup. 4) Submit the pre-restart response.
+- **Expected**: Renderer reload while the host remains alive preserves the
+  original deadline.
+  Startup transaction marks the pending row and turn interrupted/aborted before
+  RPC service, leaves the session Plan, and returns `PLAN_APPROVAL_STALE` for
+  the old response. No actionable stale card is restored and no process epoch
+  field is persisted or sent.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `03-runtime/07-process-model.md`,
+  `03-runtime/10-session-state-machine.md`, `04-ux/08-component-spec.md`, ADR 0039
+- **Acceptance**: F (persistence), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-109: Approved Plan execution is not replayed after restart
+
+- **Preconditions**: A Plan request has been approved with Ask and is captured
+  once in `queued` and once in `running` state.
+- **Steps**: 1) Restart the host during each state. 2) Inspect the
+  `plan_approvals.execution_state` and turn records after startup. 3) Observe
+  provider/tool invocations and session mode. 4) Start a new user turn
+  explicitly.
+- **Expected**: Queued/running execution fields become `interrupted`,
+  associated turns abort, no provider/tool call is replayed, and the session
+  remains Agent because approval already committed. A new turn is accepted only
+  after the user starts it.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `03-runtime/07-process-model.md`,
+  `03-runtime/10-session-state-machine.md`, ADR 0039
+- **Acceptance**: C (conversation/stream), F (persistence), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-110: Scheduled Plan is rejected before any work
+
+- **Preconditions**: A scheduled task is Plan and an unattended runner is
+  available; provider, artifact, and queue writes can be observed.
+- **Steps**: 1) Trigger the task through the unattended path. 2) Inspect the
+  provider trace, `.pi/plan/`, and `plan_approvals` table. 3) Switch the
+  task/session explicitly to Agent and run it again.
+- **Expected**: Plan is rejected before provider, artifact, approval, or queue
+  work with `PLAN_REQUIRES_INTERACTIVE_SESSION`; no background auto-approval
+  occurs. Explicit Agent selection permits normal unattended policy.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `03-runtime/08-error-codes.md`, `04-ux/01-ui-ia.md`, ADR 0039
+- **Acceptance**: F (persistence), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-111: Active-turn and configuration boundaries are enforced
+
+- **Preconditions**: A session has one active Agent turn and another session is
+  idle; a Plan run can be made pending/queued/running.
+- **Steps**: 1) Attempt a second prompt, mode/provider/model/permission/shell
+  configuration change, and second Plan submission during the active turn. 2)
+  Attempt a second Plan run in the same session. 3) Repeat configuration after
+  the session returns idle.
+- **Expected**: Active-turn/configuration changes and a second Plan run fail with
+  `AGENT_BUSY`/`CONFLICT`; only the originating session is blocked. Idle
+  configuration succeeds and no cross-session event or workspace root leaks.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/02-agent-runtime.md`, `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/10-session-state-machine.md`, `04-ux/08-component-spec.md`, ADR 0039
+- **Acceptance**: C (conversation/stream), E (permissions), Quality
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-112: Selectable shell catalog persists the default
+
+- **Preconditions**: Host has an available platform catalog entry, a fixture can
+  make a persisted choice unavailable, and a project-bound Agent session is
+  idle. The Windows lane exercises the multi-choice ordering.
+- **Steps**: 1) Inspect the catalog for the platform-valid IDs
+  `windows-powershell`, `cmd`, `git-bash`, and `bash`. 2) Verify settings
+  rejects an unavailable or wrong-platform ID. 3) Select an available shell
+  and persist `defaultCommandShell`. 4) Make that persisted choice unavailable,
+  restart, and verify the catalog selects the first available platform shell
+  with `fallback: true`. 5) Execute the unchanged `Bash` tool.
+- **Expected**: Settings persists only a valid stable shell ID; unavailable
+  entries remain unavailable with guidance and a later unavailable persisted
+  choice uses the intentional first-available fallback. The host invokes the
+  effective shell while the tool/protocol name stays `Bash`, and shell
+  selection follows the idle configuration boundary.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/03-tools-and-permissions.md`, `03-runtime/06-host-rpc-protocol.md`,
+  `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`, ADR 0040
+- **Acceptance**: B (model/config), E (tools/permissions), F (persistence)
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-113: Stale shell identity fails closed
+
+- **Preconditions**: A Bash turn has a pinned effective shell ID/dialect; the
+  fixture can change the effective catalog selection before spawn.
+- **Steps**: 1) Change the effective shell ID or dialect. 2) Execute Bash with
+  the old expected ID. 3) Inspect process creation, fallback attempts, audit,
+  and UI error. 4) launch a fresh turn and retry.
+- **Expected**: The first call returns `COMMAND_SHELL_CHANGED`, starts no
+  process, and does not change shell after the turn pin. The audit records the
+  selected ID and dialect. A fresh turn snapshot is required for a later run.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
+  `03-runtime/05-host-core-rust.md`, `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/08-error-codes.md`, `05-security/01-security.md`, ADR 0040
+- **Acceptance**: E (tools/permissions), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-114: Bash streams stdout and stderr independently
+
+- **Preconditions**: A selected shell is available and a deterministic command
+  writes interleaved stdout and stderr chunks.
+- **Steps**: 1) Execute the command through `Bash`. 2) Observe host/RPC/UI
+  output events. 3) Inspect the final bounded result and transcript row.
+- **Expected**: stdout and stderr remain separate, ordered per tool call, and
+  visible while the process runs. Final output preserves truncation metadata;
+  no chunks cross sessions or turns and the Bash protocol name is unchanged.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/09-logging-and-observability.md`,
+  `03-runtime/16-tool-result-limits.md`, `04-ux/09-interaction-patterns.md`, ADR 0040
+- **Acceptance**: C (stream), E (tools), Quality
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-115: Bash timeout uses 60 seconds and a bounded override
+
+- **Preconditions**: A selected shell can run a command longer than 60 seconds;
+  host clock is observable.
+- **Steps**: 1) Run without a timeout override. 2) Observe the 60-second
+  deadline. 3) Run with an in-range override. 4) Submit zero, negative, and
+  over-300-second overrides.
+- **Expected**: Missing timeout uses exactly 60 seconds and returns
+  `TOOL_TIMEOUT` after process-tree shutdown. In-range values work within
+  1–300 seconds; out-of-range values fail validation and never spawn.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `03-runtime/08-error-codes.md`,
+  `03-runtime/16-tool-result-limits.md`, `05-security/01-security.md`, ADR 0040
+- **Acceptance**: E (tools), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-116: Bash abort shuts down the complete process tree
+
+- **Preconditions**: A Bash command starts a child and grandchild that emit
+  delayed output; the originating session is running.
+- **Steps**: 1) Start the command. 2) Abort the active turn. 3) Inspect process
+  descendants, output events, audit, and turn state after the shutdown grace.
+- **Expected**: The process group/job tree is terminated, no descendant remains,
+  no later output arrives, the turn returns `TURN_ABORTED`, and the workspace is
+  not rolled back automatically.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
+  `03-runtime/07-process-model.md`, `03-runtime/08-error-codes.md`,
+  `03-runtime/16-tool-result-limits.md`, `05-security/01-security.md`, ADR 0040
+- **Acceptance**: C (abort), E (tools), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Documented
+
+#### E2E-117: Agent/Plan UX and locales contain no Chat controls
+
+- **Preconditions**: App can run in English and zh-CN with an idle session,
+  Plan artifact fixture, shell settings, and command palette available.
+- **Steps**: 1) Inspect Agent/Plan, permission, artifact approval, and shell
+  controls in English. 2) Enter Plan and inspect planning/approval/queue/
+  interrupted states. 3) Repeat in zh-CN. 4) Search visible commands for the
+  removed Chat mode and request-changes controls.
+- **Expected**: Agent is the default; Plan shows Ask/Accept edits/Auto, the
+  submitted title/question, an artifact opener, expiry/status, approve/reject
+  only, shell catalog/fallback status, and localized failed-closed states. No
+  Chat mode, `/chat-mode`, request-changes action, inline Markdown/hash/size
+  requirement, or stale actionable queue is exposed; `page = "chat"` remains
+  an internal route.
+- **Specs linked**: `01-product/01-product-scope.md`, `04-ux/01-ui-ia.md`,
+  `04-ux/04-builtin-commands.md`, `04-ux/03-permission-ux.md`,
+  `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/02-i18n-english-first.md`, ADR 0039, ADR 0040
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6
+- **Status**: Documented
+
 ## 8. Traceability Matrix
 
 
@@ -2069,16 +2533,16 @@ Each scenario is documented in this format:
 
 | Acceptance | Scenarios |
 |---|---|
-| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079 |
+| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
-| C — Chat & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086 |
+| C — Conversation & stream | E2E-008, E2E-009, E2E-010, E2E-011, E2E-031, E2E-040, E2E-047, E2E-048, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-AGENTS-001 |
 | D — Workspace | E2E-012, E2E-013, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
-| E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049, E2E-074 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084 |
-| G — Plugins | E2E-022, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-025, E2E-026 |
-| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042 |
-| Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068, E2E-086 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086 |
+| E — Tools & permissions | E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040, E2E-049, E2E-074, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-073a, E2E-082, E2E-084, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-AGENTS-001 |
+| G — Plugins | E2E-022, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-025, E2E-026, E2E-105, E2E-117 |
+| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116 |
+| Security | E2E-028, E2E-029, E2E-030, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-073a, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-111, E2E-114, E2E-117, E2E-AGENTS-001 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -2086,7 +2550,8 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086 (+ packaging scenarios in release runbook) |
+| M5 | E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-059a, E2E-060, E2E-060b, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-073a, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-AGENTS-001 (+ packaging scenarios in release runbook) |
+| M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117 |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -2099,7 +2564,7 @@ rather than the A–H criteria; their gold source is the capture suite.
 When adding or changing a feature that affects user-visible or protocol-visible behavior:
 
 1. **Add a new scenario** using the template in §6. Assign the next available ID (`E2E-<N>`).
-2. **Link it** to the relevant acceptance criterion (A–H) and milestone (M1–M5).
+2. **Link it** to the relevant acceptance criterion (A–H) and milestone (M1–M6).
 3. **Set status** to `Draft` unless an automated test already exists.
 4. **Update the traceability matrix** in §8.
 5. **Commit** the update as part of the change (per [ai-development-workflow](03-ai-development-workflow.md) R3).
@@ -2155,14 +2620,15 @@ This test plan spec is accepted when:
 ### US-UI-04 Composer without workspace context
 - With a git workspace open, composer does not show project, Local, or branch
   labels above the prompt surface.
-- Permission toggle switches between Agent and Request approval (chat mode).
+- Operating-mode selector switches between Agent and Plan; Plan keeps the
+  permission-mode chip and explains its Bash tradeoff.
 
 ### US-UI-05 Locale chrome
 - On a zh-CN system locale, sidebar labels render in Chinese (新建任务 / 项目 /
   插件 / 临时会话), without 拉取请求 or 已安排 entries.
 - Empty-thread hero remains the English PI-Desktop shell copy: "What should we build?".
-- Composer omits the 本地 workspace label and shows Chat mode plus the active
-  model ID.
+- Composer omits the 本地 workspace label and shows Plan/Agent plus the active
+  model ID; both locales expose the Plan approval copy.
 
 ### US-UI-06 Session auto-title
 - Create a new task and send a first prompt such as "同步代码".
@@ -2229,6 +2695,8 @@ This test plan spec is accepted when:
 ### US-UI-17 PI-Desktop home hero logo
 - On empty chat home, the canonical PI-Desktop PNG renders at 56px above the
   title with its native colors and no decorative hover state.
+- The hero logo is theme-aware: light mode shows `build/icon_1024.png`, dark
+  mode shows `build/logo_dark.png`, and the swap tracks `data-theme` live.
 - Title is 28px / weight 400; active project name uses dotted underline (1px, offset 4px).
 - Composer does not render attachment or appshot controls before their payload
   reaches pi end to end.
@@ -2237,7 +2705,7 @@ This test plan spec is accepted when:
 - On chat home and a docked thread, inspect every composer control.
 - Expect no file, photo, or appshot controls while those payloads are
   unsupported by the pi runtime. Exact reasoning-capable models expose the
-  current Thinking level immediately to the right of Chat / Agent; unsupported
+  current Thinking level immediately to the right of Agent / Plan; unsupported
   models show no trigger. Unknown compatible models can explicitly enable
   thinking from the model menu, and changes update the durable session.
 - Expect no project, Local, or branch context labels in the composer.
@@ -2254,11 +2722,11 @@ This test plan spec is accepted when:
 - Switch to dark theme on chat home.
 - Expect main `#181818`, sidebar `#000000`, and the floating composer plate at elevated-primary (`#212121f5` / gray-800 96%) with elevation-prominent stroke + soft lift so the box reads against the main surface.
 
-### US-UI-21 Composer model menu configures pi
-- Create a session with provider A/model A, then open the composer model menu.
+### US-UI-21 Top-bar model menu configures pi
+- Create a session with provider A/model A, then open the top-bar model menu.
 - Expect enabled, runnable provider/default-model pairs and an Agent entry. The
   model trigger shows only the model ID; a capability-gated Thinking trigger is
-  placed beside Chat / Agent instead of being nested in the model menu.
+  placed beside Agent / Plan instead of being nested in the model menu.
 - Select provider B/model B, send a prompt, and expect the main-to-sidecar
   `agent.prompt` payload and pi runtime to use B for that session.
 - Switch away and back; expect B to remain selected. While a turn runs, expect
@@ -2277,18 +2745,29 @@ This test plan spec is accepted when:
 
 ### US-UI-23 Project archive index
 - Open Settings → Project archive.
-- Expect the Settings title "Project archive", primary "Add project", and
-  either an empty state or a project index with colored glyph, path, durable
-  pinned indicator where supplied by the host, archived rows, and active highlight.
+- Expect the Settings title "Project archive" plus three stacked bands (D168):
+  an overview banner with one intent sentence, the primary "Add project", and
+  four counters (projects, open, archived, sessions); a toolbar with a search
+  field, clear affordance, live match count, and a Recent / Name sort segmented
+  control; and a grouped index in the order Pinned, All projects, Archived where
+  each present section shows its label and row count. With no project at all the
+  grouped index is replaced by one empty-state card with its own primary action.
+- Expect each row to carry a colored glyph, the project name with its Active /
+  Open / pinned / Archived tags, one meta line with the shortened monospace
+  path, branch, and session count, a relative last-active time, and the
+  hover-revealed New task and row-menu actions. Archived rows stay listed and
+  softened rather than hidden.
 - Expand a non-active project and open one of its sessions; expect the app to
   activate that project before selecting the session, so workspace tools and
   session scope use the same project.
+- Switch the sort to Name and expect rows to reorder inside every section with
+  no row hidden; clear the search and expect the complete index back.
 
 ### US-UI-24 Settings full-page shell
 - Open Settings (footer profile → Settings).
 - Expect **full-page** Codex settings (no app sidebar/nav). Left rail has Back
-  to app, search, and exactly Basics / Model configuration / Import / Project
-  archive / Info in that order; content pane shows section title and the
+  to app, search, and exactly Basics / 全局 AI / Shortcuts / Model configuration /
+  Import / Project archive / Info in that order; content pane shows section title and the
   destination's settings or archive content.
 - Return to the app shell and expect Plugins to remain an independent sidebar
   destination.
@@ -2387,12 +2866,14 @@ This test plan spec is accepted when:
 ### US-UI-44 Settings compact directory + merged sections
 - Open Settings light theme at ~1200×690.
 - Full-page shell: rail ~260px on `#f3f3f3`, main `#fff`; Back to app; search pill; Basics active pill with icon.
-- Rail order is exactly Basics, Model configuration, Import, Project archive,
-  and Info;
+- Rail order is exactly Basics, 全局 AI/AI, Shortcuts, Model configuration,
+  Import, Project archive, and Info;
   there are no Personal/Integrations/Coding group headings, plugin duplicate,
   or placeholder destinations.
 - Basics content: large title and an **Appearance** card with working
-  system/light/dark controls. Permission defaults, file-open target, language
+  system/light/dark controls and a **Defaults** card. 全局 AI holds Permissions
+  and Context management; Shortcuts holds the Keyboard shortcuts card.
+  File-open target, language
   override, menu-bar behavior, and bottom-panel behavior are absent until
   host-backed implementations exist.
 - Model configuration contains the provider studio hero, default mode/model, Enter-to-send
@@ -2689,7 +3170,7 @@ This test plan spec is accepted when:
 
 ### US-UI-70 Disable text correction on editable fields (D145)
 - Open empty home, a docked transcript, Settings search, Plugins market search,
-  Projects archive search, command palette, global search, provider model combo,
+  Projects archive search, global search (which now includes commands), provider model combo,
   message-edit textarea, and the work-panel browser URL bar in light and dark.
 - Expect every text `input`/`textarea` to expose `spellcheck="false"` (React
   `spellCheck={false}`) plus `autocorrect="off"` and `autocapitalize="off"`.
@@ -2699,7 +3180,7 @@ This test plan spec is accepted when:
 ### US-UI-71 Composer runtime chip descenders (D150)
 - Open empty home and a docked thread with a model ID that contains descenders
   (for example `gpt`, `gemini`, or any id with `g`/`y`/`p`/`q`/`j`).
-- Inspect Chat/Agent, Thinking (when present), permission mode (Agent), and the
+- Inspect Agent/Plan, Thinking (when present), permission mode, and the
   model chip in light and dark.
 - Expect every chip label to show full glyph ink — bottoms of `g`/`y`/`p` are not
   clipped by the 28px capsule — while long model IDs still ellipsize horizontally.

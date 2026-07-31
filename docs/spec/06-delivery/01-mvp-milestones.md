@@ -107,13 +107,48 @@ Progress:
   ([06-release-runbook](06-release-runbook.md)); blocked only on Apple
   Developer credentials (operational, not code)
 
+### M6 — Plan Operating State
+Status: **In Progress (spec freeze; implementation not complete)**
+
+Goal: replace the former Chat operating profile with a host-authoritative Plan
+state on the same pi Agent, including a separate approval boundary.
+
+Deliverables:
+- Agent | Plan selector with Agent as the default
+- persisted session/settings/scheduled `chat` → `plan` migration
+- protocol v9 and schema v10 with immutable host-written `.pi/plan/*.md`
+  artifacts, structured title/question fields, and `plan_approvals` artifact/
+  execution fields
+- Rust-owned mode resolution, Plan tool policy, selectable shell catalog with
+  fallback and turn-pinned identity,
+  streamed Bash output, bounded timeout, and process-tree cancellation
+- one-Agent `EnterPlanMode` / `SubmitPlan` lifecycle with approve/reject-only
+  resolution and fail-closed recovery
+- Plan artifact approval IPC/RPC/events, renderer projection, shell selection,
+  approval UX, and EN/zh-CN copy
+- plugin denial, scheduled Plan rejection, and focused unit/integration
+  verification documented in the E2E plan
+
+Exit criteria:
+- only one pi Agent is used before, during, and after planning
+- Plan denies Write/Edit/plugin tools but exposes Bash under the selected
+  permission mode, including Auto's explicit mutation tradeoff
+- approval is separate from generic tool permission, atomically selects the
+  Agent permission mode, and defaults the UI selection to Ask
+- reject and expiry leave the session in Plan; a host restart interrupts
+  pending/queued/running work without replay, while an already-approved
+  interrupted execution leaves the session Agent
+- each submitted Markdown snapshot is preserved byte-for-byte in a unique
+  `.pi/plan/*.md` artifact with recorded path/hash/size, and approval opens it
+- all M6 scenarios are documented; E2E execution remains opt-in
+
 ### M6+ (Post-MVP)
 - Skills depth
 - MCP
 - `.piplug` packaging UX polish
 - marketplace preview
 - Windows/Linux hardening
-- additional locales (e.g. zh-CN)
+- additional locales beyond the shipped zh-CN catalog
 
 ## Release constraint
 

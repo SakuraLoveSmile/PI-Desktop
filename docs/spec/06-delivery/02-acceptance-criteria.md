@@ -43,7 +43,10 @@ MVP passes when:
 - [x] Tool paths resolve against the project root — auto:host-core tests (`workspace::tests`)
 
 ### E. Tools and permissions
-- [x] Chat mode cannot run Write/Edit/Bash — manual:M3 (D004)
+- [ ] Plan denies Write/Edit/plugin tools under every permission mode — M6
+- [ ] Plan Bash prompts under Ask/Accept edits and runs without confirmation
+  under explicit Auto — M6
+- [x] Agent mode uses permission policy for Write/Edit/Bash — manual:M3
 - [x] Permission timeout (120s) becomes deny — manual:M3 (D005)
 - [x] Read/Glob/Grep work inside the project — auto:`test:e2e` (glob tool)
 - [x] Write/Edit/Bash trigger an inline, session-scoped confirmation card — manual:M3
@@ -52,6 +55,27 @@ MVP passes when:
 - [x] Deny prevents execution — manual:M3
 - [x] Allow returns the result to model and UI — manual:M3
 - [x] Paths outside the workspace are rejected — auto:host-core tests (`blocks_escape`)
+
+### M6. Plan checkpoint and shell execution
+- [ ] One pi Agent owns Agent, planning, approval, and post-approval execution — M6
+- [ ] `EnterPlanMode` and UI/session Plan selection converge on the same state — M6
+- [ ] `SubmitPlan(title, markdown, question)` preserves exact Markdown bytes in
+  a unique `.pi/plan/*.md` artifact, keeps title/question structured in
+  `plan_approvals`, and records path/hash/size — M6
+- [ ] Approval offers only Approve/Reject; Approve requires an explicit
+  permission mode with Ask selected by default — M6
+- [ ] The approval deadline is an absolute 30 minutes and stale responses fail
+  closed — M6
+- [ ] v8→v10 migration preserves sessions/transcripts and continues
+  `plan_approvals` with artifact/execution fields — M6
+- [ ] Pending, queued, and running Plan work is interrupted on host restart with
+  no replay; an already-approved interrupted execution leaves the session Agent — M6
+- [ ] Scheduled/unattended Plan runs fail before the provider request — M6
+- [ ] Plan plugin tools remain denied despite low risk, grants, or Auto — M6
+- [ ] Shell catalog selection persists a platform-valid ID, falls back to the
+  first available platform shell when a later lookup is unavailable, rejects a
+  stale turn ID/dialect, streams stdout/stderr, enforces the 60s default
+  timeout, and kills process trees on abort — M6
 
 ### F. Persistence
 - [x] Sessions survive restart — manual:M2 (SQLite via host-core)
@@ -88,6 +112,10 @@ MVP passes when:
 - [x] Errors show a readable message — manual:M2 (AppError message surfaced)
 - [x] Long output does not freeze the UI — manual:M3 (256KB/4000-line truncation)
 - [x] Key operations show loading/running state — manual:M2
+- [x] Release package has no duplicate renderer/runtime dependency trees —
+  auto:desktop package contract + macOS arm64 native package audit:E2E-092
+- [ ] Packaged startup and local renderer/runtime capabilities remain available
+  offline on every native target — draft:E2E-092
 
 ## 5. Acceptance demo script
 

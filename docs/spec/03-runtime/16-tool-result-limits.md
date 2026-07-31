@@ -13,8 +13,9 @@ Keep agent context healthy and UI responsive by bounding tool outputs without si
 | single Read file bytes | 512 KB | refuse range/smaller read |
 | Grep max matches | 200 | stop with partial flag |
 | Glob max entries | 2000 | stop with partial flag |
-| Bash stdout+stderr | 256 KB | truncate |
-| Bash timeout | 60s default | kill + error |
+| Bash stdout + stderr final result | 256 KB combined | stream live, then truncate + marker |
+| Bash output stream | per-stream sequence | preserve stdout/stderr separation |
+| Bash timeout | 60s default; 1–300s override | kill process tree + error |
 
 Limits are host-enforced where possible.
 
@@ -35,6 +36,8 @@ Checkpoint-only aggregate truncation uses the distinct model-context marker in
 ## 4. Model-facing vs UI-facing
 
 - model receives truncated payload with marker
+- Renderer receives ordered `stdout` and `stderr` chunks while Bash runs; the
+  final model/UI result remains the bounded combined payload.
 - UI may offer “open full output in viewer” for Bash/Read later (post-MVP optional)
 - full raw output is not required to persist forever; session may store truncated form in MVP
 - the per-result host cap does not bound a parallel batch in aggregate. During
@@ -78,10 +81,15 @@ type ToolResultEnvelope = {
 3. binary files: do not dump raw binary into model; return metadata error `TOOL_BINARY_CONTENT`
 4. aggregate checkpoint truncation must preserve every provider-valid assistant
    tool-call/result pair and re-estimate the resulting tail before persistence
+5. Timeout and abort close both output streams only after the complete process
+   tree has been shut down; no orphan process may continue writing output
 
 ## 7. Acceptance criteria
 
 - [ ] oversize Bash output truncates with marker
+- [ ] stdout and stderr stream separately with stable per-tool sequence values
+- [ ] Bash uses the 60s default and rejects an override outside 1–300s
+- [ ] timeout/abort stops the complete process tree and emits no later chunks
 - [ ] Grep stops at max matches with partial=true
 - [ ] Read oversize file fails with actionable error or bounded preview policy
 - [ ] truncated results still valid UTF-8 text

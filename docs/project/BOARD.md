@@ -17,7 +17,7 @@ Until that is enabled, track delivery with:
 | Review | Waiting validation |
 | Done | Completed |
 
-## Status snapshot (2026-07-25, evening)
+## Status snapshot (2026-07-31)
 
 | Milestone | GitHub | Local status |
 |---|---|---|
@@ -27,6 +27,7 @@ Until that is enabled, track delivery with:
 | M3 Workspace Tools | [closed](https://github.com/vastsa/PI-Desktop/milestone/4) | Done |
 | M4 Plugin Foundation | [closed](https://github.com/vastsa/PI-Desktop/milestone/5) | Done |
 | M5 Desktop Hardening | [open](https://github.com/vastsa/PI-Desktop/milestone/6) | Done except notarization (credential-gated) |
+| M6 Plan Operating State | planned | In Progress: documentation contract and implementation plan; runtime/UI implementation not complete |
 
 Open issue:
 - [#6 M5: Packaging and desktop hardening](https://github.com/vastsa/PI-Desktop/issues/6)
@@ -75,6 +76,15 @@ Open issue:
 - Codex visual gold polish (ongoing capture-driven iteration)
 - Composer slash commands + @ file references wired to pi prompt templates
   (D123–D125 / ADR 0024)
+- M6 Plan operating state: protocol v9/schema v10 contract, ADR 0039/0040,
+  D170/D171, E2E-104–E2E-117, and implementation plan are documented. The
+  chosen checkpoint is immutable unique `.pi/plan/*.md` artifacts with
+  structured title/question fields and one `plan_approvals` row carrying
+  artifact/execution fields; startup interruption fences prior work without
+  replay. The shell catalog uses `windows-powershell`, `cmd`, `git-bash`, and
+  `bash`, with intentional first-available fallback and turn-pinned ID/dialect.
+  Implementation and final verification are not complete, so the milestone
+  remains In Progress.
 
 ### Blocked (external)
 - Full DMG notarization — needs Apple Developer credentials; runbook ready

@@ -37,6 +37,14 @@ export const ChatSurface = memo(function ChatSurface() {
       ? state.pendingPermissions[state.activeSessionId]
       : undefined,
   );
+  const activePlan = useAppStore((state) =>
+    state.activeSessionId ? state.pendingPlans[state.activeSessionId] : undefined,
+  );
+  const activePlanningState = useAppStore((state) =>
+    state.activeSessionId
+      ? state.planningStates[state.activeSessionId]
+      : undefined,
+  );
 
   const heroProject = useMemo(
     () => projectName(workspace?.path, workspace?.name),
@@ -55,8 +63,17 @@ export const ChatSurface = memo(function ChatSurface() {
       messages,
       isRunning,
       pendingPermission: activePermission,
+      approvalPending: Boolean(activePlan),
+      planningState: activePlanningState,
     }),
-    [activePermission, activeSessionId, isRunning, messages],
+    [
+      activePermission,
+      activePlan,
+      activePlanningState,
+      activeSessionId,
+      isRunning,
+      messages,
+    ],
   );
   const deferredSessionId = useDeferredValue(activeSessionId);
   const previousTranscriptViewRef = useRef(currentTranscriptView);
@@ -74,7 +91,9 @@ export const ChatSurface = memo(function ChatSurface() {
   }, [activeSessionId, currentTranscriptView, deferredSessionId]);
 
   const hasTranscript =
+    transcriptView.approvalPending ||
     Boolean(transcriptView.pendingPermission) ||
+    (transcriptView.isRunning && transcriptView.planningState === "planning") ||
     transcriptView.messages.some((message) => {
       const hasContent = Boolean((message.content || "").trim());
       const hasThinking =
@@ -134,6 +153,7 @@ export const ChatSurface = memo(function ChatSurface() {
             messages={transcriptView.messages}
             isRunning={transcriptView.isRunning}
             pendingPermission={transcriptView.pendingPermission}
+            planningState={transcriptView.planningState}
           />
           <StableComposer variant="docked" />
         </>

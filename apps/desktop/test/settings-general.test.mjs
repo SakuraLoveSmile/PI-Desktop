@@ -22,6 +22,14 @@ const mainSource = await readFile(
   new URL("../src/main.tsx", import.meta.url),
   "utf8",
 );
+const electronMainSource = await readFile(
+  new URL("../electron/main/index.ts", import.meta.url),
+  "utf8",
+);
+const preloadSource = await readFile(
+  new URL("../electron/preload/index.ts", import.meta.url),
+  "utf8",
+);
 const sharedTypesSource = await readFile(
   new URL("../../../packages/shared/src/types.ts", import.meta.url),
   "utf8",
@@ -31,7 +39,7 @@ const stylesSource = await readFile(
   "utf8",
 );
 
-test("basics tab exposes language, default mode, enter-to-send, and permission mode", () => {
+test("General and AI tabs expose their respective app and AI controls", () => {
   assert.match(settingsPageSource, /settings\.language/);
   assert.match(settingsPageSource, /settings\.languageAuto/);
   assert.match(settingsPageSource, /"zh-CN"/);
@@ -42,6 +50,11 @@ test("basics tab exposes language, default mode, enter-to-send, and permission m
     /defaultPermissionMode: e\.target\.value as GlobalPermissionMode/,
   );
   assert.match(settingsPageSource, /"accept-edits"/);
+  assert.ok(
+    settingsPageSource.indexOf('{tab === "ai" && settings && (') <
+      settingsPageSource.indexOf("defaultPermissionMode: e.target.value"),
+    "permission mode remains in the AI tab",
+  );
 });
 
 test("language persists as part of shared app settings", () => {
@@ -71,6 +84,14 @@ test("stored language drives i18n at startup and on settings change", () => {
   assert.match(mainSource, /initLanguageSync\(\)/);
 });
 
+test("sandboxed preload receives the OS locale without importing main-only APIs", () => {
+  assert.match(electronMainSource, /additionalArguments:\s*\[`--pi-desktop-locale=\$\{app\.getLocale\(\)\}`\]/);
+  assert.match(preloadSource, /const LOCALE_ARGUMENT_PREFIX = "--pi-desktop-locale="/);
+  assert.match(preloadSource, /process\.argv[\s\S]*startsWith\(LOCALE_ARGUMENT_PREFIX\)/);
+  assert.doesNotMatch(preloadSource, /import\s*\{[^}]*\bapp\b[^}]*\}\s*from "electron"/);
+  assert.doesNotMatch(preloadSource, /locale:\s*app\.getLocale\(\)/);
+});
+
 test("model configuration keeps model defaults; basics owns app behavior", () => {
   assert.match(providersSource, /settings\.defaultModel/);
   assert.doesNotMatch(providersSource, /enterToSend/);
@@ -80,6 +101,8 @@ test("model configuration keeps model defaults; basics owns app behavior", () =>
 
 test("settings nav icons map each destination to a semantic lucide glyph", () => {
   assert.match(settingsPageSource, /general: <IconSliders/);
+  assert.match(settingsPageSource, /ai: <IconSparkles/);
+  assert.match(settingsPageSource, /shortcuts: <IconKeyboard/);
   assert.match(settingsPageSource, /agent: <IconBot/);
   assert.match(settingsPageSource, /import: <IconDownload/);
   assert.match(settingsPageSource, /projects: <IconArchive/);

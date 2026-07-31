@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import type { HostProcess, ProcessExitHandler, StderrHandler } from "./host-process";
+import { DEFAULT_RPC_TIMEOUT_MS, rpcTimeoutMs } from "@pi-desktop/shared";
 
 export type SidecarNotificationHandler = (method: string, params: unknown) => void;
 
@@ -21,17 +22,28 @@ export type LocalToolHandler = (input: {
   args: unknown;
 }) => Promise<LocalToolResult>;
 
+export type ProjectInstructionResolver = (input: {
+  sessionId: string;
+  path: string;
+}) => Promise<unknown>;
+
 // The sidecar runs model-directed code paths; it must not be able to pull
 // secrets or mutate configuration through the parent proxy. Tight allowlist
 // of host methods the agent loop legitimately needs.
 const HOST_PROXY_ALLOWED = new Set([
   "tools.execute",
+  "tools.abort",
   "tools.list",
   "session.get",
   "session.appendMessage",
   "session.appendCompaction",
   "session.replaceMessages",
   "workspace.get",
+  "plans.enter",
+  "plans.submit",
+  "plans.pending",
+  "plans.abort",
+  "project.instructions.resolve",
   "app.health",
 ]);
 
@@ -51,16 +63,26 @@ export class AgentSidecar {
   private child: ChildProcessWithoutNullStreams;
   private pending = new Map<
     string,
-    { resolve: (v: any) => void; reject: (e: Error) => void }
+    {
+      resolve: (v: any) => void;
+      reject: (e: Error) => void;
+      timer?: ReturnType<typeof setTimeout>;
+    }
   >();
   private handlers = new Set<SidecarNotificationHandler>();
   private exitHandlers = new Set<ProcessExitHandler>();
   private disposed = false;
+  private closed = false;
+  private exitNotified = false;
   private host: HostProcess | null = null;
   private unsubscribeHost: (() => void) | null = null;
+  private unsubscribeHostExit: (() => void) | null = null;
+  private readline?: ReturnType<typeof createInterface>;
   // Tools served by Electron main itself (e.g. BrowserPreview drives the
   // work panel's WebContentsView) — host-core never sees these.
   private localTools = new Map<string, LocalToolHandler>();
+  private localToolTimers = new Set<ReturnType<typeof setTimeout>>();
+  private projectInstructionResolver: ProjectInstructionResolver | null = null;
 
   constructor(onStderr?: StderrHandler) {
     const entry = resolveSidecarEntry();
@@ -80,25 +102,102 @@ export class AgentSidecar {
     });
 
     this.child.on("exit", (code, signal) => {
-      this.rejectAllPending(new Error("agent sidecar exited"));
-      for (const h of this.exitHandlers) {
-        h({ code, signal, intentional: this.disposed });
-      }
+      this.closeTransport(new Error("agent sidecar exited"));
+      this.notifyExit({ code, signal, intentional: this.disposed });
     });
-    this.child.on("error", () => {
-      this.rejectAllPending(new Error("agent sidecar spawn failed"));
+    this.child.on("error", (error) => {
+      this.closeTransport(error instanceof Error ? error : new Error(String(error)));
+      this.notifyExit({ code: null, signal: null, intentional: this.disposed });
     });
 
     const rl = createInterface({ input: this.child.stdout });
+    this.readline = rl;
     rl.on("line", (line) => void this.onLine(line));
   }
 
-  private rejectAllPending(error: Error) {
-    for (const [, p] of this.pending) p.reject(error);
+  private closeTransport(error: Error) {
+    if (this.closed) return;
+    this.closed = true;
+    this.unsubscribeHost?.();
+    this.unsubscribeHost = null;
+    this.unsubscribeHostExit?.();
+    this.unsubscribeHostExit = null;
+    this.host = null;
+    for (const [, p] of this.pending) {
+      if (p.timer) clearTimeout(p.timer);
+      p.reject(error);
+    }
     this.pending.clear();
+    for (const timer of this.localToolTimers) clearTimeout(timer);
+    this.localToolTimers.clear();
+    this.handlers.clear();
+    this.readline?.close();
+    this.readline = undefined;
+    this.child.removeAllListeners("exit");
+    this.child.removeAllListeners("error");
+    this.child.stderr.removeAllListeners("data");
+  }
+
+  private notifyExit(info: {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+    intentional: boolean;
+  }) {
+    if (this.exitNotified) return;
+    this.exitNotified = true;
+    for (const h of this.exitHandlers) h(info);
+    this.exitHandlers.clear();
+  }
+
+  private writeToChild(payload: string): boolean {
+    if (this.closed || this.disposed) return false;
+    if (this.child.stdin.destroyed || !this.child.stdin.writable) {
+      const failure = new Error("agent sidecar stdin is unavailable");
+      this.closeTransport(failure);
+      this.notifyExit({ code: null, signal: null, intentional: this.disposed });
+      return false;
+    }
+    try {
+      this.child.stdin.write(payload, (error) => {
+        if (error) {
+          this.closeTransport(error);
+          this.notifyExit({ code: null, signal: null, intentional: this.disposed });
+        }
+      });
+      return true;
+    } catch (error) {
+      const failure = error instanceof Error ? error : new Error(String(error));
+      this.closeTransport(failure);
+      this.notifyExit({ code: null, signal: null, intentional: this.disposed });
+      return false;
+    }
+  }
+
+  private async runLocalTool(
+    handler: LocalToolHandler,
+    input: Parameters<LocalToolHandler>[0],
+  ): Promise<LocalToolResult> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        handler(input),
+        new Promise<LocalToolResult>((_, reject) => {
+          timer = setTimeout(() => {
+            reject(new Error("main-local tool timeout"));
+          }, DEFAULT_RPC_TIMEOUT_MS);
+          this.localToolTimers.add(timer);
+        }),
+      ]);
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+        this.localToolTimers.delete(timer);
+      }
+    }
   }
 
   onExit(handler: ProcessExitHandler): () => void {
+    if (this.closed) return () => undefined;
     this.exitHandlers.add(handler);
     return () => this.exitHandlers.delete(handler);
   }
@@ -108,9 +207,15 @@ export class AgentSidecar {
     this.localTools.set(name, handler);
   }
 
+  setProjectInstructionResolver(resolver: ProjectInstructionResolver): void {
+    this.projectInstructionResolver = resolver;
+  }
+
   setHost(host: HostProcess) {
+    if (this.closed) return;
     this.host = host;
     this.unsubscribeHost?.();
+    this.unsubscribeHostExit?.();
     this.unsubscribeHost = host.onNotification((method, params) => {
       // Forward host notifications to sidecar. permissions.request stays out:
       // the renderer already gets it straight from wireHost, and bouncing it
@@ -123,7 +228,13 @@ export class AgentSidecar {
           method: "host.notification",
           params: { method, params },
         }) + "\n";
-      this.child.stdin.write(payload);
+      this.writeToChild(payload);
+    });
+    this.unsubscribeHostExit = host.onExit(() => {
+      this.unsubscribeHost?.();
+      this.unsubscribeHost = null;
+      this.unsubscribeHostExit = null;
+      this.host = null;
     });
   }
 
@@ -147,6 +258,19 @@ export class AgentSidecar {
           );
         }
         const params = (msg.params?.params ?? {}) as Record<string, unknown>;
+        if (method === "project.instructions.resolve") {
+          if (!this.projectInstructionResolver) {
+            throw new Error("project instruction resolver unavailable");
+          }
+          const result = await this.projectInstructionResolver({
+            sessionId: String(params.sessionId ?? ""),
+            path: String(params.path ?? ""),
+          });
+          this.writeToChild(
+            JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
+          );
+          return;
+        }
         // Main-local tools short-circuit before host-core (which doesn't
         // know them); everything else proxies through unchanged.
         const localTool =
@@ -154,23 +278,23 @@ export class AgentSidecar {
             ? this.localTools.get(String(params.toolName ?? ""))
             : undefined;
         if (localTool) {
-          const result = await localTool({
+          const result = await this.runLocalTool(localTool, {
             sessionId: String(params.sessionId ?? ""),
             toolCallId: String(params.toolCallId ?? ""),
             args: params.args,
           });
-          this.child.stdin.write(
+          this.writeToChild(
             JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
           );
           return;
         }
         if (!this.host) throw new Error("host unavailable");
         const result = await this.host.call(method, params);
-        this.child.stdin.write(
+        this.writeToChild(
           JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
         );
       } catch (e: any) {
-        this.child.stdin.write(
+        this.writeToChild(
           JSON.stringify({
             jsonrpc: "2.0",
             id: msg.id,
@@ -189,6 +313,7 @@ export class AgentSidecar {
       const pending = this.pending.get(String(msg.id));
       if (pending) {
         this.pending.delete(String(msg.id));
+        if (pending.timer) clearTimeout(pending.timer);
         if (msg.error) {
           const err = new Error(msg.error.message) as Error & {
             code?: number;
@@ -210,37 +335,49 @@ export class AgentSidecar {
   }
 
   onNotification(handler: SidecarNotificationHandler): () => void {
+    if (this.closed) return () => undefined;
     this.handlers.add(handler);
     return () => this.handlers.delete(handler);
   }
 
   async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+    if (this.closed) throw new Error("agent sidecar is unavailable");
     const id = randomUUID();
+    const timeoutMs = rpcTimeoutMs(method, params);
     const payload = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, {
         resolve: resolve as (v: any) => void,
         reject,
       });
-      this.child.stdin.write(payload, (err) => {
-        if (err) {
-          this.pending.delete(id);
-          reject(err);
-        }
-      });
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
-          reject(new Error(`sidecar RPC timeout: ${method}`));
-        }
-      }, 130_000);
+      const settle = (settleWith: (pending: {
+        resolve: (v: any) => void;
+        reject: (e: Error) => void;
+        timer?: ReturnType<typeof setTimeout>;
+      }) => void) => {
+        const pending = this.pending.get(id);
+        if (!pending) return;
+        this.pending.delete(id);
+        if (pending.timer) clearTimeout(pending.timer);
+        settleWith(pending);
+      };
+      if (!this.writeToChild(payload)) {
+        settle((pending) => pending.reject(new Error("agent sidecar stdin is unavailable")));
+      }
+      if (timeoutMs !== undefined) {
+        const timer = setTimeout(() => {
+          settle((pending) => pending.reject(new Error(`sidecar RPC timeout: ${method}`)));
+        }, timeoutMs);
+        const pending = this.pending.get(id);
+        if (pending) pending.timer = timer;
+      }
     });
   }
 
   async dispose(): Promise<void> {
     this.disposed = true;
-    this.unsubscribeHost?.();
-    this.rejectAllPending(new Error("agent sidecar disposed"));
+    this.closeTransport(new Error("agent sidecar disposed"));
+    this.exitHandlers.clear();
     this.child.kill();
   }
 }

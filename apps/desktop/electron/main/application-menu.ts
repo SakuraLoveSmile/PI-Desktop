@@ -128,12 +128,6 @@ export function buildApplicationMenuTemplate({
       submenu: [
         appCommand(labels.menu.search, "openSearch", dispatch, accelerator("openSearch")),
         appCommand(
-          labels.menu.commandPalette,
-          "openCommandPalette",
-          dispatch,
-          accelerator("openCommandPalette"),
-        ),
-        appCommand(
           labels.menu.toggleSidebar,
           "toggleSidebar",
           dispatch,

@@ -25,6 +25,14 @@ Provide a permission–capability–risk–default-policy reference table for re
 - `agent.tool.register` is required to contribute agentTools
 - When `fs.write.workspace` is present, it is recommended to also declare `fs.read.workspace`
 
+## 3A. Plan operating-state rule
+
+Every `agentTools` contribution is denied in Plan, regardless of this matrix's
+risk or default policy. `agent.tool.register` authorizes registration for
+Agent, not visibility in Plan. The host returns `PLUGIN_DISABLED_IN_PLAN` for a
+direct Plan call and records the denial. Plugin tools become eligible only
+after the same Agent is approved into Agent mode.
+
 ## 4. Permission display copy
 
 English is the primary copy. The zh-CN column holds the localized example strings.

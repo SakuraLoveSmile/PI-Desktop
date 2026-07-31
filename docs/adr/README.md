@@ -47,4 +47,12 @@ Each ADR includes:
 | 0029 | Separate native-window and work-panel resize ownership | Superseded in part by 0032 |
 | 0030 | Turn-boundary context checkpoint compaction | Accepted |
 | 0031 | Keep composer prompt rows free of brand icons | Accepted |
-| 0032 | Reserve native width for the docked work panel | Accepted |
+| 0032 | Reserve native width for the docked work panel | Accepted (superseded in part by 0033) |
+| 0033 | Internal-dock work panel (no native window expansion) | Accepted |
+| 0034 | Merge command palette into global search | Accepted |
+| 0035 | Surface the OS locale through the preload bridge | Accepted |
+| 0036 | Split Settings into AI and Shortcuts destinations | Accepted |
+| 0037 | Resolve project instructions in Electron main | Accepted |
+| 0038 | Plan operating state and approval boundary | Superseded by 0039 |
+| 0039 | Plan checkpoint artifact, approval, and execution epoch | Accepted for implementation |
+| 0040 | Selectable command shell catalog and execution identity | Accepted for implementation |

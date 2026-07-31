@@ -26,10 +26,9 @@ test("user turns keep a compact right-aligned plate", () => {
     /\.message-row\.user \.message-col \{[\s\S]*?max-width:\s*min\(82%,\s*600px\);[\s\S]*?align-items:\s*flex-end;/,
   );
   // The wrap constraint lives on the column alone; the bubble fills it.
-  // Stacked percentage max-widths previously wrapped prompts at ~60% width.
   assert.match(
     userBubbleStyles,
-    /max-width:\s*100%;[\s\S]*?background:\s*color-mix\(in oklab,\s*var\(--ds-text-primary\) 7%,\s*transparent\);[\s\S]*?border:\s*1px solid color-mix\(in oklab,\s*var\(--ds-text-primary\) 5%,\s*transparent\);/,
+    /max-width:\s*100%;[\s\S]*?background:\s*color-mix\(in oklab,\s*var\(--ds-text-primary\) 8%,\s*transparent\);/,
   );
   assert.doesNotMatch(userBubbleStyles, /var\(--ds-accent\)/);
 });
@@ -45,17 +44,20 @@ test("assistant turns stay transparent full-width prose", () => {
   );
   assert.match(
     stylesSource,
-    /\.message-row\.assistant \.message-col[\s\S]*?width:\s*min\(100%,\s*720px\);/,
+    /\.message-row\.assistant[\s\S]*?\.message-col[\s\S]*?width:\s*min\(100%,\s*720px\);/,
   );
   assert.match(
     stylesSource,
-    /\.message-row\.assistant \.message-bubble\.streaming \{[\s\S]*?border-left:\s*2px solid/,
+    /\.message-row\.assistant-turn\.streaming \.message-col\s*\{[\s\S]*?border-left-color:/,
   );
 });
 
 test("transcript density and hover actions are quiet", () => {
-  assert.match(stylesSource, /\.message-row \{[\s\S]*?padding:\s*10px 0;/);
-  assert.match(stylesSource, /\.thread-content \{[\s\S]*?padding:\s*20px 28px 228px;/);
+  assert.match(stylesSource, /\.message-row \{[\s\S]*?padding:\s*12px 0;/);
+  assert.match(
+    stylesSource,
+    /\.thread-content \{[\s\S]*?padding:\s*20px 28px calc\(var\(--composer-dock-height, 228px\) \+ 16px\);/,
+  );
   assert.match(
     stylesSource,
     /\.message-actions \{[\s\S]*?opacity:\s*0;[\s\S]*?\.message-row:hover \.message-actions/,
@@ -219,7 +221,7 @@ test("conversation minimap stays centered below titlebar at high density", () =>
   );
   assert.match(
     stylesSource,
-    /\.minimap-rail \{[\s\S]*?top:\s*var\(--ds-toolbar-height\);[\s\S]*?bottom:\s*200px;[\s\S]*?justify-content:\s*center;/,
+    /\.minimap-rail \{[\s\S]*?top:\s*var\(--ds-toolbar-height\);[\s\S]*?bottom:\s*calc\(var\(--composer-dock-height, 200px\) \+ 16px\);[\s\S]*?justify-content:\s*center;/,
   );
   assert.match(
     stylesSource,

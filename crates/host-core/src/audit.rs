@@ -5,13 +5,32 @@ use serde_json::Value;
 use crate::db::{now_ms, Database};
 
 pub fn append(db: &Database, kind: &str, session_id: Option<&str>, payload: Value) -> Result<()> {
-    // Redact obvious secrets in payload serialization path (best-effort)
+    append_to(db.conn(), kind, session_id, payload)
+}
+
+/// Append using an existing transaction so security-relevant state changes
+/// and their audit record commit or roll back together.
+pub fn append_tx(
+    tx: &rusqlite::Transaction<'_>,
+    kind: &str,
+    session_id: Option<&str>,
+    payload: Value,
+) -> Result<()> {
+    append_to(tx, kind, session_id, payload)
+}
+
+fn append_to(
+    conn: &rusqlite::Connection,
+    kind: &str,
+    session_id: Option<&str>,
+    payload: Value,
+) -> Result<()> {
+    // Redact obvious secrets in payload serialization path (best-effort).
     let redacted = redact_value(payload);
-    db.conn()
-        .prepare_cached(
-            "INSERT INTO audit_log (ts, kind, session_id, payload_json) VALUES (?1, ?2, ?3, ?4)",
-        )?
-        .execute(params![now_ms(), kind, session_id, redacted.to_string()])?;
+    conn.prepare_cached(
+        "INSERT INTO audit_log (ts, kind, session_id, payload_json) VALUES (?1, ?2, ?3, ?4)",
+    )?
+    .execute(params![now_ms(), kind, session_id, redacted.to_string()])?;
     Ok(())
 }
 

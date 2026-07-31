@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type AnimationEvent as ReactAnimationEvent,
   type ErrorInfo,
   type ReactNode,
 } from "react";
@@ -21,9 +22,9 @@ import {
   type ShortcutPlatform,
 } from "@pi-desktop/shared";
 import { Sidebar } from "./components/Sidebar";
+import { ConversationTopbar } from "./components/ConversationTopbar";
 import { WorkPanel } from "./components/workpanel/WorkPanel";
 import { ChatSurface } from "./components/ChatSurface";
-import { CommandPalette } from "./components/CommandPalette";
 import { SearchDialog } from "./components/SearchDialog";
 import { ToastHost } from "./components/Toast";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -151,6 +152,7 @@ function AppShell() {
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const showToast = useAppStore((s) => s.showToast);
   const handleAgentEvent = useAppStore((s) => s.handleAgentEvent);
+  const handlePlansChanged = useAppStore((s) => s.handlePlansChanged);
   const abort = useAppStore((s) => s.abort);
   const settings = useAppStore((s) => s.settings);
   const workspace = useAppStore((s) => s.workspace);
@@ -159,9 +161,31 @@ function AppShell() {
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
   const workPanelWidth = useAppStore((s) => s.workPanelWidth);
 
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarExiting, setSidebarExiting] = useState(false);
+  const toggleSidebar = () => {
+    if (sidebarCollapsed) {
+      setSidebarExiting(false);
+      setSidebarCollapsed(false);
+    } else {
+      setSidebarExiting(true);
+      setSidebarCollapsed(true);
+    }
+  };
+  const handleSidebarAnimationEnd = (event: ReactAnimationEvent<HTMLElement>) => {
+    if (event.target !== event.currentTarget) return;
+    if (!sidebarExiting) return;
+    if (!event.animationName.startsWith("sidebar-out")) return;
+    setSidebarExiting(false);
+  };
+
+  // Fallback in case animationend is skipped (e.g. display:none mid-flight).
+  useEffect(() => {
+    if (!sidebarExiting) return;
+    const timer = window.setTimeout(() => setSidebarExiting(false), 240);
+    return () => window.clearTimeout(timer);
+  }, [sidebarExiting]);
   const [presentedWorkPanelOpen, setPresentedWorkPanelOpen] = useState(false);
   const [workPanelExiting, setWorkPanelExiting] = useState(false);
   const workPanelReservationRequest = useRef(0);
@@ -220,7 +244,11 @@ function AppShell() {
       workPanelExitClosing.current = false;
       workPanelExitingRef.current = false;
       setWorkPanelExiting(false);
-      const requestedWidth = Math.round(workPanelWidth);
+      // Internal-dock redesign (ADR 0033): the work panel is a flex column
+      // inside the fixed client area, so it never expands the OS window. The
+      // native reservation target is therefore always 0; the native browser
+      // view still follows the renderer-measured panel rect via browserSetBounds.
+      const requestedWidth = 0;
       void commitWorkPanelPresentation({
         reservation: api.setWorkPanelReservation(requestedWidth),
         isCurrent: () => request === workPanelReservationRequest.current,
@@ -279,10 +307,10 @@ function AppShell() {
             setSearchOpen(true);
             break;
           case "openCommandPalette":
-            setPaletteOpen(true);
+            setSearchOpen(true);
             break;
           case "toggleSidebar":
-            setSidebarCollapsed((value) => !value);
+            toggleSidebar();
             break;
           case "openHelp":
             store.setSettingsTab("about");
@@ -370,6 +398,7 @@ function AppShell() {
   useEffect(() => {
     void bootstrap();
     const offEvent = api.onAgentEvent(handleAgentEvent);
+    const offPlansChanged = api.onPlansChanged(handlePlansChanged);
     // Host-pushed toasts (plugin runtime etc.) are informational.
     const offToast = api.onToast((message) => showToast(message));
     // Agent-driven HTML preview: surface the browser tab when the agent
@@ -471,10 +500,10 @@ function AppShell() {
             setSearchOpen(true);
             break;
           case "openCommandPalette":
-            setPaletteOpen(true);
+            setSearchOpen(true);
             break;
           case "toggleSidebar":
-            setSidebarCollapsed((value) => !value);
+            toggleSidebar();
             break;
           case "abort":
             void abort();
@@ -495,6 +524,7 @@ function AppShell() {
     window.addEventListener("keydown", onKey);
     return () => {
       offEvent();
+      offPlansChanged();
       offToast();
       offBrowserPreview();
       offHostStatus();
@@ -505,6 +535,7 @@ function AppShell() {
   }, [
     bootstrap,
     handleAgentEvent,
+    handlePlansChanged,
     showToast,
     abort,
     t,
@@ -848,7 +879,6 @@ function AppShell() {
             <SettingsPage />
           </Suspense>
           <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
-          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
           <ToastHost />
           <UpdateBanner />
         </>
@@ -857,31 +887,43 @@ function AppShell() {
       shell = (
         <>
           <WindowControls />
-          {!sidebarCollapsed && (
+          {!sidebarCollapsed || sidebarExiting ? (
             <Sidebar
+              className={sidebarExiting ? "is-exiting" : undefined}
+              onAnimationEnd={handleSidebarAnimationEnd}
               onOpenSearch={() => setSearchOpen(true)}
-              onToggleSidebar={() => setSidebarCollapsed(true)}
+              onToggleSidebar={toggleSidebar}
               sidebarToggleShortcut={sidebarToggleShortcut}
             />
-          )}
+          ) : null}
 
           <section className="main-pane">
-            <div
-              className={cx(
-                "main-titlebar",
-                presentedWorkPanelOpen && "work-panel-open",
-              )}
-            >
-              {sidebarCollapsed && (
-                <div className="main-titlebar-left no-drag">
-                  <CollapsedTitlebarActions
-                    onToggleSidebar={() => setSidebarCollapsed(false)}
-                    onNewTask={() => void runMenuCommand("newTask")}
-                    sidebarToggleShortcut={sidebarToggleShortcut}
-                  />
-                </div>
-              )}
-            </div>
+            {page === "chat" ? (
+              <ConversationTopbar
+                sidebarCollapsed={sidebarCollapsed}
+                workPanelOpen={presentedWorkPanelOpen}
+                onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+                onNewTask={() => void runMenuCommand("newTask")}
+                onOpenSearch={() => setSearchOpen(true)}
+              />
+            ) : (
+              <div
+                className={cx(
+                  "main-titlebar",
+                  presentedWorkPanelOpen && "work-panel-open",
+                )}
+              >
+                {sidebarCollapsed && (
+                  <div className="main-titlebar-left no-drag">
+                    <CollapsedTitlebarActions
+                      onToggleSidebar={() => setSidebarCollapsed(false)}
+                      onNewTask={() => void runMenuCommand("newTask")}
+                      sidebarToggleShortcut={sidebarToggleShortcut}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
             <UpdateBanner />
 
             {backendDown && (
@@ -926,7 +968,7 @@ function AppShell() {
 
           {(presentedWorkPanelOpen || workPanelExiting) && (
             <WorkPanel
-              browserBlocked={paletteOpen || searchOpen}
+              browserBlocked={searchOpen}
               exiting={workPanelExiting}
               onExitAnimationEnd={() =>
                 finishWorkPanelExit(workPanelExitGeneration.current)
@@ -936,7 +978,6 @@ function AppShell() {
           )}
 
           <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
-          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
           <ToastHost />
         </>
       );

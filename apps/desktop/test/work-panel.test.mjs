@@ -51,14 +51,13 @@ test("work panel replaces the context panel overlay", async () => {
   assert.doesNotMatch(appSource, /key\.toLowerCase\(\) === "j"/);
 });
 
-test("work panel reserves native window space before it is presented", () => {
+test("work panel is an internal dock that never expands the OS window", () => {
   assert.match(appSource, /presentedWorkPanelOpen/);
   assert.match(appSource, /setPresentedWorkPanelOpen/);
   assert.match(appSource, /workPanelExiting/);
-  assert.match(
-    appSource,
-    /requestedWidth\s*=\s*Math\.round\(workPanelWidth\)/,
-  );
+  // Internal-dock redesign (ADR 0033): the panel occupies client-area space
+  // and never reserves native window width, so the reservation target is 0.
+  assert.match(appSource, /requestedWidth\s*=\s*0/);
   assert.match(appSource, /setWorkPanelReservation\(requestedWidth\)/);
   assert.ok(
     appSource.indexOf("setWorkPanelReservation(requestedWidth)") <
@@ -87,7 +86,7 @@ test("work panel reserves native window space before it is presented", () => {
   assert.match(panelSource, /exitAnimationReady && "is-exiting"/);
   assert.match(panelSource, /if \(!exitAnimationReady\) return/);
   assert.match(panelSource, /animationName\.startsWith\("work-panel-out"\)/);
-  // The panel remains a fixed-width shell sibling after the native window grows.
+  // The panel remains a fixed-width in-flow shell sibling; the window never grows.
   assert.match(globalStyles, /\.work-panel \{[^}]*flex: 0 0 auto/s);
   assert.doesNotMatch(
     globalStyles.match(/\.work-panel \{[^}]*\}/s)?.[0] ?? "",
@@ -107,49 +106,49 @@ test("work panel reserves native window space before it is presented", () => {
 
 test("work panel activity rail exposes tools and keeps resources in a switcher", () => {
   const headerIndex = panelSource.indexOf('className="work-panel-header"');
-  const railIndex = panelSource.indexOf('className="work-panel-rail no-drag"');
-  const switcherIndex = panelSource.indexOf('className="work-panel-switcher-trigger"');
+  const contextIndex = panelSource.indexOf('className="work-panel-context no-drag"');
+  const actionsIndex = panelSource.indexOf('className="work-panel-actions no-drag"');
   const bodyIndex = panelSource.indexOf('<div className="work-panel-body">');
 
-  assert.ok(railIndex > -1 && headerIndex > railIndex && switcherIndex > headerIndex);
-  assert.ok(bodyIndex > headerIndex);
-  assert.match(panelSource, /HEADER_TOOLS\.map\(\(\{ kind, Icon \}\) =>/);
-  assert.match(panelSource, /"work-panel-rail-button"/);
-  assert.match(panelSource, /aria-pressed=\{selected\}/);
+  assert.ok(contextIndex > headerIndex);
+  assert.ok(actionsIndex > contextIndex && bodyIndex > actionsIndex);
+  assert.match(panelSource, /HEADER_TOOLS\.map\(\(\{ kind, Icon \}/);
+  assert.match(panelSource, /"work-panel-create-item"/);
+  assert.match(panelSource, /aria-expanded=\{contextOpen\}/);
   assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
   assert.match(panelSource, /function headerToolTab\(kind: HeaderToolKind\): WorkPanelTab/);
   assert.match(panelSource, /if \(kind === "file"\) return \{ id: "file", kind \}/);
   assert.match(panelSource, /openWorkPanelTab\(headerToolTab\(kind\)\)/);
   assert.match(panelSource, /tabs\.map\(\(tab, index\) =>/);
-  assert.match(panelSource, /className="work-panel-switcher-menu"/);
+  assert.match(panelSource, /className="work-panel-context-menu"/);
   assert.match(panelSource, /id=\{activeTab \? `work-panel-title-\$\{activeTab\.id\}`/);
   assert.match(panelSource, /role="menuitemradio"/);
   assert.match(panelSource, /aria-checked=\{selected\}/);
   assert.match(panelSource, /data-work-panel-switch-item/);
   assert.match(panelSource, /data-work-panel-menu-item/);
   assert.match(panelSource, /role="tabpanel"/);
-  assert.match(panelSource, /className="work-panel-current-close no-drag"/);
+  assert.match(panelSource, /className="work-panel-current-close"/);
   assert.match(panelSource, /className="work-panel-switcher-close"/);
   assert.match(panelSource, /closeTab\(tab\.id\)/);
   assert.doesNotMatch(panelSource, /collapsePanel/);
   assert.doesNotMatch(panelSource, /work-panel-collapse/);
   assert.match(panelSource, /onCollapse/);
-  assert.match(panelSource, /work-panel-rail-collapse/);
+  assert.match(panelSource, /work-panel-toolbar-collapse/);
   assert.match(panelSource, /data-work-panel-section="current"/);
   assert.match(panelSource, /panel\.openTool/);
   assert.match(panelSource, /panel\.openItems/);
   assert.match(
     panelSource,
-    /blocked=\{[\s\S]*exiting \|\| browserBlocked \|\| switcherOpen \|\| dragWidth !== null[\s\S]*\}/,
+    /blocked=\{[\s\S]*exiting \|\| browserBlocked \|\| contextOpen \|\| dragWidth !== null[\s\S]*\}/,
   );
   assert.doesNotMatch(panelSource, /onContextMenu|createPortal|work-panel-tools-menu/);
   assert.match(
     globalStyles,
-    /\.work-panel-rail \{[^}]*width:\s*44px;[^}]*flex-direction:\s*column;/s,
+    /\.work-panel-context-menu \{[^}]*position:\s*absolute;[^}]*min-width:/s,
   );
   assert.match(
     globalStyles,
-    /\.work-panel-switcher-menu \{[^}]*position:\s*absolute;[^}]*max-height:/s,
+    /\.work-panel-context-menu \{[^}]*position:\s*absolute;[^}]*max-height:/s,
   );
   assert.doesNotMatch(globalStyles, /\.work-panel-tabs\s*\{/);
 });
@@ -167,7 +166,7 @@ test("work panel starts closed with no tabs and persists width only", () => {
 
 test("work panel resizing is independent from the chat viewport", () => {
   assert.equal(MAIN_PANE_MIN_WIDTH, 360);
-  assert.equal(WORK_PANEL_MIN_WIDTH, 364);
+  assert.equal(WORK_PANEL_MIN_WIDTH, 244);
   assert.equal(WORK_PANEL_MAX_WIDTH, 720);
   assert.match(panelSource, /clampWorkPanelWidth\(width\)/);
   assert.match(panelSource, /workPanelWidthLimits\(\)/);
@@ -332,7 +331,8 @@ test("background panel updates do not replace or resize the visible session", ()
   assert.ok(openForSessionBlock, "session-scoped tab action exists");
   assert.match(
     openForSessionBlock,
-    /pendingSessionSelection === null && state\.activeSessionId === sessionId/,
+    /const affectsVisibleSession\s*=\s*state\.activeSessionId\s*===\s*sessionId\s*&&\s*\(\s*pendingSessionSelection\s*===\s*null\s*\|\|\s*pendingSessionSelection\.id\s*===\s*sessionId\s*\)/,
+    "visible-session updates require the active session and matching pending selection",
   );
   assert.match(openForSessionBlock, /workPanelContexts/);
   assert.match(openForSessionBlock, /openWorkPanelTabState/);

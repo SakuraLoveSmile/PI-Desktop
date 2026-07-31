@@ -4,7 +4,7 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { en, zhCN, flattenCatalog, resolveLocale } from "@pi-desktop/i18n";
 import App from "./App";
-import { initLanguageSync } from "./lib/app-language";
+import { initLanguageSync, resolveOsLocale } from "./lib/app-language";
 import "./styles/globals.css";
 
 document.documentElement.dataset.theme = "dark";
@@ -13,7 +13,7 @@ document.documentElement.dataset.theme = "dark";
 document.documentElement.dataset.platform =
   window.piDesktop?.platform ?? "darwin";
 
-const locale = resolveLocale(navigator.language || (navigator as any).userLanguage);
+const locale = resolveLocale(resolveOsLocale());
 
 void i18n.use(initReactI18next).init({
   lng: locale,

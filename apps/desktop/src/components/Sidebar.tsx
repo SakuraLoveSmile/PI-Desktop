@@ -4,9 +4,11 @@ import {
   useMemo,
   useRef,
   useState,
+  type AnimationEventHandler as ReactAnimationEventHandler,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { cx } from "./ui";
 
 // --- Time-based session grouping ---
 type TimeGroup = "today" | "yesterday" | "thisWeek" | "older14d" | "archived";
@@ -30,6 +32,7 @@ function getTimeGroup(dateStr?: string): TimeGroup {
 const TIME_GROUP_ORDER: TimeGroup[] = ["today", "yesterday", "thisWeek", "older14d", "archived"];
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { api } from "../lib/api";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import { normalizeProjectPath } from "../lib/sidebar-session-groups";
 import {
@@ -88,6 +91,9 @@ type ProjectPathTooltip = {
   top: number;
   left: number;
 };
+
+const FLOATING_MENU_WIDTH = 184;
+const VIEWPORT_PADDING = 8;
 
 function projectName(path: string, fallback?: string) {
   if (fallback?.trim()) return fallback.trim();
@@ -171,10 +177,14 @@ export function Sidebar({
   onOpenSearch,
   onToggleSidebar,
   sidebarToggleShortcut,
+  className,
+  onAnimationEnd,
 }: {
   onOpenSearch: () => void;
   onToggleSidebar: () => void;
   sidebarToggleShortcut: string;
+  className?: string;
+  onAnimationEnd?: ReactAnimationEventHandler<HTMLElement>;
 }) {
   const { t } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
@@ -224,7 +234,11 @@ export function Sidebar({
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
   const [projectMenu, setProjectMenu] = useState<string | null>(null);
   const [sectionMenu, setSectionMenu] = useState<"sessions" | "projects" | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left?: number;
+    right?: number;
+  } | null>(null);
   const [projectPathTooltip, setProjectPathTooltip] = useState<ProjectPathTooltip | null>(null);
   const [visibleTimeGroups, setVisibleTimeGroups] = useState<Record<string, Set<TimeGroup>>>({});
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -261,20 +275,31 @@ export function Sidebar({
   const placeMenu = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setMenuPosition({
-      top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 220)),
-      right: Math.max(8, window.innerWidth - rect.right),
+      top: Math.max(
+        VIEWPORT_PADDING,
+        Math.min(rect.bottom + 4, window.innerHeight - 220),
+      ),
+      right: Math.max(VIEWPORT_PADDING, window.innerWidth - rect.right),
     });
   }, []);
 
-  // Context-menu variant: anchor to the pointer. The menu is positioned by
-  // its right edge, so keep that edge far enough from the left border for
-  // the 184px menu to stay on screen.
+  // Context menus open to the pointer's right. At the viewport edge, clamp
+  // their left edge so the complete menu remains visible.
   const placeMenuAtPoint = useCallback((x: number, y: number) => {
     setMenuPosition({
-      top: Math.max(8, Math.min(y + 4, window.innerHeight - 220)),
-      right: Math.min(
-        Math.max(8, window.innerWidth - x),
-        Math.max(8, window.innerWidth - 192),
+      top: Math.max(
+        VIEWPORT_PADDING,
+        Math.min(y + 4, window.innerHeight - 220),
+      ),
+      left: Math.max(
+        VIEWPORT_PADDING,
+        Math.min(
+          x + 4,
+          Math.max(
+            VIEWPORT_PADDING,
+            window.innerWidth - FLOATING_MENU_WIDTH - VIEWPORT_PADDING,
+          ),
+        ),
       ),
     });
   }, []);
@@ -401,7 +426,7 @@ export function Sidebar({
     const index = THEME_ORDER.indexOf(current.theme as ThemeChoice);
     const next = THEME_ORDER[(index + 1) % THEME_ORDER.length];
     try {
-      await (await import("../lib/api")).api.setSettings({ ...current, theme: next });
+      await api.setSettings({ ...current, theme: next });
       useAppStore.setState({ settings: { ...current, theme: next } });
     } catch { /* ignore */ }
   }, []);
@@ -817,7 +842,7 @@ export function Sidebar({
   const openProjectFolder = async (entry: ProjectEntry) => {
     closeMenus(false);
     try {
-      await (await import("../lib/api")).api.openProjectFolder(entry.path);
+      await api.openProjectFolder(entry.path);
     } catch (error) {
       reportError(error);
     }
@@ -1172,7 +1197,11 @@ export function Sidebar({
           role="menu"
           data-sidebar-section-menu={sectionMenu}
           onKeyDown={onMenuKeyDown}
-          style={{ top: menuPosition.top, right: menuPosition.right }}
+          style={{
+            top: menuPosition.top,
+            right: menuPosition.right,
+            left: menuPosition.left,
+          }}
         >
           <button
             ref={menuFirstItemRef}
@@ -1198,7 +1227,11 @@ export function Sidebar({
           className="sidebar-popover sidebar-sort-menu sidebar-floating-menu"
           role="menu"
           onKeyDown={onMenuKeyDown}
-          style={{ top: menuPosition.top, right: menuPosition.right }}
+          style={{
+            top: menuPosition.top,
+            right: menuPosition.right,
+            left: menuPosition.left,
+          }}
         >
           <div className="sidebar-popover-title">
             {t("nav.sortSessions", { defaultValue: "Sort sessions" })}
@@ -1230,7 +1263,11 @@ export function Sidebar({
         className="sidebar-row-menu sidebar-floating-menu"
         role="menu"
         onKeyDown={onMenuKeyDown}
-        style={{ top: menuPosition.top, right: menuPosition.right }}
+        style={{
+          top: menuPosition.top,
+          right: menuPosition.right,
+          left: menuPosition.left,
+        }}
       >
         {session ? (
           <>
@@ -1369,7 +1406,10 @@ export function Sidebar({
   };
 
   return (
-    <aside className="sidebar">
+    <aside
+      className={cx("sidebar", className)}
+      onAnimationEnd={onAnimationEnd}
+    >
       <div className="sidebar-header">
         <button
           type="button"
@@ -1570,7 +1610,7 @@ export function Sidebar({
               }
               void (async () => {
                 try {
-                  await (await import("../lib/api")).api.updatesCheck();
+                  await api.updatesCheck();
                 } catch { /* ignore */ }
               })();
             }}

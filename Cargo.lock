@@ -392,7 +392,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "host-core"
-version = "0.2.9"
+version = "0.2.11"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -402,6 +402,7 @@ dependencies = [
  "globset",
  "hex",
  "ignore",
+ "libc",
  "rand",
  "regex",
  "rusqlite",
@@ -415,6 +416,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "walkdir",
+ "windows-sys",
 ]
 
 [[package]]

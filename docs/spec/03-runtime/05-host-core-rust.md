@@ -14,13 +14,18 @@ It does **not** replace pi. It provides safe host capabilities to:
 
 1. Workspace path canonicalization and boundary checks
 2. Builtin tool execution (Read/Glob/Grep/Write/Edit/Bash)
-3. Permission policy evaluation
-4. Plugin registry/install/lifecycle services
-5. Contribution registration bookkeeping (with TS side)
-6. Persistence adapters (sessions/settings metadata and the durable
-   notification inbox)
-7. Secrets storage integration points
-8. Audit logging for sensitive actions
+3. Authoritative durable session-mode and tool-policy evaluation
+4. Permission policy evaluation, including Plan Bash prompts
+5. Immutable `.pi/plan/*.md` artifact writer, `plan_approvals` broker, and
+   startup interruption fence
+6. Selectable shell catalog, identity validation, streamed output, and process
+   tree shutdown
+7. Plugin registry/install/lifecycle services
+8. Contribution registration bookkeeping (with TS side)
+9. Persistence adapters (sessions/settings metadata, `plan_approvals` artifact
+   and execution fields, and the durable notification inbox)
+10. Secrets storage integration points
+11. Audit logging for sensitive actions
 
 ## 3. Non-responsibilities
 
@@ -63,6 +68,8 @@ Domains:
 - `plugins.*`
 - `session.*` (adapter level)
 - `notification.*` (adapter level; durable inbox)
+- `plans.*` (approval broker and recovery)
+- `shell.*` (catalog and default selection)
 - `settings.*` (adapter level)
 - `secrets.*`
 - `audit.*`
@@ -71,6 +78,8 @@ Example:
 
 ```text
 tools.execute
+plans.resolve
+plans.pending
 permissions.request
 plugins.list
 plugins.load_dev
@@ -81,11 +90,20 @@ notification.list
 
 ## 6. Security invariants
 
-1. No unchecked path escape from workspace tools
-2. High-risk ops require policy decision
-3. Plugin calls pass permission gateway
-4. Secrets never returned to renderer logs
-5. Crash in plugin path should not take down host core if isolatable
+1. No unchecked path escape from workspace tools or `.pi/plan/*.md`
+2. Host resolves the durable session mode; request-supplied mode is never
+   authoritative
+3. Plan denies Write/Edit/plugin/unknown tools before permission evaluation
+4. Plan Bash follows the durable permission mode and may mutate under Auto
+5. Plan artifact bytes, path, hash, size, and approval/execution identity are
+   host-authenticated
+6. Plan approval is host-authenticated, durable, and atomic before Agent entry
+7. Effective shell ID/dialect is checked before spawn; settings reject
+   unavailable/wrong-platform IDs, and a persisted unavailable choice falls
+   back only during catalog selection
+8. Secrets never returned to renderer logs
+9. Crash in plugin, shell, or approval path fails closed and does not grant or
+   replay execution
 
 ## 7. Packaging
 
@@ -102,3 +120,16 @@ notification.list
 5. unseen completed/failed turns create exactly one durable notification
    through the `session.endTurn` transaction; results already visible in the
    focused current chat and aborted turns create none
+6. a durable Plan session cannot authorize Write/Edit/plugin tools through a
+   conflicting request mode, and Plan Bash follows the resolved permission
+   mode
+7. SubmitPlan writes exact Markdown bytes to a new `.pi/plan/*.md` artifact and
+   stores durable path/hash/size plus structured title/question in
+   `plan_approvals`; approval is approve/reject-only, session/turn/version
+   scoped, and expires at 30 absolute minutes with
+   `PLAN_APPROVAL_TIMEOUT`
+8. Pending/queued/running Plan work is interrupted on host restart with no
+   replay; approved interruptions leave the session Agent
+9. Shell selection/fallback, stale ID/dialect rejection, stdout/stderr
+   streaming, 60s timeout, bounded override, and process-tree abort are
+   host-enforced

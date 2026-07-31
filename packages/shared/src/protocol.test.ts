@@ -1,0 +1,163 @@
+import { describe, expect, it } from "vitest";
+import {
+  IPC,
+  IPC_WHITELIST,
+  PROTOCOL_VERSION,
+  SCHEMA_VERSION,
+  normalizeGlobalPermissionMode,
+  normalizeMode,
+  isCommandShellCatalog,
+  isCommandShellOption,
+  isGlobalPermissionMode,
+  isToolsOutputParams,
+  rpcTimeoutMs,
+  type PlanExecution,
+  type PlanArtifact,
+  type PlanResolveRequest,
+  type CommandShellCatalog,
+  type ToolsOutputParams,
+} from "./index.js";
+
+describe("Plan protocol contracts", () => {
+  it("uses protocol v9/schema v10 and exposes the plan and shell IPC channels", () => {
+    expect(PROTOCOL_VERSION).toBe(9);
+    expect(SCHEMA_VERSION).toBe(10);
+    expect(IPC_WHITELIST.has(IPC.invoke.plansPending)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.plansResolve)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.event.plansChanged)).toBe(true);
+    expect(IPC.invoke.commandShellList).toBe("pi-desktop/commandShell/list");
+    expect(IPC_WHITELIST.has(IPC.invoke.commandShellList)).toBe(true);
+  });
+
+  it("maps legacy Chat values to Plan while keeping Agent as fallback", () => {
+    expect(normalizeMode("chat")).toBe("plan");
+    expect(normalizeMode("plan")).toBe("plan");
+    expect(normalizeMode("agent")).toBe("agent");
+    expect(normalizeMode(undefined)).toBe("agent");
+  });
+
+  it("keeps approval actions and target permission modes typed", () => {
+    const request: PlanResolveRequest = {
+      proposalId: "proposal-1",
+      sessionId: "session-1",
+      turnId: "turn-1",
+      toolCallId: "exit-call-1",
+      action: "approve",
+      targetPermissionMode: "accept-edits",
+    };
+    expect(request).toMatchObject({
+      sessionId: "session-1",
+      turnId: "turn-1",
+      toolCallId: "exit-call-1",
+      action: "approve",
+      targetPermissionMode: "accept-edits",
+    });
+  });
+
+  it("uses durable approval statuses separately from resolution actions", () => {
+    const statuses = [
+      "pending",
+      "approved",
+      "changes_requested",
+      "rejected",
+      "expired",
+      "interrupted",
+    ] as const;
+    expect(statuses).toContain("pending");
+    expect(statuses).toContain("changes_requested");
+    expect(statuses).not.toContain("request_changes" as never);
+  });
+
+  it("normalizes the plan approval permission fallback to ask", () => {
+    expect(normalizeGlobalPermissionMode(undefined)).toBe("ask");
+    expect(normalizeGlobalPermissionMode("invalid")).toBe("ask");
+    expect(normalizeGlobalPermissionMode("ask")).toBe("ask");
+    expect(normalizeGlobalPermissionMode("accept-edits")).toBe("accept-edits");
+    expect(isGlobalPermissionMode("ask")).toBe(true);
+    expect(isGlobalPermissionMode("invalid")).toBe(false);
+  });
+
+  it("keeps the artifact and queued execution wire shapes explicit", () => {
+    const artifact: PlanArtifact = {
+      relativePath: ".pi/plans/plan.md",
+      sha256: "sha256",
+      sizeBytes: 6,
+    };
+    const execution: PlanExecution = {
+      id: "execution-1",
+      proposalId: "proposal-1",
+      sessionId: "session-1",
+      plan: "# Plan",
+      title: "Plan",
+      question: "Approve?",
+      artifact,
+      targetPermissionMode: "auto",
+      state: "queued",
+    };
+    expect(execution.artifact).toEqual(artifact);
+    expect(execution.state).toBe("queued");
+  });
+
+  it("keeps command shell catalogs path-free and output identities explicit", () => {
+    const catalog: CommandShellCatalog = {
+      configuredId: "windows-powershell",
+      effective: {
+        id: "windows-powershell",
+        label: "Windows PowerShell",
+        dialect: "powershell",
+        available: true,
+        isDefault: true,
+      },
+      fallback: false,
+      choices: [],
+    };
+    const output: ToolsOutputParams = {
+      sessionId: "session-1",
+      toolCallId: "tool-1",
+      commandShellId: "windows-powershell",
+      stream: "stdout",
+      chunk: "ok",
+    };
+    expect(catalog.effective).not.toHaveProperty("path");
+    expect(output).toMatchObject({
+      sessionId: "session-1",
+      toolCallId: "tool-1",
+      commandShellId: "windows-powershell",
+    });
+    expect(isCommandShellOption(catalog.effective)).toBe(true);
+    expect(isCommandShellCatalog(catalog)).toBe(true);
+    expect(isToolsOutputParams(output)).toBe(true);
+    expect(
+      isCommandShellOption({ ...catalog.effective, dialect: "cmd" }),
+    ).toBe(false);
+    expect(
+      isToolsOutputParams({ ...output, commandShellId: "not-a-shell" }),
+    ).toBe(false);
+  });
+
+  it("derives transport deadlines from command execution semantics", () => {
+    expect(rpcTimeoutMs("tools.execute", { toolName: "Bash" })).toBe(190_000);
+    expect(
+      rpcTimeoutMs("tools.execute", { toolName: "Bash", timeoutMs: 5_000 }),
+    ).toBe(135_000);
+    expect(
+      rpcTimeoutMs("tools.execute", { toolName: "Bash", timeoutMs: 60_000 }),
+    ).toBe(190_000);
+    expect(
+      rpcTimeoutMs("tools.execute", { toolName: "Bash", timeoutMs: 0 }),
+    ).toBe(190_000);
+    expect(
+      rpcTimeoutMs("tools.execute", {
+        toolName: "Bash",
+        timeoutMs: 2_147_483_647,
+      }),
+    ).toBe(2_147_483_647);
+    expect(rpcTimeoutMs("tools.execute", { toolName: "Read" })).toBe(130_000);
+    expect(rpcTimeoutMs("tools.execute", { toolName: "BrowserPreview" })).toBe(
+      130_000,
+    );
+    expect(rpcTimeoutMs("tools.abort", { sessionId: "s", toolCallId: "t" })).toBe(
+      130_000,
+    );
+  });
+});

@@ -5,7 +5,15 @@
  * like "主题" or "theme" can surface the tab that owns the row.
  */
 
-export type SettingsTabId = "general" | "agent" | "import" | "projects" | "about";
+export type SettingsTabId =
+  | "general"
+  | "ai"
+  | "shortcuts"
+  | "instructions"
+  | "agent"
+  | "import"
+  | "projects"
+  | "about";
 
 export type SettingsNavGroupId = "personal" | "integrations" | "system";
 
@@ -35,21 +43,46 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.appearance",
       "settings.theme",
       "settings.language",
+      "settings.defaultsTitle",
       "settings.mode",
+      "settings.commandShell",
       "settings.enterToSend",
+    ],
+  },
+  {
+    id: "ai",
+    labelKey: "settings.ai",
+    groupId: "personal",
+    keywordKeys: [
+      "settings.permissions",
+      "settings.permissionMode",
+      "settings.permissionModeAsk",
+      "settings.permissionModeAcceptEdits",
+      "settings.permissionModeAuto",
       "settings.contextCompaction",
       "settings.contextCompactionEnabled",
       "settings.contextCompactionReserve",
       "settings.contextCompactionRecent",
-      "settings.permissions",
-      "settings.permissionMode",
+    ],
+  },
+  {
+    id: "shortcuts",
+    labelKey: "settings.shortcuts",
+    groupId: "personal",
+    keywordKeys: [
       "settings.keyboard",
       "settings.shortcutAction.openSearch",
       "settings.shortcutAction.openCommandPalette",
       "settings.shortcutAction.toggleSidebar",
-      "settings.developer",
-      "settings.developerMode",
-      "settings.devTools",
+    ],
+  },
+  {
+    id: "instructions",
+    labelKey: "settings.instructions",
+    groupId: "personal",
+    keywordKeys: [
+      "settings.instructionsGlobal",
+      "settings.instructionsPath",
     ],
   },
   {
@@ -91,7 +124,14 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     id: "about",
     labelKey: "settings.about",
     groupId: "system",
-    keywordKeys: ["settings.application", "settings.logs", "updates.title"],
+    keywordKeys: [
+      "settings.application",
+      "settings.logs",
+      "updates.title",
+      "settings.developer",
+      "settings.developerMode",
+      "settings.devTools",
+    ],
   },
 ];
 

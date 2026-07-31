@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { useTranslation } from "react-i18next";
 import type {
   AppSettings,
+  AgentInstructionFile,
+  CommandShellCatalog,
+  CommandShellId,
   GlobalPermissionMode,
   ShortcutPlatform,
 } from "@pi-desktop/shared";
@@ -9,6 +12,7 @@ import { DEFAULT_CONTEXT_COMPACTION_SETTINGS } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import type { ImportCandidate } from "../lib/api";
+import { resolveAppLanguage } from "../lib/app-language";
 import { useUpdateState } from "../lib/use-update-state";
 import {
   DEFAULT_IMPORT_GROUP_BY,
@@ -26,11 +30,18 @@ import {
   IconArchive,
   IconBot,
   IconChevronLeft,
+  IconCircleCheck,
   IconDownload,
   IconFileText,
+  IconGlobe,
   IconInfo,
+  IconKeyboard,
+  IconMonitor,
+  IconMoon,
   IconSearch,
   IconSliders,
+  IconSparkles,
+  IconSun,
 } from "../components/icons";
 import { ProvidersSection } from "../components/settings/ProvidersSection";
 import { KeyboardShortcutsSection } from "../components/settings/KeyboardShortcutsSection";
@@ -85,6 +96,209 @@ function SettingsCard({
       {title ? <h3 className="settings-card-heading">{title}</h3> : null}
       <div className="settings-panel">{children}</div>
     </section>
+  );
+}
+
+function CommandShellRow({
+  settings,
+  saveSettings,
+}: {
+  settings: AppSettings;
+  saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [catalog, setCatalog] = useState<CommandShellCatalog | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [selectedOverride, setSelectedOverride] =
+    useState<CommandShellId | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .listCommandShells()
+      .then((next) => {
+        if (cancelled) return;
+        setCatalog(next);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedId =
+    selectedOverride ??
+    catalog?.configuredId ??
+    catalog?.effective?.id ??
+    settings.defaultCommandShell ??
+    "";
+  const configuredChoice = catalog?.choices.find(
+    (choice) => choice.id === catalog.configuredId,
+  );
+  const effectiveChoice = catalog?.effective;
+
+  let effectiveStatus: string | null = null;
+  if (catalog && !effectiveChoice && catalog.choices.length > 0) {
+    effectiveStatus = t("settings.commandShellNoEffective");
+  } else if (catalog && effectiveChoice) {
+    if (!catalog.configuredId) {
+      effectiveStatus = t("settings.commandShellDefault", {
+        shell: effectiveChoice.label,
+      });
+    } else if (
+      catalog.fallback ||
+      catalog.configuredId !== effectiveChoice.id ||
+      configuredChoice?.available === false
+    ) {
+      effectiveStatus = t("settings.commandShellFallback", {
+        shell: effectiveChoice.label,
+      });
+    } else {
+      effectiveStatus = t("settings.commandShellConfigured", {
+        shell: configuredChoice?.label ?? effectiveChoice.label,
+      });
+    }
+  }
+
+  const onChange = async (value: string) => {
+    if (!catalog || saving) return;
+    const choice = catalog.choices.find((candidate) => candidate.id === value);
+    if (!choice || !choice.available) return;
+    setSaving(true);
+    setSaveError(false);
+    setSelectedOverride(choice.id);
+    try {
+      await saveSettings({ defaultCommandShell: choice.id });
+      setCatalog((current) =>
+        current
+          ? {
+              ...current,
+              configuredId: choice.id,
+              effective: choice,
+              fallback: false,
+            }
+          : current,
+      );
+    } catch {
+      setSelectedOverride(null);
+      setSaveError(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <SettingsRow
+      title={t("settings.commandShell")}
+      description={t("settings.commandShellDesc")}
+    >
+      <div
+        className="settings-command-shell-control"
+        aria-busy={saving || (!catalog && !loadError)}
+      >
+        {!catalog ? (
+          <span className="settings-command-shell-state" role="status">
+            {loadError
+              ? t("settings.commandShellLoadError")
+              : t("settings.commandShellLoading")}
+          </span>
+        ) : catalog.choices.length === 0 ? (
+          <span className="settings-command-shell-state" role="status">
+            {t("settings.commandShellNoChoices")}
+          </span>
+        ) : (
+          <Select
+            className="settings-command-shell-select"
+            value={selectedId}
+            disabled={saving}
+            aria-label={t("settings.commandShell")}
+            onChange={(event) => void onChange(event.target.value)}
+          >
+            {catalog.choices.map((choice) => (
+              <option key={choice.id} value={choice.id} disabled={!choice.available}>
+                {choice.label}
+                {!choice.available
+                  ? ` - ${t("settings.commandShellUnavailable")}`
+                  : ""}
+              </option>
+            ))}
+          </Select>
+        )}
+        {effectiveStatus ? (
+          <span className="settings-command-shell-status">{effectiveStatus}</span>
+        ) : null}
+        {saveError ? (
+          <span className="settings-command-shell-state error" role="status">
+            {t("settings.commandShellSaveError")}
+          </span>
+        ) : null}
+      </div>
+    </SettingsRow>
+  );
+}
+
+function AgentInstructionsSection() {
+  const { t } = useTranslation();
+  const [global, setGlobal] = useState<AgentInstructionFile | null>(null);
+  const [globalDraft, setGlobalDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api.getAgentInstructions().then((result) => {
+      if (cancelled) return;
+      setGlobal(result.global);
+      setGlobalDraft(result.global.content);
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const result = await api.saveAgentInstructions("global", globalDraft);
+      setGlobal(result.file);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const globalDirty = global !== null && globalDraft !== global.content;
+  return (
+    <div className="settings-stack">
+      <SettingsCard title={t("settings.instructionsGlobal")}>
+        <div className="settings-form-grid">
+          <div className="settings-row-copy">
+            <div className="settings-row-desc">{t("settings.instructionsGlobalDesc")}</div>
+            <div className="settings-instruction-path">{global?.path ?? ""}</div>
+          </div>
+          <textarea
+            className="field-textarea settings-instruction-editor"
+            value={globalDraft}
+            onChange={(event) => setGlobalDraft(event.target.value)}
+            aria-label={t("settings.instructionsGlobal")}
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+          />
+        </div>
+        <div className="settings-panel-actions">
+          <Button
+            variant="primary"
+            disabled={!globalDirty || saving}
+            onClick={() => void save()}
+          >
+            {saving ? t("settings.saving") : t("settings.instructionsSave")}
+          </Button>
+        </div>
+      </SettingsCard>
+    </div>
   );
 }
 
@@ -547,7 +761,9 @@ export function SettingsPage() {
 
   const saveSettings = async (patch: Partial<AppSettings>) => {
     if (!settings) return;
-    await api.setSettings({ ...settings, ...patch });
+    const nextSettings = { ...settings, ...patch };
+    await api.setSettings(nextSettings);
+    useAppStore.setState({ settings: nextSettings });
     await refreshProviders();
   };
   const contextCompaction = {
@@ -560,8 +776,11 @@ export function SettingsPage() {
   // are view-level.
   const navGroups: NavGroup[] = useMemo(() => {
     const iconFor: Record<SettingsTab, ReactNode> = {
-      // Semantic Lucide glyphs for the five-destination rail.
+      // Semantic Lucide glyphs for the settings destinations.
       general: <IconSliders size={14} />,
+      ai: <IconSparkles size={14} />,
+      shortcuts: <IconKeyboard size={14} />,
+      instructions: <IconFileText size={14} />,
       agent: <IconBot size={14} />,
       import: <IconDownload size={14} />,
       projects: <IconArchive size={14} />,
@@ -671,55 +890,143 @@ export function SettingsPage() {
           {tab === "general" && settings && (
             <div className="settings-stack">
               <SettingsCard title={t("settings.appearance")}>
-                <SettingsRow
-                  title={t("settings.language")}
-                  description={t("settings.languageDesc")}
-                >
-                  <select
-                    className="field-select"
-                    aria-label={t("settings.language")}
-                    value={settings.language ?? "auto"}
-                    onChange={(e) =>
-                      void saveSettings({
-                        language: e.target.value as "auto" | "en" | "zh-CN",
-                      })
-                    }
-                  >
-                    <option value="auto">{t("settings.languageAuto")}</option>
-                    <option value="en">English</option>
-                    <option value="zh-CN">简体中文</option>
-                  </select>
-                </SettingsRow>
+                {(() => {
+                  const detectedLocale = resolveAppLanguage("auto");
+                  const detectedLocaleLabel =
+                    detectedLocale === "zh-CN"
+                      ? t("settings.languageZh")
+                      : t("settings.languageEn");
+                  return (
+                    <div
+                      className="settings-theme-grid"
+                      role="radiogroup"
+                      aria-label={t("settings.language")}
+                    >
+                      {(["auto", "zh-CN", "en"] as const).map((value) => {
+                        const active = (settings.language ?? "auto") === value;
+                        const LangIcon = value === "auto" ? IconGlobe : null;
+                        const glyph = value === "zh-CN" ? "中" : value === "en" ? "A" : null;
+                        const label =
+                          value === "auto"
+                            ? t("settings.languageAuto")
+                            : value === "zh-CN"
+                              ? t("settings.languageZh")
+                              : t("settings.languageEn");
+                        const sub =
+                          value === "auto"
+                            ? t("settings.languageAutoDesc", { state: detectedLocaleLabel })
+                            : value === "zh-CN"
+                              ? t("settings.languageZhDesc")
+                              : t("settings.languageEnDesc");
+                        const sample =
+                          value === "auto"
+                            ? detectedLocale === "zh-CN"
+                              ? "中 / A"
+                              : "A / 中"
+                            : value === "zh-CN"
+                              ? "你好，世界"
+                              : "Hello, world";
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={active}
+                            className={cx(
+                              "settings-theme-card",
+                              active && "active",
+                              "lang",
+                              value,
+                            )}
+                            onClick={() => void saveSettings({ language: value })}
+                          >
+                            {active && (
+                              <span className="settings-card-check" aria-hidden="true">
+                                <IconCircleCheck size={16} />
+                              </span>
+                            )}
+                            <span className="settings-lang-preview" aria-hidden="true">
+                              {LangIcon ? (
+                                <LangIcon size={20} className="settings-lang-glyph-icon" />
+                              ) : (
+                                <span className="settings-lang-glyph">{glyph}</span>
+                              )}
+                              <span className="settings-lang-sample">{sample}</span>
+                            </span>
+                            <span className="settings-theme-meta">
+                              <span className="settings-theme-label">{label}</span>
+                              <span className="settings-theme-sub">{sub}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
                 <div className="settings-row settings-row-plain">
                   <div className="settings-row-copy">
                     <div className="settings-row-title">{t("settings.theme")}</div>
                     <div className="settings-row-desc">{t("settings.themeDesc")}</div>
                   </div>
                 </div>
-                <div className="settings-theme-grid" role="group" aria-label={t("settings.theme")}>
-                  {(["light", "dark", "system"] as const).map((theme) => (
-                    <button
-                      key={theme}
-                      type="button"
-                      className={cx(
-                        "settings-theme-card",
-                        settings.theme === theme && "active",
-                        theme,
-                      )}
-                      onClick={() => void saveSettings({ theme })}
-                    >
-                      <span className="settings-theme-swatch" />
-                      <span className="settings-theme-label">
-                        {t(
-                          theme === "light"
-                            ? "settings.themeLight"
-                            : theme === "dark"
-                              ? "settings.themeDark"
-                              : "settings.themeSystem",
+                <div
+                  className="settings-theme-grid"
+                  role="radiogroup"
+                  aria-label={t("settings.theme")}
+                >
+                  {(["system", "light", "dark"] as const).map((theme) => {
+                    const active = settings.theme === theme;
+                    const ThemeIcon =
+                      theme === "light"
+                        ? IconSun
+                        : theme === "dark"
+                          ? IconMoon
+                          : IconMonitor;
+                    const label = t(
+                      theme === "light"
+                        ? "settings.themeLight"
+                        : theme === "dark"
+                          ? "settings.themeDark"
+                          : "settings.themeSystem",
+                    );
+                    const sub = t(
+                      theme === "light"
+                        ? "settings.themeLightDesc"
+                        : theme === "dark"
+                          ? "settings.themeDarkDesc"
+                          : "settings.themeSystemDesc",
+                    );
+                    return (
+                      <button
+                        key={theme}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        className={cx("settings-theme-card", active && "active", theme)}
+                        onClick={() => void saveSettings({ theme })}
+                      >
+                        {active && (
+                          <span className="settings-card-check" aria-hidden="true">
+                            <IconCircleCheck size={16} />
+                          </span>
                         )}
-                      </span>
-                    </button>
-                  ))}
+                        <span className="settings-theme-preview" aria-hidden="true">
+                          <span className="settings-theme-preview-bar" />
+                          <span className="settings-theme-preview-line" />
+                          <span className="settings-theme-preview-line short" />
+                          <span className="settings-theme-preview-btn" />
+                        </span>
+                        <span className="settings-theme-meta">
+                          <span className="settings-theme-label">
+                            <ThemeIcon size={15} className="settings-theme-icon" />
+                            {label}
+                          </span>
+                          <span className="settings-theme-sub">{sub}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </SettingsCard>
 
@@ -732,7 +1039,7 @@ export function SettingsPage() {
                   >
                     {([
                       ["agent", "settings.modeAgent"],
-                      ["chat", "settings.modeChat"],
+                      ["plan", "settings.modePlan"],
                     ] as const).map(([value, labelKey]) => (
                       <button
                         key={value}
@@ -749,6 +1056,7 @@ export function SettingsPage() {
                     ))}
                   </div>
                 </SettingsRow>
+                <CommandShellRow settings={settings} saveSettings={saveSettings} />
                 <SettingsRow
                   title={t("settings.enterToSend")}
                   description={t("settings.enterToSendDesc")}
@@ -767,7 +1075,11 @@ export function SettingsPage() {
                   </button>
                 </SettingsRow>
               </SettingsCard>
+            </div>
+          )}
 
+          {tab === "ai" && settings && (
+            <div className="settings-stack">
               <SettingsCard title={t("settings.permissions")}>
                 <SettingsRow
                   title={t("settings.permissionMode")}
@@ -870,42 +1182,52 @@ export function SettingsPage() {
                   />
                 </SettingsRow>
               </SettingsCard>
+            </div>
+          )}
 
+          {tab === "shortcuts" && settings && (
+            <div className="settings-stack">
               <KeyboardShortcutsSection
                 settings={settings}
                 platform={platform}
                 saveSettings={saveSettings}
               />
-
-              <DeveloperSection settings={settings} saveSettings={saveSettings} />
             </div>
           )}
 
           {tab === "agent" && <ProvidersSection />}
+
+          {tab === "instructions" && <AgentInstructionsSection />}
 
           {tab === "import" && <ImportSection />}
 
           {tab === "projects" && <ProjectsPage />}
 
           {tab === "about" && (
-            <SettingsCard>
-              <SettingsRow title={t("settings.application")} description={t("settings.applicationDesc")}>
-                <div className="settings-about-meta">
-                  <div className="font-medium">
-                    {version?.name || "PI-Desktop"} {version?.version}
+            <div className="settings-stack">
+              <SettingsCard>
+                <SettingsRow title={t("settings.application")} description={t("settings.applicationDesc")}>
+                  <div className="settings-about-meta">
+                    <div className="font-medium">
+                      {version?.name || "PI-Desktop"} {version?.version}
+                    </div>
+                    <div className="font-mono text-xs-plus text-text-muted">
+                      protocol {version?.protocolVersion} · host {version?.hostVersion}
+                    </div>
                   </div>
-                  <div className="font-mono text-xs-plus text-text-muted">
-                    protocol {version?.protocolVersion} · host {version?.hostVersion}
-                  </div>
-                </div>
-              </SettingsRow>
-              <SettingsRow title={t("settings.logs")} description={t("settings.logsDesc")}>
-                <Button variant="secondary" onClick={() => void api.openLogs()}>
-                  {t("settings.openLogs")}
-                </Button>
-              </SettingsRow>
-              <UpdatesRow currentVersion={version?.version} />
-            </SettingsCard>
+                </SettingsRow>
+                <SettingsRow title={t("settings.logs")} description={t("settings.logsDesc")}>
+                  <Button variant="secondary" onClick={() => void api.openLogs()}>
+                    {t("settings.openLogs")}
+                  </Button>
+                </SettingsRow>
+                <UpdatesRow currentVersion={version?.version} />
+              </SettingsCard>
+
+              {settings && (
+                <DeveloperSection settings={settings} saveSettings={saveSettings} />
+              )}
+            </div>
           )}
 
         </div>

@@ -10,7 +10,7 @@ import {
   screen,
   shell,
 } from "electron";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
@@ -19,21 +19,36 @@ import {
   APP_NAME,
   APP_VERSION,
   APP_MENU_COMMANDS,
+  defaultCommandShellForPlatform,
   ErrorCodes,
   IPC,
   IPC_WHITELIST,
+  isCommandShellCatalog,
+  isCommandShellId,
+  isGlobalPermissionMode,
   NATIVE_MENU_ACTIONS,
   PROTOCOL_VERSION,
   THINKING_LEVELS,
   WINDOW_CONTROL_ACTIONS,
   err,
   ok,
+  normalizeMode,
+  normalizeGlobalPermissionMode,
   type AgentEventEnvelope,
   type AppMenuCommand,
   type AppNotification,
+  type CommandShellCatalog,
+  type CommandShellId,
   type KeybindingOverrides,
   type NativeMenuAction,
+  type Mode,
+  type PlanExecution,
+  type PlanExecutionFinishStatus,
+  type PlanResolutionResult,
+  type PlanResolveRequest,
+  type PlanApprovalPermissionMode,
   type Result,
+  type Risk,
   type ThinkingLevel,
   type WindowControlAction,
 } from "@pi-desktop/shared";
@@ -43,6 +58,8 @@ import {
   resolveThinkingCapabilities,
   expandSlashInvocation,
   loadComposerTemplates,
+  globalInstructionPath,
+  loadInstructionChain,
   type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
@@ -109,6 +126,8 @@ let workPanelLastAppliedBounds: WindowBounds | null = null;
 let host: HostProcess | null = null;
 let sidecar: AgentSidecar | null = null;
 let quitting = false;
+let shutdownComplete = false;
+let shutdownPromise: Promise<void> | null = null;
 const pluginPanels = new PluginPanelHost(async (pluginId, channel, payload) =>
   plugins.invokePanelBridge(pluginId, channel, payload),
 );
@@ -258,6 +277,57 @@ function normalizeThinkingLevel(value: unknown): ThinkingLevel {
     : "off";
 }
 
+function normalizePlanApprovalSettings<T>(settings: T): T & {
+  defaultCommandShell: CommandShellId;
+  planApprovalPermissionMode: PlanApprovalPermissionMode;
+} {
+  const value = (
+    settings && typeof settings === "object" ? settings : {}
+  ) as T & {
+    defaultCommandShell?: unknown;
+    planApprovalPermissionMode?: unknown;
+  };
+  return {
+    ...(value as T),
+    defaultCommandShell: isCommandShellId(value.defaultCommandShell)
+      ? value.defaultCommandShell
+      : defaultCommandShellForPlatform(process.platform),
+    planApprovalPermissionMode: normalizeGlobalPermissionMode(
+      value?.planApprovalPermissionMode,
+    ),
+  } as T & {
+    defaultCommandShell: CommandShellId;
+    planApprovalPermissionMode: PlanApprovalPermissionMode;
+  };
+}
+
+function validatePlanApprovalSettingsWrite<T>(settings: T): T {
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+    return settings;
+  }
+  const value = settings as T & {
+    defaultCommandShell?: unknown;
+    planApprovalPermissionMode?: unknown;
+  };
+  if (
+    Object.prototype.hasOwnProperty.call(value, "defaultCommandShell") &&
+    !isCommandShellId(value.defaultCommandShell)
+  ) {
+    throw Object.assign(new Error("defaultCommandShell is invalid"), {
+      errorCode: ErrorCodes.COMMAND_SHELL_INVALID,
+    });
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(value, "planApprovalPermissionMode") &&
+    !isGlobalPermissionMode(value.planApprovalPermissionMode)
+  ) {
+    throw Object.assign(new Error("planApprovalPermissionMode is invalid"), {
+      errorCode: ErrorCodes.PLAN_PERMISSION_MODE_INVALID,
+    });
+  }
+  return settings;
+}
+
 function enrichProviderList<T extends RuntimeProvider>(result: { providers: T[] }) {
   return {
     ...result,
@@ -288,12 +358,31 @@ function enrichSession<T extends RuntimeSession>(
   };
 }
 
+async function resolveEffectiveCommandShell(): Promise<CommandShellCatalog> {
+  if (!host) throw new Error("host unavailable");
+  const catalog = await host.call<CommandShellCatalog>("commandShells.list");
+  if (!isCommandShellCatalog(catalog)) {
+    throw Object.assign(new Error("Host returned an invalid command shell catalog"), {
+      errorCode: ErrorCodes.COMMAND_SHELL_INVALID,
+    });
+  }
+  if (!catalog.effective || !catalog.effective.available) {
+    throw Object.assign(
+      new Error("No available command shell is configured for this session"),
+      { errorCode: ErrorCodes.SHELL_NOT_FOUND },
+    );
+  }
+  return catalog;
+}
+
 async function resolveAgentRuntimeLaunch(
   sessionId: string,
   session: any,
   settings: any,
+  overrides: { mode?: Mode; turnId?: string } = {},
 ) {
   if (!host) throw new Error("host unavailable");
+  const commandShell = (await resolveEffectiveCommandShell()).effective!;
   const providers = await host.call<{ providers: RuntimeProvider[] }>(
     "providers.list",
     { includeDisabled: false },
@@ -337,14 +426,20 @@ async function resolveAgentRuntimeLaunch(
     modelId,
     apiStyle: provider.apiStyle,
   });
+  const projectInstructions = await loadInstructionChain(session.projectPath);
   return {
     providerId: provider.id,
     modelId,
     sidecarParams: {
       sessionId,
-      mode: session.mode || settings.defaultMode || "agent",
+      mode: normalizeMode(
+        overrides.mode ?? session.mode ?? settings.defaultMode ?? "agent",
+      ),
+      ...(overrides.turnId ? { turnId: overrides.turnId } : {}),
       thinkingLevel,
+      commandShell,
       scratchDir: join(dataDir, "scratch", sessionId),
+      projectInstructions,
       compactionSettings: settings.contextCompaction,
       provider: {
         id: provider.id,
@@ -363,6 +458,9 @@ async function resolveAgentRuntimeLaunch(
         name: tool.fullName,
         description: tool.description,
         parameters: tool.schema ?? { type: "object", properties: {} },
+        ...(tool.risk === "low" || tool.risk === "medium" || tool.risk === "high"
+          ? { risk: tool.risk as Risk }
+          : {}),
       })),
     },
   };
@@ -607,6 +705,29 @@ async function importLegacyScheduled() {
 
 /** sessionId → open host turn id, for turn bookkeeping across agent events. */
 const activeTurns = new Map<string, string>();
+/** Plan submission turns end without a task-complete notification. */
+const planSubmissionTurnIds = new Set<string>();
+/** sessionId → host execution id for an approved plan currently dispatched. */
+const approvedExecutionIdsBySession = new Map<string, string>();
+/** executionId → durable execution turn identity. */
+const approvedExecutionTurns = new Map<
+  string,
+  { sessionId: string; turnId: string }
+>();
+/** Claimed executions remain tracked even before their durable turn exists. */
+const claimedExecutionSessions = new Map<string, string>();
+/** Click/start deduplication for approved plan execution. */
+const dispatchingApprovedExecutions = new Set<string>();
+const startedApprovedExecutions = new Set<string>();
+const finishedApprovedExecutions = new Set<string>();
+const pendingExecutionFinishes = new Map<
+  string,
+  { status: PlanExecutionFinishStatus; errorCode?: string }
+>();
+const inFlightExecutionFinishes = new Set<string>();
+let approvedExecutionDrain: Promise<void> | null = null;
+const turnSettlements = new Map<string, Set<() => void>>();
+const turnFinalizations = new Map<string, Promise<void>>();
 /** sessionId → scheduled task_run id awaiting completion. */
 const scheduledRunsBySession = new Map<string, string>();
 /** Session currently rendered on the chat page; focus remains Main-owned. */
@@ -619,6 +740,20 @@ const activeToolCalls = new Map<
 
 function activeToolCallKey(sessionId: string, toolCallId: string) {
   return `${sessionId}:${toolCallId}`;
+}
+
+function planSubmissionTurnKey(sessionId: string, turnId: string) {
+  return `${sessionId}:${turnId}`;
+}
+
+function waitForTurnSettlement(sessionId: string, turnId: string): Promise<void> {
+  if (activeTurns.get(sessionId) !== turnId) return Promise.resolve();
+  const key = planSubmissionTurnKey(sessionId, turnId);
+  return new Promise((resolve) => {
+    const waiters = turnSettlements.get(key) ?? new Set<() => void>();
+    waiters.add(resolve);
+    turnSettlements.set(key, waiters);
+  });
 }
 
 function shouldCreateTaskNotification(sessionId: string) {
@@ -782,6 +917,10 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Preload runs in a sandbox and cannot import Electron's main-only `app`
+      // module. Pass the display locale at process creation so it remains
+      // available synchronously before the renderer's first paint.
+      additionalArguments: [`--pi-desktop-locale=${app.getLocale()}`],
     },
   });
   const window = mainWindow;
@@ -1711,10 +1850,22 @@ function wireHost(h: HostProcess) {
           sendToRenderer(IPC.event.toast, { message: toast });
         }
       })();
+    } else if (method === "plans.changed") {
+      sendToRenderer(IPC.event.plansChanged, params);
     }
   });
   h.onExit(({ code, signal, intentional }) => {
     if (intentional || quitting) return;
+    for (const [executionId, sessionId] of claimedExecutionSessions) {
+      if (approvedExecutionIdsBySession.get(sessionId) === executionId) {
+        void finishTurn(sessionId, "aborted", "PLAN_EXECUTION_INTERRUPTED");
+      }
+      void finishApprovedExecution(
+        executionId,
+        "interrupted",
+        "PLAN_EXECUTION_INTERRUPTED",
+      );
+    }
     logger.app("error", "host-core exited unexpectedly", {
       code: ErrorCodes.HOST_UNAVAILABLE,
       data: { exitCode: code, signal },
@@ -1763,6 +1914,32 @@ function wireSidecar(s: AgentSidecar) {
   });
   s.onExit(({ code, signal, intentional }) => {
     if (intentional || quitting) return;
+    // A sidecar crash closes live approval waiters before the replacement
+    // sidecar starts. This prevents an old renderer response from waking a
+    // dead runtime and records the durable turn as interrupted.
+    for (const sessionId of [...activeTurns.keys()]) {
+      void (async () => {
+        const executionId = approvedExecutionIdsBySession.get(sessionId);
+        if (host) {
+          await host.call("plans.abort", { sessionId }).catch(() => undefined);
+        }
+        await finishTurn(sessionId, "aborted", "PLAN_APPROVAL_INTERRUPTED");
+        if (executionId) {
+          await finishApprovedExecution(
+            executionId,
+            "interrupted",
+            "PLAN_EXECUTION_INTERRUPTED",
+          );
+        }
+      })();
+    }
+    for (const [executionId] of claimedExecutionSessions) {
+      void finishApprovedExecution(
+        executionId,
+        "interrupted",
+        "PLAN_EXECUTION_INTERRUPTED",
+      );
+    }
     logger.app("error", "agent sidecar exited unexpectedly", {
       data: { exitCode: code, signal },
     });
@@ -1778,6 +1955,13 @@ function wireSidecar(s: AgentSidecar) {
 async function startSidecar(): Promise<void> {
   const s = new AgentSidecar((text) => logger.child("agent", text));
   wireSidecar(s);
+  s.setProjectInstructionResolver(async ({ sessionId, path }) => {
+    const detail = await host?.call<{ session?: { projectPath?: string } | null }>(
+      "session.get",
+      { id: sessionId },
+    );
+    return loadInstructionChain(detail?.session?.projectPath, path);
+  });
   // Agent-driven work panel preview (D100): open a workspace HTML file in
   // the embedded browser; live reload keeps it current through later edits.
   s.setLocalTool("BrowserPreview", async ({ args, sessionId }) => {
@@ -1836,60 +2020,407 @@ function finishTurn(
   sessionId: string,
   status: "completed" | "aborted" | "error",
   errorCode?: string,
-) {
-  const turnId = activeTurns.get(sessionId);
-  activeTurns.delete(sessionId);
-  if (host && turnId) {
-    const createNotification = shouldCreateTaskNotification(sessionId);
-    void host
-      .call<{ ok: boolean; notification?: AppNotification }>("session.endTurn", {
-        turnId,
-        status,
-        errorCode,
-        createNotification,
-      })
-      .then((result) => {
-        if (result.notification) {
-          sendToRenderer(IPC.event.notificationChanged, {
-            notification: result.notification,
+  options: { createNotification?: boolean } = {},
+): Promise<void> {
+  const existing = turnFinalizations.get(sessionId);
+  if (existing) return existing;
+
+  const finalization = (async () => {
+    const turnId = activeTurns.get(sessionId);
+    const turnKey = turnId
+      ? planSubmissionTurnKey(sessionId, turnId)
+      : undefined;
+    const wasPlanSubmission = turnKey
+      ? planSubmissionTurnIds.has(turnKey)
+      : false;
+
+    try {
+      if (host && turnId) {
+        const createNotification =
+          options.createNotification ??
+          (!wasPlanSubmission && shouldCreateTaskNotification(sessionId));
+        try {
+          const result = await host.call<{
+            ok: boolean;
+            notification?: AppNotification;
+          }>("session.endTurn", {
+            turnId,
+            status,
+            errorCode,
+            createNotification,
+          });
+          if (result.notification) {
+            sendToRenderer(IPC.event.notificationChanged, {
+              notification: result.notification,
+            });
+          }
+        } catch (e) {
+          logger.app("warn", "endTurn failed", {
+            sessionId,
+            data: String(e),
           });
         }
-      })
-      .catch((e) =>
-        logger.app("warn", "endTurn failed", { sessionId, data: String(e) }),
-      );
-  }
-  const runId = scheduledRunsBySession.get(sessionId);
-  if (runId) {
-    scheduledRunsBySession.delete(sessionId);
-    if (host) {
-      void host
-        .call("scheduled.finishRun", { runId, status, errorCode })
-        .catch((e) =>
-          logger.app("warn", "finishRun failed", { sessionId, data: String(e) }),
-        );
+      }
+
+      const runId = scheduledRunsBySession.get(sessionId);
+      if (runId) {
+        scheduledRunsBySession.delete(sessionId);
+        if (host) {
+          await host
+            .call("scheduled.finishRun", { runId, status, errorCode })
+            .catch((e) =>
+              logger.app("warn", "finishRun failed", {
+                sessionId,
+                data: String(e),
+              }),
+            );
+        }
+      }
+    } finally {
+      // Do not release local ownership or wake a queued approved execution
+      // until the durable endTurn request has settled above.
+      if (turnId && activeTurns.get(sessionId) === turnId) {
+        activeTurns.delete(sessionId);
+      }
+      if (turnKey) {
+        planSubmissionTurnIds.delete(turnKey);
+        const waiters = turnSettlements.get(turnKey);
+        if (waiters) {
+          turnSettlements.delete(turnKey);
+          for (const resolve of waiters) resolve();
+        }
+      }
     }
+
+    const toolPrefix = `${sessionId}:`;
+    // A host tool can finish shortly after the turn is aborted. Keep metadata
+    // long enough for a late tool_end to persist a readable historical row.
+    setTimeout(() => {
+      for (const key of activeToolCalls.keys()) {
+        if (key.startsWith(toolPrefix)) activeToolCalls.delete(key);
+      }
+    }, 5 * 60 * 1000).unref();
+  })();
+
+  turnFinalizations.set(sessionId, finalization);
+  void finalization.then(
+    () => {
+      if (turnFinalizations.get(sessionId) === finalization) {
+        turnFinalizations.delete(sessionId);
+      }
+    },
+    () => {
+      if (turnFinalizations.get(sessionId) === finalization) {
+        turnFinalizations.delete(sessionId);
+      }
+    },
+  );
+  return finalization;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function planExecutionFromUnknown(value: unknown): PlanExecution | null {
+  if (!isRecord(value)) return null;
+  const artifact = isRecord(value.artifact) ? value.artifact : null;
+  const state =
+    value.state === "queued" ||
+    value.state === "running" ||
+    value.state === "completed" ||
+    value.state === "interrupted"
+      ? value.state
+      : "queued";
+  if (
+    typeof value.id !== "string" ||
+    typeof value.proposalId !== "string" ||
+    typeof value.sessionId !== "string" ||
+    typeof value.plan !== "string" ||
+    typeof value.title !== "string" ||
+    typeof value.question !== "string" ||
+    !artifact ||
+    typeof artifact.relativePath !== "string" ||
+    typeof artifact.sha256 !== "string" ||
+    typeof artifact.sizeBytes !== "number"
+  ) {
+    return null;
   }
-  const toolPrefix = `${sessionId}:`;
-  // A host tool can finish shortly after the turn is aborted. Keep metadata
-  // long enough for a late tool_end to persist a readable historical row.
-  setTimeout(() => {
-    for (const key of activeToolCalls.keys()) {
-      if (key.startsWith(toolPrefix)) activeToolCalls.delete(key);
+  return {
+    id: value.id,
+    proposalId: value.proposalId,
+    sessionId: value.sessionId,
+    plan: value.plan,
+    title: value.title,
+    question: value.question,
+    artifact: {
+      relativePath: artifact.relativePath,
+      sha256: artifact.sha256,
+      sizeBytes: artifact.sizeBytes,
+    },
+    targetPermissionMode: normalizeGlobalPermissionMode(
+      value.targetPermissionMode,
+    ),
+    state,
+  };
+}
+
+function executionFromResponse(value: unknown): PlanExecution | null {
+  if (isRecord(value) && value.execution) {
+    return planExecutionFromUnknown(value.execution);
+  }
+  return planExecutionFromUnknown(value);
+}
+
+function executionListFromResponse(value: unknown): PlanExecution[] {
+  const raw = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.executions)
+      ? value.executions
+      : [];
+  return raw
+    .map((candidate) => planExecutionFromUnknown(candidate))
+    .filter((candidate): candidate is PlanExecution => candidate !== null);
+}
+
+async function finishApprovedExecution(
+  executionId: string,
+  status: PlanExecutionFinishStatus,
+  errorCode?: string,
+): Promise<void> {
+  if (finishedApprovedExecutions.has(executionId)) return;
+  if (inFlightExecutionFinishes.has(executionId)) return;
+  if (!pendingExecutionFinishes.has(executionId)) {
+    pendingExecutionFinishes.set(executionId, { status, errorCode });
+  }
+  inFlightExecutionFinishes.add(executionId);
+  if (!host) {
+    inFlightExecutionFinishes.delete(executionId);
+    return;
+  }
+  try {
+    const pending = pendingExecutionFinishes.get(executionId) ?? {
+      status,
+      errorCode,
+    };
+    await host.call("plans.finishExecution", {
+      executionId,
+      status: pending.status,
+      ...(pending.errorCode ? { errorCode: pending.errorCode } : {}),
+    });
+    finishedApprovedExecutions.add(executionId);
+    startedApprovedExecutions.delete(executionId);
+    pendingExecutionFinishes.delete(executionId);
+    const turn = approvedExecutionTurns.get(executionId);
+    const sessionId = turn?.sessionId ?? claimedExecutionSessions.get(executionId);
+    if (sessionId && approvedExecutionIdsBySession.get(sessionId) === executionId) {
+      approvedExecutionIdsBySession.delete(sessionId);
     }
-  }, 5 * 60 * 1000).unref();
+    approvedExecutionTurns.delete(executionId);
+    claimedExecutionSessions.delete(executionId);
+  } catch (error) {
+    logger.app("warn", "approved plan execution finalization failed", {
+      data: { executionId, error: String(error) },
+    });
+  } finally {
+    inFlightExecutionFinishes.delete(executionId);
+  }
+}
+
+async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
+  const initial = planExecutionFromUnknown(rawExecution);
+  if (!initial) {
+    logger.app("warn", "approved plan execution descriptor was invalid");
+    return;
+  }
+  if (
+    initial.state === "running" ||
+    initial.state === "interrupted" ||
+    initial.state === "completed" ||
+    startedApprovedExecutions.has(initial.id) ||
+    finishedApprovedExecutions.has(initial.id) ||
+    dispatchingApprovedExecutions.has(initial.id)
+  ) {
+    return;
+  }
+  if (!host || !sidecar) return;
+  dispatchingApprovedExecutions.add(initial.id);
+  let claimed = false;
+  let turnId: string | undefined;
+  try {
+    const activeTurnId = activeTurns.get(initial.sessionId);
+    if (
+      activeTurnId &&
+      planSubmissionTurnIds.has(
+        planSubmissionTurnKey(initial.sessionId, activeTurnId),
+      )
+    ) {
+      await waitForTurnSettlement(initial.sessionId, activeTurnId);
+    }
+    if (activeTurns.has(initial.sessionId)) {
+      const retry = setTimeout(() => {
+        void dispatchApprovedPlan(initial);
+      }, 250);
+      retry.unref();
+      return;
+    }
+    const claimResponse = await host.call("plans.claimExecution", {
+      executionId: initial.id,
+    });
+    const claimedExecution = executionFromResponse(claimResponse);
+    if (
+      claimedExecution?.state === "interrupted" ||
+      claimedExecution?.state === "completed" ||
+      claimedExecution?.state === "running"
+    ) {
+      // A running descriptor is the host's durable ownership signal. It may
+      // belong to a previous process and must never be replayed here.
+      if (claimedExecution.state !== "running") return;
+    }
+    const execution: PlanExecution = {
+      ...(claimedExecution ?? initial),
+      state: "running",
+    };
+    claimed = true;
+    claimedExecutionSessions.set(execution.id, execution.sessionId);
+
+    const [settings, sessionResult] = await Promise.all([
+      host.call("settings.get"),
+      host.call<{ session?: any }>("session.get", { id: execution.sessionId }),
+    ]);
+    if (!sessionResult.session) {
+      throw Object.assign(new Error("Session not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    const launch = await resolveAgentRuntimeLaunch(
+      execution.sessionId,
+      sessionResult.session,
+      settings,
+      { mode: "agent" },
+    );
+    const turn = await host.call<{ turnId: string }>("session.beginTurn", {
+      sessionId: execution.sessionId,
+      providerId: launch.providerId,
+      modelId: launch.modelId,
+    });
+    turnId = String(turn.turnId || "").trim();
+    if (!turnId) throw new Error("execution turn was not created");
+    activeTurns.set(execution.sessionId, turnId);
+    approvedExecutionIdsBySession.set(execution.sessionId, execution.id);
+    approvedExecutionTurns.set(execution.id, {
+      sessionId: execution.sessionId,
+      turnId,
+    });
+    startedApprovedExecutions.add(execution.id);
+    const accepted = await sidecar.call<{ accepted: boolean }>(
+      "agent.executeApprovedPlan",
+      {
+        ...launch.sidecarParams,
+        mode: "agent",
+        turnId,
+        execution,
+      },
+    );
+    if (accepted?.accepted !== true) {
+      throw new Error("approved plan execution was not accepted");
+    }
+    logger.app("info", "approved plan execution started", {
+      sessionId: execution.sessionId,
+      data: { executionId: execution.id, turnId },
+    });
+  } catch (error: any) {
+    const errorCode =
+      error?.data?.errorCode || error?.errorCode || ErrorCodes.PLAN_EXECUTION_INTERRUPTED;
+    if (turnId && activeTurns.get(initial.sessionId) === turnId) {
+      await finishTurn(initial.sessionId, "error", errorCode);
+    }
+    if (claimed) {
+      await finishApprovedExecution(initial.id, "interrupted", errorCode);
+    }
+    logger.app("warn", "approved plan execution failed to start", {
+      sessionId: initial.sessionId,
+      data: { executionId: initial.id, error: String(error) },
+    });
+  } finally {
+    dispatchingApprovedExecutions.delete(initial.id);
+  }
+}
+
+async function drainApprovedPlanExecutions(): Promise<void> {
+  if (approvedExecutionDrain) return approvedExecutionDrain;
+  approvedExecutionDrain = (async () => {
+    if (!host || !sidecar) return;
+    for (const [executionId, finish] of pendingExecutionFinishes) {
+      await finishApprovedExecution(executionId, finish.status, finish.errorCode);
+    }
+    const response = await host.call("plans.queuedExecutions");
+    for (const execution of executionListFromResponse(response)) {
+      // Only queued rows are dispatchable. Running/interrupted rows are durable
+      // recovery outcomes and must remain untouched on startup.
+      if (execution.state !== "queued") continue;
+      await dispatchApprovedPlan(execution);
+    }
+  })();
+  try {
+    await approvedExecutionDrain;
+  } finally {
+    approvedExecutionDrain = null;
+  }
+}
+
+async function dispatchExecutionForProposal(proposalId: string): Promise<void> {
+  if (!host) return;
+  try {
+    const response = await host.call("plans.queuedExecutions");
+    const execution = executionListFromResponse(response).find(
+      (candidate) => candidate.proposalId === proposalId,
+    );
+    if (execution?.state === "queued") {
+      await dispatchApprovedPlan(execution);
+    }
+  } catch (error) {
+    logger.app("warn", "approved plan lookup after resolution failed", {
+      data: String(error),
+    });
+  }
 }
 
 function persistAgentEvent(envelope: AgentEventEnvelope) {
   if (!host) return;
   const event = envelope.event;
   const turnId = activeTurns.get(envelope.sessionId);
+  const executionId = (() => {
+    const candidate = approvedExecutionIdsBySession.get(envelope.sessionId);
+    if (!candidate) return undefined;
+    if (pendingExecutionFinishes.get(candidate)?.status === "interrupted") {
+      return undefined;
+    }
+    const executionTurn = approvedExecutionTurns.get(candidate);
+    return executionTurn?.turnId === (envelope.turnId || turnId)
+      ? candidate
+      : undefined;
+  })();
+  if (
+    event.type === "planning_state" &&
+    event.state === "awaiting_approval" &&
+    (envelope.turnId || turnId)
+  ) {
+    planSubmissionTurnIds.add(
+      planSubmissionTurnKey(envelope.sessionId, envelope.turnId || turnId!),
+    );
+  }
   if (event.type === "tool_start") {
     activeToolCalls.set(activeToolCallKey(envelope.sessionId, event.toolCallId), {
       toolName: event.toolName,
       args: event.args,
       createdAt: new Date(envelope.ts).toISOString(),
     });
+    if (event.toolName === "SubmitPlan" && (envelope.turnId || turnId)) {
+      planSubmissionTurnIds.add(
+        planSubmissionTurnKey(envelope.sessionId, envelope.turnId || turnId!),
+      );
+    }
   }
   if (event.type === "error") {
     // Async provider failures must close the durable turn / scheduled run the
@@ -1899,15 +2430,29 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
       code: event.error.code,
       data: { message: event.error.message, retriable: event.error.retriable },
     });
-    finishTurn(
+    const turnFinalization = finishTurn(
       envelope.sessionId,
       event.error.code === "TURN_ABORTED" ? "aborted" : "error",
       event.error.code,
     );
+    if (executionId) {
+      void turnFinalization.then(() =>
+        finishApprovedExecution(
+          executionId,
+          "interrupted",
+          event.error.code,
+        ),
+      );
+    }
     return;
   }
   if (event.type === "agent_end") {
-    finishTurn(envelope.sessionId, "completed");
+    const turnFinalization = finishTurn(envelope.sessionId, "completed");
+    if (executionId) {
+      void turnFinalization.then(() =>
+        finishApprovedExecution(executionId, "completed"),
+      );
+    }
     // Persist the completed branch as the active regenerate revision when the
     // latest user turn carries revision metadata (ChatGPT-style history).
     void (async () => {
@@ -2078,6 +2623,7 @@ async function superviseRestart(kind: "host" | "sidecar"): Promise<void> {
     } else {
       await startSidecar();
     }
+    await drainApprovedPlanExecutions();
     logger.app("warn", `${kind} restarted after crash`);
     sendToRenderer(IPC.event.hostStatus, {
       ok: true,
@@ -2136,6 +2682,11 @@ async function bootBackends() {
   } catch (e) {
     logger.app("error", "plugin list failed", { data: String(e) });
   }
+  await drainApprovedPlanExecutions().catch((error) =>
+    logger.app("warn", "queued approved plan drain failed", {
+      data: String(error),
+    }),
+  );
 }
 
 function registerIpc() {
@@ -2176,6 +2727,97 @@ function registerIpc() {
     await host.call("settings.set", { ...settings, onboardingDismissed: true });
     return { ok: true };
   });
+
+  const instructionFile = async (
+    scope: "global" | "project",
+    projectPath?: string | null,
+  ) => {
+    const path =
+      scope === "global"
+        ? globalInstructionPath()
+        : projectPath
+          ? join(projectPath, "AGENTS.md")
+          : null;
+    if (!path) {
+      throw Object.assign(new Error("workspace required"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    const { readFile } = await import("node:fs/promises");
+    try {
+      return { scope, path, content: await readFile(path, "utf8"), exists: true };
+    } catch {
+      return { scope, path, content: "", exists: false };
+    }
+  };
+
+  const managedProjectPath = async (input: unknown): Promise<string> => {
+    if (!host) throw new Error("host unavailable");
+    const requestedPath = typeof input === "string" ? input.trim() : "";
+    if (!requestedPath) {
+      throw Object.assign(new Error("project path required"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    const projectPath = resolve(requestedPath);
+    const listed = (await host.call("projects.list")) as {
+      projects?: Array<{ path?: string }>;
+    };
+    const known = (listed.projects ?? []).some((project) => {
+      const candidate = String(project?.path ?? "").trim();
+      return candidate && resolve(candidate) === projectPath;
+    });
+    if (!known) {
+      throw Object.assign(new Error("project not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    if (!existsSync(projectPath) || !statSync(projectPath).isDirectory()) {
+      throw Object.assign(new Error("project folder not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    return projectPath;
+  };
+
+  handle(
+    IPC.invoke.agentInstructionsGet,
+    async (input: { projectPath?: unknown } = {}) => {
+      const projectPath = input.projectPath === undefined
+        ? null
+        : await managedProjectPath(input.projectPath);
+    return {
+      global: await instructionFile("global"),
+      ...(projectPath
+        ? { project: await instructionFile("project", projectPath) }
+        : {}),
+    };
+  });
+
+  handle(
+    IPC.invoke.agentInstructionsSave,
+    async (input: {
+      scope?: "global" | "project";
+      content?: unknown;
+      projectPath?: unknown;
+    } = {}) => {
+      if (input.scope !== "global" && input.scope !== "project") {
+        throw Object.assign(new Error("instruction scope required"), {
+          errorCode: ErrorCodes.INVALID_ARGUMENT,
+        });
+      }
+      const scope = input.scope;
+      const projectPath = scope === "project"
+        ? await managedProjectPath(input.projectPath)
+        : null;
+      const file = await instructionFile(scope, projectPath);
+      const content = typeof input.content === "string" ? input.content : "";
+      const { mkdir, writeFile } = await import("node:fs/promises");
+      await mkdir(dirname(file.path), { recursive: true });
+      await writeFile(file.path, content, "utf8");
+      return { file: { ...file, content, exists: true } };
+    },
+  );
 
   handle(IPC.invoke.updatesGetState, async () => updater.getState());
 
@@ -2428,7 +3070,7 @@ function registerIpc() {
     async (
       id: string,
       config: {
-        mode: "chat" | "agent";
+        mode: Mode;
         providerId?: string;
         modelId?: string;
         thinkingLevel?: ThinkingLevel;
@@ -2497,20 +3139,26 @@ function registerIpc() {
 
   handle(IPC.invoke.settingsGet, async () => {
     if (!host) throw new Error("host unavailable");
-    return host.call("settings.get");
+    const settings = await host.call("settings.get");
+    return normalizePlanApprovalSettings(settings);
   });
   handle(IPC.invoke.settingsSet, async (settings: unknown) => {
     if (!host) throw new Error("host unavailable");
-    const result = await host.call("settings.set", settings);
+    const validatedSettings = validatePlanApprovalSettingsWrite(settings);
+    const result = await host.call("settings.set", validatedSettings);
     applyApplicationMenuSettings(
-      settings as {
+      validatedSettings as {
         language?: unknown;
         keybindings?: unknown;
         developerMode?: unknown;
       } | null,
     );
-    applyDeveloperMode(settings as { developerMode?: unknown } | null);
+    applyDeveloperMode(validatedSettings as { developerMode?: unknown } | null);
     return result;
+  });
+
+  handle(IPC.invoke.commandShellList, async () => {
+    return resolveEffectiveCommandShell();
   });
 
   handle(IPC.invoke.providersList, async () => {
@@ -3446,11 +4094,22 @@ function registerIpc() {
           }
         : {}),
     };
-    await host.call("session.appendMessage", {
-      sessionId: req.sessionId,
-      message: userMessage,
-      turnId: turn?.turnId,
-    });
+    try {
+      await host.call("session.appendMessage", {
+        sessionId: req.sessionId,
+        message: userMessage,
+        turnId: turn?.turnId,
+      });
+    } catch (error) {
+      await finishTurn(
+        req.sessionId,
+        "error",
+        (error as { data?: { errorCode?: string }; errorCode?: string })?.data
+          ?.errorCode ??
+          (error as { errorCode?: string })?.errorCode,
+      );
+      throw error;
+    }
     sendToRenderer(IPC.event.agentMessage, {
       sessionId: req.sessionId,
       ts: Date.now(),
@@ -3468,12 +4127,15 @@ function registerIpc() {
         "agent.prompt",
         {
           ...launch.sidecarParams,
+          // The host-created durable turn is the approval identity used by
+          // Rust. The runtime must not replace it with a provider-local UUID.
+          turnId: turn?.turnId,
           content: promptContent,
           userMessageId: userMessage.id,
         },
       );
     } catch (e) {
-      void finishTurn(req.sessionId, "error", (e as any)?.errorCode);
+      await finishTurn(req.sessionId, "error", (e as any)?.errorCode);
       throw e;
     }
     logger.app("info", "prompt accepted", {
@@ -3516,8 +4178,24 @@ function registerIpc() {
   handle(IPC.invoke.agentAbort, async (req: { sessionId: string }) => {
     if (!sidecar) throw new Error("sidecar unavailable");
     logger.app("info", "prompt aborted", { sessionId: req.sessionId });
-    const result = await sidecar.call("agent.abort", req);
-    finishTurn(req.sessionId, "aborted");
+    const executionId =
+      approvedExecutionIdsBySession.get(req.sessionId) ??
+      [...claimedExecutionSessions].find(
+        ([, sessionId]) => sessionId === req.sessionId,
+      )?.[0];
+    let result: unknown;
+    try {
+      result = await sidecar.call("agent.abort", req);
+    } finally {
+      await finishTurn(req.sessionId, "aborted", "TURN_ABORTED");
+      if (executionId) {
+        await finishApprovedExecution(
+          executionId,
+          "interrupted",
+          "PLAN_EXECUTION_INTERRUPTED",
+        );
+      }
+    }
     return result;
   });
 
@@ -3535,6 +4213,65 @@ function registerIpc() {
       data: { requestId: resolution.requestId, decision: resolution.decision },
     });
     return host.call("permissions.resolve", resolution);
+  });
+
+  handle(IPC.invoke.plansPending, async (input: { sessionId?: string } = {}) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("plans.pending", {
+      ...(typeof input.sessionId === "string" && input.sessionId.trim()
+        ? { sessionId: input.sessionId.trim() }
+        : {}),
+    });
+  });
+
+  handle(IPC.invoke.plansResolve, async (resolution: PlanResolveRequest) => {
+    if (!host) throw new Error("host unavailable");
+    const proposalId = String(resolution?.proposalId ?? "").trim();
+    if (!proposalId) throw new Error("proposalId required");
+    const sessionId = String(resolution?.sessionId ?? "").trim();
+    if (!sessionId) throw new Error("sessionId required");
+    const turnId = String(resolution?.turnId ?? "").trim();
+    if (!turnId) throw new Error("turnId required");
+    const toolCallId = String(resolution?.toolCallId ?? "").trim();
+    if (!toolCallId) throw new Error("toolCallId required");
+    const action = resolution?.action;
+    if (action !== "approve" && action !== "reject") {
+      throw new Error("invalid plan approval action");
+    }
+    let targetPermissionMode: PlanApprovalPermissionMode | undefined;
+    if (action === "approve") {
+      let settings: any;
+      if (!resolution?.targetPermissionMode) {
+        settings = await host.call("settings.get").catch(() => undefined);
+      }
+      targetPermissionMode = normalizeGlobalPermissionMode(
+        resolution?.targetPermissionMode ?? settings?.planApprovalPermissionMode,
+      );
+    }
+    const version =
+      typeof resolution?.version === "number" &&
+      Number.isSafeInteger(resolution.version) &&
+      resolution.version > 0
+        ? resolution.version
+        : undefined;
+    const result = await host.call<PlanResolutionResult>("plans.resolve", {
+      proposalId,
+      sessionId,
+      turnId,
+      toolCallId,
+      action,
+      ...(version !== undefined ? { version } : {}),
+      ...(targetPermissionMode ? { targetPermissionMode } : {}),
+    });
+    if (action === "approve") {
+      const execution = executionFromResponse(result);
+      if (execution) {
+        void dispatchApprovedPlan(execution);
+      } else {
+        void dispatchExecutionForProposal(proposalId);
+      }
+    }
+    return result;
   });
 
   handle(IPC.invoke.pluginList, async () => {
@@ -3910,15 +4647,34 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+  if (shutdownComplete) return;
+  event.preventDefault();
+  if (shutdownPromise) return;
+
   quitting = true;
-  void pluginPanels.closeAll();
-  updater.dispose();
-  logger.app("info", "app shutdown");
-  ptys.disposeAll();
-  browserPane.dispose();
-  void host?.dispose();
-  void sidecar?.dispose();
+  shutdownPromise = (async () => {
+    const hostShutdown = host?.dispose();
+    const pluginPanelShutdown = pluginPanels.closeAll();
+    updater.dispose();
+    logger.app("info", "app shutdown");
+    ptys.disposeAll();
+    browserPane.dispose();
+    const sidecarShutdown = sidecar?.dispose();
+
+    try {
+      await hostShutdown;
+    } catch (error) {
+      logger.app("warn", "host shutdown failed", { data: String(error) });
+    }
+    await Promise.allSettled([pluginPanelShutdown, sidecarShutdown]);
+  })();
+
+  const releaseQuit = () => {
+    shutdownComplete = true;
+    app.quit();
+  };
+  void shutdownPromise.then(releaseQuit, releaseQuit);
 });
 
 app.on("activate", () => {

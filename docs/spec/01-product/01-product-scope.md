@@ -69,12 +69,25 @@ Install or develop local plugins for commands/panels/tools.
 - Billing systems
 - Computer Use browser takeover
 
-## 6. Modes
+## 6. Operating modes
 
-| Mode | Behavior |
+| Product selector | Behavior |
 |---|---|
-| Chat | Prefer read-only behavior; high-risk tools restricted |
-| Agent | Tools available under permission policy |
+| Agent | The pi Agent runs with the full execution tool set under the selected permission policy. |
+| Plan | The same pi Agent runs in planning state. It can inspect with Read/Glob/Grep/BrowserPreview, run Bash under the selected permission policy, use plan/context controls, and call `SubmitPlan(title, markdown, question)`. Host-core preserves the exact Markdown bytes in a new immutable `<workspaceRoot>/.pi/plan/*.md` artifact before separate approval; title/question remain structured approval fields and the card opens the artifact. Write/Edit/plugin tools are denied. |
+
+Plan is a planning intent, not a strict read-only security profile: Bash under
+`ask` or `accept-edits` prompts, while Bash under `auto` runs without
+confirmation and may mutate the workspace or scratch directory. The Plan
+selector and `EnterPlanMode` both address the same Agent; approval transitions
+that Agent into Agent execution without creating a second planner. Approval is
+approve/reject only, and the explicit execution permission selection defaults to
+Ask. A host restart interrupts pending, queued, or running Plan work without
+replay; an already-approved interrupted run leaves the session in Agent.
+
+Existing persisted `Chat` mode values migrate to `Plan`. New sessions and new
+scheduled tasks default to Agent. The conversation surface may continue to use
+the internal `page = "chat"` route value; that value is not an operating mode.
 
 ## 7. Success criteria
 
@@ -84,6 +97,9 @@ Install or develop local plugins for commands/panels/tools.
 4. Sessions survive restart
 5. Renderer never has direct Node/FS privileges
 6. UI is fully usable in English
+7. A submitted plan cannot cross into execution without a separate matching
+   approval; its exact Markdown bytes are preserved in a unique `.pi/plan/*.md`
+   artifact and the approval row records its path, hash, and size
 
 ## 8. Naming
 
@@ -96,7 +112,7 @@ Install or develop local plugins for commands/panels/tools.
 
 | Platform | MVP | Notes |
 |---|---|---|
-| macOS Apple Silicon | Required | Primary dev/acceptance |
-| macOS Intel | Compatible | Best effort |
-| Windows x64 | Planned | Architecture reserved |
-| Linux x64 | Planned | Architecture reserved |
+| macOS Apple Silicon | Published | Primary development and acceptance platform |
+| macOS Intel | Not packaged | No current x64 release target |
+| Windows x64 | Published | NSIS installer and in-app update lane; native qualification continues |
+| Linux x64 | Published | AppImage and deb packages; AppImage update lane; native qualification continues |

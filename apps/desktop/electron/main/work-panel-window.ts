@@ -10,7 +10,7 @@ export type WorkPanelReservationState = {
   xOffset: number;
 };
 
-export const WORK_PANEL_MIN_WIDTH = 364;
+export const WORK_PANEL_MIN_WIDTH = 244;
 export const WORK_PANEL_MAX_WIDTH = 720;
 
 export const emptyWorkPanelReservationState = (): WorkPanelReservationState => ({

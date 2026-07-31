@@ -6,6 +6,10 @@ const composerSource = await readFile(
   new URL("../src/components/Composer.tsx", import.meta.url),
   "utf8",
 );
+const modelSelectSource = await readFile(
+  new URL("../src/components/ModelSelect.tsx", import.meta.url),
+  "utf8",
+);
 
 test("enter-to-send ignores the IME confirm keystroke", () => {
   const guardIndex = composerSource.indexOf(
@@ -23,9 +27,9 @@ test("enter-to-send ignores the IME confirm keystroke", () => {
 });
 
 test("model menu keydown ignores IME composition keystrokes", () => {
-  const handler = composerSource.slice(
-    composerSource.indexOf("const onModelMenuKeyDown"),
-    composerSource.indexOf('e.key === "ArrowDown"'),
+  const handler = modelSelectSource.slice(
+    modelSelectSource.indexOf("const onModelMenuKeyDown"),
+    modelSelectSource.indexOf('e.key === "ArrowDown"'),
   );
   assert.match(
     handler,

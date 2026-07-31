@@ -71,7 +71,8 @@ PluginManager
 
 ### Query
 - The command palette only queries contributions that are enabled + loaded successfully
-- The Agent only sees registered tools
+- Agent sees registered tools; Plan receives no plugin tools regardless of risk
+  or grant state
 
 ### Deregistration
 - Remove everything on disable/unload/uninstall
@@ -123,16 +124,19 @@ permission gate and result envelope stay in host-core:
 
 1. Model calls `plugin_<pluginIdSafe>_<toolName>`; the sidecar forwards it
    to host `tools.execute` like any built-in tool.
-2. host-core runs the normal permission flow (risk, session grants,
-   120s timeout), then emits notification `plugins.execute`
+2. host-core resolves the durable operating mode first. In Agent it runs the
+   normal permission flow (risk, session grants, 120s timeout), then emits
+   notification `plugins.execute`
    `{ executionId, sessionId, toolCallId, toolName, args }`.
-3. Electron main executes the registered plugin tool JS and answers via RPC
+3. Plan calls fail at the host policy step with `PLUGIN_DISABLED_IN_PLAN`; they
+   never reach Electron or the plugin runtime. Agent calls continue with
+   Electron main executing the registered plugin tool JS and answering via RPC
    `plugins.resolveExecution` `{ executionId, ok, content, errorCode? }`.
 4. host-core resolves the pending execution and returns a standard
    `ToolsExecuteResult` to the sidecar. Dispatch timeout maps to
    `TOOL_TIMEOUT`; an unknown/unloaded tool maps to `TOOL_NOT_FOUND`.
 
-The model-facing toolset gains plugin tools per prompt: main passes
+The model-facing Agent toolset gains plugin tools per prompt: main passes
 registered defs (`fullName`, description, JSON-schema parameters) to
-`agent.prompt`, and the runtime appends them to the built-in six.
+`agent.prompt`. The Plan toolset explicitly excludes those defs.
 Covered by protocol smoke scenario E2E-024.

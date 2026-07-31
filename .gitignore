@@ -43,3 +43,4 @@ coverage/
 
 .playwright-mcp/
 .claude/
+.workbuddy

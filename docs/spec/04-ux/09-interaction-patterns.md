@@ -22,7 +22,7 @@
 | `Cmd/Ctrl + .` | Abort active turn | Global (same as abort button) |
 | `Cmd/Ctrl + K` | Open command palette | Global |
 
-### 1.2 Chat context shortcuts
+### 1.2 Conversation context shortcuts
 
 | Shortcut | Action | Context |
 |---|---|---|
@@ -247,9 +247,12 @@ may be retained while exactly one workspace supplies the visible shell context.
 - File resources use normalized paths as identity. Review, Terminal, and
   Browser are singletons; repeated triggers preserve resource order and
   activate the existing resource.
-- Once open, the panel's 44px activity rail makes Review, Terminal, and Browser
-  one-click actions. The active-resource header opens an ordered resource
-  switcher with pointer and keyboard selection plus per-item close controls.
+- Once open, the panel's unified context trigger anchors the left of the header
+  and opens a single dropdown: its top section is an ordered resource switcher
+  (pointer and keyboard selection plus per-item close controls) and, after a
+  divider, a create-new section that makes Review, Terminal, Browser, and Files
+  one-click actions. A right action cluster groups the close / collapse controls
+  behind a divider.
 - Every resource can be closed from the switcher, and the active resource has
   a direct header close control. Closing the active resource selects the right
   neighbor, then the left; closing the final tab hides the panel. The separate
@@ -262,7 +265,7 @@ may be retained while exactly one workspace supplies the visible shell context.
 - A successful workspace Write/Edit creates or activates Review in its
   originating session. Failed and scratch writes do not. Background-session
   artifacts update only their retained context and never open, activate, resize,
-  focus, or change the native reservation of the visible panel.
+  focus, or change the visible panel.
 - When a session has produced a successful workspace Write/Edit and that Git
   working tree has changes, a compact Review changes command remains visible at
   the end of that session's transcript independently of the activity disclosure
@@ -449,7 +452,7 @@ may be retained while exactly one workspace supplies the visible shell context.
 ### 5.1 Flow sequence
 
 ```text
-Agent calls high-risk tool
+Agent calls a permission-gated tool (including Plan Bash under Ask or Accept edits)
   → PermissionCard inserted inline in transcript
   → Composer disabled (cannot send new prompt)
   → Countdown starts (120s)
@@ -474,6 +477,37 @@ Agent calls high-risk tool
 - Action buttons are tab-reachable within the card
 - After resolution: focus returns to composer
 - Full spec: [03-permission-ux.md](03-permission-ux.md)
+
+## 5A. Plan workflow
+
+1. The user selects Plan while the session is idle, or the same Agent calls
+   `EnterPlanMode`; the host persists/validates `mode = plan` and the renderer
+   projects `planning`.
+2. The Agent investigates with the Plan tool set. Read/Glob/Grep and
+   BrowserPreview are allowed; Bash follows the visible permission mode. A
+   Plan Bash command may mutate under Auto, so the mode chip remains visible.
+3. The Agent calls `SubmitPlan(title, markdown, question)` alone in its tool
+   batch. Host-core preserves the exact Markdown bytes in a new immutable
+   `.pi/plan/*.md` artifact, records its path/hash/size and structured
+   title/question, and the renderer displays `PlanApprovalCard` with the
+   artifact opener and 30-minute absolute deadline.
+4. Approve requires Ask / Accept edits / Auto selection, with Ask selected by
+   default. Host-core commits the approval, `mode = agent`, permission mode,
+   and `queued` state atomically; the same Agent continues on a fresh turn with
+   Agent tools.
+5. Reject stops the pending run and keeps the session in Plan. Revisions are
+   new SubmitPlan calls; there is no request-changes action.
+6. Expiry, abort, persistence failure, renderer/host/sidecar crash, or stale
+   response renders a failed-closed state. A host restart interrupts pending,
+   queued, and running work without replay; an already-approved interruption
+   keeps the session in Agent.
+
+The approval card is session-scoped. Background sessions may retain a pending
+approval or queued/running execution state in `plan_approvals`, but opening
+another session never covers it or moves focus; returning to the originating
+session restores the record and original deadline while the host remains alive.
+Mode/provider/model/permission/shell configuration and new prompts remain
+disabled until the session is idle.
 
 ## 6. Toast vs inline error
 
@@ -569,23 +603,22 @@ Work-panel width resizing is implemented in MVP:
 
 - The 10px left-edge separator anchors to the press position and starting
   width, then follows pointer delta without jumping.
-- The committed width clamps to the fixed `364px–720px` range.
+- The committed width clamps to the fixed `244px–720px` range.
 - Pointer movement is frame-coalesced. Pointer release persists one committed
-  preferred width and updates the native reservation once; Escape, pointer
-  cancellation, and lost capture roll back both.
-- Open requests native width equal to the committed panel width. Collapse and
-  final close request zero. Repeating a target is idempotent.
-- When the work area can supply the full reservation, MainChat keeps its width
-  across open, commit, collapse, and close. When it cannot, native geometry uses
-  all available reservation width while the fixed panel assigns only the
-  unavoidable shortfall to MainChat.
+  preferred width; Escape, pointer cancellation, and lost capture roll back both.
+- The renderer always requests a native reservation width of 0, so the OS window
+  never expands (ADR 0033). Opening, collapse, and final close change only the
+  committed preferred width. Repeating a target is idempotent.
+- MainChat keeps its width across open, commit, collapse, and close because the
+  window does not change; when the fixed window is too narrow for both panel and
+  a readable chat, chat reflows below its 360px target.
 - Native window and sidebar resize never clamp or rewrite the panel. Native
-  edges resize MainChat only.
-- Maximized/fullscreen changes defer native reservation geometry until normal;
-  display/work-area changes reconcile it against the current available width.
-  Ordinary movement within one unchanged work area does not reapply geometry.
-  Persisted base bounds exclude reservation width and its x shift.
-- Background-session artifacts never update visible reservation state.
+  edges resize MainChat by reflow only.
+- Maximized/fullscreen is unaffected; display/work-area changes reconcile the
+  window bounds normally. Ordinary movement within one unchanged work area does
+  not reapply geometry. Persisted base bounds are the user's window size
+  (reservation is always 0).
+- Background-session artifacts never update the visible panel.
 
 The following gestures remain reserved for future milestones:
 
@@ -773,6 +806,6 @@ This does not prevent state changes — it makes them instant.
 20. Streamed message updates stay within the chat render boundary; shell
     navigation, composer, completed rows, and work-panel content do not rerender
     solely because the current assistant message appended content
-21. Native window-edge resize changes MainChat without compressing the fixed
-    work panel; divider commit updates its native reservation, while divider
-    cancellation restores the prior width and reservation
+21. Native window-edge resize changes MainChat by reflow without compressing the
+    fixed work panel; divider commit updates the committed preferred width,
+    while divider cancellation restores the prior width (ADR 0033)

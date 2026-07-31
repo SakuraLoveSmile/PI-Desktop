@@ -5,13 +5,15 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { api } from "../lib/api";
+import { runPaletteCommand } from "../lib/commands";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import { normalizeProjectPath } from "../lib/sidebar-session-groups";
 import {
   searchSettings,
   type SettingsSearchHit,
 } from "../lib/settings-search";
-import type { SessionSummary } from "@pi-desktop/shared";
+import type { SessionSummary, CommandItem } from "@pi-desktop/shared";
 import type { SessionMeta } from "../lib/sidebar-preferences";
 import {
   IconAt,
@@ -21,6 +23,7 @@ import {
   IconPullRequest,
   IconSearch,
   IconSettings,
+  IconSliders,
 } from "./icons";
 
 /** Navigable pages surfaced by the global search alongside sessions. */
@@ -115,14 +118,28 @@ export function SearchDialog({
 
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [commandHits, setCommandHits] = useState<CommandItem[]>([]);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
     setActive(0);
+    setCommandHits([]);
     // Catch sessions renamed/created since the last store refresh.
     void refreshSessions().catch(() => undefined);
   }, [open, refreshSessions]);
+
+  // Surface command-palette commands inside global search so a single
+  // surface covers sessions, pages, settings, and commands.
+  useEffect(() => {
+    if (!open) return;
+    const handle = window.setTimeout(() => {
+      void api
+        .searchCommands(query)
+        .then((res) => setCommandHits(res.commands));
+    }, 80);
+    return () => window.clearTimeout(handle);
+  }, [query, open]);
 
   const projectNames = useMemo(() => {
     const names = new Map<string, string>();
@@ -205,7 +222,8 @@ export function SearchDialog({
   );
 
   const settingsBase = rows.length + pageHits.length + 1;
-  const optionCount = settingsBase + settingsHits.length;
+  const commandsBase = settingsBase + settingsHits.length;
+  const optionCount = commandsBase + commandHits.length;
 
   useEffect(() => {
     setActive(0);
@@ -248,14 +266,31 @@ export function SearchDialog({
     onClose();
   };
 
+  const runCommand = async (command: CommandItem) => {
+    try {
+      await runPaletteCommand(command.id);
+      onClose();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), {
+        variant: "error",
+      });
+    }
+  };
+
   const runActive = () => {
     if (active === 0) return void run(null);
-    const row = rows[active - 1];
-    if (row) return void run(row);
-    const pageEntry = pageHits[active - 1 - rows.length];
-    if (pageEntry) return openPage(pageEntry);
-    const hit = settingsHits[active - settingsBase];
-    if (hit) openSettingsHit(hit);
+    const sessionIndex = active - 1;
+    if (sessionIndex < rows.length) return void run(rows[sessionIndex]);
+    const pageIndex = active - 1 - rows.length;
+    if (pageIndex >= 0 && pageIndex < pageHits.length) return openPage(pageHits[pageIndex]);
+    const settingsIndex = active - settingsBase;
+    if (settingsIndex >= 0 && settingsIndex < settingsHits.length) {
+      return openSettingsHit(settingsHits[settingsIndex]);
+    }
+    const commandIndex = active - commandsBase;
+    if (commandIndex >= 0 && commandIndex < commandHits.length) {
+      return void runCommand(commandHits[commandIndex]);
+    }
   };
 
   return (
@@ -435,9 +470,42 @@ export function SearchDialog({
               })}
             </div>
           ) : null}
+          {commandHits.length > 0 ? (
+            <div role="presentation">
+              <div className="search-group-label" role="presentation">
+                {t("search.commands")}
+              </div>
+              {commandHits.map((command, index) => {
+                const optionIndex = commandsBase + index;
+                return (
+                  <button
+                    key={command.id}
+                    id={`global-search-option-${optionIndex}`}
+                    type="button"
+                    role="option"
+                    aria-selected={active === optionIndex}
+                    className={`search-item ${active === optionIndex ? "active" : ""}`}
+                    onMouseEnter={() => setActive(optionIndex)}
+                    onClick={() => void runCommand(command)}
+                  >
+                    <IconSliders size={15} className="search-item-icon" />
+                    <span className="search-item-title">
+                      {highlightMatch(command.title, query)}
+                    </span>
+                    {command.source === "plugin" && (
+                      <span className="search-item-badge">
+                        {t("plugins.title")}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           {rows.length === 0 &&
           pageHits.length === 0 &&
           settingsHits.length === 0 &&
+          commandHits.length === 0 &&
           query.trim() ? (
             <div className="search-empty">{t("search.empty")}</div>
           ) : null}

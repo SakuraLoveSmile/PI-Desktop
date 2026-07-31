@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { IPC, IPC_WHITELIST } from "@pi-desktop/shared";
 
+const LOCALE_ARGUMENT_PREFIX = "--pi-desktop-locale=";
+
+function readOsLocale(): string | undefined {
+  return process.argv
+    .find((argument) => argument.startsWith(LOCALE_ARGUMENT_PREFIX))
+    ?.slice(LOCALE_ARGUMENT_PREFIX.length);
+}
+
 function assertChannel(channel: string) {
   if (!IPC_WHITELIST.has(channel)) {
     throw new Error(`IPC channel not allowed: ${channel}`);
@@ -24,6 +32,10 @@ const api = {
   // (traffic lights on macOS vs. controls overlay on Windows/Linux)
   // before first paint, without an IPC round-trip.
   platform: process.platform,
+  // `app.getLocale()` is resolved in the main process and passed as a renderer
+  // creation argument. This keeps the locale available before first paint
+  // without importing Electron's main-only `app` module in the sandbox.
+  locale: readOsLocale(),
 };
 
 contextBridge.exposeInMainWorld("piDesktop", api);

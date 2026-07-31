@@ -31,11 +31,12 @@ PI-Desktop uses a layered desktop architecture:
 ## 2. Design principles
 
 1. **UI and privileged runtime are separated**
-2. **Rust owns host/system capabilities**
+2. **Rust owns host/system capabilities, durable mode, and approval policy**
 3. **pi owns model/agent loop semantics**
 4. **Renderer is unprivileged**
 5. **All cross-boundary contracts are typed**
 6. **English is the product source language**
+7. **Plan is a state of the one pi Agent, never a second planner**
 
 ## 3. Subsystems
 
@@ -62,6 +63,8 @@ not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 - workspace path enforcement
 - builtin tool execution
 - permission policy evaluation
+- durable session mode resolution (`agent | plan`)
+- plan approval records, requests, and atomic Plan → Agent transition
 - plugin install/registry/lifecycle services
 - sqlite adapters / secure storage glue
 - audit logs
@@ -71,6 +74,8 @@ not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 - `Agent.prompt/abort`
 - event normalization from pi events
 - tool call requests emitted to host core
+- one-Agent planning state, host-written Plan checkpoint submission, and
+  approve/reject execution boundary
 
 ### 3.5 Plugin System
 - manifest validation
@@ -78,7 +83,7 @@ not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 - plugin panels
 - permission grants
 
-## 4. Request path (chat + tool)
+## 4. Request path (conversation + tool)
 
 ```text
 1. UI submits prompt
@@ -87,13 +92,30 @@ not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 4. UI renders text deltas
 5. On tool call:
  5.1 pi requests tool execution via host bridge
- 5.2 Rust permission gateway evaluates risk
- 5.3 UI confirms if required
+  5.2 Rust resolves the durable session mode and evaluates the authoritative
+      Plan/Agent tool policy before permission modes
+  5.3 UI confirms if required, including a separate Plan approval request and
+      the selected shell identity for Bash
  5.4 Rust resolves the durable session's project and executes the tool in that
      workspace sandbox (never whichever sidebar tab is currently active)
  5.5 result returns to pi runtime
 6. turn ends; session persistence updates
 ```
+
+When the same Agent calls `SubmitPlan`, host-core preserves the exact Markdown
+bytes in a new immutable `<workspaceRoot>/.pi/plan/*.md` artifact, records its
+relative path/hash/size and structured title/question in `plan_approvals`, and
+waits for `plans.resolve`. The approval card opens that artifact. Approval
+atomically changes the durable session to Agent with the selected permission
+mode and queues a fresh execution turn. Reject, expiry, host/sidecar crash, and
+persistence failure grant no execution capability. A startup transaction
+interrupts pending approvals and queued/running execution fields before RPC
+service, with no replay; an already-approved interrupted execution leaves the
+session in Agent.
+
+The renderer may display Plan state and approval UI, but it is only a projection
+of host/runtime events. It cannot authorize a tool or choose a mode for host
+policy by sending a conflicting request field.
 
 The renderer may retain several project tabs, but this does not create several
 host workspace singletons. One project supplies visible shell context;
@@ -134,6 +156,18 @@ Dev mode may colocate some services, but contracts stay the same.
 Desktop package must ship:
 
 - Electron app
-- Rust host binary
-- Node runtime assets for pi sidecar (strategy implementation-defined)
-- English locale pack (default)
+- one target-native Rust host binary
+- one bundled pi sidecar entry under `Resources/agent-runtime/sidecar.js`, run
+  by the Electron binary with `ELECTRON_RUN_AS_NODE=1`
+- English and Simplified Chinese product locale catalogs, plus only the
+  Chromium locale packs needed for those product languages
+- target-native runtime modules that cannot be bundled safely, including
+  `node-pty`
+
+Renderer-only libraries are build inputs. Vite must emit their executable
+code and lazy assets under `out/renderer`; electron-builder must not also copy
+their original production `node_modules` trees into ASAR. Electron Main may
+inline pure-JS workspace helpers while native or runtime-resolved modules stay
+external. Release packages exclude dependency source maps, tests, examples,
+declarations, and non-target native prebuilds without replacing local assets
+with network fetches.

@@ -363,7 +363,11 @@ pub fn remove_session_files(data_dir: &Path, session_id: &str) {
     let Ok(revisions) = revisions_path(data_dir, session_id) else {
         return;
     };
-    for path in [transcript.with_extension("jsonl.tmp"), transcript, revisions] {
+    for path in [
+        transcript.with_extension("jsonl.tmp"),
+        transcript,
+        revisions,
+    ] {
         if let Err(error) = fs::remove_file(&path) {
             if error.kind() != std::io::ErrorKind::NotFound {
                 tracing::warn!(path = %path.display(), %error, "transcript cleanup failed");
@@ -418,8 +422,20 @@ mod tests {
     #[test]
     fn append_creates_header_then_lines() {
         let dir = tempdir().unwrap();
-        append_message(dir.path(), "s1", "2026-07-26T00:00:00Z", &record("m1", "hi")).unwrap();
-        append_message(dir.path(), "s1", "2026-07-26T00:00:00Z", &record("m2", "again")).unwrap();
+        append_message(
+            dir.path(),
+            "s1",
+            "2026-07-26T00:00:00Z",
+            &record("m1", "hi"),
+        )
+        .unwrap();
+        append_message(
+            dir.path(),
+            "s1",
+            "2026-07-26T00:00:00Z",
+            &record("m2", "again"),
+        )
+        .unwrap();
 
         let raw = fs::read_to_string(transcript_path(dir.path(), "s1").unwrap()).unwrap();
         let lines: Vec<&str> = raw.lines().collect();
@@ -438,7 +454,13 @@ mod tests {
     #[test]
     fn read_skips_torn_tail_and_unknown_lines() {
         let dir = tempdir().unwrap();
-        append_message(dir.path(), "s1", "2026-07-26T00:00:00Z", &record("m1", "ok")).unwrap();
+        append_message(
+            dir.path(),
+            "s1",
+            "2026-07-26T00:00:00Z",
+            &record("m1", "ok"),
+        )
+        .unwrap();
         let path = transcript_path(dir.path(), "s1").unwrap();
         let mut raw = fs::read_to_string(&path).unwrap();
         raw.push_str("{\"type\":\"future-kind\",\"x\":1}\n");
@@ -480,13 +502,21 @@ mod tests {
     fn missing_file_is_empty_transcript() {
         let dir = tempdir().unwrap();
         assert!(read_transcript(dir.path(), "nope").unwrap().is_empty());
-        assert!(read_revision(dir.path(), "nope", "u1", 1).unwrap().is_none());
+        assert!(read_revision(dir.path(), "nope", "u1", 1)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
     fn write_transcript_replaces_content() {
         let dir = tempdir().unwrap();
-        append_message(dir.path(), "s1", "2026-07-26T00:00:00Z", &record("old", "gone")).unwrap();
+        append_message(
+            dir.path(),
+            "s1",
+            "2026-07-26T00:00:00Z",
+            &record("old", "gone"),
+        )
+        .unwrap();
         write_transcript(
             dir.path(),
             "s1",

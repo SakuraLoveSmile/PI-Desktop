@@ -1,7 +1,8 @@
-export const PROTOCOL_VERSION = 6 as const;
+export const PROTOCOL_VERSION = 9 as const;
+export const SCHEMA_VERSION = 10 as const;
 export const APP_ID = "com.pi-desktop.app";
 export const APP_NAME = "PI-Desktop";
-export const APP_VERSION = "0.2.9";
+export const APP_VERSION = "0.2.11";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -66,6 +67,8 @@ export const IPC = {
     agentCompact: "pi-desktop/agent/compact",
     agentAbort: "pi-desktop/agent/abort",
     agentGetStatus: "pi-desktop/agent/getStatus",
+    agentInstructionsGet: "pi-desktop/agent/instructions/get",
+    agentInstructionsSave: "pi-desktop/agent/instructions/save",
     sessionList: "pi-desktop/session/list",
     sessionCreate: "pi-desktop/session/create",
     sessionFork: "pi-desktop/session/fork",
@@ -82,6 +85,7 @@ export const IPC = {
     projectOpenFolder: "pi-desktop/project/openFolder",
     settingsGet: "pi-desktop/settings/get",
     settingsSet: "pi-desktop/settings/set",
+    commandShellList: "pi-desktop/commandShell/list",
     secretsSet: "pi-desktop/secrets/set",
     secretsDelete: "pi-desktop/secrets/delete",
     secretsHas: "pi-desktop/secrets/has",
@@ -97,6 +101,8 @@ export const IPC = {
     scheduledDelete: "pi-desktop/scheduled/delete",
     scheduledRun: "pi-desktop/scheduled/run",
     toolResolvePermission: "pi-desktop/tool/resolvePermission",
+    plansPending: "pi-desktop/plans/pending",
+    plansResolve: "pi-desktop/plans/resolve",
     providersList: "pi-desktop/providers/list",
     providersCreate: "pi-desktop/providers/create",
     providersUpdate: "pi-desktop/providers/update",
@@ -160,6 +166,7 @@ export const IPC = {
     menuCommand: "pi-desktop/menu/event/command",
     notificationChanged: "pi-desktop/notification/event/changed",
     notificationActivated: "pi-desktop/notification/event/activated",
+    plansChanged: "pi-desktop/plans/event/changed",
     updatesState: "pi-desktop/updates/event/state",
   },
 } as const;

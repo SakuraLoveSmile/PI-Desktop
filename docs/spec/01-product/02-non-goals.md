@@ -13,6 +13,10 @@
 9. Computer Use browser takeover
 10. Unconfirmed full-disk high privilege mode
 11. Non-English as the primary source language
+12. A second planner Agent, planner service, planner model, or separate
+    permission profile for Plan
+13. Treating Plan as a strict read-only security sandbox or auto-approving a
+    scheduled Plan run
 
 ## 2. Not optimized yet
 

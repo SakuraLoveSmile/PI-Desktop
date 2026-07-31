@@ -19,7 +19,7 @@ destination, chat as the home surface, tools and permissions inline.
 | Sidebar (~275px) | Main pane (active destination) | Work panel       |
 |  New task        |  chat home / transcript        |  (optional,      |
 |  Plugins         |  or Plugins page               |   resizable      |
-|                  |                                |   364–720px)     |
+|                  |                                |   244–720px)     |
 |  Sessions     +↕ |                                | surface          |
 |   Recent rows ↕  |                                |                  |
 |  Projects      + |                                | ◫ | App.tsx  ⌄ × |
@@ -73,17 +73,18 @@ destination, chat as the home surface, tools and permissions inline.
   artifacts, or by the contextual transcript review entry when the current
   session produced a successful workspace Write/Edit and that working tree is
   still dirty. Its
-  44px activity rail keeps Review, Terminal, and Browser one click away while
-  the panel is visible; opened-but-inactive tools show a quiet dot and the
-  active tool has a restrained edge marker. The 46px content header names the
+  a combined create trigger keeps Review, Terminal, Browser, and Files one
+  click away while the panel is visible; opened-but-inactive tools show a quiet
+  dot and the active tool has a restrained edge marker. The 46px content header
+  names the
   current resource, closes it directly, and opens a compact switcher for all
   current session resources. File paths stay distinct in that switcher while
-  Review, Terminal, and Browser deduplicate by kind. The activity rail is not
+  Review, Terminal, and Browser deduplicate by kind. The create trigger is not
   rendered while the panel is closed and does not create a global or empty
   manual panel entry point. A
   successful active-session workspace Write/Edit artifact opens Review;
   scratch, failed, and background-session writes never steal focus. Width is
-  drag-resizable from 364px (44px rail + 320px content) to 720px and remains at
+  drag-resizable from 244px to 720px and remains at
   its fixed committed width while open. The sole panel-level control collapses
   the panel;
   each session retains its own runtime open state, tab set, active tab, and
@@ -94,22 +95,24 @@ destination, chat as the home surface, tools and permissions inline.
   originating session's retained panel context and never open, activate, or
   resize the visible panel. Startup is closed with no retained session
   contexts, and only the preferred panel width persists across launches.
-  Opening the visible panel reserves that committed width in the normal native
-  window; collapse and final-resource close reclaim it symmetrically, and a
-  divider commit updates the reservation. Chat width therefore remains stable
-  when the display work area can supply the full reservation. On constrained
-  displays, Main reserves the available width, the panel stays fixed, and chat
-  absorbs only the unavoidable shortfall. Native window edges resize chat and
-  never the panel. Maximized/fullscreen geometry is deferred until normal;
-  moving between displays or changing a display work area reconciles the target
-  against the new available width. Persisted base bounds exclude reservation
-  width and its x shift. Background artifacts never change the visible
-  reservation (D163, ADR 0032).
+  The work panel is a fixed-width in-flow column of the fixed client area
+  (ADR 0033). Opening it reflows MainChat to the left and never expands the OS
+  window; collapse and final-resource close release the space, and a divider
+  commit updates the preferred width. On constrained windows chat reflows below
+  its 360px target. Native window edges resize chat by reflow and never the
+  panel. Maximized/fullscreen is unaffected; moving between displays or changing
+  a display work area reconciles the window bounds normally. Persisted base
+  bounds are the user's window size. Background artifacts never change the
+  visible panel (D163, ADR 0033).
   Replaces the former context-panel overlay; workspace/model/status info lives
   in the composer chips and Settings instead.
-- **Composer**: workspace-agnostic floating pill anchored to the chat
+- **Composer**: workspace-agnostic floating pill anchored to the conversation
   destination — scrollable centered stack on the empty home (D111),
   bottom-docked in a transcript, with no project / Local / branch rail (D095).
+  Its operating-mode selector contains exactly **Agent** and **Plan**. Plan
+  shows the same Agent's planning state, keeps the permission-mode chip, and
+  exposes the host-written immutable `.pi/plan/*.md` artifact opener and
+  approval surface after `SubmitPlan`.
 - **Backend status capsule**: appears under the titlebar while the backend
   restarts or is fatally degraded (D080), with an Open-logs action.
 
@@ -172,6 +175,12 @@ title, status badge, branch meta, external link, and "Review with agent"
 ### 3.4 Scheduled
 Create card + task rows (cadence/enabled badges, prompt preview, last run,
 Run now / toggle / Delete). Run now opens a session seeded with the prompt.
+New tasks default to Agent. A migrated Plan task is allowed to remain stored,
+but an unattended run is explicitly rejected before provider, artifact, or
+queue work with `PLAN_REQUIRES_INTERACTIVE_SESSION`; it cannot display or
+auto-approve a plan.
+The user must explicitly switch it to Agent before enabling unattended
+execution.
 
 ### 3.5 Plugins
 Installed plugin list (enable/disable/uninstall), dev-load entry, permission
@@ -179,9 +188,12 @@ declarations.
 
 ### 3.6 Settings (full-page takeover)
 Settings replaces the whole shell (D063): back-to-app + search + a compact
-five-destination rail in the exact order Basics / Model configuration / Import /
-Project archive / Info (D133), with elevated content cards.
-Appearance lives inside Basics; provider management lives inside
+seven-destination rail in the exact order Basics / 全局 AI / Shortcuts / Model
+configuration / Import / Project archive / Info (D133, D166), with elevated
+content cards.
+Appearance lives inside Basics; global AI behavior (permissions and context
+management) lives inside 全局 AI; keyboard shortcuts has its own destination;
+provider management lives inside
 Agent. Import scans supported local agent stores and presents
 candidates in collapsible groups. Project path is an alternate grouping
 alongside the default source grouping, and every scan or grouping change starts
@@ -204,7 +216,8 @@ Plugins destination described in §3.5.
 
 ## 5. Navigation model
 
-- `page` state: `chat | pulls | scheduled | plugins | settings`; the project
+- `page` state: `chat | pulls | scheduled | plugins | settings`; `chat` is the
+  conversation-surface route, not an operating mode. The project
   archive is the `projects` settings tab rather than a standalone page.
 - Destination history is linear; `Cmd/Ctrl+[` and `Cmd/Ctrl+]` traverse it
   without persistent back/forward chrome.
@@ -257,6 +270,12 @@ Plugins destination described in §3.5.
   event never navigates by itself; only explicit activation does.
 - Backend degraded → status capsule (restarting) or fatal banner with Open
   logs (D080); composer submits are rejected with readable errors while down.
+- Plan checkpoint → the originating session shows the structured title and
+  question, an opener for its immutable `.pi/plan/*.md` artifact, absolute
+  approval deadline, and current status. Renderer reload preserves a pending
+  row while the host remains alive; startup interruption shows interrupted with
+  no replay. An already-approved interrupted execution keeps the session's
+  Agent state.
 
 ## 8. i18n
 

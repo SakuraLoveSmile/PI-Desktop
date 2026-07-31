@@ -75,6 +75,13 @@ pi.agent.registerTool(tool: {
 pi.agent.unregisterTool(name: string): Promise<void>
 ```
 
+Registered plugin agent tools are Agent-only contributions. During Plan the
+host filters them out of the model tool list and rejects direct execution with
+`PLUGIN_DISABLED_IN_PLAN`, including when the manifest risk is `low`, the user
+has an `allow-session` grant, or the session permission mode is `auto`. A
+successful plan approval makes the same registered tools eligible again under
+the selected Agent permission policy.
+
 ```ts
 type ToolExecContext = {
  sessionId: string
@@ -91,7 +98,7 @@ pi.clipboard.writeText(text: string): Promise<void>
 pi.shell.openExternal(url: string): Promise<void>
 ```
 
-### net (high risk by default, can be deferred)
+### net
 ```ts
 pi.net.fetch(input: {
  url: string
@@ -119,14 +126,15 @@ type PluginApiError = {
 
 All API failures throw an error carrying a `code`.
 
-## 5. Events (host -> plugin)
+## 5. Events (host -> plugin, planned)
 
 ```ts
 pi.events.on(event, handler)
 pi.events.off(event, handler)
 ```
 
-MVP events:
+The SDK reserves this shape, but the current host delivers no events; `on` and
+`off` are no-ops in the plugin process. Planned events include:
 - `workspace:changed`
 - `session:activated`
 - `plugin:settingsChanged`
