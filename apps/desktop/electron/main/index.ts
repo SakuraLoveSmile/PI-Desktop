@@ -1502,11 +1502,20 @@ async function createWindow() {
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-scheduled-live");
             await mainWindow!.webContents.executeJavaScript(
-              `window.__PI_DESKTOP__?.seedPlugins?.(3)`,
+              `window.__PI_DESKTOP__?.seedPlugins?.(4)`,
             );
             await setPage("plugins");
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-plugins-live");
+            // Marketplace tab of the same page (D169 segmented control).
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const tabs = [...document.querySelectorAll('.plugins-segment-btn')];
+                tabs[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 900));
+            await shot("pi-plugins-market");
             await mainWindow!.webContents.executeJavaScript(
               `window.__PI_DESKTOP__?.seedPlugins?.(0)`,
             );

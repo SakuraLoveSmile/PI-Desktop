@@ -40,6 +40,7 @@ import {
   IconNewSession,
   IconSidebar,
 } from "./components/icons";
+import type { PluginSummary } from "@pi-desktop/shared";
 
 const MODIFIER_ONLY_KEYS = new Set([
   "Alt",
@@ -624,41 +625,68 @@ function AppShell() {
         );
         useAppStore.setState({ messages });
       },
-      seedPlugins: (count = 3) => {
+      seedPlugins: (count = 4) => {
         // Capture-only plugins fixture (plugins index scenes); count 0 clears.
+        // One sample per row group so the D169 bands are all exercised.
         if (!(window as any).__PI_CAPTURE__) return;
         if (count <= 0) {
           useAppStore.setState({ plugins: [] });
           return;
         }
-        const samples = [
+        const samples: PluginSummary[] = [
+          {
+            id: "pi.deploy-preview",
+            name: "Deploy Preview",
+            version: "0.4.1",
+            enabled: true,
+            source: "installed",
+            status: "load_error",
+            errorMessage: "Manifest declares net.fetch but the grant is missing.",
+            permissions: ["net.fetch", "ui.panel"],
+            author: "Pi Labs",
+            description: "Builds a preview deployment for the current branch.",
+          },
           {
             id: "pi.git-insights",
             name: "Git Insights",
             version: "1.4.2",
             enabled: true,
+            source: "marketplace",
+            status: "ready",
+            permissions: ["fs.read.workspace", "ui.panel", "notify"],
+            author: "Pi Labs",
+            description: "Summarizes repository activity into a review panel.",
+            updateAvailable: {
+              version: "1.5.0",
+              shasum: "capture",
+              url: "https://example.invalid/git-insights-1.5.0.piplug",
+            },
           },
           {
             id: "pi.markdown-tools",
             name: "Markdown Tools",
             version: "0.9.0",
             enabled: true,
+            source: "marketplace",
+            status: "ready",
+            permissions: ["clipboard.read", "clipboard.write", "ui.panel"],
+            author: "Community",
+            description: "Formats tables and normalizes headings on demand.",
+            autoUpdate: true,
           },
           {
-            id: "pi.deploy-preview",
-            name: "Deploy Preview",
+            id: "pi.scratchpad",
+            name: "Scratchpad",
             version: "dev",
             enabled: false,
+            source: "dev",
+            status: "disabled",
+            permissions: ["ui.panel"],
+            author: "Local build",
+            description: "A local panel for quick notes beside the transcript.",
           },
         ];
-        useAppStore.setState({
-          plugins: samples.slice(0, count).map((sample) => ({
-            ...sample,
-            source: "dev" as const,
-            status: sample.enabled ? ("ready" as const) : ("disabled" as const),
-            permissions: [],
-          })),
-        });
+        useAppStore.setState({ plugins: samples.slice(0, count) });
       },
       seedNotifications: (count = 105) => {
         // Capture-only notification fixture; count 0 restores an empty inbox.
