@@ -184,6 +184,18 @@ const plugins = new PluginRuntime({
     });
     sendToRenderer(IPC.event.pluginChanged, { reason: "crash", pluginId });
   },
+  // Hot reload happens without anyone asking for it, so it has to report
+  // itself: the plugins page reads status from the host, not from the edit.
+  onPluginReloaded: ({ pluginId, name, ok, message }) => {
+    logger.app(ok ? "info" : "error", "development plugin reloaded", {
+      pluginId,
+      data: { ok, message },
+    });
+    sendToRenderer(IPC.event.toast, {
+      message: ok ? `Reloaded ${name}` : `Reload failed: ${name} — ${message ?? ""}`,
+    });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "reload", pluginId });
+  },
 });
 const ptys = new PtyManager({
   onData: (termId, data) =>
@@ -1881,7 +1893,8 @@ async function startSidecar(): Promise<void> {
       return loaded.plugin?.permissions ?? [];
     },
     loadPlugin: async (path, permissions) => {
-      await plugins.loadFromPath(path, permissions ?? []);
+      const manifest = await plugins.loadFromPath(path, permissions ?? []);
+      plugins.watchDevPlugin(manifest.id);
       for (const toast of plugins.drainToasts()) {
         sendToRenderer(IPC.event.toast, { message: toast });
       }
@@ -2191,6 +2204,9 @@ async function bootBackends() {
       if (p.enabled && p.path) {
         try {
           await plugins.loadFromPath(p.path, p.permissions ?? []);
+          // Dev plugins keep hot reload across restarts: the folder was picked
+          // once, and the edit loop should not have to pick it again.
+          if (p.source === "dev") plugins.watchDevPlugin(p.id);
           logger.app("info", "plugin restored", { pluginId: p.id });
         } catch (e) {
           logger.app("error", "plugin restore failed", {
@@ -3711,6 +3727,7 @@ function registerIpc() {
     const path = result.filePaths[0];
     const loaded = await host.call<{ plugin: any }>("plugins.loadDev", { path });
     await plugins.loadFromPath(path, loaded.plugin?.permissions ?? []);
+    if (loaded.plugin?.id) plugins.watchDevPlugin(loaded.plugin.id);
     for (const toast of plugins.drainToasts()) {
       sendToRenderer(IPC.event.toast, { message: toast });
     }
@@ -3739,6 +3756,7 @@ function registerIpc() {
         path: dir,
       });
       await plugins.loadFromPath(dir, loaded.plugin?.permissions ?? []);
+      plugins.watchDevPlugin(created.id);
       for (const toast of plugins.drainToasts()) {
         sendToRenderer(IPC.event.toast, { message: toast });
       }
@@ -3809,6 +3827,7 @@ function registerIpc() {
     const res = await host.call<{ plugin: any }>("plugins.enable", { id });
     if (res.plugin?.path) {
       await plugins.loadFromPath(res.plugin.path, res.plugin.permissions ?? []);
+      if (res.plugin.source === "dev") plugins.watchDevPlugin(id);
     }
     logger.app("info", "plugin enabled", { pluginId: id });
     return res;
@@ -4108,6 +4127,7 @@ app.on("before-quit", () => {
   updater.dispose();
   logger.app("info", "app shutdown");
   ptys.disposeAll();
+  plugins.disposeWatchers();
   browserPane.dispose();
   void host?.dispose();
   void sidecar?.dispose();
