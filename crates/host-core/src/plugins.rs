@@ -292,7 +292,9 @@ impl PluginManager {
     }
 
     fn installed_dir(&self, id: &str) -> PathBuf {
-        self.data_dir.join("plugins/installed").join(sanitize_id(id))
+        self.data_dir
+            .join("plugins/installed")
+            .join(sanitize_id(id))
     }
 
     fn data_dir_for(&self, id: &str) -> PathBuf {
@@ -334,8 +336,8 @@ impl PluginManager {
         }
         let raw = fs::read_to_string(&manifest_path)
             .with_context(|| format!("read manifest {}", manifest_path.display()))?;
-        let manifest: PluginManifest = serde_json::from_str(&raw)
-            .map_err(|e| anyhow!("PLUGIN_INVALID: {e}"))?;
+        let manifest: PluginManifest =
+            serde_json::from_str(&raw).map_err(|e| anyhow!("PLUGIN_INVALID: {e}"))?;
         if manifest.id.trim().is_empty() || manifest.main.trim().is_empty() {
             bail!("PLUGIN_INVALID: id/main required");
         }
@@ -500,9 +502,10 @@ impl PluginManager {
                     .and_then(|p| p.installed_at.clone())
                     .or_else(|| Some(now.clone())),
                 updated_at: Some(now),
-                marketplace: opts.marketplace.clone().or_else(|| {
-                    existing.as_ref().and_then(|p| p.marketplace.clone())
-                }),
+                marketplace: opts
+                    .marketplace
+                    .clone()
+                    .or_else(|| existing.as_ref().and_then(|p| p.marketplace.clone())),
                 auto_update: Some(
                     opts.auto_update
                         || existing
@@ -682,13 +685,20 @@ impl PluginManager {
         }
         // Relative package paths resolve against the catalog URL directory.
         if let Some(idx) = catalog_url.rfind('/') {
-            format!("{}{}", &catalog_url[..=idx], package_url.trim_start_matches('/'))
+            format!(
+                "{}{}",
+                &catalog_url[..=idx],
+                package_url.trim_start_matches('/')
+            )
         } else {
             package_url.to_string()
         }
     }
 
-    fn rewrite_catalog_urls(catalog_url: &str, mut catalog: MarketCatalogFile) -> MarketCatalogFile {
+    fn rewrite_catalog_urls(
+        catalog_url: &str,
+        mut catalog: MarketCatalogFile,
+    ) -> MarketCatalogFile {
         for plugin in &mut catalog.plugins {
             for version in &mut plugin.versions {
                 version.url = Self::resolve_package_url(catalog_url, &version.url);
@@ -723,8 +733,8 @@ impl PluginManager {
             .map_err(|e| anyhow!("PLUGIN_NETWORK: failed to fetch marketplace catalog: {e}"))?;
         let raw = String::from_utf8(bytes)
             .map_err(|_| anyhow!("PLUGIN_MARKET_INVALID: catalog is not utf8"))?;
-        let parsed: MarketCatalogFile = serde_json::from_str(&raw)
-            .map_err(|e| anyhow!("PLUGIN_MARKET_INVALID: {e}"))?;
+        let parsed: MarketCatalogFile =
+            serde_json::from_str(&raw).map_err(|e| anyhow!("PLUGIN_MARKET_INVALID: {e}"))?;
         if parsed.plugins.is_empty() {
             bail!("PLUGIN_MARKET_INVALID: remote catalog has no plugins");
         }
@@ -773,17 +783,17 @@ impl PluginManager {
         }
     }
 
-    pub fn market_search(&self, query: Option<&str>, category: Option<&str>) -> Result<Vec<MarketPluginSummary>> {
+    pub fn market_search(
+        &self,
+        query: Option<&str>,
+        category: Option<&str>,
+    ) -> Result<Vec<MarketPluginSummary>> {
         let catalog = self.load_catalog()?;
         let q = query.unwrap_or("").trim().to_lowercase();
         let mut out = Vec::new();
         for entry in catalog.plugins {
             if let Some(cat) = category {
-                if !cat.is_empty()
-                    && !entry
-                        .categories
-                        .iter()
-                        .any(|c| c.eq_ignore_ascii_case(cat))
+                if !cat.is_empty() && !entry.categories.iter().any(|c| c.eq_ignore_ascii_case(cat))
                 {
                     continue;
                 }
@@ -791,10 +801,7 @@ impl PluginManager {
             if !q.is_empty() {
                 let hay = format!(
                     "{} {} {} {}",
-                    entry.id,
-                    entry.name,
-                    entry.description,
-                    entry.author
+                    entry.id, entry.name, entry.description, entry.author
                 )
                 .to_lowercase();
                 if !hay.contains(&q) {
@@ -966,14 +973,11 @@ impl PluginManager {
     }
 
     fn download_market_package(&self, info: &MarketDownloadInfo) -> Result<PathBuf> {
-        let cache = self
-            .data_dir
-            .join("plugins/cache/download")
-            .join(format!(
-                "{}-{}.piplug",
-                sanitize_id(&info.plugin_id),
-                sanitize_id(&info.version)
-            ));
+        let cache = self.data_dir.join("plugins/cache/download").join(format!(
+            "{}-{}.piplug",
+            sanitize_id(&info.plugin_id),
+            sanitize_id(&info.version)
+        ));
         if let Some(parent) = cache.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -1537,13 +1541,7 @@ fn copy_dir_filtered(src: &Path, dest: &Path) -> Result<()> {
     fs::create_dir_all(dest)?;
     let mut file_count = 0usize;
     let mut total_bytes = 0u64;
-    fn walk(
-        src_root: &Path,
-        from: &Path,
-        to: &Path,
-        file_count: &mut usize,
-        total_bytes: &mut u64,
-    ) -> Result<()> {
+    fn walk(from: &Path, to: &Path, file_count: &mut usize, total_bytes: &mut u64) -> Result<()> {
         for entry in fs::read_dir(from)? {
             let entry = entry?;
             let file_type = entry.file_type()?;
@@ -1557,7 +1555,7 @@ fn copy_dir_filtered(src: &Path, dest: &Path) -> Result<()> {
                 bail!("PLUGIN_INVALID: symlinks are not allowed");
             } else if file_type.is_dir() {
                 fs::create_dir_all(&target)?;
-                walk(src_root, &entry.path(), &target, file_count, total_bytes)?;
+                walk(&entry.path(), &target, file_count, total_bytes)?;
             } else if file_type.is_file() {
                 *file_count += 1;
                 if *file_count > MAX_PACKAGE_FILES {
@@ -1576,7 +1574,7 @@ fn copy_dir_filtered(src: &Path, dest: &Path) -> Result<()> {
         }
         Ok(())
     }
-    walk(src, src, dest, &mut file_count, &mut total_bytes)
+    walk(src, dest, &mut file_count, &mut total_bytes)
 }
 
 fn safe_join(base: &Path, rel: &str) -> Result<PathBuf> {
@@ -1608,7 +1606,13 @@ fn permission_diff(old: &[String], new: &[String]) -> Vec<String> {
 
 fn sanitize_id(id: &str) -> String {
     id.chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
@@ -1764,7 +1768,9 @@ mod tests {
     #[test]
     fn package_path_traversal_rejected() {
         let dir = tempdir().unwrap();
-        unsafe { std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path()); }
+        unsafe {
+            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+        }
         let bad = make_zip(&[("../evil.js", b"alert(1)")]);
         let pkg = dir.path().join("bad.piplug");
         fs::write(&pkg, bad).unwrap();
@@ -1784,34 +1790,40 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("path traversal") || err.contains("PLUGIN_INVALID"));
-        unsafe { std::env::remove_var("PI_DESKTOP_DATA_DIR"); }
+        unsafe {
+            std::env::remove_var("PI_DESKTOP_DATA_DIR");
+        }
     }
 
     #[test]
     fn high_risk_permissions_roundtrip_on_notes_plugin() {
         with_local_market(|| {
-        let dir = tempdir().unwrap();
-        unsafe { std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path()); }
-        // Clean up any existing packages to ensure fresh generation
-        let packages_dir = dir.path().join("plugins/market/packages");
-        if packages_dir.exists() {
-            let _ = fs::remove_dir_all(&packages_dir);
-        }
-        let mut mgr = PluginManager::new(dir.path());
-        let installed = mgr
-            .install_from_market("demo.workspace-notes", None, true, false, None)
-            .unwrap();
-        assert!(installed
-            .plugin
-            .permissions
-            .iter()
-            .any(|p| p == "fs.write.workspace"));
-        assert!(installed
-            .plugin
-            .permissions
-            .iter()
-            .any(|p| p == "net.fetch"));
-        unsafe { std::env::remove_var("PI_DESKTOP_DATA_DIR"); }
+            let dir = tempdir().unwrap();
+            unsafe {
+                std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+            }
+            // Clean up any existing packages to ensure fresh generation
+            let packages_dir = dir.path().join("plugins/market/packages");
+            if packages_dir.exists() {
+                let _ = fs::remove_dir_all(&packages_dir);
+            }
+            let mut mgr = PluginManager::new(dir.path());
+            let installed = mgr
+                .install_from_market("demo.workspace-notes", None, true, false, None)
+                .unwrap();
+            assert!(installed
+                .plugin
+                .permissions
+                .iter()
+                .any(|p| p == "fs.write.workspace"));
+            assert!(installed
+                .plugin
+                .permissions
+                .iter()
+                .any(|p| p == "net.fetch"));
+            unsafe {
+                std::env::remove_var("PI_DESKTOP_DATA_DIR");
+            }
         });
     }
 
@@ -1843,7 +1855,10 @@ mod tests {
         let meta = mgr.refresh_market(true).expect("remote catalog");
         assert_eq!(meta["providerId"], "official");
         assert!(meta["pluginCount"].as_u64().unwrap_or(0) >= 1);
-        assert!(meta["sourceUrl"].as_str().unwrap_or("").contains("pi-desktop-plugins"));
+        assert!(meta["sourceUrl"]
+            .as_str()
+            .unwrap_or("")
+            .contains("pi-desktop-plugins"));
         let search = mgr.market_search(Some("hello"), None).unwrap();
         assert!(search.iter().any(|p| p.id == "demo.hello"));
         unsafe {

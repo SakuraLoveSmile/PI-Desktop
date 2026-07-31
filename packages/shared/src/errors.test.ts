@@ -19,6 +19,10 @@ describe("result helpers", () => {
     expect(ErrorCodes.PLAN_EXECUTION_INTERRUPTED).toBe(
       "PLAN_EXECUTION_INTERRUPTED",
     );
+    expect(ErrorCodes.PLAN_REQUIRES_INTERACTIVE_SESSION).toBe(
+      "PLAN_REQUIRES_INTERACTIVE_SESSION",
+    );
+    expect(ErrorCodes.TOOL_ABORTED).toBe("TOOL_ABORTED");
   });
 
   it("exposes command shell contract failure codes", () => {

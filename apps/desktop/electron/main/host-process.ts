@@ -5,6 +5,9 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { PROTOCOL_VERSION, rpcTimeoutMs } from "@pi-desktop/shared";
 
+const HOST_DISPOSE_GRACE_MS = 3_000;
+const HOST_FORCE_KILL_GRACE_MS = 1_000;
+
 export type HostNotificationHandler = (method: string, params: unknown) => void;
 export type ProcessExitHandler = (info: {
   code: number | null;
@@ -48,10 +51,17 @@ export class HostProcess {
   private disposed = false;
   private closed = false;
   private exitNotified = false;
+  private exitObserved = false;
+  private exitPromise: Promise<void>;
+  private resolveExit!: () => void;
+  private disposePromise?: Promise<void>;
   private readline?: ReturnType<typeof createInterface>;
   readonly binaryPath: string;
 
   constructor(dataDir: string, onStderr?: StderrHandler) {
+    this.exitPromise = new Promise<void>((resolve) => {
+      this.resolveExit = resolve;
+    });
     this.binaryPath = resolveHostBinary();
     this.child = spawn(this.binaryPath, [], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -70,7 +80,10 @@ export class HostProcess {
 
     this.child.on("exit", (code, signal) => {
       this.closeTransport(new Error("host-core exited"));
+      this.exitObserved = true;
+      this.resolveExit();
       this.notifyExit({ code, signal, intentional: this.disposed });
+      this.cleanupProcessListeners();
     });
     this.child.on("error", (error) => {
       this.closeTransport(error instanceof Error ? error : new Error(String(error)));
@@ -93,9 +106,28 @@ export class HostProcess {
     this.handlers.clear();
     this.readline?.close();
     this.readline = undefined;
+  }
+
+  private cleanupProcessListeners() {
     this.child.removeAllListeners("exit");
     this.child.removeAllListeners("error");
     this.child.stderr.removeAllListeners("data");
+  }
+
+  private waitForExit(timeoutMs: number): Promise<boolean> {
+    if (this.exitObserved) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (observed: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        resolve(observed);
+      };
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      timer.unref?.();
+      this.exitPromise.then(() => finish(true));
+    });
   }
 
   private notifyExit(info: {
@@ -195,9 +227,29 @@ export class HostProcess {
   }
 
   async dispose(): Promise<void> {
+    if (this.disposePromise) return this.disposePromise;
+    this.disposePromise = this.disposeInternal();
+    return this.disposePromise;
+  }
+
+  private async disposeInternal(): Promise<void> {
     this.disposed = true;
+    // EOF is the graceful host-core shutdown signal. Send it before rejecting
+    // transport callers so the runner can clean up active tools first.
+    if (!this.child.stdin.destroyed && !this.child.stdin.writableEnded) {
+      this.child.stdin.end();
+    }
     this.closeTransport(new Error("host-core disposed"));
-    this.exitHandlers.clear();
-    this.child.kill();
+    if (this.exitObserved) return;
+
+    const exited = await this.waitForExit(HOST_DISPOSE_GRACE_MS);
+    if (exited || this.exitObserved) return;
+
+    try {
+      this.child.kill("SIGKILL");
+    } catch {
+      // The child may have exited between the grace check and kill fallback.
+    }
+    await this.waitForExit(HOST_FORCE_KILL_GRACE_MS);
   }
 }

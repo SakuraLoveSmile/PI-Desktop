@@ -9,7 +9,7 @@ function stubStdout() {
 }
 
 describe("ParentHostProxy RPC deadlines", () => {
-  it("waits for an unbounded Bash command until the host responds", async () => {
+  it("bounds the default Bash command deadline until the host responds", async () => {
     vi.useFakeTimers();
     const stdout = stubStdout();
     try {
@@ -26,7 +26,7 @@ describe("ParentHostProxy RPC deadlines", () => {
         },
       );
 
-      await vi.advanceTimersByTimeAsync(130_000);
+      await vi.advanceTimersByTimeAsync(189_999);
       expect(settled).toBe(false);
       proxy.handleParentMessage({ id: request.id, result: { ok: true } });
       await expect(pending).resolves.toEqual({ ok: true });
@@ -80,7 +80,7 @@ describe("ParentHostProxy RPC deadlines", () => {
     }
   });
 
-  it("rejects an unbounded command immediately when the parent closes", async () => {
+  it("rejects a default-deadline command immediately when the parent closes", async () => {
     const stdout = stubStdout();
     try {
       const proxy = new ParentHostProxy();

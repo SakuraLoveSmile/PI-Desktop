@@ -32,6 +32,7 @@ function getTimeGroup(dateStr?: string): TimeGroup {
 const TIME_GROUP_ORDER: TimeGroup[] = ["today", "yesterday", "thisWeek", "older14d", "archived"];
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { api } from "../lib/api";
 import { isDefaultSessionTitle, useAppStore } from "../stores/app-store";
 import { normalizeProjectPath } from "../lib/sidebar-session-groups";
 import {
@@ -425,7 +426,7 @@ export function Sidebar({
     const index = THEME_ORDER.indexOf(current.theme as ThemeChoice);
     const next = THEME_ORDER[(index + 1) % THEME_ORDER.length];
     try {
-      await (await import("../lib/api")).api.setSettings({ ...current, theme: next });
+      await api.setSettings({ ...current, theme: next });
       useAppStore.setState({ settings: { ...current, theme: next } });
     } catch { /* ignore */ }
   }, []);
@@ -841,7 +842,7 @@ export function Sidebar({
   const openProjectFolder = async (entry: ProjectEntry) => {
     closeMenus(false);
     try {
-      await (await import("../lib/api")).api.openProjectFolder(entry.path);
+      await api.openProjectFolder(entry.path);
     } catch (error) {
       reportError(error);
     }
@@ -1609,7 +1610,7 @@ export function Sidebar({
               }
               void (async () => {
                 try {
-                  await (await import("../lib/api")).api.updatesCheck();
+                  await api.updatesCheck();
                 } catch { /* ignore */ }
               })();
             }}

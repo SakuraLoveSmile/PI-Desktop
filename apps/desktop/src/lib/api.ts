@@ -140,6 +140,7 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
     planApprovalPermissionMode: normalizeGlobalPermissionMode(
       (settings as { planApprovalPermissionMode?: unknown })
         .planApprovalPermissionMode,
+      "ask",
     ),
   };
 }

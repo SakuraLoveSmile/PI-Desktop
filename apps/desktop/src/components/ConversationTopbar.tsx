@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import type { ThinkingLevel } from "@pi-desktop/shared";
+import type { Mode, ThinkingLevel } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { thinkingLevelForProvider } from "./Composer";
 import { ModelSelect } from "./ModelSelect";
@@ -76,7 +76,7 @@ export function ConversationTopbar({
   const busy = isRunning || sessionRunning;
 
   const setMode = useCallback(
-    async (next: "chat" | "agent") => {
+    async (next: Mode) => {
       if (busy) return;
       try {
         await configureActiveSession({
@@ -128,12 +128,12 @@ export function ConversationTopbar({
         <div className="ct-mode" role="group" aria-label={t("settings.mode")}>
           <button
             type="button"
-            className={`ct-mode-btn ${mode === "chat" ? "active" : ""}`}
-            aria-pressed={mode === "chat"}
+            className={`ct-mode-btn ${mode === "plan" ? "active" : ""}`}
+            aria-pressed={mode === "plan"}
             disabled={busy}
-            onClick={() => void setMode("chat")}
+            onClick={() => void setMode("plan")}
           >
-            {t("settings.modeChat")}
+            {t("settings.modePlan")}
           </button>
           <button
             type="button"

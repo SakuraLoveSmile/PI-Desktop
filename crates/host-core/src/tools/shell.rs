@@ -17,7 +17,8 @@ pub const CMD_ID: &str = "cmd";
 pub const GIT_BASH_ID: &str = "git-bash";
 pub const BASH_ID: &str = "bash";
 
-pub const SHELL_MISSING_GUIDANCE: &str = "No usable command shell was found. Install or enable a supported shell and try again.";
+pub const SHELL_MISSING_GUIDANCE: &str =
+    "No usable command shell was found. Install or enable a supported shell and try again.";
 
 /// Windows CreateProcess accepts at most 32,767 UTF-16 code units in its
 /// command line. Keep the builder below that limit, including executable and
@@ -51,8 +52,6 @@ pub struct ShellCatalog {
 
 #[derive(Debug, Clone)]
 pub struct ResolvedShell {
-    pub id: String,
-    pub dialect: String,
     pub program: PathBuf,
 }
 
@@ -133,16 +132,6 @@ pub fn catalog(configured_id: Option<&str>) -> ShellCatalog {
     })
 }
 
-pub fn resolve_effective(configured_id: Option<&str>) -> Result<ResolvedShell, String> {
-    let catalog = catalog(configured_id);
-    let effective = catalog
-        .effective
-        .ok_or_else(|| SHELL_MISSING_GUIDANCE.to_string())?;
-    // Resolve the selected id directly. Do not silently select another
-    // dialect after the catalog/effective-id check has completed.
-    resolve_shell(&effective.id)
-}
-
 pub fn resolve_shell(id: &str) -> Result<ResolvedShell, String> {
     resolve_shell_for_platform(current_platform(), id)
 }
@@ -151,53 +140,24 @@ pub fn resolve_shell_for_platform(
     platform: ShellPlatform,
     id: &str,
 ) -> Result<ResolvedShell, String> {
-    let dialect = dialect_for_id(id)
-        .ok_or_else(|| format!("unknown command shell id '{id}'"))?
-        .to_string();
+    dialect_for_id(id).ok_or_else(|| format!("unknown command shell id '{id}'"))?;
 
     match platform {
         ShellPlatform::Windows => match id {
-            WINDOWS_POWERSHELL_ID => find_windows_powershell().map(|program| ResolvedShell {
-                id: id.to_string(),
-                dialect,
-                program,
-            }),
-            CMD_ID => find_cmd().map(|program| ResolvedShell {
-                id: id.to_string(),
-                dialect,
-                program,
-            }),
-            GIT_BASH_ID => find_bash().map(|program| ResolvedShell {
-                id: id.to_string(),
-                dialect,
-                program,
-            }),
+            WINDOWS_POWERSHELL_ID => {
+                find_windows_powershell().map(|program| ResolvedShell { program })
+            }
+            CMD_ID => find_cmd().map(|program| ResolvedShell { program }),
+            GIT_BASH_ID => find_bash().map(|program| ResolvedShell { program }),
             _ => Err(format!("command shell '{id}' is not available on Windows")),
         },
         ShellPlatform::Unix => match id {
-            BASH_ID => find_bash().map(|program| ResolvedShell {
-                id: id.to_string(),
-                dialect,
-                program,
-            }),
-            _ => Err(format!("command shell '{id}' is not available on this platform")),
+            BASH_ID => find_bash().map(|program| ResolvedShell { program }),
+            _ => Err(format!(
+                "command shell '{id}' is not available on this platform"
+            )),
         },
     }
-}
-
-/// Build the invocation for a resolved shell. The selected id is required so
-/// a later call cannot fall back to a different dialect.
-pub fn build_invocation(
-    shell_id: &str,
-    command: &str,
-) -> Result<ShellInvocation, String> {
-    let resolved = resolve_shell(shell_id)?;
-    build_invocation_for_platform(
-        current_platform(),
-        shell_id,
-        resolved.program,
-        command,
-    )
 }
 
 /// Pure invocation builder used by runtime code and cross-platform tests.
@@ -243,17 +203,28 @@ pub fn build_invocation_for_platform(
                 "-c".into(),
                 command.to_string(),
             ],
-            _ => return Err(format!("command shell '{shell_id}' is not available on Windows")),
+            _ => {
+                return Err(format!(
+                    "command shell '{shell_id}' is not available on Windows"
+                ))
+            }
         },
         ShellPlatform::Unix => match shell_id {
             BASH_ID => vec!["-lc".into(), command.to_string()],
-            _ => return Err(format!("command shell '{shell_id}' is not available on this platform")),
+            _ => {
+                return Err(format!(
+                    "command shell '{shell_id}' is not available on this platform"
+                ))
+            }
         },
     };
 
     if platform == ShellPlatform::Windows {
         let units = program.to_string_lossy().encode_utf16().count()
-            + args.iter().map(|arg| arg.encode_utf16().count()).sum::<usize>()
+            + args
+                .iter()
+                .map(|arg| arg.encode_utf16().count())
+                .sum::<usize>()
             + args.len();
         if units > MAX_WINDOWS_COMMAND_LINE_UNITS {
             return Err(format!(
@@ -449,7 +420,10 @@ mod tests {
     fn catalog_defaults_and_fallback_are_platform_specific() {
         let unix = catalog_for_platform(ShellPlatform::Unix, None, |_| true);
         assert_eq!(unix.configured_id, BASH_ID);
-        assert_eq!(unix.effective.as_ref().map(|option| option.id.as_str()), Some(BASH_ID));
+        assert_eq!(
+            unix.effective.as_ref().map(|option| option.id.as_str()),
+            Some(BASH_ID)
+        );
         assert!(!unix.fallback);
         assert_eq!(unix.choices.len(), 1);
 
@@ -459,20 +433,26 @@ mod tests {
         assert_eq!(windows.choices[0].label, "Windows PowerShell");
         assert!(windows.choices[0].is_default);
 
-        let fallback = catalog_for_platform(
-            ShellPlatform::Windows,
-            Some(WINDOWS_POWERSHELL_ID),
-            |id| id != WINDOWS_POWERSHELL_ID,
+        let fallback =
+            catalog_for_platform(ShellPlatform::Windows, Some(WINDOWS_POWERSHELL_ID), |id| {
+                id != WINDOWS_POWERSHELL_ID
+            });
+        assert_eq!(
+            fallback.effective.as_ref().map(|option| option.id.as_str()),
+            Some(CMD_ID)
         );
-        assert_eq!(fallback.effective.as_ref().map(|option| option.id.as_str()), Some(CMD_ID));
         assert!(fallback.fallback);
     }
 
     #[test]
     fn unknown_configured_id_normalizes_to_platform_default() {
-        let catalog = catalog_for_platform(ShellPlatform::Unix, Some("C:\\custom\\shell.exe"), |_| true);
+        let catalog =
+            catalog_for_platform(ShellPlatform::Unix, Some("C:\\custom\\shell.exe"), |_| true);
         assert_eq!(catalog.configured_id, BASH_ID);
-        assert_eq!(catalog.effective.as_ref().map(|option| option.id.as_str()), Some(BASH_ID));
+        assert_eq!(
+            catalog.effective.as_ref().map(|option| option.id.as_str()),
+            Some(BASH_ID)
+        );
     }
 
     #[test]
@@ -511,7 +491,14 @@ mod tests {
         .unwrap();
         assert_eq!(
             cmd.args,
-            ["/D", "/Q", "/V:OFF", "/S", "/C", "chcp 65001>nul && echo hello"]
+            [
+                "/D",
+                "/Q",
+                "/V:OFF",
+                "/S",
+                "/C",
+                "chcp 65001>nul && echo hello"
+            ]
         );
 
         let git_bash = build_invocation_for_platform(

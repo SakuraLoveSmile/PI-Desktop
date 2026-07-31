@@ -1700,6 +1700,8 @@ html {
   display: flex;
   justify-content: center;
   width: 100%;
+  container-type: inline-size;
+  container-name: composer-stack;
 }
 
 /* Thread mode: floating bottom dock with fade */
@@ -2171,11 +2173,12 @@ html {
 }
 
 .plan-approval-bar {
-  display: flex;
+  display: grid;
   width: 100%;
   min-width: 0;
-  align-items: center;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 10px 14px;
   margin-bottom: 8px;
   padding: 7px 9px;
   border: 1px solid var(--ds-border-default);
@@ -2184,9 +2187,36 @@ html {
   box-shadow: 0 1px 0 color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
 }
 
+.plan-approval-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.plan-approval-label {
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-tight);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.plan-approval-title {
+  min-width: 0;
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-md-plus);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--leading-compact);
+  overflow-wrap: anywhere;
+}
+
 .plan-approval-question {
   min-width: 0;
-  flex: 1 1 240px;
+  margin: 0;
   color: var(--ds-text-secondary);
   font-size: var(--text-sm-plus);
   line-height: var(--leading-body);
@@ -2195,10 +2225,86 @@ html {
   word-break: break-word;
 }
 
+.plan-approval-details {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 2px;
+}
+
+.plan-approval-artifact {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-3xs);
+  padding: 2px 5px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-compact);
+  text-align: left;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.plan-approval-artifact:hover,
+.plan-approval-artifact:focus-visible {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.plan-approval-artifact > svg {
+  flex: 0 0 auto;
+}
+
+.plan-approval-artifact-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.plan-approval-artifact-path {
+  min-width: 0;
+  max-width: min(38vw, 320px);
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-approval-expiry,
+.plan-approval-terminal {
+  min-width: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}
+
+.plan-approval-terminal {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.plan-approval-terminal-status {
+  color: var(--ds-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.plan-approval-terminal-feedback {
+  white-space: pre-wrap;
+}
+
 .plan-approval-actions {
   display: flex;
   min-width: 0;
   flex: 0 1 auto;
+  align-self: end;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
@@ -2243,12 +2349,12 @@ html {
 }
 
 .plan-approval-approve-main {
-  min-width: 122px;
+  min-width: 0;
   flex: 1 1 auto;
   padding: 0 10px;
   border-radius: var(--radius-3xs) 0 0 var(--radius-3xs);
   color: var(--ds-text-primary);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .plan-approval-approve-main:hover:not(:disabled),
@@ -2308,15 +2414,35 @@ html {
   margin-left: auto;
 }
 
+.plan-approval-warning {
+  display: inline-flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 5px;
+  grid-column: 1 / -1;
+  color: var(--ds-warning);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}
+
+.plan-approval-warning svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
 @container composer-stack (max-width: 520px) {
   .plan-approval-bar {
-    align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .plan-approval-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .plan-approval-artifact-path {
+    max-width: min(48vw, 320px);
   }
 }
 
@@ -2342,6 +2468,10 @@ html {
   .plan-approval-split {
     width: 100%;
     flex: 0 0 auto;
+  }
+
+  .plan-approval-warning {
+    width: 100%;
   }
 }
 
@@ -6114,10 +6244,65 @@ html {
   justify-content: flex-end;
 }
 
+.settings-command-shell-control {
+  display: flex;
+  width: min(100%, 240px);
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.settings-command-shell-select {
+  width: 100%;
+  min-width: 0 !important;
+}
+
+.settings-command-shell-state,
+.settings-command-shell-status {
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.settings-command-shell-state.error {
+  color: var(--ds-text-secondary);
+}
+
 .settings-row-control .field-select,
 .settings-row-control .field-input {
   width: 100%;
   min-width: 140px;
+}
+
+@media (max-width: 820px) {
+  .settings-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .settings-row-control {
+    width: 100%;
+    max-width: none;
+    justify-content: flex-start;
+  }
+
+  .settings-row-control .field-select,
+  .settings-row-control .field-input {
+    min-width: 0;
+  }
+
+  .settings-command-shell-control {
+    width: 100%;
+  }
+
+  .settings-command-shell-state,
+  .settings-command-shell-status {
+    text-align: left;
+  }
 }
 
 .shortcut-map {

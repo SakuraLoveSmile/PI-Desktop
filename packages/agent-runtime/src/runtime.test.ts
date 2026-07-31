@@ -232,7 +232,8 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect(bash.description).toContain("Windows PowerShell");
     expect((bash.parameters as any).properties.timeout).toMatchObject({
       type: "number",
-      exclusiveMinimum: 0,
+      minimum: 1,
+      maximum: 300,
     });
     expect(
       runtime.matches("agent", provider, "medium", [], undefined, powershell),
@@ -244,13 +245,17 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await runtime.dispose();
   });
 
-  it("sends an explicit Bash timeout and omits default transport fields", async () => {
+  it("sends the default Bash timeout and preserves explicit overrides", async () => {
     const host = {
       call: vi.fn().mockResolvedValue({ ok: true, content: "done" }),
     };
     const runtime = createRuntime({ host });
     const bash = (runtime as any).agent.state.tools.find(
       (tool: any) => tool.name === "Bash",
+    );
+    expect(bash.description).toContain("60-second timeout");
+    expect((bash.parameters as any).properties.timeout.description).toContain(
+      "defaults to 60 seconds",
     );
 
     await bash.execute("bash-default", { command: "printf default" });
@@ -259,8 +264,8 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect(defaultCall[1]).toMatchObject({
       toolName: "Bash",
       expectedCommandShellId: "bash",
+      timeoutMs: 60_000,
     });
-    expect(defaultCall[1]).not.toHaveProperty("timeoutMs");
 
     await bash.execute("bash-timeout", { command: "printf timed", timeout: 1.25 });
     const timedCall = host.call.mock.calls.at(-1)!;
@@ -269,6 +274,38 @@ describe("DesktopAgentRuntime configuration matching", () => {
       timeoutMs: 1_250,
     });
 
+    await runtime.dispose();
+  });
+
+  it("accepts Bash timeout bounds and rejects invalid values before host execution", async () => {
+    const host = {
+      call: vi.fn().mockResolvedValue({ ok: true, content: "done" }),
+    };
+    const runtime = createRuntime({ host });
+    const bash = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Bash",
+    );
+
+    await bash.execute("bash-min", { command: "printf min", timeout: 1 });
+    expect(host.call).toHaveBeenLastCalledWith(
+      "tools.execute",
+      expect.objectContaining({ timeoutMs: 1_000 }),
+    );
+    await bash.execute("bash-max", { command: "printf max", timeout: 300 });
+    expect(host.call).toHaveBeenLastCalledWith(
+      "tools.execute",
+      expect.objectContaining({ timeoutMs: 300_000 }),
+    );
+
+    for (const timeout of [Number.NaN, Number.POSITIVE_INFINITY, 0.999, 300.001]) {
+      await expect(
+        bash.execute(`bash-invalid-${String(timeout)}`, {
+          command: "printf invalid",
+          timeout,
+        }),
+      ).rejects.toMatchObject({ errorCode: "INVALID_ARGUMENT" });
+    }
+    expect(host.call).toHaveBeenCalledTimes(2);
     await runtime.dispose();
   });
 
@@ -411,8 +448,9 @@ describe("DesktopAgentRuntime configuration matching", () => {
   });
 
   it("propagates a tools.abort protocol error instead of hiding it", async () => {
+    let finishExecution!: (value: { ok: boolean; content: unknown }) => void;
     const execution = new Promise<{ ok: boolean; content: unknown }>((resolve) => {
-      setTimeout(() => resolve({ ok: false, content: { code: "TOOL_ABORTED" } }), 0);
+      finishExecution = resolve;
     });
     const host = {
       call: vi.fn((method: string) =>
@@ -432,7 +470,9 @@ describe("DesktopAgentRuntime configuration matching", () => {
       { command: "printf progress" },
       controller.signal,
     );
+    await new Promise<void>((resolve) => setImmediate(resolve));
     controller.abort();
+    finishExecution({ ok: false, content: { code: "TOOL_ABORTED" } });
     await expect(pending).rejects.toThrow("tools.abort protocol failure");
     await runtime.dispose();
   });
@@ -524,14 +564,15 @@ describe("DesktopAgentRuntime plan transitions", () => {
     expect(runtime.getMode()).toBe("plan");
     expect(agent.state.tools.map((tool: any) => tool.name)).toContain("SubmitPlan");
 
+    const exactMarkdown = "  # Implement it\n\n1. Make the change.  \n";
     const proposal = {
       id: "proposal-1",
       sessionId: "session-1",
       turnId: "durable-turn-1",
       toolCallId: "submit-call-1",
       title: "Implement it",
-      markdown: "# Implement it\n\n1. Make the change.",
-      plan: "# Implement it\n\n1. Make the change.",
+      markdown: exactMarkdown,
+      plan: exactMarkdown,
       question: "Approve implementation?",
       artifact: {
         relativePath: ".pi/plans/proposal-1.md",

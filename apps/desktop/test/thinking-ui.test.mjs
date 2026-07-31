@@ -79,7 +79,7 @@ test("reasoning-capable models lead the composer chip row, mode sits in the top 
   assert.ok(thinkingControl >= 0);
   assert.ok(permissionControl > thinkingControl);
   assert.match(topbarSource, /className="ct-mode"/);
-  assert.match(topbarSource, /ct-mode-btn[\s\S]*?mode === "chat"/);
+  assert.match(topbarSource, /ct-mode-btn[\s\S]*?mode === "plan"/);
   assert.match(topbarSource, /ct-mode-btn[\s\S]*?mode === "agent"/);
   assert.match(
     leftToolbar,

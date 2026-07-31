@@ -51,7 +51,7 @@ test("plan approval sends exact identities and waits for host confirmation", () 
   assert.match(barSource, /toolCallId: proposal\.toolCallId/);
   assert.match(barSource, /version: proposal\.version/);
   assert.match(barSource, /action,\n\s+\.\.\.\(action === "approve" && targetPermissionMode/);
-  assert.doesNotMatch(barSource, /request_changes|feedback/);
+  assert.doesNotMatch(barSource, /request_changes/);
   assert.match(barSource, /data-testid="plan-approval-bar"/);
   assert.match(barSource, /role="menuitemradio"/);
   assert.match(barSource, /aria-checked=\{rememberedMode === candidate\}/);

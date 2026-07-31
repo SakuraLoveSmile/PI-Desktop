@@ -37,7 +37,10 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
-import { DEFAULT_CONTEXT_COMPACTION_SETTINGS } from "@pi-desktop/shared";
+import {
+  DEFAULT_COMMAND_TIMEOUT_MS,
+  DEFAULT_CONTEXT_COMPACTION_SETTINGS,
+} from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   AgentStatus,
@@ -326,8 +329,8 @@ function safeJson(value: unknown): string {
   }
 }
 
-const MAX_COMMAND_TIMEOUT_MS = 2_147_483_647;
-const MAX_COMMAND_TIMEOUT_SECONDS = MAX_COMMAND_TIMEOUT_MS / 1000;
+const MIN_COMMAND_TIMEOUT_SECONDS = 1;
+const MAX_COMMAND_TIMEOUT_SECONDS = 300;
 const TOOL_OUTPUT_UPDATE_THROTTLE_MS = 100;
 const MAX_TOOL_PROGRESS_CHARS = 64 * 1024;
 const TOOL_PROGRESS_TRUNCATION_MARKER =
@@ -379,22 +382,27 @@ function commandShellToolDescription(
     "The protocol tool remains named Bash for compatibility; write commands for the active shell dialect.",
     shellSyntaxGuidance(shell),
     `The session scratch directory variable is ${shellScratchVariable(shell)}.`,
-    "An optional timeout may be supplied in seconds; without it, the command has no command timeout.",
+    "An optional timeout from 1 to 300 seconds may be supplied; without it, the command defaults to a 60-second timeout.",
     ...(scratchDir ? [`The session scratch directory is ${scratchDir}.`] : []),
   ].join(" ");
 }
 
-function commandTimeoutMs(params: unknown): number | undefined {
+function commandTimeoutMs(params: unknown): number {
   const timeout = isRecord(params) ? params.timeout : undefined;
-  if (timeout === undefined) return undefined;
-  if (typeof timeout !== "number" || !Number.isFinite(timeout) || timeout <= 0) {
+  if (timeout === undefined) return DEFAULT_COMMAND_TIMEOUT_MS;
+  if (
+    typeof timeout !== "number" ||
+    !Number.isFinite(timeout) ||
+    timeout < MIN_COMMAND_TIMEOUT_SECONDS
+  ) {
     throw Object.assign(
-      new Error("Invalid timeout: must be a finite number of seconds greater than zero"),
+      new Error(
+        `Invalid timeout: must be a finite number of seconds between ${MIN_COMMAND_TIMEOUT_SECONDS} and ${MAX_COMMAND_TIMEOUT_SECONDS}`,
+      ),
       { errorCode: "INVALID_ARGUMENT" },
     );
   }
-  const timeoutMs = Math.ceil(timeout * 1000);
-  if (!Number.isFinite(timeoutMs) || timeoutMs > MAX_COMMAND_TIMEOUT_MS) {
+  if (timeout > MAX_COMMAND_TIMEOUT_SECONDS) {
     throw Object.assign(
       new Error(
         `Invalid timeout: maximum is ${MAX_COMMAND_TIMEOUT_SECONDS} seconds`,
@@ -402,6 +410,7 @@ function commandTimeoutMs(params: unknown): number | undefined {
       { errorCode: "INVALID_ARGUMENT" },
     );
   }
+  const timeoutMs = Math.ceil(timeout * 1000);
   return timeoutMs;
 }
 
@@ -1058,8 +1067,10 @@ export class DesktopAgentRuntime {
                         command: Type.String(),
                         timeout: Type.Optional(
                           Type.Number({
-                            exclusiveMinimum: 0,
-                            description: "Optional command timeout in seconds.",
+                            minimum: MIN_COMMAND_TIMEOUT_SECONDS,
+                            maximum: MAX_COMMAND_TIMEOUT_SECONDS,
+                            description:
+                              "Optional command timeout in seconds from 1 to 300; defaults to 60 seconds.",
                           }),
                         ),
                       }
@@ -1182,7 +1193,7 @@ export class DesktopAgentRuntime {
               ...(isBash
                 ? {
                     expectedCommandShellId: this.commandShell.id,
-                    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+                    timeoutMs,
                   }
                 : {}),
               ...(toolName.startsWith("plugin_")
@@ -1315,13 +1326,13 @@ export class DesktopAgentRuntime {
             : "";
         const markdown =
           isRecord(params) && typeof params.markdown === "string"
-            ? params.markdown.trim()
+            ? params.markdown
             : "";
         const question =
           isRecord(params) && typeof params.question === "string"
             ? params.question.trim()
             : "";
-        if (!title || !markdown || !question) {
+        if (!title || !markdown.trim() || !question) {
           return {
             content: [
               {

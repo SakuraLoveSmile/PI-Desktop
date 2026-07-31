@@ -126,6 +126,8 @@ let workPanelLastAppliedBounds: WindowBounds | null = null;
 let host: HostProcess | null = null;
 let sidecar: AgentSidecar | null = null;
 let quitting = false;
+let shutdownComplete = false;
+let shutdownPromise: Promise<void> | null = null;
 const pluginPanels = new PluginPanelHost(async (pluginId, channel, payload) =>
   plugins.invokePanelBridge(pluginId, channel, payload),
 );
@@ -725,6 +727,7 @@ const pendingExecutionFinishes = new Map<
 const inFlightExecutionFinishes = new Set<string>();
 let approvedExecutionDrain: Promise<void> | null = null;
 const turnSettlements = new Map<string, Set<() => void>>();
+const turnFinalizations = new Map<string, Promise<void>>();
 /** sessionId → scheduled task_run id awaiting completion. */
 const scheduledRunsBySession = new Map<string, string>();
 /** Session currently rendered on the chat page; focus remains Main-owned. */
@@ -750,12 +753,6 @@ function waitForTurnSettlement(sessionId: string, turnId: string): Promise<void>
     const waiters = turnSettlements.get(key) ?? new Set<() => void>();
     waiters.add(resolve);
     turnSettlements.set(key, waiters);
-    const timer = setTimeout(() => {
-      if (!waiters.delete(resolve)) return;
-      if (waiters.size === 0) turnSettlements.delete(key);
-      resolve();
-    }, 30_000);
-    timer.unref();
   });
 }
 
@@ -1861,7 +1858,7 @@ function wireHost(h: HostProcess) {
     if (intentional || quitting) return;
     for (const [executionId, sessionId] of claimedExecutionSessions) {
       if (approvedExecutionIdsBySession.get(sessionId) === executionId) {
-        finishTurn(sessionId, "aborted", "PLAN_EXECUTION_INTERRUPTED");
+        void finishTurn(sessionId, "aborted", "PLAN_EXECUTION_INTERRUPTED");
       }
       void finishApprovedExecution(
         executionId,
@@ -1926,7 +1923,7 @@ function wireSidecar(s: AgentSidecar) {
         if (host) {
           await host.call("plans.abort", { sessionId }).catch(() => undefined);
         }
-        finishTurn(sessionId, "aborted", "PLAN_APPROVAL_INTERRUPTED");
+        await finishTurn(sessionId, "aborted", "PLAN_APPROVAL_INTERRUPTED");
         if (executionId) {
           await finishApprovedExecution(
             executionId,
@@ -2024,61 +2021,101 @@ function finishTurn(
   status: "completed" | "aborted" | "error",
   errorCode?: string,
   options: { createNotification?: boolean } = {},
-) {
-  const turnId = activeTurns.get(sessionId);
-  activeTurns.delete(sessionId);
-  if (turnId) {
-    const key = planSubmissionTurnKey(sessionId, turnId);
-    const waiters = turnSettlements.get(key);
-    if (waiters) {
-      turnSettlements.delete(key);
-      for (const resolve of waiters) resolve();
-    }
-  }
-  const wasPlanSubmission = turnId
-    ? planSubmissionTurnIds.delete(planSubmissionTurnKey(sessionId, turnId))
-    : false;
-  if (host && turnId) {
-    const createNotification =
-      options.createNotification ??
-      (!wasPlanSubmission && shouldCreateTaskNotification(sessionId));
-    void host
-      .call<{ ok: boolean; notification?: AppNotification }>("session.endTurn", {
-        turnId,
-        status,
-        errorCode,
-        createNotification,
-      })
-      .then((result) => {
-        if (result.notification) {
-          sendToRenderer(IPC.event.notificationChanged, {
-            notification: result.notification,
+): Promise<void> {
+  const existing = turnFinalizations.get(sessionId);
+  if (existing) return existing;
+
+  const finalization = (async () => {
+    const turnId = activeTurns.get(sessionId);
+    const turnKey = turnId
+      ? planSubmissionTurnKey(sessionId, turnId)
+      : undefined;
+    const wasPlanSubmission = turnKey
+      ? planSubmissionTurnIds.has(turnKey)
+      : false;
+
+    try {
+      if (host && turnId) {
+        const createNotification =
+          options.createNotification ??
+          (!wasPlanSubmission && shouldCreateTaskNotification(sessionId));
+        try {
+          const result = await host.call<{
+            ok: boolean;
+            notification?: AppNotification;
+          }>("session.endTurn", {
+            turnId,
+            status,
+            errorCode,
+            createNotification,
+          });
+          if (result.notification) {
+            sendToRenderer(IPC.event.notificationChanged, {
+              notification: result.notification,
+            });
+          }
+        } catch (e) {
+          logger.app("warn", "endTurn failed", {
+            sessionId,
+            data: String(e),
           });
         }
-      })
-      .catch((e) =>
-        logger.app("warn", "endTurn failed", { sessionId, data: String(e) }),
-      );
-  }
-  const runId = scheduledRunsBySession.get(sessionId);
-  if (runId) {
-    scheduledRunsBySession.delete(sessionId);
-    if (host) {
-      void host
-        .call("scheduled.finishRun", { runId, status, errorCode })
-        .catch((e) =>
-          logger.app("warn", "finishRun failed", { sessionId, data: String(e) }),
-        );
+      }
+
+      const runId = scheduledRunsBySession.get(sessionId);
+      if (runId) {
+        scheduledRunsBySession.delete(sessionId);
+        if (host) {
+          await host
+            .call("scheduled.finishRun", { runId, status, errorCode })
+            .catch((e) =>
+              logger.app("warn", "finishRun failed", {
+                sessionId,
+                data: String(e),
+              }),
+            );
+        }
+      }
+    } finally {
+      // Do not release local ownership or wake a queued approved execution
+      // until the durable endTurn request has settled above.
+      if (turnId && activeTurns.get(sessionId) === turnId) {
+        activeTurns.delete(sessionId);
+      }
+      if (turnKey) {
+        planSubmissionTurnIds.delete(turnKey);
+        const waiters = turnSettlements.get(turnKey);
+        if (waiters) {
+          turnSettlements.delete(turnKey);
+          for (const resolve of waiters) resolve();
+        }
+      }
     }
-  }
-  const toolPrefix = `${sessionId}:`;
-  // A host tool can finish shortly after the turn is aborted. Keep metadata
-  // long enough for a late tool_end to persist a readable historical row.
-  setTimeout(() => {
-    for (const key of activeToolCalls.keys()) {
-      if (key.startsWith(toolPrefix)) activeToolCalls.delete(key);
-    }
-  }, 5 * 60 * 1000).unref();
+
+    const toolPrefix = `${sessionId}:`;
+    // A host tool can finish shortly after the turn is aborted. Keep metadata
+    // long enough for a late tool_end to persist a readable historical row.
+    setTimeout(() => {
+      for (const key of activeToolCalls.keys()) {
+        if (key.startsWith(toolPrefix)) activeToolCalls.delete(key);
+      }
+    }, 5 * 60 * 1000).unref();
+  })();
+
+  turnFinalizations.set(sessionId, finalization);
+  void finalization.then(
+    () => {
+      if (turnFinalizations.get(sessionId) === finalization) {
+        turnFinalizations.delete(sessionId);
+      }
+    },
+    () => {
+      if (turnFinalizations.get(sessionId) === finalization) {
+        turnFinalizations.delete(sessionId);
+      }
+    },
+  );
+  return finalization;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -2296,7 +2333,7 @@ async function dispatchApprovedPlan(rawExecution: unknown): Promise<void> {
     const errorCode =
       error?.data?.errorCode || error?.errorCode || ErrorCodes.PLAN_EXECUTION_INTERRUPTED;
     if (turnId && activeTurns.get(initial.sessionId) === turnId) {
-      finishTurn(initial.sessionId, "error", errorCode);
+      await finishTurn(initial.sessionId, "error", errorCode);
     }
     if (claimed) {
       await finishApprovedExecution(initial.id, "interrupted", errorCode);
@@ -2393,24 +2430,28 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
       code: event.error.code,
       data: { message: event.error.message, retriable: event.error.retriable },
     });
-    finishTurn(
+    const turnFinalization = finishTurn(
       envelope.sessionId,
       event.error.code === "TURN_ABORTED" ? "aborted" : "error",
       event.error.code,
     );
     if (executionId) {
-      void finishApprovedExecution(
-        executionId,
-        "interrupted",
-        event.error.code,
+      void turnFinalization.then(() =>
+        finishApprovedExecution(
+          executionId,
+          "interrupted",
+          event.error.code,
+        ),
       );
     }
     return;
   }
   if (event.type === "agent_end") {
-    finishTurn(envelope.sessionId, "completed");
+    const turnFinalization = finishTurn(envelope.sessionId, "completed");
     if (executionId) {
-      void finishApprovedExecution(executionId, "completed");
+      void turnFinalization.then(() =>
+        finishApprovedExecution(executionId, "completed"),
+      );
     }
     // Persist the completed branch as the active regenerate revision when the
     // latest user turn carries revision metadata (ChatGPT-style history).
@@ -4053,11 +4094,22 @@ function registerIpc() {
           }
         : {}),
     };
-    await host.call("session.appendMessage", {
-      sessionId: req.sessionId,
-      message: userMessage,
-      turnId: turn?.turnId,
-    });
+    try {
+      await host.call("session.appendMessage", {
+        sessionId: req.sessionId,
+        message: userMessage,
+        turnId: turn?.turnId,
+      });
+    } catch (error) {
+      await finishTurn(
+        req.sessionId,
+        "error",
+        (error as { data?: { errorCode?: string }; errorCode?: string })?.data
+          ?.errorCode ??
+          (error as { errorCode?: string })?.errorCode,
+      );
+      throw error;
+    }
     sendToRenderer(IPC.event.agentMessage, {
       sessionId: req.sessionId,
       ts: Date.now(),
@@ -4083,7 +4135,7 @@ function registerIpc() {
         },
       );
     } catch (e) {
-      void finishTurn(req.sessionId, "error", (e as any)?.errorCode);
+      await finishTurn(req.sessionId, "error", (e as any)?.errorCode);
       throw e;
     }
     logger.app("info", "prompt accepted", {
@@ -4135,7 +4187,7 @@ function registerIpc() {
     try {
       result = await sidecar.call("agent.abort", req);
     } finally {
-      finishTurn(req.sessionId, "aborted", "TURN_ABORTED");
+      await finishTurn(req.sessionId, "aborted", "TURN_ABORTED");
       if (executionId) {
         await finishApprovedExecution(
           executionId,
@@ -4595,15 +4647,34 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+  if (shutdownComplete) return;
+  event.preventDefault();
+  if (shutdownPromise) return;
+
   quitting = true;
-  void pluginPanels.closeAll();
-  updater.dispose();
-  logger.app("info", "app shutdown");
-  ptys.disposeAll();
-  browserPane.dispose();
-  void host?.dispose();
-  void sidecar?.dispose();
+  shutdownPromise = (async () => {
+    const hostShutdown = host?.dispose();
+    const pluginPanelShutdown = pluginPanels.closeAll();
+    updater.dispose();
+    logger.app("info", "app shutdown");
+    ptys.disposeAll();
+    browserPane.dispose();
+    const sidecarShutdown = sidecar?.dispose();
+
+    try {
+      await hostShutdown;
+    } catch (error) {
+      logger.app("warn", "host shutdown failed", { data: String(error) });
+    }
+    await Promise.allSettled([pluginPanelShutdown, sidecarShutdown]);
+  })();
+
+  const releaseQuit = () => {
+    shutdownComplete = true;
+    app.quit();
+  };
+  void shutdownPromise.then(releaseQuit, releaseQuit);
 });
 
 app.on("activate", () => {

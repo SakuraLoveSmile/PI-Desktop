@@ -66,6 +66,16 @@ pub struct PermissionRequest {
     pub command_shell_id: Option<String>,
 }
 
+pub struct PermissionRequestParams<'a> {
+    pub session_id: &'a str,
+    pub tool_call_id: &'a str,
+    pub tool_name: &'a str,
+    pub args_preview: serde_json::Value,
+    pub reason: &'a str,
+    pub declared_risk: Option<&'a str>,
+    pub command_shell_id: Option<&'a str>,
+}
+
 #[derive(Debug)]
 struct Pending {
     created_at: Instant,
@@ -80,10 +90,6 @@ pub struct PermissionManager {
 }
 
 impl PermissionManager {
-    pub fn tool_risk(tool_name: &str) -> Risk {
-        Self::tool_risk_with_declared(tool_name, None)
-    }
-
     pub fn tool_risk_with_declared(tool_name: &str, declared: Option<&str>) -> Risk {
         match tool_name {
             "Read" | "Glob" | "Grep" => Risk::Low,
@@ -107,28 +113,13 @@ impl PermissionManager {
         )
     }
 
-    pub fn evaluate_auto(
-        &self,
-        session_id: &str,
-        tool_name: &str,
-        mode: &str,
-        session_grants: &HashMap<String, Vec<String>>,
-    ) -> Option<PermissionDecision> {
-        self.evaluate_auto_with_permission_mode(
-            session_id,
-            tool_name,
-            mode,
-            "ask",
-            session_grants,
-        )
-    }
-
     /// Auto-decision with an effective permission mode (D115).
     ///
     /// `permission_mode` is the already-resolved effective mode — the
     /// caller collapses `inherit` against the global default before calling.
     /// Plan mode's hard deny for unavailable tools stays above every permission
     /// mode: `auto` cannot re-enable Write/Edit/plugins in Plan.
+    #[cfg(test)]
     pub fn evaluate_auto_with_permission_mode(
         &self,
         session_id: &str,
@@ -183,6 +174,7 @@ impl PermissionManager {
         None
     }
 
+    #[cfg(test)]
     pub fn create_request(
         &mut self,
         session_id: &str,
@@ -194,45 +186,33 @@ impl PermissionManager {
         PermissionRequest,
         tokio::sync::oneshot::Receiver<PermissionDecision>,
     ) {
-        self.create_request_with_risk(session_id, tool_call_id, tool_name, args_preview, reason, None)
+        self.create_request_with_risk_and_shell(PermissionRequestParams {
+            session_id,
+            tool_call_id,
+            tool_name,
+            args_preview,
+            reason,
+            declared_risk: None,
+            command_shell_id: None,
+        })
     }
 
-    pub fn create_request_with_risk(
+    pub fn create_request_with_risk_and_shell(
         &mut self,
-        session_id: &str,
-        tool_call_id: &str,
-        tool_name: &str,
-        args_preview: serde_json::Value,
-        reason: &str,
-        declared_risk: Option<&str>,
+        params: PermissionRequestParams<'_>,
     ) -> (
         PermissionRequest,
         tokio::sync::oneshot::Receiver<PermissionDecision>,
     ) {
-        self.create_request_with_risk_and_shell(
+        let PermissionRequestParams {
             session_id,
             tool_call_id,
             tool_name,
             args_preview,
             reason,
             declared_risk,
-            None,
-        )
-    }
-
-    pub fn create_request_with_risk_and_shell(
-        &mut self,
-        session_id: &str,
-        tool_call_id: &str,
-        tool_name: &str,
-        args_preview: serde_json::Value,
-        reason: &str,
-        declared_risk: Option<&str>,
-        command_shell_id: Option<&str>,
-    ) -> (
-        PermissionRequest,
-        tokio::sync::oneshot::Receiver<PermissionDecision>,
-    ) {
+            command_shell_id,
+        } = params;
         let request_id = Uuid::new_v4().to_string();
         let request = PermissionRequest {
             request_id: request_id.clone(),
@@ -423,7 +403,10 @@ mod tests {
     fn plan_denial_wins_over_grants_and_scratch_exceptions() {
         let pm = PermissionManager::default();
         let mut grants = HashMap::new();
-        grants.insert("s".to_string(), vec!["Write".to_string(), "plugin_x_run".to_string()]);
+        grants.insert(
+            "s".to_string(),
+            vec!["Write".to_string(), "plugin_x_run".to_string()],
+        );
         for tool in ["Write", "Edit", "plugin_x_run", "unknown"] {
             assert_eq!(
                 pm.evaluate_auto_with_permission_mode("s", tool, "plan", "auto", &grants),
@@ -458,7 +441,11 @@ mod tests {
         let args = serde_json::json!({ "path": "a.txt", "content": content });
         let (req, _rx) = pm.create_request("s", "tc1", "Write", args, "reason");
         let preview = req.args_preview.get("content").unwrap().as_str().unwrap();
-        assert!(preview.chars().count() < 2_100, "content capped: {}", preview.len());
+        assert!(
+            preview.chars().count() < 2_100,
+            "content capped: {}",
+            preview.len()
+        );
         assert!(preview.ends_with("… (+48000 chars)"));
         assert_eq!(
             req.args_preview.get("path").unwrap().as_str().unwrap(),

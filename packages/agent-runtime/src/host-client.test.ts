@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { HostClient } from "./host-client.js";
 
 describe("HostClient lifecycle", () => {
-  it("rejects an unbounded Bash call when the host child dies", async () => {
+  it("rejects a default-deadline Bash call when the host child dies", async () => {
     const client = new HostClient(process.execPath);
     const closed = vi.fn();
     client.onClose(closed);

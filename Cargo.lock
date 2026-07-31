@@ -402,6 +402,7 @@ dependencies = [
  "globset",
  "hex",
  "ignore",
+ "libc",
  "rand",
  "regex",
  "rusqlite",

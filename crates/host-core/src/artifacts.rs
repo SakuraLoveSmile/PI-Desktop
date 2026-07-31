@@ -23,13 +23,7 @@ pub fn record(
     op: &str,
     turn_id: Option<&str>,
 ) -> Result<()> {
-    record_on(
-        db.conn(),
-        session_id,
-        path,
-        op,
-        turn_id,
-    )
+    record_on(db.conn(), session_id, path, op, turn_id)
 }
 
 /// Register an artifact as part of the plan submission transaction.
@@ -50,16 +44,15 @@ fn record_on(
     op: &str,
     turn_id: Option<&str>,
 ) -> Result<()> {
-    conn
-        .prepare_cached(
-            "INSERT INTO artifacts (session_id, path, op, turn_id, updated_at)
+    conn.prepare_cached(
+        "INSERT INTO artifacts (session_id, path, op, turn_id, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5)
              ON CONFLICT(session_id, path) DO UPDATE SET
                op = excluded.op,
                turn_id = COALESCE(excluded.turn_id, artifacts.turn_id),
                updated_at = excluded.updated_at",
-        )?
-        .execute(params![session_id, path, op, turn_id, now_ms()])?;
+    )?
+    .execute(params![session_id, path, op, turn_id, now_ms()])?;
     Ok(())
 }
 

@@ -16,8 +16,8 @@ const [protocol, types, main, api, store, runtime, commands, hostRpc] =
     read("../../../crates/host-core/src/rpc/mod.rs"),
   ]);
 
-test("context compaction is wired through protocol v7 and the manual IPC path", () => {
-  assert.match(protocol, /PROTOCOL_VERSION = 7/);
+test("context compaction is wired through protocol v9 and the manual IPC path", () => {
+  assert.match(protocol, /PROTOCOL_VERSION = 9/);
   assert.match(protocol, /agentCompact:\s*"pi-desktop\/agent\/compact"/);
   assert.match(types, /type ContextCompactionRecord/);
   assert.match(types, /type: "compaction_start"/);

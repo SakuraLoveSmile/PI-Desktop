@@ -19,9 +19,9 @@ import {
 } from "./index.js";
 
 describe("Plan protocol contracts", () => {
-  it("uses protocol v9/schema v9 and exposes the plan and shell IPC channels", () => {
+  it("uses protocol v9/schema v10 and exposes the plan and shell IPC channels", () => {
     expect(PROTOCOL_VERSION).toBe(9);
-    expect(SCHEMA_VERSION).toBe(9);
+    expect(SCHEMA_VERSION).toBe(10);
     expect(IPC_WHITELIST.has(IPC.invoke.plansPending)).toBe(true);
     expect(IPC_WHITELIST.has(IPC.invoke.plansResolve)).toBe(true);
     expect(IPC_WHITELIST.has(IPC.event.plansChanged)).toBe(true);
@@ -68,9 +68,9 @@ describe("Plan protocol contracts", () => {
     expect(statuses).not.toContain("request_changes" as never);
   });
 
-  it("normalizes the plan approval permission fallback to auto", () => {
-    expect(normalizeGlobalPermissionMode(undefined)).toBe("auto");
-    expect(normalizeGlobalPermissionMode("invalid")).toBe("auto");
+  it("normalizes the plan approval permission fallback to ask", () => {
+    expect(normalizeGlobalPermissionMode(undefined)).toBe("ask");
+    expect(normalizeGlobalPermissionMode("invalid")).toBe("ask");
     expect(normalizeGlobalPermissionMode("ask")).toBe("ask");
     expect(normalizeGlobalPermissionMode("accept-edits")).toBe("accept-edits");
     expect(isGlobalPermissionMode("ask")).toBe(true);
@@ -136,10 +136,22 @@ describe("Plan protocol contracts", () => {
   });
 
   it("derives transport deadlines from command execution semantics", () => {
-    expect(rpcTimeoutMs("tools.execute", { toolName: "Bash" })).toBeUndefined();
+    expect(rpcTimeoutMs("tools.execute", { toolName: "Bash" })).toBe(190_000);
     expect(
       rpcTimeoutMs("tools.execute", { toolName: "Bash", timeoutMs: 5_000 }),
     ).toBe(135_000);
+    expect(
+      rpcTimeoutMs("tools.execute", { toolName: "Bash", timeoutMs: 60_000 }),
+    ).toBe(190_000);
+    expect(
+      rpcTimeoutMs("tools.execute", { toolName: "Bash", timeoutMs: 0 }),
+    ).toBe(190_000);
+    expect(
+      rpcTimeoutMs("tools.execute", {
+        toolName: "Bash",
+        timeoutMs: 2_147_483_647,
+      }),
+    ).toBe(2_147_483_647);
     expect(rpcTimeoutMs("tools.execute", { toolName: "Read" })).toBe(130_000);
     expect(rpcTimeoutMs("tools.execute", { toolName: "BrowserPreview" })).toBe(
       130_000,

@@ -5,9 +5,15 @@ import type {
   GlobalPermissionMode,
   PlanProposal,
 } from "@pi-desktop/shared";
-import { normalizeGlobalPermissionMode } from "@pi-desktop/shared";
+import { ErrorCodes, normalizeGlobalPermissionMode } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
-import { IconCheck, IconChevronDown } from "./icons";
+import { fileWorkPanelTab } from "../lib/work-panel-tabs";
+import {
+  IconCheck,
+  IconChevronDown,
+  IconFileText,
+  IconTriangleAlert,
+} from "./icons";
 
 const APPROVAL_MODES: readonly GlobalPermissionMode[] = [
   "ask",
@@ -27,22 +33,64 @@ const APPROVE_LABEL_KEYS: Record<GlobalPermissionMode, string> = {
   auto: "plan.approveAuto",
 };
 
+const PLAN_APPROVAL_RECONCILE_RETRY_MS = 5_000;
+
 function isApprovalMode(value: string | undefined): value is GlobalPermissionMode {
   return value === "ask" || value === "accept-edits" || value === "auto";
 }
 
+const TERMINAL_STATUS_LABEL_KEYS: Partial<
+  Record<PlanProposal["status"], string>
+> = {
+  approved: "plan.statusApproved",
+  changes_requested: "plan.statusNeedsRevision",
+  rejected: "plan.statusRejected",
+  expired: "plan.statusExpired",
+  interrupted: "plan.statusInterrupted",
+};
+
+function formatPlanTimestamp(value: string | undefined, locale: string | undefined) {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return null;
+  try {
+    return new Intl.DateTimeFormat(locale || "en", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(timestamp));
+  } catch {
+    return null;
+  }
+}
+
 export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const settings = useAppStore((state) => state.settings);
   const resolvePlan = useAppStore((state) => state.resolvePlan);
+  const restorePendingPlan = useAppStore((state) => state.restorePendingPlan);
   const showToast = useAppStore((state) => state.showToast);
+  const openWorkPanelTabForSession = useAppStore(
+    (state) => state.openWorkPanelTabForSession,
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const chevronRef = useRef<HTMLButtonElement>(null);
+  const artifactPath = proposal.artifact?.relativePath?.trim() || null;
+  const isPending = proposal.status === "pending";
   const rememberedMode = normalizeGlobalPermissionMode(
     settings?.planApprovalPermissionMode,
+    "ask",
   );
+  const expiryTime = formatPlanTimestamp(
+    proposal.expiresAt,
+    i18n.resolvedLanguage || i18n.language,
+  );
+  const terminalStatusKey = TERMINAL_STATUS_LABEL_KEYS[proposal.status];
+  const terminalStatus = terminalStatusKey ? t(terminalStatusKey) : null;
+  const terminalFeedback = !isPending ? proposal.feedback?.trim() || null : null;
+  const busy = resolving || reconciling;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -72,6 +120,50 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!isPending || !proposal.expiresAt) return;
+    const expiresAt = Date.parse(proposal.expiresAt);
+    if (!Number.isFinite(expiresAt)) return;
+    let cancelled = false;
+    let reconcileTimer: number | undefined;
+
+    const scheduleReconcile = (delay: number) => {
+      if (cancelled) return;
+      reconcileTimer = window.setTimeout(() => {
+        reconcileTimer = undefined;
+        if (cancelled) return;
+        setReconciling(true);
+        void restorePendingPlan(proposal.sessionId).then(
+          (result) => {
+            if (cancelled) return;
+            if (result === "pending" || result === "unavailable") {
+              scheduleReconcile(PLAN_APPROVAL_RECONCILE_RETRY_MS);
+            }
+          },
+          () => {
+            if (cancelled) return;
+            scheduleReconcile(PLAN_APPROVAL_RECONCILE_RETRY_MS);
+          },
+        );
+      }, delay);
+    };
+
+    scheduleReconcile(Math.max(0, expiresAt - Date.now()));
+    return () => {
+      cancelled = true;
+      if (reconcileTimer !== undefined) {
+        window.clearTimeout(reconcileTimer);
+        reconcileTimer = undefined;
+      }
+    };
+  }, [isPending, proposal.expiresAt, proposal.sessionId, restorePendingPlan]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+    setResolving(false);
+    setReconciling(false);
+  }, [proposal.id, proposal.status]);
+
   const focusComposer = () => {
     if (useAppStore.getState().activeSessionId !== proposal.sessionId) return;
     requestAnimationFrame(() => {
@@ -83,7 +175,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
     action: "approve" | "reject",
     targetPermissionMode?: GlobalPermissionMode,
   ) => {
-    if (resolving) return;
+    if (busy || !isPending) return;
     setMenuOpen(false);
     setResolving(true);
     try {
@@ -103,8 +195,21 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
       showToast(error instanceof Error ? error.message : String(error), {
         variant: "error",
       });
-      setResolving(false);
+      if (
+        (error as { code?: unknown })?.code !==
+        ErrorCodes.PLAN_APPROVAL_TIMEOUT
+      ) {
+        setResolving(false);
+      }
     }
+  };
+
+  const openArtifact = () => {
+    if (!artifactPath) return;
+    openWorkPanelTabForSession(
+      proposal.sessionId,
+      fileWorkPanelTab(artifactPath),
+    );
   };
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -153,77 +258,132 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
       className="plan-approval-bar"
       role="region"
       aria-label={t("plan.approvalRegion")}
-      aria-busy={resolving}
+      aria-busy={busy}
+      data-status={proposal.status}
       data-testid="plan-approval-bar"
     >
       <span className="sr-only" role="status" aria-live="polite">
         {t("plan.readyAnnouncement")}
       </span>
-      <div className="plan-approval-question">{proposal.question}</div>
-      <div className="plan-approval-actions">
-        <button
-          type="button"
-          className="plan-approval-reject"
-          disabled={resolving}
-          onClick={() => void resolve("reject")}
-        >
-          {t("plan.reject")}
-        </button>
-        <div
-          ref={menuRef}
-          className="plan-approval-split"
-          onKeyDown={onMenuKeyDown}
-        >
-          <button
-            type="button"
-            className="plan-approval-approve-main"
-            disabled={resolving}
-            aria-label={t(APPROVE_LABEL_KEYS[rememberedMode])}
-            onClick={() => void resolve("approve", rememberedMode)}
-          >
-            {resolving
-              ? t("plan.approving")
-              : t(APPROVE_LABEL_KEYS[rememberedMode])}
-          </button>
-          <button
-            ref={chevronRef}
-            type="button"
-            className="plan-approval-approve-menu"
-            disabled={resolving}
-            aria-label={t("plan.chooseApprovalMode")}
-            title={t("plan.chooseApprovalMode")}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <IconChevronDown size={13} aria-hidden />
-          </button>
-          {menuOpen ? (
-            <div
-              className="plan-approval-menu"
-              role="menu"
-              aria-label={t("plan.chooseApprovalMode")}
+      <div className="plan-approval-copy">
+        <div className="plan-approval-label">{t("plan.approvalRegion")}</div>
+        <h2 className="plan-approval-title">
+          {proposal.title.trim() || t("plan.untitled")}
+        </h2>
+        <p className="plan-approval-question">{proposal.question}</p>
+        <div className="plan-approval-details">
+          {artifactPath ? (
+            <button
+              type="button"
+              className="plan-approval-artifact"
+              data-testid="plan-open-artifact"
+              aria-label={t("plan.openArtifactLabel", { path: artifactPath })}
+              title={artifactPath}
+              onClick={openArtifact}
             >
-              {APPROVAL_MODES.map((candidate) => (
-                <button
-                  key={candidate}
-                  type="button"
-                  className="plan-approval-menu-item"
-                  role="menuitemradio"
-                  aria-checked={rememberedMode === candidate}
-                  data-approval-mode={candidate}
-                  onClick={() => void resolve("approve", candidate)}
-                >
-                  <span>{t(APPROVAL_MODE_LABEL_KEYS[candidate])}</span>
-                  {rememberedMode === candidate ? (
-                    <IconCheck size={13} aria-hidden />
-                  ) : null}
-                </button>
-              ))}
+              <IconFileText size={14} aria-hidden />
+              <span className="plan-approval-artifact-label">
+                {t("plan.openArtifact")}
+              </span>
+              <span className="plan-approval-artifact-path">
+                {artifactPath}
+              </span>
+            </button>
+          ) : null}
+          {expiryTime ? (
+            <span className="plan-approval-expiry">
+              {t("plan.expiresAt", { time: expiryTime })}
+            </span>
+          ) : null}
+          {terminalStatus || terminalFeedback ? (
+            <div className="plan-approval-terminal" role="status">
+              {terminalStatus ? (
+                <span className="plan-approval-terminal-status">
+                  {terminalStatus}
+                </span>
+              ) : null}
+              {terminalFeedback ? (
+                <span className="plan-approval-terminal-feedback">
+                  {terminalFeedback}
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>
       </div>
+      {isPending ? (
+        <div className="plan-approval-actions">
+          <button
+            type="button"
+            className="plan-approval-reject"
+            disabled={busy}
+            onClick={() => void resolve("reject")}
+          >
+            {t("plan.reject")}
+          </button>
+          <div
+            ref={menuRef}
+            className="plan-approval-split"
+            onKeyDown={onMenuKeyDown}
+          >
+            <button
+              type="button"
+              className="plan-approval-approve-main"
+              disabled={busy}
+              aria-label={t(APPROVE_LABEL_KEYS[rememberedMode])}
+              onClick={() => void resolve("approve", rememberedMode)}
+            >
+              {resolving
+                ? t("plan.approving")
+                : t(APPROVE_LABEL_KEYS[rememberedMode])}
+            </button>
+            <button
+              ref={chevronRef}
+              type="button"
+              className="plan-approval-approve-menu"
+              disabled={busy}
+              aria-label={t("plan.chooseApprovalMode")}
+              title={t("plan.chooseApprovalMode")}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <IconChevronDown size={13} aria-hidden />
+            </button>
+            {menuOpen ? (
+              <div
+                className="plan-approval-menu"
+                role="menu"
+                aria-label={t("plan.chooseApprovalMode")}
+              >
+                {APPROVAL_MODES.map((candidate) => (
+                  <button
+                    key={candidate}
+                    type="button"
+                    className="plan-approval-menu-item"
+                    role="menuitemradio"
+                    aria-checked={rememberedMode === candidate}
+                    data-approval-mode={candidate}
+                    disabled={busy}
+                    onClick={() => void resolve("approve", candidate)}
+                  >
+                    <span>{t(APPROVAL_MODE_LABEL_KEYS[candidate])}</span>
+                    {rememberedMode === candidate ? (
+                      <IconCheck size={13} aria-hidden />
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+      {isPending && rememberedMode === "auto" ? (
+        <div className="plan-approval-warning" role="note">
+          <IconTriangleAlert size={13} aria-hidden />
+          <span>{t("plan.autoWarning")}</span>
+        </div>
+      ) : null}
     </section>
   );
 }

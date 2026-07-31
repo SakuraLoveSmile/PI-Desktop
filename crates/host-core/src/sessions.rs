@@ -809,10 +809,8 @@ pub fn fork_session_through(
     if has_running_turn {
         return Ok(ForkSessionResult::Busy);
     }
-    let mut source_records = dedupe_records(transcripts::read_transcript(
-        db.data_dir(),
-        source_id,
-    )?);
+    let mut source_records =
+        dedupe_records(transcripts::read_transcript(db.data_dir(), source_id)?);
     if let Some(message_id) = through_message_id
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -1070,14 +1068,20 @@ pub fn replace_messages(db: &Database, session_id: &str, messages: &[UiMessage])
     tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
         .execute(params![session_id])?;
     for (seq, record) in records.iter().enumerate() {
-        insert_index_row(&tx, session_id, seq as i64, None, record, texts[seq].as_deref())?;
+        insert_index_row(
+            &tx,
+            session_id,
+            seq as i64,
+            None,
+            record,
+            texts[seq].as_deref(),
+        )?;
     }
     tx.prepare_cached("UPDATE sessions SET last_seq = ?1, updated_at = ?2 WHERE id = ?3")?
         .execute(params![records.len() as i64, now_ms(), session_id])?;
     tx.commit()?;
     Ok(())
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1253,7 +1257,14 @@ pub fn activate_message_revision(
     tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
         .execute(params![session_id])?;
     for (seq, record) in records.iter().enumerate() {
-        insert_index_row(&tx, session_id, seq as i64, None, record, texts[seq].as_deref())?;
+        insert_index_row(
+            &tx,
+            session_id,
+            seq as i64,
+            None,
+            record,
+            texts[seq].as_deref(),
+        )?;
     }
     tx.prepare_cached("UPDATE sessions SET last_seq = ?1, updated_at = ?2 WHERE id = ?3")?
         .execute(params![records.len() as i64, now_ms(), session_id])?;
@@ -1320,7 +1331,14 @@ pub fn import_session(
             ts_to_ms(&summary.updated_at),
         ])?;
         for (seq, record) in records.iter().enumerate() {
-            insert_index_row(&tx, &summary.id, seq as i64, None, record, texts[seq].as_deref())?;
+            insert_index_row(
+                &tx,
+                &summary.id,
+                seq as i64,
+                None,
+                record,
+                texts[seq].as_deref(),
+            )?;
         }
         tx.commit()?;
         Ok(())
@@ -1349,12 +1367,38 @@ pub fn begin_turn(
     model_id: Option<&str>,
 ) -> Result<String> {
     let id = Uuid::new_v4().to_string();
-    db.conn()
+    let inserted = db
+        .conn()
         .prepare_cached(
             "INSERT INTO turns (id, session_id, provider_id, model_id, started_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+             SELECT ?1, ?2, ?3, ?4, ?5
+             WHERE EXISTS (SELECT 1 FROM sessions WHERE id = ?2)
+               AND NOT EXISTS (
+                 SELECT 1 FROM turns WHERE session_id = ?2 AND status = 'running'
+               )",
         )?
-        .execute(params![id, session_id, provider_id, model_id, now_ms()])?;
+        .execute(params![id, session_id, provider_id, model_id, now_ms()])
+        .map_err(|error| {
+            let message = error.to_string();
+            if message.contains("turns.session_id")
+                || message.contains("idx_turns_one_running_session")
+            {
+                anyhow!("AGENT_BUSY")
+            } else {
+                error.into()
+            }
+        })?;
+    if inserted == 0 {
+        let session_exists: bool = db.conn().query_row(
+            "SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ?1)",
+            params![session_id],
+            |row| row.get(0),
+        )?;
+        if !session_exists {
+            return Err(anyhow!("session not found: {session_id}"));
+        }
+        return Err(anyhow!("AGENT_BUSY"));
+    }
     Ok(id)
 }
 
@@ -1547,22 +1591,18 @@ mod tests {
         );
 
         replace_messages(&db, &session.id, &messages[..2]).unwrap();
-        assert!(
-            get_session(&db, &session.id)
-                .unwrap()
-                .unwrap()
-                .compaction
-                .is_some()
-        );
+        assert!(get_session(&db, &session.id)
+            .unwrap()
+            .unwrap()
+            .compaction
+            .is_some());
 
         replace_messages(&db, &session.id, &messages[..1]).unwrap();
-        assert!(
-            get_session(&db, &session.id)
-                .unwrap()
-                .unwrap()
-                .compaction
-                .is_none()
-        );
+        assert!(get_session(&db, &session.id)
+            .unwrap()
+            .unwrap()
+            .compaction
+            .is_none());
     }
 
     #[test]
@@ -1683,7 +1723,7 @@ mod tests {
             .canonicalize()
             .unwrap()
             .to_string_lossy()
-            .to_string();
+            .replace('\\', "/");
         assert_eq!(session.project_path.as_deref(), Some(canonical.as_str()));
         assert_eq!(
             get_session(&db, &session.id)
@@ -1911,7 +1951,10 @@ mod tests {
         );
         assert_eq!(detail.messages[0].content, "final answer");
         assert_eq!(detail.messages[0].model_id.as_deref(), Some("model-1"));
-        assert_eq!(detail.messages[0].provider_id.as_deref(), Some("provider-1"));
+        assert_eq!(
+            detail.messages[0].provider_id.as_deref(),
+            Some("provider-1")
+        );
         let usage = detail.messages[0].usage.as_ref().expect("usage");
         assert_eq!(usage.input_tokens, 12);
         assert_eq!(usage.output_tokens, 34);
@@ -2291,6 +2334,19 @@ mod tests {
             .unwrap();
         assert_eq!(status, "completed");
         assert_eq!((input, output), (10, 20));
+    }
+
+    #[test]
+    fn begin_turn_rejects_a_second_running_turn_with_agent_busy() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let first = begin_turn(&db, &session.id, None, None).unwrap();
+
+        let error = begin_turn(&db, &session.id, None, None).unwrap_err();
+        assert_eq!(error.to_string(), "AGENT_BUSY");
+
+        end_turn(&db, &first, "aborted", None, None, false).unwrap();
+        assert!(begin_turn(&db, &session.id, None, None).is_ok());
     }
 
     #[test]

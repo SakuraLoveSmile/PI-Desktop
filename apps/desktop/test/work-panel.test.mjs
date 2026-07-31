@@ -331,7 +331,8 @@ test("background panel updates do not replace or resize the visible session", ()
   assert.ok(openForSessionBlock, "session-scoped tab action exists");
   assert.match(
     openForSessionBlock,
-    /pendingSessionSelection === null && state\.activeSessionId === sessionId/,
+    /const affectsVisibleSession\s*=\s*state\.activeSessionId\s*===\s*sessionId\s*&&\s*\(\s*pendingSessionSelection\s*===\s*null\s*\|\|\s*pendingSessionSelection\.id\s*===\s*sessionId\s*\)/,
+    "visible-session updates require the active session and matching pending selection",
   );
   assert.match(openForSessionBlock, /workPanelContexts/);
   assert.match(openForSessionBlock, /openWorkPanelTabState/);

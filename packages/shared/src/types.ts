@@ -14,7 +14,6 @@ export function normalizeMode(value: unknown, fallback: Mode = "agent"): Mode {
 
 export type PlanningState = "inactive" | "planning" | "awaiting_approval";
 export type PlanApprovalAction = "approve" | "reject";
-export type LegacyPlanApprovalAction = "request_changes";
 export type PlanApprovalStatus =
   | "pending"
   | "approved"
@@ -64,7 +63,7 @@ export type PlanProposal = {
   updatedAt: string;
   expiresAt?: string;
   resolvedAt?: string;
-  action?: PlanApprovalAction | LegacyPlanApprovalAction;
+  action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
   feedback?: string;
   errorCode?: string;
@@ -102,7 +101,7 @@ export type PlanningStateEvent = {
   version?: number;
   plan?: string;
   feedback?: string;
-  action?: PlanApprovalAction | LegacyPlanApprovalAction;
+  action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
   executionId?: string;
   executionState?: PlanExecutionState;
@@ -125,9 +124,7 @@ export type PlanResolveRequest = {
   turnId: string;
   toolCallId: string;
   version?: number;
-  /** `request_changes` is accepted only for legacy renderer compilation;
-   * current Main/host resolution accepts approve or reject. */
-  action: PlanApprovalAction | LegacyPlanApprovalAction;
+  action: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
   feedback?: string;
 };
@@ -136,7 +133,7 @@ export type PlanResolutionResult = {
   ok: boolean;
   proposal: PlanProposal;
   state: PlanningState;
-  action?: PlanApprovalAction | LegacyPlanApprovalAction;
+  action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
   feedback?: string;
   execution?: PlanExecution;
@@ -161,7 +158,7 @@ export type PermissionMode = (typeof PERMISSION_MODES)[number];
 export type GlobalPermissionMode = Exclude<PermissionMode, "inherit">;
 /** Compatibility alias for existing Plan approval consumers. */
 export type PlanApprovalPermissionMode = GlobalPermissionMode;
-export const DEFAULT_PLAN_APPROVAL_PERMISSION_MODE: GlobalPermissionMode = "auto";
+export const DEFAULT_PLAN_APPROVAL_PERMISSION_MODE: GlobalPermissionMode = "ask";
 
 export function isGlobalPermissionMode(
   value: unknown,

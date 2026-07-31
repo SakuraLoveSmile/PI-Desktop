@@ -24,6 +24,7 @@ import type {
   WorkspaceDiff,
 } from "@pi-desktop/shared";
 import {
+  ErrorCodes,
   highestSupportedThinkingLevel,
   normalizeGlobalPermissionMode,
   normalizeMode,
@@ -110,6 +111,8 @@ export type ToastOptions = {
   duration?: number;
 };
 
+export type PendingPlanRefreshResult = "pending" | "terminal" | "unavailable";
+
 const WORK_PANEL_STORAGE_KEY = "pi.desktop.workPanel";
 const SESSION_TRANSCRIPT_CACHE_LIMIT = 5;
 // Preserve the original 320px tool-content minimum beside the 44px activity rail.
@@ -121,7 +124,7 @@ const navigationIntents = createNavigationIntentController();
 let pendingSessionSelection: { id: string; intent: number } | null = null;
 let sessionWorkspaceQueue: Promise<void> = Promise.resolve();
 const sessionTranscriptCache = new Map<string, UiMessage[]>();
-const pendingPlanLoads = new Map<string, Promise<void>>();
+const pendingPlanLoads = new Map<string, Promise<PendingPlanRefreshResult>>();
 const planResolutionRequests = new Map<string, Promise<PlanResolutionResult>>();
 const planSyncGenerations = new Map<string, number>();
 const sessionDetailLoads = new Map<
@@ -399,7 +402,7 @@ export type AppState = {
   openNotification: (id: string) => Promise<void>;
   /** Drop a session's sidebar outcome badge and read its task notifications. */
   acknowledgeSessionOutcome: (sessionId: string) => Promise<void>;
-  restorePendingPlan: (sessionId: string) => Promise<void>;
+  restorePendingPlan: (sessionId: string) => Promise<PendingPlanRefreshResult>;
   handleAgentEvent: (envelope: AgentEventEnvelope) => void;
   handlePlansChanged: (event: PlanningStateEvent) => void;
   setPage: (page: AppState["page"], opts?: { record?: boolean }) => void;
@@ -776,20 +779,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   restorePendingPlan: async (sessionId) => {
-    if (!sessionId) return;
+    if (!sessionId) return "unavailable";
     const existing = pendingPlanLoads.get(sessionId);
     if (existing) return existing;
     const generation = nextPlanSyncGeneration(sessionId);
-    const request = (async () => {
+    const request = (async (): Promise<PendingPlanRefreshResult> => {
       try {
         const result = await api.pendingPlans(sessionId);
-        if (generation !== planSyncGeneration(sessionId)) return;
+        if (generation !== planSyncGeneration(sessionId)) return "unavailable";
         const proposal = result.plans.find((candidate) => candidate.sessionId === sessionId);
+        const nextState =
+          result.state ??
+          (proposal ? "awaiting_approval" : "inactive");
         set((state) => ({
           planningStates: {
             ...state.planningStates,
-            [sessionId]:
-              result.state ?? (proposal ? "awaiting_approval" : "inactive"),
+            [sessionId]: nextState,
           },
           pendingPlans: proposal
             ? { ...state.pendingPlans, [sessionId]: proposal }
@@ -798,9 +803,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             session.id === sessionId
               ? {
                   ...session,
-                  mode: sessionModeForPlanningState(
-                    result.state ?? (proposal ? "awaiting_approval" : "inactive"),
-                  ),
+                  mode: sessionModeForPlanningState(nextState),
                 }
               : session,
           ),
@@ -808,14 +811,16 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (proposal) {
           openPlanArtifact(proposal, get().openWorkPanelTabForSession);
         }
+        return proposal?.status === "pending" ? "pending" : "terminal";
       } catch {
         // A transient host failure must not erase a live approval already held
         // by the renderer; the next host event or activation retries it.
+        return "unavailable";
       }
     })();
     pendingPlanLoads.set(sessionId, request);
     try {
-      await request;
+      return await request;
     } finally {
       if (pendingPlanLoads.get(sessionId) === request) {
         pendingPlanLoads.delete(sessionId);
@@ -2600,38 +2605,48 @@ export const useAppStore = create<AppState>((set, get) => ({
       throw new Error("Plan approval is no longer available");
     }
     const request = (async () => {
-      const result = await api.resolvePlan(resolution);
-      if (resolution.action === "approve") {
-        const targetPermissionMode =
-          result.targetPermissionMode ?? resolution.targetPermissionMode;
-        if (targetPermissionMode) {
-          set((state) =>
-            state.settings
-              ? {
-                  settings: {
-                    ...state.settings,
-                    planApprovalPermissionMode: normalizeGlobalPermissionMode(
-                      targetPermissionMode,
-                    ),
-                  },
-                }
-              : {},
-          );
+      try {
+        const result = await api.resolvePlan(resolution);
+        if (resolution.action === "approve") {
+          const targetPermissionMode =
+            result.targetPermissionMode ?? resolution.targetPermissionMode;
+          if (targetPermissionMode) {
+            set((state) =>
+              state.settings
+                ? {
+                    settings: {
+                      ...state.settings,
+                      planApprovalPermissionMode: normalizeGlobalPermissionMode(
+                        targetPermissionMode,
+                      ),
+                    },
+                  }
+                : {},
+            );
+          }
         }
+        // The response is authoritative host success. The matching
+        // plans.changed event is also accepted by handlePlansChanged; neither
+        // path clears a proposal before the host has confirmed the action.
+        get().handlePlansChanged({
+          sessionId: resolution.sessionId,
+          state: result.state,
+          proposal: result.proposal,
+          proposalId: result.proposal.id,
+          action: result.action,
+          targetPermissionMode: result.targetPermissionMode,
+          feedback: result.feedback,
+        });
+        return result;
+      } catch (error) {
+        if (
+          (error as { code?: unknown })?.code ===
+          ErrorCodes.PLAN_APPROVAL_TIMEOUT
+        ) {
+          await get().restorePendingPlan(resolution.sessionId);
+        }
+        throw error;
       }
-      // The response is authoritative host success. The matching
-      // plans.changed event is also accepted by handlePlansChanged; neither
-      // path clears a proposal before the host has confirmed the action.
-      get().handlePlansChanged({
-        sessionId: resolution.sessionId,
-        state: result.state,
-        proposal: result.proposal,
-        proposalId: result.proposal.id,
-        action: result.action,
-        targetPermissionMode: result.targetPermissionMode,
-        feedback: result.feedback,
-      });
-      return result;
     })();
     planResolutionRequests.set(resolution.proposalId, request);
     try {

@@ -39,7 +39,7 @@ test("Electron retains the stable Plan IPC names and protocol version", async ()
   ]);
 
   assert.match(protocol, /PROTOCOL_VERSION = 9/);
-  assert.match(protocol, /SCHEMA_VERSION = 9/);
+  assert.match(protocol, /SCHEMA_VERSION = 10/);
   assert.match(protocol, /plansPending:/);
   assert.match(protocol, /plansResolve:/);
   assert.match(protocol, /plansChanged:/);

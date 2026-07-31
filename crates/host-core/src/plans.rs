@@ -11,14 +11,13 @@ use uuid::Uuid;
 
 use crate::artifacts;
 use crate::audit;
-use crate::db::{ms_to_ts, now_ms, Database};
+use crate::db::{ms_to_ts, now_ms, Database, PLAN_APPROVAL_TIMEOUT_MS};
 use crate::sessions;
 
 pub const PLAN_MAX_MARKDOWN_BYTES: usize = 512 * 1024;
 
 pub const STATUS_PENDING: &str = "pending";
 pub const STATUS_APPROVED: &str = "approved";
-pub const STATUS_CHANGES_REQUESTED: &str = "changes_requested";
 pub const STATUS_REJECTED: &str = "rejected";
 pub const STATUS_EXPIRED: &str = "expired";
 pub const STATUS_INTERRUPTED: &str = "interrupted";
@@ -106,8 +105,73 @@ pub struct PlanResolution {
 #[derive(Debug, Default)]
 pub struct PlanManager;
 
+pub struct PlanSubmitParams<'a> {
+    pub workspace_root: &'a Path,
+    pub session_id: &'a str,
+    pub turn_id: &'a str,
+    pub tool_call_id: &'a str,
+    pub title: &'a str,
+    pub markdown: &'a str,
+    pub question: &'a str,
+}
+
+pub struct PlanResolveParams<'a> {
+    pub workspace_root: Option<&'a Path>,
+    pub proposal_id: &'a str,
+    pub session_id: &'a str,
+    pub turn_id: &'a str,
+    pub tool_call_id: &'a str,
+    pub version: Option<i64>,
+    pub action: &'a str,
+    pub target_permission_mode: Option<&'a str>,
+    pub feedback: Option<&'a str>,
+}
+
 fn plan_error(code: &str) -> anyhow::Error {
     anyhow!(code.to_string())
+}
+
+/// Expire approvals at the first read or mutation boundary that observes
+/// them. The state transition and audit record share one transaction so a
+/// timed-out approval can never remain actionable after its error is visible.
+fn expire_pending_approvals(db: &Database) -> Result<()> {
+    let now = now_ms();
+    let tx = db.conn().unchecked_transaction()?;
+    let expired: Vec<(String, String, String, String)> = {
+        let mut stmt = tx.prepare_cached(
+            "SELECT request_id, session_id, turn_id, tool_call_id
+             FROM plan_approvals
+             WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at <= ?1",
+        )?;
+        let rows = stmt.query_map(params![now], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    tx.execute(
+        "UPDATE plan_approvals
+         SET status = 'expired', resolved_at = ?1, updated_at = ?1,
+             error_code = 'PLAN_APPROVAL_TIMEOUT', version = version + 1
+         WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at <= ?1",
+        params![now],
+    )?;
+    for (proposal_id, session_id, turn_id, tool_call_id) in expired {
+        audit::append_tx(
+            &tx,
+            "plan_approval_expired",
+            Some(&session_id),
+            json!({
+                "proposalId": proposal_id,
+                "sessionId": session_id,
+                "turnId": turn_id,
+                "toolCallId": tool_call_id,
+                "status": STATUS_EXPIRED,
+                "errorCode": "PLAN_APPROVAL_TIMEOUT"
+            }),
+        )?;
+    }
+    tx.commit()?;
+    Ok(())
 }
 
 fn valid_permission_mode(value: &str) -> bool {
@@ -419,7 +483,8 @@ fn set_plan_approval_permission_tx(tx: &rusqlite::Transaction<'_>, mode: &str) -
 }
 
 /// The plan approval preference is deliberately independent of the general
-/// tool permission default. A missing or malformed value falls back to auto.
+/// tool permission default. A missing or malformed value falls back to ask.
+#[cfg(test)]
 pub fn plan_approval_permission_mode(db: &Database) -> Result<String> {
     let value = db.get_setting("app")?.and_then(|settings| {
         settings
@@ -428,12 +493,12 @@ pub fn plan_approval_permission_mode(db: &Database) -> Result<String> {
             .filter(|mode| valid_permission_mode(mode))
             .map(str::to_string)
     });
-    Ok(value.unwrap_or_else(|| "auto".into()))
+    Ok(value.unwrap_or_else(|| "ask".into()))
 }
 
 /// Prevent renderer configuration calls from bypassing durable Plan work.
-/// Changes that only select a provider, model, or thinking level remain
-/// possible while a proposal is waiting.
+/// Every persisted configuration change is blocked while its session has
+/// active work that must retain the current runtime configuration.
 pub fn gate_session_configure(
     db: &Database,
     session_id: &str,
@@ -443,7 +508,14 @@ pub fn gate_session_configure(
     requested_thinking_level: Option<&str>,
     requested_permission_mode: Option<&str>,
 ) -> Result<()> {
-    let Some((current_mode, current_provider_id, current_model_id, current_thinking_level, current_permission_mode)) = db
+    expire_pending_approvals(db)?;
+    let Some((
+        current_mode,
+        current_provider_id,
+        current_model_id,
+        current_thinking_level,
+        current_permission_mode,
+    )) = db
         .conn()
         .query_row(
             "SELECT mode, provider_id, model_id, thinking_level, permission_mode
@@ -467,10 +539,10 @@ pub fn gate_session_configure(
     let mode_changes = current_mode != requested_mode;
     let provider_changes = requested_provider_id
         .is_some_and(|provider| current_provider_id.as_deref() != Some(provider));
-    let model_changes = requested_model_id
-        .is_some_and(|model| current_model_id.as_deref() != Some(model));
-    let thinking_changes = requested_thinking_level
-        .is_some_and(|level| level != current_thinking_level);
+    let model_changes =
+        requested_model_id.is_some_and(|model| current_model_id.as_deref() != Some(model));
+    let thinking_changes =
+        requested_thinking_level.is_some_and(|level| level != current_thinking_level);
     let permission_changes =
         requested_permission_mode.is_some_and(|permission| permission != current_permission_mode);
     if !mode_changes
@@ -485,10 +557,13 @@ pub fn gate_session_configure(
         "SELECT EXISTS(
              SELECT 1 FROM plan_approvals
              WHERE session_id = ?1 AND status = 'pending'
-         ) OR EXISTS(
-             SELECT 1 FROM plan_approvals
-             WHERE session_id = ?1 AND execution_state IN ('queued', 'running')
-         )",
+          ) OR EXISTS(
+              SELECT 1 FROM plan_approvals
+              WHERE session_id = ?1 AND execution_state IN ('queued', 'running')
+          ) OR EXISTS(
+              SELECT 1 FROM turns
+              WHERE session_id = ?1 AND status = 'running'
+          )",
         params![session_id],
         |row| row.get(0),
     )?;
@@ -528,17 +603,16 @@ impl PlanManager {
         Ok(())
     }
 
-    pub fn submit(
-        &self,
-        db: &Database,
-        workspace_root: &Path,
-        session_id: &str,
-        turn_id: &str,
-        tool_call_id: &str,
-        title: &str,
-        markdown: &str,
-        question: &str,
-    ) -> Result<PlanProposal> {
+    pub fn submit(&self, db: &Database, params: PlanSubmitParams<'_>) -> Result<PlanProposal> {
+        let PlanSubmitParams {
+            workspace_root,
+            session_id,
+            turn_id,
+            tool_call_id,
+            title,
+            markdown,
+            question,
+        } = params;
         if session_id.trim().is_empty()
             || turn_id.trim().is_empty()
             || tool_call_id.trim().is_empty()
@@ -548,9 +622,10 @@ impl PlanManager {
         {
             return Err(plan_error("PLAN_INVALID_ARGUMENT"));
         }
-        if markdown.as_bytes().len() > PLAN_MAX_MARKDOWN_BYTES {
+        if markdown.len() > PLAN_MAX_MARKDOWN_BYTES {
             return Err(plan_error("PLAN_MARKDOWN_TOO_LARGE"));
         }
+        expire_pending_approvals(db)?;
         if !session_is_plan(db, session_id)? {
             return Err(plan_error("PLAN_NOT_ACTIVE"));
         }
@@ -577,11 +652,11 @@ impl PlanManager {
             tx.prepare_cached(
                 "INSERT INTO plan_approvals (
                      request_id, session_id, turn_id, tool_call_id, plan_json,
-                     title, question, status, created_at, updated_at,
+                     title, question, status, created_at, updated_at, expires_at,
                      artifact_relative_path, artifact_sha256, artifact_size_bytes,
                      version
                  ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?8,
-                           ?9, ?10, ?11, 1)",
+                           ?9, ?10, ?11, ?12, 1)",
             )?
             .execute(params![
                 id,
@@ -592,6 +667,7 @@ impl PlanManager {
                 title.trim(),
                 question.trim(),
                 now,
+                now + PLAN_APPROVAL_TIMEOUT_MS,
                 artifact.relative_path,
                 artifact.sha256,
                 artifact.size_bytes as i64,
@@ -632,6 +708,7 @@ impl PlanManager {
         db: &Database,
         session_id: Option<&str>,
     ) -> Result<Vec<PlanProposal>> {
+        expire_pending_approvals(db)?;
         let sql = format!(
             "SELECT {PROPOSAL_COLUMNS}
              FROM plan_approvals
@@ -645,6 +722,7 @@ impl PlanManager {
     }
 
     pub fn state_for_session(&self, db: &Database, session_id: &str) -> Result<String> {
+        expire_pending_approvals(db)?;
         let Some(mode) = sessions::session_mode(db, session_id)? else {
             return Err(plan_error("PLAN_SESSION_NOT_FOUND"));
         };
@@ -657,11 +735,13 @@ impl PlanManager {
         Ok("planning".into())
     }
 
+    #[cfg(test)]
     pub fn resolution_for(
         &self,
         db: &Database,
         proposal_id: &str,
     ) -> Result<Option<PlanResolution>> {
+        expire_pending_approvals(db)?;
         let Some(proposal) = get_proposal(db, proposal_id)? else {
             return Ok(None);
         };
@@ -671,19 +751,19 @@ impl PlanManager {
         Ok(Some(resolution_from_proposal(proposal)?))
     }
 
-    pub fn resolve(
-        &self,
-        db: &Database,
-        workspace_root: Option<&Path>,
-        proposal_id: &str,
-        session_id: &str,
-        turn_id: &str,
-        tool_call_id: &str,
-        version: Option<i64>,
-        action: &str,
-        target_permission_mode: Option<&str>,
-        feedback: Option<&str>,
-    ) -> Result<PlanResolution> {
+    pub fn resolve(&self, db: &Database, params: PlanResolveParams<'_>) -> Result<PlanResolution> {
+        let PlanResolveParams {
+            workspace_root,
+            proposal_id,
+            session_id,
+            turn_id,
+            tool_call_id,
+            version,
+            action,
+            target_permission_mode,
+            feedback,
+        } = params;
+        expire_pending_approvals(db)?;
         let Some(current) = get_proposal(db, proposal_id)? else {
             return Err(plan_error("PLAN_NOT_FOUND"));
         };
@@ -693,11 +773,11 @@ impl PlanManager {
         {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
         }
-        if !matches!(action, "approve" | "reject" | "request_changes") {
+        if !matches!(action, "approve" | "reject") {
             return Err(plan_error("PLAN_INVALID_ACTION"));
         }
-        if current.status == STATUS_PENDING && action == "request_changes" {
-            return Err(plan_error("PLAN_INVALID_ACTION"));
+        if current.status == STATUS_EXPIRED {
+            return Err(plan_error("PLAN_APPROVAL_TIMEOUT"));
         }
         let selected = if action == "approve" {
             let Some(selected) = target_permission_mode else {
@@ -711,9 +791,6 @@ impl PlanManager {
             None
         };
         let feedback = feedback.map(str::trim).filter(|value| !value.is_empty());
-        if action == "request_changes" && feedback.is_none() {
-            return Err(plan_error("PLAN_FEEDBACK_REQUIRED"));
-        }
 
         if current.status != STATUS_PENDING {
             let same_resolution = current.action.as_deref() == Some(action)
@@ -739,7 +816,6 @@ impl PlanManager {
         let now = now_ms();
         let status = match action {
             "approve" => STATUS_APPROVED,
-            "request_changes" => STATUS_CHANGES_REQUESTED,
             _ => STATUS_REJECTED,
         };
         let execution_id = (action == "approve").then(|| Uuid::new_v4().to_string());
@@ -776,7 +852,8 @@ impl PlanManager {
                      error_code = NULL, version = version + 1,
                      execution_id = ?6, execution_state = ?7
                  WHERE request_id = ?8 AND session_id = ?9 AND turn_id = ?10
-                   AND tool_call_id = ?11 AND status = 'pending' AND version = ?12",
+                   AND tool_call_id = ?11 AND status = 'pending' AND version = ?12
+                    AND expires_at > ?13",
             )?
             .execute(params![
                 status,
@@ -791,6 +868,7 @@ impl PlanManager {
                 turn_id,
                 tool_call_id,
                 current.version,
+                now,
             ])?;
         if changed != 1 {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
@@ -819,6 +897,7 @@ impl PlanManager {
     }
 
     pub fn abort_session(&self, db: &Database, session_id: &str) -> Result<bool> {
+        expire_pending_approvals(db)?;
         let ids: Vec<String> = {
             let mut stmt = db.conn().prepare_cached(
                 "SELECT request_id FROM plan_approvals
@@ -1039,13 +1118,15 @@ mod tests {
         manager
             .submit(
                 db,
-                root,
-                &session.id,
-                &turn,
-                call,
-                "Build API",
-                "# Plan\n- implement",
-                "Proceed?",
+                PlanSubmitParams {
+                    workspace_root: root,
+                    session_id: &session.id,
+                    turn_id: &turn,
+                    tool_call_id: call,
+                    title: "Build API",
+                    markdown: "# Plan\n- implement",
+                    question: "Proceed?",
+                },
             )
             .unwrap()
     }
@@ -1062,24 +1143,32 @@ mod tests {
     }
 
     #[test]
+    fn plan_approval_permission_defaults_to_ask() {
+        let (_dir, db) = test_db();
+        assert_eq!(plan_approval_permission_mode(&db).unwrap(), "ask");
+    }
+
+    #[test]
     fn publication_collides_without_overwriting() {
         let (dir, db) = test_db();
         let root = dir.path().join("workspace");
         fs::create_dir_all(&root).unwrap();
-        let manager = PlanManager::default();
+        let manager = PlanManager;
         let first = submit(&manager, &db, &root, "call-1");
         let second_session = plan_session(&db, &root);
         let turn2 = live_turn(&db, &second_session.id);
         let second = manager
             .submit(
                 &db,
-                &root,
-                &second_session.id,
-                &turn2,
-                "call-2",
-                "Build API",
-                "second",
-                "Proceed?",
+                PlanSubmitParams {
+                    workspace_root: &root,
+                    session_id: &second_session.id,
+                    turn_id: &turn2,
+                    tool_call_id: "call-2",
+                    title: "Build API",
+                    markdown: "second",
+                    question: "Proceed?",
+                },
             )
             .unwrap();
         assert_ne!(
@@ -1099,16 +1188,18 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         let session = plan_session(&db, &root);
         let turn = live_turn(&db, &session.id);
-        let error = PlanManager::default()
+        let error = PlanManager
             .submit(
                 &db,
-                &root,
-                &session.id,
-                &turn,
-                "call-1",
-                "Too large",
-                &"x".repeat(PLAN_MAX_MARKDOWN_BYTES + 1),
-                "Proceed?",
+                PlanSubmitParams {
+                    workspace_root: &root,
+                    session_id: &session.id,
+                    turn_id: &turn,
+                    tool_call_id: "call-1",
+                    title: "Too large",
+                    markdown: &"x".repeat(PLAN_MAX_MARKDOWN_BYTES + 1),
+                    question: "Proceed?",
+                },
             )
             .unwrap_err();
         assert_eq!(error.to_string(), "PLAN_MARKDOWN_TOO_LARGE");
@@ -1127,23 +1218,25 @@ mod tests {
         std::os::unix::fs::symlink(&outside, root.join(".pi/plan")).unwrap();
         let session = plan_session(&db, &root);
         let turn = live_turn(&db, &session.id);
-        let error = PlanManager::default()
+        let error = PlanManager
             .submit(
                 &db,
-                &root,
-                &session.id,
-                &turn,
-                "call-1",
-                "Plan",
-                "body",
-                "?",
+                PlanSubmitParams {
+                    workspace_root: &root,
+                    session_id: &session.id,
+                    turn_id: &turn,
+                    tool_call_id: "call-1",
+                    title: "Plan",
+                    markdown: "body",
+                    question: "?",
+                },
             )
             .unwrap_err();
         assert_eq!(error.to_string(), "PLAN_ARTIFACT_PATH_UNSAFE");
     }
 
     #[test]
-    fn pending_rows_survive_database_restart() {
+    fn pending_rows_are_interrupted_during_database_restart() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("pi.sqlite");
         let (session_id, proposal_id);
@@ -1154,27 +1247,33 @@ mod tests {
             let session = plan_session(&db, &root);
             session_id = session.id;
             let turn = live_turn(&db, &session_id);
-            proposal_id = PlanManager::default()
+            proposal_id = PlanManager
                 .submit(
                     &db,
-                    &root,
-                    &session_id,
-                    &turn,
-                    "call-1",
-                    "Plan",
-                    "body",
-                    "?",
+                    PlanSubmitParams {
+                        workspace_root: &root,
+                        session_id: &session_id,
+                        turn_id: &turn,
+                        tool_call_id: "call-1",
+                        title: "Plan",
+                        markdown: "body",
+                        question: "?",
+                    },
                 )
                 .unwrap()
                 .id;
         }
         let db = Database::open(&path).unwrap();
-        let pending = PlanManager::default()
+        let pending = PlanManager
             .pending_for_session(&db, Some(&session_id))
             .unwrap();
-        assert_eq!(pending.len(), 1);
-        assert_eq!(pending[0].id, proposal_id);
-        assert_eq!(pending[0].status, STATUS_PENDING);
+        assert!(pending.is_empty());
+        let proposal = get_proposal(&db, &proposal_id).unwrap().unwrap();
+        assert_eq!(proposal.status, STATUS_INTERRUPTED);
+        assert_eq!(
+            proposal.error_code.as_deref(),
+            Some("PLAN_APPROVAL_INTERRUPTED")
+        );
     }
 
     #[test]
@@ -1182,7 +1281,7 @@ mod tests {
         let (dir, db) = test_db();
         let root = dir.path().join("workspace");
         fs::create_dir_all(&root).unwrap();
-        let manager = PlanManager::default();
+        let manager = PlanManager;
         let proposal = submit(&manager, &db, &root, "call-1");
         let before = sessions::get_session(&db, &proposal.session_id)
             .unwrap()
@@ -1191,15 +1290,17 @@ mod tests {
         let result = manager
             .resolve(
                 &db,
-                Some(&root),
-                &proposal.id,
-                &proposal.session_id,
-                &proposal.turn_id,
-                &proposal.tool_call_id,
-                Some(proposal.version),
-                "reject",
-                None,
-                None,
+                PlanResolveParams {
+                    workspace_root: Some(&root),
+                    proposal_id: &proposal.id,
+                    session_id: &proposal.session_id,
+                    turn_id: &proposal.turn_id,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "reject",
+                    target_permission_mode: None,
+                    feedback: None,
+                },
             )
             .unwrap();
         let after = sessions::get_session(&db, &proposal.session_id)
@@ -1226,20 +1327,22 @@ mod tests {
         let (dir, db) = test_db();
         let root = dir.path().join("workspace");
         fs::create_dir_all(&root).unwrap();
-        let manager = PlanManager::default();
+        let manager = PlanManager;
         let proposal = submit(&manager, &db, &root, "call-1");
         let result = manager
             .resolve(
                 &db,
-                Some(&root),
-                &proposal.id,
-                &proposal.session_id,
-                &proposal.turn_id,
-                &proposal.tool_call_id,
-                Some(proposal.version),
-                "approve",
-                Some("accept-edits"),
-                None,
+                PlanResolveParams {
+                    workspace_root: Some(&root),
+                    proposal_id: &proposal.id,
+                    session_id: &proposal.session_id,
+                    turn_id: &proposal.turn_id,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("accept-edits"),
+                    feedback: None,
+                },
             )
             .unwrap();
         let execution = result.execution.unwrap();
@@ -1263,34 +1366,38 @@ mod tests {
         let (dir, db) = test_db();
         let root = dir.path().join("workspace");
         fs::create_dir_all(&root).unwrap();
-        let manager = PlanManager::default();
+        let manager = PlanManager;
         let proposal = submit(&manager, &db, &root, "call-1");
         let first = manager
             .resolve(
                 &db,
-                Some(&root),
-                &proposal.id,
-                &proposal.session_id,
-                &proposal.turn_id,
-                &proposal.tool_call_id,
-                Some(proposal.version),
-                "approve",
-                Some("auto"),
-                None,
+                PlanResolveParams {
+                    workspace_root: Some(&root),
+                    proposal_id: &proposal.id,
+                    session_id: &proposal.session_id,
+                    turn_id: &proposal.turn_id,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("auto"),
+                    feedback: None,
+                },
             )
             .unwrap();
         let duplicate = manager
             .resolve(
                 &db,
-                Some(&root),
-                &proposal.id,
-                &proposal.session_id,
-                &proposal.turn_id,
-                &proposal.tool_call_id,
-                Some(proposal.version),
-                "approve",
-                Some("auto"),
-                None,
+                PlanResolveParams {
+                    workspace_root: Some(&root),
+                    proposal_id: &proposal.id,
+                    session_id: &proposal.session_id,
+                    turn_id: &proposal.turn_id,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("auto"),
+                    feedback: None,
+                },
             )
             .unwrap();
         assert_eq!(duplicate.proposal.version, first.proposal.version);
@@ -1299,15 +1406,17 @@ mod tests {
             manager
                 .resolve(
                     &db,
-                    Some(&root),
-                    &proposal.id,
-                    &proposal.session_id,
-                    &proposal.turn_id,
-                    &proposal.tool_call_id,
-                    Some(proposal.version),
-                    "reject",
-                    None,
-                    None,
+                    PlanResolveParams {
+                        workspace_root: Some(&root),
+                        proposal_id: &proposal.id,
+                        session_id: &proposal.session_id,
+                        turn_id: &proposal.turn_id,
+                        tool_call_id: &proposal.tool_call_id,
+                        version: Some(proposal.version),
+                        action: "reject",
+                        target_permission_mode: None,
+                        feedback: None,
+                    },
                 )
                 .unwrap_err()
                 .to_string(),
@@ -1316,24 +1425,101 @@ mod tests {
     }
 
     #[test]
+    fn approval_deadline_expires_lazily_and_rejects_late_resolution() {
+        let (dir, db) = test_db();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        let manager = PlanManager;
+        let proposal = submit(&manager, &db, &root, "call-1");
+        let expires_at = proposal
+            .expires_at
+            .as_deref()
+            .map(crate::db::ts_to_ms)
+            .unwrap();
+        assert!(expires_at >= now_ms() + PLAN_APPROVAL_TIMEOUT_MS - 1_000);
+        db.conn()
+            .execute(
+                "UPDATE plan_approvals SET expires_at = ?1 WHERE request_id = ?2",
+                params![now_ms() - 1, proposal.id],
+            )
+            .unwrap();
+
+        assert!(manager
+            .pending_for_session(&db, Some(&proposal.session_id))
+            .unwrap()
+            .is_empty());
+        let stored = get_proposal(&db, &proposal.id).unwrap().unwrap();
+        assert_eq!(stored.status, STATUS_EXPIRED);
+        assert_eq!(stored.error_code.as_deref(), Some("PLAN_APPROVAL_TIMEOUT"));
+        assert_eq!(
+            manager
+                .state_for_session(&db, &proposal.session_id)
+                .unwrap(),
+            "planning"
+        );
+        assert_eq!(
+            manager
+                .resolution_for(&db, &proposal.id)
+                .unwrap()
+                .unwrap()
+                .status,
+            STATUS_EXPIRED
+        );
+
+        sessions::end_turn(&db, &proposal.turn_id, "aborted", None, None, false).unwrap();
+        assert!(gate_session_configure(
+            &db,
+            &proposal.session_id,
+            "agent",
+            None,
+            None,
+            None,
+            Some("auto"),
+        )
+        .is_ok());
+        assert_eq!(
+            manager
+                .resolve(
+                    &db,
+                    PlanResolveParams {
+                        workspace_root: Some(&root),
+                        proposal_id: &proposal.id,
+                        session_id: &proposal.session_id,
+                        turn_id: &proposal.turn_id,
+                        tool_call_id: &proposal.tool_call_id,
+                        version: Some(proposal.version),
+                        action: "reject",
+                        target_permission_mode: None,
+                        feedback: None,
+                    },
+                )
+                .unwrap_err()
+                .to_string(),
+            "PLAN_APPROVAL_TIMEOUT"
+        );
+    }
+
+    #[test]
     fn claim_and_finish_are_durable_cas_transitions() {
         let (dir, db) = test_db();
         let root = dir.path().join("workspace");
         fs::create_dir_all(&root).unwrap();
-        let manager = PlanManager::default();
+        let manager = PlanManager;
         let proposal = submit(&manager, &db, &root, "call-1");
         let approved = manager
             .resolve(
                 &db,
-                Some(&root),
-                &proposal.id,
-                &proposal.session_id,
-                &proposal.turn_id,
-                &proposal.tool_call_id,
-                Some(proposal.version),
-                "approve",
-                Some("auto"),
-                None,
+                PlanResolveParams {
+                    workspace_root: Some(&root),
+                    proposal_id: &proposal.id,
+                    session_id: &proposal.session_id,
+                    turn_id: &proposal.turn_id,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("auto"),
+                    feedback: None,
+                },
             )
             .unwrap();
         let id = approved.execution.as_ref().unwrap().id.clone();
@@ -1354,7 +1540,7 @@ mod tests {
         let (dir, db) = test_db();
         let root = dir.path().join("workspace");
         fs::create_dir_all(&root).unwrap();
-        let manager = PlanManager::default();
+        let manager = PlanManager;
         let proposal = submit(&manager, &db, &root, "call-1");
         assert_eq!(
             gate_session_configure(
@@ -1366,8 +1552,8 @@ mod tests {
                 None,
                 Some("auto"),
             )
-                .unwrap_err()
-                .to_string(),
+            .unwrap_err()
+            .to_string(),
             "PLAN_CONFIGURATION_BLOCKED"
         );
         for blocked in [
@@ -1407,30 +1593,66 @@ mod tests {
         manager
             .resolve(
                 &db,
-                Some(&root),
-                &proposal.id,
-                &proposal.session_id,
-                &proposal.turn_id,
-                &proposal.tool_call_id,
-                Some(proposal.version),
-                "approve",
-                Some("auto"),
-                None,
+                PlanResolveParams {
+                    workspace_root: Some(&root),
+                    proposal_id: &proposal.id,
+                    session_id: &proposal.session_id,
+                    turn_id: &proposal.turn_id,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("auto"),
+                    feedback: None,
+                },
             )
             .unwrap();
         assert_eq!(
-            gate_session_configure(
-                &db,
-                &proposal.session_id,
-                "plan",
-                None,
-                None,
-                None,
-                None,
-            )
+            gate_session_configure(&db, &proposal.session_id, "plan", None, None, None, None,)
                 .unwrap_err()
                 .to_string(),
             "PLAN_CONFIGURATION_BLOCKED"
         );
+    }
+
+    #[test]
+    fn configure_gate_blocks_changes_while_a_turn_is_running() {
+        let (dir, db) = test_db();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        let session = sessions::create_session(
+            &db,
+            Some("Agent".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(root.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let turn = sessions::begin_turn(&db, &session.id, None, None).unwrap();
+        assert_eq!(
+            gate_session_configure(
+                &db,
+                &session.id,
+                "agent",
+                Some("provider-2"),
+                None,
+                None,
+                None,
+            )
+            .unwrap_err()
+            .to_string(),
+            "PLAN_CONFIGURATION_BLOCKED"
+        );
+        sessions::end_turn(&db, &turn, "aborted", None, None, false).unwrap();
+        assert!(gate_session_configure(
+            &db,
+            &session.id,
+            "agent",
+            Some("provider-2"),
+            None,
+            None,
+            None,
+        )
+        .is_ok());
     }
 }
