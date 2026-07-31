@@ -41,6 +41,9 @@ builtin.<domain>.<action>
 - Debug commands may be hidden in production release builds
 - Plugin management commands always available
 - Project commands available even without active session
+- `SubmitPlan` is a model tool, not a palette command. Mode commands are
+  accepted only for an idle session; there is no Chat mode or request-changes
+  alias.
 
 ## 5. Execution results
 

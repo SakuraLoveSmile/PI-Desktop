@@ -1,8 +1,8 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.13`
-- Date: `2026-07-30`
-- Status: `Frozen for implementation details (Plan operating state + plan approval boundary + protocol v7 + schema v8 + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
+- Baseline Version: `0.4.14`
+- Date: `2026-07-31`
+- Status: `Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v9 + schema v10 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -35,11 +35,21 @@
 > leading brand mark through D160 / ADR 0031 while preserving shell branding
 > elsewhere.
 > `0.4.13` replaces the Chat operating profile with the Plan operating state
-> through D166 / ADR 0033. Plan is the same pi Agent in planning state, keeps
+> through D169 / ADR 0038. Plan is the same pi Agent in planning state, keeps
 > permission-mode selection, exposes Bash subject to that policy, denies
 > Write/Edit/plugin tools, and submits structured plans through a separate
 > host-owned approval transition. The host protocol is v7 and storage schema
 > v8; persisted Chat values migrate to Plan while Agent remains the default.
+> `0.4.14` replaces that proposal with immutable host-written Markdown
+> checkpoints under `<workspaceRoot>/.pi/plan/*.md` through D170 / ADR 0039.
+> SubmitPlan accepts title, Markdown, and question; the Markdown bytes are
+> preserved exactly while title/question remain structured approval fields.
+> Approval is approve/reject only with explicit permission selection defaulting
+> to Ask, and opens the artifact for review. Pending, queued, and running work
+> is interrupted by the startup process fence without replay, while an
+> already-approved session remains Agent. ADR 0040 adds the selectable shell
+> catalog while retaining the Bash protocol name. The host protocol is v9 and
+> storage schema is v10.
 
 ## Frozen Decisions
 
@@ -75,7 +85,8 @@
     tag builds now publish all three desktop platforms
 28. TS schema library: **typebox**
 29. i18n library: **i18next**
-30. Bash in M3: **non-interactive only**
+30. Bash: **non-interactive, streamed, and resolved from the selectable shell
+    catalog; default timeout 60s with a bounded override**
 31. Onboarding: **inline checklist**
 32. Observability MVP: **local logs only**
 33. Error model: **shared AppError code registry**
@@ -97,13 +108,25 @@
      per-`turn_end` soft guidance, deterministic pre-request hard guards,
      durable host checkpoints, and one overflow retry**
 44. Plan tools and policy: **Read / Glob / Grep / BrowserPreview / Bash plus
-    `CompactContext` and `ExitPlanMode`; Write/Edit/plugin tools are denied.
-    Bash follows `ask`, `accept-edits`, or `auto`, so Plan is planning intent,
-    not a strict read-only security profile.**
-45. Plan approval: **the same Agent submits a structured plan, waits for a
-    separate host-authenticated approval, receives feedback in Plan, or enters
-    Agent atomically with the selected permission mode; reject, timeout, and
-    crash fail closed.**
+    `CompactContext`, `EnterPlanMode`, and `SubmitPlan`; Write/Edit/plugin and
+    unknown tools are denied. Bash follows `ask`, `accept-edits`, or `auto`, so
+    Plan is planning intent, not a strict read-only security profile.**
+45. Plan checkpoint: **`SubmitPlan(title, markdown, question)` causes host-core
+    to preserve the exact Markdown bytes in a new unique
+    `<workspaceRoot>/.pi/plan/*.md` artifact, while title/question remain
+    structured fields in the existing `plan_approvals` row. The row records the
+    artifact path/hash/size and execution fields. Approve/reject are the only
+    actions; approval explicitly selects `ask`, `accept-edits`, or `auto` with
+    Ask as the UI default, opens the artifact for review, and expires after 30
+    absolute minutes with `PLAN_APPROVAL_TIMEOUT`.**
+46. Plan recovery and shells: **a startup transaction marks prior pending,
+    queued, and running Plan work interrupted before serving RPC, with no
+    replay; an already-approved interrupted execution leaves the session Agent.
+    Configuration is idle-only and each session has one running turn.
+    `defaultCommandShell` selects the platform catalog entry; unavailable
+    persisted choices fall back to the first available platform shell, each
+    turn pins effective ID/dialect, and host rejects stale identity before
+    streaming output under the 60-second default timeout.**
 
 ## Source of Truth
 
@@ -115,11 +138,12 @@
 
 ## Next Action
 
-Start **M6 — Plan** against these frozen details:
+Continue **M6 — Plan** against these frozen details:
 
-1. shared Plan/session contracts and protocol v7
-2. schema v8 migration and host-owned approval records
-3. Rust-authoritative Plan tool policy and approval transition
-4. one-Agent pi runtime state transitions
-5. renderer approval projection and EN/zh-CN UX
-6. focused migration, policy, protocol, and recovery verification
+1. shared Plan/session/shell contracts and protocol v9
+2. schema v10 migration, immutable plan artifacts, and the `plan_approvals`
+   execution fields/startup fence
+3. Rust-authoritative Plan policy, shell identity, and process cancellation
+4. one-Agent SubmitPlan/approval/execution state transitions
+5. renderer artifact approval, shell selection, and EN/zh-CN UX
+6. focused migration, policy, streaming, timeout, and recovery verification

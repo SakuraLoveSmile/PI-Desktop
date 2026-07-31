@@ -17,12 +17,13 @@ Principles:
 |---|---|
 | `app` | App info, health checks |
 | `agent` | Conversation, abort, status |
-| `plan` | Plan approval request listing and resolution |
+| `plan` | Plan proposal listing, resolution, and change events |
 | `session` | Session CRUD / history |
 | `settings` | Config read/write |
 | `secrets` | Secret write/delete/exists (never return plaintext to UI logs) |
 | `project` | Workspace selection and query |
 | `tool` | Permission confirmation callback |
+| `shell` | Host shell catalog and persisted default shell |
 | `log` | Diagnostics that the frontend can display |
 | `plugin` | Plugin install/enable-disable/query/permissions |
 | `commandPalette` | Command palette search and execution |
@@ -94,8 +95,9 @@ renderer executes them locally. Unknown `/foo` passes through as literal
 content. `@path` tokens are not transformed anywhere in the pipeline (D124).
 
 Prompt execution resolves `mode`, `providerId`, `modelId`, and `thinkingLevel`
-from the durable
-session record. The renderer changes those values through
+from the durable session record and snapshots the effective command shell ID and
+dialect for Bash.
+The renderer changes those values through
 `pi-desktop/session/configure` while the session is idle:
 
 ```ts
@@ -111,6 +113,10 @@ type SessionConfigureRequest = {
   thinkingLevel: ThinkingLevel;
 };
 ```
+
+`session/configure` is accepted only while the session is idle. Mode, provider,
+model, permission, and shell-default changes are rejected while a turn or a
+Plan `pending`/`queued`/`running` record exists.
 
 Image and file payloads are not part of the current prompt contract.
 
@@ -136,7 +142,7 @@ type AgentAbortRequest = {
 };
 ```
 
-### 5.3 compact (protocol v7)
+### 5.3 compact (protocol v9)
 
 ```ts
 type AgentCompactRequest = { sessionId: string };
@@ -148,62 +154,138 @@ session. It is available even when automatic context protection is disabled.
 Missing provider/session configuration fails through the normal `AppError`
 envelope; an active turn or compaction returns `AGENT_BUSY`.
 
-### 5.4 Plan approval
+### 5.4 Plan checkpoint approval
 
-Plan approval is separate from a tool permission. The renderer receives a
-structured proposal from the same Agent and resolves it through typed preload
-IPC; it never changes the session mode optimistically.
+Plan approval is separate from a tool permission. The renderer receives the
+host-written artifact metadata from the same Agent and resolves it through
+typed preload IPC; it never changes the session mode optimistically. Plan entry
+and submission remain Agent/host operations, not renderer preload methods.
 
 ```ts
-type PlanStep = {
+type PlanningState = "inactive" | "planning" | "awaiting_approval";
+
+type GlobalPermissionMode = "ask" | "accept-edits" | "auto";
+
+type PlanApprovalAction = "approve" | "reject";
+
+type PlanProposalStatus =
+  | "pending" | "approved" | "changes_requested" | "rejected"
+  | "expired" | "interrupted";
+
+type PlanExecutionState =
+  | "queued" | "running" | "completed" | "interrupted";
+
+type SubmitPlanInput = {
   title: string;
-  description: string;
-  files?: string[];
-  validation?: string[];
+  markdown: string;
+  question: string;
 };
 
-type PlanDocument = {
-  title: string;
-  summary: string;
-  steps: PlanStep[];
-  risks?: string[];
-  openQuestions?: string[];
-  proposedCommands?: string[]; // display-only; never authorization
+type PlanArtifact = {
+  relativePath: string; // `.pi/plan/<unique-name>.md`
+  sha256: string;
+  sizeBytes: number;
 };
 
-type PlanApprovalRequest = {
-  requestId: string;
+type PlanProposal = {
+  id: string;
   sessionId: string;
   turnId: string;
   toolCallId: string;
-  plan: PlanDocument;
+  plan: string;
+  markdown: string;
+  title: string;
+  question: string;
+  status: PlanProposalStatus;
   createdAt: string;
-  expiresAt: string;
-  timeoutMs: number;
+  updatedAt: string;
+  expiresAt?: string;
+  resolvedAt?: string;
+  action?: PlanApprovalAction;
+  targetPermissionMode?: GlobalPermissionMode;
+  feedback?: string;
+  errorCode?: string;
+  artifact?: PlanArtifact;
+  version: number;
+  executionId?: string;
+  executionState?: PlanExecutionState;
 };
 
-type PlanApprovalAction = "approve" | "request_changes" | "reject";
-
-type PlanApprovalResponse = {
-  requestId: string;
+type PlanExecution = {
+  id: string;
+  proposalId: string;
   sessionId: string;
-  action: PlanApprovalAction;
+  plan: string;
+  title: string;
+  question: string;
+  artifact: PlanArtifact;
+  targetPermissionMode: GlobalPermissionMode;
+  state: PlanExecutionState;
+};
+
+type PlanningStateEvent = {
+  sessionId: string;
+  state: PlanningState;
+  proposalId?: string;
+  title?: string;
+  markdown?: string;
+  question?: string;
+  artifact?: PlanArtifact;
+  version?: number;
+  plan?: string;
   feedback?: string;
-  targetPermissionMode?: "ask" | "accept-edits" | "auto";
+  action?: PlanApprovalAction;
+  targetPermissionMode?: GlobalPermissionMode;
+  executionId?: string;
+  executionState?: PlanExecutionState;
+  proposal?: PlanProposal;
+};
+
+type PlansPendingResult = {
+  plans: PlanProposal[];
+  state?: PlanningState;
+};
+
+type PlanResolveRequest = {
+  proposalId: string;
+  sessionId: string;
+  turnId: string;
+  toolCallId: string;
+  version?: number;
+  action: PlanApprovalAction;
+  targetPermissionMode?: GlobalPermissionMode;
+  feedback?: string;
+};
+
+type PlanResolutionResult = {
+  ok: boolean;
+  proposal: PlanProposal;
+  state: PlanningState;
+  action?: PlanApprovalAction;
+  targetPermissionMode?: GlobalPermissionMode;
+  feedback?: string;
+  execution?: PlanExecution;
 };
 ```
 
 Preload methods:
 
-- `pi-desktop/plan/pending() -> { requests: PlanApprovalRequest[] }`
-- `pi-desktop/plan/resolve(PlanApprovalResponse) -> { accepted: true }`
+- `pi-desktop/plans/pending({ sessionId? }) -> PlansPendingResult`
+- `pi-desktop/plans/resolve(PlanResolveRequest) -> PlanResolutionResult`
 
-Approval requires a non-empty `feedback` for `request_changes` and an explicit
-`targetPermissionMode` for `approve`. The UI defaults that choice to `ask`; the
-Agent cannot choose it. Responses with a wrong session, turn, request id, or
-expired host-owned deadline fail with a stable Plan approval error.
+Electron forwards each host `plans.changed` notification unchanged to the
+renderer through the stable shared `IPC.event.plansChanged` channel
+(`pi-desktop/plans/event/changed`). This is the Plan change event surface; the
+renderer does not receive Plan approval transitions as AgentEvent variants.
 
-### 5.4 getStatus
+For `approve`, host-core requires `targetPermissionMode`. Electron fills a
+missing value from `planApprovalPermissionMode` (default `ask`) before
+forwarding; the Agent cannot choose it. `reject` carries no permission mode.
+Responses with a wrong proposal, session, turn, tool-call, version, or expired
+host-owned deadline fail with a stable Plan approval error. There is no
+request-changes action.
+
+### 5.5 getStatus
 
 ```ts
 type AgentStatus = {
@@ -239,19 +321,8 @@ type AgentEvent =
  | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
  | { type: "tool_update"; toolCallId: string; partialResult?: unknown }
  | { type: "tool_end"; toolCallId: string; result: unknown; isError?: boolean }
-  | { type: "tool_permission_request"; request: ToolPermissionRequest }
-  | {
-      type: "plan_state_changed";
-      state: "inactive" | "planning" | "awaiting_approval";
-      source: "session" | "tool" | "approval" | "abort" | "recovery";
-    }
-  | { type: "plan_approval_request"; request: PlanApprovalRequest }
-  | {
-      type: "plan_approval_resolved";
-      requestId: string;
-      sessionId: string;
-      action: PlanApprovalAction;
-    }
+ | ({ type: "planning_state" } & Omit<PlanningStateEvent, "sessionId">)
+ | { type: "tool_permission_request"; request: ToolPermissionRequest }
   | { type: "compaction_start";
      reason: "manual" | "threshold" | "overflow" }
  | { type: "compaction_end";
@@ -264,6 +335,15 @@ type AgentEvent =
 
 > These are **UI-normalized events**, not a pass-through of raw pi events.
 > `packages/agent-runtime` is responsible for mapping pi events to this model.
+
+`planning_state` is the agent-runtime's local planning projection. Its optional
+proposal and execution fields mirror the shared `PlanningStateEvent` shape
+(`proposal`, `executionId`, and `executionState`). The full approved execution
+descriptor uses `PlanExecution` and is carried by the host result/notification.
+The authoritative host approval/queue transition is the separate `plans.changed`
+notification forwarded through `IPC.event.plansChanged`.
+`tools.output` is a host notification consumed by `packages/agent-runtime`
+while a Bash tool runs; it is not an AgentEvent.
 
 `turn_end` closes one model/tool turn but is not a terminal desktop run event:
 another provider request may follow immediately. Renderer busy state and
@@ -419,13 +499,14 @@ Message-scoped assistant Fork/Edit uses this option so the child receives a
 new session id and therefore cannot reuse or mutate the source pi runtime or
 its provider cache.
 
-Protocol version 7 adds Plan/Agent operating-mode values, normalized planning
-state events, structured plan approval request/resolution events, typed
-`pi-desktop/plan/pending` and `pi-desktop/plan/resolve`, and the existing
-protocol-v6 context checkpoint fields. A version 6 host must fail the handshake
-so a desktop cannot display Plan while silently losing the approval or policy
-boundary. `pi-desktop/agent/compact` and `session.appendCompaction` remain part
-of the v7 contract.
+Protocol version 9 adds the checkpoint Plan contract: `SubmitPlan`, unique
+`.pi/plan/*.md` artifact metadata, approve/reject-only responses, absolute
+expiry, `plan_approvals` execution fields, shell catalog/identity fields, and
+streamed stdout/stderr events. A v7 or older host, and any incompatible v8
+peer, must fail the handshake so a desktop cannot display Plan while silently
+losing the artifact, queue, shell, or policy boundary.
+`pi-desktop/agent/compact` and `session.appendCompaction` remain part of the v9
+contract.
 
 Protocol version 2 adds `thinkingLevel`, `UiMessage.thinking`, and
 `message_update.deltaThinking`. A v1 peer must fail the version check instead
@@ -443,12 +524,46 @@ Non-sensitive config that can be returned to the UI:
 
 - provider list (without secret plaintext)
 - default model
+- persisted `defaultCommandShell` from the host shell catalog
 - permission policy toggles
 - UI preferences, including optional `AppSettings.keybindings` overrides keyed
   by the shared shortcut action ids; values use portable `Mod+Shift+Key`
   notation and contain no platform-specific native accelerator strings
 - optional `AppSettings.developerMode`; absent and `false` both keep developer
   tools disabled
+
+### shell
+
+```ts
+type CommandShellId = "windows-powershell" | "cmd" | "git-bash" | "bash";
+
+type CommandShellOption = {
+  id: CommandShellId;
+  label: string;
+  dialect: "powershell" | "cmd" | "posix";
+  available: boolean;
+  isDefault: boolean;
+};
+
+type CommandShellCatalog = {
+  configuredId: CommandShellId | null;
+  effective: CommandShellOption | null;
+  fallback: boolean;
+  choices: CommandShellOption[];
+};
+```
+
+Preload methods:
+
+- `pi-desktop/commandShell/list() -> CommandShellCatalog`
+- `pi-desktop/settings/set({ defaultCommandShell }) -> { ok: true }`
+
+Settings writes accept only an available ID for the current platform and reject
+unknown, unavailable, or wrong-platform IDs. If a persisted ID later becomes
+unavailable, the catalog selects the first available platform shell and sets
+`fallback: true`; if no choice is available, Bash returns `SHELL_NOT_FOUND`.
+Each turn pins the effective ID/dialect, and host rejects a changed pin before
+spawn with `COMMAND_SHELL_CHANGED`.
 
 ### secrets
 - `secrets/set(providerId, apiKey)`
@@ -520,7 +635,7 @@ above.
 
 ## 11. Version Compatibility
 
-- IPC/host contract version field: `protocolVersion: 7`
+- IPC/host contract version field: `protocolVersion: 9`
 - Breaking changes must bump the version and record an ADR
 - renderer and main validate the version at startup; on mismatch, prompt to upgrade/reinstall
 - Protocol v4 adds notification records, channels, and the
@@ -535,10 +650,12 @@ above.
 - Protocol v6 added durable context checkpoints plus the manual/lifecycle
   channels. A v5 peer is rejected because silently omitting a checkpoint can
   make the next provider request unsafe (ADR 0030).
-- Protocol v7 adds the `plan | agent` mode union, Plan state events, structured
-  plan approval request/response events and preload methods. A v6 peer is
-  rejected before the UI becomes interactive because it cannot enforce or
-  represent the Plan approval boundary (ADR 0033).
+- Protocol v9 supersedes the earlier v7 Plan contract. It adds `SubmitPlan`,
+  exact unique artifact metadata, approve/reject-only resolution, 30-minute
+  absolute expiry, `plan_approvals` execution states, shell selection and
+  pinned ID/dialect, and streamed command output. A v7/v8 peer is rejected
+  before the UI becomes interactive because it cannot enforce or represent this
+  boundary (ADR 0039/0040).
 
 ## 12. Plugin API (host UI side)
 

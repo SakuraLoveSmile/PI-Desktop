@@ -1,7 +1,7 @@
 # PI-Desktop Spec
 
-> Baseline: `0.4.13`
-> Updated: `2026-07-30`
+> Baseline: `0.4.14`
+> Updated: `2026-07-31`
 > Language: **English-first**
 > Stack: Electron + **Rust host core** + pi Agent Harness + user-installable plugins
 
@@ -72,7 +72,13 @@ docs/spec/
 6. SQLite owned by Rust only
 7. Default mode = Agent; operating selector = Agent | Plan; Plan is the same
    Agent in planning state and is not a strict read-only security profile
-8. Permission timeout 120s deny
-9. Local user-installable plugins (market later)
-10. Tag releases = macOS arm64, Windows x64, and Linux x64 (D126)
-11. Universal provider/model coverage (native + OpenAI-compatible + custom)
+8. SubmitPlan writes exact Markdown bytes to a new host-owned
+   `.pi/plan/*.md` artifact; title/question stay structured in
+   `plan_approvals`, approval opens the artifact, is approve/reject only, and
+   expires after 30 absolute minutes with `PLAN_APPROVAL_TIMEOUT`
+9. Protocol v9 and storage schema v10 are authoritative for Plan checkpoints,
+   `plan_approvals` execution fields, startup interruption, and shell identity
+10. Permission timeout 120s deny; Bash timeout 60s by default
+11. Local user-installable plugins (market later)
+12. Tag releases = macOS arm64, Windows x64, and Linux x64 (D126)
+13. Universal provider/model coverage (native + OpenAI-compatible + custom)

@@ -116,24 +116,30 @@ state on the same pi Agent, including a separate approval boundary.
 Deliverables:
 - Agent | Plan selector with Agent as the default
 - persisted session/settings/scheduled `chat` → `plan` migration
-- protocol v7 and schema v8 with durable plan approvals
-- Rust-owned mode resolution, Plan tool policy, Bash permission behavior, and
-  atomic Plan → Agent approval transition
-- one-Agent `EnterPlanMode` / `ExitPlanMode` lifecycle with request-changes
-  feedback and fail-closed recovery
-- Plan approval IPC/RPC/events, renderer projection, approval UX, and EN/zh-CN
-  copy
-- plugin denial, scheduled/unattended policy, and focused unit/integration
+- protocol v9 and schema v10 with immutable host-written `.pi/plan/*.md`
+  artifacts, structured title/question fields, and `plan_approvals` artifact/
+  execution fields
+- Rust-owned mode resolution, Plan tool policy, selectable shell catalog with
+  fallback and turn-pinned identity,
+  streamed Bash output, bounded timeout, and process-tree cancellation
+- one-Agent `EnterPlanMode` / `SubmitPlan` lifecycle with approve/reject-only
+  resolution and fail-closed recovery
+- Plan artifact approval IPC/RPC/events, renderer projection, shell selection,
+  approval UX, and EN/zh-CN copy
+- plugin denial, scheduled Plan rejection, and focused unit/integration
   verification documented in the E2E plan
 
 Exit criteria:
 - only one pi Agent is used before, during, and after planning
 - Plan denies Write/Edit/plugin tools but exposes Bash under the selected
   permission mode, including Auto's explicit mutation tradeoff
-- approval is separate from generic tool permission and atomically selects the
-  Agent permission mode
-- reject, timeout, abort, crash, stale response, and persistence failure leave
-  the session in Plan without execution capability
+- approval is separate from generic tool permission, atomically selects the
+  Agent permission mode, and defaults the UI selection to Ask
+- reject and expiry leave the session in Plan; a host restart interrupts
+  pending/queued/running work without replay, while an already-approved
+  interrupted execution leaves the session Agent
+- each submitted Markdown snapshot is preserved byte-for-byte in a unique
+  `.pi/plan/*.md` artifact with recorded path/hash/size, and approval opens it
 - all M6 scenarios are documented; E2E execution remains opt-in
 
 ### M6+ (Post-MVP)

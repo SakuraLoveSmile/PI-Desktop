@@ -111,7 +111,8 @@ destination, chat as the home surface, tools and permissions inline.
   bottom-docked in a transcript, with no project / Local / branch rail (D095).
   Its operating-mode selector contains exactly **Agent** and **Plan**. Plan
   shows the same Agent's planning state, keeps the permission-mode chip, and
-  exposes a structured approval surface after `ExitPlanMode`.
+  exposes the host-written immutable `.pi/plan/*.md` artifact opener and
+  approval surface after `SubmitPlan`.
 - **Backend status capsule**: appears under the titlebar while the backend
   restarts or is fatally degraded (D080), with an Open-logs action.
 
@@ -175,8 +176,9 @@ title, status badge, branch meta, external link, and "Review with agent"
 Create card + task rows (cadence/enabled badges, prompt preview, last run,
 Run now / toggle / Delete). Run now opens a session seeded with the prompt.
 New tasks default to Agent. A migrated Plan task is allowed to remain stored,
-but an unattended run fails before the provider request with
-`PLAN_REQUIRES_INTERACTIVE_SESSION`; it cannot display or auto-approve a plan.
+but an unattended run is explicitly rejected before provider, artifact, or
+queue work with `PLAN_REQUIRES_INTERACTIVE_SESSION`; it cannot display or
+auto-approve a plan.
 The user must explicitly switch it to Agent before enabling unattended
 execution.
 
@@ -268,6 +270,12 @@ Plugins destination described in §3.5.
   event never navigates by itself; only explicit activation does.
 - Backend degraded → status capsule (restarting) or fatal banner with Open
   logs (D080); composer submits are rejected with readable errors while down.
+- Plan checkpoint → the originating session shows the structured title and
+  question, an opener for its immutable `.pi/plan/*.md` artifact, absolute
+  approval deadline, and current status. Renderer reload preserves a pending
+  row while the host remains alive; startup interruption shows interrupted with
+  no replay. An already-approved interrupted execution keeps the session's
+  Agent state.
 
 ## 8. i18n
 

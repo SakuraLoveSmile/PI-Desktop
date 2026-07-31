@@ -2,7 +2,7 @@
 
 ## 1. Goal
 
-Applied decisions: **D002/D003/D008/D158/D166**.
+Applied decisions: **D002/D003/D008/D158/D170/D171**.
 
 
 Wrap pi into a product runtime that desktop layers can consume safely.
@@ -64,19 +64,20 @@ interface AgentRuntime {
 4. validate model/secret availability
 5. reject if session busy
 6. persist user message
-7. start pi turn with the resolved session configuration and effective
+7. snapshot the effective shell ID and dialect for the turn
+8. start pi turn with the resolved session configuration and effective
    thinking level; transient provider transport failures (request timeout,
    dropped connection, 429/5xx) retry up to twice with interruptible
    backoff before the turn is failed (D127)
-8. stream normalized answer and thinking events to UI
-9. on tool calls, delegate to Rust host bridge with the durable `sessionId`;
-   host resolves the session-bound workspace root
-10. if pi finishes a message with `stopReason: "error"`, finalize any partial
-    assistant bubble with a structured `UiMessage.error`, persist it in the
-    transcript, and emit a normalized lifecycle `error` event carrying the
-    same provider `AppError`; even a failure with no answer text remains a
-    visible assistant error message
-11. finalize and persist successful answer/thinking blocks independently
+9. stream normalized answer and thinking events to UI
+10. on tool calls, delegate to Rust host bridge with the durable `sessionId`;
+    host resolves the session-bound workspace root
+11. if pi finishes a message with `stopReason: "error"`, finalize any partial
+     assistant bubble with a structured `UiMessage.error`, persist it in the
+     transcript, and emit a normalized lifecycle `error` event carrying the
+     same provider `AppError`; even a failure with no answer text remains a
+     visible assistant error message
+12. finalize and persist successful answer/thinking blocks independently
 
 The runtime constructs exactly one pi `Agent` per durable session. Plan does
 not select a second model, planner service, permission implementation, or
@@ -169,25 +170,38 @@ The live planning state is derived and projected as:
 
 ```ts
 type OperatingMode = "agent" | "plan";
-type PlanningState = "inactive" | "planning" | "awaiting_approval";
+type PlanningState =
+  | "inactive"
+  | "planning"
+  | "awaiting_approval"
+  | "queued"
+  | "running"
+  | "stopped";
 ```
 
 `Agent / inactive` enters `Plan / planning` either when the user selects Plan
 while idle or when the Agent calls `EnterPlanMode`. In Plan, the Agent can
 inspect, use context controls, run Bash through the selected permission mode,
-and call `ExitPlanMode` with a structured plan. The host then moves the live
-state to `awaiting_approval` and blocks that tool call until a matching plan
-approval response arrives.
+and call `SubmitPlan(title, markdown, question)`. Host-core preserves the
+submitted Markdown bytes in a new immutable
+`.pi/plan/<unique-name>.md` artifact, records its relative path/hash/size and
+structured title/question in `plan_approvals`, and moves the live state to
+`awaiting_approval`.
 
-Approval commits `mode = agent` and the selected explicit permission mode in
-one host transaction. The same Agent receives a fresh model turn with the
-Agent tool set. `request_changes` returns non-empty feedback to the same Agent
-as a Plan tool result and returns to `planning`; it never starts a second Agent.
-`reject`, approval timeout, host/sidecar crash, abort, stale response, or
-persistence failure leaves durable mode as Plan and grants no execution tools.
+Approval has only `approve` and `reject`. Approval commits `mode = agent`, the
+explicit permission mode, an execution ID, and `execution_state = queued` on
+the same `plan_approvals` row in one host transaction. The
+same Agent then receives a fresh model turn with the Agent tool set. Reject,
+absolute expiry, a pending interruption, stale response, or persistence
+failure leaves durable mode as Plan and grants no execution tools. If approval
+already committed and a queued/running execution is interrupted, durable mode
+remains Agent and the execution is not replayed.
 
-Manual mode selection is allowed only while idle. Selecting Agent is an
-intentional user override and does not synthesize a plan or approval.
+Manual mode and configuration selection is allowed only while idle. Selecting
+Agent is an intentional user override and does not synthesize a plan or
+approval. Each session has one active turn, one pending approval, and one
+queued/running execution; a second prompt, configuration change, or execution
+is rejected.
 
 ## 5c. Thinking capability and stream contract
 
@@ -280,9 +294,10 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 The Plan prompt tells the same Agent to understand the request, inspect the
 relevant repository/specification/test context, identify impacted files and
 risks, include focused validation and migration/recovery implications, surface
-open questions, and call `ExitPlanMode` exactly when the plan is ready. It must
-not claim that changes were made. After `request_changes`, it must incorporate
-the feedback and submit a revised plan rather than attempting execution.
+open questions, and call `SubmitPlan` exactly when the checkpoint is ready. It
+must not claim that changes were made. The host writes the immutable
+`.pi/plan/*.md` artifact; the Agent does not write it itself and does not
+receive a request-changes flow.
 
 The prompt may describe Bash as permission-gated and potentially mutating. It
 must not describe Plan as a strict read-only security boundary.

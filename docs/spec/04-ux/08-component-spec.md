@@ -1184,37 +1184,40 @@ Inline transcript card requesting user approval for a high-risk tool call. See
 
 ### 10A.1 Purpose
 
-Inline approval surface for a structured Plan submitted by the same pi Agent.
-It is distinct from `PermissionCard`: it approves a Plan → Agent transition
-and an explicit execution permission mode, not an individual tool call.
+Inline approval surface for the exact Markdown bytes submitted by the same pi
+Agent and preserved in a new immutable `.pi/plan/*.md` artifact. It is distinct
+from `PermissionCard`: it approves a Plan → Agent transition and an explicit
+execution permission mode, not an individual tool call.
 
 ### 10A.2 Content
 
-The card renders the host-issued request identity and every structured plan
-field: title, summary, ordered steps, affected files, validation, risks, open
-questions, and proposed commands. Proposed commands are visibly display-only;
-they do not authorize Bash.
+The card renders the host-issued request identity, structured title and
+question, an opener for the exact `.pi/plan/*.md` path, status, and absolute
+expiry. Opening the artifact reads the host-written file; renderer edits do
+not change the approved bytes. Inline Markdown, SHA-256, and byte size are not
+required card content.
 
 ### 10A.3 Actions and states
 
 | State | Actions | Contract |
 |---|---|---|
-| Pending | Approve, Request changes, Reject, Abort | request is live and session/turn scoped |
+| Pending | Approve, Reject, Abort | request is live and proposal/session/turn/tool-call/version scoped |
 | Resolving | all actions disabled | retain the proposal until host result |
 | Approved | no actions | same Agent continues in Agent with selected permission mode |
-| Changes requested | composer returns to Plan | feedback is delivered to the same Agent |
+| Queued / Running | no actions | approved execution is active and tied to the same approval row |
 | Rejected | no actions | run stops and session remains Plan |
-| Expired / Interrupted | no actions | failed closed; a new plan must be submitted |
+| Expired / Interrupted | no actions | failed closed; a new plan must be submitted unless approval already committed, in which case session remains Agent |
 
 Approve opens the explicit Ask / Accept edits / Auto choice with Ask selected.
-Request changes requires non-empty feedback. Renderer reload calls
-`plan/pending` and restores only a request backed by a live host waiter. A full
-restart never restores an actionable stale approval.
+Reject carries no permission mode. Renderer reload calls `plans.pending` and
+restores a pending row with its original deadline while the host remains alive.
+Startup recovery interrupts pending/queued/running fields before serving RPC,
+restores no actionable stale approval, and never replays execution.
 
 ### 10A.4 Accessibility
 
 - The card is a session-scoped `region` with a localized plan title.
-- Approval, feedback, reject, and abort controls have explicit labels and
+- Approval, reject, and abort controls have explicit labels and
   keyboard focus.
 - The selected permission mode exposes radio semantics and its Plan Bash
   consequence is available in the accessible description.
@@ -1275,7 +1278,8 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | Plan / planning | textarea active while idle; Plan badge and permission chip visible | inspect, send, or submit plan |
-| Plan / awaiting approval | transcript shows the structured Plan approval card; composer remains blocked for that session | approve, request changes, reject, or abort |
+| Plan / awaiting approval | transcript shows the title/question, artifact opener, expiry, and status for the exact `.pi/plan/*.md` approval; composer remains blocked for that session | approve, reject, or abort |
+| Plan / queued or running | Agent badge remains selected; queue/running state is visible and composer remains blocked | abort; no replay control |
 | Plan / failed closed | Plan badge remains visible with an actionable failure state | submit a new plan; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
 
@@ -1298,9 +1302,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Runtime chips keep descenders fully visible (D150): mode, thinking,
   permission, and model triggers use compact line-height rather than
   `leading-none` under overflow; the model trigger still ellipsizes long IDs.
-- Agent / Plan and provider/model changes update the active session, not the
-  app default. They are disabled while a turn runs; Plan approval actions are
-  the exception while awaiting approval.
+- Agent / Plan, provider/model, permission, and shell-default changes update the
+  active session/settings only while idle; they are disabled while a turn or
+  Plan pending/queued/running state exists. Plan approval actions are the
+  exception while awaiting approval.
 - Runtime chips keep descenders fully visible (D150): the Thinking and
   permission triggers in the composer use compact line-height rather than
   `leading-none` under overflow. The Agent/Plan mode toggle and provider/model
@@ -1308,8 +1313,8 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   still ellipsizes long IDs.
 - Agent / Plan mode and provider/model changes (made from the conversation top
   bar, §2) update the active session, not the app default. They are disabled
-  while a turn runs; Plan approval actions are the exception while awaiting
-  approval.
+  while a turn or Plan pending/queued/running state exists; Plan approval
+  actions are the exception while awaiting approval.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing

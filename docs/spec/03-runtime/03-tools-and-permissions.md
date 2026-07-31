@@ -1,6 +1,6 @@
 # 03. Tools and Permissions
 
-> Decisions applied: D003, D005, D006, D013, D015, D093, D114, D115, D166
+> Decisions applied: D003, D005, D006, D015, D093, D114, D115, D170, D171
 
 ## 0. Frozen policy summary
 
@@ -8,11 +8,11 @@
 |---|---|
 | Default mode | Agent |
 | Agent tools | Read / Glob / Grep / Write / Edit / Bash |
-| Plan tools | Read / Glob / Grep / BrowserPreview / Bash / CompactContext / ExitPlanMode |
+| Plan tools | Read / Glob / Grep / BrowserPreview / Bash / CompactContext / SubmitPlan |
 | Plan hard deny | Write / Edit / all plugin tools / unknown tools |
 | Permission timeout | 120s → deny |
 | allow-session scope | toolName |
-| Bash style (M3) | non-interactive (no PTY) |
+| Bash style | non-interactive; selected host catalog shell with streamed output |
 
 ## 1. Goal
 
@@ -28,7 +28,7 @@ Let the agent get things done, but stay under control by default.
 | `BrowserPreview` | low | Open a workspace-relative preview in the user-driven Browser panel |
 | `CompactContext` | low | Create a model-context checkpoint without workspace mutation |
 | `EnterPlanMode` | low | Move the same Agent from Agent to Plan after host validation |
-| `ExitPlanMode` | low | Submit a structured Plan for separate user approval |
+| `SubmitPlan` | low | Preserve exact Markdown bytes in a new `.pi/plan/*.md` artifact and request approval |
 | `Write` | high | Create/overwrite files |
 | `Edit` | high | Modify files |
 | `Bash` | high | Execute commands |
@@ -110,25 +110,31 @@ session gets a scratch directory outside the workspace:
 
 ## 5. Bash Rules
 
-MVP baseline:
+Host execution baseline:
 
 - A project-bound session workspace is required
 - Default cwd = the originating session's `workspaceRoot`
 - Confirmation required by default
-- Set a timeout (e.g. 60s, configurable)
-- Capture stdout/stderr
-- Truncate large output
+- Set a mandatory 60s timeout; accept only a bounded 1s–300s override
+- Stream stdout and stderr separately, then return bounded final output
+- Truncate large output without mixing the two streams
 - No interactive TTY (MVP)
 
-Shell resolution (D084 — bash on every platform, resolved once per process):
+Shell catalog (D171) exposes the stable IDs `windows-powershell`, `cmd`,
+`git-bash`, and `bash` where supported by the platform. The host persists
+`defaultCommandShell`; if that persisted choice later becomes unavailable, the
+effective catalog selection intentionally falls back to the first available
+platform shell. A turn pins the effective shell ID and dialect. `Bash` remains
+the tool/protocol name, and the request carries the pinned shell ID separately.
+Host-core resolves the entry again before spawn and rejects a changed ID/dialect
+with `COMMAND_SHELL_CHANGED`; settings writes reject unavailable or
+wrong-platform IDs with `COMMAND_SHELL_INVALID`. No arbitrary executable path
+or executable path hash is accepted as shell identity.
 
-1. `PI_DESKTOP_BASH` env override (path to a bash executable)
-2. Unix: well-known locations (`/bin/bash`, `/usr/bin/bash`, `/usr/local/bin/bash`, Homebrew), then PATH
-3. Windows: `bash.exe` from Git for Windows — derived from the `git` on PATH, then standard install dirs, then PATH excluding the WSL launcher in `System32`
-
-- Unix invokes `bash -lc` (login shell keeps profile PATH for Finder/Dock launches); Windows invokes `bash -c` with `CREATE_NO_WINDOW`
-- No bash bundled in the installer: Git for Windows is the Windows prerequisite (the app requires git anyway)
-- Resolution failure returns stable `SHELL_NOT_FOUND` with install guidance
+- Windows PowerShell and cmd use their native non-interactive invocation.
+- Git Bash uses the discovered Git for Windows executable.
+- Unix Bash uses an approved system Bash entry.
+- User abort and timeout terminate the complete process tree before returning.
 
 Initial denylist (extensible):
 
@@ -259,11 +265,13 @@ matching log lines.
 ### 10.1 Plan control and context tools
 
 `CompactContext` is available when automatic context protection permits it and
-does not mutate the workspace. `ExitPlanMode` is available only in Plan and
-must be the only tool call in its assistant batch. `EnterPlanMode` is available
-only in Agent and must be the only tool call in its batch. The host validates
-the durable mode before either transition; the visible tool list is guidance,
-not the security boundary.
+does not mutate the workspace. `SubmitPlan` is available only in Plan and must
+be the only tool call in its assistant batch. It preserves the exact Markdown
+bytes in a new unique `.pi/plan/*.md` artifact
+through host-core before creating one pending approval. `EnterPlanMode` is
+available only in Agent and must be the only tool call in its batch. The host
+validates the durable mode and active-turn/configuration boundary before either
+transition; the visible tool list is guidance, not the security boundary.
 
 ## 11. Plugin Tools
 

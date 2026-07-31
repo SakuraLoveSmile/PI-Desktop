@@ -53,4 +53,6 @@ Each ADR includes:
 | 0035 | Surface the OS locale through the preload bridge | Accepted |
 | 0036 | Split Settings into AI and Shortcuts destinations | Accepted |
 | 0037 | Resolve project instructions in Electron main | Accepted |
-| 0038 | Plan operating state and approval boundary | Accepted for implementation |
+| 0038 | Plan operating state and approval boundary | Superseded by 0039 |
+| 0039 | Plan checkpoint artifact, approval, and execution epoch | Accepted for implementation |
+| 0040 | Selectable command shell catalog and execution identity | Accepted for implementation |

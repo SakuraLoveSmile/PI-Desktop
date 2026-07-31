@@ -1,10 +1,16 @@
 # ADR 0038: Plan operating state and approval boundary
 
-- Status: Accepted for implementation
+- Status: Superseded by ADR 0039
 - Date: 2026-07-30
 - Baseline: `0.4.13`
 - Protocol: v7
 - Storage schema: v8
+
+ADR 0039 replaces this checkpoint with immutable unique host-written
+`.pi/plan/*.md` artifacts, approve/reject-only resolution, the existing
+`plan_approvals` artifact/execution fields, and a startup interruption fence
+with no replay. The structured proposal/request-changes details below remain
+historical context for the superseded design.
 
 ## Context
 

@@ -486,21 +486,28 @@ Agent calls a permission-gated tool (including Plan Bash under Ask or Accept edi
 2. The Agent investigates with the Plan tool set. Read/Glob/Grep and
    BrowserPreview are allowed; Bash follows the visible permission mode. A
    Plan Bash command may mutate under Auto, so the mode chip remains visible.
-3. The Agent calls `ExitPlanMode` alone in its tool batch with a structured
-   proposal. The host persists a pending approval and the renderer displays
-   `PlanApprovalCard`; the Agent waits.
-4. Approve requires Ask / Accept edits / Auto selection. Host-core commits the
-   approval, `mode = agent`, and permission mode atomically, then the same
-   Agent continues on a fresh model turn with Agent tools.
-5. Request changes requires feedback, returns it to the same Agent, and keeps
-   the session in Plan for revision. Reject stops the run and keeps Plan.
-6. Timeout, abort, persistence failure, renderer/host/sidecar crash, or stale
-   response renders a failed-closed state. No control clears Plan optimistically
-   and no execution tool becomes available.
+3. The Agent calls `SubmitPlan(title, markdown, question)` alone in its tool
+   batch. Host-core preserves the exact Markdown bytes in a new immutable
+   `.pi/plan/*.md` artifact, records its path/hash/size and structured
+   title/question, and the renderer displays `PlanApprovalCard` with the
+   artifact opener and 30-minute absolute deadline.
+4. Approve requires Ask / Accept edits / Auto selection, with Ask selected by
+   default. Host-core commits the approval, `mode = agent`, permission mode,
+   and `queued` state atomically; the same Agent continues on a fresh turn with
+   Agent tools.
+5. Reject stops the pending run and keeps the session in Plan. Revisions are
+   new SubmitPlan calls; there is no request-changes action.
+6. Expiry, abort, persistence failure, renderer/host/sidecar crash, or stale
+   response renders a failed-closed state. A host restart interrupts pending,
+   queued, and running work without replay; an already-approved interruption
+   keeps the session in Agent.
 
 The approval card is session-scoped. Background sessions may retain a pending
-request, but opening another session never covers it or moves focus; returning
-to the originating session restores the live card and original deadline.
+approval or queued/running execution state in `plan_approvals`, but opening
+another session never covers it or moves focus; returning to the originating
+session restores the record and original deadline while the host remains alive.
+Mode/provider/model/permission/shell configuration and new prompts remain
+disabled until the session is idle.
 
 ## 6. Toast vs inline error
 

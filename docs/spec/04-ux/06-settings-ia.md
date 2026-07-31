@@ -46,6 +46,13 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ### 全局 AI (`ai` tab)
 - **Permissions** card: the global permission-mode control
   (ask / accept-edits / auto) that governs how autonomously the agent acts.
+- **Command shell** card: the host-discovered catalog of native PowerShell,
+  cmd, Git Bash, and Bash with IDs `windows-powershell`, `cmd`, `git-bash`, and
+  `bash` where supported. The selected `defaultCommandShell` persists across
+  restart; writes reject unavailable or wrong-platform IDs. If a persisted
+  choice later becomes unavailable, the first available platform shell is used
+  and the fallback state is shown. A Bash turn verifies its pinned ID/dialect
+  before execution.
 - **Context management** card:
   - automatic compaction is enabled by default
   - the switch controls per-`turn_end` soft guidance, deterministic threshold
@@ -207,8 +214,10 @@ not a strict read-only security profile.
 18. Context management defaults to automatic protection, persists all three
     settings, and cannot configure a retained tail that prevents compaction on
      a small-window model because runtime limits remain model-aware
-18. The default operating-mode selector contains only Agent and Plan; legacy
+19. The default operating-mode selector contains only Agent and Plan; legacy
     Chat values migrate to Plan and do not reappear as a selectable option
+20. Command shell selection persists a platform-valid catalog ID, exposes
+    unavailable/fallback status, and never authorizes a stale ID/dialect
 
 ## 5. Basics chrome metrics
 

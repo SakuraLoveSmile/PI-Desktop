@@ -60,10 +60,10 @@ PI-Desktop =
 2. Configure provider/API key
 3. Open a project workspace
 4. Create a session and send a task
-5. Optionally enter Plan, inspect the project, and submit a structured plan
-6. Approve the plan and choose the execution permission mode
+5. Optionally enter Plan, inspect the project, and submit a Markdown checkpoint
+6. Approve or reject the checkpoint and choose the execution permission mode
 7. Approve local tool execution when required
-8. Restart app and resume the session
+8. Restart the app; interrupted Plan work is not replayed
 
 ## Quality principles
 

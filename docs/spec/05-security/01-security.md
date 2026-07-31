@@ -72,15 +72,31 @@ before permission modes, grants, plugin risk, or renderer/sidecar state. Plan
 denies Write/Edit/plugin/unknown tools, while BrowserPreview is the explicit
 read-only UI inspection exception. Bash remains available in Plan: Ask and
 Accept edits prompt, and Auto runs without confirmation and may mutate the
-workspace or scratch directory. The UI must state this tradeoff.
+workspace or scratch directory. The UI must state this tradeoff. `SubmitPlan`
+preserves exact Markdown bytes in a new unique `<workspaceRoot>/.pi/plan/*.md`
+file through host-core, validates the in-root artifact path, computes SHA-256
+and byte size, and only then creates the `plan_approvals` record with
+structured title/question fields. Renderer and sidecar state cannot write or
+replace an artifact.
 
 ## 5. Command execution
 
 - Bash requires confirmation by default (risk-tiered permission cards); in
   either Agent or Plan, explicit Auto may run it without confirmation
-- Timeouts are mandatory; output truncated at 256KB / 4000 lines with the
-  `[truncated: output exceeded 256KB or 4000 lines]` marker
-- Full command line recorded in the audit log (SQLite, redacted)
+- The Bash protocol name remains stable, but host-core selects a catalog shell
+  (`windows-powershell`, `cmd`, `git-bash`, or `bash`) from persisted
+  `defaultCommandShell` where supported by the platform. Settings writes reject
+  unavailable/wrong-platform IDs. If a persisted choice later becomes
+  unavailable, catalog resolution intentionally falls back to the first
+  available platform shell; each turn pins its effective ID/dialect and the
+  host rejects a changed pin before spawn with `COMMAND_SHELL_CHANGED`.
+- Timeouts are mandatory: 60s default with a 1–300s bounded override. Output
+  streams as separate stdout/stderr channels and is truncated at 256KB / 4000
+  lines with the `[truncated: output exceeded 256KB or 4000 lines]` marker
+- User abort and timeout shut down the complete process tree before the tool
+  closes; no orphan process may continue writing output.
+- Full command line recorded in the audit log (SQLite, redacted), with shell ID
+  and dialect rather than an untrusted executable path or path hash
 - Allowlist/denylist refinement is a tracked follow-up
   ([03-tools-and-permissions](../03-runtime/03-tools-and-permissions.md))
 
@@ -133,8 +149,8 @@ workspace or scratch directory. The UI must state this tradeoff.
   `workspace.get`, `app.health`) — the sidecar cannot pull secrets or
   mutate providers/settings/plugins through the proxy
 - host-core child processes (Bash tool) run with the user's privileges;
-  containment relies on the permission layer, not OS sandboxing (documented
-  limitation for MVP)
+  containment relies on the permission layer, catalog identity, process-group/
+  job-tree shutdown, and workspace sandbox rather than OS sandboxing
 
 ## 9. Threat model (summary)
 
@@ -155,4 +171,9 @@ workspace or scratch directory. The UI must state this tradeoff.
 4. API keys never appear in plaintext in exports/logs by default — verified
 5. Non-whitelisted IPC channels are rejected — verified (M1)
 6. A forged renderer/sidecar mode cannot override the durable host session mode
-7. Plan approval timeout, rejection, abort, and crash never grant Agent tools
+7. Plan artifact bytes/path/hash/size are host-authenticated; approval is
+   approve/reject-only and scheduled Plan is rejected before artifact/queue work
+8. Plan expiry, rejection, host restart, and stale responses never replay
+   pending/queued/running work; an approved interruption leaves the session Agent
+9. Invalid settings and stale shell ID/dialect fail closed; Bash output streams
+   separately and timeout/abort kills the complete process tree

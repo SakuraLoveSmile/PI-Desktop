@@ -11,7 +11,7 @@ Make high-risk local actions visible, interruptible, and predictable.
 | Agent | allow | allow | permission policy | permission policy | registered risk policy |
 | Plan | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | deny |
 
-Decision source: **D003/D166**.
+Decision source: **D003/D170/D171**.
 
 Plan keeps this permission-mode control visible. It is planning intent, not a
 strict read-only security profile: a Bash command can mutate workspace or
@@ -88,25 +88,28 @@ A durable grants-management surface is deferred until a host-backed settings
 schema exists; Settings must not render a control that cannot persist or affect
 the permission runtime.
 
-## 9. Plan approval card
+## 9. Plan checkpoint approval card
 
 Plan approval is not a generic tool permission card. It is rendered inline in
-the originating session after `ExitPlanMode` submits a structured proposal.
+the originating session after `SubmitPlan(title, markdown, question)` causes
+host-core to preserve the exact Markdown bytes in a new immutable
+`.pi/plan/*.md` artifact.
 
-The card shows the plan title, summary, ordered steps, files, validation,
-risks, open questions, and proposed commands. Proposed commands are display
-only and never pre-authorize Bash. It offers:
+The card shows the structured title and question, an opener for the exact
+artifact path, the current status, and the absolute deadline. It offers only:
 
 - **Approve** with an explicit target permission mode (`Ask`, `Accept edits`,
   or `Auto`; default `Ask`)
-- **Request changes**, which requires non-empty feedback and leaves Plan active
 - **Reject**, which stops the run and leaves Plan active
 
-The card has distinct `pending`, `resolving`, `approved`, `changes requested`,
+The card has distinct `pending`, `resolving`, `approved`, `queued`, `running`,
 `rejected`, `expired`, and `interrupted` states. Approval is enabled only for a
-matching live host request. Renderer reload may restore a still-live request;
-full process restart shows a failed-closed interrupted state and offers no
-stale action.
+matching live proposal/session/turn/tool-call/version request and the deadline
+is exactly 30 minutes from creation. Renderer reload may restore a pending row
+without resetting its deadline. Startup interruption marks pending and
+queued/running work interrupted before RPC service, offers no stale action, and
+never replays it. Expiry uses `PLAN_APPROVAL_TIMEOUT`. An already-approved
+interrupted run keeps the session in Agent.
 
 ## 10. Acceptance
 
@@ -119,7 +122,10 @@ stale action.
 6. concurrent session requests remain isolated and never take over the visible
    conversation or its work panel; post-approval artifacts remain assigned to
    the request's originating session
-7. Plan approval displays all structured fields, requires feedback for changes,
-   and sends the selected permission mode only on approval
-8. reject, timeout, abort, crash, stale response, and persistence failure leave
-   the session in Plan with no execution capability
+7. Plan approval displays title/question, opens the immutable artifact, shows
+   expiry/status, and sends the selected permission mode only on approval; no
+   inline Markdown/hash/byte-size or feedback action is required
+8. reject, expiry, abort, crash, stale response, and persistence failure leave
+   pending Plan work in Plan with no execution capability
+9. host restart interrupts pending/queued/running work without replay and keeps
+   already-approved interrupted sessions in Agent

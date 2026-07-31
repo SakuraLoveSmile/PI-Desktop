@@ -75,16 +75,20 @@ Rules:
 | `TOOL_DENIED` | no | permission denied / mode forbidden |
 | `TOOL_TIMEOUT` | yes | tool execution timeout |
 | `TOOL_FAILED` | maybe | tool executed but failed |
-| `SHELL_NOT_FOUND` | no | no usable bash on the machine; message carries install guidance |
+| `SHELL_NOT_FOUND` | no | no effective platform shell is available after catalog fallback |
+| `COMMAND_SHELL_CHANGED` | no | pinned shell ID or dialect changed before execution |
+| `COMMAND_SHELL_INVALID` | no | settings supplied an unknown, unavailable, or wrong-platform shell ID |
 | `PERMISSION_TIMEOUT` | no | permission prompt timed out (mapped to deny) |
 | `PERMISSION_REQUIRED` | no | waiting for user decision |
 | `WRITE_DISABLED_IN_PLAN` | no | Plan hard-deny for Write |
 | `EDIT_DISABLED_IN_PLAN` | no | Plan hard-deny for Edit |
 | `PLUGIN_DISABLED_IN_PLAN` | no | Plan hard-deny for every plugin tool |
-| `PLAN_APPROVAL_REQUIRED` | no | ExitPlanMode is waiting for a separate plan approval |
-| `PLAN_APPROVAL_TIMEOUT` | no | plan approval deadline expired and execution was not granted |
-| `PLAN_APPROVAL_STALE` | no | response does not match the live request/session/turn |
-| `PLAN_APPROVAL_INTERRUPTED` | no | abort, crash, or persistence failure closed approval |
+| `PLAN_APPROVAL_REQUIRED` | no | SubmitPlan is waiting for a separate plan approval |
+| `PLAN_APPROVAL_TIMEOUT` | no | absolute 30-minute plan approval deadline expired |
+| `PLAN_APPROVAL_STALE` | no | response does not match the live proposal/session/turn/tool-call/version |
+| `PLAN_APPROVAL_INTERRUPTED` | no | pending approval closed during abort, crash, or persistence failure |
+| `PLAN_ARTIFACT_WRITE_FAILED` | no | host could not write exact bytes to a new `.pi/plan/*.md` artifact |
+| `PLAN_EXECUTION_INTERRUPTED` | no | approved queued/running Plan execution stopped without replay |
 | `PLAN_REQUIRES_INTERACTIVE_SESSION` | no | unattended/scheduled Plan run cannot request approval |
 
 ### 3.4 Secrets / settings
@@ -127,7 +131,10 @@ Until emitted, implementations use the canonical parent code shown.
 Historical aliases (never use in new code): `PROVIDER_AUTH_FAILED` →
 `PROVIDER_UNAUTHORIZED`; `PROVIDER_STREAM_INTERRUPTED` → `STREAM_FAILED`;
 `WORKSPACE_OUTSIDE_ROOT` → `PATH_OUTSIDE_WORKSPACE`; `SECRET_MISSING` →
-`PROVIDER_SECRET_MISSING`. Truncation is not an error: truncated tool output
+`PROVIDER_SECRET_MISSING`; `SHELL_UNAVAILABLE` → `SHELL_NOT_FOUND`;
+`SHELL_IDENTITY_STALE` → `COMMAND_SHELL_CHANGED`; `PLAN_APPROVAL_EXPIRED` →
+`PLAN_APPROVAL_TIMEOUT`. Truncation is not an error:
+truncated tool output
 carries the inline marker `[truncated: output exceeded 256KB or 4000 lines]`
 (see [16-tool-result-limits](16-tool-result-limits.md)).
 
@@ -149,6 +156,16 @@ Node sidecar maps provider SDK errors into:
 
 ### Permission timeout
 UI/host timeout emits `PERMISSION_TIMEOUT` internally, tool result presented as denied (`TOOL_DENIED`) to agent.
+
+### Shell and Plan checkpoint failures
+
+`SHELL_NOT_FOUND` is returned only when catalog fallback finds no available
+platform shell. `COMMAND_SHELL_CHANGED` never retries with a different shell;
+the turn must obtain a fresh effective ID/dialect. `PLAN_ARTIFACT_WRITE_FAILED`
+never creates an approval row. `PLAN_APPROVAL_TIMEOUT` applies only to the
+absolute pending deadline;
+`PLAN_EXECUTION_INTERRUPTED` identifies an already-approved queued/running
+execution interrupted by abort or host recovery.
 
 ## 5. UI handling guidelines
 
@@ -187,3 +204,7 @@ Examples:
    Plan solely because of the operating mode and instead follows permission
    policy
 4. Host numeric codes map to stable string codes
+5. Invalid shell settings, no-effective-shell/stale-pin, artifact-write,
+   expiry, scheduled-rejection, and restart-interruption paths map to stable
+   codes; only the documented pre-turn catalog fallback is allowed and no work
+   is replayed

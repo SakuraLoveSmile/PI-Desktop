@@ -56,20 +56,26 @@ MVP passes when:
 - [x] Allow returns the result to model and UI — manual:M3
 - [x] Paths outside the workspace are rejected — auto:host-core tests (`blocks_escape`)
 
-### M6. Plan operating state
-- [ ] One pi Agent owns Agent, planning, approval, feedback, and post-approval
-  execution — M6
+### M6. Plan checkpoint and shell execution
+- [ ] One pi Agent owns Agent, planning, approval, and post-approval execution — M6
 - [ ] `EnterPlanMode` and UI/session Plan selection converge on the same state — M6
-- [ ] `ExitPlanMode` submits structured plan data and waits for a separate
-  host-owned approval — M6
-- [ ] Approval atomically enters Agent and persists the selected permission
-  mode; request-changes stays Plan and reaches the same Agent — M6
-- [ ] Reject, timeout, abort, crash, stale response, and persistence failure
-  fail closed — M6
-- [ ] v7→v8 migration maps sessions, app defaults, and scheduled values from
-  Chat to Plan while preserving transcripts and permission settings — M6
+- [ ] `SubmitPlan(title, markdown, question)` preserves exact Markdown bytes in
+  a unique `.pi/plan/*.md` artifact, keeps title/question structured in
+  `plan_approvals`, and records path/hash/size — M6
+- [ ] Approval offers only Approve/Reject; Approve requires an explicit
+  permission mode with Ask selected by default — M6
+- [ ] The approval deadline is an absolute 30 minutes and stale responses fail
+  closed — M6
+- [ ] v8→v10 migration preserves sessions/transcripts and continues
+  `plan_approvals` with artifact/execution fields — M6
+- [ ] Pending, queued, and running Plan work is interrupted on host restart with
+  no replay; an already-approved interrupted execution leaves the session Agent — M6
 - [ ] Scheduled/unattended Plan runs fail before the provider request — M6
 - [ ] Plan plugin tools remain denied despite low risk, grants, or Auto — M6
+- [ ] Shell catalog selection persists a platform-valid ID, falls back to the
+  first available platform shell when a later lookup is unavailable, rejects a
+  stale turn ID/dialect, streams stdout/stderr, enforces the 60s default
+  timeout, and kills process trees on abort — M6
 
 ### F. Persistence
 - [x] Sessions survive restart — manual:M2 (SQLite via host-core)
