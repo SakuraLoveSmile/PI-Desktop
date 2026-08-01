@@ -48,6 +48,98 @@
   background: var(--ds-bg-secondary);
 }
 
+.agent-progress {
+  width: min(100%, 720px);
+  margin: 10px 0 8px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-secondary);
+  padding: 10px 12px;
+  color: var(--ds-text-secondary);
+}
+
+.agent-progress-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.agent-progress-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--ds-accent);
+}
+
+.agent-progress-detail {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-progress-elapsed {
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-progress-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-progress-step {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-xs);
+  line-height: var(--leading-compact);
+  white-space: nowrap;
+}
+
+.agent-progress-step.active {
+  color: var(--ds-text-primary);
+}
+
+.agent-progress-step.complete {
+  color: var(--ds-text-secondary);
+}
+
+.agent-progress-marker {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-round);
+  color: var(--ds-bg-primary);
+}
+
+.agent-progress-step.active .agent-progress-marker {
+  border-color: var(--ds-accent);
+  background: color-mix(in oklab, var(--ds-accent) 16%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 10%, transparent);
+}
+
+.agent-progress-step.complete .agent-progress-marker {
+  border-color: var(--ds-accent);
+  background: var(--ds-accent);
+}
+
 .review-changes-entry {
   width: min(100%, 720px);
   margin: 8px 0;

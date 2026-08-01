@@ -386,6 +386,21 @@ may be retained while exactly one workspace supplies the visible shell context.
   ResizeObserver keeps a pinned transcript at the bottom, while a user who has
   scrolled upward remains at their reading position.
 
+### 2.4 Live progress narrative
+
+- An active turn renders one compact four-stage timeline: **Understanding** →
+  **Working** → **Checking** → **Putting it together**.
+- The renderer advances the timeline only from real agent envelopes: start and
+  reasoning events select Understanding, tool start selects Working, tool
+  completion/turn boundaries select Checking, and streamed answer content
+  selects Putting it together.
+- The detail line may name the active tool. A pending permission keeps the
+  timeline visible but replaces the detail with “Waiting for your approval”.
+- The timeline is session-scoped. Background sessions update only their own
+  progress state and never replace the visible transcript or move focus.
+- The elapsed time is informational and resets for each active turn. Reduced
+  motion removes non-essential marker transitions but preserves phase changes.
+
 ### 2.3 Stream interruption
 
 - If connection drops mid-stream: show error state on partial message

@@ -11,6 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { MessageUsage, UiMessage } from "@pi-desktop/shared";
 import { ConversationMinimap } from "./ConversationMinimap";
+import { AgentProgressTimeline } from "./AgentProgressTimeline";
 import { Markdown, useCopy } from "./Markdown";
 import {
   formatToolDuration,
@@ -1105,6 +1106,9 @@ export const ChatTranscript = memo(function ChatTranscript({
   pendingPermission?: PendingPermission;
 }) {
   const { t } = useTranslation();
+  const agentProgress = useAppStore((state) =>
+    sessionId ? state.agentProgress[sessionId] : undefined,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -1237,7 +1241,14 @@ export const ChatTranscript = memo(function ChatTranscript({
               permission={pendingPermission}
             />
           ) : null}
-          {showWorking ? <WorkingIndicator /> : null}
+          {isRunning ? (
+            <AgentProgressTimeline
+              progress={agentProgress}
+              waitingForPermission={Boolean(pendingPermission)}
+            />
+          ) : showWorking ? (
+            <WorkingIndicator />
+          ) : null}
         </div>
       </div>
       {showJump ? (

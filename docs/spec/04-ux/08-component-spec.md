@@ -466,6 +466,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 |---|---|
 | Empty | Hero + contextual quick actions + optional onboarding checklist + home composer in one scrollable stack; no marketing suggestion cards (D111/D131) |
 | Streaming | Auto-scroll follows while pinned; new tokens append |
+| Active progress | A compact four-stage timeline follows real agent events: understanding, working, checking, and finalizing. The current tool name may appear in the detail line; a pending permission changes the detail to a localized approval wait. |
 | Turn start (send / retry / regenerate) | Re-pins and jumps to bottom even if the user had scrolled up |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
 | Session-owned dirty Git workspace | After this session successfully writes or edits the workspace, a compact Review changes command follows its transcript outside collapsed activity groups; it shows the capped file count plus explicit addition/deletion totals and opens the singleton Review tab. Other sessions in the same project do not render the command. |
@@ -482,6 +483,9 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
   action has a concrete localized label, never submits automatically, and
   returns focus to the home composer after prefilling it. The no-workspace
   action opens the project picker instead of creating an invalid prompt.
+- The active progress timeline is a labelled `role="status"` region. Its four
+  stages are announced as one live detail, while the visual markers are
+  supplementary and do not rely on color alone.
 
 ### 4.6 MVP constraints
 
