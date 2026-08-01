@@ -132,6 +132,25 @@ export const en = {
     emptyTitle: "What should we build?",
     emptyTitleInProject: "What should we build in {{project}}?",
     emptyHint: "Add an AI provider, open a project, then send your first message.",
+    emptyWelcome: "Start with a question, a rough idea, or a task you want to finish.",
+    emptyWelcomeInProject: "I will get oriented in this project and help you move it forward.",
+    quickActionsTitle: "Start somewhere",
+    quickActionOpenProject: "Open a project",
+    quickActionInspect: "Understand this project",
+    quickActionInspectPrompt:
+      "Give me a concise map of this project: its key files, how they fit together, and where I should start.",
+    quickActionImprove: "Find something to improve",
+    quickActionImprovePrompt:
+      "Look through this project and identify one worthwhile improvement. Explain the opportunity before making changes.",
+    quickActionContinue: "Continue a task",
+    quickActionContinuePrompt:
+      "Help me continue from where I left off. First inspect the current project state and summarize what is unfinished.",
+    quickActionPlan: "Make a practical plan",
+    quickActionPlanPrompt:
+      "Help me turn an idea into a practical plan with a clear first step.",
+    quickActionAsk: "Start with a question",
+    quickActionAskPrompt:
+      "Help me think through a question and turn the answer into a useful next step.",
     placeholder: "Ask PI-Desktop to help with anything",
     placeholderHome: "Ask anything",
     addFiles: "Add files and more",

@@ -134,6 +134,23 @@ export const zhCN = {
     emptyTitle: "今天想做什么？",
     emptyTitleInProject: "要在 {{project}} 里做什么？",
     emptyHint: "添加 AI 模型服务、打开项目，然后发送第一条消息。",
+    emptyWelcome: "可以从一个问题、一个模糊想法，或一件想完成的事开始。",
+    emptyWelcomeInProject: "我会先了解这个项目，再和你一起把事情推进下去。",
+    quickActionsTitle: "从这里开始",
+    quickActionOpenProject: "打开一个项目",
+    quickActionInspect: "先了解项目",
+    quickActionInspectPrompt:
+      "先用简洁的方式梳理这个项目：重要文件、它们之间的关系，以及我应该从哪里开始。",
+    quickActionImprove: "找一件值得改进的事",
+    quickActionImprovePrompt:
+      "先看看这个项目，找出一件值得改进的地方。先解释机会和原因，再决定是否修改。",
+    quickActionContinue: "继续一件任务",
+    quickActionContinuePrompt:
+      "帮我继续上次没做完的事情。先检查当前项目状态，并总结还剩下什么。",
+    quickActionPlan: "做一个实际计划",
+    quickActionPlanPrompt: "帮我把一个想法变成可执行的计划，并明确第一步。",
+    quickActionAsk: "从一个问题开始",
+    quickActionAskPrompt: "帮我想清楚一个问题，并把答案变成下一步可以执行的事情。",
     placeholder: "让 PI-Desktop 帮你做任何事",
     placeholderHome: "随便问问",
     addFiles: "添加文件等内容",

@@ -576,9 +576,11 @@ Empty chat home uses a **single scrollable vertical stack** inside
 - Stack (`.home-stack-inner`) is `min-height: 100%`, content width
   **`min(100%, 768px)`**, **`gap: 24px`** (workstation ceiling), and centers
   the column when the viewport is tall
-- Order is always: **hero → optional onboarding checklist → home composer**.
-  The former four suggestion cards and their prompt-prefill actions are not
-  rendered (D131); the checklist remains in normal document flow
+- Order is always: **hero → contextual quick actions → optional onboarding
+  checklist → home composer**. Quick actions are compact ghost controls that
+  prefill the home composer or open the project picker; they never auto-submit
+  a prompt. The former four marketing suggestion cards are not rendered
+  (D131); the checklist remains in normal document flow
 - Short windows (`max-height ≤ 760px`) top-align the stack and keep every
   block reachable by scrolling; the composer must not cover the checklist
 - Composer is **not** absolute-docked on empty home; thread mode keeps the

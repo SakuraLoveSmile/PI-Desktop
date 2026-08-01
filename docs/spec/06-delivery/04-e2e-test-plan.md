@@ -1570,18 +1570,21 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`sessions::tests::save_and_activate_message_revision`, schema v4 migration); full scenario Draft
 
-#### E2E-063: Empty home omits suggestion cards without leaving a layout gap
+#### E2E-063: Empty home offers contextual actions without leaving a layout gap
 
 - **Preconditions**: App running on empty chat home (no transcript) in light
   and dark themes; window can be resized to ~1200×690 and ~900×640.
-- **Steps**: 1) Open empty home. 2) Inspect the space between the hero and home
-  composer with onboarding visible. 3) Dismiss onboarding and inspect again.
-  4) Repeat in the other theme. 5) Resize to a short height and scroll if
-  needed.
-- **Expected**: No Explore / Build / Review / Fix cards render. Hero, optional
-  checklist, and composer form one scrollable stack; dismissing the checklist
-  leaves no empty spacer. The composer never covers the checklist, and short
-  windows keep every remaining block reachable via scroll.
+- **Steps**: 1) Open empty home. 2) Inspect the compact contextual action row
+  between the hero and onboarding/composer. 3) Activate a project action and
+  confirm it opens the project picker. 4) With a project open, activate an
+  inspection action and confirm it prefills, but does not submit, the composer.
+  5) Dismiss onboarding and inspect again. 6) Repeat in the other theme.
+  7) Resize to a short height and scroll if needed.
+- **Expected**: No Explore / Build / Review / Fix marketing cards render. The
+  contextual actions remain a compact labelled button group. Hero, actions,
+  optional checklist, and composer form one scrollable stack; dismissing the
+  checklist leaves no empty spacer. The composer never covers the checklist,
+  and short windows keep every remaining block reachable via scroll.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D111/D131)
 - **Acceptance**: Quality (layout integrity)

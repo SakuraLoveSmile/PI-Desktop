@@ -117,8 +117,11 @@ destination, chat as the home surface, tools and permissions inline.
 ### 3.1 Chat home (default)
 - Empty state: hero title ("What should we build?" — project name becomes a
   dotted-underline button when a workspace is open), optional first-run
-  checklist, and centered composer. The former four suggestion cards are not
-  rendered (D131).
+  checklist, a compact contextual quick-action row, and centered composer. The
+  quick actions prefill the composer with a concrete first step or open a
+  project when no workspace is active; they are not marketing cards and never
+  auto-submit a prompt. The former four suggestion cards are not rendered
+  (D131).
 - With transcript: message stream + tool disclosure rows (D071), a contextual
   Review changes entry when this session produced a successful workspace
   Write/Edit and its Git working tree is still dirty, docked composer, and a

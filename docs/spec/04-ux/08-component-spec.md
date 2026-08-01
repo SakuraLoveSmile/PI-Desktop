@@ -464,7 +464,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 
 | State | Behavior |
 |---|---|
-| Empty | Hero + optional onboarding checklist + home composer in one scrollable stack; no suggestion cards (D111/D131) |
+| Empty | Hero + contextual quick actions + optional onboarding checklist + home composer in one scrollable stack; no marketing suggestion cards (D111/D131) |
 | Streaming | Auto-scroll follows while pinned; new tokens append |
 | Turn start (send / retry / regenerate) | Re-pins and jumps to bottom even if the user had scrolled up |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
@@ -478,6 +478,10 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 - Review changes is a native button with a localized accessible name that
   includes file, addition, and deletion counts; the visible text and icon do
   not rely on color to communicate the action
+- Empty-home quick actions are native buttons in one labelled group. Each
+  action has a concrete localized label, never submits automatically, and
+  returns focus to the home composer after prefilling it. The no-workspace
+  action opens the project picker instead of creating an invalid prompt.
 
 ### 4.6 MVP constraints
 

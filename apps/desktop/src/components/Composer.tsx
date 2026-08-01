@@ -117,7 +117,18 @@ function cssPixels(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }) {
+export type ComposerPrefill = {
+  text: string;
+  token: number;
+};
+
+export function Composer({
+  variant = "docked",
+  prefill,
+}: {
+  variant?: "home" | "docked";
+  prefill?: ComposerPrefill | null;
+}) {
   const { t } = useTranslation();
   const sendPrompt = useAppStore((s) => s.sendPrompt);
   const abort = useAppStore((s) => s.abort);
@@ -156,6 +167,18 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
       el.setSelectionRange(len, len);
     });
   }, [composerPrefill, clearComposerPrefill]);
+
+  useEffect(() => {
+    if (!prefill?.text) return;
+    setValue(prefill.text);
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      const len = el.value.length;
+      el.setSelectionRange(len, len);
+    });
+  }, [prefill]);
 
   useEffect(() => {
     const el = ref.current;
