@@ -136,6 +136,13 @@ export type AgentProgressState = {
   updatedAt: number;
 };
 
+export type AgentTurnResult = {
+  status: "completed" | "failed";
+  turnId: string;
+  finishedAt: number;
+  errorCode?: string;
+};
+
 const WORK_PANEL_STORAGE_KEY = "pi.desktop.workPanel";
 const SESSION_TRANSCRIPT_CACHE_LIMIT = 5;
 // Preserve the original 320px tool-content minimum beside the 44px activity rail.
@@ -305,6 +312,8 @@ export type AppState = {
   runningSessions: Record<string, boolean>;
   /** Renderer-only progress phase for the currently running turn. */
   agentProgress: Record<string, AgentProgressState>;
+  /** Latest in-memory result for each session, used by the active transcript. */
+  latestTurnResults: Record<string, AgentTurnResult>;
   /** Latest terminal outcome per session for compact sidebar feedback. */
   sessionOutcomes: Record<string, SidebarSessionOutcome>;
   providers: ProviderPublic[];
@@ -601,6 +610,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isRunning: false,
   runningSessions: {},
   agentProgress: {},
+  latestTurnResults: {},
   sessionOutcomes: {},
   providers: [],
   providerModels: {},
@@ -1085,6 +1095,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       errorRetriable: null,
       runningSessions: { ...s.runningSessions, [startedIn]: true },
       agentProgress: withoutRecordKey(s.agentProgress, startedIn),
+      latestTurnResults: withoutRecordKey(s.latestTurnResults, startedIn),
       sessionOutcomes: withoutRecordKey(s.sessionOutcomes, startedIn),
     }));
     try {
@@ -1108,6 +1119,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         isRunning: s.activeSessionId === startedIn ? false : s.isRunning,
         runningSessions: { ...s.runningSessions, [startedIn]: false },
         agentProgress: withoutRecordKey(s.agentProgress, startedIn),
+        latestTurnResults: {
+          ...s.latestTurnResults,
+          [startedIn]: {
+            status: "failed",
+            turnId: `${startedIn}:${Date.now()}`,
+            finishedAt: Date.now(),
+            errorCode: messageError.code,
+          },
+        },
         sessionOutcomes: { ...s.sessionOutcomes, [startedIn]: "failed" },
         ...(s.activeSessionId === startedIn
           ? { messages: [...s.messages, assistantErrorMessage(messageError)] }
@@ -1202,6 +1222,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       errorRetriable: null,
       runningSessions: { ...s.runningSessions, [sessionId]: true },
       agentProgress: withoutRecordKey(s.agentProgress, sessionId),
+      latestTurnResults: withoutRecordKey(s.latestTurnResults, sessionId),
       sessionOutcomes: withoutRecordKey(s.sessionOutcomes, sessionId),
     }));
 
@@ -1224,6 +1245,15 @@ export const useAppStore = create<AppState>((set, get) => ({
           isRunning: s.activeSessionId === sessionId ? false : s.isRunning,
           runningSessions: { ...s.runningSessions, [sessionId]: false },
           agentProgress: withoutRecordKey(s.agentProgress, sessionId),
+          latestTurnResults: {
+            ...s.latestTurnResults,
+            [sessionId]: {
+              status: "failed",
+              turnId: `${sessionId}:${Date.now()}`,
+              finishedAt: Date.now(),
+              errorCode: (e as { code?: string })?.code,
+            },
+          },
           sessionOutcomes: { ...s.sessionOutcomes, [sessionId]: "failed" },
           error: e instanceof Error ? e.message : String(e),
           errorCode: (e as { code?: string })?.code ?? null,
@@ -1233,6 +1263,15 @@ export const useAppStore = create<AppState>((set, get) => ({
           isRunning: s.activeSessionId === sessionId ? false : s.isRunning,
           runningSessions: { ...s.runningSessions, [sessionId]: false },
           agentProgress: withoutRecordKey(s.agentProgress, sessionId),
+          latestTurnResults: {
+            ...s.latestTurnResults,
+            [sessionId]: {
+              status: "failed",
+              turnId: `${sessionId}:${Date.now()}`,
+              finishedAt: Date.now(),
+              errorCode: (e as { code?: string })?.code,
+            },
+          },
           sessionOutcomes: { ...s.sessionOutcomes, [sessionId]: "failed" },
           error: e instanceof Error ? e.message : String(e),
           errorCode: (e as { code?: string })?.code ?? null,
@@ -1270,6 +1309,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       errorRetriable: null,
       runningSessions: { ...s.runningSessions, [sessionId]: true },
       agentProgress: withoutRecordKey(s.agentProgress, sessionId),
+      latestTurnResults: withoutRecordKey(s.latestTurnResults, sessionId),
       sessionOutcomes: withoutRecordKey(s.sessionOutcomes, sessionId),
     }));
     try {
@@ -1283,6 +1323,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         isRunning: s.activeSessionId === sessionId ? false : s.isRunning,
         runningSessions: { ...s.runningSessions, [sessionId]: false },
         agentProgress: withoutRecordKey(s.agentProgress, sessionId),
+        latestTurnResults: {
+          ...s.latestTurnResults,
+          [sessionId]: {
+            status: "failed",
+            turnId: `${sessionId}:${Date.now()}`,
+            finishedAt: Date.now(),
+            errorCode: (e as { code?: string })?.code,
+          },
+        },
         sessionOutcomes: { ...s.sessionOutcomes, [sessionId]: "failed" },
         error: e instanceof Error ? e.message : String(e),
         errorCode: (e as { code?: string })?.code ?? null,
@@ -2066,6 +2115,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           runningSessions: { ...s.runningSessions, [envelope.sessionId]: true },
           sessionOutcomes: withoutRecordKey(s.sessionOutcomes, envelope.sessionId),
+          latestTurnResults: withoutRecordKey(
+            s.latestTurnResults,
+            envelope.sessionId,
+          ),
           ...(agentProgress === s.agentProgress ? {} : { agentProgress }),
         };
       });
@@ -2085,6 +2138,21 @@ export const useAppStore = create<AppState>((set, get) => ({
           s.pendingPermissions,
           envelope.sessionId,
         ),
+        latestTurnResults:
+          event.type === "error" && event.error.code === "TURN_ABORTED"
+            ? withoutRecordKey(s.latestTurnResults, envelope.sessionId)
+            : {
+                ...s.latestTurnResults,
+                [envelope.sessionId]: {
+                  status: event.type === "error" ? "failed" : "completed",
+                  turnId:
+                    envelope.turnId ?? `${envelope.sessionId}:${envelope.ts}`,
+                  finishedAt: envelope.ts,
+                  ...(event.type === "error"
+                    ? { errorCode: event.error.code }
+                    : {}),
+                },
+              },
         sessionOutcomes:
           event.type === "error" && event.error.code === "TURN_ABORTED"
             ? withoutRecordKey(s.sessionOutcomes, envelope.sessionId)

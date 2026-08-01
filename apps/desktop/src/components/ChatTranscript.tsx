@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { MessageUsage, UiMessage } from "@pi-desktop/shared";
 import { ConversationMinimap } from "./ConversationMinimap";
 import { AgentProgressTimeline } from "./AgentProgressTimeline";
+import { TurnOutcomeCard } from "./TurnOutcomeCard";
 import { Markdown, useCopy } from "./Markdown";
 import {
   formatToolDuration,
@@ -66,6 +67,9 @@ import { PermissionCard } from "./PermissionCard";
 const WorkspaceChangesEntry = memo(function WorkspaceChangesEntry() {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((state) => state.activeSessionId);
+  const latestTurnResult = useAppStore((state) =>
+    activeSessionId ? state.latestTurnResults[activeSessionId] : undefined,
+  );
   const workspacePath = useAppStore((state) => state.workspace?.path);
   const diffPath = useAppStore((state) => state.workspaceDiffPath);
   const diff = useAppStore((state) => state.workspaceDiff);
@@ -79,7 +83,7 @@ const WorkspaceChangesEntry = memo(function WorkspaceChangesEntry() {
     reviewSessions,
   });
 
-  if (!summary) return null;
+  if (!summary || latestTurnResult?.status === "completed") return null;
 
   const countLabel = t(
     summary.truncated
@@ -1109,6 +1113,9 @@ export const ChatTranscript = memo(function ChatTranscript({
   const agentProgress = useAppStore((state) =>
     sessionId ? state.agentProgress[sessionId] : undefined,
   );
+  const latestTurnResult = useAppStore((state) =>
+    sessionId ? state.latestTurnResults[sessionId] : undefined,
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -1235,6 +1242,11 @@ export const ChatTranscript = memo(function ChatTranscript({
             ),
           )}
           <WorkspaceChangesEntry />
+          <TurnOutcomeCard
+            sessionId={sessionId}
+            messages={messages}
+            result={latestTurnResult}
+          />
           {pendingPermission ? (
             <PermissionCard
               key={pendingPermission.requestId}
