@@ -214,8 +214,6 @@ export const en = {
     usageReasoning: "Reasoning {{count}}",
     scrollToBottom: "Jump to latest",
     minimap: "Conversation outline",
-    resultComplete: "Task complete",
-    resultCompleteBody: "The latest turn is ready to review.",
     resultNeedsAttention: "This task needs attention",
     resultFailedBody: "The turn stopped before it was complete. Your work is still here.",
     resultContinue: "Continue",

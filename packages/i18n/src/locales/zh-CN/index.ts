@@ -214,8 +214,6 @@ export const zhCN = {
     usageReasoning: "推理 {{count}}",
     scrollToBottom: "回到最新",
     minimap: "对话大纲",
-    resultComplete: "这次任务完成了",
-    resultCompleteBody: "最新一轮结果已经准备好，可以查看改动。",
     resultNeedsAttention: "这次任务需要处理一下",
     resultFailedBody: "这一轮在完成前停下了，但已有内容都还在。",
     resultContinue: "继续",

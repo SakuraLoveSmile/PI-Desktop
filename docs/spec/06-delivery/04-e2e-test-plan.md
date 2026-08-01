@@ -1612,22 +1612,21 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`agent-progress-timeline.test.mjs`); full UI scenario Draft
 
-#### E2E-095: Terminal turns close with evidence and recovery actions
+#### E2E-095: Terminal failures expose recovery without a success card
 
 - **Preconditions**: A deterministic provider can complete a turn with a
   workspace edit and can fail a second turn with a retriable error; the session
   has a visible composer.
-- **Steps**: 1) Complete the workspace-edit turn. 2) Inspect the outcome card
-  and the inline review card immediately after the change tool row. 3) Expand
-  the inline card and verify its hunks. 4) Trigger the retriable failure. 5)
-  Inspect the failure card, then choose Retry. 6) Start another new prompt and
-  inspect the old card.
-- **Expected**: Completion shows a localized success heading, tool evidence,
-  and Continue; file status, counts, and hunks stay on the adjacent inline
-  review card. Failure shows that existing work remains, exposes Retry and
-  Continue, and retry preserves the latest prompt. A new turn clears the
-  previous outcome card; an abort creates neither success nor failure outcome
-  copy.
+- **Steps**: 1) Complete the workspace-edit turn. 2) Confirm that no success
+  outcome card appears and inspect the inline review card immediately after the
+  change tool row. 3) Expand the inline card and verify its hunks. 4) Trigger
+  the retriable failure. 5) Inspect the failure card, then choose Retry. 6)
+  Start another new prompt and inspect the old card.
+- **Expected**: Completion uses the transcript and inline review card as its
+  evidence without adding a "Task complete" card. Failure shows that existing
+  work remains, exposes Retry and Continue, and retry preserves the latest
+  prompt. A new turn clears the previous failure card; an abort creates no
+  failure outcome copy.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`, `03-runtime/10-session-state-machine.md`
 - **Acceptance**: C (chat stream), Quality (completion and recovery)

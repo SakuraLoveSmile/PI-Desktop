@@ -409,18 +409,17 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 ### 2.5 Turn outcome closure
 
-- A completed or failed visible turn renders one session-scoped outcome card
-  after the transcript content. It is based on the terminal agent event, not a
-  timeout or a guessed spinner state.
-- Completion copy states that the latest turn is ready and may show the number
-  of tool steps. File-level review stays attached to the adjacent message
-  cards; the outcome card does not create a second Review entry.
+- A failed visible turn renders one session-scoped recovery card after the
+  transcript content. It is based on the terminal agent event, not a timeout
+  or a guessed spinner state. Completed turns do not add a success card; their
+  existing transcript and message-scoped review cards remain the completion
+  evidence.
 - Failure copy states that the existing work remains available. Retry resends
   the latest user prompt through the existing retry path; Continue returns
   focus to the composer without changing the transcript.
-- Aborted turns do not render a completion or failure card. Starting a new
-  turn clears the previous card, and background-session results remain scoped
-  until that session is selected.
+- Aborted turns do not render a failure card. Starting a new turn clears the
+  previous card, and background-session results remain scoped until that
+  session is selected.
 
 ### 2.3 Stream interruption
 

@@ -468,7 +468,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 | Empty | Restrained hero + compact contextual quick actions + optional onboarding checklist + home composer in one scrollable stack; no marketing suggestion cards (D111/D131) |
 | Streaming | Auto-scroll follows while pinned; new tokens append |
 | Active progress | A compact four-stage timeline follows real agent events: understanding, working, checking, and finalizing. The current tool name may appear in the detail line; a pending permission changes the detail to a localized approval wait. |
-| Turn outcome | After a completed or failed turn, a session-scoped result card summarizes the outcome, tool evidence, and the next action. File review stays on the message-scoped InlineReviewCard; failed turns can retry without losing the transcript. |
+| Turn outcome | After a failed turn, a session-scoped recovery card summarizes the interruption and tool evidence. Completed turns use the existing transcript and message-scoped InlineReviewCard without an extra success card; failed turns can retry without losing the transcript. |
 | Turn start (send / retry / regenerate) | Re-pins and jumps to bottom even if the user had scrolled up |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
 | Message-scoped dirty Git workspace | Each successful workspace Write/Edit tool row is followed by one compact InlineReviewCard when the current diff contains that path. The card shows added/modified/deleted/renamed/untracked status, explicit addition/deletion totals, and expands the matching hunks in place. It does not render as a bottom/global entry or leak into another session's transcript. |
@@ -490,10 +490,10 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 - The active progress timeline is a labelled `role="status"` region. Its four
   stages are announced as one live detail, while the visual markers are
   supplementary and do not rely on color alone.
-- The turn outcome card is a labelled `role="status"` region with explicit
-  text actions. Success and failure use icon geometry plus text, never color
-  alone; Retry preserves the existing prompt and Continue returns focus to the
-  composer.
+- The failed-turn recovery card is a labelled `role="status"` region with
+  explicit text actions. It uses icon geometry plus text, never color alone;
+  Retry preserves the existing prompt and Continue returns focus to the
+  composer. Completed turns do not render this card.
 
 ### 4.6 MVP constraints
 

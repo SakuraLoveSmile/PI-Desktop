@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { UiMessage } from "@pi-desktop/shared";
 import type { AgentTurnResult } from "../stores/app-store";
 import { useAppStore } from "../stores/app-store";
-import { IconCheck, IconCircleAlert } from "./icons";
+import { IconCircleAlert } from "./icons";
 
 type TurnOutcomeCardProps = {
   messages: UiMessage[];
@@ -33,7 +33,7 @@ export function TurnOutcomeCard({
   const { t } = useTranslation();
   const retryLastPrompt = useAppStore((state) => state.retryLastPrompt);
 
-  if (!result) return null;
+  if (!result || result.status === "completed") return null;
 
   const tail = latestTurnMessages(messages);
   const toolCount = tail.filter((message) => message.role === "tool").length;
@@ -46,26 +46,21 @@ export function TurnOutcomeCard({
 
   if (!hasVisibleTurn) return null;
 
-  const completed = result.status === "completed";
   return (
     <section
-      className={`turn-outcome-card ${completed ? "completed" : "failed"}`}
+      className="turn-outcome-card failed"
       data-testid="turn-outcome-card"
-      data-outcome={result.status}
+      data-outcome="failed"
       role="status"
       aria-live="polite"
     >
       <div className="turn-outcome-heading">
         <span className="turn-outcome-icon" aria-hidden>
-          {completed ? <IconCheck size={16} /> : <IconCircleAlert size={16} />}
+          <IconCircleAlert size={16} />
         </span>
         <div className="turn-outcome-copy">
-          <strong>
-            {t(completed ? "chat.resultComplete" : "chat.resultNeedsAttention")}
-          </strong>
-          <span>
-            {t(completed ? "chat.resultCompleteBody" : "chat.resultFailedBody")}
-          </span>
+          <strong>{t("chat.resultNeedsAttention")}</strong>
+          <span>{t("chat.resultFailedBody")}</span>
         </div>
       </div>
       {toolCount > 0 ? (
@@ -74,15 +69,13 @@ export function TurnOutcomeCard({
         </div>
       ) : null}
       <div className="turn-outcome-actions">
-        {!completed ? (
-          <button
-            type="button"
-            className="copy-btn primary"
-            onClick={() => void retryLastPrompt()}
-          >
-            {t("chat.retry")}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="copy-btn primary"
+          onClick={() => void retryLastPrompt()}
+        >
+          {t("chat.retry")}
+        </button>
         <button type="button" className="copy-btn" onClick={focusComposer}>
           {t("chat.resultContinue")}
         </button>
