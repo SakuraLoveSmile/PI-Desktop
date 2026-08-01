@@ -322,7 +322,8 @@ may be retained while exactly one workspace supplies the visible shell context.
   Manual checks expose up-to-date or error feedback; automatic failures do not
   open a toast or ambient banner.
 - Manual delivery (`darwin` and non-AppImage Linux) stops at `available` and
-  offers the fixed GitHub Releases page. In-app delivery (Windows NSIS and
+  offers the fixed GitHub Releases page for `vastsa/PI-Dock`. In-app delivery
+  (Windows NSIS and
   Linux AppImage readiness builds) automatically advances through
   `downloading` to the stable `downloaded` state.
 - `downloaded` remains actionable until Restart to update or normal app quit;

@@ -122,6 +122,10 @@ Artifacts land in `apps/desktop/release/` (DMG + blockmap).
 
 ### 4.3 GitHub tag workflow
 
+The canonical GitHub repository is `vastsa/PI-Dock`. Tag builds,
+release links, CI badges, and electron-updater metadata must point to
+this repository; the product name remains PI-Desktop.
+
 The GitHub Release workflow starts all native platform runners without a
 separate validation-job barrier. Each runner validates that the pushed tag
 matches `apps/desktop/package.json` immediately after checkout, before package

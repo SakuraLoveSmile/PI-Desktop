@@ -8,8 +8,8 @@
 
 自带模型，代码、密钥与会话全部留在你自己的电脑上。
 
-[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?include_prereleases&label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
-[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/vastsa/PI-Dock?include_prereleases&label=release)](https://github.com/vastsa/PI-Dock/releases/latest)
+[![CI](https://github.com/vastsa/PI-Dock/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Dock/actions/workflows/ci.yml)
 ![Platforms](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-4c8dd8)
 
 [下载](#下载) · [快速上手](#快速上手) · [功能亮点](#功能亮点) · [工作原理](#工作原理) · [参与开发](#参与开发) · [English](README.md)
@@ -50,7 +50,7 @@ PI-Desktop 把 AI 编程智能体装进原生桌面应用：打开一个项目�
 
 ## 下载
 
-前往 [Releases 页面](https://github.com/vastsa/PI-Desktop/releases/latest)获取最新版本。
+前往 [Releases 页面](https://github.com/vastsa/PI-Dock/releases/latest)获取最新版本。
 
 | 平台 | 安装包 | 状态 |
 |---|---|---|

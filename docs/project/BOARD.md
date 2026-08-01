@@ -21,15 +21,15 @@ Until that is enabled, track delivery with:
 
 | Milestone | GitHub | Local status |
 |---|---|---|
-| M0 Spec Freeze | [closed](https://github.com/vastsa/PI-Desktop/milestone/1) | Done |
-| M1 App Skeleton | [closed](https://github.com/vastsa/PI-Desktop/milestone/2) | Done |
-| M2 Pi Chat Runtime | [closed](https://github.com/vastsa/PI-Desktop/milestone/3) | Done |
-| M3 Workspace Tools | [closed](https://github.com/vastsa/PI-Desktop/milestone/4) | Done |
-| M4 Plugin Foundation | [closed](https://github.com/vastsa/PI-Desktop/milestone/5) | Done |
-| M5 Desktop Hardening | [open](https://github.com/vastsa/PI-Desktop/milestone/6) | Done except notarization (credential-gated) |
+| M0 Spec Freeze | [closed](https://github.com/vastsa/PI-Dock/milestone/1) | Done |
+| M1 App Skeleton | [closed](https://github.com/vastsa/PI-Dock/milestone/2) | Done |
+| M2 Pi Chat Runtime | [closed](https://github.com/vastsa/PI-Dock/milestone/3) | Done |
+| M3 Workspace Tools | [closed](https://github.com/vastsa/PI-Dock/milestone/4) | Done |
+| M4 Plugin Foundation | [closed](https://github.com/vastsa/PI-Dock/milestone/5) | Done |
+| M5 Desktop Hardening | [open](https://github.com/vastsa/PI-Dock/milestone/6) | Done except notarization (credential-gated) |
 
 Open issue:
-- [#6 M5: Packaging and desktop hardening](https://github.com/vastsa/PI-Desktop/issues/6)
+- [#6 M5: Packaging and desktop hardening](https://github.com/vastsa/PI-Dock/issues/6)
 
 ## Swimlanes
 

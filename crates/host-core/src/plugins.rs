@@ -1066,8 +1066,8 @@ fn built_in_catalog() -> MarketCatalogFile {
                 categories: vec!["demo".into(), "official".into()],
                 verified: true,
                 downloads: Some(1280),
-                homepage: Some("https://github.com/vastsa/PI-Desktop".into()),
-                repository: Some("https://github.com/vastsa/PI-Desktop".into()),
+                homepage: Some("https://github.com/vastsa/PI-Dock".into()),
+                repository: Some("https://github.com/vastsa/PI-Dock".into()),
                 readme_markdown: Some(
                     "# Hello\n\nOfficial demo plugin used by the local marketplace provider.".into(),
                 ),

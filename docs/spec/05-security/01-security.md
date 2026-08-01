@@ -93,7 +93,8 @@ Required (all **implemented**):
 ## 7. Application update security (D120)
 
 - Electron Main owns `electron-updater`; renderer IPC cannot provide or
-  override the fixed HTTPS GitHub owner/repository or releases URL.
+  override the fixed HTTPS GitHub owner/repository (`vastsa/PI-Dock`) or
+  releases URL.
 - The updater forces `allowPrerelease = false` so discovery always uses
   GitHub's latest stable release rather than a same-channel prerelease pin.
 - Feed manifests bind artifacts with electron-builder hashes. An error,
