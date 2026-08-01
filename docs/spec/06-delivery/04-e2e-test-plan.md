@@ -1592,26 +1592,26 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`home-empty-layout.test.mjs`); full UI scenario Draft
 
-#### E2E-094: Active turns expose real progress phases without stealing focus
+#### E2E-094: Active turns keep the lower transcript surface clear
 
 - **Preconditions**: A deterministic agent can emit thinking, tool start/end,
   streamed answer, permission, and terminal events for a durable session; a
   second session can run in the background.
-- **Steps**: 1) Start a turn in the visible session. 2) Observe the progress
-  timeline after start, tool start, tool end, and streamed answer events.
-  3) Trigger a permission request and inspect the live detail. 4) Switch to a
-  second session while the first continues. 5) Return to the first session
-  after completion.
-- **Expected**: The visible timeline advances through Understanding, Working,
-  Checking, and Putting it together from the matching real events. The active
-  tool name is shown when available; permission state reads as waiting for
-  approval. Background progress never changes the visible session, transcript,
-  composer focus, or project. The timeline disappears when the turn settles.
+- **Steps**: 1) Start a turn in the visible session. 2) Observe the transcript
+  while the agent is thinking, using tools, and streaming an answer. 3) Trigger
+  a permission request and inspect the approval card. 4) Switch to a second
+  session while the first continues. 5) Return to the first session after
+  completion.
+- **Expected**: No generic Understanding, Working, Checking, or completion
+  card appears below the transcript while the turn is active. Assistant and
+  tool rows remain inline; only an actual permission request renders an
+  actionable card. Background activity never changes the visible session,
+  transcript, composer focus, or project.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`, `03-runtime/10-session-state-machine.md`
 - **Acceptance**: C (chat stream), Quality (interaction and accessibility)
 - **Milestone**: M5
-- **Status**: Unit-covered (`agent-progress-timeline.test.mjs`); full UI scenario Draft
+- **Status**: Unit-covered (`active-turn-surface.test.mjs`); full UI scenario Draft
 
 #### E2E-095: Terminal failures expose recovery without a success card
 

@@ -12,7 +12,6 @@ import {
 import { useTranslation } from "react-i18next";
 import type { MessageUsage, UiMessage } from "@pi-desktop/shared";
 import { ConversationMinimap } from "./ConversationMinimap";
-import { AgentProgressTimeline } from "./AgentProgressTimeline";
 import { TurnOutcomeCard } from "./TurnOutcomeCard";
 import { ReviewChangeCard } from "./ReviewChangeCard";
 import { Markdown, useCopy } from "./Markdown";
@@ -698,27 +697,6 @@ const ActivityGroup = memo(function ActivityGroup({
   );
 }, activityGroupPropsEqual);
 
-/* Shimmering "Working…" line with elapsed time, Codex-style. */
-function WorkingIndicator() {
-  const { t } = useTranslation();
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    const started = Date.now();
-    const id = window.setInterval(
-      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
-      1000,
-    );
-    return () => window.clearInterval(id);
-  }, []);
-  const time = formatToolDuration(elapsed);
-  return (
-    <div className="working-indicator">
-      <span className="shimmer-text">{t("chat.running")}</span>
-      {elapsed > 0 ? <span className="working-elapsed">{time}</span> : null}
-    </div>
-  );
-}
-
 const MessageRow = memo(function MessageRow({
   message,
   isRunning,
@@ -1049,9 +1027,6 @@ export const ChatTranscript = memo(function ChatTranscript({
   pendingPermission?: PendingPermission;
 }) {
   const { t } = useTranslation();
-  const agentProgress = useAppStore((state) =>
-    sessionId ? state.agentProgress[sessionId] : undefined,
-  );
   const latestTurnResult = useAppStore((state) =>
     sessionId ? state.latestTurnResults[sessionId] : undefined,
   );
@@ -1143,16 +1118,6 @@ export const ChatTranscript = memo(function ChatTranscript({
     () => buildTranscriptEntries(messages),
     [messages],
   );
-  const lastEntry = entries[entries.length - 1];
-  const lastTurnPart =
-    lastEntry?.kind === "assistant-turn" ? lastEntry.parts.at(-1) : undefined;
-  const activeToolGroup = isRunning && lastTurnPart?.kind === "activity";
-  const assistantIsAnswering =
-    lastTurnPart?.kind === "message" &&
-    lastTurnPart.message.status === "streaming" &&
-    Boolean((lastTurnPart.message.content || "").trim());
-  const showWorking =
-    isRunning && !pendingPermission && !activeToolGroup && !assistantIsAnswering;
 
   return (
     <div className="thread-wrap">
@@ -1189,14 +1154,6 @@ export const ChatTranscript = memo(function ChatTranscript({
               key={pendingPermission.requestId}
               permission={pendingPermission}
             />
-          ) : null}
-          {isRunning ? (
-            <AgentProgressTimeline
-              progress={agentProgress}
-              waitingForPermission={Boolean(pendingPermission)}
-            />
-          ) : showWorking ? (
-            <WorkingIndicator />
           ) : null}
         </div>
       </div>

@@ -681,7 +681,6 @@
   .provider-dialog {
     animation-duration: 0.01ms !important;
   }
-  .shimmer-text,
   .tool-row-name.running,
   .tool-activity-label.running {
     animation: none;

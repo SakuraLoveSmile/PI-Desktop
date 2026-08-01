@@ -84,26 +84,6 @@ function withoutRecordKey<T>(record: Record<string, T>, key: string): Record<str
   return next;
 }
 
-function updateAgentProgress(
-  record: Record<string, AgentProgressState>,
-  sessionId: string,
-  phase: AgentProgressPhase,
-  toolName?: string,
-): Record<string, AgentProgressState> {
-  const previous = record[sessionId];
-  if (previous?.phase === phase && previous.toolName === toolName) return record;
-  const now = Date.now();
-  return {
-    ...record,
-    [sessionId]: {
-      phase,
-      ...(toolName ? { toolName } : {}),
-      startedAt: previous?.startedAt ?? now,
-      updatedAt: now,
-    },
-  };
-}
-
 export type ToastVariant = "info" | "success" | "warning" | "error";
 
 export type ToastItem = {
@@ -118,19 +98,6 @@ export type ToastOptions = {
   variant?: ToastVariant;
   /** Override the variant default (4s, error 8s); 0 disables auto-dismiss. */
   duration?: number;
-};
-
-export type AgentProgressPhase =
-  | "understanding"
-  | "working"
-  | "checking"
-  | "finalizing";
-
-export type AgentProgressState = {
-  phase: AgentProgressPhase;
-  toolName?: string;
-  startedAt: number;
-  updatedAt: number;
 };
 
 export type AgentTurnResult = {
@@ -306,8 +273,6 @@ export type AppState = {
   isRunning: boolean;
   /** Run state per session id — sessions run independent agents. */
   runningSessions: Record<string, boolean>;
-  /** Renderer-only progress phase for the currently running turn. */
-  agentProgress: Record<string, AgentProgressState>;
   /** Latest in-memory result for each session, used by the active transcript. */
   latestTurnResults: Record<string, AgentTurnResult>;
   /** Latest terminal outcome per session for compact sidebar feedback. */
@@ -595,7 +560,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   messages: [],
   isRunning: false,
   runningSessions: {},
-  agentProgress: {},
   latestTurnResults: {},
   sessionOutcomes: {},
   providers: [],
@@ -1080,7 +1044,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       errorCode: null,
       errorRetriable: null,
       runningSessions: { ...s.runningSessions, [startedIn]: true },
-      agentProgress: withoutRecordKey(s.agentProgress, startedIn),
       latestTurnResults: withoutRecordKey(s.latestTurnResults, startedIn),
       sessionOutcomes: withoutRecordKey(s.sessionOutcomes, startedIn),
     }));
@@ -1104,7 +1067,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         // flight; only reset the spinner if the failed session is visible.
         isRunning: s.activeSessionId === startedIn ? false : s.isRunning,
         runningSessions: { ...s.runningSessions, [startedIn]: false },
-        agentProgress: withoutRecordKey(s.agentProgress, startedIn),
         latestTurnResults: {
           ...s.latestTurnResults,
           [startedIn]: {
@@ -1207,7 +1169,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       errorCode: null,
       errorRetriable: null,
       runningSessions: { ...s.runningSessions, [sessionId]: true },
-      agentProgress: withoutRecordKey(s.agentProgress, sessionId),
       latestTurnResults: withoutRecordKey(s.latestTurnResults, sessionId),
       sessionOutcomes: withoutRecordKey(s.sessionOutcomes, sessionId),
     }));
@@ -1230,7 +1191,6 @@ export const useAppStore = create<AppState>((set, get) => ({
               : s.messages,
           isRunning: s.activeSessionId === sessionId ? false : s.isRunning,
           runningSessions: { ...s.runningSessions, [sessionId]: false },
-          agentProgress: withoutRecordKey(s.agentProgress, sessionId),
           latestTurnResults: {
             ...s.latestTurnResults,
             [sessionId]: {
@@ -1248,7 +1208,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         set((s) => ({
           isRunning: s.activeSessionId === sessionId ? false : s.isRunning,
           runningSessions: { ...s.runningSessions, [sessionId]: false },
-          agentProgress: withoutRecordKey(s.agentProgress, sessionId),
           latestTurnResults: {
             ...s.latestTurnResults,
             [sessionId]: {
@@ -1294,7 +1253,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       errorCode: null,
       errorRetriable: null,
       runningSessions: { ...s.runningSessions, [sessionId]: true },
-      agentProgress: withoutRecordKey(s.agentProgress, sessionId),
       latestTurnResults: withoutRecordKey(s.latestTurnResults, sessionId),
       sessionOutcomes: withoutRecordKey(s.sessionOutcomes, sessionId),
     }));
@@ -1308,7 +1266,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((s) => ({
         isRunning: s.activeSessionId === sessionId ? false : s.isRunning,
         runningSessions: { ...s.runningSessions, [sessionId]: false },
-        agentProgress: withoutRecordKey(s.agentProgress, sessionId),
         latestTurnResults: {
           ...s.latestTurnResults,
           [sessionId]: {
@@ -2128,28 +2085,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       event.type === "turn_start" ||
       event.type === "compaction_start"
     ) {
-      const phase: AgentProgressPhase =
-        event.type === "compaction_start" ? "working" : "understanding";
-      set((s) => {
-        const agentProgress = updateAgentProgress(
-          s.agentProgress,
+      set((s) => ({
+        runningSessions: { ...s.runningSessions, [envelope.sessionId]: true },
+        sessionOutcomes: withoutRecordKey(s.sessionOutcomes, envelope.sessionId),
+        latestTurnResults: withoutRecordKey(
+          s.latestTurnResults,
           envelope.sessionId,
-          phase,
-        );
-        return {
-          runningSessions: { ...s.runningSessions, [envelope.sessionId]: true },
-          sessionOutcomes: withoutRecordKey(s.sessionOutcomes, envelope.sessionId),
-          latestTurnResults: withoutRecordKey(
-            s.latestTurnResults,
-            envelope.sessionId,
-          ),
-          ...(agentProgress === s.agentProgress ? {} : { agentProgress }),
-        };
-      });
+        ),
+      }));
     } else if (event.type === "compaction_end" && event.reason === "manual") {
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: false },
-        agentProgress: withoutRecordKey(s.agentProgress, envelope.sessionId),
       }));
     } else if (
       event.type === "agent_end" ||
@@ -2157,7 +2103,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     ) {
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: false },
-        agentProgress: withoutRecordKey(s.agentProgress, envelope.sessionId),
         pendingPermissions: clearPendingPermission(
           s.pendingPermissions,
           envelope.sessionId,
@@ -2191,33 +2136,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
     }
     // Observe tool lifecycle events before the cross-session early return so
-    // progress and review artifacts remain scoped to their originating session.
+    // review artifacts remain scoped to their originating session.
     if (event.type === "tool_start") {
       if (toolNamesByCallId.size >= TOOL_NAME_CACHE_LIMIT) {
         const oldest = toolNamesByCallId.keys().next().value;
         if (oldest !== undefined) toolNamesByCallId.delete(oldest);
       }
       toolNamesByCallId.set(event.toolCallId, event.toolName);
-      set((s) => {
-        const agentProgress = updateAgentProgress(
-          s.agentProgress,
-          envelope.sessionId,
-          "working",
-          event.toolName,
-        );
-        return agentProgress === s.agentProgress ? {} : { agentProgress };
-      });
     } else if (event.type === "tool_end") {
       const toolName = toolNamesByCallId.get(event.toolCallId);
       toolNamesByCallId.delete(event.toolCallId);
       set((state) => {
         const pending = state.pendingPermissions[envelope.sessionId];
-        const agentProgress = updateAgentProgress(
-          state.agentProgress,
-          envelope.sessionId,
-          "checking",
-          toolName,
-        );
         return {
           ...(pending?.toolCallId === event.toolCallId
             ? {
@@ -2228,7 +2158,6 @@ export const useAppStore = create<AppState>((set, get) => ({
                 ),
               }
             : {}),
-          ...(agentProgress === state.agentProgress ? {} : { agentProgress }),
         };
       });
       const reviewArtifact = shouldOpenReviewArtifact({
@@ -2242,36 +2171,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           toolWorkPanelTab("review"),
         );
       }
-    }
-    if (event.type === "message_start" || event.type === "message_update") {
-      const message = event.message;
-      const phase: AgentProgressPhase | null =
-        message.role !== "assistant"
-          ? null
-          : (message.content || "").trim()
-            ? "finalizing"
-            : (message.thinking || "").trim()
-              ? "understanding"
-              : null;
-      if (phase) {
-        set((s) => {
-          const agentProgress = updateAgentProgress(
-            s.agentProgress,
-            envelope.sessionId,
-            phase,
-          );
-          return agentProgress === s.agentProgress ? {} : { agentProgress };
-        });
-      }
-    } else if (event.type === "turn_end") {
-      set((s) => {
-        const agentProgress = updateAgentProgress(
-          s.agentProgress,
-          envelope.sessionId,
-          "checking",
-        );
-        return agentProgress === s.agentProgress ? {} : { agentProgress };
-      });
     }
     if (envelope.sessionId !== get().activeSessionId) {
       // Cross-session events update only their scoped state. They never
