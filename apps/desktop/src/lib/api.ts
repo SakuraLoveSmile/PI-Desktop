@@ -46,6 +46,7 @@ import type {
   AppNotification,
   NativeMenuAction,
   NotificationListResult,
+  ReviewRollbackResult,
   UpdateState,
   WindowControlAction,
 } from "@pi-desktop/shared";
@@ -332,6 +333,10 @@ export const api = {
   toggleDevTools: (open?: boolean) =>
     invoke<{ open: boolean }>(IPC.invoke.devtoolsToggle, { open }),
   workspaceDiff: () => invoke<WorkspaceDiff>(IPC.invoke.workspaceDiff),
+  workspaceReviewRollback: (input: {
+    sessionId: string;
+    snapshotId: string;
+  }) => invoke<ReviewRollbackResult>(IPC.invoke.workspaceReviewRollback, input),
   terminalCreate: (input: { cwd: string; cols?: number; rows?: number }) =>
     invoke<TerminalCreateResult>(IPC.invoke.terminalCreate, input),
   terminalWrite: (termId: string, data: string) =>

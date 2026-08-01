@@ -131,6 +131,7 @@ export const IPC = {
     composerPickPhotos: "pi-desktop/composer/pickPhotos",
     composerCommands: "pi-desktop/composer/commands",
     workspaceDiff: "pi-desktop/workspace/diff",
+    workspaceReviewRollback: "pi-desktop/workspace/review/rollback",
     terminalCreate: "pi-desktop/terminal/create",
     terminalWrite: "pi-desktop/terminal/write",
     terminalResize: "pi-desktop/terminal/resize",

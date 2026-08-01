@@ -12,6 +12,7 @@ use crate::audit;
 use crate::notifications;
 use crate::permissions::{PermissionDecision, PermissionManager};
 use crate::providers::{self, DiscoveredModelInput, ProviderCreateInput, ProviderUpdateInput};
+use crate::review;
 use crate::scheduled;
 use crate::scratch;
 use crate::sessions::{self, UiMessage};
@@ -433,6 +434,38 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "ok": true }))
         }
+        "review.rollback" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|value| value.as_str())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let snapshot_id = params
+                .get("snapshotId")
+                .and_then(|value| value.as_str())
+                .ok_or_else(|| rpc_err(1002, "snapshotId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let workspace_root = resolve_tool_workspace(&st, session_id)?;
+            let outcome = review::rollback_change(
+                &st.data_dir,
+                session_id,
+                snapshot_id,
+                workspace_root.as_deref().map(std::path::Path::new),
+            )
+            .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
+            if matches!(outcome.status, "rolledBack" | "alreadyRolledBack") {
+                sessions::update_tool_review_state(
+                    &st.db,
+                    session_id,
+                    &outcome.message_id,
+                    snapshot_id,
+                    "rolledBack",
+                )
+                .map_err(|error| rpc_err(1000, error.to_string(), "INTERNAL"))?;
+            }
+            Ok(serde_json::to_value(outcome).map_err(|error| {
+                rpc_err(1000, error.to_string(), "INTERNAL")
+            })?)
+        }
 
         "settings.get" => {
             let st = state.lock().await;
@@ -703,6 +736,7 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             if ok {
                 scratch::remove_session_dir(&st.data_dir, id);
+                review::remove_session(&st.data_dir, id);
             }
             Ok(json!({ "ok": ok }))
         }
@@ -1316,6 +1350,25 @@ async fn handle_request(
 
             let ws_path = workspace_path.map(PathBuf::from);
             let timeout = p.timeout_ms.unwrap_or(60_000);
+            let data_dir = { state.lock().await.data_dir.clone() };
+            let pending_review = review::prepare_change(
+                &data_dir,
+                &p.session_id,
+                &p.tool_call_id,
+                ws_path.as_deref(),
+                scratch_path.as_deref(),
+                &p.tool_name,
+                &p.args,
+            )
+            .unwrap_or_else(|error| {
+                tracing::warn!(
+                    session_id = %p.session_id,
+                    tool_call_id = %p.tool_call_id,
+                    error = %error,
+                    "review snapshot preparation failed"
+                );
+                None
+            });
             let mut result = if p.tool_name.starts_with("plugin_") {
                 execute_plugin_tool(&state, &tx, &p, timeout).await
             } else {
@@ -1329,6 +1382,34 @@ async fn handle_request(
                 .await
             };
             result.tool_call_id = p.tool_call_id.clone();
+
+            if let Some(pending) = pending_review {
+                if result.ok {
+                    match review::finalize_change(&pending) {
+                        Ok(change) => {
+                            if let Some(object) = result.content.as_object_mut() {
+                                object.insert(
+                                    "review".to_string(),
+                                    serde_json::to_value(change).map_err(|error| {
+                                        rpc_err(1000, error.to_string(), "INTERNAL")
+                                    })?,
+                                );
+                            }
+                        }
+                        Err(error) => {
+                            tracing::warn!(
+                                session_id = %p.session_id,
+                                tool_call_id = %p.tool_call_id,
+                                error = %error,
+                                "review snapshot finalization failed"
+                            );
+                            review::discard_change(pending);
+                        }
+                    }
+                } else {
+                    review::discard_change(pending);
+                }
+            }
 
             let st = state.lock().await;
             // Scratch files are temp by definition: keep them out of the

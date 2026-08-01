@@ -493,6 +493,22 @@ fn clone_records_for_fork(
                             object.insert(key.to_string(), json!(new_id));
                         }
                     }
+                    // Review snapshots are owned by the source session's
+                    // workspace. Keep the copied diff evidence visible, but
+                    // prevent a fork from offering a rollback against a
+                    // snapshot it does not own.
+                    if object.get("type").and_then(Value::as_str) == Some("tool_call") {
+                        if let Some(review) = object
+                            .get_mut("result")
+                            .and_then(Value::as_object_mut)
+                            .and_then(|result| result.get_mut("details"))
+                            .and_then(Value::as_object_mut)
+                            .and_then(|details| details.get_mut("review"))
+                            .and_then(Value::as_object_mut)
+                        {
+                            review.insert("reversible".into(), Value::Bool(false));
+                        }
+                    }
                 }
             }
             record
@@ -1051,6 +1067,50 @@ pub fn replace_messages(db: &Database, session_id: &str, messages: &[UiMessage])
         .execute(params![records.len() as i64, now_ms(), session_id])?;
     tx.commit()?;
     Ok(())
+}
+
+/// Persist the rollback state on the tool message that owns a review snapshot.
+/// The tool result remains the message-local source of truth after restart.
+pub fn update_tool_review_state(
+    db: &Database,
+    session_id: &str,
+    message_id: &str,
+    snapshot_id: &str,
+    state: &str,
+) -> Result<bool> {
+    let Some(detail) = get_session(db, session_id)? else {
+        return Ok(false);
+    };
+    let mut messages = detail.messages;
+    let mut changed = false;
+    for message in &mut messages {
+        if message.id != message_id || message.role != "tool" {
+            continue;
+        }
+        let Some(tool_result) = message.tool_result.as_mut().and_then(Value::as_object_mut)
+        else {
+            continue;
+        };
+        let Some(details) = tool_result
+            .get_mut("details")
+            .and_then(Value::as_object_mut)
+        else {
+            continue;
+        };
+        let Some(review) = details.get_mut("review").and_then(Value::as_object_mut) else {
+            continue;
+        };
+        if review.get("snapshotId").and_then(Value::as_str) != Some(snapshot_id) {
+            continue;
+        }
+        review.insert("state".into(), Value::String(state.to_string()));
+        changed = true;
+        break;
+    }
+    if changed {
+        replace_messages(db, session_id, &messages)?;
+    }
+    Ok(changed)
 }
 
 
@@ -1814,6 +1874,49 @@ mod tests {
         assert_eq!(m2.tool_duration_ms, Some(1_000));
         assert_eq!(m2.content, "ok");
         assert_eq!(m2.status.as_deref(), Some("complete"));
+
+        let mut review_tool = tool.clone();
+        review_tool.tool_result = Some(json!({
+            "ok": true,
+            "details": {
+                "root": "workspace",
+                "review": {
+                    "snapshotId": "snapshot-1",
+                    "state": "active"
+                }
+            }
+        }));
+        replace_messages(
+            &db,
+            &session.id,
+            &[
+                user_msg("m1", "写一个文件", "2025-05-01T00:00:00Z"),
+                review_tool,
+            ],
+        )
+        .unwrap();
+        assert!(update_tool_review_state(
+            &db,
+            &session.id,
+            "m2",
+            "snapshot-1",
+            "rolledBack",
+        )
+        .unwrap());
+        let updated = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(
+            updated.messages[1].tool_result,
+            Some(json!({
+                "ok": true,
+                "details": {
+                    "root": "workspace",
+                    "review": {
+                        "snapshotId": "snapshot-1",
+                        "state": "rolledBack"
+                    }
+                }
+            }))
+        );
 
         // seq allocation is monotonic per session.
         let last_seq: i64 = db

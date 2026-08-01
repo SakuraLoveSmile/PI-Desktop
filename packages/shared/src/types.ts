@@ -609,6 +609,43 @@ export type DiffHunk = {
   lines: DiffLine[];
 };
 
+export type ReviewChangeOperation = "write" | "edit" | "delete";
+export type ReviewChangeStatus = "added" | "modified" | "deleted";
+export type ReviewChangeState = "active" | "rolledBack";
+
+/**
+ * Durable, message-owned change evidence returned by a workspace mutation.
+ * Unlike WorkspaceDiff, this record remains valid after a git commit.
+ */
+export type ReviewChange = {
+  version: 1;
+  snapshotId: string;
+  messageId: string;
+  path: string;
+  operation: ReviewChangeOperation;
+  status: ReviewChangeStatus;
+  state: ReviewChangeState;
+  additions: number;
+  deletions: number;
+  hunks: DiffHunk[];
+  binary?: boolean;
+  truncated?: boolean;
+  reversible: boolean;
+};
+
+export type ReviewRollbackStatus =
+  | "rolledBack"
+  | "alreadyRolledBack"
+  | "conflict"
+  | "unavailable";
+
+export type ReviewRollbackResult = {
+  status: ReviewRollbackStatus;
+  snapshotId: string;
+  messageId?: string;
+  path?: string;
+};
+
 export type DiffFileStatus =
   | "added"
   | "modified"

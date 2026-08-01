@@ -5,6 +5,7 @@ mod notifications;
 mod permissions;
 mod plugins;
 mod providers;
+mod review;
 mod rpc;
 mod scheduled;
 mod scratch;
@@ -60,6 +61,7 @@ async fn main() -> anyhow::Result<()> {
             let live: std::collections::HashSet<String> =
                 list.into_iter().map(|s| s.id).collect();
             scratch::sweep(&data_dir, &live);
+            review::sweep(&data_dir, &live);
         }
     }
     rpc::serve(state).await

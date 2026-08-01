@@ -3191,6 +3191,13 @@ function registerIpc() {
     }
     return collectWorkspaceDiff(cwd);
   });
+  handle(
+    IPC.invoke.workspaceReviewRollback,
+    async (input: { sessionId: string; snapshotId: string }) => {
+      if (!host) throw new Error("host unavailable");
+      return host.call("review.rollback", input);
+    },
+  );
 
   handle(
     IPC.invoke.terminalCreate,
