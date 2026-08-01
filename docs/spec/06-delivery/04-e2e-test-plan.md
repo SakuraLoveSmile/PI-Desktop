@@ -1570,21 +1570,23 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`sessions::tests::save_and_activate_message_revision`, schema v4 migration); full scenario Draft
 
-#### E2E-063: Empty home offers contextual actions without leaving a layout gap
+#### E2E-063: Empty home keeps the primary task surface focused
 
 - **Preconditions**: App running on empty chat home (no transcript) in light
   and dark themes; window can be resized to ~1200×690 and ~900×640.
-- **Steps**: 1) Open empty home. 2) Inspect the compact contextual action row
-  between the hero and onboarding/composer. 3) Activate a project action and
-  confirm it opens the project picker. 4) With a project open, activate an
-  inspection action and confirm it prefills, but does not submit, the composer.
-  5) Dismiss onboarding and inspect again. 6) Repeat in the other theme.
-  7) Resize to a short height and scroll if needed.
+- **Steps**: 1) Open empty home. 2) Confirm the hero is limited to the quiet
+  logo and title, with no welcome paragraph. 3) Confirm quick actions are
+  collapsed, expand them, and activate a project action to open the picker.
+  4) With a project open, activate an inspection action and confirm it
+  prefills, but does not submit, the composer. 5) Dismiss onboarding and
+  inspect again. 6) Repeat in the other theme. 7) Resize to a short height
+  and scroll if needed.
 - **Expected**: No Explore / Build / Review / Fix marketing cards render. The
-  contextual actions remain a compact labelled button group. Hero, actions,
-  optional checklist, and composer form one scrollable stack; dismissing the
-  checklist leaves no empty spacer. The composer never covers the checklist,
-  and short windows keep every remaining block reachable via scroll.
+  default empty state keeps the title, optional checklist, and composer as the
+  visual anchors; contextual actions remain available behind one disclosure.
+  Dismissing the checklist leaves no empty spacer. The composer never covers
+  the checklist, and short windows keep every remaining block reachable via
+  scroll.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D111/D131)
 - **Acceptance**: Quality (layout integrity)
@@ -2153,7 +2155,7 @@ Each scenario is documented in this format:
   - Light mode everywhere renders `build/icon_1024.png` (the canonical light logo).
   - Dark mode everywhere renders `build/logo_dark.png` (the dark logo variant).
   - The swap is live: changing `data-theme` updates the logo source in the sidebar, empty-home hero, and startup splash without a window reload.
-  - Sizes are unchanged (sidebar 20px, hero 56px, splash 64px) and the logo stays decorative with no change to click/keyboard/focus behavior.
+  - Sizes are unchanged (sidebar 20px, hero 40px, splash 64px) and the logo stays decorative with no change to click/keyboard/focus behavior.
 - **Specs linked**: `04-ux/08-component-spec.md` §3.7, `04-ux/07-ui-design-system.md`
 - **Acceptance**: Quality
 - **Milestone**: M5
@@ -2673,7 +2675,7 @@ This test plan spec is accepted when:
   row, with no Logo/Home brand or back/forward buttons.
 
 ### US-UI-17 PI-Desktop home hero logo
-- On empty chat home, the canonical PI-Desktop PNG renders at 56px above the
+- On empty chat home, the canonical PI-Desktop PNG renders at 40px above the
   title with its native colors and no decorative hover state.
 - The hero logo is theme-aware: light mode shows `build/icon_1024.png`, dark
   mode shows `build/logo_dark.png`, and the swap tracks `data-theme` live.

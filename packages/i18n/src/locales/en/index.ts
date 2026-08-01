@@ -132,8 +132,6 @@ export const en = {
     emptyTitle: "What should we build?",
     emptyTitleInProject: "What should we build in {{project}}?",
     emptyHint: "Add an AI provider, open a project, then send your first message.",
-    emptyWelcome: "Start with a question, a rough idea, or a task you want to finish.",
-    emptyWelcomeInProject: "I will get oriented in this project and help you move it forward.",
     quickActionsTitle: "Start somewhere",
     quickActionOpenProject: "Open a project",
     quickActionInspect: "Understand this project",

@@ -41,7 +41,7 @@ test("empty home uses a single scrollable stack instead of dual-grow portals", (
   );
 });
 
-test("empty home omits suggestion cards and keeps onboarding above the composer", () => {
+test("empty home keeps the primary task surface focused", () => {
   const emptyStart = chatSurface.indexOf("{!hasTranscript ? (");
   const emptyEnd = chatSurface.indexOf("<ChatTranscript", emptyStart);
   const emptyBlock = chatSurface.slice(emptyStart, emptyEnd);
@@ -51,6 +51,7 @@ test("empty home omits suggestion cards and keeps onboarding above the composer"
   assert.notEqual(composerAt, -1);
   assert.ok(onboardingAt < composerAt, "onboarding must precede composer in markup");
   assert.match(emptyBlock, /<HomeQuickActions[\s\S]*?onPrefill=/);
+  assert.doesNotMatch(emptyBlock, /empty-hero-copy/);
   assert.doesNotMatch(emptyBlock, /HomeSuggestions|home-suggestion-card/);
 });
 
@@ -61,13 +62,17 @@ test("short windows keep the empty stack scrollable rather than overlapping", ()
   assert.doesNotMatch(checklist, /\bmt-6\b/);
 });
 
-test("empty home offers compact contextual actions without marketing cards", async () => {
+test("empty home keeps optional actions collapsed by default", async () => {
   const quickActions = await read("../src/components/HomeQuickActions.tsx");
-  assert.match(chatSurface, /empty-hero-copy/);
+  assert.match(quickActions, /<details/);
+  assert.doesNotMatch(quickActions, /<details[^>]*\bopen\b/);
+  assert.match(quickActions, /<summary className="home-quick-actions-trigger">/);
   assert.match(quickActions, /data-testid="home-quick-actions"/);
   assert.match(quickActions, /quickActionInspectPrompt/);
   assert.match(quickActions, /quickActionOpenProject/);
   assert.match(styles, /\.home-quick-actions-list\s*\{/);
+  assert.match(styles, /\.home-quick-actions-trigger\s*\{/);
+  assert.match(styles, /\.home-quick-actions\[open\]/);
   assert.match(styles, /\.home-quick-action\s*\{[\s\S]*?border-radius:\s*var\(--radius-full\)/);
   assert.doesNotMatch(styles, /\.home-suggestion-card/);
 });

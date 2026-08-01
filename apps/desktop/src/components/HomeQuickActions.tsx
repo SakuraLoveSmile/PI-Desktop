@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import {
   IconArrowUpRight,
+  IconChevronDown,
   IconFolder,
   IconSearch,
   IconSparkles,
@@ -64,14 +65,14 @@ export function HomeQuickActions({
   const actions = hasWorkspace ? workspaceActions : standaloneActions;
 
   return (
-    <section
+    <details
       className="home-quick-actions"
-      aria-labelledby="home-quick-actions-title"
       data-testid="home-quick-actions"
     >
-      <div className="home-quick-actions-heading" id="home-quick-actions-title">
+      <summary className="home-quick-actions-trigger">
         {t("chat.quickActionsTitle")}
-      </div>
+        <IconChevronDown size={13} aria-hidden />
+      </summary>
       <div className="home-quick-actions-list">
         {!hasWorkspace ? (
           <button
@@ -108,6 +109,6 @@ export function HomeQuickActions({
           );
         })}
       </div>
-    </section>
+    </details>
   );
 }

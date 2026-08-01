@@ -134,8 +134,6 @@ export const zhCN = {
     emptyTitle: "今天想做什么？",
     emptyTitleInProject: "要在 {{project}} 里做什么？",
     emptyHint: "添加 AI 模型服务、打开项目，然后发送第一条消息。",
-    emptyWelcome: "可以从一个问题、一个模糊想法，或一件想完成的事开始。",
-    emptyWelcomeInProject: "我会先了解这个项目，再和你一起把事情推进下去。",
     quickActionsTitle: "从这里开始",
     quickActionOpenProject: "打开一个项目",
     quickActionInspect: "先了解项目",

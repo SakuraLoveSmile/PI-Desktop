@@ -86,7 +86,7 @@ Codex as a visual reference. The identity contract is deliberately small:
   and NSIS shortcut identity stay aligned so native notifications,
   notification settings, and taskbar groups identify the app as `PI-Desktop`
   rather than Electron.
-- The home hero logo is 56px. Expanded/collapsed sidebar logos are 20px/18px.
+- The home hero logo is 40px. Expanded/collapsed sidebar logos are 20px/18px.
   Composer prompt rows do not render a leading brand icon in either home or
   thread-docked mode. The image keeps its native colors in both themes and is
   not replaced by a theme-tinted vector approximation.
@@ -574,11 +574,12 @@ Empty chat home uses a **single scrollable vertical stack** inside
 - Column `flex: 1; min-height: 0; overflow: hidden`
 - Inner scroller (`.home-scroll`) is the only vertical overflow surface
 - Stack (`.home-stack-inner`) is `min-height: 100%`, content width
-  **`min(100%, 768px)`**, **`gap: 24px`** (workstation ceiling), and centers
+  **`min(100%, 768px)`**, **`gap: 16px`** (workstation ceiling), and centers
   the column when the viewport is tall
-- Order is always: **hero → contextual quick actions → optional onboarding
-  checklist → home composer**. Quick actions are compact ghost controls that
-  prefill the home composer or open the project picker; they never auto-submit
+- Order is always: **hero → collapsed contextual quick actions → optional
+  onboarding checklist → home composer**. The quick-action disclosure is
+  collapsed by default; expanding it reveals compact ghost controls that
+  prefill the home composer or open the project picker. They never auto-submit
   a prompt. The former four marketing suggestion cards are not rendered
   (D131); the checklist remains in normal document flow
 - Short windows (`max-height ≤ 760px`) top-align the stack and keep every
@@ -593,6 +594,8 @@ Empty chat home uses a **single scrollable vertical stack** inside
   only), not a solid chip
 - Empty hero title uses `var(--ds-text-primary)` (light override `#1a1c1f`);
   never hardcode light ink for shared hero styles
+- Empty-home branding stays quiet: the hero logo is 40px and the supporting
+  welcome paragraph is omitted so the composer remains the visual focus
 - Night home composer plate styles are **dark-scoped only** (elevated-primary
   `#212121f5` + standard elevation-prominent)
 - Empty draft row keeps **one visible line / 28px optical minimum** so the

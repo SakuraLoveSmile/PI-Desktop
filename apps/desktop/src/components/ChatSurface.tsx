@@ -109,7 +109,7 @@ export const ChatSurface = memo(function ChatSurface() {
             <div className="home-stack-inner">
               <div className="empty-hero">
                 <div className="empty-hero-icon" data-testid="home-icon" aria-hidden>
-                  <BrandLogo size={56} />
+                  <BrandLogo size={40} />
                 </div>
                 <h1>
                   {heroProject ? (
@@ -129,11 +129,6 @@ export const ChatSurface = memo(function ChatSurface() {
                     t("chat.emptyTitle")
                   )}
                 </h1>
-                <p className="empty-hero-copy">
-                  {heroProject
-                    ? t("chat.emptyWelcomeInProject")
-                    : t("chat.emptyWelcome")}
-                </p>
               </div>
               <HomeQuickActions
                 hasWorkspace={Boolean(workspace?.path)}
