@@ -117,7 +117,11 @@ export const ReviewChangeCard = memo(function ReviewChangeCard({
   );
 
   return (
-    <section className={cx("review-change-card", compact && "is-compact", open && "open")}>
+    <section
+      className={cx("review-change-card", compact && "is-compact", open && "open")}
+      data-state={change.state}
+      data-status={change.status}
+    >
       <button
         type="button"
         className="review-change-card-header"
@@ -127,26 +131,35 @@ export const ReviewChangeCard = memo(function ReviewChangeCard({
         title={accessibleLabel}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="review-change-card-icon" aria-hidden>
-          <IconDiff size={14} />
+        <span className={cx("review-change-card-icon", `is-${change.status}`)} aria-hidden>
+          <IconDiff size={15} />
         </span>
-        <span className={cx("review-change-card-status", `is-${change.status}`)}>
-          {statusLabel}
+        <span className="review-change-card-main">
+          <span className="review-change-card-path" title={change.path}>
+            {change.path}
+          </span>
+          <span className="review-change-card-meta">
+            <span className={cx("review-change-card-status", `is-${change.status}`)}>
+              {statusLabel}
+            </span>
+            <span
+              className="review-change-card-counts diff-file-counts"
+              aria-label={t("chat.reviewChangeCounts", change)}
+            >
+              {change.additions > 0 && (
+                <span className="diff-count-add">+{change.additions}</span>
+              )}
+              {change.deletions > 0 && (
+                <span className="diff-count-del">−{change.deletions}</span>
+              )}
+            </span>
+            {change.state === "rolledBack" ? (
+              <span className="review-change-card-state">
+                {t("panel.review.rolledBack")}
+              </span>
+            ) : null}
+          </span>
         </span>
-        <span className="review-change-card-path" title={change.path}>
-          {change.path}
-        </span>
-        <span className="diff-file-counts" aria-label={t("chat.reviewChangeCounts", change)}>
-          {change.additions > 0 && (
-            <span className="diff-count-add">+{change.additions}</span>
-          )}
-          {change.deletions > 0 && (
-            <span className="diff-count-del">−{change.deletions}</span>
-          )}
-        </span>
-        {change.state === "rolledBack" ? (
-          <span className="review-change-card-state">{t("panel.review.rolledBack")}</span>
-        ) : null}
         <span className="review-change-card-caret" aria-hidden>
           <IconChevronRight size={12} />
         </span>

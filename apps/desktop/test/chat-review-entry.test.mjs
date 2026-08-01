@@ -19,6 +19,18 @@ const reviewSource = await readFile(
   new URL("../src/components/workpanel/ReviewTab.tsx", import.meta.url),
   "utf8",
 );
+const messageStylesSource = await readFile(
+  new URL("../src/styles/messages.css", import.meta.url),
+  "utf8",
+);
+const workPanelStylesSource = await readFile(
+  new URL("../src/styles/work-panel.css", import.meta.url),
+  "utf8",
+);
+const responsiveStylesSource = await readFile(
+  new URL("../src/styles/responsive.css", import.meta.url),
+  "utf8",
+);
 const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
 const storeSource = await readFile(
   new URL("../src/stores/app-store.ts", import.meta.url),
@@ -173,4 +185,14 @@ test("Review is a session change history and no longer refreshes a Git diff", ()
   assert.match(reviewSource, /panel\.review\.noChanges/);
   assert.doesNotMatch(reviewSource, /workspaceDiff|refreshWorkspaceDiff|api\.workspaceDiff/);
   assert.doesNotMatch(appSource, /reviewRev|refreshWorkspaceDiff|workspaceDiff/);
+});
+
+test("review surfaces keep visual state, focus, and motion feedback", () => {
+  assert.match(cardSource, /data-state=\{change\.state\}/);
+  assert.match(cardSource, /data-status=\{change\.status\}/);
+  assert.match(messageStylesSource, /\.review-change-card-header:focus-visible/);
+  assert.match(messageStylesSource, /\.review-change-card\[data-status="added"\]/);
+  assert.match(messageStylesSource, /@keyframes review-change-reveal/);
+  assert.match(workPanelStylesSource, /\.review-toolbar-counts/);
+  assert.match(responsiveStylesSource, /\.review-change-card-body\s*\{[\s\S]*animation: none/);
 });

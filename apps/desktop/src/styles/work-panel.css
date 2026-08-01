@@ -458,8 +458,16 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  min-height: 42px;
+  padding: 7px 12px;
+  background: color-mix(in oklab, var(--ds-text-primary) 2%, transparent);
   border-bottom: 1px solid var(--ds-border-subtle);
+}
+
+.review-toolbar-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--ds-accent-soft);
 }
 
 .review-summary {
@@ -468,8 +476,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--text-sm);
-  color: var(--ds-text-muted);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+}
+
+.review-toolbar-counts {
+  gap: 7px;
+  padding: 3px 7px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-bg-primary) 65%, transparent);
+  font-size: var(--text-2xs);
 }
 
 .review-truncated {
@@ -483,7 +501,8 @@
   min-height: 0;
   flex: 1;
   overflow: auto;
-  padding: 8px 10px 16px;
+  padding: 10px 10px 18px;
+  background: color-mix(in oklab, var(--ds-bg-inset) 30%, var(--ds-bg-primary));
 }
 
 .diff-file {
