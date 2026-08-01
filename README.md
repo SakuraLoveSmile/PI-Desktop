@@ -8,8 +8,8 @@
 
 Bring your own models. Keep your code, your keys, and your conversations on your machine.
 
-[![Release](https://img.shields.io/github/v/release/vastsa/PI-Dock?include_prereleases&label=release)](https://github.com/vastsa/PI-Dock/releases/latest)
-[![CI](https://github.com/vastsa/PI-Dock/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Dock/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?include_prereleases&label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
+[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
 ![Platforms](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-4c8dd8)
 
 [Download](#download) · [Getting started](#getting-started) · [Highlights](#highlights) · [How it works](#how-it-works) · [Development](#development) · [简体中文](README.zh-CN.md)
@@ -50,7 +50,7 @@ There is no account, no subscription, and no cloud in the middle: you connect th
 
 ## Download
 
-Grab the latest build from the [Releases page](https://github.com/vastsa/PI-Dock/releases/latest).
+Grab the latest build from the [Releases page](https://github.com/vastsa/PI-Desktop/releases/latest).
 
 | Platform | Package | Status |
 |---|---|---|

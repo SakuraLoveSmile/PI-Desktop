@@ -25,7 +25,7 @@ import type { Logger } from "./logger";
 
 const { autoUpdater } = electronUpdaterPkg;
 
-export const RELEASES_URL = "https://github.com/vastsa/PI-Dock/releases/latest";
+export const RELEASES_URL = "https://github.com/vastsa/PI-Desktop/releases/latest";
 
 const AUTO_CHECK_INITIAL_DELAY_MS = 15_000;
 const AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;

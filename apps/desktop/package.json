@@ -3,7 +3,7 @@
   "version": "0.4.0",
   "private": true,
   "description": "PI-Desktop Electron application",
-  "homepage": "https://github.com/vastsa/PI-Dock",
+  "homepage": "https://github.com/vastsa/PI-Desktop",
   "author": {
     "name": "vastsa",
     "email": "hhxk666@gmail.com"
@@ -79,7 +79,7 @@
       {
         "provider": "github",
         "owner": "vastsa",
-        "repo": "PI-Dock"
+        "repo": "PI-Desktop"
       }
     ],
     "files": [

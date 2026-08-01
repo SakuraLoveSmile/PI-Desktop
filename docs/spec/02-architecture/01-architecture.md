@@ -46,8 +46,7 @@ PI-Desktop uses a layered desktop architecture:
 - process boot order
 
 Electron Main exclusively owns the update client and fixed GitHub Releases
-target (`vastsa/PI-Dock`). The renderer can request allowlisted operations
-and render typed state,
+target. The renderer can request allowlisted operations and render typed state,
 but cannot supply a feed URL or access the updater directly. App updates do
 not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 

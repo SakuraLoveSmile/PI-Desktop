@@ -1762,9 +1762,8 @@ Each scenario is documented in this format:
 #### E2E-067A: Prerelease install discovers newer stable release (D120)
 
 - **Preconditions**: Packaged build whose embedded version is a prerelease such
-  as `0.2.0-rc.6`; the canonical `vastsa/PI-Dock` GitHub Releases latest
-  stable tag is
-  newer (for example `0.2.2`) with published `latest*.yml` feeds.
+  as `0.2.0-rc.6`; GitHub Releases latest stable tag is newer (for example
+  `0.2.2`) with published `latest*.yml` feeds.
 - **Steps**: 1) Launch the packaged prerelease install. 2) Wait for the
   automatic check or invoke Check for Updates from the application menu /
   Settings → Info.
