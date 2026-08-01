@@ -1,4 +1,5 @@
 import {
+  Fragment,
   memo,
   useCallback,
   useEffect,
@@ -9,7 +10,12 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type { MessageUsage, UiMessage } from "@pi-desktop/shared";
+import type {
+  DiffFile,
+  MessageUsage,
+  UiMessage,
+  WorkspaceDiff,
+} from "@pi-desktop/shared";
 import { ConversationMinimap } from "./ConversationMinimap";
 import { AgentProgressTimeline } from "./AgentProgressTimeline";
 import { TurnOutcomeCard } from "./TurnOutcomeCard";
@@ -28,8 +34,7 @@ import {
   splitChatText,
   type ChatPreviewTarget,
 } from "../lib/chat-links";
-import { summarizeSessionWorkspaceChanges } from "../lib/workspace-review";
-import { toolWorkPanelTab } from "../lib/work-panel-tabs";
+import { findWorkspaceChangeForMessage } from "../lib/workspace-review";
 import { reduceTranscriptScroll } from "../lib/transcript-scroll";
 import {
   assistantTurnContent,
@@ -64,66 +69,110 @@ import { useAppStore } from "../stores/app-store";
 import type { PendingPermission } from "../lib/pending-permissions";
 import { PermissionCard } from "./PermissionCard";
 
-const WorkspaceChangesEntry = memo(function WorkspaceChangesEntry() {
+function diffStatusLabel(
+  status: DiffFile["status"],
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  return t(`panel.review.status.${status}`);
+}
+
+function InlineDiffBody({ file }: { file: DiffFile }) {
   const { t } = useTranslation();
-  const activeSessionId = useAppStore((state) => state.activeSessionId);
-  const latestTurnResult = useAppStore((state) =>
-    activeSessionId ? state.latestTurnResults[activeSessionId] : undefined,
+
+  if (file.binary) {
+    return <div className="review-change-note">{t("panel.review.binary")}</div>;
+  }
+  if (file.tooLarge) {
+    return <div className="review-change-note">{t("panel.review.tooLarge")}</div>;
+  }
+
+  return (
+    <div className="review-change-diff">
+      {file.hunks.map((hunk, hunkIndex) => (
+        <div className="diff-hunk" key={hunkIndex}>
+          <div className="diff-line hunk">
+            <span className="diff-line-text">{hunk.header}</span>
+          </div>
+          {hunk.lines.map((line, lineIndex) => (
+            <div className={`diff-line ${line.type}`} key={lineIndex}>
+              <span className="diff-line-sign" aria-hidden>
+                {line.type === "add" ? "+" : line.type === "del" ? "−" : " "}
+              </span>
+              <span className="diff-line-text">{line.text}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   );
+}
+
+const WorkspaceChangeCard = memo(function WorkspaceChangeCard({
+  message,
+}: {
+  message: UiMessage;
+}) {
+  const { t } = useTranslation();
   const workspacePath = useAppStore((state) => state.workspace?.path);
   const diffPath = useAppStore((state) => state.workspaceDiffPath);
-  const diff = useAppStore((state) => state.workspaceDiff);
-  const reviewSessions = useAppStore((state) => state.workspaceReviewSessions);
-  const openWorkPanelTab = useAppStore((state) => state.openWorkPanelTab);
-  const summary = summarizeSessionWorkspaceChanges({
-    diff,
-    diffPath,
-    workspacePath,
-    sessionId: activeSessionId,
-    reviewSessions,
-  });
+  const workspaceDiff = useAppStore((state) => state.workspaceDiff);
+  const detailsId = useId();
+  const [open, setOpen] = useState(false);
+  const diff: WorkspaceDiff | null =
+    diffPath === workspacePath ? workspaceDiff : null;
+  const file = findWorkspaceChangeForMessage(message, diff);
 
-  if (!summary || latestTurnResult?.status === "completed") return null;
+  if (!file) return null;
 
-  const countLabel = t(
-    summary.truncated
-      ? "chat.reviewChangedFilesTruncated"
-      : "chat.reviewChangedFiles",
-    { count: summary.fileCount },
-  );
+  const status = diffStatusLabel(file.status, t);
+  const displayPath = file.oldPath
+    ? `${file.oldPath} → ${file.path}`
+    : file.path;
   const accessibleLabel = t(
-    summary.truncated
-      ? "chat.reviewChangesAccessibleTruncated"
-      : "chat.reviewChangesAccessible",
+    open ? "chat.reviewChangeHide" : "chat.reviewChangeShow",
     {
-      count: summary.fileCount,
-      additions: summary.additions,
-      deletions: summary.deletions,
+      path: displayPath,
+      status,
+      additions: file.additions,
+      deletions: file.deletions,
     },
   );
 
   return (
-    <div className="review-changes-entry">
+    <section className={`review-change-card ${open ? "open" : ""}`}>
       <button
         type="button"
-        className="review-changes-button"
+        className="review-change-card-header"
+        aria-expanded={open}
+        aria-controls={detailsId}
         aria-label={accessibleLabel}
-        onClick={() => openWorkPanelTab(toolWorkPanelTab("review"))}
+        onClick={() => setOpen((value) => !value)}
       >
-        <span className="review-changes-icon" aria-hidden>
-          <IconDiff size={15} />
+        <span className="review-change-card-icon" aria-hidden>
+          <IconDiff size={14} />
         </span>
-        <span className="review-changes-title">{t("chat.reviewChanges")}</span>
-        <span className="review-changes-meta">{countLabel}</span>
-        <span className="diff-file-counts" aria-hidden>
-          <span className="diff-count-add">+{summary.additions}</span>
-          <span className="diff-count-del">−{summary.deletions}</span>
+        <span className={`diff-file-status is-${file.status}`}>{status}</span>
+        <code className="review-change-card-path">{displayPath}</code>
+        <span
+          className="diff-file-counts"
+          aria-label={t("chat.reviewChangeCounts", {
+            additions: file.additions,
+            deletions: file.deletions,
+          })}
+        >
+          <span className="diff-count-add">+{file.additions}</span>
+          <span className="diff-count-del">−{file.deletions}</span>
         </span>
-        <span className="review-changes-caret" aria-hidden>
-          <IconChevronRight size={13} />
+        <span className="review-change-card-caret" aria-hidden>
+          <IconChevronRight size={12} />
         </span>
       </button>
-    </div>
+      {open ? (
+        <div className="review-change-card-body" id={detailsId}>
+          <InlineDiffBody file={file} />
+        </div>
+      ) : null}
+    </section>
   );
 });
 
@@ -743,7 +792,10 @@ const ActivityGroup = memo(function ActivityGroup({
           <div className="tool-activity-body" id={detailsId}>
             {items.map((item) =>
               item.kind === "tool" ? (
-                <ToolRow key={item.message.id} message={item.message} />
+                <Fragment key={item.message.id}>
+                  <ToolRow message={item.message} />
+                  <WorkspaceChangeCard message={item.message} />
+                </Fragment>
               ) : (
                 <ThinkingRow
                   key={`thinking-${item.message.id}`}
@@ -1241,9 +1293,7 @@ export const ChatTranscript = memo(function ChatTranscript({
               />
             ),
           )}
-          <WorkspaceChangesEntry />
           <TurnOutcomeCard
-            sessionId={sessionId}
             messages={messages}
             result={latestTurnResult}
           />

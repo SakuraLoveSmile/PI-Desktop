@@ -23,10 +23,10 @@ test("terminal agent events retain a session-scoped result for the transcript", 
 test("outcome card exposes completion evidence and recovery actions", () => {
   assert.match(outcome, /data-testid="turn-outcome-card"/);
   assert.match(outcome, /resultComplete/);
-  assert.match(outcome, /resultFilesChanged/);
+  assert.match(outcome, /resultSteps/);
   assert.match(outcome, /retryLastPrompt/);
-  assert.match(outcome, /openWorkPanelTab\(toolWorkPanelTab\("review"\)\)/);
   assert.match(outcome, /focusComposer/);
+  assert.doesNotMatch(outcome, /toolWorkPanelTab/);
   assert.match(styles, /\.turn-outcome-card\s*\{/);
   assert.match(styles, /\.turn-outcome-card\.failed\s*\{/);
 });

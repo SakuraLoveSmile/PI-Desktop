@@ -1346,29 +1346,28 @@ Each scenario is documented in this format:
 - **Preconditions**: A git workspace with a clean tree; agent configured.
 - **Steps**: 1) Ask the active agent to edit a tracked workspace file and
   create a new one in session A. 2) Switch to session B in the same project,
-  then return to session A. 3) Repeat with a failed Write, a scratch Write, and
-  a Write in a background project session. 4) Collapse the activity group,
-  then inspect and activate the transcript Review changes entry. 5) Collapse
-  the panel and close the Review tab, using the transcript entry after each
-  action. 6) Edit a file outside the app, refocus the window, and press refresh
+  then return to session A. 3) Repeat with a failed Write, a scratch Write, a
+  deleted file, and a Write in a background project session. 4) Expand the
+  activity group and inspect each review card directly after its corresponding
+  tool row; click cards open and close their hunks. 5) Collapse the panel and
+  close the Review tab, then confirm the inline cards still work without the
+  panel. 6) Edit a file outside the app, refocus the window, and press refresh
   after Review is open. 7) Revert all changes, then inspect a non-git folder.
 - **Expected**: Each successful active-session workspace Write/Edit creates or
   activates one deduplicated Review tab and refreshes the diff automatically
-  (debounced) with
-  per-file status badges, +/− counts, and colored unified hunks (untracked
-  files included). Failed/scratch/background writes do not open or steal focus;
-  background invalidation remains scoped. While the real working tree is dirty,
-  one keyboard-accessible transcript entry remains visible in session A outside
-  the collapsed activity group, reports file and +/− totals, and reopens or
-  activates the same singleton Review tab without duplication. Session B does
-  not inherit session A's entry; returning to A restores it. A successful
-  background workspace Write/Edit assigns the entry only to its originating
-  session without stealing focus. Refocus and manual refresh pick up external
-  edits. The entry disappears after revert, clears prior ownership, and stays
-  hidden for clean, non-git, no-workspace, and failed-refresh states, while
-  Review renders its existing dedicated empty copy. Binary and >200KB patches
-  render as capped rows without hunks; >100 changed files shows the
-  truncation notice.
+  (debounced) with per-file status badges, +/− counts, and colored unified
+  hunks (added, modified, deleted, renamed, and untracked files included).
+  Each matching tool row has at most one adjacent keyboard-accessible inline
+  card; the card shows that row's workspace path and status, and expansion
+  renders the matching hunks in place. There is no bottom/global Review entry,
+  and session B does not inherit session A's cards. Failed and scratch writes
+  do not render cards. A background write updates only its originating
+  transcript and never appears in B or steals focus; returning to A restores
+  A's card. Background invalidation remains scoped. Refocus and manual refresh
+  pick up external edits. Cards disappear when their file no longer appears in
+  the current diff, while Review renders its existing dedicated empty copy.
+  Binary and >200KB patches render as capped rows without hunks; >100 changed
+  files shows the truncation notice.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a, `04-ux/08-component-spec.md` §5
 - **Acceptance**: D (workspace), Quality
 - **Milestone**: M5
@@ -1617,16 +1616,18 @@ Each scenario is documented in this format:
 
 - **Preconditions**: A deterministic provider can complete a turn with a
   workspace edit and can fail a second turn with a retriable error; the session
-  has a visible composer and Review artifact support.
+  has a visible composer.
 - **Steps**: 1) Complete the workspace-edit turn. 2) Inspect the outcome card
-  and its step/file evidence. 3) Open Review from the card and return to chat.
-  4) Trigger the retriable failure. 5) Inspect the failure card, then choose
-  Retry. 6) Start another new prompt and inspect the old card.
-- **Expected**: Completion shows a localized success heading, real tool/file
-  evidence, Review, and Continue actions. Review reuses the existing Review
-  tab. Failure shows that existing work remains, exposes Retry and Continue,
-  and retry preserves the latest prompt. A new turn clears the previous card;
-  an abort creates neither success nor failure outcome copy.
+  and the inline review card immediately after the change tool row. 3) Expand
+  the inline card and verify its hunks. 4) Trigger the retriable failure. 5)
+  Inspect the failure card, then choose Retry. 6) Start another new prompt and
+  inspect the old card.
+- **Expected**: Completion shows a localized success heading, tool evidence,
+  and Continue; file status, counts, and hunks stay on the adjacent inline
+  review card. Failure shows that existing work remains, exposes Retry and
+  Continue, and retry preserves the latest prompt. A new turn clears the
+  previous outcome card; an abort creates neither success nor failure outcome
+  copy.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`, `03-runtime/10-session-state-machine.md`
 - **Acceptance**: C (chat stream), Quality (completion and recovery)

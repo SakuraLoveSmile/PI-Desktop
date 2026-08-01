@@ -48,10 +48,6 @@ import {
 } from "../lib/sidebar-preferences";
 import { formatToolValue } from "../lib/tool-display";
 import {
-  withoutWorkspaceReviewSessions,
-  type WorkspaceReviewSessions,
-} from "../lib/workspace-review";
-import {
   activateWorkPanelTabState,
   closeWorkPanelTabState,
   emptyWorkPanelContext,
@@ -446,8 +442,6 @@ export type AppState = {
   workspaceDiff: WorkspaceDiff | null;
   workspaceDiffPath: string | null;
   workspaceDiffLoading: boolean;
-  /** Sessions that produced reviewable edits, keyed to their workspace path. */
-  workspaceReviewSessions: WorkspaceReviewSessions;
   refreshWorkspaceDiff: () => Promise<void>;
   /** Chat-initiated "preview this file" request consumed by the files tab. */
   workPanelFileRequest: { path: string; seq: number } | null;
@@ -603,7 +597,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   workspaceDiff: null,
   workspaceDiffPath: null,
   workspaceDiffLoading: false,
-  workspaceReviewSessions: {},
   workPanelFileRequest: null,
   projectSort: initialSidebarPreferences.projectSort,
   messages: [],
@@ -1733,10 +1726,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         state.pendingPermissions,
         id,
       );
-      const workspaceReviewSessions = withoutRecordKey(
-        state.workspaceReviewSessions,
-        id,
-      );
       const retainedNav = state.navStack.filter(
         (entry) => entry.sessionId !== id,
       );
@@ -1755,7 +1744,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         messages: state.activeSessionId === id ? [] : state.messages,
         isRunning: state.activeSessionId === id ? false : state.isRunning,
         pendingPermissions,
-        workspaceReviewSessions,
         navStack,
         navIndex: Math.min(state.navIndex, navStack.length - 1),
       };
@@ -2216,21 +2204,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         result: event.result,
       });
       if (reviewArtifact) {
-        const state = get();
-        const workspacePath =
-          state.sessions.find((session) => session.id === envelope.sessionId)
-            ?.projectPath ??
-          (state.activeSessionId === envelope.sessionId
-            ? state.workspace?.path
-            : undefined);
-        if (workspacePath) {
-          set((current) => ({
-            workspaceReviewSessions: {
-              ...current.workspaceReviewSessions,
-              [envelope.sessionId]: workspacePath,
-            },
-          }));
-        }
         get().openWorkPanelTabForSession(
           envelope.sessionId,
           toolWorkPanelTab("review"),
@@ -2603,18 +2576,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         requestSeq === workspaceDiffRequestSeq &&
         get().workspace?.path === workspacePath
       ) {
-        set((state) => ({
+        set({
           workspaceDiff,
           workspaceDiffPath: workspacePath,
-          ...(!workspaceDiff.repo || workspaceDiff.clean
-            ? {
-                workspaceReviewSessions: withoutWorkspaceReviewSessions(
-                  state.workspaceReviewSessions,
-                  workspacePath,
-                ),
-              }
-            : {}),
-        }));
+        });
       }
     } catch {
       if (

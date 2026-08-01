@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
-  summarizeSessionWorkspaceChanges,
+  findWorkspaceChangeForMessage,
   summarizeWorkspaceChanges,
-  withoutWorkspaceReviewSessions,
+  workspaceChangePath,
 } from "../src/lib/workspace-review.ts";
 
 const transcriptSource = await readFile(
@@ -73,75 +73,74 @@ test("workspace change summary only describes a dirty git work tree", () => {
   );
 });
 
-test("workspace change entry belongs only to the session that edited it", () => {
-  const reviewSessions = { "session-a": "/repo", "session-c": "/other" };
+test("review cards resolve the file changed by their tool message", () => {
+  const message = {
+    id: "tool-1",
+    role: "tool",
+    content: "",
+    createdAt: new Date().toISOString(),
+    toolName: "Edit",
+    toolStatus: "success",
+    toolArgs: { path: "src/a.ts" },
+    toolResult: { details: { root: "workspace", path: "src/a.ts" } },
+  };
 
-  assert.deepEqual(
-    summarizeSessionWorkspaceChanges({
-      diff: dirtyDiff,
-      diffPath: "/repo",
-      workspacePath: "/repo/",
-      sessionId: "session-a",
-      reviewSessions,
-    }),
-    { fileCount: 1, additions: 4, deletions: 1, truncated: false },
-  );
+  assert.equal(workspaceChangePath(message), "src/a.ts");
   assert.equal(
-    summarizeSessionWorkspaceChanges({
-      diff: dirtyDiff,
-      diffPath: "/repo",
-      workspacePath: "/repo",
-      sessionId: "session-b",
-      reviewSessions,
-    }),
+    findWorkspaceChangeForMessage(message, dirtyDiff)?.path,
+    "src/a.ts",
+  );
+
+  for (const status of [
+    "added",
+    "modified",
+    "deleted",
+    "renamed",
+    "untracked",
+  ]) {
+    const file = { ...dirtyDiff.files[0], status };
+    assert.equal(
+      findWorkspaceChangeForMessage(message, {
+        ...dirtyDiff,
+        files: [file],
+      })?.status,
+      status,
+      `status ${status} stays reviewable`,
+    );
+  }
+
+  assert.equal(
+    workspaceChangePath({ ...message, toolStatus: "error" }),
     null,
   );
   assert.equal(
-    summarizeSessionWorkspaceChanges({
-      diff: dirtyDiff,
-      diffPath: "/repo",
-      workspacePath: "/repo",
-      sessionId: "session-c",
-      reviewSessions,
+    workspaceChangePath({
+      ...message,
+      toolResult: { details: { root: "scratch", path: "src/a.ts" } },
     }),
     null,
   );
 });
 
-test("clean workspace refresh clears every review owner for that workspace", () => {
-  assert.deepEqual(
-    withoutWorkspaceReviewSessions(
-      {
-        "session-a": "/repo",
-        "session-b": "/repo/",
-        "session-c": "/other",
-      },
-      "/repo",
-    ),
-    { "session-c": "/other" },
-  );
-});
-
-test("chat exposes a persistent review entry backed by the shared diff", () => {
-  const entryIndex = transcriptSource.indexOf("<WorkspaceChangesEntry />");
-  const permissionIndex = transcriptSource.indexOf("{pendingPermission ? (");
-
-  assert.ok(entryIndex > -1, "review entry is rendered in the transcript");
-  assert.ok(
-    entryIndex < permissionIndex,
-    "review entry stays outside collapsed activity rows",
+test("chat renders each review card immediately after its change tool row", () => {
+  assert.equal(transcriptSource.includes("<WorkspaceChangesEntry />"), false);
+  assert.equal(transcriptSource.includes("review-changes-entry"), false);
+  assert.match(
+    transcriptSource,
+    /<ToolRow message=\{item\.message\} \/>[\s\S]*<WorkspaceChangeCard message=\{item\.message\} \/>/,
   );
   assert.match(
     transcriptSource,
-    /openWorkPanelTab\(toolWorkPanelTab\("review"\)\)/,
+    /findWorkspaceChangeForMessage\(message, diff\)/,
   );
-  assert.match(transcriptSource, /sessionId: activeSessionId/);
-  assert.match(transcriptSource, /reviewSessions/);
-  assert.match(transcriptSource, /chat\.reviewChangesAccessible/);
+  assert.match(transcriptSource, /aria-expanded=\{open\}/);
+  assert.match(transcriptSource, /chat\.reviewChangeShow/);
+  assert.match(transcriptSource, /InlineDiffBody/);
   assert.match(
     storeSource,
-    /const reviewArtifact = shouldOpenReviewArtifact\([\s\S]*if \(reviewArtifact\)[\s\S]*\[envelope\.sessionId\]: workspacePath/,
+    /const reviewArtifact = shouldOpenReviewArtifact\([\s\S]*if \(reviewArtifact\)[\s\S]*openWorkPanelTabForSession/,
   );
+  assert.doesNotMatch(storeSource, /workspaceReviewSessions/);
 });
 
 test("one diff refresh feeds both chat and Review with race-safe triggers", () => {

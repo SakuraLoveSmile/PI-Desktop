@@ -434,8 +434,8 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 | ChatTranscript (scrollable, flex-1)  |
 |   MessageBubble (user/assistant)     |
 |   ToolCallCard                       |
-|   Review changes · 3 files  +8 −2  |
 |   TurnOutcomeCard                    |
+|   InlineReviewCard · modified App.tsx +8 −2 |
 |   PermissionCard                     |
 |   ...                                |
 +--------------------------------------+
@@ -468,19 +468,20 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 | Empty | Restrained hero + compact contextual quick actions + optional onboarding checklist + home composer in one scrollable stack; no marketing suggestion cards (D111/D131) |
 | Streaming | Auto-scroll follows while pinned; new tokens append |
 | Active progress | A compact four-stage timeline follows real agent events: understanding, working, checking, and finalizing. The current tool name may appear in the detail line; a pending permission changes the detail to a localized approval wait. |
-| Turn outcome | After a completed or failed turn, a session-scoped result card summarizes the outcome, available tool/file evidence, and the next action. Completed turns can open Review; failed turns can retry without losing the transcript. |
+| Turn outcome | After a completed or failed turn, a session-scoped result card summarizes the outcome, tool evidence, and the next action. File review stays on the message-scoped InlineReviewCard; failed turns can retry without losing the transcript. |
 | Turn start (send / retry / regenerate) | Re-pins and jumps to bottom even if the user had scrolled up |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
-| Session-owned dirty Git workspace | After this session successfully writes or edits the workspace, a compact Review changes command follows its transcript outside collapsed activity groups; it shows the capped file count plus explicit addition/deletion totals and opens the singleton Review tab. Other sessions in the same project do not render the command. |
+| Message-scoped dirty Git workspace | Each successful workspace Write/Edit tool row is followed by one compact InlineReviewCard when the current diff contains that path. The card shows added/modified/deleted/renamed/untracked status, explicit addition/deletion totals, and expands the matching hunks in place. It does not render as a bottom/global entry or leak into another session's transcript. |
 
 ### 4.5 Accessibility
 
 - `role="log"` for transcript container
 - `aria-live="polite"` on transcript for new message announcements
 - Scroll-to-bottom button appears when user scrolls up during stream
-- Review changes is a native button with a localized accessible name that
-  includes file, addition, and deletion counts; the visible text and icon do
-  not rely on color to communicate the action
+- InlineReviewCard uses a native button with `aria-expanded` and
+  `aria-controls`. Its localized accessible name includes the path, status,
+  addition count, and deletion count; the visible text and color are not the
+  only status signal.
 - Empty-home quick actions are native buttons in one labelled group without a
   separate visible heading. Each action has a concrete localized label, never
   submits automatically, and returns focus to the home composer after
@@ -491,8 +492,8 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
   supplementary and do not rely on color alone.
 - The turn outcome card is a labelled `role="status"` region with explicit
   text actions. Success and failure use icon geometry plus text, never color
-  alone; Retry preserves the existing prompt and Review opens the session's
-  existing artifact surface.
+  alone; Retry preserves the existing prompt and Continue returns focus to the
+  composer.
 
 ### 4.6 MVP constraints
 
@@ -565,7 +566,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 | State | Behavior |
 |---|---|
-| Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. A contextual Review changes command is available only in a session that produced a successful workspace Write/Edit while that Git working tree remains dirty. |
+| Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. Inline review cards remain available in the transcript because they are message-scoped and do not require the work panel. |
 | Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 244–720px (default 280px). It occupies client-area space and never expands the OS window (ADR 0033). |
 | Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded menu lists the tools first and then the transcript-opened resources in first-open order, with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
@@ -581,21 +582,19 @@ preview), and Files (workspace browser). Codex-parity surface.
   that session's preview path/URL as its Browser resource. Successful workspace
   Write/Edit artifacts create/activate Review in the originating session.
   Background artifacts may update that retained context but never reveal it,
-  resize the window, or change visible selection/focus. While the shared
-  working-tree diff is dirty, only a session that produced a successful
-  workspace Write/Edit exposes Review changes; activating it creates, reopens,
-  or activates that session's singleton Review tab. Other sessions in the same
-  project do not inherit the entry. Repeated resources deduplicate within the
-  originating session.
-- Review truth: the renderer shares one current-workspace diff between the
-  transcript entry and Review. It refreshes on workspace activation, after a
-  500ms debounce for successful Write/Edit/Bash completion, on explicit Review
-  refresh, and when the app window regains focus. A workspace-keyed request
-  sequence discards late responses. Clean and non-Git results clear review
-  ownership for that workspace; clean, non-Git, missing-workspace, and
-  failed-refresh states hide the transcript entry. Session ownership is
-  renderer-memory state and is discarded on relaunch with D142's work-panel
-  contexts.
+  resize the window, or change visible selection/focus. The transcript does
+  not create a global Review changes launcher: each successful workspace
+  Write/Edit row owns only its adjacent InlineReviewCard, and another session
+  cannot render that card in its transcript. Repeated resources deduplicate
+  within the originating session.
+- Review truth: the renderer shares one current-workspace diff between inline
+  cards and Review. A card filters that diff by the path from its own tool
+  result, so its status, counts, and hunks describe the file changed by that
+  row. The diff refreshes on workspace activation, after a 500ms debounce for
+  successful Write/Edit/Bash completion, on explicit Review refresh, and when
+  the app window regains focus. A workspace-keyed request sequence discards
+  late responses. Clean, non-Git, missing-workspace, and failed-refresh states
+  hide inline cards; the full Review tab keeps its dedicated empty copy.
 - Unified context menu: while the panel is visible, one context trigger in the
   header opens a single dropdown. Its top section lists the open resources in
   first-open order (rows select a resource and retain per-resource close

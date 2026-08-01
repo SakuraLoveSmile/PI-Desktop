@@ -57,3 +57,4 @@ Each ADR includes:
 | 0039 | Activate plugin skills and ship plugin authoring as a first-party devkit | Accepted (skill delivery revised by D174) |
 | 0040 | Resident plugin services and the inter-plugin message bus | Accepted |
 | 0041 | Bound host runtime resources and decouple message persistence | Accepted |
+| 0042 | Message-scoped inline review cards | Accepted |

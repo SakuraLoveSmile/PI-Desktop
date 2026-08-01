@@ -70,11 +70,8 @@ destination, chat as the home surface, tools and permissions inline.
   bell instead (D130/D117).
 - **Work panel**: docked right column (not an overlay) created only by file,
   URL, browser-preview, successful-command, or successful workspace-edit
-  artifacts, or by the contextual transcript review entry when the current
-  session produced a successful workspace Write/Edit and that working tree is
-  still dirty. Its
-  a combined create trigger keeps Review, Terminal, Browser, and Files one
-  click away while the panel is visible; opened-but-inactive tools show a quiet
+  artifacts. A combined create trigger keeps Review, Terminal, Browser, and
+  Files one click away while the panel is visible; opened-but-inactive tools show a quiet
   dot and the active tool has a restrained edge marker. The 46px content header
   names the
   current resource, closes it directly, and opens a compact switcher for all
@@ -122,10 +119,11 @@ destination, chat as the home surface, tools and permissions inline.
   project without auto-submitting; the former four suggestion cards are not
   rendered (D131).
 - With transcript: message stream + tool disclosure rows (D071), a contextual
-  Review changes entry when this session produced a successful workspace
-  Write/Edit and its Git working tree is still dirty, docked composer, and a
-  session-scoped permission card inline. Another session in the same project
-  does not inherit the entry. A background
+  message-scoped review card immediately after each successful workspace
+  Write/Edit row whose current Git diff still contains that path, docked
+  composer, and a session-scoped permission card inline. The card shows the
+  file status and addition/deletion counts, then expands the matching hunks in
+  place; it is not a global transcript entry. A background
   session's message, tool, and permission events never replace or cover the
   visible conversation.
 

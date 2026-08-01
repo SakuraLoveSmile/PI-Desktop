@@ -47,25 +47,37 @@ test("locale resolution maps Chinese variants and falls back to English", () => 
   assert.equal(resolveLocale(), "en");
 });
 
-test("review file counts use locale-aware plural keys", () => {
+test("inline review cards expose localized accessible labels", () => {
   const english = flattenCatalog(en);
   const chinese = flattenCatalog(zhCN);
 
-  assert.equal(english["chat.reviewChangedFiles_one"], "1 file");
-  assert.equal(english["chat.reviewChangedFiles_other"], "{{count}} files");
-  assert.match(english["chat.reviewChangesAccessible_one"], /1 file changed/);
-  assert.match(
-    english["chat.reviewChangesAccessible_other"],
-    /{{count}} files changed/,
+  assert.equal(
+    english["chat.reviewChangeShow"],
+    "Show {{status}} changes for {{path}} ({{additions}} additions, {{deletions}} deletions)",
+  );
+  assert.equal(
+    english["chat.reviewChangeHide"],
+    "Hide {{status}} changes for {{path}} ({{additions}} additions, {{deletions}} deletions)",
+  );
+  assert.equal(
+    chinese["chat.reviewChangeShow"],
+    "显示 {{path}} 的{{status}}改动（新增 {{additions}} 行，删除 {{deletions}} 行）",
+  );
+  assert.equal(
+    chinese["chat.reviewChangeHide"],
+    "隐藏 {{path}} 的{{status}}改动（新增 {{additions}} 行，删除 {{deletions}} 行）",
+  );
+  assert.equal(
+    english["chat.reviewChangeCounts"],
+    "{{additions}} additions, {{deletions}} deletions",
+  );
+  assert.equal(
+    chinese["chat.reviewChangeCounts"],
+    "新增 {{additions}} 行，删除 {{deletions}} 行",
   );
   assert.equal(english["panel.review.filesChanged_one"], "1 file changed");
   assert.equal(
     english["panel.review.filesChanged_other"],
     "{{count}} files changed",
-  );
-  assert.equal(chinese["chat.reviewChangedFiles_one"], "1 个文件");
-  assert.equal(
-    chinese["chat.reviewChangedFiles_other"],
-    "{{count}} 个文件",
   );
 });

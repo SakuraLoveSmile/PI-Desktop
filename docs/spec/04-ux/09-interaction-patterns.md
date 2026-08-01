@@ -249,7 +249,7 @@ may be retained while exactly one workspace supplies the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
-### 1.8 Artifact-driven work panel resources (D128, D140, D142, D154, D173)
+### 1.8 Artifact-driven work panel resources (D128, D142, D154, D173, D179)
 
 - The shell exposes no empty or unconditional work-panel launcher,
   application-menu command, or global shortcut. An artifact trigger atomically
@@ -286,17 +286,23 @@ may be retained while exactly one workspace supplies the visible shell context.
   originating session. Failed and scratch writes do not. Background-session
   artifacts update only their retained context and never open, activate, resize,
   focus, or change the visible panel.
-- When a session has produced a successful workspace Write/Edit and that Git
-  working tree has changes, a compact Review changes command remains visible at
-  the end of that session's transcript independently of the activity disclosure
-  state. It reports files and addition/deletion totals and creates, reopens, or
-  activates the singleton Review tab. Other sessions in the same project do not
-  inherit the command. Clean, non-Git, and no-workspace states do not render it;
-  clean and non-Git results also clear the workspace's prior session ownership.
-- The transcript and Review consume one workspace-keyed diff state. Workspace
-  activation, debounced agent mutation, Review refresh, and window focus
-  refresh that state; request sequencing prevents a late response from a prior
-  workspace from changing the visible entry.
+- Each successful workspace Write/Edit tool row is followed by one compact
+  InlineReviewCard when the current Git diff still contains that tool result's
+  workspace path. The card is rendered in the same activity disclosure,
+  immediately after its tool row; it is never moved to the transcript bottom
+  and never shared with another session. Its status badge covers added,
+  modified, deleted, renamed, and untracked files, while the counts and
+  expandable hunks are read from that file's current diff.
+- The transcript cards and Review consume one workspace-keyed diff state.
+  Workspace activation, debounced agent mutation, Review refresh, and window
+  focus refresh that state; request sequencing prevents a late response from a
+  prior workspace from changing any card. Clean, non-Git, no-workspace, failed,
+  and scratch results do not render an inline card. A background session's
+  card is retained with its own transcript and becomes visible only after that
+  session is selected; its event never renders in the currently visible
+  session. Successful workspace artifacts may still create or activate the
+  singleton Review tab; the panel remains the all-files view rather than a
+  second card ownership model.
 - Terminal mounts only after a command artifact opens it and remains mounted
   across tab switches while that tab exists.
 - Each session retains `{open, tabs, activeTabId, browserResource}` in renderer
@@ -407,9 +413,8 @@ may be retained while exactly one workspace supplies the visible shell context.
   after the transcript content. It is based on the terminal agent event, not a
   timeout or a guessed spinner state.
 - Completion copy states that the latest turn is ready and may show the number
-  of tool steps and real workspace files changed. If a session-owned Review
-  artifact exists, the card opens the existing Review tab rather than creating
-  a second artifact entry.
+  of tool steps. File-level review stays attached to the adjacent message
+  cards; the outcome card does not create a second Review entry.
 - Failure copy states that the existing work remains available. Retry resends
   the latest user prompt through the existing retry path; Continue returns
   focus to the composer without changing the transcript.

@@ -129,7 +129,11 @@ writes results to workspace memory/config — a form disguised as a chat.
 Sessions produce files the user later can't find without scrolling the
 transcript. **Adopted first step in D128**: clicking a file artifact creates a
 path-keyed, closeable work-panel tab, and successful workspace Write/Edit
-artifacts open Review. These renderer tabs are transient views, not a second
+artifacts open Review. **Adopted in D179**: the transcript also places a
+message-scoped review card directly after each successful file mutation; its
+status, +/− totals, and expandable hunks stay attached to that tool row rather
+than becoming a global footer entry. These renderer tabs and cards are
+transient views, not a second
 persistence model; the host-owned `artifacts` table remains authoritative.
 A future dedicated Artifacts destination may list files grouped by session
 with name / kind / session / time columns and Finder/diff actions. Skip the

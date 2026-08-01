@@ -1,4 +1,4 @@
-import type { WorkspaceDiff } from "@pi-desktop/shared";
+import type { DiffFile, UiMessage, WorkspaceDiff } from "@pi-desktop/shared";
 
 export type WorkspaceChangeSummary = {
   fileCount: number;
@@ -7,14 +7,7 @@ export type WorkspaceChangeSummary = {
   truncated: boolean;
 };
 
-export type WorkspaceReviewSessions = Record<string, string>;
-
-function normalizeWorkspacePath(path?: string | null): string | null {
-  const value = path?.trim();
-  if (!value) return null;
-  const normalized = value.replace(/\\/g, "/").replace(/\/+$/, "");
-  return normalized || "/";
-}
+const WORKSPACE_CHANGE_TOOLS = new Set(["Write", "Edit"]);
 
 export function summarizeWorkspaceChanges(
   diff: WorkspaceDiff | null,
@@ -29,40 +22,59 @@ export function summarizeWorkspaceChanges(
   };
 }
 
-export function summarizeSessionWorkspaceChanges({
-  diff,
-  diffPath,
-  workspacePath,
-  sessionId,
-  reviewSessions,
-}: {
-  diff: WorkspaceDiff | null;
-  diffPath: string | null;
-  workspacePath?: string | null;
-  sessionId?: string | null;
-  reviewSessions: WorkspaceReviewSessions;
-}): WorkspaceChangeSummary | null {
-  if (!sessionId || !workspacePath || !diffPath) return null;
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
 
-  const workspaceKey = normalizeWorkspacePath(workspacePath);
+function toolResultDetails(message: UiMessage): Record<string, unknown> | null {
+  return recordValue(recordValue(message.toolResult)?.details);
+}
+
+/** Return the workspace-relative path written by a successful file tool. */
+export function workspaceChangePath(message: UiMessage): string | null {
   if (
-    normalizeWorkspacePath(diffPath) !== workspaceKey ||
-    normalizeWorkspacePath(reviewSessions[sessionId]) !== workspaceKey
+    message.role !== "tool" ||
+    message.toolStatus !== "success" ||
+    !WORKSPACE_CHANGE_TOOLS.has(message.toolName || "")
   ) {
     return null;
   }
 
-  return summarizeWorkspaceChanges(diff);
+  const details = toolResultDetails(message);
+  if (details?.root !== "workspace") return null;
+
+  const args = recordValue(message.toolArgs);
+  const path =
+    typeof details.path === "string"
+      ? details.path
+      : typeof args?.path === "string"
+        ? args.path
+        : null;
+  return normalizeDiffPath(path);
 }
 
-export function withoutWorkspaceReviewSessions(
-  reviewSessions: WorkspaceReviewSessions,
-  workspacePath: string,
-): WorkspaceReviewSessions {
-  const workspaceKey = normalizeWorkspacePath(workspacePath);
-  return Object.fromEntries(
-    Object.entries(reviewSessions).filter(
-      ([, path]) => normalizeWorkspacePath(path) !== workspaceKey,
-    ),
+function normalizeDiffPath(path?: string | null): string | null {
+  const value = path?.trim();
+  if (!value) return null;
+  const normalized = value.replace(/\\/g, "/").replace(/^\.\//, "");
+  return normalized || "/";
+}
+
+/** Find the current working-tree diff produced by one transcript tool row. */
+export function findWorkspaceChangeForMessage(
+  message: UiMessage,
+  diff: WorkspaceDiff | null,
+): DiffFile | null {
+  const path = workspaceChangePath(message);
+  if (!path || !diff?.repo || diff.clean) return null;
+
+  return (
+    diff.files.find(
+      (file) =>
+        normalizeDiffPath(file.path) === path ||
+        normalizeDiffPath(file.oldPath) === path,
+    ) ?? null
   );
 }
