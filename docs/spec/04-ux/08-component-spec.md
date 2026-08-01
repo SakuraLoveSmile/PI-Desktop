@@ -465,7 +465,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 
 | State | Behavior |
 |---|---|
-| Empty | Restrained hero + collapsed contextual quick actions + optional onboarding checklist + home composer in one scrollable stack; no marketing suggestion cards (D111/D131) |
+| Empty | Restrained hero + compact contextual quick actions + optional onboarding checklist + home composer in one scrollable stack; no marketing suggestion cards (D111/D131) |
 | Streaming | Auto-scroll follows while pinned; new tokens append |
 | Active progress | A compact four-stage timeline follows real agent events: understanding, working, checking, and finalizing. The current tool name may appear in the detail line; a pending permission changes the detail to a localized approval wait. |
 | Turn outcome | After a completed or failed turn, a session-scoped result card summarizes the outcome, available tool/file evidence, and the next action. Completed turns can open Review; failed turns can retry without losing the transcript. |
@@ -481,11 +481,11 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 - Review changes is a native button with a localized accessible name that
   includes file, addition, and deletion counts; the visible text and icon do
   not rely on color to communicate the action
-- Empty-home quick actions live behind a native `details` disclosure with a
-  visible `summary` label. Expanded actions are native buttons with concrete
-  localized labels, never submit automatically, and return focus to the home
-  composer after prefilling it. The no-workspace action opens the project
-  picker instead of creating an invalid prompt.
+- Empty-home quick actions are native buttons in one labelled group without a
+  separate visible heading. Each action has a concrete localized label, never
+  submits automatically, and returns focus to the home composer after
+  prefilling it. The no-workspace action opens the project picker instead of
+  creating an invalid prompt.
 - The active progress timeline is a labelled `role="status"` region. Its four
   stages are announced as one live detail, while the visual markers are
   supplementary and do not rely on color alone.

@@ -1575,18 +1575,17 @@ Each scenario is documented in this format:
 - **Preconditions**: App running on empty chat home (no transcript) in light
   and dark themes; window can be resized to ~1200×690 and ~900×640.
 - **Steps**: 1) Open empty home. 2) Confirm the hero is limited to the quiet
-  logo and title, with no welcome paragraph. 3) Confirm quick actions are
-  collapsed, expand them, and activate a project action to open the picker.
-  4) With a project open, activate an inspection action and confirm it
-  prefills, but does not submit, the composer. 5) Dismiss onboarding and
-  inspect again. 6) Repeat in the other theme. 7) Resize to a short height
-  and scroll if needed.
+  logo and title, with no welcome paragraph. 3) Confirm the compact quick
+  actions are visible without a section heading, then activate a project
+  action to open the picker. 4) With a project open, activate an inspection
+  action and confirm it prefills, but does not submit, the composer. 5) Dismiss
+  onboarding and inspect again. 6) Repeat in the other theme. 7) Resize to a
+  short height and scroll if needed.
 - **Expected**: No Explore / Build / Review / Fix marketing cards render. The
-  default empty state keeps the title, optional checklist, and composer as the
-  visual anchors; contextual actions remain available behind one disclosure.
-  Dismissing the checklist leaves no empty spacer. The composer never covers
-  the checklist, and short windows keep every remaining block reachable via
-  scroll.
+  default empty state keeps the quiet title and composer as the visual anchors;
+  contextual actions remain a compact, heading-free row. Dismissing the
+  checklist leaves no empty spacer. The composer never covers the checklist,
+  and short windows keep every remaining block reachable via scroll.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D111/D131)
 - **Acceptance**: Quality (layout integrity)

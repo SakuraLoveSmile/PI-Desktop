@@ -62,17 +62,15 @@ test("short windows keep the empty stack scrollable rather than overlapping", ()
   assert.doesNotMatch(checklist, /\bmt-6\b/);
 });
 
-test("empty home keeps optional actions collapsed by default", async () => {
+test("empty home keeps contextual actions visible without a heading", async () => {
   const quickActions = await read("../src/components/HomeQuickActions.tsx");
-  assert.match(quickActions, /<details/);
-  assert.doesNotMatch(quickActions, /<details[^>]*\bopen\b/);
-  assert.match(quickActions, /<summary className="home-quick-actions-trigger">/);
+  assert.doesNotMatch(quickActions, /<details/);
+  assert.doesNotMatch(quickActions, /home-quick-actions-trigger/);
+  assert.match(quickActions, /role="group"/);
   assert.match(quickActions, /data-testid="home-quick-actions"/);
   assert.match(quickActions, /quickActionInspectPrompt/);
   assert.match(quickActions, /quickActionOpenProject/);
   assert.match(styles, /\.home-quick-actions-list\s*\{/);
-  assert.match(styles, /\.home-quick-actions-trigger\s*\{/);
-  assert.match(styles, /\.home-quick-actions\[open\]/);
   assert.match(styles, /\.home-quick-action\s*\{[\s\S]*?border-radius:\s*var\(--radius-full\)/);
   assert.doesNotMatch(styles, /\.home-suggestion-card/);
 });
