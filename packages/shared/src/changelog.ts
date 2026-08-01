@@ -23,6 +23,14 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.4.1",
+    date: "2026-08-02",
+    highlights: [
+      "Update GitHub Releases and auto-update links to the canonical PI-Desktop repository.",
+      "Refresh project, plugin, and release documentation to use the PI-Desktop repository name.",
+    ],
+  },
+  {
     version: "0.4.0",
     date: "2026-08-01",
     highlights: [
@@ -174,6 +182,14 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.4.1",
+    date: "2026-08-02",
+    highlights: [
+      "将 GitHub Releases 与自动更新链接统一到正式的 PI-Desktop 仓库。",
+      "更新项目、插件和发布文档中的仓库名称，统一使用 PI-Desktop。",
+    ],
+  },
   {
     version: "0.4.0",
     date: "2026-08-01",
