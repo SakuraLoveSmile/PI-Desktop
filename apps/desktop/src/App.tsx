@@ -158,9 +158,6 @@ function AppShell() {
   const handleAgentEvent = useAppStore((s) => s.handleAgentEvent);
   const abort = useAppStore((s) => s.abort);
   const settings = useAppStore((s) => s.settings);
-  const workspace = useAppStore((s) => s.workspace);
-  const reviewRev = useAppStore((s) => s.reviewRev);
-  const refreshWorkspaceDiff = useAppStore((s) => s.refreshWorkspaceDiff);
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
   const workPanelWidth = useAppStore((s) => s.workPanelWidth);
   const pluginThemes = useAppStore((s) => s.pluginThemes);
@@ -413,22 +410,6 @@ function AppShell() {
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, [settings?.theme, pluginThemes]);
-
-  useEffect(() => {
-    if (!ready) return;
-    const timer = window.setTimeout(
-      () => void refreshWorkspaceDiff(),
-      reviewRev === 0 ? 0 : 500,
-    );
-    return () => window.clearTimeout(timer);
-  }, [ready, workspace?.path, reviewRev, refreshWorkspaceDiff]);
-
-  useEffect(() => {
-    if (!ready) return;
-    const refreshOnFocus = () => void refreshWorkspaceDiff();
-    window.addEventListener("focus", refreshOnFocus);
-    return () => window.removeEventListener("focus", refreshOnFocus);
-  }, [ready, refreshWorkspaceDiff]);
 
   useEffect(() => {
     void bootstrap();

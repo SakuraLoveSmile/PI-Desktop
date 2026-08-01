@@ -149,6 +149,12 @@
   background: color-mix(in oklab, var(--ds-bg-secondary) 72%, transparent);
 }
 
+.review-change-card.is-compact {
+  width: 100%;
+  margin: 0 0 8px;
+  background: var(--ds-bg-primary);
+}
+
 :root[data-theme="light"] .review-change-card {
   background: #ffffff;
   border-color: color-mix(in oklab, #1a1c1f 10%, transparent);
@@ -179,6 +185,26 @@
   color: var(--ds-text-muted);
 }
 
+.review-change-card-status {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.review-change-card-status.is-added {
+  background: color-mix(in oklab, var(--ds-success) 14%, transparent);
+  color: var(--ds-success);
+}
+
+.review-change-card-status.is-deleted {
+  background: color-mix(in oklab, var(--ds-error) 14%, transparent);
+  color: var(--ds-error);
+}
+
 .review-change-card-path {
   min-width: 0;
   flex: 1;
@@ -205,6 +231,74 @@
   max-height: min(360px, 42vh);
   overflow: auto;
   border-top: 1px solid var(--ds-border-subtle);
+}
+
+.review-change-card-body-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.review-change-card-state {
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+
+.review-change-card-actions {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.review-change-card-actions.is-compact {
+  padding-inline: 8px;
+}
+
+.review-change-rollback {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.review-change-rollback:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.review-change-rollback:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.review-change-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ds-success);
+  font-size: var(--text-xs-plus);
+}
+
+.review-change-rollback-note {
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+}
+
+.review-change-rollback-note.is-warning {
+  flex: 1;
+  color: var(--ds-warning);
 }
 
 .review-change-diff .diff-hunk {

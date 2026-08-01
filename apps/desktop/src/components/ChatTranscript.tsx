@@ -10,15 +10,11 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
-import type {
-  DiffFile,
-  MessageUsage,
-  UiMessage,
-  WorkspaceDiff,
-} from "@pi-desktop/shared";
+import type { MessageUsage, UiMessage } from "@pi-desktop/shared";
 import { ConversationMinimap } from "./ConversationMinimap";
 import { AgentProgressTimeline } from "./AgentProgressTimeline";
 import { TurnOutcomeCard } from "./TurnOutcomeCard";
+import { ReviewChangeCard } from "./ReviewChangeCard";
 import { Markdown, useCopy } from "./Markdown";
 import {
   formatToolDuration,
@@ -34,7 +30,6 @@ import {
   splitChatText,
   type ChatPreviewTarget,
 } from "../lib/chat-links";
-import { findWorkspaceChangeForMessage } from "../lib/workspace-review";
 import { reduceTranscriptScroll } from "../lib/transcript-scroll";
 import {
   assistantTurnContent,
@@ -53,7 +48,6 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconCopy,
-  IconDiff,
   IconFileText,
   IconFolder,
   IconGlobe,
@@ -68,113 +62,6 @@ import {
 import { useAppStore } from "../stores/app-store";
 import type { PendingPermission } from "../lib/pending-permissions";
 import { PermissionCard } from "./PermissionCard";
-
-function diffStatusLabel(
-  status: DiffFile["status"],
-  t: (key: string, options?: Record<string, unknown>) => string,
-) {
-  return t(`panel.review.status.${status}`);
-}
-
-function InlineDiffBody({ file }: { file: DiffFile }) {
-  const { t } = useTranslation();
-
-  if (file.binary) {
-    return <div className="review-change-note">{t("panel.review.binary")}</div>;
-  }
-  if (file.tooLarge) {
-    return <div className="review-change-note">{t("panel.review.tooLarge")}</div>;
-  }
-
-  return (
-    <div className="review-change-diff">
-      {file.hunks.map((hunk, hunkIndex) => (
-        <div className="diff-hunk" key={hunkIndex}>
-          <div className="diff-line hunk">
-            <span className="diff-line-text">{hunk.header}</span>
-          </div>
-          {hunk.lines.map((line, lineIndex) => (
-            <div className={`diff-line ${line.type}`} key={lineIndex}>
-              <span className="diff-line-sign" aria-hidden>
-                {line.type === "add" ? "+" : line.type === "del" ? "−" : " "}
-              </span>
-              <span className="diff-line-text">{line.text}</span>
-            </div>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const WorkspaceChangeCard = memo(function WorkspaceChangeCard({
-  message,
-}: {
-  message: UiMessage;
-}) {
-  const { t } = useTranslation();
-  const workspacePath = useAppStore((state) => state.workspace?.path);
-  const diffPath = useAppStore((state) => state.workspaceDiffPath);
-  const workspaceDiff = useAppStore((state) => state.workspaceDiff);
-  const detailsId = useId();
-  const [open, setOpen] = useState(false);
-  const diff: WorkspaceDiff | null =
-    diffPath === workspacePath ? workspaceDiff : null;
-  const file = findWorkspaceChangeForMessage(message, diff);
-
-  if (!file) return null;
-
-  const status = diffStatusLabel(file.status, t);
-  const displayPath = file.oldPath
-    ? `${file.oldPath} → ${file.path}`
-    : file.path;
-  const accessibleLabel = t(
-    open ? "chat.reviewChangeHide" : "chat.reviewChangeShow",
-    {
-      path: displayPath,
-      status,
-      additions: file.additions,
-      deletions: file.deletions,
-    },
-  );
-
-  return (
-    <section className={`review-change-card ${open ? "open" : ""}`}>
-      <button
-        type="button"
-        className="review-change-card-header"
-        aria-expanded={open}
-        aria-controls={detailsId}
-        aria-label={accessibleLabel}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <span className="review-change-card-icon" aria-hidden>
-          <IconDiff size={14} />
-        </span>
-        <span className={`diff-file-status is-${file.status}`}>{status}</span>
-        <code className="review-change-card-path">{displayPath}</code>
-        <span
-          className="diff-file-counts"
-          aria-label={t("chat.reviewChangeCounts", {
-            additions: file.additions,
-            deletions: file.deletions,
-          })}
-        >
-          <span className="diff-count-add">+{file.additions}</span>
-          <span className="diff-count-del">−{file.deletions}</span>
-        </span>
-        <span className="review-change-card-caret" aria-hidden>
-          <IconChevronRight size={12} />
-        </span>
-      </button>
-      {open ? (
-        <div className="review-change-card-body" id={detailsId}>
-          <InlineDiffBody file={file} />
-        </div>
-      ) : null}
-    </section>
-  );
-});
 
 /**
  * Copy chip. Message toolbars are glyph-only (`icon`) with the label in a
@@ -794,7 +681,7 @@ const ActivityGroup = memo(function ActivityGroup({
               item.kind === "tool" ? (
                 <Fragment key={item.message.id}>
                   <ToolRow message={item.message} />
-                  <WorkspaceChangeCard message={item.message} />
+                  <ReviewChangeCard message={item.message} />
                 </Fragment>
               ) : (
                 <ThinkingRow

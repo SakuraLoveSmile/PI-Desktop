@@ -13,10 +13,10 @@ import type {
   PermissionMode,
   ProjectWorkspace,
   ProviderPublic,
+  ReviewRollbackResult,
   SessionSummary,
   ThinkingLevel,
   UiMessage,
-  WorkspaceDiff,
 } from "@pi-desktop/shared";
 import {
   highestSupportedThinkingLevel,
@@ -47,6 +47,7 @@ import {
   type SessionSort,
 } from "../lib/sidebar-preferences";
 import { formatToolValue } from "../lib/tool-display";
+import { withReviewChangeState } from "../lib/workspace-review";
 import {
   activateWorkPanelTabState,
   closeWorkPanelTabState,
@@ -144,7 +145,6 @@ const SESSION_TRANSCRIPT_CACHE_LIMIT = 5;
 // Preserve the original 320px tool-content minimum beside the 44px activity rail.
 export { WORK_PANEL_DEFAULT_WIDTH, WORK_PANEL_MIN_WIDTH };
 
-let workspaceDiffRequestSeq = 0;
 let workPanelFileRequestSeq = 0;
 const navigationIntents = createNavigationIntentController();
 let pendingSessionSelection: { id: string; intent: number } | null = null;
@@ -368,6 +368,10 @@ export type AppState = {
   clearError: () => void;
   activateMessageRevision: (rootUserId: string, revisionIndex: number) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
+  rollbackWorkspaceChange: (
+    messageId: string,
+    snapshotId: string,
+  ) => Promise<ReviewRollbackResult | null>;
   abort: () => Promise<void>;
   openProject: () => Promise<void>;
   activateProject: (
@@ -437,12 +441,6 @@ export type AppState = {
   /** Runtime-only work panel state owned by each conversation. */
   workPanelContexts: Record<string, WorkPanelContext>;
   workPanelWidth: number;
-  /** Bumped on agent Write/Edit/Bash completion; review tab refetches. */
-  reviewRev: number;
-  workspaceDiff: WorkspaceDiff | null;
-  workspaceDiffPath: string | null;
-  workspaceDiffLoading: boolean;
-  refreshWorkspaceDiff: () => Promise<void>;
   /** Chat-initiated "preview this file" request consumed by the files tab. */
   workPanelFileRequest: { path: string; seq: number } | null;
   openWorkPanelTab: (tab: WorkPanelTab) => void;
@@ -501,7 +499,6 @@ function switchWorkPanelSession(
 
 // tool_end events carry no tool name, and cross-session tool calls never
 // enter `messages`, so remember names from tool_start envelopes here.
-const WORKSPACE_MUTATING_TOOLS = new Set(["Write", "Edit", "Bash"]);
 const toolNamesByCallId = new Map<string, string>();
 const TOOL_NAME_CACHE_LIMIT = 512;
 const providerModelLoads = new Map<string, Promise<void>>();
@@ -593,10 +590,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeWorkPanelTabId: null,
   workPanelContexts: {},
   workPanelWidth: initialWorkPanelWidth,
-  reviewRev: 0,
-  workspaceDiff: null,
-  workspaceDiffPath: null,
-  workspaceDiffLoading: false,
   workPanelFileRequest: null,
   projectSort: initialSidebarPreferences.projectSort,
   messages: [],
@@ -1398,6 +1391,49 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  rollbackWorkspaceChange: async (messageId, snapshotId) => {
+    const state = get();
+    const sessionId = state.activeSessionId;
+    if (!sessionId || state.isRunning) return null;
+    try {
+      const result = await api.workspaceReviewRollback({
+        sessionId,
+        snapshotId,
+      });
+      if (result.status === "rolledBack" || result.status === "alreadyRolledBack") {
+        set((current) =>
+          current.activeSessionId === sessionId
+            ? {
+                messages: current.messages.map((message) =>
+                  message.id === messageId
+                    ? withReviewChangeState(message, "rolledBack")
+                    : message,
+                ),
+              }
+            : {},
+        );
+      } else if (result.status === "conflict") {
+        get().showToast(i18n.t("panel.review.rollbackConflict"), {
+          variant: "warning",
+        });
+      } else if (result.status === "unavailable") {
+        get().showToast(i18n.t("panel.review.rollbackUnavailable"), {
+          variant: "warning",
+        });
+      }
+      return result;
+    } catch (error) {
+      get().showToast(i18n.t("panel.review.rollbackError"), {
+        variant: "error",
+      });
+      set({
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: (error as { code?: string })?.code ?? null,
+      });
+      return null;
+    }
+  },
+
   abort: async () => {
     const stateBeforeAbort = get();
     const sessionId = stateBeforeAbort.activeSessionId;
@@ -2154,8 +2190,8 @@ export const useAppStore = create<AppState>((set, get) => ({
               },
       }));
     }
-    // Any session's workspace mutation invalidates the review diff; this
-    // must precede the cross-session early-return below.
+    // Observe tool lifecycle events before the cross-session early return so
+    // progress and review artifacts remain scoped to their originating session.
     if (event.type === "tool_start") {
       if (toolNamesByCallId.size >= TOOL_NAME_CACHE_LIMIT) {
         const oldest = toolNamesByCallId.keys().next().value;
@@ -2195,9 +2231,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           ...(agentProgress === state.agentProgress ? {} : { agentProgress }),
         };
       });
-      if (toolName && WORKSPACE_MUTATING_TOOLS.has(toolName) && !event.isError) {
-        set((s) => ({ reviewRev: s.reviewRev + 1 }));
-      }
       const reviewArtifact = shouldOpenReviewArtifact({
         toolName,
         isError: event.isError,
@@ -2552,48 +2585,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   dismissToast: (id) =>
     set((state) => ({ toasts: state.toasts.filter((item) => item.id !== id) })),
-
-  refreshWorkspaceDiff: async () => {
-    const workspacePath = get().workspace?.path ?? null;
-    const requestSeq = ++workspaceDiffRequestSeq;
-    if (!workspacePath) {
-      set({
-        workspaceDiff: null,
-        workspaceDiffPath: null,
-        workspaceDiffLoading: false,
-      });
-      return;
-    }
-
-    set((state) => ({
-      workspaceDiffLoading: true,
-      workspaceDiffPath: workspacePath,
-      ...(state.workspaceDiffPath === workspacePath ? {} : { workspaceDiff: null }),
-    }));
-    try {
-      const workspaceDiff = await api.workspaceDiff();
-      if (
-        requestSeq === workspaceDiffRequestSeq &&
-        get().workspace?.path === workspacePath
-      ) {
-        set({
-          workspaceDiff,
-          workspaceDiffPath: workspacePath,
-        });
-      }
-    } catch {
-      if (
-        requestSeq === workspaceDiffRequestSeq &&
-        get().workspace?.path === workspacePath
-      ) {
-        set({ workspaceDiff: null, workspaceDiffPath: workspacePath });
-      }
-    } finally {
-      if (requestSeq === workspaceDiffRequestSeq) {
-        set({ workspaceDiffLoading: false });
-      }
-    }
-  },
 
   openWorkPanelTabForSession: (sessionId, tab) => {
     if (!sessionId) return;

@@ -334,7 +334,6 @@ test("terminal mounts on demand and survives switches while its tab stays open",
 });
 
 test("workspace artifacts attach review to their originating session", () => {
-  const bumpIndex = storeSource.indexOf("WORKSPACE_MUTATING_TOOLS.has(toolName)");
   const artifactIndex = storeSource.indexOf("shouldOpenReviewArtifact({");
   const openReviewMatch = storeSource.match(
     /get\(\)\.openWorkPanelTabForSession\(\s*envelope\.sessionId,\s*toolWorkPanelTab\("review"\),?\s*\)/,
@@ -343,8 +342,7 @@ test("workspace artifacts attach review to their originating session", () => {
   const gateIndex = storeSource.indexOf(
     "if (envelope.sessionId !== get().activeSessionId)",
   );
-  assert.ok(bumpIndex > -1, "reviewRev bump exists");
-  assert.ok(artifactIndex > bumpIndex, "workspace artifact gate exists");
+  assert.ok(artifactIndex > -1, "workspace artifact gate exists");
   assert.ok(openReviewIndex > artifactIndex, "review artifact records its session tab");
   assert.ok(gateIndex > -1, "cross-session gate exists");
   assert.ok(

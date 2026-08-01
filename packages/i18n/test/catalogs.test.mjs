@@ -80,4 +80,9 @@ test("inline review cards expose localized accessible labels", () => {
     english["panel.review.filesChanged_other"],
     "{{count}} files changed",
   );
+  assert.equal(english["panel.review.changes_one"], "1 recorded change");
+  assert.equal(
+    chinese["panel.review.rollbackConflict"],
+    "该文件在此消息之后又发生了变化，已跳过回退。",
+  );
 });

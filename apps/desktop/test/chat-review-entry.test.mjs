@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
-  findWorkspaceChangeForMessage,
-  summarizeWorkspaceChanges,
-  workspaceChangePath,
+  reviewChangeFromMessage,
+  reviewChangesFromMessages,
+  summarizeReviewChanges,
 } from "../src/lib/workspace-review.ts";
 
 const transcriptSource = await readFile(
   new URL("../src/components/ChatTranscript.tsx", import.meta.url),
+  "utf8",
+);
+const cardSource = await readFile(
+  new URL("../src/components/ReviewChangeCard.tsx", import.meta.url),
   "utf8",
 );
 const reviewSource = await readFile(
@@ -21,60 +25,31 @@ const storeSource = await readFile(
   "utf8",
 );
 
-const dirtyDiff = {
-  repo: true,
-  clean: false,
-  truncated: false,
-  files: [
+const baseReview = {
+  version: 1,
+  snapshotId: "snapshot-1",
+  messageId: "tool-1",
+  path: "src/a.ts",
+  operation: "edit",
+  status: "modified",
+  state: "active",
+  additions: 4,
+  deletions: 1,
+  hunks: [
     {
-      path: "src/a.ts",
-      status: "modified",
-      additions: 4,
-      deletions: 1,
-      hunks: [],
+      header: "@@ -1,2 +1,3 @@",
+      lines: [
+        { type: "context", text: "const before = true;" },
+        { type: "del", text: "const removed = true;" },
+        { type: "add", text: "const added = true;" },
+      ],
     },
   ],
+  reversible: true,
 };
 
-test("workspace change summary only describes a dirty git work tree", () => {
-  assert.equal(summarizeWorkspaceChanges(null), null);
-  assert.equal(
-    summarizeWorkspaceChanges({ repo: false, clean: true, files: [] }),
-    null,
-  );
-  assert.equal(
-    summarizeWorkspaceChanges({ repo: true, clean: true, files: [] }),
-    null,
-  );
-
-  assert.deepEqual(
-    summarizeWorkspaceChanges({
-      repo: true,
-      clean: false,
-      truncated: true,
-      files: [
-        {
-          path: "src/a.ts",
-          status: "modified",
-          additions: 4,
-          deletions: 1,
-          hunks: [],
-        },
-        {
-          path: "src/b.ts",
-          status: "untracked",
-          additions: 3,
-          deletions: 0,
-          hunks: [],
-        },
-      ],
-    }),
-    { fileCount: 2, additions: 7, deletions: 1, truncated: true },
-  );
-});
-
-test("review cards resolve the file changed by their tool message", () => {
-  const message = {
+function message(overrides = {}) {
+  return {
     id: "tool-1",
     role: "tool",
     content: "",
@@ -82,60 +57,109 @@ test("review cards resolve the file changed by their tool message", () => {
     toolName: "Edit",
     toolStatus: "success",
     toolArgs: { path: "src/a.ts" },
-    toolResult: { details: { root: "workspace", path: "src/a.ts" } },
+    toolResult: { details: { root: "workspace", review: baseReview } },
+    ...overrides,
   };
+}
 
-  assert.equal(workspaceChangePath(message), "src/a.ts");
-  assert.equal(
-    findWorkspaceChangeForMessage(message, dirtyDiff)?.path,
-    "src/a.ts",
+test("review evidence is read from the successful message, not Git", () => {
+  const change = reviewChangeFromMessage(message());
+  assert.equal(change?.path, "src/a.ts");
+  assert.equal(change?.status, "modified");
+  assert.equal(change?.additions, 4);
+  assert.equal(change?.deletions, 1);
+  assert.equal(change?.hunks[0].lines[1].type, "del");
+
+  const entries = reviewChangesFromMessages([
+    message(),
+    message({
+      id: "tool-2",
+      toolName: "Write",
+      toolResult: {
+        details: {
+          root: "workspace",
+          review: {
+            ...baseReview,
+            snapshotId: "snapshot-2",
+            messageId: "tool-2",
+            path: "new.ts",
+            operation: "write",
+            status: "added",
+            additions: 3,
+            deletions: 0,
+          },
+        },
+      },
+    }),
+    message({
+      id: "tool-3",
+      toolResult: {
+        details: {
+          root: "workspace",
+          review: {
+            ...baseReview,
+            snapshotId: "snapshot-3",
+            messageId: "tool-3",
+            path: "old.ts",
+            status: "deleted",
+            additions: 0,
+            deletions: 8,
+          },
+        },
+      },
+    }),
+  ]);
+  assert.deepEqual(
+    entries.map(({ change }) => [change.status, change.path]),
+    [
+      ["modified", "src/a.ts"],
+      ["added", "new.ts"],
+      ["deleted", "old.ts"],
+    ],
   );
+  assert.deepEqual(summarizeReviewChanges(entries), {
+    changeCount: 3,
+    activeCount: 3,
+    rolledBackCount: 0,
+    additions: 7,
+    deletions: 9,
+  });
+});
 
-  for (const status of [
-    "added",
-    "modified",
-    "deleted",
-    "renamed",
-    "untracked",
-  ]) {
-    const file = { ...dirtyDiff.files[0], status };
-    assert.equal(
-      findWorkspaceChangeForMessage(message, {
-        ...dirtyDiff,
-        files: [file],
-      })?.status,
-      status,
-      `status ${status} stays reviewable`,
-    );
-  }
-
+test("failed and scratch tool rows cannot manufacture review evidence", () => {
+  assert.equal(reviewChangeFromMessage(message({ toolStatus: "error" })), null);
   assert.equal(
-    workspaceChangePath({ ...message, toolStatus: "error" }),
+    reviewChangeFromMessage(
+      message({
+        toolResult: { details: { root: "scratch", review: baseReview } },
+      }),
+    ),
     null,
   );
   assert.equal(
-    workspaceChangePath({
-      ...message,
-      toolResult: { details: { root: "scratch", path: "src/a.ts" } },
-    }),
+    reviewChangeFromMessage(
+      message({ toolResult: { details: { root: "workspace" } } }),
+    ),
     null,
   );
 });
 
-test("chat renders each review card immediately after its change tool row", () => {
+test("chat renders one message-owned card immediately after its tool row", () => {
   assert.equal(transcriptSource.includes("<WorkspaceChangesEntry />"), false);
   assert.equal(transcriptSource.includes("review-changes-entry"), false);
   assert.match(
     transcriptSource,
-    /<ToolRow message=\{item\.message\} \/>[\s\S]*<WorkspaceChangeCard message=\{item\.message\} \/>/,
+    /<ToolRow message=\{item\.message\} \/>[\s\S]*<ReviewChangeCard message=\{item\.message\} \/>/,
   );
+  assert.doesNotMatch(transcriptSource, /workspaceDiff|findWorkspaceChange/);
+  assert.match(cardSource, /aria-expanded=\{open\}/);
+  assert.match(cardSource, /chat\.reviewChangeShow/);
+  assert.match(cardSource, /change\.hunks\.map/);
+  assert.match(cardSource, /workspaceReviewRollback|rollbackWorkspaceChange/);
   assert.match(
-    transcriptSource,
-    /findWorkspaceChangeForMessage\(message, diff\)/,
+    storeSource,
+    /rollbackWorkspaceChange:[\s\S]*api\.workspaceReviewRollback[\s\S]*withReviewChangeState/,
   );
-  assert.match(transcriptSource, /aria-expanded=\{open\}/);
-  assert.match(transcriptSource, /chat\.reviewChangeShow/);
-  assert.match(transcriptSource, /InlineDiffBody/);
   assert.match(
     storeSource,
     /const reviewArtifact = shouldOpenReviewArtifact\([\s\S]*if \(reviewArtifact\)[\s\S]*openWorkPanelTabForSession/,
@@ -143,10 +167,10 @@ test("chat renders each review card immediately after its change tool row", () =
   assert.doesNotMatch(storeSource, /workspaceReviewSessions/);
 });
 
-test("one diff refresh feeds both chat and Review with race-safe triggers", () => {
-  assert.match(reviewSource, /useAppStore\(\(s\) => s\.workspaceDiff\)/);
-  assert.match(reviewSource, /useAppStore\(\(s\) => s\.refreshWorkspaceDiff\)/);
-  assert.doesNotMatch(reviewSource, /api\.workspaceDiff/);
-  assert.match(appSource, /reviewRev === 0 \? 0 : 500/);
-  assert.match(appSource, /window\.addEventListener\("focus", refreshOnFocus\)/);
+test("Review is a session change history and no longer refreshes a Git diff", () => {
+  assert.match(reviewSource, /reviewChangesFromMessages\(messages\)/);
+  assert.match(reviewSource, /<ReviewChangeCard/);
+  assert.match(reviewSource, /panel\.review\.noChanges/);
+  assert.doesNotMatch(reviewSource, /workspaceDiff|refreshWorkspaceDiff|api\.workspaceDiff/);
+  assert.doesNotMatch(appSource, /reviewRev|refreshWorkspaceDiff|workspaceDiff/);
 });
