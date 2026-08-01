@@ -58,3 +58,4 @@ Each ADR includes:
 | 0040 | Resident plugin services and the inter-plugin message bus | Accepted |
 | 0041 | Bound host runtime resources and decouple message persistence | Accepted |
 | 0042 | Message-scoped inline review cards | Accepted |
+| 0043 | Message-owned review snapshots and guarded rollback | Accepted |

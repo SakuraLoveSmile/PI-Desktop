@@ -154,6 +154,11 @@ type ToolBudgetHealth = {
 - `workspace.set`
 - `workspace.clear`
 
+### Review snapshots (ADR 0043)
+- `review.rollback({sessionId, snapshotId})` — verify the current post-tool
+  hash, restore the session-owned previous bytes, and return one of
+  `rolledBack`, `alreadyRolledBack`, `conflict`, or `unavailable`.
+
 ### Projects
 - `projects.list` — returns durable project records ordered pinned-first, then
   by last-opened time; includes records materialized by session imports
@@ -360,6 +365,8 @@ type ToolsExecuteResult = {
   durationMs: number
   denied?: boolean
   errorCode?: string
+  // Workspace Write/Edit results may include content.details.review. The
+  // record is persisted with the tool message and is independent of Git.
 }
 ```
 

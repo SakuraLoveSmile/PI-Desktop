@@ -120,10 +120,11 @@ destination, chat as the home surface, tools and permissions inline.
   rendered (D131).
 - With transcript: message stream + tool disclosure rows (D071), a contextual
   message-scoped review card immediately after each successful workspace
-  Write/Edit row whose current Git diff still contains that path, docked
-  composer, and a session-scoped permission card inline. The card shows the
-  file status and addition/deletion counts, then expands the matching hunks in
-  place; it is not a global transcript entry. A background
+  Write/Edit row, docked composer, and a session-scoped permission card inline.
+  The card reads the message's durable review snapshot rather than the current
+  Git diff, so it stays visible after commit. It shows the file status and
+  addition/deletion counts, expands the exact message hunks in place, and
+  offers guarded rollback; it is not a global transcript entry. A background
   session's message, tool, and permission events never replace or cover the
   visible conversation.
 

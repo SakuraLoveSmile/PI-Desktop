@@ -471,7 +471,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 | Turn outcome | After a failed turn, a session-scoped recovery card summarizes the interruption and tool evidence. Completed turns use the existing transcript and message-scoped InlineReviewCard without an extra success card; failed turns can retry without losing the transcript. |
 | Turn start (send / retry / regenerate) | Re-pins and jumps to bottom even if the user had scrolled up |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
-| Message-scoped dirty Git workspace | Each successful workspace Write/Edit tool row is followed by one compact InlineReviewCard when the current diff contains that path. The card shows added/modified/deleted/renamed/untracked status, explicit addition/deletion totals, and expands the matching hunks in place. It does not render as a bottom/global entry or leak into another session's transcript. |
+| Message-scoped review snapshot | Each successful workspace Write/Edit tool row is followed by one compact InlineReviewCard carrying that message's added/modified/deleted status, explicit addition/deletion totals, and expandable hunks. The card remains after a Git commit, never becomes a bottom/global entry, and offers hash-guarded rollback without leaking into another session's transcript. |
 
 ### 4.5 Accessibility
 
@@ -529,7 +529,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 |   ▤ App.tsx              [×]¦         |
 +---------------------------------------+
 | Active resource body                  |
-|  Review: file cards + diff            |
+|  Review: recorded changes + diff      |
 |  Terminal: xterm host                 |
 |  Browser: URL bar + preview           |
 |  Files: tree + file viewer            |
@@ -587,14 +587,14 @@ preview), and Files (workspace browser). Codex-parity surface.
   Write/Edit row owns only its adjacent InlineReviewCard, and another session
   cannot render that card in its transcript. Repeated resources deduplicate
   within the originating session.
-- Review truth: the renderer shares one current-workspace diff between inline
-  cards and Review. A card filters that diff by the path from its own tool
-  result, so its status, counts, and hunks describe the file changed by that
-  row. The diff refreshes on workspace activation, after a 500ms debounce for
-  successful Write/Edit/Bash completion, on explicit Review refresh, and when
-  the app window regains focus. A workspace-keyed request sequence discards
-  late responses. Clean, non-Git, missing-workspace, and failed-refresh states
-  hide inline cards; the full Review tab keeps its dedicated empty copy.
+- Review truth: host-core adds one bounded `details.review` record to each
+  successful workspace Write/Edit result. The renderer reads that record from
+  the owning transcript message, so status, counts, and hunks describe exactly
+  what that row changed and remain available after a commit, restart, or
+  workspace switch. The Review tab is the same session's chronological change
+  history, not a current-worktree scan. Its rollback action calls the host;
+  the host compares the current content with the recorded post-tool hash and
+  returns a conflict without overwriting later work.
 - Unified context menu: while the panel is visible, one context trigger in the
   header opens a single dropdown. Its top section lists the open resources in
   first-open order (rows select a resource and retain per-resource close
@@ -666,7 +666,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 
 ### 5.6 MVP constraints
 
-- Tab content specs: Review diff is read-only (no line comments yet);
+- Tab content specs: Review has host-guarded rollback but no line comments;
   Browser is user-driven (no agent control); Files is read-only
 - Single panel instance; no per-tab detach or split
 

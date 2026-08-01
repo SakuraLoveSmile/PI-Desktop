@@ -42,6 +42,9 @@ Local-first, recoverable after restart, sensitive data isolated — plus, for v7
  ├── plugins/             # code + data + registry.json (unchanged, spec 07-11)
  ├── logs/                # NDJSON app/host/agent logs (D082)
  ├── cache/               # disposable caches
+ ├── review-changes/<sessionId>/<snapshotId>/
+ │    ├── before          # bounded pre-tool bytes, when reversible
+ │    └── meta.json       # path, hashes, diff state, and ownership
  └── scratch/<sessionId>/ # per-session agent temp files (D114) — deleted with
                           # the session; startup sweep removes orphans/stale
 ```
@@ -51,6 +54,17 @@ turn + artifact in one commit). The DB stores **no large payloads**: message
 content lives in `sessions/`, attachments and tool outputs beyond the limits
 of [16-tool-result-limits](16-tool-result-limits.md) live on disk, referenced
 by path/hash.
+
+### 2.0 Message-owned review snapshots (ADR 0043)
+
+Successful workspace `Write`/`Edit` tool results carry the bounded
+`details.review` record described in [03-tools-and-permissions](03-tools-and-permissions.md).
+The transcript JSONL is the durable index for the visible card; the previous
+bytes and hashes live outside the workspace in
+`review-changes/<sessionId>/<snapshotId>/`. The host removes a session's
+snapshot directory with `session.delete` and sweeps directories whose session
+no longer exists at startup. A snapshot is never inferred from Git, so a later
+commit does not remove historical review evidence.
 
 ### 2.1 Transcript files (D119)
 

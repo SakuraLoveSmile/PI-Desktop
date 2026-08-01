@@ -1,6 +1,6 @@
 # ADR 0042: Message-scoped inline review cards
 
-- Status: Accepted
+- Status: Superseded by ADR 0043
 - Date: 2026-08-02
 - Related: [01-ui-ia](../spec/04-ux/01-ui-ia.md) ·
   [08-component-spec](../spec/04-ux/08-component-spec.md) ·

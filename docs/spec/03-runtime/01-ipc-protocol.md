@@ -25,7 +25,7 @@ Principles:
 | `log` | Diagnostics that the frontend can display |
 | `plugin` | Plugin install/enable-disable/query/permissions |
 | `commandPalette` | Command palette search and execution |
-| `workspace` | Working-tree inspection for the work panel (diff) |
+| `workspace` | Workspace selection and legacy working-tree diagnostics |
 | `terminal` | Work panel PTY create/write/resize/dispose + data/exit events |
 | `browser` | Work panel embedded preview navigation/bounds/visibility + state events |
 | `fs` | Work panel workspace file listing/reading/reveal (read-only) |
@@ -507,10 +507,14 @@ visible session's workspace.
 ### workspace
 
 - `workspace/diff()` → `WorkspaceDiff { repo, clean, files: DiffFile[], truncated? }`.
-  Working tree vs `HEAD` (empty tree before the first commit) plus untracked
-  files, collected via the git CLI with rename detection. Caps: 100 files,
-  200KB per patch (`tooLarge`), binary detection; capped entries keep their
-  path row but omit hunks (D098).
+  This legacy diagnostics channel may inspect the current working tree, but it
+  is not the Review source of truth. The Review UI reads message-owned review
+  records from transcript tool results instead, so a commit cannot erase a
+  recorded change.
+- `workspace/review/rollback({sessionId, snapshotId})` →
+  `ReviewRollbackResult`. The host verifies the current post-tool hash before
+  restoring the snapshot; it returns `rolledBack`, `alreadyRolledBack`,
+  `conflict`, or `unavailable` and never overwrites a conflicting later edit.
 
 ### terminal (D099)
 

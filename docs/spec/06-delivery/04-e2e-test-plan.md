@@ -1341,37 +1341,38 @@ Each scenario is documented in this format:
   `work-panel-window.test.mjs`, `work-panel-presentation.test.mjs`,
   `work-panel.test.mjs`); full UI scenario Draft
 
-#### E2E-057: Review tab reflects the git working tree
+#### E2E-057: Message-owned review history survives commits and rolls back safely
 
-- **Preconditions**: A git workspace with a clean tree; agent configured.
-- **Steps**: 1) Ask the active agent to edit a tracked workspace file and
-  create a new one in session A. 2) Switch to session B in the same project,
-  then return to session A. 3) Repeat with a failed Write, a scratch Write, a
-  deleted file, and a Write in a background project session. 4) Expand the
-  activity group and inspect each review card directly after its corresponding
-  tool row; click cards open and close their hunks. 5) Collapse the panel and
-  close the Review tab, then confirm the inline cards still work without the
-  panel. 6) Edit a file outside the app, refocus the window, and press refresh
-  after Review is open. 7) Revert all changes, then inspect a non-git folder.
-- **Expected**: Each successful active-session workspace Write/Edit creates or
-  activates one deduplicated Review tab and refreshes the diff automatically
-  (debounced) with per-file status badges, +/− counts, and colored unified
-  hunks (added, modified, deleted, renamed, and untracked files included).
-  Each matching tool row has at most one adjacent keyboard-accessible inline
-  card; the card shows that row's workspace path and status, and expansion
-  renders the matching hunks in place. There is no bottom/global Review entry,
-  and session B does not inherit session A's cards. Failed and scratch writes
-  do not render cards. A background write updates only its originating
-  transcript and never appears in B or steals focus; returning to A restores
-  A's card. Background invalidation remains scoped. Refocus and manual refresh
-  pick up external edits. Cards disappear when their file no longer appears in
-  the current diff, while Review renders its existing dedicated empty copy.
-  Binary and >200KB patches render as capped rows without hunks; >100 changed
-  files shows the truncation notice.
-- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a, `04-ux/08-component-spec.md` §5
+- **Preconditions**: A project-bound Agent session with a writable workspace;
+  no Git repository is required.
+- **Steps**: 1) Ask the active agent to edit an existing file and create a new
+  file in session A. 2) Expand the activity group and inspect each review card
+  directly after its corresponding tool row; verify added/modified status,
+  +/− counts, and the exact hunks. 3) Commit the files outside the app, close
+  and reopen the Review panel, then reload session A. 4) Verify the same cards
+  and counts remain because they come from the transcript messages. 5) Use a
+  card's rollback action and verify the created file is removed or the previous
+  file bytes are restored. 6) Edit that file again outside the app and retry
+  rollback; inspect the conflict result and verify the later bytes remain. 7)
+  Switch to session B and a background project session, then return to A. 8)
+  Repeat with failed, denied, and scratch writes.
+- **Expected**: Each successful workspace Write/Edit creates one message-owned
+  review record and one adjacent keyboard-accessible card; the card is never a
+  bottom/global entry. The Review tab lists A's chronological recorded changes,
+  independent of Git status, repository presence, commit state, focus refresh,
+  or workspace switching. Added, modified, and deleted statuses plus line
+  additions/deletions and hunks are shown when bounded evidence is available.
+  Successful rollback updates the card to Rolled back and survives restart.
+  A post-tool file change returns Conflict and does not overwrite it. Failed,
+  denied, and scratch writes do not create cards; session B cannot inherit A's
+  records. Binary or oversized snapshots show bounded metadata and disable
+  rollback when the previous bytes were not retained.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a,
+  `03-runtime/03-tools-and-permissions.md` §4c,
+  `04-ux/08-component-spec.md` §5, ADR 0043
 - **Acceptance**: D (workspace), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`git-diff-parse.test.mjs`, `chat-review-entry.test.mjs`); full UI scenario Draft
+- **Status**: Unit-covered (`chat-review-entry.test.mjs`); full UI scenario Draft
 
 #### E2E-058: Interactive terminal session lifecycle
 
@@ -1619,14 +1620,16 @@ Each scenario is documented in this format:
   has a visible composer.
 - **Steps**: 1) Complete the workspace-edit turn. 2) Confirm that no success
   outcome card appears and inspect the inline review card immediately after the
-  change tool row. 3) Expand the inline card and verify its hunks. 4) Trigger
-  the retriable failure. 5) Inspect the failure card, then choose Retry. 6)
-  Start another new prompt and inspect the old card.
+  change tool row. 3) Expand the inline card and verify its hunks. 4) Commit
+  the edited file and confirm the recorded card remains, then use rollback
+  once. 5) Trigger the retriable failure. 6) Inspect the failure card, then
+  choose Retry. 7) Start another new prompt and inspect the old card.
 - **Expected**: Completion uses the transcript and inline review card as its
-  evidence without adding a "Task complete" card. Failure shows that existing
-  work remains, exposes Retry and Continue, and retry preserves the latest
-  prompt. A new turn clears the previous failure card; an abort creates no
-  failure outcome copy.
+  evidence without adding a "Task complete" card. File status, counts, and
+  hunks remain on the adjacent card after commit, and guarded rollback restores
+  the pre-tool state. Failure shows that existing work remains, exposes Retry
+  and Continue, and retry preserves the latest prompt. A new turn clears the
+  previous failure card; an abort creates no failure outcome copy.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`, `03-runtime/10-session-state-machine.md`
 - **Acceptance**: C (chat stream), Quality (completion and recovery)

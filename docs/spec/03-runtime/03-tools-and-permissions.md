@@ -101,6 +101,41 @@ session gets a scratch directory outside the workspace:
 - A session lookup/storage error fails the tool request; it must never be
   treated as a missing legacy session or redirected to the selected workspace.
 
+## 4c. Message-owned review snapshots and rollback
+
+`Write` and `Edit` are the structured review boundary. For a successful
+workspace-root mutation, host-core captures the previous file before execution
+and adds bounded review evidence to the tool result:
+
+```ts
+type ReviewChange = {
+  version: 1;
+  snapshotId: string;
+  messageId: string;
+  path: string;
+  operation: "write" | "edit" | "delete";
+  status: "added" | "modified" | "deleted";
+  state: "active" | "rolledBack";
+  additions: number;
+  deletions: number;
+  hunks: DiffHunk[];
+  binary?: boolean;
+  truncated?: boolean;
+  reversible: boolean;
+};
+```
+
+- The renderer persists and displays this record with the tool message; it
+  does not recompute Review from Git, `HEAD`, or the current dirty tree.
+- Scratch-root, failed, denied, and unresolvable writes have no `review`
+  record. Binary or oversized content may omit hunks and be non-reversible.
+- Rollback is host-owned and hash-guarded. It restores the captured previous
+  bytes, or removes a newly-created file, only when the current content still
+  equals the post-tool hash. A later edit returns `conflict` without touching
+  the file.
+- Review snapshot files live outside the workspace and are removed with their
+  session; orphaned session directories are swept on host startup.
+
 ## 5. Bash Rules
 
 MVP baseline:
