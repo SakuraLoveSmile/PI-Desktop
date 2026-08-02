@@ -1140,7 +1140,8 @@ async fn handle_request(
             // *inside* the tool — the wait is either the approval prompt or the
             // model round trip that follows. Splitting the host's own share
             // into approval / execution / bookkeeping is what makes the three
-            // distinguishable in host.log instead of one opaque duration.
+            // distinguishable in host/timing.log instead of one opaque
+            // duration.
             let call_started = std::time::Instant::now();
             let p: ToolsExecuteParams = serde_json::from_value(params.clone())
                 .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;

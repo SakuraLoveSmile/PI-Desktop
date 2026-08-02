@@ -169,12 +169,12 @@ const plugins = new PluginRuntime({
     }
   },
   audit: (entry) => {
-    logger.app("info", "plugin.api", entry);
+    logger.app("plugin", "info", "plugin.api", entry);
   },
   // A plugin host process dying is contained: contributions are already
   // deregistered by the runtime, we only have to tell the user and the UI.
   onPluginCrash: ({ pluginId, name, exitCode }) => {
-    logger.app("error", "plugin host process crashed", {
+    logger.app("plugin", "error", "plugin host process crashed", {
       pluginId,
       code: "PLUGIN_CRASHED",
       data: { exitCode },
@@ -187,7 +187,7 @@ const plugins = new PluginRuntime({
   // Supervision state is UI-only: the runtime owns restarts, the renderer just
   // reflects what happened.
   onServiceChange: (status) => {
-    logger.app("info", "plugin.service", {
+    logger.app("plugin", "info", "plugin.service", {
       pluginId: status.pluginId,
       data: { serviceId: status.serviceId, state: status.state, restarts: status.restarts },
     });
@@ -199,7 +199,7 @@ const plugins = new PluginRuntime({
   // Hot reload happens without anyone asking for it, so it has to report
   // itself: the plugins page reads status from the host, not from the edit.
   onPluginReloaded: ({ pluginId, name, ok, message }) => {
-    logger.app(ok ? "info" : "error", "development plugin reloaded", {
+    logger.app("plugin", ok ? "info" : "error", "development plugin reloaded", {
       pluginId,
       data: { ok, message },
     });
@@ -234,7 +234,7 @@ const logger = new Logger(
   process.env.NODE_ENV === "production" ? "info" : "debug",
 );
 const persistenceOutbox = new PersistenceOutbox(dataDir, (level, message, data) => {
-  logger.app(level, message, { data });
+  logger.app("persistence", level, message, { data });
 });
 
 /** Product UI locale for dual-locale update notes (mirrored from settings). */
@@ -441,7 +441,7 @@ function applyDevelopmentBranding() {
   const iconPath = join(app.getAppPath(), "build", "icon_1024.png");
   const icon = nativeImage.createFromPath(iconPath);
   if (icon.isEmpty()) {
-    logger.app("warn", "development dock icon missing", {
+    logger.app("lifecycle", "warn", "development dock icon missing", {
       data: { iconPath },
     });
     return;
@@ -533,7 +533,7 @@ function dispatchApplicationMenuCommand(command: AppMenuCommand) {
     return;
   }
   void deliverApplicationMenuCommand(command).catch((error) => {
-    logger.app("error", "application menu command failed", {
+    logger.app("diagnostics", "error", "application menu command failed", {
       data: String(error),
     });
   });
@@ -599,7 +599,7 @@ function flushPendingApplicationMenuCommands() {
       await deliverApplicationMenuCommand(command);
     }
   })().catch((error) => {
-    logger.app("error", "queued application menu command failed", {
+    logger.app("diagnostics", "error", "queued application menu command failed", {
       data: String(error),
     });
   });
@@ -651,14 +651,14 @@ async function importLegacyScheduled() {
       const res = await host.call<{ imported: number }>("scheduled.import", {
         tasks: parsed,
       });
-      logger.app("info", "legacy scheduled tasks imported", {
+      logger.app("persistence", "info", "legacy scheduled tasks imported", {
         data: { imported: res.imported, total: parsed.length },
       });
     }
     await rename(path, `${path}.imported.bak`);
   } catch (e: any) {
     if (e?.code !== "ENOENT") {
-      logger.app("warn", "legacy scheduled import failed", { data: String(e) });
+      logger.app("persistence", "warn", "legacy scheduled import failed", { data: String(e) });
     }
   }
 }
@@ -968,7 +968,7 @@ async function createWindow() {
     const devOrigin = process.env.ELECTRON_RENDERER_URL;
     if (devOrigin && url.startsWith(devOrigin)) return;
     event.preventDefault();
-    logger.app("warn", "blocked navigation attempt", { data: { url } });
+    logger.app("diagnostics", "warn", "blocked navigation attempt", { data: { url } });
   });
 
   // Codex-like default footprint. CG bounds are truth under Stage Manager.
@@ -1784,7 +1784,7 @@ function wireHost(h: HostProcess) {
     // current plugin/renderer bridge after a restart.
     if (host !== h) return;
     if (method === "permissions.request") {
-      logger.app("info", "permission requested", {
+      logger.app("permission", "info", "permission requested", {
         sessionId: (params as any).sessionId,
         toolCallId: (params as any).toolCallId,
         data: { toolName: (params as any).toolName, risk: (params as any).risk },
@@ -1841,7 +1841,7 @@ function wireHost(h: HostProcess) {
             };
           }
         }
-        logger.app("info", "plugin tool executed", {
+        logger.app("plugin", "info", "plugin tool executed", {
           toolCallId: q.toolCallId,
           pluginId: tool?.pluginId,
           data: { toolName: q.toolName, ok: payload.ok === true },
@@ -1849,7 +1849,7 @@ function wireHost(h: HostProcess) {
         try {
           await h.call("plugins.resolveExecution", payload);
         } catch (e) {
-          logger.app("warn", "plugin execution resolve failed", {
+          logger.app("plugin", "warn", "plugin execution resolve failed", {
             data: String(e),
           });
         }
@@ -1861,9 +1861,10 @@ function wireHost(h: HostProcess) {
   });
   h.onExit(({ code, signal, intentional }) => {
     if (host !== h) return;
+    logger.flushChild("host");
     host = null;
     if (intentional || quitting) return;
-    logger.app("error", "host-core exited unexpectedly", {
+    logger.app("runtime", "error", "host-core exited unexpectedly", {
       code: ErrorCodes.HOST_UNAVAILABLE,
       data: { exitCode: code, signal },
     });
@@ -1882,13 +1883,14 @@ async function startHost(): Promise<void> {
   host = h;
   try {
     await h.handshake();
-    logger.app("info", "host-core handshake ok", {
+    logger.app("runtime", "info", "host-core handshake ok", {
       data: { generation: h.generation },
     });
     void importLegacyScheduled();
     void persistenceOutbox.flush(() => host);
   } catch (error) {
     if (host === h) host = null;
+    logger.flushChild("host");
     await h.dispose();
     throw error;
   }
@@ -1900,13 +1902,13 @@ function wireSidecar(s: AgentSidecar) {
       const envelope = params as AgentEventEnvelope;
       const event = envelope.event;
       if (event.type === "tool_start") {
-        logger.app("info", "tool start", {
+        logger.app("tool", "info", "tool start", {
           sessionId: envelope.sessionId,
           toolCallId: (event as any).toolCallId,
           data: { toolName: (event as any).toolName },
         });
       } else if (event.type === "tool_end") {
-        logger.app("info", "tool end", {
+        logger.app("tool", "info", "tool end", {
           sessionId: envelope.sessionId,
           toolCallId: (event as any).toolCallId,
           data: { isError: (event as any).isError === true },
@@ -1920,9 +1922,10 @@ function wireSidecar(s: AgentSidecar) {
   });
   s.onExit(({ code, signal, intentional }) => {
     if (sidecar !== s) return;
+    logger.flushChild("agent");
     sidecar = null;
     if (intentional || quitting) return;
-    logger.app("error", "agent sidecar exited unexpectedly", {
+    logger.app("runtime", "error", "agent sidecar exited unexpectedly", {
       data: { exitCode: code, signal },
     });
     sendToRenderer(IPC.event.hostStatus, {
@@ -2054,7 +2057,7 @@ async function startSidecar(): Promise<void> {
     hostBinary: host?.binaryPath,
     dataDir,
   });
-  logger.app("info", "agent sidecar configured");
+  logger.app("runtime", "info", "agent sidecar configured");
 }
 
 /// Close the open turn + scheduled run (if any) for a session. Both host
@@ -2083,7 +2086,7 @@ function finishTurn(
         }
       })
       .catch((e) =>
-        logger.app("warn", "endTurn failed", { sessionId, data: String(e) }),
+        logger.app("persistence", "warn", "endTurn failed", { sessionId, data: String(e) }),
       );
   }
   const runId = scheduledRunsBySession.get(sessionId);
@@ -2093,7 +2096,7 @@ function finishTurn(
       void host
         .call("scheduled.finishRun", { runId, status, errorCode })
         .catch((e) =>
-          logger.app("warn", "finishRun failed", { sessionId, data: String(e) }),
+          logger.app("persistence", "warn", "finishRun failed", { sessionId, data: String(e) }),
         );
     }
   }
@@ -2120,7 +2123,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
   if (event.type === "error") {
     // Async provider failures must close the durable turn / scheduled run the
     // same way agent_end does; otherwise they stay 'running' in the DB.
-    logger.app("error", "agent turn failed", {
+    logger.app("session", "error", "agent turn failed", {
       sessionId: envelope.sessionId,
       code: event.error.code,
       data: { message: event.error.message, retriable: event.error.retriable },
@@ -2205,7 +2208,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
           event: { type: "message_end", message: stamped },
         } satisfies AgentEventEnvelope);
       } catch (error) {
-        logger.app("warn", "save active regenerate branch failed", {
+        logger.app("persistence", "warn", "save active regenerate branch failed", {
           sessionId: envelope.sessionId,
           data: String(error),
         });
@@ -2234,7 +2237,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
         () => host,
       )
       .catch((e) =>
-        logger.app("warn", "assistant message persistence enqueue failed", {
+        logger.app("persistence", "warn", "assistant message persistence enqueue failed", {
           sessionId: envelope.sessionId,
           data: String(e),
         }),
@@ -2274,7 +2277,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
         () => host,
       )
       .catch((e) =>
-        logger.app("warn", "tool message persistence enqueue failed", {
+        logger.app("persistence", "warn", "tool message persistence enqueue failed", {
           sessionId: envelope.sessionId,
           toolCallId: (event as any).toolCallId,
           data: String(e),
@@ -2303,7 +2306,7 @@ async function superviseRestartLoop(kind: RestartKind): Promise<void> {
     }
     st.count += 1;
     if (st.count > MAX_RESTARTS_PER_WINDOW) {
-      logger.app("error", `${kind} restart limit reached; giving up`, {
+      logger.app("runtime", "error", `${kind} restart limit reached; giving up`, {
         code: ErrorCodes.HOST_UNAVAILABLE,
       });
       sendToRenderer(IPC.event.hostStatus, {
@@ -2323,7 +2326,7 @@ async function superviseRestartLoop(kind: RestartKind): Promise<void> {
       } else {
         await startSidecar();
       }
-      logger.app("warn", `${kind} restarted after crash`);
+      logger.app("runtime", "warn", `${kind} restarted after crash`);
       sendToRenderer(IPC.event.hostStatus, {
         ok: true,
         component: kind,
@@ -2331,14 +2334,14 @@ async function superviseRestartLoop(kind: RestartKind): Promise<void> {
       });
       return;
     } catch (e) {
-      logger.app("error", `${kind} restart failed`, { data: String(e) });
+      logger.app("runtime", "error", `${kind} restart failed`, { data: String(e) });
     }
   }
 }
 
 async function bootBackends() {
   mkdirSync(join(dataDir, "logs"), { recursive: true });
-  logger.app("info", `app boot ${APP_NAME} ${APP_VERSION}`, {
+  logger.app("lifecycle", "info", `app boot ${APP_NAME} ${APP_VERSION}`, {
     data: { protocolVersion: PROTOCOL_VERSION },
   });
   await startHost();
@@ -2373,9 +2376,9 @@ async function bootBackends() {
           // Dev plugins keep hot reload across restarts: the folder was picked
           // once, and the edit loop should not have to pick it again.
           if (p.source === "dev") plugins.watchDevPlugin(p.id);
-          logger.app("info", "plugin restored", { pluginId: p.id });
+          logger.app("plugin", "info", "plugin restored", { pluginId: p.id });
         } catch (e) {
-          logger.app("error", "plugin restore failed", {
+          logger.app("plugin", "error", "plugin restore failed", {
             pluginId: p.id,
             data: String(e),
           });
@@ -2383,7 +2386,7 @@ async function bootBackends() {
       }
     }
   } catch (e) {
-    logger.app("error", "plugin list failed", { data: String(e) });
+    logger.app("plugin", "error", "plugin list failed", { data: String(e) });
   }
 }
 
@@ -2615,7 +2618,7 @@ function registerIpc() {
       "session.create",
       input,
     );
-    logger.app("info", "session created", { sessionId: res.session?.id });
+    logger.app("session", "info", "session created", { sessionId: res.session?.id });
     if (!res.session) return res;
     const providers = await listRuntimeProviders();
     return { ...res, session: enrichSession(res.session, providers) };
@@ -2657,7 +2660,7 @@ function registerIpc() {
         throw error;
       }
       if (!result.session) return result;
-      logger.app("info", "session forked", {
+      logger.app("session", "info", "session forked", {
         sessionId: (result.session as { id?: string }).id,
         data: { sourceSessionId: sessionId },
       });
@@ -2688,7 +2691,7 @@ function registerIpc() {
         .call("agent.disposeSession", { sessionId: id })
         .catch(() => undefined);
     }
-    logger.app("info", "session deleted", { sessionId: id });
+    logger.app("session", "info", "session deleted", { sessionId: id });
     return res;
   });
   handle(IPC.invoke.sessionRename, async (id: string, title: string) => {
@@ -2811,7 +2814,7 @@ function registerIpc() {
         const item = key ? scannedImportSessions.get(key) : undefined;
         if (!item) {
           failed += 1;
-          logger.app("warn", "session import selection rejected", {
+          logger.app("session", "warn", "session import selection rejected", {
             data: { reason: "candidate was not returned by the latest scan" },
           });
           continue;
@@ -2826,12 +2829,12 @@ function registerIpc() {
           else skipped += 1;
         } catch (e) {
           failed += 1;
-          logger.app("warn", "session import failed", {
+          logger.app("session", "warn", "session import failed", {
             data: { source: item?.source, externalId: item?.externalId, error: String(e) },
           });
         }
       }
-      logger.app("info", "session import finished", {
+      logger.app("session", "info", "session import finished", {
         data: { imported, skipped, failed },
       });
       return { imported, skipped, failed };
@@ -3039,7 +3042,7 @@ function registerIpc() {
                   });
                 }
               } catch (e) {
-                logger.app("warn", "model cache update failed", {
+                logger.app("provider", "warn", "model cache update failed", {
                   data: {
                     providerId: provider.id,
                     error: e instanceof Error ? e.message : String(e),
@@ -3051,7 +3054,7 @@ function registerIpc() {
           }
         } catch (e) {
           discoveryError = e instanceof Error ? e.message : String(e);
-          logger.app("warn", "model discovery failed", {
+          logger.app("provider", "warn", "model discovery failed", {
             data: { providerId: provider?.id, error: discoveryError },
           });
         }
@@ -3226,7 +3229,7 @@ function registerIpc() {
         cols: input.cols,
         rows: input.rows,
       });
-      logger.app("info", "terminal session attached", {
+      logger.app("terminal", "info", "terminal session attached", {
         data: { termId: created.termId },
       });
       return created;
@@ -3376,7 +3379,7 @@ function registerIpc() {
     }
     const { templates, diagnostics } = await loadComposerTemplates(root);
     for (const diagnostic of diagnostics) {
-      logger.app("warn", "composer template diagnostic", { data: diagnostic });
+      logger.app("diagnostics", "warn", "composer template diagnostic", { data: diagnostic });
     }
     composerTemplateCache = { key, at: now, templates };
     return templates;
@@ -3708,7 +3711,7 @@ function registerIpc() {
             activeRevision: count + 1,
           };
         } catch (error) {
-          logger.app("warn", "save regenerate revision failed", {
+          logger.app("persistence", "warn", "save regenerate revision failed", {
             sessionId: req.sessionId,
             data: String(error),
           });
@@ -3768,7 +3771,7 @@ function registerIpc() {
           slashCommand = expansion.command;
         }
       } catch (error) {
-        logger.app("warn", "slash expansion failed; sending literal text", {
+        logger.app("session", "warn", "slash expansion failed; sending literal text", {
           sessionId: req.sessionId,
           data: String(error),
         });
@@ -3828,7 +3831,7 @@ function registerIpc() {
       void finishTurn(req.sessionId, "error", (e as any)?.errorCode);
       throw e;
     }
-    logger.app("info", "prompt accepted", {
+    logger.app("session", "info", "prompt accepted", {
       sessionId: req.sessionId,
       turnId: result.turnId,
       data: { providerId: launch.providerId, modelId: launch.modelId },
@@ -3859,7 +3862,7 @@ function registerIpc() {
     );
     sidecar.setProjectInstructionRoot(req.sessionId, launch.projectPath);
     const result = await sidecar.call("agent.compact", launch.sidecarParams);
-    logger.app("info", "context compacted manually", {
+    logger.app("session", "info", "context compacted manually", {
       sessionId: req.sessionId,
       data: { providerId: launch.providerId, modelId: launch.modelId },
     });
@@ -3868,7 +3871,7 @@ function registerIpc() {
 
   handle(IPC.invoke.agentAbort, async (req: { sessionId: string }) => {
     if (!sidecar) throw new Error("sidecar unavailable");
-    logger.app("info", "prompt aborted", { sessionId: req.sessionId });
+    logger.app("session", "info", "prompt aborted", { sessionId: req.sessionId });
     const result = await sidecar.call("agent.abort", req);
     finishTurn(req.sessionId, "aborted");
     return result;
@@ -3884,7 +3887,7 @@ function registerIpc() {
     decision: string;
   }) => {
     if (!host) throw new Error("host unavailable");
-    logger.app("info", "permission resolved", {
+    logger.app("permission", "info", "permission resolved", {
       data: { requestId: resolution.requestId, decision: resolution.decision },
     });
     return host.call("permissions.resolve", resolution);
@@ -4020,7 +4023,7 @@ function registerIpc() {
       await plugins.loadFromPath(res.plugin.path, res.plugin.permissions ?? []);
       if (res.plugin.source === "dev") plugins.watchDevPlugin(id);
     }
-    logger.app("info", "plugin enabled", { pluginId: id });
+    logger.app("plugin", "info", "plugin enabled", { pluginId: id });
     sendToRenderer(IPC.event.pluginChanged, { reason: "enable", pluginId: id });
     return res;
   });
@@ -4028,7 +4031,7 @@ function registerIpc() {
   handle(IPC.invoke.pluginDisable, async (id: string) => {
     if (!host) throw new Error("host unavailable");
     await plugins.unload(id);
-    logger.app("info", "plugin disabled", { pluginId: id });
+    logger.app("plugin", "info", "plugin disabled", { pluginId: id });
     const res = await host.call("plugins.disable", { id });
     sendToRenderer(IPC.event.pluginChanged, { reason: "disable", pluginId: id });
     return res;
@@ -4037,7 +4040,7 @@ function registerIpc() {
   handle(IPC.invoke.pluginUninstall, async (id: string) => {
     if (!host) throw new Error("host unavailable");
     await plugins.unload(id);
-    logger.app("info", "plugin uninstalled", { pluginId: id });
+    logger.app("plugin", "info", "plugin uninstalled", { pluginId: id });
     const res = await host.call("plugins.uninstall", { id });
     sendToRenderer(IPC.event.pluginChanged, { reason: "uninstall", pluginId: id });
     return res;
@@ -4207,7 +4210,7 @@ app.whenReady().then(async () => {
     await bootBackends();
   } catch (e) {
     bootError = e;
-    logger.app("error", "backend boot failed", {
+    logger.app("runtime", "error", "backend boot failed", {
       code: ErrorCodes.HOST_UNAVAILABLE,
       data: String(e),
     });
@@ -4288,7 +4291,7 @@ app.whenReady().then(async () => {
   if (process.env.PI_DESKTOP_SUPERVISION_PROBE === "1") {
     const initialHost = host;
     setTimeout(() => {
-      logger.app("info", "supervision probe: killing host-core");
+      logger.app("runtime", "info", "supervision probe: killing host-core");
       (initialHost as any)?.child?.kill("SIGKILL");
     }, 1500);
     const t0 = Date.now();
@@ -4328,7 +4331,7 @@ app.on("before-quit", () => {
   quitting = true;
   void pluginPanels.closeAll();
   updater.dispose();
-  logger.app("info", "app shutdown");
+  logger.app("lifecycle", "info", "app shutdown");
   ptys.disposeAll();
   plugins.disposeWatchers();
   browserPane.dispose();

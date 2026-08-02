@@ -83,6 +83,9 @@ Cross-boundary contracts:
  ├── secrets/
  ├── attachments/
  ├── logs/
+ │    ├── app/<category>.log
+ │    ├── host/<category>.log
+ │    └── agent/<category>.log
  ├── cache/
  ├── workspaces/
  └── plugins/

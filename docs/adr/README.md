@@ -60,3 +60,5 @@ Each ADR includes:
 | 0042 | Message-scoped inline review cards | Accepted |
 | 0043 | Message-owned review snapshots and guarded rollback | Accepted |
 | 0044 | Session-bound project instruction preflight | Accepted |
+| 0045 | Bash tool inherits the user's login-shell PATH | Accepted |
+| 0046 | Categorized process log files | Accepted |

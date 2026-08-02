@@ -212,7 +212,9 @@ Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
 4. Onboarding checklist appears; configure provider; one streamed chat turn.
 5. One permissioned tool call (Write) allow + deny paths.
 6. Quit/relaunch → session history restored, window bounds restored.
-7. `~/.pi-desktop/logs/` contains `app.log` / `host.log` / `agent.log`.
+7. `~/.pi-desktop/logs/` contains categorized NDJSON under `app/`, `host/`,
+   and `agent/`; timing records are in `host/timing.log` and
+   `agent/timing.log`.
 8. With network access disabled, the shell still starts; English/Chinese
    switching, syntax highlighting, KaTeX, Mermaid fallback/rendering, terminal,
    host health, and sidecar health continue to use packaged local assets.

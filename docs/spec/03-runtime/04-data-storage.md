@@ -40,7 +40,7 @@ Local-first, recoverable after restart, sensitive data isolated — plus, for v7
  ├── secrets/             # encrypted secret blobs + .machine-key (unchanged)
  ├── attachments/         # content-addressed blobs (sha256 name), refs from messages
  ├── plugins/             # code + data + registry.json (unchanged, spec 07-11)
- ├── logs/                # NDJSON app/host/agent logs (D082)
+ ├── logs/                # NDJSON app/<category>, host/<category>, agent/<category> logs
  ├── cache/               # disposable caches
  ├── review-changes/<sessionId>/<snapshotId>/
  │    ├── before          # bounded pre-tool bytes, when reversible

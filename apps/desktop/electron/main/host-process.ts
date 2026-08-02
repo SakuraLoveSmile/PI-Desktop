@@ -56,11 +56,11 @@ export class HostProcess {
       },
     });
 
-    this.child.stderr.on("data", (buf) => {
-      const text = String(buf).trim();
+    this.child.stderr.setEncoding("utf8");
+    this.child.stderr.on("data", (text: string) => {
       if (!text) return;
       if (onStderr) onStderr(text);
-      else console.error(`[host-core] ${text}`);
+      else console.error(`[host-core] ${text.trimEnd()}`);
     });
 
     this.child.on("exit", (code, signal) => {

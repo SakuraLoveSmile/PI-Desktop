@@ -8,8 +8,8 @@
  * sidecar waited on `tools.execute` (approval included) and how long the
  * provider took before and during the next assistant message.
  *
- * Lines go to stderr, which the Electron main `Logger` wraps into the `agent`
- * channel of `~/.pi-desktop/logs/agent.log`.
+ * Lines go to stderr, which the Electron main `Logger` wraps into the
+ * `agent/timing.log` category file under `~/.pi-desktop/logs/`.
  */
 
 export type TimingFields = Record<

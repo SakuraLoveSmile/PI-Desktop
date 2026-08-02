@@ -103,10 +103,10 @@ export class AppUpdaterController {
     // lands on the next normal quit.
     autoUpdater.autoInstallOnAppQuit = true;
     autoUpdater.logger = {
-      info: (m: unknown) => this.logger.app("info", `updater: ${String(m)}`),
-      warn: (m: unknown) => this.logger.app("warn", `updater: ${String(m)}`),
-      error: (m: unknown) => this.logger.app("error", `updater: ${String(m)}`),
-      debug: (m: unknown) => this.logger.app("debug", `updater: ${String(m)}`),
+      info: (m: unknown) => this.logger.app("updater", "info", `updater: ${String(m)}`),
+      warn: (m: unknown) => this.logger.app("updater", "warn", `updater: ${String(m)}`),
+      error: (m: unknown) => this.logger.app("updater", "error", `updater: ${String(m)}`),
+      debug: (m: unknown) => this.logger.app("updater", "debug", `updater: ${String(m)}`),
     };
 
     autoUpdater.on("checking-for-update", () => {
@@ -148,7 +148,7 @@ export class AppUpdaterController {
     autoUpdater.on("error", (error: Error) => {
       // Auto checks fail quietly (offline, private repo, rate limits);
       // the renderer only surfaces errors when `manual` is set.
-      this.logger.app("warn", "updater error", { data: String(error) });
+      this.logger.app("updater", "warn", "updater error", { data: String(error) });
       this.setState({ status: "error", error: error.message });
     });
   }

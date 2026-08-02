@@ -23,9 +23,9 @@ Default runtime level:
 
 | channel | content | location |
 |---|---|---|
-| app | boot, ipc, window, process supervision | `~/.pi-desktop/logs/app.log` |
-| host | rust host-core events (stderr capture) | `~/.pi-desktop/logs/host.log` |
-| agent | pi sidecar turn/provider events (stderr capture) | `~/.pi-desktop/logs/agent.log` |
+| app | boot, ipc, window, process supervision | `~/.pi-desktop/logs/app/<category>.log` |
+| host | rust host-core events (stderr capture) | `~/.pi-desktop/logs/host/<category>.log` |
+| agent | pi sidecar turn/provider events (stderr capture) | `~/.pi-desktop/logs/agent/<category>.log` |
 | audit | permissions/tools/plugins sensitive actions | host-core SQLite `audit_log` table |
 | plugin | per-plugin logs | `~/.pi-desktop/plugins/logs/<id>.log` |
 
@@ -38,6 +38,34 @@ Notes:
   a flat file: it needs queryability and longer retention than debug logs.
   `logs folder` diagnostics still apply to the three file channels.
 
+### 3a. Category routing
+
+The three process channels are directories, not aggregate files. The main
+process writes each record to `<channel>/<category>.log`, so high-volume
+session, tool, timing, and provider records can be inspected independently.
+
+The app channel uses these categories:
+
+- `lifecycle` — boot, shutdown, and application supervision
+- `session` — prompts, turns, session lifecycle, and compaction
+- `tool` — tool start/end events
+- `permission` — permission requests and decisions
+- `plugin` — plugin loading, services, and plugin tool execution
+- `provider` — provider/model discovery and cache failures
+- `persistence` — transcript and outbox persistence failures
+- `updater` — electron-updater diagnostics
+- `diagnostics` — blocked navigation, menu, and template diagnostics
+- `terminal` — terminal attachments
+- `runtime` — host/sidecar lifecycle events
+
+Host and agent stderr is classified into the same categories when the line
+contains a recognizable subsystem marker. Timing lines are always routed to
+`host/timing.log` or `agent/timing.log`; unknown child output goes to that
+channel's `runtime.log`. Every record includes its `category` field.
+
+The flat `app.log`, `host.log`, and `agent.log` names are no longer written.
+Existing legacy files are left untouched during the layout transition.
+
 ## 4. Required fields
 
 Every structured log line should include:
@@ -47,6 +75,7 @@ type LogRecord = {
   ts: string
   level: "debug" | "info" | "warn" | "error"
   channel: string
+  category: string
   message: string
   traceId?: string
   sessionId?: string
@@ -143,8 +172,9 @@ Not in MVP:
 
 ## 9. Retention
 
-- app/host/agent logs: size-capped rotation — rotate at 5 MB, keep 2 rotated
-  files per channel (`<channel>.1.log`, `<channel>.2.log`)
+- app/host/agent category logs: size-capped rotation — rotate each category
+  file at 5 MB, keep 2 rotated files beside it (`<category>.1.log`,
+  `<category>.2.log`)
 - audit log (SQLite): retained with the database; longer than debug logs
 - rotation must never fail the caller; disk trouble is swallowed
 

@@ -85,11 +85,11 @@ export class AgentSidecar {
       },
     });
 
-    this.child.stderr.on("data", (buf) => {
-      const text = String(buf).trim();
+    this.child.stderr.setEncoding("utf8");
+    this.child.stderr.on("data", (text: string) => {
       if (!text) return;
       if (onStderr) onStderr(text);
-      else console.error(`[agent-sidecar] ${text}`);
+      else console.error(`[agent-sidecar] ${text.trimEnd()}`);
     });
 
     this.child.on("exit", (code, signal) => {

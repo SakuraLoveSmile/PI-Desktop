@@ -113,7 +113,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D079 | App icon / brand mark v1 | **`build/icon_1024.png` is the canonical PI-Desktop logo; `scripts/make-icon.py` derives `build/icon.icns` without overwriting the PNG; packaged macOS builds, `pnpm dev`, and renderer chrome reuse those assets** | Keep one visual identity across development, renderer, and packaged lanes while preventing the derivation script from restoring the obsolete generated mark |
 | D080 | Backend supervision | **Child exit rejects in-flight RPCs immediately; backoff restarts (0.5s→4s, max 3 per 2min); `hostStatus` events drive renderer degradation UI** | Crash recovery without hangs; fail visible, not silent |
 | D081 | Renderer sandbox | **`sandbox: true` with fully bundled CJS preload; production CSP drops `unsafe-eval` and localhost connect-src** | Electron security baseline; verified by `test:e2e:boot` |
-| D082 | Log channels | **app/host/agent NDJSON files with 5MB rotation (keep 2 rotated) via main-process Logger; audit channel stays in host-core SQLite** | Diagnosable failures without unbounded growth; audit needs queryability |
+| D082 | Log channels | *(superseded in part by D182)* **app/host/agent NDJSON files with 5MB rotation (keep 2 rotated) via main-process Logger; audit channel stays in host-core SQLite** | Diagnosable failures without unbounded growth; audit needs queryability |
 | D083 | Window state | **Persist last good bounds to `window-state.json` (min 960×640 to restore); Stage Manager shelf recovery keeps the Codex footprint; capture runs force deterministic bounds** | Users keep their window; shelf recovery and pixel captures stay deterministic |
 | D084 | Cross-platform shell strategy | **The Bash tool runs bash on every platform, resolved once per process: `PI_DESKTOP_BASH` override → Unix well-known paths + PATH → Windows `bash.exe` derived from Git for Windows (git on PATH, standard install dirs, then PATH minus the WSL `System32` launcher); Unix uses `bash -lc`, Windows `bash -c` + `CREATE_NO_WINDOW`; no bash bundled in installers; missing shell surfaces stable `SHELL_NOT_FOUND` with install guidance** | Agent-generated commands are POSIX-flavored, so PowerShell/cmd would fork prompts and skills; the app already requires git, and on Windows Git for Windows ships bash — detection beats bundling (~300MB, GPLv2 obligations, duplicate installs) |
 | D085 | Toast system v2 | **Single global toast stack (`ToastHost` + store queue) replaces the string `setToast`: `showToast(message, {variant, duration})` with info/success/warning/error variants (Lucide icon tinted by semantic token on a neutral elevated plate), auto-dismiss 4s / error 8s / 0 sticky owned by the system (no caller timers), hover pause, max 4 with dedupe, enter/exit motion + reduced-motion-safe removal, `aria-live` + role status/alert; usage rules in 08-component-spec §17** | Old toast was a bare fixed div: no variants or stacking, and most call sites never cleared it so messages persisted forever; callers hand-rolled timeouts |
@@ -844,3 +844,20 @@ section mirrors only marketplace/catalog items still blocking nothing.
   pnpm, or Homebrew tooling initialized in `~/.zshrc` / `~/.zprofile`.
 - Decision D181; ADR
   [0045](../../adr/0045-bash-inherits-user-login-path.md).
+
+## 2026-08-02 — Route process logs into category files
+
+- The `app`, `host`, and `agent` channels remain local NDJSON files, but each
+  channel is now a directory containing focused `<category>.log` files. App
+  records use explicit lifecycle/session/tool/permission/plugin/provider/
+  persistence/updater/diagnostics/terminal/runtime categories; host and agent
+  stderr is classified into the same categories, with timing lines isolated
+  in `timing.log`.
+- Every record carries a `category` field. Child stderr is buffered by line,
+  decoded as UTF-8, and stripped of ANSI control sequences before it is
+  persisted. Unknown child output goes to `runtime.log`.
+- Rotation remains 5 MB with two rotated files, but the limit applies to each
+  category file. The logger uses byte length for UTF-8 records and treats
+  rotation and disk failures as best effort. Existing flat log files are not
+  deleted during migration.
+- Decision D182; ADR [0046](../../adr/0046-categorized-process-logs.md).
