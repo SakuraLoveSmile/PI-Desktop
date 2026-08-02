@@ -125,6 +125,13 @@ fn platform_bash() -> Option<PathBuf> {
 /// friends usually live) bash never reads. Probed once per process and cached;
 /// returns `None` when no login shell can be probed, so callers fall back to
 /// the host environment unchanged.
+/// Windows keeps `bash -c` with the host environment (D084 unchanged):
+/// no login-shell probe, so the Bash tool behaves exactly as before.
+#[cfg(windows)]
+pub fn user_login_path() -> Option<&'static str> {
+    None
+}
+
 #[cfg(unix)]
 pub fn user_login_path() -> Option<&'static str> {
     static CACHE: OnceLock<Option<String>> = OnceLock::new();
