@@ -273,6 +273,13 @@ host RPC boundary. Its activation marker is retained in the persisted tool
 result so a restored transcript remains provider-valid, although a restarted
 runtime still requires a fresh search before reusing a deferred capability.
 
+For user-visible HTML deliverables, the default system prompt asks the agent to
+activate `BrowserPreview` once after creating the page or making its first
+meaningful visual edit, using a workspace-relative path. The agent reuses the
+live-reloading preview while iterating instead of issuing repeated preview
+calls. Generated, test-only, and non-visual HTML files are excluded. When the
+tool is deferred, `ToolSearch` must activate it before the preview call.
+
 The Electron main process first resolves the global
 `~/.pi/agent/AGENTS.md`, then project instruction files inside the
 session-bound project root when a runtime starts. For each project directory it

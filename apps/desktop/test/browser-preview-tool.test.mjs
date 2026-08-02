@@ -109,7 +109,14 @@ test("agent runtime exposes BrowserPreview in every mode and prompts for it", ()
   );
   assert.match(baseline, /"BrowserPreview"/);
   assert.match(runtimeSource, /BrowserPreview: \{ path: Type\.String\(\) \}/);
-  // Default system prompt teaches the live-reload contract: one call per page.
-  assert.match(runtimeSource, /call the BrowserPreview tool/);
+  // Default system prompt limits preview calls to user-visible HTML work and
+  // reuses the live-reloading surface while the page is being refined.
+  assert.match(runtimeSource, /user-visible HTML pages/);
+  assert.match(runtimeSource, /first meaningful visual edit/);
+  assert.match(runtimeSource, /Reuse that preview while iterating/);
+  assert.match(
+    runtimeSource,
+    /Skip generated, test-only, and non-visual HTML files/,
+  );
   assert.match(runtimeSource, /live-reloads/);
 });

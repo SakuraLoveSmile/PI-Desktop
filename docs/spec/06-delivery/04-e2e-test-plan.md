@@ -229,11 +229,14 @@ Each scenario is documented in this format:
 - **Expected**: The first request contains only the mode core tools,
   `CompactContext` when enabled, and local `ToolSearch`; deferred schemas are
   represented only by a bounded `# On-demand tools` catalog. The agent calls
-  `ToolSearch` before `BrowserPreview` (or the selected plugin/`Skill` tool),
-  and the matching schema is available on the next model turn. The loaded set
-  does not leak into the next prompt's first request. Tool activation markers
-  survive transcript reload without granting a host permission or workspace
-  escape.
+  `ToolSearch` before `BrowserPreview` (or the selected plugin/`Skill` tool)
+  when the capability is needed, and the matching schema is available on the
+  next model turn. For a user-visible HTML deliverable, `BrowserPreview` is
+  called once after creation or the first meaningful visual edit, then reused
+  through live reload while the page is refined. Generated, test-only, and
+  non-visual HTML files do not trigger a preview call. The loaded set does not
+  leak into the next prompt's first request. Tool activation markers survive
+  transcript reload without granting a host permission or workspace escape.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §7.1,
   `03-runtime/03-tools-and-permissions.md` §2.1, ADR 0048,
   `08-meta/decisions-log.md` (D185)

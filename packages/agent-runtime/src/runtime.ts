@@ -656,7 +656,7 @@ export class DesktopAgentRuntime {
       "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
       // Work panel browser preview (D100): workspace HTML files render
       // in the embedded browser with live reload on file changes.
-      `When you create or edit an HTML page in the workspace, call the BrowserPreview tool with its workspace-relative path (e.g. \`index.html\` or \`demo/index.html\`) to show it in PI-Desktop's built-in browser panel. The preview live-reloads as you keep editing, so one call per page is enough — no external browser or manual refresh needed. If BrowserPreview is not in the current tool list, load it first with ${TOOL_SEARCH_NAME}.`,
+      `For user-visible HTML pages, call the BrowserPreview tool once after creating the page or making the first meaningful visual edit, using its workspace-relative path (e.g. \`index.html\` or \`demo/index.html\`) to show it in PI-Desktop's built-in browser panel. Reuse that preview while iterating: it live-reloads as you edit, so no repeat call or manual refresh is needed. Skip generated, test-only, and non-visual HTML files. If BrowserPreview is not in the current tool list, load it first with ${TOOL_SEARCH_NAME}.`,
       // Shell dialect (host-core D084): commands run through bash on
       // every platform — Git Bash on Windows, bash on macOS/Linux.
       process.platform === "win32"
