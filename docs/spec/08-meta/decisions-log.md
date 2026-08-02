@@ -868,11 +868,12 @@ section mirrors only marketplace/catalog items still blocking nothing.
   combines a remaining-capacity ring, `Context` label, and percentage. Hover
   and keyboard focus open a non-modal panel with the context window, exact
   provider input/output/cache/reasoning usage, aggregate generation speed in
-  `tokens/s`, and every tool in execution order.
-- Tool rows expose argument tokens, result tokens, total estimated footprint,
-  share bar, and duration. Runtime estimates use pi-agent-core's existing
-  four-characters-per-token heuristic; provider-reported usage remains the
-  authoritative total and the UI labels tool rows as estimates.
+  `tokens/s`, and each unique tool type in first-seen execution order.
+- Tool rows aggregate repeated calls and expose call count, argument tokens,
+  result tokens, total estimated footprint, share bar, and cumulative known
+  duration. Runtime estimates use pi-agent-core's existing four-characters-
+  per-token heuristic; provider-reported usage remains the authoritative total
+  and the UI labels tool rows as estimates.
 - `UiMessage.responseDurationMs`, `UiMessage.toolUsage`, and the optional
   `tool_end.toolUsage` event field are additive, so older persisted messages
   and peers remain readable.

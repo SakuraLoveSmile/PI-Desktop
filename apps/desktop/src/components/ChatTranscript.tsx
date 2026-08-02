@@ -43,10 +43,10 @@ import {
   type AssistantTurnEntry,
 } from "../lib/assistant-turns";
 import {
+  aggregateToolTokenUsage,
   calculateContextUsage,
   calculateTokenRate,
   DEFAULT_CONTEXT_WINDOW,
-  toolTokenUsage,
   latestMessageUsage,
   resolveContextWindow,
   usageTokenTotal,
@@ -150,12 +150,9 @@ function ContextUsageInspector({
     turnUsage.outputTokens,
     responseDurationMs,
   );
-  const toolRows = tools.map((message) => ({
-    message,
-    usage: toolTokenUsage(message),
-  }));
+  const toolRows = aggregateToolTokenUsage(tools);
   const toolTotal = toolRows.reduce(
-    (total, row) => total + row.usage.totalTokens,
+    (total, row) => total + row.totalTokens,
     0,
   );
   const level =
@@ -384,6 +381,7 @@ function ContextUsageInspector({
           <span>
             {t("chat.usageToolsSummary", {
               count: toolRows.length,
+              calls: tools.length,
               tokens: formatTokenCount(toolTotal),
             })}
           </span>
@@ -391,40 +389,43 @@ function ContextUsageInspector({
         <p className="context-inspector-note">{t("chat.usageToolEstimate")}</p>
         {toolRows.length > 0 ? (
           <div className="context-inspector-tool-list">
-            {toolRows.map(({ message, usage: rowUsage }) => {
+            {toolRows.map((row) => {
               const percent =
                 toolTotal > 0
-                  ? Math.round((rowUsage.totalTokens / toolTotal) * 100)
+                  ? Math.round((row.totalTokens / toolTotal) * 100)
                   : 0;
               const name =
-                getToolDisplayName(message.toolName) ||
-                message.toolName ||
+                getToolDisplayName(row.toolName) ||
+                row.toolName ||
                 t("chat.usageUnknownTool");
               return (
-                <div className="context-inspector-tool" key={message.id}>
+                <div
+                  className="context-inspector-tool"
+                  key={row.toolName ?? "unknown-tool"}
+                >
                   <div className="context-inspector-tool-heading">
-                    <span title={message.toolName}>{name}</span>
-                    <strong>~{formatTokenCount(rowUsage.totalTokens)}</strong>
+                    <span title={row.toolName}>{name}</span>
+                    <strong>~{formatTokenCount(row.totalTokens)}</strong>
                   </div>
                   <div className="context-inspector-tool-track" aria-hidden="true">
                     <span style={{ width: `${percent}%` }} />
                   </div>
                   <div className="context-inspector-tool-meta">
                     <span>
+                      {t("chat.usageToolCalls", { count: row.callCount })}
+                      {" · "}
                       {t("chat.usageToolArgs", {
-                        count: formatTokenCount(rowUsage.argumentTokens),
+                        count: formatTokenCount(row.argumentTokens),
                       })}
                       {" · "}
                       {t("chat.usageToolResult", {
-                        count: formatTokenCount(rowUsage.resultTokens),
+                        count: formatTokenCount(row.resultTokens),
                       })}
                     </span>
-                    {message.toolDurationMs !== undefined ? (
+                    {row.durationMs !== undefined ? (
                       <span>
                         {t("chat.usageToolDuration", {
-                          time: formatToolDuration(
-                            message.toolDurationMs / 1000,
-                          ),
+                          time: formatToolDuration(row.durationMs / 1000),
                         })}
                       </span>
                     ) : null}

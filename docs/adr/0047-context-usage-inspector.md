@@ -36,11 +36,15 @@ anchor, but providers do not expose exact per-tool allocation.
    placement on transcript scroll, window resize, or panel-size changes. Keep
    hover, focus, and Escape dismissal behavior independent from the transcript
    scroll container.
+7. Aggregate repeated tool rows by their exact tool name, preserving the
+   first-seen order. Each row shows the number of calls and sums argument,
+   result, token, and known duration estimates across those calls.
 
 ## Consequences
 
-- Users can inspect exact model usage and see every tool's relative context
-  footprint without opening logs.
+- Users can inspect exact model usage and see each tool type's relative context
+  footprint without opening logs, while repeated calls stay compact and
+  auditable through their call counts.
 - Historical tool rows remain useful through a deterministic fallback estimate.
 - Tool estimates are transparent but cannot claim billing precision.
 - The transcript protocol and storage shape gain optional fields, while the

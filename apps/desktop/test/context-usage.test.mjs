@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  aggregateToolTokenUsage,
   calculateTokenRate,
   calculateContextUsage,
   estimateToolTokenUsage,
@@ -81,4 +82,72 @@ test("tool usage exposes argument and result estimates", () => {
   assert.equal(usage.totalTokens, usage.argumentTokens + usage.resultTokens);
   assert.equal(usage.estimated, true);
   assert.deepEqual(toolTokenUsage({ ...message, toolUsage: usage }), usage);
+});
+
+test("tool usage aggregates repeated calls in first-seen order", () => {
+  const messages = [
+    {
+      id: "tool-1",
+      role: "tool",
+      content: "first result",
+      createdAt: new Date().toISOString(),
+      toolName: "read",
+      toolUsage: {
+        argumentTokens: 10,
+        resultTokens: 20,
+        totalTokens: 30,
+        estimated: true,
+      },
+      toolDurationMs: 100,
+    },
+    {
+      id: "tool-2",
+      role: "tool",
+      content: "second result",
+      createdAt: new Date().toISOString(),
+      toolName: "bash",
+      toolUsage: {
+        argumentTokens: 4,
+        resultTokens: 6,
+        totalTokens: 10,
+        estimated: true,
+      },
+      toolDurationMs: 250,
+    },
+    {
+      id: "tool-3",
+      role: "tool",
+      content: "third result",
+      createdAt: new Date().toISOString(),
+      toolName: "read",
+      toolUsage: {
+        argumentTokens: 7,
+        resultTokens: 13,
+        totalTokens: 20,
+        estimated: true,
+      },
+      toolDurationMs: 300,
+    },
+  ];
+
+  assert.deepEqual(aggregateToolTokenUsage(messages), [
+    {
+      toolName: "read",
+      callCount: 2,
+      argumentTokens: 17,
+      resultTokens: 33,
+      totalTokens: 50,
+      durationMs: 400,
+      estimated: true,
+    },
+    {
+      toolName: "bash",
+      callCount: 1,
+      argumentTokens: 4,
+      resultTokens: 6,
+      totalTokens: 10,
+      durationMs: 250,
+      estimated: true,
+    },
+  ]);
 });

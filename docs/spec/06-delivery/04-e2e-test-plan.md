@@ -1550,7 +1550,8 @@ Each scenario is documented in this format:
   usage, then focus its Context inspector trigger with the keyboard. 3) Inspect
   the panel's remaining/total context tokens, used percentage, model
   context-window size, exact input/output/cache/reasoning breakdown, generation
-  tokens/s, and every tool's estimated argument/result token allocation. 4)
+  tokens/s, and each unique tool type's aggregated call count and estimated
+  argument/result token allocation. 4)
   Scroll the transcript until the trigger is close to the top, bottom, and
   right viewport edges, and resize the window while the panel is open. 5) Click
   Retry on that turn while idle. 6) Confirm a turn without usage still offers
@@ -1558,9 +1559,10 @@ Each scenario is documented in this format:
 - **Expected**: Model badge and compact Context inspector appear under completed
   assistant answers when data exists; the trigger shows remaining capacity and
   low-space warning/error states, while hover and keyboard focus expose the
-  same complete token panel. Tool rows show each tool in execution order and
-  explicitly mark their estimates; Retry re-sends the nearest preceding user
-  prompt and is disabled while a turn is running; the portaled panel remains
+  same complete token panel. Tool rows show each unique tool type in first-seen
+  order, aggregate repeated calls, include call counts and cumulative duration,
+  and explicitly mark their estimates; Retry re-sends the nearest preceding
+  user prompt and is disabled while a turn is running; the portaled panel remains
   fully visible within the viewport, never clipped by transcript scrolling, and
   follows the trigger after scrolling or resize; Copy still excludes thinking
   text.
@@ -3092,9 +3094,9 @@ This test plan spec is accepted when:
 - Expect a model badge and compact Context inspector under the answer. The
   trigger shows the remaining context percentage; hover or keyboard focus shows
   used/remaining/window tokens, exact input/output/cache/reasoning usage,
-  generation tokens/s, and every tool's estimated argument/result footprint,
-  share, and duration. The panel labels provider totals as reported and tool
-  rows as estimates.
+  generation tokens/s, and each unique tool type's aggregated call count,
+  argument/result footprint, share, and duration. The panel labels provider
+  totals as reported and tool rows as estimates.
 - Move the trigger near each viewport edge and scroll or resize while the panel
   is open; expect the body-level overlay to flip, clamp, and remain fully
   visible instead of being clipped by the transcript scroll container.

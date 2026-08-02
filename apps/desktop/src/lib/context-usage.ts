@@ -127,6 +127,60 @@ export function toolTokenUsage(message: UiMessage): ToolTokenUsage {
   return message.toolUsage ?? estimateToolTokenUsage(message);
 }
 
+export type ToolTokenUsageSummary = {
+  toolName?: string;
+  callCount: number;
+  argumentTokens: number;
+  resultTokens: number;
+  totalTokens: number;
+  durationMs?: number;
+  estimated: true;
+};
+
+function toolDuration(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? value
+    : undefined;
+}
+
+/** Group repeated tool calls while preserving first-seen execution order. */
+export function aggregateToolTokenUsage(
+  messages: UiMessage[],
+): ToolTokenUsageSummary[] {
+  const groups = new Map<string, ToolTokenUsageSummary>();
+
+  for (const message of messages) {
+    const toolName = message.toolName?.trim() || undefined;
+    const key = toolName ?? "__unknown_tool__";
+    const usage = toolTokenUsage(message);
+    const durationMs = toolDuration(message.toolDurationMs);
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.callCount += 1;
+      existing.argumentTokens += usage.argumentTokens;
+      existing.resultTokens += usage.resultTokens;
+      existing.totalTokens += usage.totalTokens;
+      if (durationMs !== undefined) {
+        existing.durationMs = (existing.durationMs ?? 0) + durationMs;
+      }
+      continue;
+    }
+
+    groups.set(key, {
+      toolName,
+      callCount: 1,
+      argumentTokens: usage.argumentTokens,
+      resultTokens: usage.resultTokens,
+      totalTokens: usage.totalTokens,
+      durationMs,
+      estimated: true,
+    });
+  }
+
+  return [...groups.values()];
+}
+
 export function calculateTokenRate(
   outputTokens: number,
   responseDurationMs: number | undefined,

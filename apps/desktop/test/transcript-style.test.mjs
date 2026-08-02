@@ -170,6 +170,8 @@ test("assistant context inspector and retry action are wired", () => {
   assert.match(transcriptSource, /function ContextUsageInspector/);
   assert.match(transcriptSource, /className="context-inspector"/);
   assert.match(transcriptSource, /chat\.usageTools/);
+  assert.match(transcriptSource, /aggregateToolTokenUsage/);
+  assert.match(transcriptSource, /chat\.usageToolCalls/);
   assert.match(transcriptSource, /chat\.usageThroughput/);
   assert.match(transcriptSource, /assistantTurnTools/);
   assert.match(transcriptSource, /assistantTurnResponseDuration/);
