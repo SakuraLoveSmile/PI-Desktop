@@ -878,6 +878,9 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Generation speed is a completed-turn snapshot from provider output and final
   stream duration; active assistant streams do not show a live token-rate
   counter.
+- The context-window total comes from the matching `pi-ai` model metadata used
+  by the agent sidecar; provider metadata and the 128K default remain fallbacks
+  for unknown models.
 - `UiMessage.responseDurationMs`, `UiMessage.toolUsage`, and the optional
   `tool_end.toolUsage` event field are additive, so older persisted messages
   and peers remain readable.

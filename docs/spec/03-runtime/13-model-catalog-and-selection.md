@@ -185,6 +185,12 @@ Warnings are non-blocking unless execution is impossible.
 - no aggressive background polling in MVP
 - refresh failures keep previous cache and surface non-fatal error
 
+Electron decorates cached and freshly discovered model rows with the matching
+`pi-ai` model record when one exists. Its `contextWindow` is the authoritative
+value for the picker and context inspector because the same record is passed to
+the agent sidecar. Provider discovery remains the fallback for models absent
+from the `pi-ai` catalog.
+
 ## 13. Search behavior
 
 - case-insensitive match on displayName, modelId, provider name, vendorKey

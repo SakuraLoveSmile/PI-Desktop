@@ -2965,18 +2965,23 @@ function registerIpc() {
       }) => {
         const capabilities = new Set(model.capabilities ?? ["text"]);
         capabilities.add("text");
-        const thinking = resolveThinkingCapabilities({
+        const modelRef = {
           vendorKey: provider?.vendorKey || "custom",
           modelId: model.modelId,
           apiStyle,
-        });
+        };
+        const piModel = resolvePiModelConfig(modelRef);
+        const thinking = resolveThinkingCapabilities(modelRef);
         if (thinking.supportsReasoning) capabilities.add("reasoning");
         else capabilities.delete("reasoning");
         return {
           modelId: model.modelId,
           displayName: model.displayName,
           providerId: provider?.id ?? "",
-          contextWindow: model.contextWindow,
+          // Keep the model picker and context inspector aligned with the
+          // exact pi-ai model metadata sent to the sidecar. Provider discovery
+          // often returns only ids, so its context window may be absent.
+          contextWindow: piModel?.contextWindow ?? model.contextWindow,
           capabilities: [...capabilities],
           supportedThinkingLevels: thinking.supportedThinkingLevels,
           source: model.source ?? ("discovered" as const),

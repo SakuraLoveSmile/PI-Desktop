@@ -53,6 +53,21 @@ describe("pi-ai model resolution", () => {
     });
   });
 
+  it("resolves GPT-5.6 Luna context limits for Responses gateways", () => {
+    const model = resolvePiModelConfig({
+      vendorKey: "custom",
+      modelId: "gpt-5.6-luna",
+      apiStyle: "responses",
+    });
+
+    expect(model).toMatchObject({
+      source: "pi",
+      name: "GPT-5.6 Luna",
+      contextWindow: 272_000,
+      maxTokens: 128_000,
+    });
+  });
+
   it("matches gateway alias ids by a separator boundary", () => {
     const model = resolvePiModelConfig({
       vendorKey: "custom",

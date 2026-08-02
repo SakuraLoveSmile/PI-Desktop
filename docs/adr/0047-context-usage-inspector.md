@@ -40,6 +40,10 @@ anchor, but providers do not expose exact per-tool allocation.
 7. Aggregate repeated tool rows by their exact tool name, preserving the
    first-seen order. Each row shows the number of calls and sums argument,
    result, token, and known duration estimates across those calls.
+8. Resolve the context-window total from the same `pi-ai` model record that
+   Electron passes to the agent sidecar, and enrich cached/discovered model
+   rows with that value. Use provider metadata and the 128K default only when
+   the selected model is absent from the `pi-ai` catalog.
 
 ## Consequences
 

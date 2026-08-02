@@ -962,9 +962,11 @@ Single message render — either user (plaintext) or assistant (markdown streami
   a response is streaming. The panel also lists each unique tool type from the
   assistant turn in first-seen execution order, with its call count, aggregated
   argument/result footprint, share bar, and cumulative duration. Provider
-  totals are exact; tool rows are explicitly marked as estimates because
-  providers do not report per-tool context allocation. The panel is portaled to
-  the document body as a fixed viewport overlay, flips
+  totals are exact; the context-window total uses the same `pi-ai` model
+  metadata as the agent sidecar, while unknown models fall back to the provider
+  catalog or the default window. Tool rows are explicitly marked as estimates
+  because providers do not report per-tool context allocation. The panel is
+  portaled to the document body as a fixed viewport overlay, flips
   above or below the trigger, clamps to viewport margins, and repositions on
   transcript scrolling or window resize so no transcript clipping ancestor can
   hide it (D103, D184).

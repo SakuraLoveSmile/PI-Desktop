@@ -1573,10 +1573,11 @@ Each scenario is documented in this format:
   usage; another completed assistant message has content but no usage.
 - **Steps**: 1) Open the session. 2) Hover the completed assistant turn that has
   usage, then focus its Context inspector trigger with the keyboard. 3) Inspect
-  the panel's remaining-token header, used percentage and meter, model
-  context-window size, exact input/output/cache/reasoning breakdown, completed
-  generation tokens/s value, source badges, and each unique tool type's
-  aggregated call count and estimated argument/result token allocation. 4)
+  the panel's remaining-token header, used percentage and meter, the
+  pi-ai-resolved model context-window size, exact input/output/cache/reasoning
+  breakdown, completed generation tokens/s value, source badges, and each
+  unique tool type's aggregated call count and estimated argument/result token
+  allocation. 4)
   Scroll the transcript until the trigger is close to the top, bottom, and
   right viewport edges, and resize the window while the panel is open. 5) Click
   Retry on that turn while idle. 6) Confirm a turn without usage still offers
@@ -1585,8 +1586,9 @@ Each scenario is documented in this format:
   assistant answers when data exists; the trigger shows remaining capacity and
   low-space warning/error states, while hover and keyboard focus expose the
   same complete token panel. The panel's exact provider and estimated tool
-  sources are visibly distinguished; tool rows show each unique tool type in
-  first-seen order, aggregate repeated calls, include call counts and
+  sources are visibly distinguished, and its context-window total matches the
+  model metadata used by the agent runtime; tool rows show each unique tool
+  type in first-seen order, aggregate repeated calls, include call counts and
   cumulative duration, and explicitly mark their estimates. The generation
   rate remains a completed-turn value and does not update during streaming;
   Retry re-sends the nearest preceding user prompt and is disabled while a turn
