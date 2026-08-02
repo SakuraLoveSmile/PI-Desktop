@@ -40,6 +40,13 @@ import {
   type AssistantTurnEntry,
 } from "../lib/assistant-turns";
 import {
+  calculateContextUsage,
+  DEFAULT_CONTEXT_WINDOW,
+  latestMessageUsage,
+  resolveContextWindow,
+  usageTokenTotal,
+} from "../lib/context-usage";
+import {
   IconArrowDown,
   IconBranch,
   IconCheck,
@@ -101,37 +108,145 @@ function formatTokenCount(value: number): string {
   return String(value);
 }
 
-function usageLabel(usage: MessageUsage, t: (key: string, opts?: Record<string, unknown>) => string): string {
-  const total = usage.totalTokens || usage.inputTokens + usage.outputTokens;
-  return t("chat.usageTokens", { count: formatTokenCount(total) });
-}
+const CONTEXT_RING_RADIUS = 15;
+const CONTEXT_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_RING_RADIUS;
 
-function usageTitle(usage: MessageUsage, t: (key: string, opts?: Record<string, unknown>) => string): string {
-  const parts = [
-    t("chat.usageInput", { count: formatTokenCount(usage.inputTokens) }),
-    t("chat.usageOutput", { count: formatTokenCount(usage.outputTokens) }),
-  ];
-  if (usage.cacheReadTokens) {
-    parts.push(t("chat.usageCacheRead", { count: formatTokenCount(usage.cacheReadTokens) }));
-  }
-  if (usage.cacheWriteTokens) {
-    parts.push(t("chat.usageCacheWrite", { count: formatTokenCount(usage.cacheWriteTokens) }));
-  }
-  if (usage.reasoningTokens !== undefined) {
-    parts.push(t("chat.usageReasoning", { count: formatTokenCount(usage.reasoningTokens) }));
-  }
-  return parts.join(" · ");
+function ContextUsageRing({
+  usage,
+  turnUsage,
+  contextWindow,
+}: {
+  usage: MessageUsage;
+  turnUsage: MessageUsage;
+  contextWindow: number;
+}) {
+  const { t } = useTranslation();
+  const tooltipId = useId();
+  const context = calculateContextUsage(usage, contextWindow);
+  const turnTotal = usageTokenTotal(turnUsage);
+  const level =
+    context.remainingPercent <= 10
+      ? "critical"
+      : context.remainingPercent <= 25
+        ? "warning"
+        : "comfortable";
+
+  return (
+    <span
+      className="context-usage"
+      data-level={level}
+      tabIndex={0}
+      role="img"
+      aria-label={t("chat.usageContextAria", {
+        percent: context.remainingPercent,
+        remaining: formatTokenCount(context.remainingTokens),
+      })}
+      aria-describedby={tooltipId}
+    >
+      <svg
+        className="context-usage-ring"
+        viewBox="0 0 40 40"
+        aria-hidden="true"
+      >
+        <circle
+          className="context-usage-ring-track"
+          cx="20"
+          cy="20"
+          r={CONTEXT_RING_RADIUS}
+        />
+        <circle
+          className="context-usage-ring-progress"
+          cx="20"
+          cy="20"
+          r={CONTEXT_RING_RADIUS}
+          strokeDasharray={CONTEXT_RING_CIRCUMFERENCE}
+          strokeDashoffset={
+            CONTEXT_RING_CIRCUMFERENCE * (1 - context.remainingRatio)
+          }
+        />
+      </svg>
+      <span className="context-usage-value" aria-hidden="true">
+        {context.remainingPercent}%
+      </span>
+      <span
+        className="context-usage-popover"
+        id={tooltipId}
+        role="tooltip"
+      >
+        <span className="context-usage-popover-header">
+          <span>{t("chat.usageContextRemaining")}</span>
+          <strong>{context.remainingPercent}%</strong>
+        </span>
+        <span className="context-usage-popover-window">
+          {formatTokenCount(context.remainingTokens)} / {formatTokenCount(contextWindow)}
+        </span>
+        <span className="context-usage-popover-caption">
+          {t("chat.usageContextWindow", {
+            count: formatTokenCount(contextWindow),
+          })}
+        </span>
+        <span className="context-usage-meter" aria-hidden="true">
+          <span style={{ width: `${context.usedPercent}%` }} />
+        </span>
+        <span className="context-usage-popover-used">
+          {t("chat.usageContextUsed", {
+            percent: context.usedPercent,
+            count: formatTokenCount(context.usedTokens),
+          })}
+        </span>
+        <span className="context-usage-breakdown-title">
+          {t("chat.usageBreakdown")}
+        </span>
+        <span className="context-usage-breakdown-row">
+          <span>{t("chat.usageTurnTotal")}</span>
+          <strong>{formatTokenCount(turnTotal)}</strong>
+        </span>
+        <span className="context-usage-breakdown">
+          <span className="context-usage-breakdown-row">
+            <span>{t("chat.usageInput")}</span>
+            <strong>{formatTokenCount(turnUsage.inputTokens)}</strong>
+          </span>
+          <span className="context-usage-breakdown-row">
+            <span>{t("chat.usageOutput")}</span>
+            <strong>{formatTokenCount(turnUsage.outputTokens)}</strong>
+          </span>
+          {turnUsage.cacheReadTokens !== undefined ? (
+            <span className="context-usage-breakdown-row">
+              <span>{t("chat.usageCacheRead")}</span>
+              <strong>{formatTokenCount(turnUsage.cacheReadTokens)}</strong>
+            </span>
+          ) : null}
+          {turnUsage.cacheWriteTokens !== undefined ? (
+            <span className="context-usage-breakdown-row">
+              <span>{t("chat.usageCacheWrite")}</span>
+              <strong>{formatTokenCount(turnUsage.cacheWriteTokens)}</strong>
+            </span>
+          ) : null}
+          {turnUsage.reasoningTokens !== undefined ? (
+            <span className="context-usage-breakdown-row">
+              <span>{t("chat.usageReasoning")}</span>
+              <strong>{formatTokenCount(turnUsage.reasoningTokens)}</strong>
+            </span>
+          ) : null}
+        </span>
+      </span>
+    </span>
+  );
 }
 
 function MessageMeta({
   modelId,
   usage,
+  contextUsage,
+  contextWindow = DEFAULT_CONTEXT_WINDOW,
 }: {
   modelId?: string;
   usage?: MessageUsage;
+  contextUsage?: MessageUsage;
+  contextWindow?: number;
 }) {
-  const { t } = useTranslation();
-  if (!modelId && !usage) return null;
+  const visibleContextUsage = contextUsage ?? usage;
+  if (!modelId && !usage && !visibleContextUsage) return null;
   return (
     <div className="message-meta">
       {modelId ? (
@@ -139,10 +254,12 @@ function MessageMeta({
           {modelId}
         </span>
       ) : null}
-      {usage ? (
-        <span className="message-meta-chip usage" title={usageTitle(usage, t)}>
-          {usageLabel(usage, t)}
-        </span>
+      {visibleContextUsage ? (
+        <ContextUsageRing
+          usage={visibleContextUsage}
+          turnUsage={usage ?? visibleContextUsage}
+          contextWindow={contextWindow}
+        />
       ) : null}
     </div>
   );
@@ -930,6 +1047,8 @@ const AssistantTurn = memo(function AssistantTurn({
   const { t } = useTranslation();
   const retryAssistantMessage = useAppStore((s) => s.retryAssistantMessage);
   const forkAssistantMessage = useAppStore((s) => s.forkAssistantMessage);
+  const providerModels = useAppStore((s) => s.providerModels);
+  const providers = useAppStore((s) => s.providers);
   const messages = assistantTurnMessages(entry);
   const content = assistantTurnContent(entry);
   const actionMessage = [...messages]
@@ -938,7 +1057,20 @@ const AssistantTurn = memo(function AssistantTurn({
   const metaMessage = [...messages]
     .reverse()
     .find((message) => message.modelId || message.usage);
+  const latestUsageMessage = [...messages]
+    .reverse()
+    .find((message) => message.usage);
+  const latestUsage = latestMessageUsage(messages);
   const usage = assistantTurnUsage(entry);
+  const modelId = metaMessage?.modelId ?? latestUsageMessage?.modelId;
+  const contextWindow = latestUsage
+    ? resolveContextWindow(
+        latestUsageMessage?.providerId ?? metaMessage?.providerId,
+        latestUsageMessage?.modelId ?? modelId,
+        providerModels,
+        providers,
+      )
+    : DEFAULT_CONTEXT_WINDOW;
   const hasError = messages.some((message) => Boolean(message.error));
   const complete =
     !isActive && !hasError && Boolean(content) && Boolean(actionMessage);
@@ -982,7 +1114,12 @@ const AssistantTurn = memo(function AssistantTurn({
           ),
         )}
         {!isActive && metaMessage && (metaMessage.modelId || usage) ? (
-          <MessageMeta modelId={metaMessage.modelId} usage={usage} />
+          <MessageMeta
+            modelId={modelId}
+            usage={usage}
+            contextUsage={latestUsage}
+            contextWindow={contextWindow}
+          />
         ) : null}
         {(content || hasError) && actionMessage ? (
           <div className="message-actions">

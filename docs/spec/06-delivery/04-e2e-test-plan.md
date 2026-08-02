@@ -1542,23 +1542,26 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`transcript-style.test.mjs`); full visual scenario Draft
 
-#### E2E-060: Assistant meta chips and retry action
+#### E2E-060: Assistant context ring and retry action
 
 - **Preconditions**: A completed assistant message includes modelId and token
   usage; another completed assistant message has content but no usage.
 - **Steps**: 1) Open the session. 2) Hover the completed assistant turn that has
-  usage. 3) Inspect the model/token chips and their tooltip. 4) Click Retry on
-  that turn while idle. 5) Confirm a turn without usage still offers Retry and
-  omits the token chip.
-- **Expected**: Model badge and token chip appear under completed assistant
-  answers when data exists; token chip hover shows input/output and optional
-  cache/reasoning breakdown; Retry re-sends the nearest preceding user prompt
+  usage, then focus its context ring with the keyboard. 3) Inspect the ring,
+  remaining/total context tokens, used percentage, model context-window size,
+  and input/output/cache/reasoning breakdown. 4) Click Retry on that turn while
+  idle. 5) Confirm a turn without usage still offers Retry and omits the ring.
+- **Expected**: Model badge and context ring appear under completed assistant
+  answers when data exists; the ring displays remaining capacity and low-space
+  warning/error states, while hover and keyboard focus expose the same complete
+  token-consumption breakdown; Retry re-sends the nearest preceding user prompt
   and is disabled while a turn is running; Copy still excludes thinking text.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/10-workbuddy-benchmark-ux.md`, `03-runtime/01-ipc-protocol.md`
 - **Acceptance**: C (chat stream), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`transcript-style.test.mjs`, runtime usage mapping); full scenario Draft
+- **Status**: Unit-covered (`transcript-style.test.mjs`,
+  `context-usage.test.mjs`, runtime usage mapping); full scenario Draft
 
 #### E2E-061: Regenerate replaces the current turn in place
 
@@ -3076,10 +3079,12 @@ This test plan spec is accepted when:
 - Expand thinking markdown and confirm it stays visually subordinate to the answer.
 
 
-### US-UI-61 Assistant meta chips + retry (D103)
+### US-UI-61 Assistant context ring + retry (D103)
 - Complete an assistant turn that reports usage.
-- Expect a model badge and token chip under the answer; hover shows the
-  input/output breakdown.
+- Expect a model badge and context ring under the answer. The ring shows the
+  remaining context percentage; hover or keyboard focus shows used percentage,
+  remaining/total tokens, model context-window size, and input/output/cache/
+  reasoning breakdown.
 - Hover the action row and click Retry; the nearest preceding user prompt is
   re-sent.
 

@@ -99,9 +99,15 @@ input/output/cached breakdown). Data already exists in the runtime usage
 events.
 
 **Adopted in D103 (tokens-only first cut)**: completed assistant turns show a
-model badge plus a compact token chip (`{{count}} tokens`) under the answer;
-hover reveals input/output/cache/reasoning breakdown. Currency pricing remains
-deferred. Regenerate is available as a quiet action chip next to Copy and rewrites the current turn in place (D105); when multiple variants exist, a ChatGPT-style `current / total` pager on the root user turn restores archived branches (D109). Completed assistant rows also expose Fork and reversible Edit, while omitting Delete; both edits diverge into isolated sessions so the source cache/runtime stays untouched (D134).
+model badge plus a context-usage ring under the answer. The ring shows the
+remaining context percentage and hover/focus reveals remaining/total context
+tokens, the used percentage, and the input/output/cache/reasoning breakdown.
+Currency pricing remains deferred. Regenerate is available as a quiet action
+chip next to Copy and rewrites the current turn in place (D105); when multiple
+variants exist, a ChatGPT-style `current / total` pager on the root user turn
+restores archived branches (D109). Completed assistant rows also expose Fork
+and reversible Edit, while omitting Delete; both edits diverge into isolated
+sessions so the source cache/runtime stays untouched (D134).
 
 ### 3.3 Template galleries on empty states
 WorkBuddy never ships a dead empty state: Automations and Projects both pair
