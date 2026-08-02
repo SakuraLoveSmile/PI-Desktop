@@ -39,6 +39,10 @@ anchor, but providers do not expose exact per-tool allocation.
 7. Aggregate repeated tool rows by their exact tool name, preserving the
    first-seen order. Each row shows the number of calls and sums argument,
    result, token, and known duration estimates across those calls.
+8. During an active assistant stream, show an inline live rate estimated from
+   streamed text/thinking characters and the elapsed stream duration. Keep the
+   final inspector rate authoritative by switching back to provider-reported
+   output tokens divided by the measured final stream duration.
 
 ## Consequences
 
@@ -52,6 +56,8 @@ anchor, but providers do not expose exact per-tool allocation.
 - The panel is no longer constrained by the transcript's overflow clipping or
   stacking context; collision-aware placement keeps its complete contents
   visible at viewport edges.
+- Live output rate is available before provider usage arrives, while completed
+  turns retain the exact provider-based rate for historical inspection.
 
 ## Alternatives
 

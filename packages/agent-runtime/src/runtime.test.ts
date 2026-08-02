@@ -696,6 +696,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     expect(events[1].event.message).toMatchObject({
       content: "answer",
       thinking: "plan done",
+      responseDurationMs: expect.any(Number),
     });
     expect(events[2].event.message).toMatchObject({
       content: "answer",

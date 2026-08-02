@@ -35,6 +35,7 @@ import {
   assistantTurnContent,
   assistantTurnMessages,
   assistantTurnResponseDuration,
+  assistantTurnStreamingMessage,
   assistantTurnTools,
   assistantTurnUsage,
   buildTranscriptEntries,
@@ -47,6 +48,7 @@ import {
   calculateContextUsage,
   calculateTokenRate,
   DEFAULT_CONTEXT_WINDOW,
+  estimateOutputTokens,
   latestMessageUsage,
   resolveContextWindow,
   usageTokenTotal,
@@ -117,11 +119,39 @@ const CONTEXT_RING_RADIUS = 9;
 const CONTEXT_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_RING_RADIUS;
 const CONTEXT_POPOVER_GAP = 8;
 const CONTEXT_VIEWPORT_MARGIN = 16;
+const LIVE_RATE_UPDATE_INTERVAL_MS = 250;
 
 type ContextPopoverPosition = {
   top: number;
   left: number;
 };
+
+function useLiveElapsedMs(
+  isLive: boolean,
+  responseDurationMs: number | undefined,
+): number | undefined {
+  const [elapsedMs, setElapsedMs] = useState<number | undefined>(
+    responseDurationMs,
+  );
+
+  useEffect(() => {
+    if (!isLive) {
+      setElapsedMs(responseDurationMs);
+      return;
+    }
+
+    const baseDurationMs = Math.max(0, responseDurationMs ?? 0);
+    const startedAt = Date.now() - baseDurationMs;
+    const update = () => {
+      setElapsedMs(Math.max(baseDurationMs, Date.now() - startedAt));
+    };
+    update();
+    const timer = window.setInterval(update, LIVE_RATE_UPDATE_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [isLive, responseDurationMs]);
+
+  return isLive ? elapsedMs : responseDurationMs;
+}
 
 function ContextUsageInspector({
   usage,
@@ -129,12 +159,16 @@ function ContextUsageInspector({
   contextWindow,
   tools,
   responseDurationMs,
+  isLive,
+  liveThroughput,
 }: {
   usage: MessageUsage;
   turnUsage: MessageUsage;
   contextWindow: number;
   tools: UiMessage[];
   responseDurationMs?: number;
+  isLive?: boolean;
+  liveThroughput?: number;
 }) {
   const { t } = useTranslation();
   const tooltipId = useId();
@@ -146,10 +180,9 @@ function ContextUsageInspector({
     useState<ContextPopoverPosition | null>(null);
   const context = calculateContextUsage(usage, contextWindow);
   const turnTotal = usageTokenTotal(turnUsage);
-  const throughput = calculateTokenRate(
-    turnUsage.outputTokens,
-    responseDurationMs,
-  );
+  const throughput = isLive
+    ? liveThroughput
+    : calculateTokenRate(turnUsage.outputTokens, responseDurationMs);
   const toolRows = aggregateToolTokenUsage(tools);
   const toolTotal = toolRows.reduce(
     (total, row) => total + row.totalTokens,
@@ -335,9 +368,12 @@ function ContextUsageInspector({
           <strong>
             {throughput === undefined
               ? t("chat.usageThroughputUnavailable")
-              : t("chat.usageThroughput", {
-                  count: formatTokenCount(throughput),
-                })}
+              : t(
+                  isLive
+                    ? "chat.usageThroughputLive"
+                    : "chat.usageThroughput",
+                  { count: formatTokenCount(throughput) },
+                )}
           </strong>
         </div>
       </div>
@@ -507,6 +543,8 @@ function MessageMeta({
   contextWindow = DEFAULT_CONTEXT_WINDOW,
   tools = [],
   responseDurationMs,
+  isLive = false,
+  liveOutputTokens,
 }: {
   modelId?: string;
   usage?: MessageUsage;
@@ -514,9 +552,23 @@ function MessageMeta({
   contextWindow?: number;
   tools?: UiMessage[];
   responseDurationMs?: number;
+  isLive?: boolean;
+  liveOutputTokens?: number;
 }) {
+  const { t } = useTranslation();
   const visibleContextUsage = contextUsage ?? usage;
-  if (!modelId && !usage && !visibleContextUsage) return null;
+  const liveElapsedMs = useLiveElapsedMs(isLive, responseDurationMs);
+  const liveThroughput = isLive
+    ? calculateTokenRate(liveOutputTokens ?? 0, liveElapsedMs)
+    : undefined;
+  if (
+    !modelId &&
+    !usage &&
+    !visibleContextUsage &&
+    liveThroughput === undefined
+  ) {
+    return null;
+  }
   return (
     <div className="message-meta">
       {modelId ? (
@@ -531,7 +583,17 @@ function MessageMeta({
           contextWindow={contextWindow}
           tools={tools}
           responseDurationMs={responseDurationMs}
+          isLive={isLive}
+          liveThroughput={liveThroughput}
         />
+      ) : null}
+      {liveThroughput !== undefined ? (
+        <span className="message-meta-live-rate">
+          <span className="message-meta-live-dot" aria-hidden="true" />
+          {t("chat.usageThroughputLive", {
+            count: formatTokenCount(liveThroughput),
+          })}
+        </span>
       ) : null}
     </div>
   );
@@ -1335,8 +1397,19 @@ const AssistantTurn = memo(function AssistantTurn({
   const latestUsage = latestMessageUsage(messages);
   const usage = assistantTurnUsage(entry);
   const tools = assistantTurnTools(entry);
+  const liveAssistantMessage = assistantTurnStreamingMessage(entry);
+  const isLive = liveAssistantMessage !== undefined;
+  const liveOutputTokens = liveAssistantMessage
+    ? estimateOutputTokens(
+        liveAssistantMessage.content,
+        liveAssistantMessage.thinking,
+      )
+    : undefined;
   const responseDurationMs = assistantTurnResponseDuration(entry);
-  const modelId = metaMessage?.modelId ?? latestUsageMessage?.modelId;
+  const modelId =
+    liveAssistantMessage?.modelId ??
+    metaMessage?.modelId ??
+    latestUsageMessage?.modelId;
   const contextWindow = latestUsage
     ? resolveContextWindow(
         latestUsageMessage?.providerId ?? metaMessage?.providerId,
@@ -1387,7 +1460,8 @@ const AssistantTurn = memo(function AssistantTurn({
             </div>
           ),
         )}
-        {!isActive && metaMessage && (metaMessage.modelId || usage) ? (
+        {(metaMessage || liveAssistantMessage) &&
+        (modelId || usage || isLive) ? (
           <MessageMeta
             modelId={modelId}
             usage={usage}
@@ -1395,6 +1469,8 @@ const AssistantTurn = memo(function AssistantTurn({
             contextWindow={contextWindow}
             tools={tools}
             responseDurationMs={responseDurationMs}
+            isLive={isLive}
+            liveOutputTokens={liveOutputTokens}
           />
         ) : null}
         {(content || hasError) && actionMessage ? (

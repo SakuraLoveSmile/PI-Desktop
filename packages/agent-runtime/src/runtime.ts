@@ -1585,6 +1585,10 @@ export class DesktopAgentRuntime {
               ? content.thinking.slice(previousThinking.length)
               : content.thinking
             : "";
+          const responseDurationMs =
+            this.streamStartedAt !== undefined
+              ? Math.max(0, Date.now() - this.streamStartedAt)
+              : undefined;
           this.currentAssistant = {
             ...this.currentAssistant,
             content: nextText,
@@ -1594,6 +1598,7 @@ export class DesktopAgentRuntime {
                 ? { thinking: undefined }
                 : {}),
             status: "streaming",
+            ...(responseDurationMs !== undefined ? { responseDurationMs } : {}),
           };
           this.emit({
             type: "message_update",

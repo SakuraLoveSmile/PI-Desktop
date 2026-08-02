@@ -207,6 +207,7 @@ export const zhCN = {
     usageTurnTotal: "本轮合计",
     usageThroughputLabel: "生成速度",
     usageThroughput: "{{count}} tokens/s",
+    usageThroughputLive: "实时 {{count}} tokens/s",
     usageThroughputUnavailable: "—",
     usageProviderUsage: "模型用量",
     usageExact: "已上报",

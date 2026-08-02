@@ -5,6 +5,7 @@ import {
   calculateTokenRate,
   calculateContextUsage,
   estimateToolTokenUsage,
+  estimateOutputTokens,
   resolveContextWindow,
   toolTokenUsage,
   usageTokenTotal,
@@ -63,6 +64,11 @@ test("generation throughput uses provider output and stream duration", () => {
   assert.equal(calculateTokenRate(1_200, 4_000), 300);
   assert.equal(calculateTokenRate(0, 4_000), undefined);
   assert.equal(calculateTokenRate(1_200, undefined), undefined);
+});
+
+test("streamed output token estimate includes thinking text", () => {
+  assert.equal(estimateOutputTokens("1234", "12"), 2);
+  assert.equal(estimateOutputTokens("", undefined), 0);
 });
 
 test("tool usage exposes argument and result estimates", () => {

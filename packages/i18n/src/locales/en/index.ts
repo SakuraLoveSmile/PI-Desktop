@@ -207,6 +207,7 @@ export const en = {
     usageTurnTotal: "This turn",
     usageThroughputLabel: "Generation speed",
     usageThroughput: "{{count}} tokens/s",
+    usageThroughputLive: "Live {{count}} tokens/s",
     usageThroughputUnavailable: "—",
     usageProviderUsage: "Provider usage",
     usageExact: "reported",

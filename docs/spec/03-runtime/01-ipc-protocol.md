@@ -382,7 +382,10 @@ transcript but are excluded from restored model context.
 
 The context inspector consumes two additive usage signals. `MessageUsage` is
 the provider-reported assistant usage and `responseDurationMs` is the elapsed
-sidecar stream time used to display output tokens per second. `ToolTokenUsage`
+sidecar stream time used to display output tokens per second. During
+`message_update`, `responseDurationMs` is a transient elapsed snapshot for the
+live rate; `message_end` carries the final value used by persisted history.
+`ToolTokenUsage`
 is a runtime estimate from the tool call arguments and result; providers do not
 report per-tool allocation, so the renderer labels these rows as estimates and
 never merges them into the exact provider total. Older peers may omit all of
