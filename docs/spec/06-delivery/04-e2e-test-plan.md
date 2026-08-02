@@ -209,7 +209,9 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Provider configured.
 - **Steps**: 1) Create new session. 2) Type a message. 3) Send.
-- **Expected**: Message sent; assistant begins streaming response.
+- **Expected**: The transcript immediately shows a compact localized `Working…`
+  status after send, before the first assistant or tool event. It yields to
+  concrete thinking/tool/answer feedback, and disappears when the turn ends.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`, `03-runtime/10-session-state-machine.md`
 - **Acceptance**: C (new session, send message)
 - **Milestone**: M2

@@ -14,11 +14,17 @@ const [store, transcript, messagesStyles, proseStyles, en, zh] =
     read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
   ]);
 
-test("active turns keep the lower transcript surface clear", () => {
-  assert.doesNotMatch(transcript, /AgentProgressTimeline|WorkingIndicator|agent-progress/);
+test("active turns show immediate feedback without a progress card", () => {
+  assert.match(transcript, /function WorkingIndicator\(\)/);
+  assert.match(transcript, /data-testid="working-indicator"/);
+  assert.match(transcript, /role="status"/);
+  assert.match(transcript, /const showWorking =/);
+  assert.match(transcript, /\{showWorking \? <WorkingIndicator \/> : null\}/);
+  assert.doesNotMatch(transcript, /AgentProgressTimeline|agent-progress/);
   assert.match(transcript, /<PermissionCard/);
   assert.doesNotMatch(store, /AgentProgress|agentProgress|updateAgentProgress/);
-  assert.doesNotMatch(messagesStyles, /\.agent-progress\s*\{/);
+  assert.match(messagesStyles, /\.working-indicator\s*\{/);
+  assert.match(messagesStyles, /\.shimmer-text\s*\{/);
   assert.doesNotMatch(proseStyles, /\.working-indicator\s*\{|\.shimmer-text\s*\{/);
   assert.doesNotMatch(
     en,

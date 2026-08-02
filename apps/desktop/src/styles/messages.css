@@ -48,6 +48,40 @@
   background: var(--ds-bg-secondary);
 }
 
+/* Compact pre-stream feedback: visible immediately after send without
+   competing with the assistant rail, tool rows, or permission card. */
+.working-indicator {
+  box-sizing: border-box;
+  display: flex;
+  width: min(100%, 720px);
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0 8px;
+  padding: 8px 0 4px 16px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+}
+
+.working-elapsed {
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  font-variant-numeric: tabular-nums;
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    90deg,
+    var(--ds-text-muted) 35%,
+    var(--ds-text-primary) 50%,
+    var(--ds-text-muted) 65%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2s linear infinite;
+}
+
 .review-change-card {
   --review-change-rail: var(--ds-accent-soft);
   position: relative;

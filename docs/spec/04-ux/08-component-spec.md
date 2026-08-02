@@ -467,7 +467,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 |---|---|
 | Empty | Restrained hero + compact contextual quick actions + optional onboarding checklist + home composer in one scrollable stack; no marketing suggestion cards (D111/D131) |
 | Streaming | Auto-scroll follows while pinned; new tokens append |
-| Active progress | Active turns keep the lower transcript surface clear. Streamed assistant/tool rows remain inline, and a permission card appears only when approval is required; no generic progress card is rendered. |
+| Active progress | Immediately after send, before the first assistant or tool event, a compact localized `Working…` status with elapsed time appears inline. It yields to concrete thinking, tool, and answer rows, while a permission card owns the approval state; no large generic progress card is rendered. |
 | Turn outcome | After a failed turn, a session-scoped recovery card summarizes the interruption and tool evidence. Completed turns use the existing transcript and message-scoped InlineReviewCard without an extra success card; failed turns can retry without losing the transcript. |
 | Turn start (send / retry / regenerate) | Re-pins and jumps to bottom even if the user had scrolled up |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |

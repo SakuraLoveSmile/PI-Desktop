@@ -370,6 +370,10 @@ may be retained while exactly one workspace supplies the visible shell context.
 - Diagram render failure or the 20,000-character / 500-edge safety limit keeps
   the source visible and copyable instead of failing the assistant turn.
 - Cursor indicator: subtle pulsing accent dot or line at the end of streaming content
+- Before the first assistant or tool event, the active turn shows one compact
+  localized `Working…` status with elapsed time. It is replaced by concrete
+  thinking/tool/answer feedback or the inline permission card as soon as one
+  of those states exists.
 - When stream completes: cursor indicator replaced by success state (2s fade)
 
 ### 2.2 Auto-scroll

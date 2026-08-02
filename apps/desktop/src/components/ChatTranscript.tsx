@@ -1107,6 +1107,37 @@ const ActivityGroup = memo(function ActivityGroup({
   );
 }, activityGroupPropsEqual);
 
+/** Keep the transcript responsive while the model waits for its first event. */
+function WorkingIndicator() {
+  const { t } = useTranslation();
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    const updateElapsed = () => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    };
+    const timer = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div
+      className="working-indicator"
+      data-testid="working-indicator"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="shimmer-text">{t("chat.running")}</span>
+      {elapsed > 0 ? (
+        <span className="working-elapsed" aria-hidden="true">
+          {formatToolDuration(elapsed)}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 const MessageRow = memo(function MessageRow({
   message,
   isRunning,
@@ -1552,6 +1583,18 @@ export const ChatTranscript = memo(function ChatTranscript({
     () => buildTranscriptEntries(messages),
     [messages],
   );
+  const lastEntry = entries[entries.length - 1];
+  const lastTurnPart =
+    lastEntry?.kind === "assistant-turn" ? lastEntry.parts.at(-1) : undefined;
+  const activeToolGroup = isRunning && lastTurnPart?.kind === "activity";
+  const assistantIsAnswering =
+    lastTurnPart?.kind === "message" &&
+    lastTurnPart.message.status === "streaming" &&
+    Boolean((lastTurnPart.message.content || "").trim());
+  // Show immediate feedback after send, then let the concrete activity row
+  // (thinking/tool/answer) take over so the transcript never duplicates state.
+  const showWorking =
+    isRunning && !pendingPermission && !activeToolGroup && !assistantIsAnswering;
 
   return (
     <div className="thread-wrap">
@@ -1589,6 +1632,7 @@ export const ChatTranscript = memo(function ChatTranscript({
               permission={pendingPermission}
             />
           ) : null}
+          {showWorking ? <WorkingIndicator /> : null}
         </div>
       </div>
       {showJump ? (
