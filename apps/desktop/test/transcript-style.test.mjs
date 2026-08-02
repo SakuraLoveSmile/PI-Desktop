@@ -173,16 +173,21 @@ test("assistant context inspector and retry action are wired", () => {
   assert.match(transcriptSource, /chat\.usageThroughput/);
   assert.match(transcriptSource, /assistantTurnTools/);
   assert.match(transcriptSource, /assistantTurnResponseDuration/);
+  assert.match(transcriptSource, /createPortal\(popover, document\.body\)/);
+  assert.match(transcriptSource, /getBoundingClientRect\(\)/);
+  assert.match(transcriptSource, /addEventListener\("scroll", handleViewportChange, true\)/);
+  assert.match(transcriptSource, /ResizeObserver\(updatePopoverPosition\)/);
   assert.match(transcriptSource, /latestMessageUsage/);
   assert.match(transcriptSource, /resolveContextWindow/);
-  assert.match(transcriptSource, /aria-describedby=\{tooltipId\}/);
+  assert.match(transcriptSource, /aria-describedby=\{open \? tooltipId : undefined\}/);
   assert.match(transcriptSource, /retryAssistantMessage/);
   assert.match(transcriptSource, /chat\.retry/);
   assert.match(stylesSource, /\.context-inspector-ring-progress/);
   assert.match(
     stylesSource,
-    /\.context-inspector:hover \.context-inspector-popover,[\s\S]*?\.context-inspector:focus-within \.context-inspector-popover/,
+    /\.context-inspector-popover\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?z-index:\s*60;/,
   );
+  assert.match(stylesSource, /\.context-inspector-popover\.is-open/);
 });
 
 test("regenerate rewrites the current turn instead of appending", async () => {

@@ -30,6 +30,12 @@ anchor, but providers do not expose exact per-tool allocation.
    persisted, and restored transcripts use the same values.
 5. Preserve additive compatibility: missing fields use the renderer fallback
    estimate or omit throughput when no stream duration is available.
+6. Render the inspector panel through `document.body` as a fixed viewport
+   overlay. Measure the trigger and panel rectangles, choose the side with
+   available space, clamp the result to a viewport margin, and update the
+   placement on transcript scroll, window resize, or panel-size changes. Keep
+   hover, focus, and Escape dismissal behavior independent from the transcript
+   scroll container.
 
 ## Consequences
 
@@ -39,6 +45,9 @@ anchor, but providers do not expose exact per-tool allocation.
 - Tool estimates are transparent but cannot claim billing precision.
 - The transcript protocol and storage shape gain optional fields, while the
   existing protocol version remains compatible.
+- The panel is no longer constrained by the transcript's overflow clipping or
+  stacking context; collision-aware placement keeps its complete contents
+  visible at viewport edges.
 
 ## Alternatives
 

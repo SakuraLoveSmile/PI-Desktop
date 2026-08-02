@@ -1551,14 +1551,18 @@ Each scenario is documented in this format:
   the panel's remaining/total context tokens, used percentage, model
   context-window size, exact input/output/cache/reasoning breakdown, generation
   tokens/s, and every tool's estimated argument/result token allocation. 4)
-  Click Retry on that turn while idle. 5) Confirm a turn without usage still
-  offers Retry and omits the inspector.
+  Scroll the transcript until the trigger is close to the top, bottom, and
+  right viewport edges, and resize the window while the panel is open. 5) Click
+  Retry on that turn while idle. 6) Confirm a turn without usage still offers
+  Retry and omits the inspector.
 - **Expected**: Model badge and compact Context inspector appear under completed
   assistant answers when data exists; the trigger shows remaining capacity and
   low-space warning/error states, while hover and keyboard focus expose the
   same complete token panel. Tool rows show each tool in execution order and
   explicitly mark their estimates; Retry re-sends the nearest preceding user
-  prompt and is disabled while a turn is running; Copy still excludes thinking
+  prompt and is disabled while a turn is running; the portaled panel remains
+  fully visible within the viewport, never clipped by transcript scrolling, and
+  follows the trigger after scrolling or resize; Copy still excludes thinking
   text.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/10-workbuddy-benchmark-ux.md`, `03-runtime/01-ipc-protocol.md`
@@ -3091,6 +3095,9 @@ This test plan spec is accepted when:
   generation tokens/s, and every tool's estimated argument/result footprint,
   share, and duration. The panel labels provider totals as reported and tool
   rows as estimates.
+- Move the trigger near each viewport edge and scroll or resize while the panel
+  is open; expect the body-level overlay to flip, clamp, and remain fully
+  visible instead of being clipped by the transcript scroll container.
 - Hover the action row and click Retry; the nearest preceding user prompt is
   re-sent.
 

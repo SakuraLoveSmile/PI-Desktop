@@ -876,4 +876,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - `UiMessage.responseDurationMs`, `UiMessage.toolUsage`, and the optional
   `tool_end.toolUsage` event field are additive, so older persisted messages
   and peers remain readable.
+- The inspector panel is rendered at the document body level as a fixed,
+  collision-aware viewport overlay. It follows transcript scroll and window
+  resize, flips around the trigger, and clamps to viewport margins instead of
+  being clipped by the transcript scroll container.
 - Decision D184; ADR [0047](../../adr/0047-context-usage-inspector.md).

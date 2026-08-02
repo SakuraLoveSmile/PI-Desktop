@@ -704,11 +704,11 @@
   min-height: 26px;
   align-items: center;
   gap: 6px;
-  border: 1px solid var(--ds-border-subtle);
+  border: 1px solid transparent;
   border-radius: var(--radius-full);
-  background: transparent;
+  background: color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
   padding: 3px 8px 3px 5px;
-  color: var(--ds-text-secondary);
+  color: currentColor;
   cursor: pointer;
   font: inherit;
   line-height: var(--leading-compact);
@@ -721,11 +721,15 @@
 .context-inspector-trigger:hover {
   border-color: color-mix(in oklab, currentColor 42%, var(--ds-border-default));
   background: color-mix(in oklab, currentColor 7%, transparent);
-  color: var(--ds-text-primary);
+}
+
+.context-inspector[data-open="true"] .context-inspector-trigger {
+  border-color: color-mix(in oklab, currentColor 28%, var(--ds-border-subtle));
+  background: color-mix(in oklab, currentColor 6%, transparent);
 }
 
 .context-inspector-trigger:focus-visible {
-  outline: 2px solid var(--ds-accent);
+  outline: 2px solid color-mix(in oklab, currentColor 54%, transparent);
   outline-offset: 2px;
 }
 
@@ -772,10 +776,8 @@
 }
 
 .context-inspector-popover {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
-  z-index: 20;
+  position: fixed;
+  z-index: 60;
   display: flex;
   width: min(360px, calc(100vw - 32px));
   max-height: min(520px, calc(100vh - 32px));
@@ -802,8 +804,7 @@
     visibility 0s linear var(--motion-duration-fast);
 }
 
-.context-inspector:hover .context-inspector-popover,
-.context-inspector:focus-within .context-inspector-popover {
+.context-inspector-popover.is-open {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);

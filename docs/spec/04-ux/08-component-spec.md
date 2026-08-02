@@ -959,8 +959,11 @@ Single message render — either user (plaintext) or assistant (markdown streami
   tokens per second. The panel also lists every tool in the assistant turn in
   execution order with an estimated argument/result footprint, share bar, and
   duration. Provider totals are exact; tool rows are explicitly marked as
-  estimates because providers do not report per-tool context allocation
-  (D103, D184).
+  estimates because providers do not report per-tool context allocation. The
+  panel is portaled to the document body as a fixed viewport overlay, flips
+  above or below the trigger, clamps to viewport margins, and repositions on
+  transcript scrolling or window resize so no transcript clipping ancestor can
+  hide it (D103, D184).
 - Gap: 12px vertical padding between consecutive message rows (denser than
   consumer chat, closer to WorkBuddy task transcript); assistant turns add a
   little extra bottom air so a completed answer separates from the next prompt
