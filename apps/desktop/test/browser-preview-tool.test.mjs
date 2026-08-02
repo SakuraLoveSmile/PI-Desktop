@@ -102,12 +102,15 @@ test("renderer routes browser preview events to the originating session", () => 
 });
 
 test("agent runtime exposes BrowserPreview in every mode and prompts for it", () => {
-  // Listed with the read-only tools, before the agent-mode additions.
-  const baseline = runtimeSource.slice(
-    runtimeSource.indexOf("const tools = ["),
-    runtimeSource.indexOf("if (this.mode === \"agent\") {"),
+  // The complete registry includes BrowserPreview even though the active
+  // provider context may defer its schema until ToolSearch activates it.
+  const builderStart = runtimeSource.indexOf("const tools =");
+  const builderEnd = runtimeSource.indexOf(
+    "const builtins = tools.map(exec)",
+    builderStart,
   );
-  assert.match(baseline, /"BrowserPreview"/);
+  assert.ok(builderStart >= 0 && builderEnd > builderStart);
+  assert.match(runtimeSource.slice(builderStart, builderEnd), /"BrowserPreview"/);
   assert.match(runtimeSource, /BrowserPreview: \{ path: Type\.String\(\) \}/);
   // Default system prompt limits preview calls to user-visible HTML work and
   // reuses the live-reloading surface while the page is being refined.
