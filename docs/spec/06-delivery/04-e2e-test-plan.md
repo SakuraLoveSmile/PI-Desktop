@@ -1999,8 +1999,11 @@ Each scenario is documented in this format:
 - **Steps**: 1) Click Collapse sidebar in the expanded sidebar header (or press
   the sidebar toggle shortcut). 2) Watch the sidebar during collapse. 3) Confirm
   the main pane expands and the collapsed titlebar now shows an Expand control.
-  4) Click Expand in the collapsed titlebar (or press the shortcut again). 5)
-  Watch the sidebar during expand. 6) Repeat on Windows/Linux.
+  4) Press the sidebar toggle shortcut again from the collapsed state: each
+  press must strictly alternate collapse and expand, so the second press
+  re-expands the sidebar (regression: it must never re-collapse). 5) Collapse
+  and re-expand once more via the shortcut, then repeat the full round trip
+  with the pointer controls. 6) Repeat on Windows/Linux.
 - **Expected**: Collapse plays the `sidebar-out` keyframe (opacity + ≤8px slide)
   while the aside stays in the tree, then unmounts once the animation ends; the
   main pane fills the freed space. Expand plays the `sidebar-in` keyframe and
