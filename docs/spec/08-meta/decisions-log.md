@@ -888,6 +888,9 @@ section mirrors only marketplace/catalog items still blocking nothing.
   collision-aware viewport overlay. It follows transcript scroll and window
   resize, flips around the trigger, and clamps to viewport margins instead of
   being clipped by the transcript scroll container.
+- The inspector resolves its context-window total from the same `pi-ai` model
+  record passed to the agent sidecar, enriching cached/discovered model rows;
+  provider metadata and the 128K default remain fallbacks for unknown models.
 - Decision D184; ADR [0047](../../adr/0047-context-usage-inspector.md).
 
 ## 2026-08-02 — Lazy per-turn tool activation
