@@ -874,10 +874,6 @@ section mirrors only marketplace/catalog items still blocking nothing.
   duration. Runtime estimates use pi-agent-core's existing four-characters-
   per-token heuristic; provider-reported usage remains the authoritative total
   and the UI labels tool rows as estimates.
-- Active assistant streams show an inline live estimated `tokens/s` rate from
-  streamed text/thinking and elapsed stream time. Once the turn completes, the
-  inspector switches to the exact provider output divided by the measured final
-  stream duration.
 - `UiMessage.responseDurationMs`, `UiMessage.toolUsage`, and the optional
   `tool_end.toolUsage` event field are additive, so older persisted messages
   and peers remain readable.

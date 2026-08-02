@@ -127,57 +127,10 @@ export function assistantTurnTools(entry: AssistantTurnEntry): UiMessage[] {
   );
 }
 
-export function assistantTurnStreamingMessage(
-  entry: AssistantTurnEntry,
-): UiMessage | undefined {
-  for (
-    let partIndex = entry.parts.length - 1;
-    partIndex >= 0;
-    partIndex -= 1
-  ) {
-    const part = entry.parts[partIndex];
-    if (
-      part.kind === "message" &&
-      part.message.role === "assistant" &&
-      part.message.status === "streaming"
-    ) {
-      return part.message;
-    }
-    if (part.kind !== "activity") continue;
-    for (
-      let itemIndex = part.items.length - 1;
-      itemIndex >= 0;
-      itemIndex -= 1
-    ) {
-      const item = part.items[itemIndex];
-      if (
-        item.kind === "thinking" &&
-        item.message.role === "assistant" &&
-        item.message.status === "streaming"
-      ) {
-        return item.message;
-      }
-    }
-  }
-  return undefined;
-}
-
 export function assistantTurnResponseDuration(
   entry: AssistantTurnEntry,
 ): number | undefined {
-  const messages = new Map<string, UiMessage>();
-  for (const part of entry.parts) {
-    if (part.kind === "message") {
-      messages.set(part.message.id, part.message);
-      continue;
-    }
-    for (const item of part.items) {
-      if (item.kind === "thinking") {
-        messages.set(item.message.id, item.message);
-      }
-    }
-  }
-  const durations = [...messages.values()].flatMap((message) =>
+  const durations = assistantTurnMessages(entry).flatMap((message) =>
     typeof message.responseDurationMs === "number" &&
     Number.isFinite(message.responseDurationMs) &&
     message.responseDurationMs > 0

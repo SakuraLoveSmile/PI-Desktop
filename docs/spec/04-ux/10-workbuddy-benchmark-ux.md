@@ -106,8 +106,6 @@ reasoning usage, generation tokens per second, and each unique tool type's
 aggregated argument/result footprint, call count, and cumulative duration.
 Repeated calls are grouped by tool name. Tool estimates are separate from exact
 provider totals because providers do not expose per-tool context allocation.
-During an active stream, the meta row shows a live estimated `tokens/s` value;
-after completion it uses the exact provider output and measured stream time.
 Currency pricing remains deferred. Regenerate is available as a quiet action
 chip next to Copy and rewrites the current turn in place (D105); when multiple
 variants exist, a ChatGPT-style `current / total` pager on the root user turn

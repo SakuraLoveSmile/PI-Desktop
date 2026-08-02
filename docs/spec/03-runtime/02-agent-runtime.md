@@ -177,9 +177,6 @@ persistence completes.
 - Pi `thinking` blocks become `UiMessage.thinking` and
   `message_update.deltaThinking`. They never append to `content` or
   `deltaText`.
-- Streaming assistant `message_update` events carry a transient
-  `responseDurationMs` snapshot from the current provider stream. The final
-  `message_end` value is the authoritative duration retained in history.
 - Restored assistant history reconstructs separate text and thinking blocks
   before the next turn.
 - Restored history also reconstructs tool call/result pairs from persisted

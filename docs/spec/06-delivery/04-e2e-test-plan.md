@@ -1552,11 +1552,9 @@ Each scenario is documented in this format:
   context-window size, exact input/output/cache/reasoning breakdown, generation
   tokens/s, and each unique tool type's aggregated call count and estimated
   argument/result token allocation. 4)
-  Start another assistant turn and observe its meta row while text is arriving;
-  confirm the live estimated tokens/s value updates before the turn completes.
-  5) Scroll the transcript until the trigger is close to the top, bottom, and
-  right viewport edges, and resize the window while the panel is open. 6) Click
-  Retry on that turn while idle. 7) Confirm a turn without usage still offers
+  Scroll the transcript until the trigger is close to the top, bottom, and
+  right viewport edges, and resize the window while the panel is open. 5) Click
+  Retry on that turn while idle. 6) Confirm a turn without usage still offers
   Retry and omits the inspector.
 - **Expected**: Model badge and compact Context inspector appear under completed
   assistant answers when data exists; the trigger shows remaining capacity and
@@ -1566,10 +1564,8 @@ Each scenario is documented in this format:
   and explicitly mark their estimates; Retry re-sends the nearest preceding
   user prompt and is disabled while a turn is running; the portaled panel remains
   fully visible within the viewport, never clipped by transcript scrolling, and
-  follows the trigger after scrolling or resize. Active assistant output shows
-  a changing live estimated tokens/s value before completion; the final panel
-  uses exact provider output and final stream duration. Copy still excludes
-  thinking text.
+  follows the trigger after scrolling or resize; Copy still excludes thinking
+  text.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/10-workbuddy-benchmark-ux.md`, `03-runtime/01-ipc-protocol.md`
 - **Acceptance**: C (chat stream), Quality

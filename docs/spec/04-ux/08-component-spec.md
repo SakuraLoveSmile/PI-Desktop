@@ -964,10 +964,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
   the document body as a fixed viewport overlay, flips
   above or below the trigger, clamps to viewport margins, and repositions on
   transcript scrolling or window resize so no transcript clipping ancestor can
-  hide it (D103, D184). While the active assistant stream is producing output,
-  the meta row also shows a live estimated `tokens/s` rate based on streamed
-  text/thinking and elapsed provider stream time; the completed panel switches
-  to the exact reported output count and final stream duration.
+  hide it (D103, D184).
 - Gap: 12px vertical padding between consecutive message rows (denser than
   consumer chat, closer to WorkBuddy task transcript); assistant turns add a
   little extra bottom air so a completed answer separates from the next prompt

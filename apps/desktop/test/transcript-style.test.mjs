@@ -173,9 +173,6 @@ test("assistant context inspector and retry action are wired", () => {
   assert.match(transcriptSource, /aggregateToolTokenUsage/);
   assert.match(transcriptSource, /chat\.usageToolCalls/);
   assert.match(transcriptSource, /chat\.usageThroughput/);
-  assert.match(transcriptSource, /useLiveElapsedMs/);
-  assert.match(transcriptSource, /estimateOutputTokens/);
-  assert.match(transcriptSource, /chat\.usageThroughputLive/);
   assert.match(transcriptSource, /assistantTurnTools/);
   assert.match(transcriptSource, /assistantTurnResponseDuration/);
   assert.match(transcriptSource, /createPortal\(popover, document\.body\)/);
@@ -193,8 +190,6 @@ test("assistant context inspector and retry action are wired", () => {
     /\.context-inspector-popover\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?z-index:\s*60;/,
   );
   assert.match(stylesSource, /\.context-inspector-popover\.is-open/);
-  assert.match(stylesSource, /\.message-meta-live-rate/);
-  assert.match(stylesSource, /@keyframes live-rate-pulse/);
 });
 
 test("regenerate rewrites the current turn instead of appending", async () => {

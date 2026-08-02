@@ -127,15 +127,6 @@ export function toolTokenUsage(message: UiMessage): ToolTokenUsage {
   return message.toolUsage ?? estimateToolTokenUsage(message);
 }
 
-/** Estimate streamed assistant output with the same four-characters heuristic. */
-export function estimateOutputTokens(
-  content: string,
-  thinking?: string,
-): number {
-  const characters = content.length + (thinking?.length ?? 0);
-  return characters > 0 ? Math.ceil(characters / 4) : 0;
-}
-
 export type ToolTokenUsageSummary = {
   toolName?: string;
   callCount: number;

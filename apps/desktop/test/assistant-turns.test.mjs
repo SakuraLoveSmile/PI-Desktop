@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  assistantTurnResponseDuration,
-  assistantTurnStreamingMessage,
   assistantTurnContent,
   assistantTurnUsage,
   buildTranscriptEntries,
@@ -105,20 +103,4 @@ test("aggregates provider usage across response fragments", () => {
     cacheReadTokens: 4,
     totalTokens: 28,
   });
-});
-
-test("tracks the active streamed assistant and its duration snapshot", () => {
-  const { entries } = buildTranscriptEntries([
-    message("user", "user", "Count"),
-    message("streaming", "assistant", "Partial", {
-      thinking: "Plan",
-      status: "streaming",
-      responseDurationMs: 120,
-    }),
-  ]);
-  const turn = entries[1];
-
-  assert.equal(turn.kind, "assistant-turn");
-  assert.equal(assistantTurnStreamingMessage(turn)?.id, "streaming");
-  assert.equal(assistantTurnResponseDuration(turn), 120);
 });
