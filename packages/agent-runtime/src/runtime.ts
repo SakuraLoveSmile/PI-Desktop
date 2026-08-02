@@ -127,6 +127,7 @@ export type RuntimeProviderConfig = {
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_TOKENS = 8_192;
 const CONTEXT_COMPACTION_TOOL_NAME = "CompactContext";
+export const TOOL_SEARCH_NAME = "ToolSearch";
 const CONTEXT_NUDGE_TURN_INTERVAL = 3;
 const CHECKPOINT_TAIL_SAFETY_TOKENS = 256;
 /** Path-scoped rules are best-effort and must not stall a file tool turn. */
@@ -137,6 +138,22 @@ const PATH_SCOPED_INSTRUCTION_TOOLS = new Set([
   "Edit",
   "BrowserPreview",
 ]);
+const CHAT_CORE_TOOL_NAMES = new Set(["Read", "Glob", "Grep"]);
+const AGENT_CORE_TOOL_NAMES = new Set([
+  "Read",
+  "Glob",
+  "Grep",
+  "Write",
+  "Edit",
+  "Bash",
+]);
+const MAX_ON_DEMAND_TOOL_PROMPT_ENTRIES = 64;
+const MAX_TOOL_SEARCH_RESULT_NAMES = 24;
+
+type ToolCatalogEntry = {
+  name: string;
+  description: string;
+};
 
 type PathInstructionResolution = {
   instructions?: ProjectInstructions;
@@ -444,6 +461,17 @@ function toolResultFromUi(
     blocks.push({ type: "text", text: safeJson(raw) });
   }
   const interrupted = m.toolStatus === "running";
+  const rawRecord: Record<string, unknown> | undefined = isRecord(raw)
+    ? raw
+    : undefined;
+  const rawAddedToolNames = rawRecord?.addedToolNames;
+  const addedToolNames =
+    Array.isArray(rawAddedToolNames)
+      ? rawAddedToolNames.filter(
+          (name: unknown): name is string =>
+            typeof name === "string" && name.length > 0,
+        )
+      : [];
   if (blocks.length === 0) {
     blocks.push({
       type: "text",
@@ -460,6 +488,7 @@ function toolResultFromUi(
     ...(isRecord(raw) && raw.details !== undefined
       ? { details: raw.details }
       : {}),
+    ...(addedToolNames.length > 0 ? { addedToolNames } : {}),
     isError:
       interrupted ||
       m.toolStatus === "error" ||
@@ -533,6 +562,12 @@ export class DesktopAgentRuntime {
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
   private pluginSkills: PluginSkillDef[];
+  /** Complete tool registry; only the active subset is sent to the provider. */
+  private toolCatalog = new Map<string, AgentTool>();
+  /** Tools intentionally omitted from the initial provider request. */
+  private deferredToolNames = new Set<string>();
+  /** Deferred tools loaded for the current user prompt. */
+  private activeDeferredToolNames = new Set<string>();
   private scratchDir?: string;
   private projectPath?: string;
   private baseSystemPrompt: string;
@@ -584,9 +619,10 @@ export class DesktopAgentRuntime {
       opts.compactionSettings,
     );
 
+    this.rebuildToolCatalog();
     const model = this.buildModel();
     this.model = model;
-    const tools = this.buildTools();
+    const tools = this.activeTools();
     const models = createModels();
     this.models = models;
     const runtimeApiKey =
@@ -615,30 +651,33 @@ export class DesktopAgentRuntime {
       this.projectInstructions,
     );
     const skillsPrompt = pluginSkillsPrompt(this.pluginSkills);
-    const baseSystemPrompt =
-      opts.systemPrompt ??
-      [
-        "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
-        // Work panel browser preview (D100): workspace HTML files render
-        // in the embedded browser with live reload on file changes.
-        "When you create or edit an HTML page in the workspace, call the BrowserPreview tool with its workspace-relative path (e.g. `index.html` or `demo/index.html`) to show it in PI-Desktop's built-in browser panel. The preview live-reloads as you keep editing, so one call per page is enough — no external browser or manual refresh needed.",
-        // Shell dialect (host-core D084): commands run through bash on
-        // every platform — Git Bash on Windows, bash on macOS/Linux.
-        process.platform === "win32"
-          ? "Shell commands run in Git Bash (POSIX bash on Windows). Always write bash/POSIX syntax with forward-slash paths — never cmd.exe or PowerShell syntax."
-          : "Shell commands run in bash. Write bash/POSIX syntax.",
-        // Session scratch directory (D114): temp files must not dirty
-        // the user's workspace or its git status.
-        ...(this.scratchDir
-          ? [
-              `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
-            ]
-          : []),
-        // Plugin skills (D174): the catalog rides in the base prompt so a
-        // path-scoped instruction reload never drops it, and it stays ahead of
-        // the instruction chain so the user's own AGENTS.md keeps the last word.
-        ...(skillsPrompt ? [skillsPrompt] : []),
-      ].join("\n\n");
+    const optionalToolsPrompt = this.optionalToolsPrompt();
+    const defaultSystemPrompt = [
+      "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
+      // Work panel browser preview (D100): workspace HTML files render
+      // in the embedded browser with live reload on file changes.
+      `When you create or edit an HTML page in the workspace, call the BrowserPreview tool with its workspace-relative path (e.g. \`index.html\` or \`demo/index.html\`) to show it in PI-Desktop's built-in browser panel. The preview live-reloads as you keep editing, so one call per page is enough — no external browser or manual refresh needed. If BrowserPreview is not in the current tool list, load it first with ${TOOL_SEARCH_NAME}.`,
+      // Shell dialect (host-core D084): commands run through bash on
+      // every platform — Git Bash on Windows, bash on macOS/Linux.
+      process.platform === "win32"
+        ? "Shell commands run in Git Bash (POSIX bash on Windows). Always write bash/POSIX syntax with forward-slash paths — never cmd.exe or PowerShell syntax."
+        : "Shell commands run in bash. Write bash/POSIX syntax.",
+      // Session scratch directory (D114): temp files must not dirty
+      // the user's workspace or its git status.
+      ...(this.scratchDir
+        ? [
+            `Your scratch directory for this session is \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR). Write ALL temporary and intermediate files there using absolute paths — one-off scripts, downloaded data, drafts, experiment output — never into the workspace. Only write into the workspace when the file is a deliverable the user asked for. Scratch files persist across turns of this session and are cleaned up automatically when the session is deleted.`,
+          ]
+        : []),
+      // Plugin skills (D174): the catalog rides in the base prompt so a
+      // path-scoped instruction reload never drops it, and it stays ahead of
+      // the instruction chain so the user's own AGENTS.md keeps the last word.
+      ...(skillsPrompt ? [skillsPrompt] : []),
+    ].join("\n\n");
+    const baseSystemPrompt = [
+      opts.systemPrompt ?? defaultSystemPrompt,
+      ...(optionalToolsPrompt ? [optionalToolsPrompt] : []),
+    ].join("\n\n");
     this.baseSystemPrompt = baseSystemPrompt;
 
     this.agent = new Agent({
@@ -732,7 +771,8 @@ export class DesktopAgentRuntime {
 
   /* Rebuild pi-ai messages from the persisted transcript, including tool
    * call/result pairs — tool rows persist toolCallId/toolName/toolArgs and
-   * the result, which is everything the model context needs. Losing them
+   * the result (including deferred-tool activation markers), which is
+   * everything the model context needs. Losing them
    * (the pre-D120 behavior) collapsed a reseeded session to bare chat text:
    * the model forgot every file it had read and, seeing its own history
    * "answer" without visible tool use, stopped calling tools altogether.
@@ -882,7 +922,7 @@ export class DesktopAgentRuntime {
     } as Model<Api>;
   }
 
-  private buildTools(): AgentTool[] {
+  private buildToolDefinitions(): AgentTool[] {
     // With a scratch dir provisioned, file tools accept absolute paths into
     // it as a second root (D114); keep the wording in sync with host-core.
     const scratchPathHint = this.scratchDir
@@ -1031,6 +1071,171 @@ export class DesktopAgentRuntime {
     return [...builtins, ...pluginTools, ...skillTools, ...contextTools];
   }
 
+  /**
+   * Build the complete registry once, then expose only the core subset to the
+   * first provider request. This mirrors pi's active-tool model while keeping
+   * the host tool implementation and permission path unchanged.
+   */
+  private rebuildToolCatalog(): void {
+    const catalog = new Map<string, AgentTool>();
+    for (const tool of this.buildToolDefinitions()) {
+      catalog.set(tool.name, tool);
+    }
+    this.toolCatalog = catalog;
+    this.deferredToolNames = new Set(
+      [...catalog.keys()].filter(
+        (name) => !this.isCoreTool(name) && name !== TOOL_SEARCH_NAME,
+      ),
+    );
+    for (const name of this.activeDeferredToolNames) {
+      if (!this.deferredToolNames.has(name)) {
+        this.activeDeferredToolNames.delete(name);
+      }
+    }
+    if (this.deferredToolNames.size > 0) {
+      this.toolCatalog.set(TOOL_SEARCH_NAME, this.buildToolSearchTool());
+    }
+  }
+
+  private isCoreTool(name: string): boolean {
+    return (
+      name === CONTEXT_COMPACTION_TOOL_NAME ||
+      (this.mode === "agent"
+        ? AGENT_CORE_TOOL_NAMES.has(name)
+        : CHAT_CORE_TOOL_NAMES.has(name))
+    );
+  }
+
+  private activeTools(): AgentTool[] {
+    return [...this.toolCatalog.entries()]
+      .filter(
+        ([name]) =>
+          this.isCoreTool(name) ||
+          name === TOOL_SEARCH_NAME ||
+          this.activeDeferredToolNames.has(name),
+      )
+      .map(([, tool]) => tool);
+  }
+
+  private optionalToolsPrompt(): string {
+    const entries: ToolCatalogEntry[] = [...this.deferredToolNames]
+      .map((name) => this.toolCatalog.get(name))
+      .filter((tool): tool is AgentTool => tool !== undefined)
+      .map((tool) => ({
+        name: tool.name,
+        description: this.toolCatalogDescription(tool),
+      }));
+    if (entries.length === 0) return "";
+
+    const visibleEntries = entries.slice(0, MAX_ON_DEMAND_TOOL_PROMPT_ENTRIES);
+    const lines = visibleEntries.map(
+      (entry) => `- ${entry.name}: ${this.compactToolDescription(entry.description)}`,
+    );
+    if (entries.length > visibleEntries.length) {
+      lines.push(
+        `- ... ${entries.length - visibleEntries.length} more; search by exact name or capability`,
+      );
+    }
+    return [
+      "# On-demand tools",
+      `The following capabilities are available on demand. Call ${TOOL_SEARCH_NAME} with an exact tool name or a short capability description before using one that is not in the current tool list.`,
+      ...lines,
+    ].join("\n");
+  }
+
+  private compactToolDescription(description: string): string {
+    const compact = description.replace(/\s+/g, " ").trim();
+    return compact.length <= 120 ? compact : `${compact.slice(0, 117)}...`;
+  }
+
+  private toolCatalogDescription(tool: AgentTool): string {
+    switch (tool.name) {
+      case "BrowserPreview":
+        return "Preview an HTML file in the built-in browser panel.";
+      case "PluginCheck":
+        return "Validate a PI-Desktop plugin directory.";
+      case "PluginScaffold":
+        return "Create a PI-Desktop plugin from a template.";
+      case "PluginPack":
+        return "Validate and package a PI-Desktop plugin.";
+      case SKILL_TOOL_NAME:
+        return "Load the full instructions for a listed skill.";
+      default:
+        return this.compactToolDescription(tool.description);
+    }
+  }
+
+  private buildToolSearchTool(): AgentTool {
+    return {
+      name: TOOL_SEARCH_NAME,
+      label: "Tool Search",
+      description:
+        "Find and activate an on-demand tool by exact name or capability. Use this before calling any tool listed under On-demand tools that is not already in the current tool list.",
+      parameters: Type.Object({
+        query: Type.String({
+          description:
+            "Exact tool name or a short capability description, for example `BrowserPreview` or `validate plugin`.",
+        }),
+      }),
+      execute: async (_toolCallId, params) => {
+        const query =
+          isRecord(params) && typeof params.query === "string"
+            ? params.query.trim()
+            : "";
+        const matches = this.findDeferredTools(query);
+        const activated = matches.filter(
+          (name) => !this.activeDeferredToolNames.has(name),
+        );
+        for (const name of activated) {
+          this.activeDeferredToolNames.add(name);
+        }
+        const available = [...this.deferredToolNames];
+        const availablePreview = available.slice(0, MAX_TOOL_SEARCH_RESULT_NAMES);
+        const remaining = available.length - availablePreview.length;
+        const text =
+          activated.length > 0
+            ? `Activated on-demand tools: ${activated.join(", ")}. They are available on the next model turn.`
+            : matches.length > 0
+              ? `These tools are already active: ${matches.join(", ")}.`
+              : `No matching on-demand tool. Available names: ${availablePreview.join(", ")}${remaining > 0 ? `, and ${remaining} more` : ""}.`;
+        return {
+          content: [{ type: "text", text }],
+          details: { query, matches, activated },
+          ...(activated.length > 0 ? { addedToolNames: activated } : {}),
+        };
+      },
+    };
+  }
+
+  private findDeferredTools(query: string): string[] {
+    const normalizedQuery = query.toLowerCase();
+    if (!normalizedQuery) return [];
+    const terms = normalizedQuery.split(/[\s,;|/]+/).filter(Boolean);
+    return [...this.deferredToolNames]
+      .map((name) => {
+        const tool = this.toolCatalog.get(name);
+        const normalizedName = name.toLowerCase();
+        const description = tool?.description.toLowerCase() ?? "";
+        let score = 0;
+        if (normalizedName === normalizedQuery) score += 10_000;
+        else if (normalizedName.includes(normalizedQuery)) score += 2_000;
+        for (const term of terms) {
+          if (normalizedName.includes(term)) score += 300;
+          if (description.includes(term)) score += 25;
+        }
+        return { name, score };
+      })
+      .filter((candidate) => candidate.score > 0)
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 4)
+      .map((candidate) => candidate.name);
+  }
+
+  private resetDeferredToolsForPrompt(): void {
+    this.activeDeferredToolNames.clear();
+    this.agent.state.tools = this.activeTools();
+  }
+
   private async loadPathInstructions(
     toolName: string,
     params: unknown,
@@ -1139,7 +1344,8 @@ export class DesktopAgentRuntime {
     this.compactionSettings = normalizeCompactionSettings(settings);
     this.pendingModelCompaction = undefined;
     this.nudgeCooldownTurns = 0;
-    this.agent.state.tools = this.buildTools();
+    this.rebuildToolCatalog();
+    this.agent.state.tools = this.activeTools();
   }
 
   private contextBudget(messages: AgentMessage[]): {
@@ -1285,11 +1491,13 @@ export class DesktopAgentRuntime {
 
   private rebuiltAgentContext(): AgentContext {
     const messages = buildSessionContext(this.entriesWithCompaction()).messages;
+    const tools = this.activeTools();
     this.agent.state.messages = messages;
+    this.agent.state.tools = tools;
     return {
       systemPrompt: this.agent.state.systemPrompt,
       messages,
-      tools: this.agent.state.tools,
+      tools,
     };
   }
 
@@ -1846,6 +2054,9 @@ export class DesktopAgentRuntime {
 
   async prompt(content: string, userMessageId?: string): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
+    // Keep every new user turn small. A capability loaded for the preceding
+    // turn can be searched again when the new task actually needs it.
+    this.resetDeferredToolsForPrompt();
     // Claims are message-scoped: a later prompt must observe edited or newly
     // created instruction files instead of reusing a previous chain.
     this.pathInstructionClaims.clear();
