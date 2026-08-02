@@ -1347,9 +1347,11 @@ Each scenario is documented in this format:
   no Git repository is required.
 - **Steps**: 1) Ask the active agent to edit an existing file and create a new
   file in session A. 2) Expand the activity group and inspect each review card
-  directly after its corresponding tool row; verify added/modified status,
-  +/− counts, and the exact hunks. 3) Commit the files outside the app, close
-  and reopen the Review panel, then reload session A. 4) Verify the same cards
+  directly after its corresponding tool row; verify every card starts
+  collapsed with its added/modified status and +/− counts visible in the
+  header, then expand it to verify the exact hunks. 3) Commit the files
+  outside the app, close and reopen the Review panel, then reload session A.
+  4) Verify the same cards
   and counts remain because they come from the transcript messages. 5) Use a
   card's rollback action and verify the created file is removed or the previous
   file bytes are restored. 6) Edit that file again outside the app and retry
@@ -1358,8 +1360,10 @@ Each scenario is documented in this format:
   Repeat with failed, denied, and scratch writes.
 - **Expected**: Each successful workspace Write/Edit creates one message-owned
   review record and one adjacent keyboard-accessible card; the card is never a
-  bottom/global entry. The Review tab lists A's chronological recorded changes,
-  independent of Git status, repository presence, commit state, focus refresh,
+  bottom/global entry. Every review card, inline and in the Review tab, is
+  collapsed by default and expands on demand. The Review tab lists A's
+  chronological recorded changes, independent of Git status, repository
+  presence, commit state, focus refresh,
   or workspace switching. Added, modified, and deleted statuses plus line
   additions/deletions and hunks are shown when bounded evidence is available.
   Successful rollback updates the card to Rolled back and survives restart.

@@ -101,7 +101,7 @@ export const ReviewChangeCard = memo(function ReviewChangeCard({
   const { t } = useTranslation();
   const change = reviewChangeFromMessage(message);
   const detailsId = useId();
-  const [open, setOpen] = useState(compact);
+  const [open, setOpen] = useState(false);
 
   if (!change) return null;
 
