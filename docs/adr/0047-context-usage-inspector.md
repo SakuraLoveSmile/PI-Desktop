@@ -21,7 +21,8 @@ anchor, but providers do not expose exact per-tool allocation.
 1. Replace the standalone ring with a compact Codex-style context inspector
    trigger. Hover and keyboard focus reveal one scrollable, non-modal panel.
 2. Keep provider-reported input/output/cache/reasoning usage authoritative and
-   show aggregate output throughput as `outputTokens / responseDurationMs`.
+   show aggregate output throughput as `outputTokens / responseDurationMs` on
+   completed turns only; active streams do not render a live estimate.
 3. Estimate each tool's argument and result footprint with the existing
    pi-agent-core token heuristic. Persist the estimate on the tool message,
    mark it as estimated in the UI, and never add it to the provider total.

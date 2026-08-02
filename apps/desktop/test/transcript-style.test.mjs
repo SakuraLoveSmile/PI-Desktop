@@ -172,6 +172,10 @@ test("assistant context inspector and retry action are wired", () => {
   assert.match(transcriptSource, /chat\.usageTools/);
   assert.match(transcriptSource, /aggregateToolTokenUsage/);
   assert.match(transcriptSource, /chat\.usageToolCalls/);
+  assert.match(transcriptSource, /context-inspector-source-badge exact/);
+  assert.match(transcriptSource, /context-inspector-source-badge estimated/);
+  assert.match(transcriptSource, /context-inspector-tool-meta-main/);
+  assert.match(transcriptSource, /chat\.usageContextRemaining/);
   assert.match(transcriptSource, /chat\.usageThroughput/);
   assert.match(transcriptSource, /assistantTurnTools/);
   assert.match(transcriptSource, /assistantTurnResponseDuration/);
@@ -185,11 +189,20 @@ test("assistant context inspector and retry action are wired", () => {
   assert.match(transcriptSource, /retryAssistantMessage/);
   assert.match(transcriptSource, /chat\.retry/);
   assert.match(stylesSource, /\.context-inspector-ring-progress/);
+  assert.match(stylesSource, /\.context-inspector-status-dot/);
+  assert.match(stylesSource, /\.context-inspector-source-badge\.estimated/);
+  assert.match(stylesSource, /\.context-inspector-tool-meta-main/);
   assert.match(
     stylesSource,
     /\.context-inspector-popover\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?z-index:\s*60;/,
   );
   assert.match(stylesSource, /\.context-inspector-popover\.is-open/);
+});
+
+test("context inspector keeps generation speed completion-only", () => {
+  assert.doesNotMatch(transcriptSource, /useLiveElapsedMs|usageThroughputLive/);
+  assert.doesNotMatch(transcriptSource, /assistantTurnStreamingMessage/);
+  assert.doesNotMatch(stylesSource, /message-meta-live-rate|live-rate-pulse/);
 });
 
 test("regenerate rewrites the current turn instead of appending", async () => {

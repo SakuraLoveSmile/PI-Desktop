@@ -954,9 +954,12 @@ Single message render — either user (plaintext) or assistant (markdown streami
   under the answer. The inspector keeps a small remaining-capacity ring beside
   the `Context` label and percentage; low capacity changes the semantic color
   without making color the only signal. Hover or keyboard focus opens a
-  non-modal, scrollable panel with the used/window counts, remaining capacity,
-  exact provider input/output/cache/reasoning usage, and generation speed in
-  tokens per second. The panel also lists each unique tool type from the
+  non-modal, scrollable panel with a clear remaining-token header, used/window
+  counts, a used-capacity meter, and compact turn/speed summary cells. Provider
+  and tool sections carry explicit reported/estimated source badges. The
+  provider section shows exact input/output/cache/reasoning usage; generation
+  speed is a completed-turn value in tokens per second and is not updated while
+  a response is streaming. The panel also lists each unique tool type from the
   assistant turn in first-seen execution order, with its call count, aggregated
   argument/result footprint, share bar, and cumulative duration. Provider
   totals are exact; tool rows are explicitly marked as estimates because

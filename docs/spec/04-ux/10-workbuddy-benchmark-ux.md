@@ -101,11 +101,13 @@ events.
 **Adopted in D103 (tokens-only first cut)**: completed assistant turns show a
 model badge plus a compact Codex-style context inspector under the answer. The
 inspector shows remaining context percentage in a small ring and hover/focus
-reveals remaining/total context tokens, exact provider input/output/cache/
-reasoning usage, generation tokens per second, and each unique tool type's
-aggregated argument/result footprint, call count, and cumulative duration.
-Repeated calls are grouped by tool name. Tool estimates are separate from exact
-provider totals because providers do not expose per-tool context allocation.
+reveals a remaining-token header, used-capacity meter, exact provider
+input/output/cache/reasoning usage, and generation tokens per second. The
+generation rate is a completed-turn snapshot rather than a live streaming
+counter. Each unique tool type has an explicit estimated badge plus aggregated
+argument/result footprint, call count, and cumulative duration. Repeated calls
+are grouped by tool name. Tool estimates are separate from exact provider
+totals because providers do not expose per-tool context allocation.
 Currency pricing remains deferred. Regenerate is available as a quiet action
 chip next to Copy and rewrites the current turn in place (D105); when multiple
 variants exist, a ChatGPT-style `current / total` pager on the root user turn

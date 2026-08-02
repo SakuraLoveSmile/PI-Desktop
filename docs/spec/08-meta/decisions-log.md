@@ -874,6 +874,9 @@ section mirrors only marketplace/catalog items still blocking nothing.
   duration. Runtime estimates use pi-agent-core's existing four-characters-
   per-token heuristic; provider-reported usage remains the authoritative total
   and the UI labels tool rows as estimates.
+- Generation speed is a completed-turn snapshot from provider output and final
+  stream duration; active assistant streams do not show a live token-rate
+  counter.
 - `UiMessage.responseDurationMs`, `UiMessage.toolUsage`, and the optional
   `tool_end.toolUsage` event field are additive, so older persisted messages
   and peers remain readable.

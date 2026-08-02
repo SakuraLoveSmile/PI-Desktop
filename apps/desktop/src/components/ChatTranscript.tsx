@@ -302,8 +302,9 @@ function ContextUsageInspector({
       onPointerLeave={scheduleClose}
     >
       <div className="context-inspector-heading">
-        <div>
+        <div className="context-inspector-heading-copy">
           <span className="context-inspector-eyebrow">
+            <span className="context-inspector-status-dot" aria-hidden="true" />
             {t("chat.usageContextLabel")}
           </span>
           <strong>
@@ -312,15 +313,23 @@ function ContextUsageInspector({
             })}
           </strong>
         </div>
-        <strong className="context-inspector-remaining">
-          {context.remainingPercent}%
-        </strong>
+        <div className="context-inspector-remaining">
+          <strong>{context.remainingPercent}%</strong>
+          <span>{t("chat.usageContextRemaining")}</span>
+        </div>
       </div>
       <div className="context-inspector-window">
-        {t("chat.usageContextTokens", {
-          used: formatTokenCount(context.usedTokens),
-          window: formatTokenCount(contextWindow),
-        })}
+        <span>{t("chat.usageContextWindow")}</span>
+        <strong>
+          {t("chat.usageContextTokens", {
+            used: formatTokenCount(context.usedTokens),
+            window: formatTokenCount(contextWindow),
+          })}
+        </strong>
+      </div>
+      <div className="context-inspector-meter-caption">
+        <span>{t("chat.usageContextUsed")}</span>
+        <span>{context.usedPercent}%</span>
       </div>
       <div className="context-inspector-meter" aria-hidden="true">
         <span style={{ width: `${context.usedPercent}%` }} />
@@ -343,8 +352,12 @@ function ContextUsageInspector({
       </div>
       <div className="context-inspector-section">
         <div className="context-inspector-section-heading">
-          <strong>{t("chat.usageProviderUsage")}</strong>
-          <span>{t("chat.usageExact")}</span>
+          <div className="context-inspector-section-title">
+            <strong>{t("chat.usageProviderUsage")}</strong>
+          </div>
+          <span className="context-inspector-source-badge exact">
+            {t("chat.usageExact")}
+          </span>
         </div>
         <div className="context-inspector-breakdown">
           <div className="context-inspector-row">
@@ -377,13 +390,18 @@ function ContextUsageInspector({
       </div>
       <div className="context-inspector-section context-inspector-tools">
         <div className="context-inspector-section-heading">
-          <strong>{t("chat.usageTools")}</strong>
-          <span>
-            {t("chat.usageToolsSummary", {
-              count: toolRows.length,
-              calls: tools.length,
-              tokens: formatTokenCount(toolTotal),
-            })}
+          <div className="context-inspector-section-title">
+            <strong>{t("chat.usageTools")}</strong>
+            <span className="context-inspector-section-summary">
+              {t("chat.usageToolsSummary", {
+                count: toolRows.length,
+                calls: tools.length,
+                tokens: formatTokenCount(toolTotal),
+              })}
+            </span>
+          </div>
+          <span className="context-inspector-source-badge estimated">
+            {t("chat.usageEstimated")}
           </span>
         </div>
         <p className="context-inspector-note">{t("chat.usageToolEstimate")}</p>
@@ -411,19 +429,22 @@ function ContextUsageInspector({
                     <span style={{ width: `${percent}%` }} />
                   </div>
                   <div className="context-inspector-tool-meta">
-                    <span>
-                      {t("chat.usageToolCalls", { count: row.callCount })}
-                      {" · "}
-                      {t("chat.usageToolArgs", {
-                        count: formatTokenCount(row.argumentTokens),
-                      })}
-                      {" · "}
-                      {t("chat.usageToolResult", {
-                        count: formatTokenCount(row.resultTokens),
-                      })}
+                    <span className="context-inspector-tool-meta-main">
+                      <span className="context-inspector-tool-calls">
+                        {t("chat.usageToolCalls", { count: row.callCount })}
+                      </span>
+                      <span className="context-inspector-tool-breakdown">
+                        {t("chat.usageToolArgs", {
+                          count: formatTokenCount(row.argumentTokens),
+                        })}
+                        {" · "}
+                        {t("chat.usageToolResult", {
+                          count: formatTokenCount(row.resultTokens),
+                        })}
+                      </span>
                     </span>
                     {row.durationMs !== undefined ? (
-                      <span>
+                      <span className="context-inspector-tool-duration">
                         {t("chat.usageToolDuration", {
                           time: formatToolDuration(row.durationMs / 1000),
                         })}
