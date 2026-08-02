@@ -32,10 +32,13 @@ Let the agent get things done, but stay under control by default.
 
 ### 2.1 Deferred ancillary tools (D185, ADR 0048)
 
-The six Agent tools and three Chat tools above are the core tool context and are
-available on the first model request. The runtime also registers ancillary
-capabilities without sending their full schemas up front:
+The six Agent tools and three Chat tools above remain available in their
+respective modes. Following pi's coding-agent default, the first Agent request
+activates only `Read`, `Bash`, `Edit`, and `Write`; `Glob` and `Grep` are loaded
+on demand. Chat keeps its read-only `Read`/`Glob`/`Grep` core. The runtime also
+registers capabilities without sending their full schemas up front:
 
+- `Glob` and `Grep` in Agent mode
 - `BrowserPreview`
 - `PluginCheck`, `PluginScaffold`, and `PluginPack`
 - plugin-declared agent tools

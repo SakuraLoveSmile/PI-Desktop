@@ -338,18 +338,14 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     const tools = (runtime as any).agent.state.tools as Array<{ name: string }>;
     const names = tools.map((tool) => tool.name);
 
-    expect(names).toEqual(
-      expect.arrayContaining([
-        "Read",
-        "Glob",
-        "Grep",
-        "Write",
-        "Edit",
-        "Bash",
-        "CompactContext",
-        "ToolSearch",
-      ]),
-    );
+    expect(names).toEqual([
+      "Read",
+      "Bash",
+      "Edit",
+      "Write",
+      "CompactContext",
+      "ToolSearch",
+    ]);
     expect(names).not.toContain("BrowserPreview");
     expect(names).not.toContain("PluginCheck");
     expect(names).not.toContain("plugin_demo_validate");

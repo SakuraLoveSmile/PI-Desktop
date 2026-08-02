@@ -226,7 +226,8 @@ Each scenario is documented in this format:
   the first provider request's tool list. 3) Ask the agent to create or edit an
   HTML page and observe the tool activity. 4) Start a second user prompt after
   the preview task completes.
-- **Expected**: The first request contains only the mode core tools,
+- **Expected**: The first request contains only the mode core tools (Agent:
+  `Read`/`Bash`/`Edit`/`Write`; Chat: `Read`/`Glob`/`Grep`),
   `CompactContext` when enabled, and local `ToolSearch`; deferred schemas are
   represented only by a bounded `# On-demand tools` catalog. The agent calls
   `ToolSearch` before `BrowserPreview` (or the selected plugin/`Skill` tool)
@@ -420,7 +421,10 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Project directory open.
 - **Steps**: 1) Ask agent to read a file in the project. 2) Observe result.
-- **Expected**: `Read`/`Glob`/`Grep` return correct results within project scope.
+- **Expected**: `Read` returns immediately within project scope. In Agent mode,
+  the agent activates `Glob` or `Grep` through `ToolSearch` before using it;
+  Chat mode keeps both tools active from the first request. All results remain
+  within project scope.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`
 - **Acceptance**: E (Read/Glob/Grep work), D (tools based on project)
 - **Milestone**: M3
@@ -474,7 +478,8 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Chat mode active.
 - **Steps**: 1) Ask agent to write a file in Chat mode. 2) Observe behavior.
-- **Expected**: Write/Edit/Bash not available in Chat mode; only Read/Glob/Grep work.
+- **Expected**: Write/Edit/Bash not available in Chat mode; only Read/Glob/Grep
+  work, with all three active in the first Chat request.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`
 - **Acceptance**: E (Chat read-only)
 - **Milestone**: M3

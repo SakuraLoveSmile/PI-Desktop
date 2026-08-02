@@ -22,12 +22,13 @@ for native deferred-tool search when the provider supports it.
 PI-Desktop keeps a complete sidecar-local tool registry but sends an active
 subset to the provider:
 
-- Agent starts with `Read`, `Glob`, `Grep`, `Write`, `Edit`, and `Bash`.
+- Agent starts with `Read`, `Bash`, `Edit`, and `Write`, matching pi's
+  coding-agent core.
 - Chat starts with `Read`, `Glob`, and `Grep`.
 - `CompactContext` remains active whenever automatic compaction is enabled.
 - A local `ToolSearch` tool remains active when deferred capabilities exist.
-- `BrowserPreview`, plugin tools, `Skill`, and plugin-development helpers are
-  deferred until requested.
+- Agent-mode `Glob` and `Grep`, `BrowserPreview`, plugin tools, `Skill`, and
+  plugin-development helpers are deferred until requested.
 
 The base prompt contains a bounded `# On-demand tools` catalog with names and
 compact one-line descriptions, never the deferred JSON parameter schemas. The
@@ -48,8 +49,8 @@ uses a deferred capability.
 ## Consequences
 
 - Simple first turns no longer pay for every optional tool schema.
-- Core coding workflows keep the normal Read/Glob/Grep and Agent write/shell
-  tools without an extra discovery call.
+- Core coding workflows keep pi's Read/Bash/Edit/Write set without an extra
+  discovery call; file enumeration and search remain one ToolSearch away.
 - A task that needs an ancillary capability incurs one explicit ToolSearch turn
   before that capability is available.
 - ToolSearch is a normal model tool activity row, so the discovery step is

@@ -894,6 +894,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 
 - The sidecar keeps a complete local registry but sends only the mode's core
   tools, `CompactContext` when enabled, and local `ToolSearch` on a new prompt.
+  Agent follows pi's coding-agent core (`Read`/`Bash`/`Edit`/`Write`), while
+  Chat keeps (`Read`/`Glob`/`Grep`). Agent-mode `Glob`/`Grep`,
   `BrowserPreview`, plugin tools, `Skill`, and plugin-development helpers are
   represented by bounded compact catalog entries instead of full parameter
   schemas.

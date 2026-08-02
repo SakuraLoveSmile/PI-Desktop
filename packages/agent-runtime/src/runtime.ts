@@ -141,8 +141,6 @@ const PATH_SCOPED_INSTRUCTION_TOOLS = new Set([
 const CHAT_CORE_TOOL_NAMES = new Set(["Read", "Glob", "Grep"]);
 const AGENT_CORE_TOOL_NAMES = new Set([
   "Read",
-  "Glob",
-  "Grep",
   "Write",
   "Edit",
   "Bash",
@@ -1031,9 +1029,21 @@ export class DesktopAgentRuntime {
     // the work panel browser), so it ships in every mode. PluginCheck only
     // reads a directory; PluginScaffold and PluginPack write, so they follow
     // Write/Edit/Bash into agent mode only.
-    const tools = ["Read", "Glob", "Grep", "BrowserPreview", "PluginCheck"];
+    const tools =
+      this.mode === "agent"
+        ? [
+            "Read",
+            "Bash",
+            "Edit",
+            "Write",
+            "Glob",
+            "Grep",
+            "BrowserPreview",
+            "PluginCheck",
+          ]
+        : ["Read", "Glob", "Grep", "BrowserPreview", "PluginCheck"];
     if (this.mode === "agent") {
-      tools.push("Write", "Edit", "Bash", "PluginScaffold", "PluginPack");
+      tools.push("PluginScaffold", "PluginPack");
     }
     const builtins = tools.map(exec);
 
