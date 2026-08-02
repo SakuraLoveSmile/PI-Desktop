@@ -71,3 +71,24 @@ test("the sidebar entrance/exit keyframes and exit rule exist", () => {
     /:root\[data-platform="win32"\] \.sidebar\.is-exiting\s*\{[\s\S]*?animation-name:\s*sidebar-out-windows/,
   );
 });
+
+test("the sidebar toggle never captures a stale collapsed state", () => {
+  // The keydown and native-menu handlers register once; toggleSidebar must be
+  // a stable callback driven by a functional update. Otherwise the second
+  // Cmd/Ctrl+B reuses the first render's closure (collapsed=false) and keeps
+  // collapsing instead of re-expanding the sidebar.
+  assert.match(
+    appSource,
+    /const toggleSidebar = useCallback\(\(\) => \{\s*setSidebarCollapsed\(\(collapsed\) => !collapsed\);/,
+  );
+  assert.match(appSource, /\},\s*\[\]\);/);
+  // The exit flag follows the collapsed state so the out/in keyframes still
+  // drive the mount-then-animate-then-unmount machine after the refactor.
+  assert.match(
+    appSource,
+    /useEffect\(\(\) => \{\s*setSidebarExiting\(sidebarCollapsed\);\s*\},\s*\[sidebarCollapsed\]\);/,
+  );
+  // Both shortcut dispatch paths depend on the stable toggle.
+  assert.match(appSource, /\[showToast, toggleSidebar\],/);
+  assert.match(appSource, /settings\?\.keybindings,\s*toggleSidebar,/);
+});

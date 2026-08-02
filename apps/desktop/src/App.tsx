@@ -166,15 +166,18 @@ function AppShell() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarExiting, setSidebarExiting] = useState(false);
-  const toggleSidebar = () => {
-    if (sidebarCollapsed) {
-      setSidebarExiting(false);
-      setSidebarCollapsed(false);
-    } else {
-      setSidebarExiting(true);
-      setSidebarCollapsed(true);
-    }
-  };
+  // Stable identity: the keydown and native-menu handlers register once and
+  // must never capture a stale `sidebarCollapsed`. A functional update keeps
+  // the toggle symmetrical, so the second Cmd/Ctrl+B re-expands the sidebar.
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((collapsed) => !collapsed);
+  }, []);
+  // Keep the exit flag in sync with the collapsed state so collapsing plays
+  // the sidebar-out keyframe and expanding cancels it (mirrors the work-panel
+  // mount-then-animate-then-unmount machine).
+  useEffect(() => {
+    setSidebarExiting(sidebarCollapsed);
+  }, [sidebarCollapsed]);
   const handleSidebarAnimationEnd = (event: ReactAnimationEvent<HTMLElement>) => {
     if (event.target !== event.currentTarget) return;
     if (!sidebarExiting) return;
@@ -335,7 +338,7 @@ function AppShell() {
         );
       }
     },
-    [showToast],
+    [showToast, toggleSidebar],
   );
 
   useEffect(() => {
@@ -555,6 +558,7 @@ function AppShell() {
     platform,
     runMenuCommand,
     settings?.keybindings,
+    toggleSidebar,
   ]);
 
   useEffect(() => {
