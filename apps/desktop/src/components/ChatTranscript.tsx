@@ -44,6 +44,7 @@ import {
 } from "../lib/assistant-turns";
 import {
   aggregateToolTokenUsage,
+  calculateCacheRate,
   calculateContextUsage,
   calculateTokenRate,
   DEFAULT_CONTEXT_WINDOW,
@@ -149,6 +150,10 @@ function ContextUsageInspector({
   const throughput = calculateTokenRate(
     turnUsage.outputTokens,
     responseDurationMs,
+  );
+  const cacheRate = calculateCacheRate(
+    turnUsage.inputTokens,
+    turnUsage.cacheReadTokens,
   );
   const toolRows = aggregateToolTokenUsage(tools);
   const toolTotal = toolRows.reduce(
@@ -372,6 +377,12 @@ function ContextUsageInspector({
             <div className="context-inspector-row">
               <span>{t("chat.usageCacheRead")}</span>
               <strong>{formatTokenCount(turnUsage.cacheReadTokens)}</strong>
+            </div>
+          ) : null}
+          {cacheRate !== undefined ? (
+            <div className="context-inspector-row">
+              <span>{t("chat.usageCacheRate")}</span>
+              <strong>{cacheRate}%</strong>
             </div>
           ) : null}
           {turnUsage.cacheWriteTokens !== undefined ? (

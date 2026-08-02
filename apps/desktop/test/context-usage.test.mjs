@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   aggregateToolTokenUsage,
+  calculateCacheRate,
   calculateTokenRate,
   calculateContextUsage,
   estimateToolTokenUsage,
@@ -63,6 +64,14 @@ test("generation throughput uses provider output and stream duration", () => {
   assert.equal(calculateTokenRate(1_200, 4_000), 300);
   assert.equal(calculateTokenRate(0, 4_000), undefined);
   assert.equal(calculateTokenRate(1_200, undefined), undefined);
+});
+
+test("cache rate measures cached prompt tokens against the full prompt", () => {
+  assert.equal(calculateCacheRate(100, 300), 75);
+  assert.equal(calculateCacheRate(100, 0), 0);
+  assert.equal(calculateCacheRate(0, 100), 100);
+  assert.equal(calculateCacheRate(100, undefined), undefined);
+  assert.equal(calculateCacheRate(0, 0), undefined);
 });
 
 test("tool usage exposes argument and result estimates", () => {

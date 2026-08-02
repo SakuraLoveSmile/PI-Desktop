@@ -1585,7 +1585,8 @@ Each scenario is documented in this format:
   usage, then focus its Context inspector trigger with the keyboard. 3) Inspect
   the panel's remaining-token header, used percentage and meter, the
   pi-ai-resolved model context-window size, exact input/output/cache/reasoning
-  breakdown, completed generation tokens/s value, source badges, and each
+  breakdown, cache hit rate when cache-read metadata is reported, completed
+  generation tokens/s value, source badges, and each
   unique tool type's aggregated call count and estimated argument/result token
   allocation. 4)
   Scroll the transcript until the trigger is close to the top, bottom, and
@@ -1596,10 +1597,13 @@ Each scenario is documented in this format:
   assistant answers when data exists; the trigger shows remaining capacity and
   low-space warning/error states, while hover and keyboard focus expose the
   same complete token panel. The panel's exact provider and estimated tool
-  sources are visibly distinguished, and its context-window total matches the
-  model metadata used by the agent runtime; tool rows show each unique tool
-  type in first-seen order, aggregate repeated calls, include call counts and
-  cumulative duration, and explicitly mark their estimates. The generation
+  sources are visibly distinguished, and its cache hit rate uses cached prompt
+  tokens divided by all reported prompt tokens (cached plus uncached); when
+  cache-read metadata is absent, the rate is omitted rather than inferred. Its
+  context-window total matches the model metadata used by the agent runtime;
+  tool rows show each unique tool type in first-seen order, aggregate repeated
+  calls, include call counts and cumulative duration, and explicitly mark their
+  estimates. The generation
   rate remains a completed-turn value and does not update during streaming;
   Retry re-sends the nearest preceding user prompt and is disabled while a turn
   is running; the portaled panel remains fully visible within the viewport,

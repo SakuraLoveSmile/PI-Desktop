@@ -216,6 +216,7 @@ export const en = {
     usageInput: "Input",
     usageOutput: "Output",
     usageCacheRead: "Cache read",
+    usageCacheRate: "Cache hit rate",
     usageCacheWrite: "Cache write",
     usageReasoning: "Reasoning",
     usageTools: "Tool context",

@@ -177,6 +177,8 @@ test("assistant context inspector and retry action are wired", () => {
   assert.match(transcriptSource, /context-inspector-tool-meta-main/);
   assert.match(transcriptSource, /chat\.usageContextRemaining/);
   assert.match(transcriptSource, /chat\.usageThroughput/);
+  assert.match(transcriptSource, /calculateCacheRate/);
+  assert.match(transcriptSource, /chat\.usageCacheRate/);
   assert.match(transcriptSource, /assistantTurnTools/);
   assert.match(transcriptSource, /assistantTurnResponseDuration/);
   assert.match(transcriptSource, /createPortal\(popover, document\.body\)/);

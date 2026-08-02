@@ -196,3 +196,27 @@ export function calculateTokenRate(
   }
   return Math.round(outputTokens / (responseDurationMs / 1000));
 }
+
+/**
+ * Calculate the provider-reported prompt cache hit rate.
+ * `inputTokens` is the uncached prompt portion and `cacheReadTokens` is the
+ * portion served from cache, so cache writes do not affect this denominator.
+ */
+export function calculateCacheRate(
+  inputTokens: number,
+  cacheReadTokens: number | undefined,
+): number | undefined {
+  if (
+    !Number.isFinite(inputTokens) ||
+    inputTokens < 0 ||
+    cacheReadTokens === undefined ||
+    !Number.isFinite(cacheReadTokens) ||
+    cacheReadTokens < 0
+  ) {
+    return undefined;
+  }
+
+  const promptTokens = inputTokens + cacheReadTokens;
+  if (promptTokens <= 0) return undefined;
+  return Math.round((cacheReadTokens / promptTokens) * 100);
+}
