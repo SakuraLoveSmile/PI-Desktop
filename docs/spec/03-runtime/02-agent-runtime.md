@@ -258,6 +258,12 @@ path's complete chain before the tool executes. This keeps rules lazy and
 prevents sibling-directory rules from persisting after the agent moves to a
 different file tree.
 
+Path-specific resolution is best-effort and has a 2-second deadline. If the
+resolver or its host RPC is unavailable or exceeds that deadline, the file
+tool continues with the runtime's base/root chain rather than waiting for the
+general host RPC timeout. A failed resolution never leaves a previously
+resolved sibling-directory chain active.
+
 All discovery stays within the session project root. Empty, unreadable, and
 out-of-root files are skipped. The combined UTF-8 content is capped at 32 KiB
 and source paths are labelled under `# Project instructions`.

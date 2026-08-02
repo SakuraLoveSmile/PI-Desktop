@@ -2381,7 +2381,10 @@ Each scenario is documented in this format:
   `AGENTS.md`; `CLAUDE.md` and `.claude/CLAUDE.md` are fallback names. The idle
   follow-up uses changed root content rather than reusing the prior runtime.
   Empty, unreadable, oversized, and out-of-root instruction files do not block
-  the turn; combined UTF-8 content is capped at 32 KiB.
+  the turn; combined UTF-8 content is capped at 32 KiB. If path-specific
+  resolution exceeds its two-second deadline or the host is unavailable, the
+  file tool continues with the base chain and does not retain a sibling
+  directory's rules.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`
 - **Acceptance**: C (chat/stream), F (persistence)
 - **Milestone**: M5

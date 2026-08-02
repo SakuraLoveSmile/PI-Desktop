@@ -45,6 +45,7 @@ import {
   loadComposerTemplates,
   globalInstructionPath,
   loadInstructionChain,
+  PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
   type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
@@ -1935,6 +1936,7 @@ async function startSidecar(): Promise<void> {
     const detail = await host?.call<{ session?: { projectPath?: string } | null }>(
       "session.get",
       { id: sessionId },
+      PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
     );
     return loadInstructionChain(detail?.session?.projectPath, path);
   });

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { estimateTokens } from "@earendil-works/pi-agent-core";
-import { DesktopAgentRuntime, type RuntimeProviderConfig } from "./runtime.js";
+import {
+  DesktopAgentRuntime,
+  PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
+  type RuntimeProviderConfig,
+} from "./runtime.js";
 import type {
   ContextCompactionRecord,
   ContextCompactionSettings,
@@ -192,6 +196,47 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await read.execute("tool-b", { path: "packages/b/file.ts" });
     expect((runtime as any).agent.state.systemPrompt).toContain("Use B rules.");
     expect((runtime as any).agent.state.systemPrompt).not.toContain("Use A rules.");
+    await runtime.dispose();
+  });
+
+  it("keeps file tools moving when path instruction resolution times out", async () => {
+    const host = {
+      call: vi
+        .fn()
+        .mockResolvedValueOnce({
+          entries: [
+            { source: "AGENTS.md", content: "Use root rules." },
+            { source: "packages/a/AGENTS.md", content: "Use A rules." },
+          ],
+        })
+        .mockResolvedValueOnce({ ok: true, content: "A contents" })
+        .mockRejectedValueOnce(new Error("parent host proxy timeout"))
+        .mockResolvedValueOnce({ ok: true, content: "B contents" }),
+    };
+    const runtime = createRuntime({
+      host,
+      projectInstructions: {
+        entries: [{ source: "AGENTS.md", content: "Use root rules." }],
+      },
+    });
+    const read = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Read",
+    );
+
+    await read.execute("tool-a", { path: "packages/a/file.ts" });
+    expect((runtime as any).agent.state.systemPrompt).toContain("Use A rules.");
+
+    await read.execute("tool-b", { path: "packages/b/file.ts" });
+
+    expect(host.call.mock.calls[2]).toEqual([
+      "project.instructions.resolve",
+      { sessionId: "session-1", path: "packages/b/file.ts" },
+      PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
+    ]);
+    expect(host.call.mock.calls[3][0]).toBe("tools.execute");
+    expect((runtime as any).agent.state.systemPrompt).toContain("Use root rules.");
+    expect((runtime as any).agent.state.systemPrompt).not.toContain("Use A rules.");
+
     await runtime.dispose();
   });
 });

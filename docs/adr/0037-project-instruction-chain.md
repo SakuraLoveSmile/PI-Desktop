@@ -41,6 +41,9 @@ workspace file access in Electron main and host-core.
 - Nested rules become available only when an agent accesses a matching path.
   Each file tool replaces the active chain with that target's complete chain,
   preventing sibling-directory rules from leaking into later tool calls.
+- Path-specific resolution is best-effort and bounded at two seconds. If the
+  resolver or its host RPC is unavailable, the tool falls back to the base
+  chain instead of waiting on the general host RPC deadline.
 - Root instruction changes rebuild an idle runtime on the next prompt. Nested
   rules are re-resolved for future file-path tool calls.
 - This private sidecar proxy remains constrained to a session id and a path

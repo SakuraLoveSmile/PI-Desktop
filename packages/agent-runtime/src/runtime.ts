@@ -128,6 +128,8 @@ const DEFAULT_MAX_TOKENS = 8_192;
 const CONTEXT_COMPACTION_TOOL_NAME = "CompactContext";
 const CONTEXT_NUDGE_TURN_INTERVAL = 3;
 const CHECKPOINT_TAIL_SAFETY_TOKENS = 256;
+/** Path-scoped rules are best-effort and must not stall a file tool turn. */
+export const PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS = 2_000;
 const PATH_SCOPED_INSTRUCTION_TOOLS = new Set([
   "Read",
   "Write",
@@ -960,13 +962,21 @@ export class DesktopAgentRuntime {
       resolved = await this.host.call<ProjectInstructions | undefined>(
         "project.instructions.resolve",
         { sessionId: this.sessionId, path },
+        PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
       );
     } catch {
+      // Path-scoped rules are best-effort. Do not carry a sibling path's rules
+      // into this tool call when the resolver or host is unavailable.
+      this.applyProjectInstructions(this.baseProjectInstructions);
       return;
     }
     // Rules are scoped to the file currently being accessed. Rebuild the
     // complete chain so sibling-directory rules never leak into one another
     // and edits to an existing instruction file take effect immediately.
+    this.applyProjectInstructions(resolved);
+  }
+
+  private applyProjectInstructions(resolved: ProjectInstructions | undefined): void {
     this.projectInstructions = resolved;
     const prompt = projectInstructionsPrompt(resolved);
     const skills = pluginSkillsPrompt(this.pluginSkills);

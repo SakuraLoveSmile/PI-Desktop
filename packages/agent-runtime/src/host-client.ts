@@ -71,7 +71,11 @@ export class HostClient {
     return () => this.notificationHandlers.delete(handler);
   }
 
-  async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+  async call<T = unknown>(
+    method: string,
+    params: unknown = {},
+    timeoutMs = 130_000,
+  ): Promise<T> {
     await this.ready;
     if (!this.available || this.child.exitCode !== null || this.child.killed) {
       throw this.unavailableError(`host RPC unavailable: ${method}`);
@@ -84,7 +88,7 @@ export class HostClient {
           this.pending.delete(id);
           reject(new Error(`host RPC timeout: ${method}`));
         }
-      }, 130_000);
+      }, timeoutMs);
       this.pending.set(id, { resolve, reject });
       try {
         this.child.stdin.write(payload, (err) => {

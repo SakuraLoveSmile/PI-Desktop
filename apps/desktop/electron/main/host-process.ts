@@ -133,7 +133,11 @@ export class HostProcess {
     return () => this.handlers.delete(handler);
   }
 
-  async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+  async call<T = unknown>(
+    method: string,
+    params: unknown = {},
+    timeoutMs = 130_000,
+  ): Promise<T> {
     if (!this.isAvailable()) {
       throw this.unavailableError(`host RPC unavailable: ${method}`);
     }
@@ -149,7 +153,7 @@ export class HostProcess {
           this.pending.delete(id);
           reject(new Error(`host RPC timeout: ${method}`));
         }
-      }, 130_000);
+      }, timeoutMs);
       this.pending.set(id, {
         resolve: (value) => {
           clearTimeout(timeout);

@@ -7,7 +7,11 @@ import { randomUUID } from "node:crypto";
 export class ParentHostProxy {
   private pending = new Map<
     string,
-    { resolve: (v: any) => void; reject: (e: Error) => void }
+    {
+      resolve: (v: any) => void;
+      reject: (e: Error) => void;
+      timeout: ReturnType<typeof setTimeout>;
+    }
   >();
   private notificationHandlers = new Set<(method: string, params: unknown) => void>();
 
@@ -17,6 +21,7 @@ export class ParentHostProxy {
       const pending = this.pending.get(String(msg.id));
       if (pending) {
         this.pending.delete(String(msg.id));
+        clearTimeout(pending.timeout);
         if (msg.error) {
           const err = new Error(msg.error.message) as Error & { data?: unknown };
           err.data = msg.error.data;
@@ -41,7 +46,11 @@ export class ParentHostProxy {
     return () => this.notificationHandlers.delete(handler);
   }
 
-  async call<T = unknown>(method: string, params: unknown = {}): Promise<T> {
+  async call<T = unknown>(
+    method: string,
+    params: unknown = {},
+    timeoutMs = 130_000,
+  ): Promise<T> {
     const id = randomUUID();
     const payload =
       JSON.stringify({
@@ -51,22 +60,27 @@ export class ParentHostProxy {
         params: { method, params },
       }) + "\n";
     return new Promise<T>((resolve, reject) => {
-      this.pending.set(id, {
-        resolve: resolve as (v: any) => void,
-        reject,
-      });
-      process.stdout.write(payload, (err) => {
-        if (err) {
-          this.pending.delete(id);
-          reject(err);
-        }
-      });
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         if (this.pending.has(id)) {
           this.pending.delete(id);
           reject(new Error(`parent host proxy timeout: ${method}`));
         }
-      }, 130_000);
+      }, timeoutMs);
+      this.pending.set(id, {
+        resolve: resolve as (v: any) => void,
+        reject,
+        timeout,
+      });
+      process.stdout.write(payload, (err) => {
+        if (err) {
+          const pending = this.pending.get(id);
+          if (pending) {
+            this.pending.delete(id);
+            clearTimeout(pending.timeout);
+            pending.reject(err);
+          }
+        }
+      });
     });
   }
 
