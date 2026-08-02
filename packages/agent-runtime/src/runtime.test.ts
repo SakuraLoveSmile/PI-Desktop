@@ -41,6 +41,7 @@ function createRuntime(
     history: UiMessage[];
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
+    projectPath: string;
     projectInstructions: import("./project-instructions.js").ProjectInstructions;
     pluginSkills: import("./plugin-skills-prompt.js").PluginSkillDef[];
     host: { call: ReturnType<typeof vi.fn> };
@@ -56,6 +57,7 @@ function createRuntime(
     history: overrides.history,
     compaction: overrides.compaction,
     compactionSettings: overrides.compactionSettings,
+    projectPath: overrides.projectPath,
     projectInstructions: overrides.projectInstructions,
     pluginSkills: overrides.pluginSkills,
     onEvent: overrides.onEvent ?? vi.fn(),
@@ -196,6 +198,67 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await read.execute("tool-b", { path: "packages/b/file.ts" });
     expect((runtime as any).agent.state.systemPrompt).toContain("Use B rules.");
     expect((runtime as any).agent.state.systemPrompt).not.toContain("Use A rules.");
+    await runtime.dispose();
+  });
+
+  it("claims one instruction chain per target directory within a prompt", async () => {
+    const host = {
+      call: vi
+        .fn()
+        .mockResolvedValueOnce({
+          entries: [{ source: "packages/api/AGENTS.md", content: "Use API rules." }],
+        })
+        .mockResolvedValue({ ok: true, content: "done" }),
+    };
+    const runtime = createRuntime({ host, projectPath: "/workspace/project" });
+    const read = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Read",
+    );
+
+    await read.execute("tool-a", { path: "packages/api/handler.ts" });
+    await read.execute("tool-b", { path: "packages/api/routes.ts" });
+
+    expect(
+      host.call.mock.calls.filter(
+        (call: unknown[]) => call[0] === "project.instructions.resolve",
+      ),
+    ).toHaveLength(1);
+    expect(host.call.mock.calls[0][1]).toEqual({
+      sessionId: "session-1",
+      path: "packages/api/handler.ts",
+      projectPath: "/workspace/project",
+    });
+    expect(host.call.mock.calls[1][0]).toBe("tools.execute");
+    expect(host.call.mock.calls[2][0]).toBe("tools.execute");
+    await runtime.dispose();
+  });
+
+  it("claims a fallback so one resolver failure cannot stall every sibling read", async () => {
+    const host = {
+      call: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("resolver unavailable"))
+        .mockResolvedValue({ ok: true, content: "done" }),
+    };
+    const runtime = createRuntime({
+      host,
+      projectInstructions: {
+        entries: [{ source: "AGENTS.md", content: "Use root rules." }],
+      },
+    });
+    const read = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Read",
+    );
+
+    await read.execute("tool-a", { path: "packages/api/handler.ts" });
+    await read.execute("tool-b", { path: "packages/api/routes.ts" });
+
+    expect(
+      host.call.mock.calls.filter(
+        (call: unknown[]) => call[0] === "project.instructions.resolve",
+      ),
+    ).toHaveLength(1);
+    expect((runtime as any).agent.state.systemPrompt).toContain("Use root rules.");
     await runtime.dispose();
   });
 

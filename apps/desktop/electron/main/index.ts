@@ -45,7 +45,6 @@ import {
   loadComposerTemplates,
   globalInstructionPath,
   loadInstructionChain,
-  PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
   type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
@@ -371,13 +370,17 @@ async function resolveAgentRuntimeLaunch(
     modelId,
     apiStyle: provider.apiStyle,
   });
-  const projectInstructions = await loadInstructionChain(session.projectPath);
+  const projectPath =
+    typeof session.projectPath === "string" && session.projectPath.trim()
+      ? session.projectPath.trim()
+      : undefined;
+  const projectInstructions = await loadInstructionChain(projectPath);
   // Skill catalog (D174): only id/name/description cross to the sidecar; the
   // document body is fetched on demand through the local `Skill` tool. Host
   // skills come first so a plugin's entry reads as a refinement of them.
   const pluginSkills = [
     ...builtinSkills({
-      workspacePath: session.projectPath,
+      workspacePath: projectPath,
       pluginPaths: plugins.listLoaded().map((loaded) => loaded.path),
     }),
     ...plugins.getSkills().map((skill) => ({
@@ -389,11 +392,13 @@ async function resolveAgentRuntimeLaunch(
   return {
     providerId: provider.id,
     modelId,
+    projectPath,
     sidecarParams: {
       sessionId,
       mode: session.mode || settings.defaultMode || "agent",
       thinkingLevel,
       scratchDir: join(dataDir, "scratch", sessionId),
+      projectPath,
       projectInstructions,
       compactionSettings: settings.contextCompaction,
       provider: {
@@ -1932,13 +1937,10 @@ function wireSidecar(s: AgentSidecar) {
 async function startSidecar(): Promise<void> {
   const s = new AgentSidecar((text) => logger.child("agent", text));
   wireSidecar(s);
-  s.setProjectInstructionResolver(async ({ sessionId, path }) => {
-    const detail = await host?.call<{ session?: { projectPath?: string } | null }>(
-      "session.get",
-      { id: sessionId },
-      PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
-    );
-    return loadInstructionChain(detail?.session?.projectPath, path);
+  s.setProjectInstructionResolver(async ({ projectPath, path }) => {
+    // The root is registered by Electron main from the host-owned session
+    // record. The sidecar can provide a target path, never an arbitrary root.
+    return loadInstructionChain(projectPath, path);
   });
   // Agent-driven work panel preview (D100): open a workspace HTML file in
   // the embedded browser; live reload keeps it current through later edits.
@@ -2681,6 +2683,7 @@ function registerIpc() {
     // Drop the session's pi-agent so a later session with the same id (or a
     // stale runtime) can't answer with this session's context.
     if (sidecar) {
+      sidecar.clearProjectInstructionRoot(id);
       await sidecar
         .call("agent.disposeSession", { sessionId: id })
         .catch(() => undefined);
@@ -2701,6 +2704,7 @@ function registerIpc() {
       // Drop the live pi-agent so the next prompt reseeds from the truncated
       // transcript instead of replaying the discarded branch in memory.
       if (sidecar) {
+        sidecar.clearProjectInstructionRoot(sessionId);
         await sidecar
           .call("agent.disposeSession", { sessionId })
           .catch(() => undefined);
@@ -2749,6 +2753,7 @@ function registerIpc() {
       if (!host) throw new Error("host unavailable");
       const sessionId = String(input?.sessionId || "");
       if (sidecar) {
+        sidecar.clearProjectInstructionRoot(sessionId);
         await sidecar
           .call("agent.disposeSession", { sessionId })
           .catch(() => undefined);
@@ -3719,6 +3724,7 @@ function registerIpc() {
         messages: kept,
       });
       if (sidecar) {
+        sidecar.clearProjectInstructionRoot(req.sessionId);
         await sidecar
           .call("agent.disposeSession", { sessionId: req.sessionId })
           .catch(() => undefined);
@@ -3733,6 +3739,7 @@ function registerIpc() {
       session,
       settings,
     );
+    sidecar.setProjectInstructionRoot(req.sessionId, launch.projectPath);
 
     // Open a durable turn row, then persist the user message under it.
     const turn = await host
@@ -3850,6 +3857,7 @@ function registerIpc() {
       detail.session,
       settings,
     );
+    sidecar.setProjectInstructionRoot(req.sessionId, launch.projectPath);
     const result = await sidecar.call("agent.compact", launch.sidecarParams);
     logger.app("info", "context compacted manually", {
       sessionId: req.sessionId,

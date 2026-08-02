@@ -40,6 +40,8 @@ type RuntimeParams = {
   pluginTools?: PluginToolDef[];
   pluginSkills?: PluginSkillDef[];
   scratchDir?: string;
+  /** Session-bound workspace root supplied by Electron main. */
+  projectPath?: string;
   projectInstructions?: ProjectInstructions;
   compactionSettings?: ContextCompactionSettings;
 };
@@ -97,6 +99,7 @@ async function runtimeFor(
     pluginToolNames,
     params.projectInstructions,
     pluginSkills,
+    params.projectPath,
   )
     ? existing
     : undefined;
@@ -140,6 +143,7 @@ async function runtimeFor(
     compactionSettings: params.compactionSettings,
     pluginTools,
     pluginSkills,
+    projectPath: params.projectPath,
     projectInstructions: params.projectInstructions,
     scratchDir:
       typeof params.scratchDir === "string" && params.scratchDir

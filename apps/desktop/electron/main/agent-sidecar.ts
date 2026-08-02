@@ -24,6 +24,8 @@ export type LocalToolHandler = (input: {
 export type ProjectInstructionResolver = (input: {
   sessionId: string;
   path: string;
+  /** Project root registered by Electron main for this session. */
+  projectPath?: string;
 }) => Promise<unknown>;
 
 // The sidecar runs model-directed code paths; it must not be able to pull
@@ -68,6 +70,10 @@ export class AgentSidecar {
   // work panel's WebContentsView) — host-core never sees these.
   private localTools = new Map<string, LocalToolHandler>();
   private projectInstructionResolver: ProjectInstructionResolver | null = null;
+  // The sidecar may request a path, but it never chooses the project root.
+  // Electron main registers this binding from the host-owned session record
+  // immediately before starting a runtime turn.
+  private projectInstructionRoots = new Map<string, string>();
 
   constructor(onStderr?: StderrHandler) {
     const entry = resolveSidecarEntry();
@@ -119,6 +125,18 @@ export class AgentSidecar {
     this.projectInstructionResolver = resolver;
   }
 
+  setProjectInstructionRoot(sessionId: string, projectPath?: string): void {
+    const id = sessionId.trim();
+    if (!id) return;
+    const root = projectPath?.trim();
+    if (root) this.projectInstructionRoots.set(id, root);
+    else this.projectInstructionRoots.delete(id);
+  }
+
+  clearProjectInstructionRoot(sessionId: string): void {
+    this.projectInstructionRoots.delete(sessionId.trim());
+  }
+
   setHost(host: HostProcess) {
     this.host = host;
     this.unsubscribeHost?.();
@@ -162,9 +180,11 @@ export class AgentSidecar {
           if (!this.projectInstructionResolver) {
             throw new Error("project instruction resolver unavailable");
           }
+          const sessionId = String(params.sessionId ?? "");
           const result = await this.projectInstructionResolver({
-            sessionId: String(params.sessionId ?? ""),
+            sessionId,
             path: String(params.path ?? ""),
+            projectPath: this.projectInstructionRoots.get(sessionId),
           });
           this.child.stdin.write(
             JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
@@ -263,6 +283,7 @@ export class AgentSidecar {
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.projectInstructionRoots.clear();
     this.unsubscribeHost?.();
     this.rejectAllPending(new Error("agent sidecar disposed"));
     this.child.kill();

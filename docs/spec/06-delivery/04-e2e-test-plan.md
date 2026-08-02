@@ -2384,11 +2384,16 @@ Each scenario is documented in this format:
   the turn; combined UTF-8 content is capped at 32 KiB. If path-specific
   resolution exceeds its two-second deadline or the host is unavailable, the
   file tool continues with the base chain and does not retain a sibling
-  directory's rules.
+  directory's rules. Repeated file tools in the same directory during one
+  prompt reuse one path-resolution claim; the next prompt resolves again so
+  changed instruction files are observed. The resolver uses the session-bound
+  project root passed at runtime launch and does not issue a per-file
+  `session.get` RPC.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`
 - **Acceptance**: C (chat/stream), F (persistence)
 - **Milestone**: M5
-- **Status**: Partially automated (`project-instructions.test.ts`); full
+- **Status**: Partially automated (`project-instructions.test.ts`,
+  `runtime.test.ts`); full
   provider/UI journey Draft
 
 #### E2E-AGENTS-002: Global settings and project menus manage instruction files

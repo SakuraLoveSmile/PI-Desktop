@@ -106,6 +106,7 @@ apart without guessing:
 | approval | host-core `tools.execute` | `permission_wait_ms` |
 | tool body | host-core tool implementation | `execute_ms` (`durationMs` in audit) |
 | host bookkeeping | host-core (workspace resolve, lock, artifacts, audit) | `overhead_ms` |
+| instruction preflight | sidecar, path-scoped chain before `tools.execute` | `instructionResolveMs` |
 | host round trip incl. IPC | sidecar around `tools.execute` | `hostRttMs` |
 | provider first token | sidecar, request → `message_start` | `providerWaitMs` |
 | provider streaming | sidecar, `message_start` → `message_end` | `streamMs` |
@@ -120,6 +121,10 @@ apart without guessing:
 - `hostRttMs` minus the host's `total_ms` for the same `toolCallId` is the
   stdio/IPC cost; `providerWaitMs` covers pi-ai's own retry backoff, so a
   provider that burns its retries shows up there rather than as a slow tool.
+- `instructionResolveMs` measures the path-scoped instruction preflight and
+  does not belong to the command body. `instructionCacheHit=true` identifies a
+  same-prompt directory claim; `instructionFallback=base` identifies a
+  timeout or resolver failure that continued with the runtime's base chain.
 - failed or aborted turns still emit a `kind=model` line with the outcome, so
   a turn that never produced tokens is still measurable.
 

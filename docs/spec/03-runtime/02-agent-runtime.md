@@ -258,6 +258,14 @@ path's complete chain before the tool executes. This keeps rules lazy and
 prevents sibling-directory rules from persisting after the agent moves to a
 different file tree.
 
+The session-bound project root is passed with the runtime launch metadata and
+registered by Electron main before each prompt or compaction request. The
+sidecar cannot select a different root. During one prompt, path-resolution
+claims are cached by project root and target directory, so repeated file tools
+in the same directory do not perform another IPC request. Claims are discarded
+at the next prompt, allowing edits and newly created instruction files to take
+effect without a stale cross-message cache.
+
 Path-specific resolution is best-effort and has a 2-second deadline. If the
 resolver or its host RPC is unavailable or exceeds that deadline, the file
 tool continues with the runtime's base/root chain rather than waiting for the
@@ -269,7 +277,10 @@ out-of-root files are skipped. The combined UTF-8 content is capped at 32 KiB
 and source paths are labelled under `# Project instructions`.
 The sidecar never reads workspace instructions directly. A changed root chain
 recreates an idle runtime on its next prompt; nested instructions are resolved
-again when a relevant file tool runs.
+again when a relevant file tool runs. The sidecar timing line records
+`instructionResolveMs`, `instructionCacheHit`, and `instructionFallback`
+separately from `hostRttMs` so a slow preflight cannot be mistaken for a slow
+command body.
 
 Settings provides dedicated management for the fixed global path. The Projects
 view project-list menu provides an `AGENTS.md` editor for its corresponding

@@ -136,6 +136,24 @@ const PATH_SCOPED_INSTRUCTION_TOOLS = new Set([
   "Edit",
   "BrowserPreview",
 ]);
+
+type PathInstructionResolution = {
+  instructions?: ProjectInstructions;
+  fallback: boolean;
+};
+
+type PathInstructionTiming = {
+  durationMs: number;
+  cacheHit: boolean;
+  fallback: boolean;
+};
+
+function pathInstructionScope(path: string): string {
+  const normalized = path.replaceAll("\\", "/");
+  const slash = normalized.lastIndexOf("/");
+  return slash >= 0 ? normalized.slice(0, slash) || "/" : ".";
+}
+
 const CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER =
   "\n\n[checkpoint truncated: tool result exceeded the retained context budget]\n\n";
 const CONTEXT_COMPACTION_NUDGE = [
@@ -218,6 +236,8 @@ export type AgentRuntimeOptions = {
   provider: RuntimeProviderConfig;
   thinkingLevel: ThinkingLevel;
   systemPrompt?: string;
+  /** Session-bound workspace root used for path-scoped instruction requests. */
+  projectPath?: string;
   /** Instructions resolved from the session's workspace. */
   projectInstructions?: ProjectInstructions;
   /** Persisted transcript to seed the agent with (session isolation: each
@@ -464,9 +484,15 @@ export class DesktopAgentRuntime {
   private pluginTools: PluginToolDef[];
   private pluginSkills: PluginSkillDef[];
   private scratchDir?: string;
+  private projectPath?: string;
   private baseSystemPrompt: string;
   private baseProjectInstructions?: ProjectInstructions;
   private projectInstructions?: ProjectInstructions;
+  /** Per-prompt claims prevent repeated path-resolution RPCs for one directory. */
+  private pathInstructionClaims = new Map<
+    string,
+    Promise<PathInstructionResolution>
+  >();
   /* Timing anchors (D137). `requestStartedAt` marks the moment the agent is
    * free to issue the next provider request — turn start, or the last tool
    * result coming back — so `providerWaitMs` below is the model's own latency
@@ -497,6 +523,7 @@ export class DesktopAgentRuntime {
     this.pluginTools = opts.pluginTools ?? [];
     this.pluginSkills = opts.pluginSkills ?? [];
     this.scratchDir = opts.scratchDir;
+    this.projectPath = opts.projectPath?.trim() || undefined;
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
     this.compactionSettings = normalizeCompactionSettings(
@@ -598,6 +625,7 @@ export class DesktopAgentRuntime {
     pluginToolNames: string[] = [],
     projectInstructions?: ProjectInstructions,
     pluginSkills: PluginSkillDef[] = [],
+    projectPath?: string,
   ): boolean {
     // Keep the pre-thinking overload usable for callers that passed plugin
     // names as the third argument. New callers pass the selected level.
@@ -640,6 +668,7 @@ export class DesktopAgentRuntime {
       current === next &&
       safeJson(this.baseProjectInstructions ?? null) ===
         safeJson(projectInstructions ?? null) &&
+      (this.projectPath ?? "") === (projectPath?.trim() ?? "") &&
       // Enabling a plugin, revoking agent.prompt.inject or renaming a skill
       // changes the catalog digest, which retires the runtime and its stale
       // prompt. Bodies are excluded: the Skill tool always reads them fresh.
@@ -861,7 +890,7 @@ export class DesktopAgentRuntime {
       description: describe(toolName),
       parameters: Type.Object(parameters[toolName] ?? { command: Type.String() }),
       execute: async (toolCallId, params) => {
-        await this.loadPathInstructions(toolName, params);
+        const instructionTiming = await this.loadPathInstructions(toolName, params);
         const startedAt = Date.now();
         const result = await this.host.call<{
           ok: boolean;
@@ -887,6 +916,9 @@ export class DesktopAgentRuntime {
           sessionId: this.sessionId,
           turnId: this.turnId,
           hostRttMs: Date.now() - startedAt,
+          instructionResolveMs: instructionTiming?.durationMs,
+          instructionCacheHit: instructionTiming?.cacheHit,
+          instructionFallback: instructionTiming?.fallback ? "base" : undefined,
           ok: result.ok,
           errorCode: result.errorCode,
         });
@@ -948,32 +980,51 @@ export class DesktopAgentRuntime {
   private async loadPathInstructions(
     toolName: string,
     params: unknown,
-  ): Promise<void> {
+  ): Promise<PathInstructionTiming | undefined> {
     if (!PATH_SCOPED_INSTRUCTION_TOOLS.has(toolName)) {
-      return;
+      return undefined;
     }
     const path = isRecord(params) && typeof params.path === "string"
       ? params.path.trim()
       : "";
-    if (!path) return;
+    if (!path) return undefined;
 
-    let resolved: ProjectInstructions | undefined;
-    try {
-      resolved = await this.host.call<ProjectInstructions | undefined>(
-        "project.instructions.resolve",
-        { sessionId: this.sessionId, path },
-        PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
-      );
-    } catch {
-      // Path-scoped rules are best-effort. Do not carry a sibling path's rules
-      // into this tool call when the resolver or host is unavailable.
-      this.applyProjectInstructions(this.baseProjectInstructions);
-      return;
+    const key = `${this.projectPath ?? ""}\u0000${pathInstructionScope(path)}`;
+    const startedAt = Date.now();
+    let resolution = this.pathInstructionClaims.get(key);
+    const cacheHit = resolution !== undefined;
+    if (!resolution) {
+      resolution = this.host
+        .call<ProjectInstructions | undefined>(
+          "project.instructions.resolve",
+          {
+            sessionId: this.sessionId,
+            path,
+            ...(this.projectPath ? { projectPath: this.projectPath } : {}),
+          },
+          PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
+        )
+        .then((instructions) => ({ instructions, fallback: false }))
+        .catch(() => ({
+          // Path-scoped rules are best-effort. Do not carry a sibling path's
+          // rules into this tool call when the resolver or host is unavailable.
+          instructions: undefined,
+          fallback: true,
+        }));
+      this.pathInstructionClaims.set(key, resolution);
     }
+    const resolved = await resolution;
     // Rules are scoped to the file currently being accessed. Rebuild the
     // complete chain so sibling-directory rules never leak into one another
     // and edits to an existing instruction file take effect immediately.
-    this.applyProjectInstructions(resolved);
+    this.applyProjectInstructions(
+      resolved.fallback ? this.baseProjectInstructions : resolved.instructions,
+    );
+    return {
+      durationMs: Date.now() - startedAt,
+      cacheHit,
+      fallback: resolved.fallback,
+    };
   }
 
   private applyProjectInstructions(resolved: ProjectInstructions | undefined): void {
@@ -1715,6 +1766,9 @@ export class DesktopAgentRuntime {
 
   async prompt(content: string, userMessageId?: string): Promise<{ turnId: string }> {
     if (this.disposed) throw new Error("runtime disposed");
+    // Claims are message-scoped: a later prompt must observe edited or newly
+    // created instruction files instead of reusing a previous chain.
+    this.pathInstructionClaims.clear();
     this.turnId = randomUUID();
     this.pendingUserMessageId = userMessageId;
     this.pendingOverflow = false;
@@ -1808,6 +1862,7 @@ export class DesktopAgentRuntime {
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.pathInstructionClaims.clear();
     this.agent.abort();
     this.compactionAbort?.abort();
   }

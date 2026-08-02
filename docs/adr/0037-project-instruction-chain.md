@@ -32,6 +32,11 @@ workspace file access in Electron main and host-core.
    tool executes, the sidecar may request a path-specific chain through the
    Electron-owned `project.instructions.resolve` local proxy. The sidecar does
    not read instruction files directly.
+6. Electron main passes the session-bound project root with runtime launch
+   metadata and registers it before each prompt or compaction request. The
+   local proxy resolves the target path against that main-owned binding instead
+   of issuing a per-file `session.get` RPC. The sidecar caches one resolution
+   claim per project-root/target-directory pair for the current prompt only.
 
 ## Consequences
 
@@ -44,6 +49,8 @@ workspace file access in Electron main and host-core.
 - Path-specific resolution is best-effort and bounded at two seconds. If the
   resolver or its host RPC is unavailable, the tool falls back to the base
   chain instead of waiting on the general host RPC deadline.
+- Path preflight records its own duration and cache/fallback markers so
+  `hostRttMs` continues to describe the actual host tool call.
 - Root instruction changes rebuild an idle runtime on the next prompt. Nested
   rules are re-resolved for future file-path tool calls.
 - This private sidecar proxy remains constrained to a session id and a path
