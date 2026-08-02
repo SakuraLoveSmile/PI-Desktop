@@ -163,16 +163,20 @@ permission gate and result envelope stay in host-core:
    `ToolsExecuteResult` to the sidecar. Dispatch timeout maps to
    `TOOL_TIMEOUT`; an unknown/unloaded tool maps to `TOOL_NOT_FOUND`.
 
-The model-facing toolset gains plugin tools per prompt: main passes
-registered defs (`fullName`, description, JSON-schema parameters) to
-`agent.prompt`, and the runtime appends them to the built-in six.
-Covered by protocol smoke scenario E2E-024.
+The model-facing registry gains plugin tools per prompt: main passes registered
+defs (`fullName`, description, JSON-schema parameters) to `agent.prompt`, and
+the runtime keeps them in a deferred catalog instead of serializing every
+schema into the first request. The model loads a matching plugin tool through
+the local `ToolSearch` tool; the next turn receives the selected schema and
+then uses the same host permission/dispatch path above. Covered by protocol
+smoke scenario E2E-024 and the runtime-loading scenario E2E-008a.
 
 Tools discovered from a plugin's MCP servers enter the same registry under
 `plugin_<pluginIdSafe>_<serverId>_<toolName>`, so steps 1–4 above are unchanged;
 only step 3 differs internally, forwarding to the MCP client instead of plugin JS.
 
 Skills use a separate, simpler path. The catalog (id, name, description) is part
-of the base system prompt, and the body is fetched by a local `Skill` tool that
-Electron main serves directly — the sidecar never holds skill text, and a skill
-document reaches the model only when it asks for it (D174).
+of the base system prompt, the `Skill` schema is itself deferred behind
+`ToolSearch`, and its body is fetched by a local `Skill` tool that Electron main
+serves directly — the sidecar never holds skill text, and a skill document
+reaches the model only when it asks for it (D174/D185).

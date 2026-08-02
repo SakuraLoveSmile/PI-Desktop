@@ -245,6 +245,34 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 + [optional user custom instructions]
 ```
 
+### 7.1 Active tool context and on-demand loading (D185, ADR 0048)
+
+The sidecar builds one complete tool registry, but it does not serialize every
+registered schema into every provider request. Each new user prompt starts with
+the mode's core set plus `CompactContext` when automatic compaction is enabled:
+
+- Agent: `Read`, `Glob`, `Grep`, `Write`, `Edit`, and `Bash`
+- Chat: `Read`, `Glob`, and `Grep`
+- both modes: `ToolSearch` when at least one deferred capability exists
+
+`BrowserPreview`, plugin tools, `Skill`, and plugin-development helpers are
+registered but deferred. Their names and compact one-line descriptions appear
+in an `# On-demand tools` catalog; parameter schemas do not. The catalog is
+bounded so a plugin with many tools cannot recreate the original prompt bloat.
+The model calls `ToolSearch` with an exact name or a short capability query.
+The sidecar activates up to four matches, returns their names through
+pi-agent-core's `addedToolNames`, and rebuilds the next-turn context with those
+schemas. Providers with native deferred-tool search receive the definitions at
+that load point; other providers receive the active definitions normally.
+
+Deferred activation is reset before each new user prompt, so a previous task
+cannot make an unrelated first request carry a growing tool set. The tool
+registry, host permission path, tool timeout, and workspace containment rules
+remain unchanged. `ToolSearch` is local to the sidecar and does not cross the
+host RPC boundary. Its activation marker is retained in the persisted tool
+result so a restored transcript remains provider-valid, although a restarted
+runtime still requires a fresh search before reusing a deferred capability.
+
 The Electron main process first resolves the global
 `~/.pi/agent/AGENTS.md`, then project instruction files inside the
 session-bound project root when a runtime starts. For each project directory it

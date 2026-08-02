@@ -30,6 +30,25 @@ Let the agent get things done, but stay under control by default.
 
 > Names may be fine-tuned during implementation, but semantics stay consistent.
 
+### 2.1 Deferred ancillary tools (D185, ADR 0048)
+
+The six Agent tools and three Chat tools above are the core tool context and are
+available on the first model request. The runtime also registers ancillary
+capabilities without sending their full schemas up front:
+
+- `BrowserPreview`
+- `PluginCheck`, `PluginScaffold`, and `PluginPack`
+- plugin-declared agent tools
+- `Skill` when an enabled plugin contributes skills
+
+These tools appear in a bounded `# On-demand tools` catalog with compact
+descriptions. The model calls the local `ToolSearch` tool with an exact name or
+capability query; the matching schemas become available on the next model turn.
+The sidecar resets this deferred set at the beginning of every new user prompt.
+The host permission, workspace/scratch containment, timeout, and audit rules do
+not change when a tool is loaded. `ToolSearch` itself never executes a workspace
+operation and never bypasses host-core policy.
+
 ## 3. Common Tool Constraints
 
 Every tool must have:

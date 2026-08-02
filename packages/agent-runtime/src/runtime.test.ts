@@ -37,12 +37,14 @@ const provider: RuntimeProviderConfig = {
 function createRuntime(
   overrides: Partial<{
     provider: RuntimeProviderConfig;
+    mode: "chat" | "agent";
     thinkingLevel: ThinkingLevel;
     history: UiMessage[];
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
     projectPath: string;
     projectInstructions: import("./project-instructions.js").ProjectInstructions;
+    pluginTools: import("./runtime.js").PluginToolDef[];
     pluginSkills: import("./plugin-skills-prompt.js").PluginSkillDef[];
     host: { call: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
@@ -51,7 +53,7 @@ function createRuntime(
   return new DesktopAgentRuntime({
     host: (overrides.host ?? { call: vi.fn() }) as never,
     sessionId: "session-1",
-    mode: "agent",
+    mode: overrides.mode ?? "agent",
     provider: overrides.provider ?? provider,
     thinkingLevel: overrides.thinkingLevel ?? "medium",
     history: overrides.history,
@@ -59,6 +61,7 @@ function createRuntime(
     compactionSettings: overrides.compactionSettings,
     projectPath: overrides.projectPath,
     projectInstructions: overrides.projectInstructions,
+    pluginTools: overrides.pluginTools,
     pluginSkills: overrides.pluginSkills,
     onEvent: overrides.onEvent ?? vi.fn(),
   });
@@ -157,9 +160,19 @@ describe("DesktopAgentRuntime configuration matching", () => {
         .mockResolvedValueOnce({ ok: true, content: "done" }),
     };
     const runtime = createRuntime({ host });
-    const tool = (runtime as any).agent.state.tools.find(
+    let tool = (runtime as any).agent.state.tools.find(
       (candidate: any) => candidate.name === toolName,
     );
+    if (!tool) {
+      const search = (runtime as any).agent.state.tools.find(
+        (candidate: any) => candidate.name === "ToolSearch",
+      );
+      await search.execute("search-1", { query: toolName });
+      await (runtime as any).rebuiltAgentContext();
+      tool = (runtime as any).agent.state.tools.find(
+        (candidate: any) => candidate.name === toolName,
+      );
+    }
 
     await tool.execute(`tool-${toolName}`, params);
 
@@ -299,6 +312,131 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect(host.call.mock.calls[3][0]).toBe("tools.execute");
     expect((runtime as any).agent.state.systemPrompt).toContain("Use root rules.");
     expect((runtime as any).agent.state.systemPrompt).not.toContain("Use A rules.");
+
+    await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime deferred tool catalog", () => {
+  it("keeps the first agent request on core tools plus discovery", async () => {
+    const runtime = createRuntime({
+      pluginTools: [
+        {
+          name: "plugin_demo_validate",
+          description: "Validate a plugin package.",
+          parameters: {},
+        },
+      ],
+      pluginSkills: [
+        {
+          id: "demo/release-notes",
+          name: "Release notes",
+          description: "Draft release notes.",
+        },
+      ],
+    });
+    const tools = (runtime as any).agent.state.tools as Array<{ name: string }>;
+    const names = tools.map((tool) => tool.name);
+
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Edit",
+        "Bash",
+        "CompactContext",
+        "ToolSearch",
+      ]),
+    );
+    expect(names).not.toContain("BrowserPreview");
+    expect(names).not.toContain("PluginCheck");
+    expect(names).not.toContain("plugin_demo_validate");
+    expect(names).not.toContain("Skill");
+
+    const prompt = (runtime as any).agent.state.systemPrompt as string;
+    expect(prompt).toContain("# On-demand tools");
+    expect(prompt).toContain("BrowserPreview");
+    expect(prompt).toContain("plugin_demo_validate");
+
+    await runtime.dispose();
+  });
+
+  it("keeps chat on the read-only core while sharing discovery", async () => {
+    const runtime = createRuntime({ mode: "chat" });
+    const names = (runtime as any).agent.state.tools.map(
+      (tool: any) => tool.name,
+    );
+
+    expect(names).toEqual(
+      expect.arrayContaining(["Read", "Glob", "Grep", "CompactContext", "ToolSearch"]),
+    );
+    expect(names).not.toContain("Write");
+    expect(names).not.toContain("Edit");
+    expect(names).not.toContain("Bash");
+
+    await runtime.dispose();
+  });
+
+  it("activates matching tools for the next model turn", async () => {
+    const runtime = createRuntime();
+    const agent = (runtime as any).agent;
+    const search = agent.state.tools.find(
+      (tool: any) => tool.name === "ToolSearch",
+    );
+
+    const result = await search.execute("search-1", { query: "BrowserPreview" });
+    expect(result.addedToolNames).toEqual(["BrowserPreview"]);
+    expect(agent.state.tools.some((tool: any) => tool.name === "BrowserPreview")).toBe(
+      false,
+    );
+
+    const next = await (runtime as any).prepareNextTurn({
+      context: { systemPrompt: "", messages: [], tools: agent.state.tools },
+      messages: [],
+      newMessages: [],
+      toolResults: [
+        {
+          role: "toolResult",
+          toolCallId: "search-1",
+          toolName: "ToolSearch",
+          content: result.content,
+          details: result.details,
+          addedToolNames: result.addedToolNames,
+          isError: false,
+          timestamp: Date.now(),
+        },
+      ],
+    });
+    expect(next.context.tools.some((tool: any) => tool.name === "BrowserPreview")).toBe(
+      true,
+    );
+
+    await runtime.dispose();
+  });
+
+  it("resets deferred capabilities at the beginning of a new prompt", async () => {
+    const runtime = createRuntime();
+    const agent = (runtime as any).agent;
+    const search = agent.state.tools.find(
+      (tool: any) => tool.name === "ToolSearch",
+    );
+    await search.execute("search-1", { query: "BrowserPreview" });
+    await (runtime as any).prepareNextTurn({
+      context: { systemPrompt: "", messages: [], tools: agent.state.tools },
+      messages: [],
+      newMessages: [],
+      toolResults: [],
+    });
+    expect(agent.state.tools.some((tool: any) => tool.name === "BrowserPreview")).toBe(
+      true,
+    );
+
+    (runtime as any).resetDeferredToolsForPrompt();
+    expect(agent.state.tools.some((tool: any) => tool.name === "BrowserPreview")).toBe(
+      false,
+    );
 
     await runtime.dispose();
   });
@@ -627,6 +765,36 @@ describe("DesktopAgentRuntime tool history restore (D120)", () => {
           text: "[tool call was interrupted before a result was recorded]",
         },
       ],
+    });
+
+    await runtime.dispose();
+  });
+
+  it("restores deferred tool activation markers from persisted results", async () => {
+    const runtime = createRuntime({
+      history: [
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "Loading the preview tool.",
+          createdAt: new Date().toISOString(),
+          status: "complete",
+        },
+        toolRow({
+          toolName: "ToolSearch",
+          toolResult: {
+            content: [{ type: "text", text: "Activated BrowserPreview." }],
+            details: { activated: ["BrowserPreview"] },
+            addedToolNames: ["BrowserPreview"],
+          },
+        }),
+      ],
+    });
+    const messages = (runtime as any).agent.state.messages;
+
+    expect(messages[1]).toMatchObject({
+      role: "toolResult",
+      addedToolNames: ["BrowserPreview"],
     });
 
     await runtime.dispose();
@@ -1436,7 +1604,7 @@ describe("DesktopAgentRuntime plugin skills (D174)", () => {
     },
   ];
 
-  it("advertises the catalog and offers the Skill tool", async () => {
+  it("advertises the catalog and loads the Skill tool on demand", async () => {
     const runtime = createRuntime({
       pluginSkills,
       projectInstructions: {
@@ -1450,6 +1618,12 @@ describe("DesktopAgentRuntime plugin skills (D174)", () => {
     expect(prompt).toContain("`demo.hello/release-notes`");
     // Only the catalog line travels up front; the body loads on demand.
     expect(prompt).not.toContain("Skill: Release notes");
+    expect(agent.state.tools.some((tool: any) => tool.name === "Skill")).toBe(false);
+    const search = agent.state.tools.find(
+      (tool: any) => tool.name === "ToolSearch",
+    );
+    await search.execute("search-1", { query: "Skill" });
+    await (runtime as any).rebuiltAgentContext();
     expect(agent.state.tools.some((tool: any) => tool.name === "Skill")).toBe(true);
     // The user's own instructions come last, so they keep the final word.
     expect(prompt.indexOf("# Skills")).toBeLessThan(
@@ -1515,6 +1689,11 @@ describe("DesktopAgentRuntime plugin skills (D174)", () => {
       call: vi.fn().mockResolvedValue({ ok: true, content: "# Skill: Release notes" }),
     };
     const runtime = createRuntime({ pluginSkills, host });
+    const search = (runtime as any).agent.state.tools.find(
+      (entry: any) => entry.name === "ToolSearch",
+    );
+    await search.execute("search-1", { query: "Skill" });
+    await (runtime as any).rebuiltAgentContext();
     const tool = (runtime as any).agent.state.tools.find(
       (entry: any) => entry.name === "Skill",
     );
