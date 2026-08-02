@@ -401,7 +401,8 @@ type Block =
   | { type: "thinking"; text: string }
   | { type: "tool_call"; callId: string; name: string; args: unknown;
       status: "ok" | "error" | "denied"; result?: unknown;
-      completedAt?: string; durationMs?: number }
+      completedAt?: string; durationMs?: number;
+      toolUsage?: ToolTokenUsage }
   | { type: "attachment"; kind: "image" | "file"; name: string;
       ref: string /* attachments/<sha256> or absolute path */ };
 ```
@@ -412,7 +413,9 @@ type Block =
   derived `text` column contains final answer text, so transcript search and
   answer previews do not expose or mix reasoning.
 - Per-response usage/model metadata rides in the file line's `meta` object;
-  `turns` holds the summable rollup — no `json_each` at query time.
+  `turns` holds the summable rollup — no `json_each` at query time. Optional
+  response stream duration and estimated tool token footprints are preserved
+  with the message metadata so the context inspector survives reload.
 - Ordering: `seq` is allocated O(1) inside the index transaction via
   `UPDATE sessions SET last_seq = last_seq + 1 … RETURNING last_seq`; the
   file's line order is the same ordering. `UNIQUE(session_id, seq)` doubles

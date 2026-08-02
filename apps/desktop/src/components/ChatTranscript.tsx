@@ -33,6 +33,8 @@ import { reduceTranscriptScroll } from "../lib/transcript-scroll";
 import {
   assistantTurnContent,
   assistantTurnMessages,
+  assistantTurnResponseDuration,
+  assistantTurnTools,
   assistantTurnUsage,
   buildTranscriptEntries,
   messageThinking as thinkingText,
@@ -41,7 +43,9 @@ import {
 } from "../lib/assistant-turns";
 import {
   calculateContextUsage,
+  calculateTokenRate,
   DEFAULT_CONTEXT_WINDOW,
+  toolTokenUsage,
   latestMessageUsage,
   resolveContextWindow,
   usageTokenTotal,
@@ -108,22 +112,38 @@ function formatTokenCount(value: number): string {
   return String(value);
 }
 
-const CONTEXT_RING_RADIUS = 15;
+const CONTEXT_RING_RADIUS = 9;
 const CONTEXT_RING_CIRCUMFERENCE = 2 * Math.PI * CONTEXT_RING_RADIUS;
 
-function ContextUsageRing({
+function ContextUsageInspector({
   usage,
   turnUsage,
   contextWindow,
+  tools,
+  responseDurationMs,
 }: {
   usage: MessageUsage;
   turnUsage: MessageUsage;
   contextWindow: number;
+  tools: UiMessage[];
+  responseDurationMs?: number;
 }) {
   const { t } = useTranslation();
   const tooltipId = useId();
   const context = calculateContextUsage(usage, contextWindow);
   const turnTotal = usageTokenTotal(turnUsage);
+  const throughput = calculateTokenRate(
+    turnUsage.outputTokens,
+    responseDurationMs,
+  );
+  const toolRows = tools.map((message) => ({
+    message,
+    usage: toolTokenUsage(message),
+  }));
+  const toolTotal = toolRows.reduce(
+    (total, row) => total + row.usage.totalTokens,
+    0,
+  );
   const level =
     context.remainingPercent <= 10
       ? "critical"
@@ -132,105 +152,190 @@ function ContextUsageRing({
         : "comfortable";
 
   return (
-    <span
-      className="context-usage"
+    <div
+      className="context-inspector"
       data-level={level}
-      tabIndex={0}
-      role="img"
       aria-label={t("chat.usageContextAria", {
         percent: context.remainingPercent,
         remaining: formatTokenCount(context.remainingTokens),
       })}
-      aria-describedby={tooltipId}
     >
-      <svg
-        className="context-usage-ring"
-        viewBox="0 0 40 40"
-        aria-hidden="true"
+      <button
+        type="button"
+        className="context-inspector-trigger"
+        aria-describedby={tooltipId}
+        aria-label={t("chat.usageContextAria", {
+          percent: context.remainingPercent,
+          remaining: formatTokenCount(context.remainingTokens),
+        })}
       >
-        <circle
-          className="context-usage-ring-track"
-          cx="20"
-          cy="20"
-          r={CONTEXT_RING_RADIUS}
-        />
-        <circle
-          className="context-usage-ring-progress"
-          cx="20"
-          cy="20"
-          r={CONTEXT_RING_RADIUS}
-          strokeDasharray={CONTEXT_RING_CIRCUMFERENCE}
-          strokeDashoffset={
-            CONTEXT_RING_CIRCUMFERENCE * (1 - context.remainingRatio)
-          }
-        />
-      </svg>
-      <span className="context-usage-value" aria-hidden="true">
-        {context.remainingPercent}%
-      </span>
-      <span
-        className="context-usage-popover"
+        <svg
+          className="context-inspector-ring"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle
+            className="context-inspector-ring-track"
+            cx="12"
+            cy="12"
+            r={CONTEXT_RING_RADIUS}
+          />
+          <circle
+            className="context-inspector-ring-progress"
+            cx="12"
+            cy="12"
+            r={CONTEXT_RING_RADIUS}
+            strokeDasharray={CONTEXT_RING_CIRCUMFERENCE}
+            strokeDashoffset={
+              CONTEXT_RING_CIRCUMFERENCE * (1 - context.remainingRatio)
+            }
+          />
+        </svg>
+        <span className="context-inspector-trigger-copy">
+          <span>{t("chat.usageContextLabel")}</span>
+          <strong>{context.remainingPercent}%</strong>
+        </span>
+      </button>
+      <div
+        className="context-inspector-popover"
         id={tooltipId}
         role="tooltip"
       >
-        <span className="context-usage-popover-header">
-          <span>{t("chat.usageContextRemaining")}</span>
-          <strong>{context.remainingPercent}%</strong>
-        </span>
-        <span className="context-usage-popover-window">
-          {formatTokenCount(context.remainingTokens)} / {formatTokenCount(contextWindow)}
-        </span>
-        <span className="context-usage-popover-caption">
-          {t("chat.usageContextWindow", {
-            count: formatTokenCount(contextWindow),
+        <div className="context-inspector-heading">
+          <div>
+            <span className="context-inspector-eyebrow">
+              {t("chat.usageContextLabel")}
+            </span>
+            <strong>
+              {t("chat.usageContextLeft", {
+                count: formatTokenCount(context.remainingTokens),
+              })}
+            </strong>
+          </div>
+          <strong className="context-inspector-remaining">
+            {context.remainingPercent}%
+          </strong>
+        </div>
+        <div className="context-inspector-window">
+          {t("chat.usageContextTokens", {
+            used: formatTokenCount(context.usedTokens),
+            window: formatTokenCount(contextWindow),
           })}
-        </span>
-        <span className="context-usage-meter" aria-hidden="true">
+        </div>
+        <div className="context-inspector-meter" aria-hidden="true">
           <span style={{ width: `${context.usedPercent}%` }} />
-        </span>
-        <span className="context-usage-popover-used">
-          {t("chat.usageContextUsed", {
-            percent: context.usedPercent,
-            count: formatTokenCount(context.usedTokens),
-          })}
-        </span>
-        <span className="context-usage-breakdown-title">
-          {t("chat.usageBreakdown")}
-        </span>
-        <span className="context-usage-breakdown-row">
-          <span>{t("chat.usageTurnTotal")}</span>
-          <strong>{formatTokenCount(turnTotal)}</strong>
-        </span>
-        <span className="context-usage-breakdown">
-          <span className="context-usage-breakdown-row">
-            <span>{t("chat.usageInput")}</span>
-            <strong>{formatTokenCount(turnUsage.inputTokens)}</strong>
-          </span>
-          <span className="context-usage-breakdown-row">
-            <span>{t("chat.usageOutput")}</span>
-            <strong>{formatTokenCount(turnUsage.outputTokens)}</strong>
-          </span>
-          {turnUsage.cacheReadTokens !== undefined ? (
-            <span className="context-usage-breakdown-row">
-              <span>{t("chat.usageCacheRead")}</span>
-              <strong>{formatTokenCount(turnUsage.cacheReadTokens)}</strong>
+        </div>
+        <div className="context-inspector-kpis">
+          <div>
+            <span>{t("chat.usageTurnTotal")}</span>
+            <strong>{formatTokenCount(turnTotal)}</strong>
+          </div>
+          <div>
+            <span>{t("chat.usageThroughputLabel")}</span>
+            <strong>
+              {throughput === undefined
+                ? t("chat.usageThroughputUnavailable")
+                : t("chat.usageThroughput", {
+                    count: formatTokenCount(throughput),
+                  })}
+            </strong>
+          </div>
+        </div>
+        <div className="context-inspector-section">
+          <div className="context-inspector-section-heading">
+            <strong>{t("chat.usageProviderUsage")}</strong>
+            <span>{t("chat.usageExact")}</span>
+          </div>
+          <div className="context-inspector-breakdown">
+            <div className="context-inspector-row">
+              <span>{t("chat.usageInput")}</span>
+              <strong>{formatTokenCount(turnUsage.inputTokens)}</strong>
+            </div>
+            <div className="context-inspector-row">
+              <span>{t("chat.usageOutput")}</span>
+              <strong>{formatTokenCount(turnUsage.outputTokens)}</strong>
+            </div>
+            {turnUsage.cacheReadTokens !== undefined ? (
+              <div className="context-inspector-row">
+                <span>{t("chat.usageCacheRead")}</span>
+                <strong>{formatTokenCount(turnUsage.cacheReadTokens)}</strong>
+              </div>
+            ) : null}
+            {turnUsage.cacheWriteTokens !== undefined ? (
+              <div className="context-inspector-row">
+                <span>{t("chat.usageCacheWrite")}</span>
+                <strong>{formatTokenCount(turnUsage.cacheWriteTokens)}</strong>
+              </div>
+            ) : null}
+            {turnUsage.reasoningTokens !== undefined ? (
+              <div className="context-inspector-row">
+                <span>{t("chat.usageReasoning")}</span>
+                <strong>{formatTokenCount(turnUsage.reasoningTokens)}</strong>
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div className="context-inspector-section context-inspector-tools">
+          <div className="context-inspector-section-heading">
+            <strong>{t("chat.usageTools")}</strong>
+            <span>
+              {t("chat.usageToolsSummary", {
+                count: toolRows.length,
+                tokens: formatTokenCount(toolTotal),
+              })}
             </span>
-          ) : null}
-          {turnUsage.cacheWriteTokens !== undefined ? (
-            <span className="context-usage-breakdown-row">
-              <span>{t("chat.usageCacheWrite")}</span>
-              <strong>{formatTokenCount(turnUsage.cacheWriteTokens)}</strong>
-            </span>
-          ) : null}
-          {turnUsage.reasoningTokens !== undefined ? (
-            <span className="context-usage-breakdown-row">
-              <span>{t("chat.usageReasoning")}</span>
-              <strong>{formatTokenCount(turnUsage.reasoningTokens)}</strong>
-            </span>
-          ) : null}
-        </span>
-      </span>
-    </span>
+          </div>
+          <p className="context-inspector-note">{t("chat.usageToolEstimate")}</p>
+          {toolRows.length > 0 ? (
+            <div className="context-inspector-tool-list">
+              {toolRows.map(({ message, usage: rowUsage }) => {
+                const percent =
+                  toolTotal > 0
+                    ? Math.round((rowUsage.totalTokens / toolTotal) * 100)
+                    : 0;
+                const name =
+                  getToolDisplayName(message.toolName) ||
+                  message.toolName ||
+                  t("chat.usageUnknownTool");
+                return (
+                  <div className="context-inspector-tool" key={message.id}>
+                    <div className="context-inspector-tool-heading">
+                      <span title={message.toolName}>{name}</span>
+                      <strong>~{formatTokenCount(rowUsage.totalTokens)}</strong>
+                    </div>
+                    <div className="context-inspector-tool-track" aria-hidden="true">
+                      <span style={{ width: `${percent}%` }} />
+                    </div>
+                    <div className="context-inspector-tool-meta">
+                      <span>
+                        {t("chat.usageToolArgs", {
+                          count: formatTokenCount(rowUsage.argumentTokens),
+                        })}
+                        {" · "}
+                        {t("chat.usageToolResult", {
+                          count: formatTokenCount(rowUsage.resultTokens),
+                        })}
+                      </span>
+                      {message.toolDurationMs !== undefined ? (
+                        <span>
+                          {t("chat.usageToolDuration", {
+                            time: formatToolDuration(
+                              message.toolDurationMs / 1000,
+                            ),
+                          })}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="context-inspector-empty">{t("chat.usageNoTools")}</p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -239,11 +344,15 @@ function MessageMeta({
   usage,
   contextUsage,
   contextWindow = DEFAULT_CONTEXT_WINDOW,
+  tools = [],
+  responseDurationMs,
 }: {
   modelId?: string;
   usage?: MessageUsage;
   contextUsage?: MessageUsage;
   contextWindow?: number;
+  tools?: UiMessage[];
+  responseDurationMs?: number;
 }) {
   const visibleContextUsage = contextUsage ?? usage;
   if (!modelId && !usage && !visibleContextUsage) return null;
@@ -255,10 +364,12 @@ function MessageMeta({
         </span>
       ) : null}
       {visibleContextUsage ? (
-        <ContextUsageRing
+        <ContextUsageInspector
           usage={visibleContextUsage}
           turnUsage={usage ?? visibleContextUsage}
           contextWindow={contextWindow}
+          tools={tools}
+          responseDurationMs={responseDurationMs}
         />
       ) : null}
     </div>
@@ -1062,6 +1173,8 @@ const AssistantTurn = memo(function AssistantTurn({
     .find((message) => message.usage);
   const latestUsage = latestMessageUsage(messages);
   const usage = assistantTurnUsage(entry);
+  const tools = assistantTurnTools(entry);
+  const responseDurationMs = assistantTurnResponseDuration(entry);
   const modelId = metaMessage?.modelId ?? latestUsageMessage?.modelId;
   const contextWindow = latestUsage
     ? resolveContextWindow(
@@ -1119,6 +1232,8 @@ const AssistantTurn = memo(function AssistantTurn({
             usage={usage}
             contextUsage={latestUsage}
             contextWindow={contextWindow}
+            tools={tools}
+            responseDurationMs={responseDurationMs}
           />
         ) : null}
         {(content || hasError) && actionMessage ? (

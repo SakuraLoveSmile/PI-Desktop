@@ -164,20 +164,24 @@ test("message toolbars are icon-only with hover tooltips", () => {
   assert.match(transcriptSource, /withLabel/);
 });
 
-test("assistant context ring and retry action are wired", () => {
+test("assistant context inspector and retry action are wired", () => {
   assert.match(transcriptSource, /function MessageMeta/);
   assert.match(transcriptSource, /message-meta-chip/);
-  assert.match(transcriptSource, /className="context-usage"/);
-  assert.match(transcriptSource, /chat\.usageContextUsed/);
+  assert.match(transcriptSource, /function ContextUsageInspector/);
+  assert.match(transcriptSource, /className="context-inspector"/);
+  assert.match(transcriptSource, /chat\.usageTools/);
+  assert.match(transcriptSource, /chat\.usageThroughput/);
+  assert.match(transcriptSource, /assistantTurnTools/);
+  assert.match(transcriptSource, /assistantTurnResponseDuration/);
   assert.match(transcriptSource, /latestMessageUsage/);
   assert.match(transcriptSource, /resolveContextWindow/);
   assert.match(transcriptSource, /aria-describedby=\{tooltipId\}/);
   assert.match(transcriptSource, /retryAssistantMessage/);
   assert.match(transcriptSource, /chat\.retry/);
-  assert.match(stylesSource, /\.context-usage-ring-progress/);
+  assert.match(stylesSource, /\.context-inspector-ring-progress/);
   assert.match(
     stylesSource,
-    /\.context-usage:hover \.context-usage-popover,[\s\S]*?\.context-usage:focus \.context-usage-popover/,
+    /\.context-inspector:hover \.context-inspector-popover,[\s\S]*?\.context-inspector:focus-within \.context-inspector-popover/,
   );
 });
 

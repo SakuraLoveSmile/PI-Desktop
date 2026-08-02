@@ -182,7 +182,8 @@ type AgentEvent =
  | { type: "message_end"; message: UiMessage }
  | { type: "tool_start"; toolCallId: string; toolName: string; args: unknown }
  | { type: "tool_update"; toolCallId: string; partialResult?: unknown }
- | { type: "tool_end"; toolCallId: string; result: unknown; isError?: boolean }
+ | { type: "tool_end"; toolCallId: string; result: unknown; isError?: boolean;
+     toolUsage?: ToolTokenUsage }
  | { type: "tool_permission_request"; request: ToolPermissionRequest }
  | { type: "compaction_start";
      reason: "manual" | "threshold" | "overflow" }
@@ -305,9 +306,23 @@ type UiMessage = {
  role: "user" | "assistant" | "system" | "tool";
  content: string;
  thinking?: string; // assistant reasoning, never folded into content
+ usage?: MessageUsage; // provider-reported assistant usage
+ responseDurationMs?: number; // model stream duration for throughput
+ toolName?: string;
+ toolCallId?: string;
+ toolArgs?: unknown;
+ toolResult?: unknown;
+ toolUsage?: ToolTokenUsage; // estimated tool call/result footprint
  error?: AppError;  // structured failure owned by this assistant turn
  createdAt: string;
  // status/tool fields omitted here
+};
+
+type ToolTokenUsage = {
+ argumentTokens: number;
+ resultTokens: number;
+ totalTokens: number;
+ estimated: true;
 };
 
 type SessionDetail = SessionSummary & {
@@ -364,6 +379,14 @@ of silently discarding these fields.
 same normalized `AppError` carried by the lifecycle `error` event to the
 assistant message before `message_end`. Error messages persist with the
 transcript but are excluded from restored model context.
+
+The context inspector consumes two additive usage signals. `MessageUsage` is
+the provider-reported assistant usage and `responseDurationMs` is the elapsed
+sidecar stream time used to display output tokens per second. `ToolTokenUsage`
+is a runtime estimate from the tool call arguments and result; providers do not
+report per-tool allocation, so the renderer labels these rows as estimates and
+never merges them into the exact provider total. Older peers may omit all of
+these optional fields without breaking the v6 handshake.
 
 ## 8. Settings / Secrets API
 

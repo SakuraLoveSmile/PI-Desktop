@@ -1542,20 +1542,24 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`transcript-style.test.mjs`); full visual scenario Draft
 
-#### E2E-060: Assistant context ring and retry action
+#### E2E-060: Assistant context inspector and retry action
 
 - **Preconditions**: A completed assistant message includes modelId and token
   usage; another completed assistant message has content but no usage.
 - **Steps**: 1) Open the session. 2) Hover the completed assistant turn that has
-  usage, then focus its context ring with the keyboard. 3) Inspect the ring,
-  remaining/total context tokens, used percentage, model context-window size,
-  and input/output/cache/reasoning breakdown. 4) Click Retry on that turn while
-  idle. 5) Confirm a turn without usage still offers Retry and omits the ring.
-- **Expected**: Model badge and context ring appear under completed assistant
-  answers when data exists; the ring displays remaining capacity and low-space
-  warning/error states, while hover and keyboard focus expose the same complete
-  token-consumption breakdown; Retry re-sends the nearest preceding user prompt
-  and is disabled while a turn is running; Copy still excludes thinking text.
+  usage, then focus its Context inspector trigger with the keyboard. 3) Inspect
+  the panel's remaining/total context tokens, used percentage, model
+  context-window size, exact input/output/cache/reasoning breakdown, generation
+  tokens/s, and every tool's estimated argument/result token allocation. 4)
+  Click Retry on that turn while idle. 5) Confirm a turn without usage still
+  offers Retry and omits the inspector.
+- **Expected**: Model badge and compact Context inspector appear under completed
+  assistant answers when data exists; the trigger shows remaining capacity and
+  low-space warning/error states, while hover and keyboard focus expose the
+  same complete token panel. Tool rows show each tool in execution order and
+  explicitly mark their estimates; Retry re-sends the nearest preceding user
+  prompt and is disabled while a turn is running; Copy still excludes thinking
+  text.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/10-workbuddy-benchmark-ux.md`, `03-runtime/01-ipc-protocol.md`
 - **Acceptance**: C (chat stream), Quality
@@ -3079,12 +3083,14 @@ This test plan spec is accepted when:
 - Expand thinking markdown and confirm it stays visually subordinate to the answer.
 
 
-### US-UI-61 Assistant context ring + retry (D103)
+### US-UI-61 Assistant context inspector + retry (D103, D184)
 - Complete an assistant turn that reports usage.
-- Expect a model badge and context ring under the answer. The ring shows the
-  remaining context percentage; hover or keyboard focus shows used percentage,
-  remaining/total tokens, model context-window size, and input/output/cache/
-  reasoning breakdown.
+- Expect a model badge and compact Context inspector under the answer. The
+  trigger shows the remaining context percentage; hover or keyboard focus shows
+  used/remaining/window tokens, exact input/output/cache/reasoning usage,
+  generation tokens/s, and every tool's estimated argument/result footprint,
+  share, and duration. The panel labels provider totals as reported and tool
+  rows as estimates.
 - Hover the action row and click Retry; the nearest preceding user prompt is
   re-sent.
 

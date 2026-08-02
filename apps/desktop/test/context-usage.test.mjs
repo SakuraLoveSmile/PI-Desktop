@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  calculateTokenRate,
   calculateContextUsage,
+  estimateToolTokenUsage,
   resolveContextWindow,
+  toolTokenUsage,
   usageTokenTotal,
 } from "../src/lib/context-usage.ts";
 
@@ -53,4 +56,29 @@ test("context usage falls back to input and output when total is absent", () => 
     usageTokenTotal({ inputTokens: 12, outputTokens: 8, totalTokens: 0 }),
     20,
   );
+});
+
+test("generation throughput uses provider output and stream duration", () => {
+  assert.equal(calculateTokenRate(1_200, 4_000), 300);
+  assert.equal(calculateTokenRate(0, 4_000), undefined);
+  assert.equal(calculateTokenRate(1_200, undefined), undefined);
+});
+
+test("tool usage exposes argument and result estimates", () => {
+  const message = {
+    id: "tool-1",
+    role: "tool",
+    content: "result text",
+    createdAt: new Date().toISOString(),
+    toolName: "read",
+    toolArgs: { path: "src/index.ts" },
+    toolResult: { content: [{ type: "text", text: "result text" }] },
+  };
+  const usage = estimateToolTokenUsage(message);
+
+  assert.ok(usage.argumentTokens > 0);
+  assert.ok(usage.resultTokens > 0);
+  assert.equal(usage.totalTokens, usage.argumentTokens + usage.resultTokens);
+  assert.equal(usage.estimated, true);
+  assert.deepEqual(toolTokenUsage({ ...message, toolUsage: usage }), usage);
 });

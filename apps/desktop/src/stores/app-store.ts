@@ -2318,6 +2318,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                   ),
                   toolStatus: event.isError ? "error" : "success",
                   toolResult: event.result,
+                  ...(event.toolUsage ? { toolUsage: event.toolUsage } : {}),
                   content:
                     typeof event.result === "string"
                       ? event.result

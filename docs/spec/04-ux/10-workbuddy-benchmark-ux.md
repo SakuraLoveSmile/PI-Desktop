@@ -99,9 +99,12 @@ input/output/cached breakdown). Data already exists in the runtime usage
 events.
 
 **Adopted in D103 (tokens-only first cut)**: completed assistant turns show a
-model badge plus a context-usage ring under the answer. The ring shows the
-remaining context percentage and hover/focus reveals remaining/total context
-tokens, the used percentage, and the input/output/cache/reasoning breakdown.
+model badge plus a compact Codex-style context inspector under the answer. The
+inspector shows remaining context percentage in a small ring and hover/focus
+reveals remaining/total context tokens, exact provider input/output/cache/
+reasoning usage, generation tokens per second, and every tool's estimated
+argument/result footprint. Tool estimates are separate from exact provider
+totals because providers do not expose per-tool context allocation.
 Currency pricing remains deferred. Regenerate is available as a quiet action
 chip next to Copy and rewrites the current turn in place (D105); when multiple
 variants exist, a ChatGPT-style `current / total` pager on the root user turn

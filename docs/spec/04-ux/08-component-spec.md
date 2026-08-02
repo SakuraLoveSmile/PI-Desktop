@@ -950,15 +950,17 @@ Single message render — either user (plaintext) or assistant (markdown streami
   copies all contentful fragments in order; Fork and Regenerate target the last
   contentful fragment so existing durable transcript semantics remain intact
   (D157).
-- Assistant meta: optional model badge + context-usage ring under the answer.
-  The ring represents the latest reported context usage against the selected
-  model's context window; its center shows the remaining percentage and its
-  progress stroke fills with the remaining capacity. Hover or keyboard focus
-  opens a non-modal popover with remaining/total context tokens, used
-  percentage, context-window size, per-turn total, and input/output/cache/
-  reasoning breakdown. Low remaining capacity switches the ring to warning or
-  error color without relying on color alone; the percentage and counts remain
-  visible (D103).
+- Assistant meta: optional model badge + compact Codex-style context inspector
+  under the answer. The inspector keeps a small remaining-capacity ring beside
+  the `Context` label and percentage; low capacity changes the semantic color
+  without making color the only signal. Hover or keyboard focus opens a
+  non-modal, scrollable panel with the used/window counts, remaining capacity,
+  exact provider input/output/cache/reasoning usage, and generation speed in
+  tokens per second. The panel also lists every tool in the assistant turn in
+  execution order with an estimated argument/result footprint, share bar, and
+  duration. Provider totals are exact; tool rows are explicitly marked as
+  estimates because providers do not report per-tool context allocation
+  (D103, D184).
 - Gap: 12px vertical padding between consecutive message rows (denser than
   consumer chat, closer to WorkBuddy task transcript); assistant turns add a
   little extra bottom air so a completed answer separates from the next prompt
@@ -982,8 +984,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
 - Assistant: `aria-label="Assistant message"`
 - Thinking trigger exposes localized Show/Hide labels, `aria-expanded`, and an
   `aria-controls` relationship to the reasoning panel
-- Context-usage ring is keyboard focusable, exposes a localized remaining
-  percentage and token count, and reveals the same breakdown on hover or focus
+- Context inspector trigger is keyboard focusable, exposes a localized
+  remaining percentage and token count, and reveals the same breakdown on
+  hover or focus
 - Timestamps: `aria-label` with full time string, visual shows relative time
 
 ### 8.6 MVP constraints

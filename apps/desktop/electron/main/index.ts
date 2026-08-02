@@ -2265,6 +2265,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
             toolArgs: started?.args,
             toolStatus: event.isError ? "error" : "success",
             toolResult: event.result,
+            ...(event.toolUsage ? { toolUsage: event.toolUsage } : {}),
             toolCompletedAt: new Date(envelope.ts).toISOString(),
             toolDurationMs: started
               ? Math.max(0, envelope.ts - Date.parse(started.createdAt))

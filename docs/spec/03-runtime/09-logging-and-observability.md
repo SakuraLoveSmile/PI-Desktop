@@ -157,6 +157,13 @@ apart without guessing:
 - failed or aborted turns still emit a `kind=model` line with the outcome, so
   a turn that never produced tokens is still measurable.
 
+The assistant transcript also preserves the successful stream duration as
+`UiMessage.responseDurationMs`. The renderer combines it with provider-reported
+output tokens to show generation speed in `tokens/s`; this is a presentation
+projection of the same `streamMs` interval, not a second timing source. Tool
+rows carry a separate estimated argument/result footprint for context
+inspection, while exact provider input/output usage remains authoritative.
+
 ## 8. User-facing diagnostics
 
 MVP provides:

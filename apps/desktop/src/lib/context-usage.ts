@@ -2,6 +2,7 @@ import type {
   MessageUsage,
   ModelInfo,
   ProviderPublic,
+  ToolTokenUsage,
   UiMessage,
 } from "@pi-desktop/shared";
 
@@ -85,4 +86,59 @@ export function calculateContextUsage(
     usedPercent,
     remainingPercent: 100 - usedPercent,
   };
+}
+
+function serializedLength(value: unknown): number {
+  if (typeof value === "string") return value.length;
+  try {
+    return JSON.stringify(value)?.length ?? 0;
+  } catch {
+    return String(value).length;
+  }
+}
+
+/**
+ * Estimate the context footprint of a historical tool row when it predates
+ * runtime-provided usage metadata. The runtime uses the same four characters
+ * per token heuristic for its durable estimate.
+ */
+export function estimateToolTokenUsage(
+  message: Pick<UiMessage, "toolName" | "toolArgs" | "toolResult" | "content">,
+): ToolTokenUsage {
+  const argumentChars = serializedLength({
+    tool: message.toolName ?? "",
+    arguments: message.toolArgs ?? null,
+  });
+  const resultChars = serializedLength(
+    message.toolResult ?? message.content ?? "",
+  );
+  const argumentTokens = Math.ceil(argumentChars / 4);
+  const resultTokens = Math.ceil(resultChars / 4);
+
+  return {
+    argumentTokens,
+    resultTokens,
+    totalTokens: argumentTokens + resultTokens,
+    estimated: true,
+  };
+}
+
+export function toolTokenUsage(message: UiMessage): ToolTokenUsage {
+  return message.toolUsage ?? estimateToolTokenUsage(message);
+}
+
+export function calculateTokenRate(
+  outputTokens: number,
+  responseDurationMs: number | undefined,
+): number | undefined {
+  if (
+    !Number.isFinite(outputTokens) ||
+    outputTokens <= 0 ||
+    !Number.isFinite(responseDurationMs) ||
+    responseDurationMs === undefined ||
+    responseDurationMs <= 0
+  ) {
+    return undefined;
+  }
+  return Math.round(outputTokens / (responseDurationMs / 1000));
 }

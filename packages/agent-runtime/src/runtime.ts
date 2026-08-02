@@ -45,6 +45,7 @@ import type {
   MessageUsage,
   Mode,
   ThinkingLevel,
+  ToolTokenUsage,
   UiMessage,
 } from "@pi-desktop/shared";
 import type { HostClient } from "./host-client.js";
@@ -468,6 +469,55 @@ function toolResultFromUi(
   };
 }
 
+function estimateToolTokenUsage(
+  model: Model<Api>,
+  toolCallId: string,
+  toolName: string,
+  args: unknown,
+  result: unknown,
+  isError: boolean,
+  timestamp: number,
+): ToolTokenUsage {
+  const toolCall = {
+    role: "assistant" as const,
+    content: [
+      {
+        type: "toolCall" as const,
+        id: toolCallId,
+        name: toolName,
+        arguments: isRecord(args) ? args : { value: args },
+      },
+    ],
+    api: model.api,
+    provider: model.provider,
+    model: model.id,
+    usage: usageToPi(undefined),
+    stopReason: "toolUse" as const,
+    timestamp,
+  } satisfies AssistantMessage;
+  const toolRow = {
+    id: toolCallId,
+    role: "tool" as const,
+    content: safeJson(result),
+    createdAt: new Date(timestamp).toISOString(),
+    toolCallId,
+    toolName,
+    toolResult: result,
+    toolStatus: isError ? ("error" as const) : ("success" as const),
+    isError,
+  } satisfies UiMessage;
+  const resultMessage = toolResultFromUi(toolRow, timestamp);
+  const argumentTokens = estimateTokens(toolCall);
+  const resultTokens = estimateTokens(resultMessage);
+
+  return {
+    argumentTokens,
+    resultTokens,
+    totalTokens: argumentTokens + resultTokens,
+    estimated: true,
+  };
+}
+
 export class DesktopAgentRuntime {
   private agent: Agent;
   private models: Models;
@@ -500,6 +550,10 @@ export class DesktopAgentRuntime {
    * which is the correct anchor: the request goes out once all have resolved. */
   private requestStartedAt?: number;
   private streamStartedAt?: number;
+  private activeToolCalls = new Map<
+    string,
+    { toolName: string; args: unknown }
+  >();
   private fullEntries: MessageEntry[];
   private activeCompaction?: ContextCompactionRecord;
   private compactionSettings: CompactionSettings;
@@ -1603,6 +1657,11 @@ export class DesktopAgentRuntime {
             ? content.thinking
             : this.currentAssistant.thinking ?? "";
           const usage = usageFromPi((event.message as any).usage as Usage | undefined);
+          const endedAt = Date.now();
+          const responseDurationMs =
+            this.streamStartedAt !== undefined
+              ? Math.max(0, endedAt - this.streamStartedAt)
+              : undefined;
           this.currentAssistant = {
             ...this.currentAssistant,
             content: nextText,
@@ -1615,12 +1674,12 @@ export class DesktopAgentRuntime {
             modelId: this.provider.modelId,
             providerId: this.provider.id,
             ...(usage ? { usage } : {}),
+            ...(responseDurationMs !== undefined ? { responseDurationMs } : {}),
             ...(classifiedError
               ? { error: classifiedError, isError: true }
               : {}),
           };
           this.emit({ type: "message_end", message: this.currentAssistant });
-          const endedAt = Date.now();
           logTiming("model", {
             model: this.provider.modelId,
             providerId: this.provider.id,
@@ -1662,6 +1721,10 @@ export class DesktopAgentRuntime {
         break;
       }
       case "tool_execution_start":
+        this.activeToolCalls.set(event.toolCallId, {
+          toolName: event.toolName,
+          args: event.args,
+        });
         this.emit({
           type: "tool_start",
           toolCallId: event.toolCallId,
@@ -1679,13 +1742,30 @@ export class DesktopAgentRuntime {
       case "tool_execution_end":
         // The agent issues the follow-up provider request as soon as the tool
         // results are in, so this is the anchor for the next providerWaitMs.
-        this.requestStartedAt = Date.now();
-        this.emit({
-          type: "tool_end",
-          toolCallId: event.toolCallId,
-          result: event.result,
-          isError: event.isError,
-        });
+        {
+          const endedAt = Date.now();
+          const activeTool = this.activeToolCalls.get(event.toolCallId);
+          this.activeToolCalls.delete(event.toolCallId);
+          const toolUsage = activeTool
+            ? estimateToolTokenUsage(
+                this.model,
+                event.toolCallId,
+                activeTool.toolName,
+                activeTool.args,
+                event.result,
+                event.isError,
+                endedAt,
+              )
+            : undefined;
+          this.requestStartedAt = endedAt;
+          this.emit({
+            type: "tool_end",
+            toolCallId: event.toolCallId,
+            result: event.result,
+            isError: event.isError,
+            ...(toolUsage ? { toolUsage } : {}),
+          });
+        }
         break;
       case "turn_end":
         if (this.suppressOverflowRunEnd) break;

@@ -32,6 +32,14 @@ export type MessageUsage = {
   totalTokens: number;
 };
 
+/** Estimated context footprint for one tool call and its returned result. */
+export type ToolTokenUsage = {
+  argumentTokens: number;
+  resultTokens: number;
+  totalTokens: number;
+  estimated: true;
+};
+
 export type UiMessage = {
   id: string;
   role: UiMessageRole;
@@ -45,6 +53,8 @@ export type UiMessage = {
   providerId?: string;
   /** Token usage for the assistant turn, when the provider reported it. */
   usage?: MessageUsage;
+  /** Elapsed model streaming time used to calculate output throughput. */
+  responseDurationMs?: number;
   /** Structured failure attached to the assistant turn that failed. */
   error?: AppError;
   /** Stable regenerate-family key shared across rewritten user prompts. */
@@ -64,6 +74,8 @@ export type UiMessage = {
   toolStatus?: "running" | "success" | "error" | "denied";
   toolArgs?: unknown;
   toolResult?: unknown;
+  /** Estimated tokens occupied by this tool call and its result. */
+  toolUsage?: ToolTokenUsage;
   toolCompletedAt?: string;
   toolDurationMs?: number;
   isError?: boolean;
@@ -199,6 +211,7 @@ export type AgentEvent =
       toolCallId: string;
       result: unknown;
       isError?: boolean;
+      toolUsage?: ToolTokenUsage;
     }
   | { type: "tool_permission_request"; request: ToolPermissionRequest }
   | { type: "compaction_start"; reason: ContextCompactionReason }

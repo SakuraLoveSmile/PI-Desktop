@@ -117,6 +117,30 @@ export function assistantTurnMessages(
   );
 }
 
+export function assistantTurnTools(entry: AssistantTurnEntry): UiMessage[] {
+  return entry.parts.flatMap((part) =>
+    part.kind === "activity"
+      ? part.items.flatMap((item) =>
+          item.kind === "tool" ? [item.message] : [],
+        )
+      : [],
+  );
+}
+
+export function assistantTurnResponseDuration(
+  entry: AssistantTurnEntry,
+): number | undefined {
+  const durations = assistantTurnMessages(entry).flatMap((message) =>
+    typeof message.responseDurationMs === "number" &&
+    Number.isFinite(message.responseDurationMs) &&
+    message.responseDurationMs > 0
+      ? [message.responseDurationMs]
+      : [],
+  );
+  if (durations.length === 0) return undefined;
+  return durations.reduce((total, duration) => total + duration, 0);
+}
+
 export function assistantTurnContent(entry: AssistantTurnEntry): string {
   return assistantTurnMessages(entry)
     .map((message) => (message.content || "").trim())
