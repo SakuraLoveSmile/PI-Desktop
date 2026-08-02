@@ -23,6 +23,13 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.4.2",
+    date: "2026-08-03",
+    highlights: [
+      "Show context cache hit rate in chat transcript header for better transparency.",
+    ],
+  },
+  {
     version: "0.4.1",
     date: "2026-08-02",
     highlights: [
@@ -182,6 +189,13 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.4.2",
+    date: "2026-08-03",
+    highlights: [
+      "在聊天记录头部显示上下文缓存命中率，提升透明度。",
+    ],
+  },
   {
     version: "0.4.1",
     date: "2026-08-02",
