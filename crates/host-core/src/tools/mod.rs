@@ -369,6 +369,12 @@ async fn tool_bash(
         // workspace (D114); the dir was created by execute_tool above.
         cmd.env("PI_SCRATCH_DIR", scratch_dir);
     }
+    if let Some(user_path) = shell::user_login_path() {
+        // D181: let Bash see the toolchain the user's own login shell exports
+        // (nvm, Homebrew, ...). The probe is best-effort and cached, so a
+        // missing/wedged user shell silently keeps the host PATH.
+        cmd.env("PATH", user_path);
+    }
     #[cfg(windows)]
     {
         // CREATE_NO_WINDOW: bash.exe must not flash a console over the GUI.
@@ -635,6 +641,40 @@ mod tests {
         assert!(result.ok);
         assert_eq!(result.content["root"].as_str(), Some("workspace"));
         assert_eq!(result.content["path"].as_str(), Some("a.txt"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn bash_inherits_user_login_path() {
+        // D181: the Bash tool runs with the user's login-shell PATH so nvm /
+        // Homebrew tools resolve; when no probe is possible it falls back to
+        // the host PATH (still non-empty for the spawned bash).
+        let dir = tempfile::tempdir().unwrap();
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Bash",
+            &serde_json::json!({ "command": "printf %s \"$PATH\"" }),
+            15_000,
+        )
+        .await;
+        assert!(result.ok, "bash failed: {:?}", result.content);
+        let stdout = result.content["stdout"].as_str().unwrap_or_default();
+        if let Some(user_path) = shell::user_login_path() {
+            // `bash -lc` re-runs the bash profile at startup; conda/brew
+            // hooks may prepend, dedupe, or reorder entries, so assert every
+            // injected entry survives rather than the exact ordering.
+            let injected: std::collections::HashSet<&str> =
+                user_path.split(':').collect();
+            let actual: std::collections::HashSet<&str> =
+                stdout.split(':').collect();
+            assert!(
+                injected.is_subset(&actual),
+                "every injected login-PATH entry is present"
+            );
+        } else {
+            assert!(!stdout.is_empty(), "falls back to host PATH");
+        }
     }
 
     #[cfg(unix)]

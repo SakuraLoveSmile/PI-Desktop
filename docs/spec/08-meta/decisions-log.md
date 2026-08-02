@@ -824,3 +824,23 @@ section mirrors only marketplace/catalog items still blocking nothing.
   public within the app.
 - Decision D178; ADR
   [0040](../../adr/0040-plugin-resident-services-and-message-bus.md).
+
+## 2026-08-02 — Bash tool inherits the user's login-shell PATH
+
+- On Unix, the first Bash call probes the user's login shell for its PATH —
+  `$SHELL` (fallback `/bin/zsh` → `/bin/bash` → `/bin/sh`) with `-lic
+  'printf %s "$PATH"'` — so `-l` sources login files and `-i` sources the
+  interactive rc, matching a fresh terminal. The probe is bounded to 5s and
+  cached per process (`OnceLock`); only the last stdout line is kept (rc
+  banners are ignored), stderr is discarded (missing-tty noise), and a
+  non-zero exit, missing shell, or timeout silently falls back to the host
+  PATH.
+- Every Bash subprocess gets the probed PATH injected via `cmd.env("PATH",
+  ...)`; `bash -lc` still re-runs the bash profile at startup (conda/brew
+  hooks may prepend/dedupe/reorder entries on top of the injected base).
+  Agent commands remain POSIX bash; the resolved bash binary is unchanged.
+  Windows keeps `bash -c` with the host environment (no change).
+- Fixes macOS Finder/Dock launches where `bash -lc` alone cannot see nvm,
+  pnpm, or Homebrew tooling initialized in `~/.zshrc` / `~/.zprofile`.
+- Decision D181; ADR
+  [0045](../../adr/0045-bash-inherits-user-login-path.md).

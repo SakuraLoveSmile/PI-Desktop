@@ -13,7 +13,11 @@ use std::env;
 #[cfg(windows)]
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::process::Stdio;
 use std::sync::OnceLock;
+#[cfg(unix)]
+use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct ShellSpec {
@@ -113,6 +117,55 @@ fn platform_bash() -> Option<PathBuf> {
     })
 }
 
+/// Best-effort PATH exported by the user's own login shell, so the Bash tool
+/// resolves the same toolchain a fresh terminal would (nvm, Homebrew, conda,
+/// ...). The app may be launched from Finder/Dock with a minimal GUI
+/// environment, and `bash -lc` alone only sources the *bash* profile — on
+/// macOS the default shell is zsh, whose `.zshrc`/`.zprofile` (where nvm and
+/// friends usually live) bash never reads. Probed once per process and cached;
+/// returns `None` when no login shell can be probed, so callers fall back to
+/// the host environment unchanged.
+#[cfg(unix)]
+pub fn user_login_path() -> Option<&'static str> {
+    static CACHE: OnceLock<Option<String>> = OnceLock::new();
+    CACHE.get_or_init(probe_user_login_path).as_deref()
+}
+
+#[cfg(unix)]
+fn probe_user_login_path() -> Option<String> {
+    let shell = env::var_os("SHELL")
+        .map(PathBuf::from)
+        .filter(|p| is_executable(p))
+        .or_else(|| {
+            ["/bin/zsh", "/bin/bash", "/bin/sh"]
+                .iter()
+                .map(PathBuf::from)
+                .find(|p| is_executable(p))
+        })?;
+    // `-l` sources login files (.zprofile / .bash_profile), `-i` sources the
+    // interactive rc (.zshrc / .bashrc): together they reproduce a terminal's
+    // PATH. stderr is discarded — shells complain about the missing tty/job
+    // control — and only the last stdout line is taken, so rc banners cannot
+    // contaminate the result.
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let output = std::process::Command::new(&shell)
+            .args(["-lic", "printf %s \"$PATH\""])
+            .stderr(Stdio::null())
+            .output();
+        let _ = tx.send(output);
+    });
+    // A wedged rc (waiting on input/network) must not stall the first Bash
+    // call; probing is best-effort and the host PATH remains the fallback.
+    let output = rx.recv_timeout(Duration::from_secs(5)).ok()?.ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    let path = stdout.lines().next_back().unwrap_or_default().trim();
+    (!path.is_empty()).then(|| path.to_string())
+}
+
 fn search_path(name: &str, accept: impl Fn(&Path) -> bool) -> Option<PathBuf> {
     let path_var = env::var_os("PATH")?;
     env::split_paths(&path_var)
@@ -154,6 +207,19 @@ mod tests {
     fn search_path_skips_rejected_candidates() {
         // With a reject-all filter nothing can match, proving the filter runs.
         assert!(search_path("bash", |_| false).is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn user_login_path_probes_a_real_path() {
+        // On any machine with a login shell the probe yields a non-empty
+        // PATH of absolute directories; when no shell can be probed the
+        // function must degrade to None rather than panic.
+        if let Some(path) = user_login_path() {
+            assert!(!path.is_empty(), "probed PATH is non-empty");
+            assert!(path.starts_with('/'), "PATH entries stay absolute");
+            assert!(path.contains('/'), "PATH looks like directories");
+        }
     }
 
     #[cfg(unix)]

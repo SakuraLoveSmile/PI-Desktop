@@ -1,6 +1,6 @@
 # 03. Tools and Permissions
 
-> Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115
+> Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115, D181
 
 ## 0. Frozen policy summary
 
@@ -155,6 +155,14 @@ Shell resolution (D084 — bash on every platform, resolved once per process):
 3. Windows: `bash.exe` from Git for Windows — derived from the `git` on PATH, then standard install dirs, then PATH excluding the WSL launcher in `System32`
 
 - Unix invokes `bash -lc` (login shell keeps profile PATH for Finder/Dock launches); Windows invokes `bash -c` with `CREATE_NO_WINDOW`
+- On Unix, the Bash tool additionally probes the user's login shell for its
+  PATH — `$SHELL` (fallback `/bin/zsh` → `/bin/bash` → `/bin/sh`) with
+  `-lic 'printf %s "$PATH"'`, 5s-bounded, cached per process — and injects it
+  into every subprocess. `bash -lc` alone sources only the *bash* profile; on
+  macOS the default shell is zsh, so nvm/pnpm/Homebrew initialized in
+  `~/.zshrc` / `~/.zprofile` would otherwise be invisible to agent commands.
+  The probe is best-effort: missing shell, non-zero exit, or timeout fall back
+  to the host PATH unchanged. Agent commands stay POSIX bash (D181 / ADR 0045).
 - No bash bundled in the installer: Git for Windows is the Windows prerequisite (the app requires git anyway)
 - Resolution failure returns stable `SHELL_NOT_FOUND` with install guidance
 

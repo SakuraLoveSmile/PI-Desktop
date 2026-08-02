@@ -490,6 +490,25 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Partially automated (host-core unit tests: evaluate matrix, chat-deny precedence, session grants under ask; renderer source test: effective-only composer options and selection)
 
+#### E2E-019d: Bash tool sees the user's login-shell toolchain (D181)
+
+- **Preconditions**: Agent mode; project open; the OS user has a login shell
+  (default on macOS) whose profile exports at least one tool not on the app's
+  minimal GUI PATH (e.g. nvm/Homebrew).
+- **Steps**: 1) Ask the agent to print `$PATH` and run a toolchain check such
+  as `command -v node && node -v`. 2) Compare with the PATH a fresh terminal
+  shows for the same user. 3) Optionally remove `~/.bash_profile` temporarily
+  and repeat on a machine where only `.zshrc` initializes the toolchain.
+- **Expected**: The Bash tool resolves tools the user's own login shell
+  exports (nvm, pnpm, Homebrew) even though commands run through bash; the
+  probed login PATH is a subset of the effective child PATH (bash profile may
+  prepend/dedupe). A missing or wedged user shell degrades to the host PATH
+  without failing the tool.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md §5`, `08-meta/decisions-log.md` (D181), ADR 0045
+- **Acceptance**: E (user toolchain visible in Bash tool)
+- **Milestone**: M5
+- **Status**: Automated (host-core unit tests: login-PATH probe + child-PATH injection)
+
 ### Session Persistence
 
 #### E2E-020: Session survives restart
