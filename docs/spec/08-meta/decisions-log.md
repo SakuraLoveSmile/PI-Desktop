@@ -910,3 +910,18 @@ section mirrors only marketplace/catalog items still blocking nothing.
   behavior are unchanged. Persisted tool results retain activation markers for
   valid transcript reconstruction.
 - Decision D185; ADR [0048](../../adr/0048-lazy-per-turn-tool-activation.md).
+
+## 2026-08-04 — Recover automatic compaction failures with a retained tail
+
+- Automatic threshold and provider-overflow compaction failures now attempt a
+  deterministic, aggressively bounded retained-tail checkpoint before ending
+  the turn. The previous checkpoint summary is preserved when available, the
+  complete visible transcript remains untouched, and host persistence plus the
+  hard-budget recheck remain mandatory.
+- The summary input is preflighted against the model window so an obviously
+  oversized summary request goes directly to the bounded recovery path instead
+  of waiting for a provider rejection or timeout.
+- The lifecycle event marks recovery with `fallback: "retained_tail"`, so the
+  renderer keeps the run active and shows a warning. Manual `/compact` remains
+  fail-fast and never silently discards historical context.
+- Decision D158; amends ADR 0030 and adds ADR 0049.

@@ -48,8 +48,11 @@ implements the desktop-specific controller.
   call/result pairing.
 - At the hard boundary, the runtime generates a checkpoint deterministically.
   The candidate context is re-estimated before persistence and again before
-  continuation. Failure or an ineffective checkpoint stops the loop before
-  another provider request with `CONTEXT_COMPACTION_FAILED`.
+  continuation. Automatic summary failure or an ineffective checkpoint first
+  attempts the retained-tail recovery defined by ADR 0049; if that recovery
+  cannot be prepared, durably appended, or brought below the safe budget, the
+  loop stops before another provider request with
+  `CONTEXT_COMPACTION_FAILED`.
 - A final tool-result batch is kept with its assistant tool-call carrier. If
   that atomic batch exceeds the normal retained-tail target, the runtime lets
   pi move the cut point to the carrier. If the batch itself reaches half the
@@ -81,8 +84,10 @@ implements the desktop-specific controller.
 - The deterministic hard guard does not depend on the model obeying a reminder.
 - Restart and model changes retain compacted working context without changing
   the human-readable conversation.
-- Compaction itself is one extra provider request and can fail; its lifecycle
-  is explicit, abortable, and surfaced through stable error codes.
+- Compaction itself is one extra provider request and can fail. Automatic
+  failures have a deterministic, durable retained-tail recovery, while manual
+  compaction remains fail-fast; the lifecycle is explicit, abortable, and
+  surfaced through stable events/error codes.
 - A checkpoint may retain a shortened model-facing copy of an oversized atomic
   tool-result batch. This is a loss of future model detail under pressure, but
   it is explicit in context, preserves every call/result pair, and does not

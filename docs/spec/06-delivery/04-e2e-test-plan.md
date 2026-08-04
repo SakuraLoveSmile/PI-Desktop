@@ -2432,6 +2432,14 @@ Each scenario is documented in this format:
   - The exact provider overflow removes only the failed assistant from model
     context, retries once after compaction, and does not loop on a second
     overflow.
+  - If automatic summary generation fails, a durable retained-tail fallback
+    checkpoint is appended, the run stays active, and one warning explains
+    that older model context was reduced; if fallback persistence or the safe
+    budget guard fails, `CONTEXT_COMPACTION_FAILED` is emitted once.
+  - If the newest checkpoint is already the transcript leaf when a follow-up
+    prompt crosses the hard budget, the runtime rebuilds a smaller tail from
+    the full transcript and carries the existing summary forward instead of
+    reporting that there is no new context to compact.
   - Disabling automatic protection removes soft/hard/overflow recovery and the
     model tool, but idle `/compact` still succeeds. Compaction failures surface
     once through `CONTEXT_COMPACTION_FAILED` without duplicate error toasts.

@@ -131,6 +131,7 @@ export type ContextCompactionRecord = {
 };
 
 export type ContextCompactionReason = "manual" | "threshold" | "overflow";
+export type ContextCompactionFallback = "retained_tail";
 
 export type MessageRevisionSummary = {
   revisionIndex: number;
@@ -222,6 +223,7 @@ export type AgentEvent =
       tokensBefore?: number;
       firstKeptMessageId?: string;
       willRetry: boolean;
+      fallback?: ContextCompactionFallback;
       error?: { code: string; message: string };
     }
   | { type: "error"; error: { code: string; message: string; retriable?: boolean } }

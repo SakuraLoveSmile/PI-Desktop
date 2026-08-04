@@ -1282,7 +1282,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | New session (reasoning model) | Thinking trigger shows the model's highest published level | User may select any published level, including Off when supported |
 | New session / switch while another session is running | textarea active, send button enabled for the destination session's own run state | Send active, Abort hidden unless the destination session itself is running |
 | Running | textarea disabled, abort button visible | Abort active, Send hidden |
-| Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls | Abort active, Send hidden |
+| Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
 

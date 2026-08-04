@@ -63,7 +63,7 @@ Rules:
 | `PROVIDER_UNAUTHORIZED` | no | bad/missing provider credentials |
 | `PROVIDER_RATE_LIMITED` | yes | provider rate limited |
 | `CONTEXT_TOO_LARGE` | no | prompt/context still exceeds the safe model budget after recovery, the second provider overflow occurred, or automatic recovery is disabled |
-| `CONTEXT_COMPACTION_FAILED` | no | checkpoint summary generation or durable checkpoint append failed; the guarded next provider request does not start |
+| `CONTEXT_COMPACTION_FAILED` | no | automatic retained-tail recovery could not prepare, persist, or fit a checkpoint, or manual checkpoint summary generation / durable append failed; the guarded next provider request does not start |
 | `STREAM_FAILED` | yes | stream interrupted unexpectedly |
 
 ### 3.3 Workspace / tools / permissions

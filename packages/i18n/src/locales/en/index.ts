@@ -906,6 +906,8 @@ export const en = {
   contextCompaction: {
     completed: "Conversation context compacted",
     retrying: "Context compacted; retrying the model request",
+    recovered:
+      "Context summary failed; recent context was retained and the task is continuing",
     failed: "Context compaction failed",
   },
   notifications: {

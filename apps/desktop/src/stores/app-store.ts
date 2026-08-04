@@ -2200,11 +2200,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (event.ok) {
           get().showToast(
             i18n.t(
-              event.reason === "overflow"
+              event.fallback
+                ? "contextCompaction.recovered"
+                : event.reason === "overflow"
                 ? "contextCompaction.retrying"
                 : "contextCompaction.completed",
             ),
-            { variant: event.reason === "overflow" ? "warning" : "info" },
+            {
+              variant:
+                event.fallback || event.reason === "overflow"
+                  ? "warning"
+                  : "info",
+            },
           );
         } else if (event.reason === "manual") {
           get().showToast(

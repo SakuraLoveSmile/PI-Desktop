@@ -104,7 +104,10 @@ Rules:
   checkpoint tail budget, `retainedTail` stores a marked, budget-bounded copy
   that preserves every call/result envelope but may shorten result text and
   omit duplicate provider-irrelevant details; the original message lines stay
-  complete and authoritative for UI/diagnostics.
+  complete and authoritative for UI/diagnostics. An automatic compaction
+  failure may store `details.fallback = "retained_tail"` and a short recovery
+  summary instead of an LLM-generated summary; the complete transcript remains
+  authoritative and the fallback tail is only a model-context recovery view.
 - Writers append with flush + fsync (message durability ≈ WAL
   `synchronous=NORMAL`); full transcript rewrites (regenerate/edit, revision
   switch, import) go through a sibling temp file + atomic rename. A normal

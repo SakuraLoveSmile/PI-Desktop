@@ -463,6 +463,9 @@ may be retained while exactly one workspace supplies the visible shell context.
   `error` settles it. A manual-only checkpoint settles on `compaction_end`.
 - Successful manual/threshold compaction shows one informational toast. A
   successful overflow recovery shows one warning toast before the single retry.
+- If automatic summary generation fails but a retained-tail checkpoint is
+  persisted, `compaction_end.fallback = "retained_tail"` shows one warning
+  toast and the active run continues with reduced historical context.
 - Manual failure shows one error toast. Automatic hard/overflow failure does
   not duplicate the assistant error with a toast; the terminal error remains
   attached to the failed turn.

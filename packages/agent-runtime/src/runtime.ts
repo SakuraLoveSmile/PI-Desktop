@@ -12,6 +12,7 @@ import {
   type AgentLoopTurnUpdate,
   type AgentMessage,
   type AgentTool,
+  type CompactionPreparation,
   type CompactionEntry,
   type CompactionSettings,
   type MessageEntry,
@@ -39,6 +40,7 @@ import { DEFAULT_CONTEXT_COMPACTION_SETTINGS } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   AgentStatus,
+  ContextCompactionFallback,
   ContextCompactionReason,
   ContextCompactionRecord,
   ContextCompactionSettings,
@@ -130,6 +132,11 @@ const CONTEXT_COMPACTION_TOOL_NAME = "CompactContext";
 export const TOOL_SEARCH_NAME = "ToolSearch";
 const CONTEXT_NUDGE_TURN_INTERVAL = 3;
 const CHECKPOINT_TAIL_SAFETY_TOKENS = 256;
+const COMPACTION_FALLBACK_KEEP_RECENT_RATIO = 0.25;
+const COMPACTION_FALLBACK_MAX_SUMMARY_CHARS = 12_000;
+const COMPACTION_SUMMARY_PROMPT_SAFETY_TOKENS = 2_048;
+const COMPACTION_FALLBACK_MARKER =
+  "[automatic context recovery: older context was omitted after summary generation failed]";
 /** Path-scoped rules are best-effort and must not stall a file tool turn. */
 export const PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS = 2_000;
 const PATH_SCOPED_INSTRUCTION_TOOLS = new Set([
@@ -328,6 +335,18 @@ function assistantContent(content: unknown): AssistantContent {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+function boundedText(value: string, maxChars: number): string {
+  const text = value.trim();
+  if (text.length <= maxChars) return text;
+  const marker = "\n\n[context recovery summary shortened]\n\n";
+  const available = Math.max(2, maxChars - marker.length);
+  const headChars = Math.ceil(available / 2);
+  const tailChars = Math.floor(available / 2);
+  return `${text.slice(0, headChars)}${marker}${text.slice(-tailChars)}`;
+}
+
+type CheckpointPersistResult = "persisted" | "oversized" | "failed";
 
 function retainedTailForContext(value: unknown): AgentMessage[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -1602,6 +1621,297 @@ export class DesktopAgentRuntime {
     }
   }
 
+  private emitCompactionFailure(
+    reason: ContextCompactionReason,
+    tokensBefore: number | undefined,
+    message: string,
+  ): void {
+    this.emit({
+      type: "compaction_end",
+      reason,
+      ok: false,
+      ...(tokensBefore !== undefined ? { tokensBefore } : {}),
+      willRetry: false,
+      error: { code: "CONTEXT_COMPACTION_FAILED", message },
+    });
+  }
+
+  private checkpointDetails(preparation: CompactionPreparation) {
+    return {
+      readFiles: [...preparation.fileOps.read].sort(),
+      modifiedFiles: [
+        ...new Set([
+          ...preparation.fileOps.written,
+          ...preparation.fileOps.edited,
+        ]),
+      ].sort(),
+    };
+  }
+
+  private createCheckpoint(
+    preparation: CompactionPreparation,
+    throughMessageId: string,
+    summary: string,
+    usage?: Usage,
+    details?: unknown,
+  ): ContextCompactionRecord {
+    return {
+      id: randomUUID(),
+      summary,
+      firstKeptMessageId: preparation.firstKeptEntryId,
+      throughMessageId,
+      tokensBefore: preparation.tokensBefore,
+      ...(usage ? { usage } : {}),
+      retainedTail: preparation.retainedTail,
+      ...(details !== undefined ? { details } : {}),
+      providerId: this.provider.id,
+      modelId: this.provider.modelId,
+      createdAt: nowIso(),
+    };
+  }
+
+  private createFallbackCheckpoint(
+    preparation: CompactionPreparation,
+    throughMessageId: string,
+    maxSummaryChars: number,
+  ): ContextCompactionRecord {
+    const previousSummary = preparation.previousSummary
+      ? boundedText(
+          preparation.previousSummary,
+          Math.min(COMPACTION_FALLBACK_MAX_SUMMARY_CHARS, maxSummaryChars),
+        )
+      : "No previous context checkpoint is available.";
+    const summary = [
+      previousSummary,
+      COMPACTION_FALLBACK_MARKER,
+      "The automatic summary request did not complete. Older messages before this checkpoint are omitted from the next model request.",
+      "The complete transcript remains available in the session. Use the retained recent messages as the source of truth for immediate continuation.",
+    ].join("\n\n");
+    return this.createCheckpoint(
+      preparation,
+      throughMessageId,
+      summary,
+      undefined,
+      {
+        ...this.checkpointDetails(preparation),
+        fallback: "retained_tail" satisfies ContextCompactionFallback,
+        failureCode: "CONTEXT_COMPACTION_FAILED",
+      },
+    );
+  }
+
+  private prepareFallbackCompactionInput(
+    entries: SessionTreeEntry[],
+    budget: {
+      hardLimit: number;
+      requestHeadroom: number;
+      keepRecentTokens: number;
+    },
+  ) {
+    const fallbackKeepRecentTokens = Math.max(
+      1,
+      Math.min(
+        budget.keepRecentTokens,
+        Math.floor(budget.hardLimit * COMPACTION_FALLBACK_KEEP_RECENT_RATIO),
+      ),
+    );
+    return this.prepareCompactionInput(entries, {
+      ...budget,
+      keepRecentTokens: fallbackKeepRecentTokens,
+    });
+  }
+
+  private compactionSummaryWouldExceedBudget(
+    preparation: CompactionPreparation,
+    budget: { hardLimit: number; requestHeadroom: number },
+  ): boolean {
+    const contextWindow = budget.hardLimit + budget.requestHeadroom;
+    const modelOutputBudget = Math.min(
+      Math.floor(budget.requestHeadroom * 0.8),
+      Math.max(1, Math.round(this.model.maxTokens || DEFAULT_MAX_TOKENS)),
+    );
+    const summaryInputLimit = Math.max(
+      1,
+      contextWindow -
+        modelOutputBudget -
+        COMPACTION_SUMMARY_PROMPT_SAFETY_TOKENS,
+    );
+    const historyTokens = preparation.messagesToSummarize.reduce(
+      (total, message) => total + estimateTokens(message),
+      0,
+    );
+    const turnPrefixTokens = preparation.turnPrefixMessages.reduce(
+      (total, message) => total + estimateTokens(message),
+      0,
+    );
+    const previousSummaryTokens = preparation.previousSummary
+      ? Math.ceil(preparation.previousSummary.length / 4)
+      : 0;
+    return Math.max(
+      historyTokens + previousSummaryTokens,
+      turnPrefixTokens,
+    ) >= summaryInputLimit;
+  }
+
+  private async persistCheckpoint(
+    checkpoint: ContextCompactionRecord,
+    reason: ContextCompactionReason,
+    willRetry: boolean,
+    mustFitSafeBudget: boolean,
+    fallback?: ContextCompactionFallback,
+  ): Promise<CheckpointPersistResult> {
+    const compactedBudget = this.contextBudget(
+      buildSessionContext(this.entriesWithCompaction(checkpoint)).messages,
+    );
+    if (
+      mustFitSafeBudget &&
+      compactedBudget.tokens >= compactedBudget.hardLimit
+    ) {
+      return "oversized";
+    }
+    try {
+      await this.host.call("session.appendCompaction", {
+        sessionId: this.sessionId,
+        compaction: checkpoint,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.emitCompactionFailure(reason, checkpoint.tokensBefore, message);
+      return "failed";
+    }
+
+    this.activeCompaction = checkpoint;
+    this.agent.state.messages = buildSessionContext(
+      this.entriesWithCompaction(),
+    ).messages;
+    this.emit({
+      type: "compaction_end",
+      reason,
+      ok: true,
+      tokensBefore: checkpoint.tokensBefore,
+      firstKeptMessageId: checkpoint.firstKeptMessageId,
+      willRetry,
+      ...(fallback ? { fallback } : {}),
+    });
+    return "persisted";
+  }
+
+  private fallbackPreparation(
+    entries: SessionTreeEntry[],
+    budget: {
+      hardLimit: number;
+      requestHeadroom: number;
+      keepRecentTokens: number;
+    },
+    preparation?: CompactionPreparation,
+  ): CompactionPreparation | undefined {
+    const fallbackInput = this.prepareFallbackCompactionInput(entries, budget);
+    if (fallbackInput.ok && fallbackInput.value) return fallbackInput.value;
+
+    // A persisted checkpoint can be the last entry when a new prompt pushes
+    // its retained tail over the hard limit. pi correctly reports that there
+    // is no new history to summarize; rebuild a smaller tail from the full
+    // transcript while carrying the existing summary forward.
+    const terminal = entries.at(-1);
+    if (terminal?.type !== "compaction") return preparation;
+    const sourceInput = this.prepareFallbackCompactionInput(
+      entries.slice(0, -1),
+      budget,
+    );
+    if (!sourceInput.ok || !sourceInput.value) return preparation;
+    return {
+      ...sourceInput.value,
+      previousSummary: terminal.summary,
+    };
+  }
+
+  private async recoverCompactionFailure(
+    entries: SessionTreeEntry[],
+    budget: {
+      tokens: number;
+      hardLimit: number;
+      requestHeadroom: number;
+      keepRecentTokens: number;
+    },
+    reason: ContextCompactionReason,
+    willRetry: boolean,
+    preparation: CompactionPreparation | undefined,
+    failureMessage: string,
+  ): Promise<boolean> {
+    if (reason === "manual") {
+      this.emitCompactionFailure(
+        reason,
+        preparation?.tokensBefore,
+        failureMessage,
+      );
+      return false;
+    }
+
+    const fallbackPreparation = this.fallbackPreparation(
+      entries,
+      budget,
+      preparation,
+    );
+    if (!fallbackPreparation) {
+      this.emitCompactionFailure(reason, undefined, failureMessage);
+      return false;
+    }
+    const throughMessageId = this.fullEntries.at(-1)?.id;
+    if (!throughMessageId) {
+      this.emitCompactionFailure(
+        reason,
+        fallbackPreparation.tokensBefore,
+        "Compaction has no durable transcript boundary",
+      );
+      return false;
+    }
+
+    const checkpoint = this.createFallbackCheckpoint(
+      fallbackPreparation,
+      throughMessageId,
+      Math.max(
+        256,
+        Math.min(
+          COMPACTION_FALLBACK_MAX_SUMMARY_CHARS,
+          Math.floor(budget.hardLimit * 0.75),
+        ),
+      ),
+    );
+    const persisted = await this.persistCheckpoint(
+      checkpoint,
+      reason,
+      willRetry,
+      true,
+      "retained_tail",
+    );
+    if (persisted === "persisted") return true;
+    if (persisted === "oversized") {
+      this.emitCompactionFailure(
+        reason,
+        checkpoint.tokensBefore,
+        "Automatic context recovery could not reduce the retained context below the safe model budget",
+      );
+    }
+    return false;
+  }
+
+  private async generateCompaction(
+    preparation: CompactionPreparation,
+    customInstructions?: string,
+  ): Promise<Awaited<ReturnType<typeof compact>>> {
+    if (!this.compactionAbort) {
+      throw new Error("Compaction was not initialized");
+    }
+    return compact(
+      preparation,
+      this.models,
+      this.model,
+      customInstructions,
+      this.compactionAbort.signal,
+      this.thinkingLevel,
+    );
+  }
+
   private async performCompaction(
     reason: ContextCompactionReason,
     willRetry: boolean,
@@ -1616,135 +1926,123 @@ export class DesktopAgentRuntime {
       const message = preparation.ok
         ? "No new context is available to compact"
         : preparation.error.message;
-      this.emit({
-        type: "compaction_end",
+      if (reason !== "manual") {
+        return await this.recoverCompactionFailure(
+          entries,
+          budget,
+          reason,
+          willRetry,
+          undefined,
+          message,
+        );
+      }
+      this.emitCompactionFailure(reason, undefined, message);
+      return false;
+    }
+
+    if (this.compactionSummaryWouldExceedBudget(preparation.value, budget)) {
+      const message =
+        "Compaction summary input exceeds the safe model budget";
+      if (reason !== "manual") {
+        return await this.recoverCompactionFailure(
+          entries,
+          budget,
+          reason,
+          willRetry,
+          preparation.value,
+          message,
+        );
+      }
+      this.emitCompactionFailure(
         reason,
-        ok: false,
-        willRetry: false,
-        error: { code: "CONTEXT_COMPACTION_FAILED", message },
-      });
+        preparation.value.tokensBefore,
+        message,
+      );
       return false;
     }
 
     this.compactionAbort = new AbortController();
     let result: Awaited<ReturnType<typeof compact>>;
     try {
-      result = await compact(
+      result = await this.generateCompaction(
         preparation.value,
-        this.models,
-        this.model,
         customInstructions,
-        this.compactionAbort.signal,
-        this.thinkingLevel,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.emit({
-        type: "compaction_end",
+      if (reason !== "manual" && !this.compactionAbort?.signal.aborted) {
+        return await this.recoverCompactionFailure(
+          entries,
+          budget,
+          reason,
+          willRetry,
+          preparation.value,
+          message,
+        );
+      }
+      this.emitCompactionFailure(
         reason,
-        ok: false,
-        tokensBefore: preparation.value.tokensBefore,
-        willRetry: false,
-        error: { code: "CONTEXT_COMPACTION_FAILED", message },
-      });
+        preparation.value.tokensBefore,
+        message,
+      );
       return false;
     } finally {
       this.compactionAbort = undefined;
     }
     if (!result.ok) {
-      this.emit({
-        type: "compaction_end",
+      if (result.error.code === "aborted") {
+        this.emitCompactionFailure(
+          reason,
+          preparation.value.tokensBefore,
+          result.error.message,
+        );
+        return false;
+      }
+      return await this.recoverCompactionFailure(
+        entries,
+        budget,
         reason,
-        ok: false,
-        tokensBefore: preparation.value.tokensBefore,
-        willRetry: false,
-        error: {
-          code: "CONTEXT_COMPACTION_FAILED",
-          message: result.error.message,
-        },
-      });
-      return false;
+        willRetry,
+        preparation.value,
+        result.error.message,
+      );
     }
 
     const throughMessageId = this.fullEntries.at(-1)?.id;
     if (!throughMessageId) {
-      this.emit({
-        type: "compaction_end",
+      this.emitCompactionFailure(
         reason,
-        ok: false,
-        willRetry: false,
-        error: {
-          code: "CONTEXT_COMPACTION_FAILED",
-          message: "Compaction has no durable transcript boundary",
-        },
-      });
+        result.value.tokensBefore,
+        "Compaction has no durable transcript boundary",
+      );
       return false;
     }
-    const checkpoint: ContextCompactionRecord = {
-      id: randomUUID(),
-      summary: result.value.summary,
-      firstKeptMessageId: result.value.firstKeptEntryId,
+    const checkpoint = this.createCheckpoint(
+      preparation.value,
       throughMessageId,
-      tokensBefore: result.value.tokensBefore,
-      usage: result.value.usage,
-      retainedTail: result.value.retainedTail,
-      details: result.value.details,
-      providerId: this.provider.id,
-      modelId: this.provider.modelId,
-      createdAt: nowIso(),
-    };
-    const compactedBudget = this.contextBudget(
-      buildSessionContext(this.entriesWithCompaction(checkpoint)).messages,
+      result.value.summary,
+      result.value.usage,
+      result.value.details,
     );
-    if (
-      (reason === "overflow" || budget.tokens >= budget.hardLimit) &&
-      compactedBudget.tokens >= compactedBudget.hardLimit
-    ) {
-      this.emit({
-        type: "compaction_end",
-        reason,
-        ok: false,
-        tokensBefore: result.value.tokensBefore,
-        willRetry: false,
-        error: {
-          code: "CONTEXT_COMPACTION_FAILED",
-          message:
-            "The checkpoint did not reduce context below the safe request budget",
-        },
-      });
-      return false;
-    }
-    try {
-      await this.host.call("session.appendCompaction", {
-        sessionId: this.sessionId,
-        compaction: checkpoint,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.emit({
-        type: "compaction_end",
-        reason,
-        ok: false,
-        tokensBefore: result.value.tokensBefore,
-        willRetry: false,
-        error: { code: "CONTEXT_COMPACTION_FAILED", message },
-      });
-      return false;
-    }
-
-    this.activeCompaction = checkpoint;
-    this.agent.state.messages = buildSessionContext(
-      this.entriesWithCompaction(),
-    ).messages;
-    this.emit({
-      type: "compaction_end",
+    const mustFitSafeBudget =
+      reason === "overflow" || budget.tokens >= budget.hardLimit;
+    const persisted = await this.persistCheckpoint(
+      checkpoint,
       reason,
-      ok: true,
-      tokensBefore: checkpoint.tokensBefore,
-      firstKeptMessageId: checkpoint.firstKeptMessageId,
       willRetry,
-    });
-    return true;
+      mustFitSafeBudget,
+    );
+    if (persisted === "persisted" || persisted === "failed") {
+      return persisted === "persisted";
+    }
+    return await this.recoverCompactionFailure(
+      entries,
+      budget,
+      reason,
+      willRetry,
+      preparation.value,
+      "The checkpoint did not reduce context below the safe request budget",
+    );
   }
 
   async compactManually(): Promise<void> {

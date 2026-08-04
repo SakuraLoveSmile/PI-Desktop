@@ -22,6 +22,7 @@ test("context compaction is wired through protocol v6 and the manual IPC path", 
   assert.match(types, /type ContextCompactionRecord/);
   assert.match(types, /type: "compaction_start"/);
   assert.match(types, /type: "compaction_end"/);
+  assert.match(types, /fallback\?: ContextCompactionFallback/);
   assert.match(main, /handle\(IPC\.invoke\.agentCompact/);
   assert.match(
     main,
@@ -55,6 +56,7 @@ test("per-turn protection nudges softly and blocks unsafe provider requests", ()
   assert.match(runtime, /checkpoint truncated: tool result exceeded the retained context budget/);
   assert.match(runtime, /pendingOverflow/);
   assert.match(runtime, /runCompaction\("overflow", true\)/);
+  assert.match(runtime, /fallback: "retained_tail"/);
 });
 
 test("compaction lifecycle keeps the renderer busy until its actual terminal event", () => {
@@ -71,4 +73,5 @@ test("compaction lifecycle keeps the renderer busy until its actual terminal eve
     store,
     /case "compaction_end":[\s\S]*event\.reason === "manual"\) set\(\{ isRunning: false \}\)/,
   );
+  assert.match(store, /contextCompaction\.recovered/);
 });

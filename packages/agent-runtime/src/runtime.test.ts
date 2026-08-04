@@ -1557,6 +1557,152 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     await runtime.dispose();
   });
 
+  it("persists a retained-tail fallback when automatic summary generation fails", async () => {
+    const onEvent = vi.fn();
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const runtime = createRuntime({
+      host,
+      onEvent,
+      history: [
+        {
+          id: "old-user",
+          role: "user",
+          content: "older task context",
+          createdAt: "2026-07-28T00:00:00Z",
+          status: "complete",
+        },
+        {
+          id: "recent-user",
+          role: "user",
+          content: "continue the task",
+          createdAt: "2026-07-28T00:00:01Z",
+          status: "complete",
+        },
+      ],
+    });
+    vi.spyOn(runtime as any, "generateCompaction").mockResolvedValue({
+      ok: false,
+      error: {
+        code: "summarization_failed",
+        message: "provider terminated the summary request",
+      },
+    });
+
+    await expect((runtime as any).runCompaction("threshold", false)).resolves.toBe(
+      true,
+    );
+
+    const checkpoint = host.call.mock.calls[0]?.[0] === "session.appendCompaction"
+      ? (host.call.mock.calls[0]?.[1] as any).compaction
+      : undefined;
+    expect(checkpoint).toEqual(
+      expect.objectContaining({
+        throughMessageId: "recent-user",
+        details: expect.objectContaining({
+          fallback: "retained_tail",
+          failureCode: "CONTEXT_COMPACTION_FAILED",
+        }),
+      }),
+    );
+    expect((runtime as any).fullEntries).toHaveLength(2);
+    expect((runtime as any).agent.state.messages[0]).toEqual(
+      expect.objectContaining({ role: "compactionSummary" }),
+    );
+    expect(onEvent.mock.calls.map(([envelope]) => (envelope as any).event)).toContainEqual(
+      expect.objectContaining({
+        type: "compaction_end",
+        ok: true,
+        fallback: "retained_tail",
+      }),
+    );
+    expect(
+      onEvent.mock.calls.some(
+        ([envelope]) => (envelope as any).event.type === "error",
+      ),
+    ).toBe(false);
+    await runtime.dispose();
+  });
+
+  it("shrinks a terminal checkpoint tail when a new prompt leaves no history to summarize", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const runtime = createRuntime({
+      host,
+      history: [
+        {
+          id: "old-user",
+          role: "user",
+          content: "older task context",
+          createdAt: "2026-07-28T00:00:00Z",
+          status: "complete",
+        },
+        {
+          id: "recent-user",
+          role: "user",
+          content: "recent context",
+          createdAt: "2026-07-28T00:00:01Z",
+          status: "complete",
+        },
+      ],
+      compaction: {
+        id: "compact-1",
+        summary: "The previous task summary.",
+        throughMessageId: "recent-user",
+        tokensBefore: 220_000,
+        retainedTail: [
+          { role: "user", content: "recent context", timestamp: 2 },
+        ],
+        createdAt: "2026-07-28T00:00:02Z",
+      },
+    });
+    const generateCompaction = vi.spyOn(
+      runtime as any,
+      "generateCompaction",
+    );
+
+    await expect((runtime as any).runCompaction("threshold", false)).resolves.toBe(
+      true,
+    );
+
+    expect(generateCompaction).not.toHaveBeenCalled();
+    expect(host.call).toHaveBeenCalledWith(
+      "session.appendCompaction",
+      expect.objectContaining({
+        compaction: expect.objectContaining({
+          details: expect.objectContaining({ fallback: "retained_tail" }),
+          summary: expect.stringContaining("The previous task summary."),
+        }),
+      }),
+    );
+    await runtime.dispose();
+  });
+
+  it("keeps manual compaction failures terminal instead of silently dropping context", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ host, onEvent });
+    vi.spyOn(runtime as any, "generateCompaction").mockResolvedValue({
+      ok: false,
+      error: {
+        code: "summarization_failed",
+        message: "summary unavailable",
+      },
+    });
+
+    await expect((runtime as any).runCompaction("manual", false)).resolves.toBe(
+      false,
+    );
+    expect(host.call).not.toHaveBeenCalled();
+    expect(onEvent.mock.calls.map(([envelope]) => (envelope as any).event)).toContainEqual(
+      expect.objectContaining({
+        type: "compaction_end",
+        reason: "manual",
+        ok: false,
+        error: expect.objectContaining({ code: "CONTEXT_COMPACTION_FAILED" }),
+      }),
+    );
+    await runtime.dispose();
+  });
+
   it("does not issue another model turn when hard-limit compaction fails", async () => {
     const runtime = createRuntime();
     vi.spyOn(runtime as any, "contextBudget").mockReturnValue({

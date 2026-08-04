@@ -30,7 +30,9 @@
 > `0.4.10` replaces destructive work-panel clearing on conversation switches
 > with runtime session-scoped contexts through D142 / ADR 0028.
 > `0.4.11` adopts turn-boundary model-context checkpoint compaction through
-> D158 / ADR 0030 while preserving the complete visible transcript.
+> D158 / ADR 0030 while preserving the complete visible transcript. The
+> context-recovery amendment in ADR 0049 adds a durable retained-tail
+> fallback for automatic compaction failures.
 > `0.4.12` standardizes home and thread-docked composer prompt rows without a
 > leading brand mark through D160 / ADR 0031 while preserving shell branding
 > elsewhere.

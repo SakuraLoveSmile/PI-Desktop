@@ -64,3 +64,4 @@ Each ADR includes:
 | 0046 | Categorized process log files | Accepted |
 | 0047 | Context usage inspector with exact and estimated token sources | Accepted |
 | 0048 | Lazy per-turn tool activation | Accepted |
+| 0049 | Recover automatic context compaction failures with a retained tail | Accepted |

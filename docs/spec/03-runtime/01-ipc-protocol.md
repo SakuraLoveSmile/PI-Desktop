@@ -190,7 +190,8 @@ type AgentEvent =
  | { type: "compaction_end";
      reason: "manual" | "threshold" | "overflow";
      ok: boolean; tokensBefore?: number; firstKeptMessageId?: string;
-     willRetry: boolean; error?: { code: string; message: string } }
+     willRetry: boolean; fallback?: "retained_tail";
+     error?: { code: string; message: string } }
  | { type: "error"; error: AppError }
  | { type: "status"; status: AgentStatus };
 ```
@@ -206,6 +207,10 @@ matching `compaction_end`, while threshold/overflow compaction remains inside
 the active agent run. The soft context-management instruction is transient and
 has no protocol event or transcript row of its own. A model-issued
 `CompactContext` call uses the normal tool lifecycle and is visible/durable.
+Automatic summary failures may still produce a successful lifecycle event with
+`fallback: "retained_tail"`; this means a durable, aggressively bounded tail
+checkpoint was installed and the run may continue with reduced historical
+context. Manual compaction never silently falls back.
 
 ## 6a. Notification API (D117, protocol v4)
 

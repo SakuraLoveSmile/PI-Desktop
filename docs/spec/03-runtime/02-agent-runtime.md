@@ -105,14 +105,17 @@ For every pi loop turn:
    focus; the internal tool queues summary generation for the end of its
    current tool turn, bypasses workspace permissions, and otherwise emits and
    persists a normal visible tool call/result row
-6. at or above the hard boundary, summary generation is mandatory; failure
-   raises `CONTEXT_COMPACTION_FAILED` and pi cannot issue another provider
-   request
-7. successful generation first appends the checkpoint through host-core, then
-   installs its summary + retained tail as the runtime context for the next
-   provider request; a hard-boundary checkpoint is re-estimated before it is
-   persisted and again before continuation, and cannot authorize the next
-   request unless it is below the hard budget
+6. at or above the hard boundary, summary generation is mandatory; the runtime
+   preflights the summary input against the model window and skips a request
+   that cannot fit. An automatic summary failure first attempts a deterministic
+   retained-tail checkpoint, while manual compaction still reports
+   `CONTEXT_COMPACTION_FAILED`
+7. successful generation or deterministic recovery first appends the
+   checkpoint through host-core, then installs its summary + retained tail as
+   the runtime context for the next provider request; a hard-boundary
+   checkpoint is re-estimated before it is persisted and again before
+   continuation, and cannot authorize the next request unless it is below the
+   hard budget
 
 pi's cut point keeps provider-valid tool call/result pairs together. When the
 final tool-result batch alone exceeds the configured recent-tail target,
@@ -136,12 +139,18 @@ the hard budget so small-context models can still shed meaningful history. The
 soft boundary precedes the hard boundary by a model-aware recent-context gap.
 
 The incoming user prompt participates in budgeting before the first provider
-request. If a checkpoint cannot make it fit, the user row and an assistant
-error remain durable but no provider request starts. Provider-reported context
-overflow is the last recovery layer: omit the failed assistant from model
-context, compact once, and retry once. A second overflow or failed checkpoint
-is terminal. Bedrock's `prompt is too long: N tokens > M maximum` form maps to
-this path.
+request. If normal compaction fails during an automatic threshold or overflow
+recovery, the runtime persists a short recovery checkpoint with the previous
+summary (when available) and an aggressively bounded recent tail. The
+complete transcript remains durable and visible, while the next model request
+receives only that recovery checkpoint and tail. The lifecycle event marks
+this as `fallback: "retained_tail"` so the renderer can show a warning rather
+than a false success. If the fallback cannot be prepared, persisted, or kept
+below the safe budget, the user row and an assistant error remain durable and
+no provider request starts. Provider-reported context overflow is the last
+recovery layer: omit the failed assistant from model context, compact once,
+and retry once. A second overflow remains terminal. Bedrock's
+`prompt is too long: N tokens > M maximum` form maps to this path.
 
 Automatic protection is enabled by default. Disabling it removes
 `CompactContext` and bypasses soft, hard, and overflow recovery; manual
