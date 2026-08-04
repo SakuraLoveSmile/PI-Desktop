@@ -64,8 +64,6 @@ pub struct PlanProposal {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_permission_mode: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub feedback: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub error_code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub artifact: Option<PlanArtifact>,
@@ -97,7 +95,6 @@ pub struct PlanResolution {
     pub proposal: PlanProposal,
     pub action: Option<String>,
     pub target_permission_mode: Option<String>,
-    pub feedback: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution: Option<PlanExecution>,
 }
@@ -124,7 +121,6 @@ pub struct PlanResolveParams<'a> {
     pub version: Option<i64>,
     pub action: &'a str,
     pub target_permission_mode: Option<&'a str>,
-    pub feedback: Option<&'a str>,
 }
 
 fn plan_error(code: &str) -> anyhow::Error {
@@ -134,7 +130,7 @@ fn plan_error(code: &str) -> anyhow::Error {
 /// Expire approvals at the first read or mutation boundary that observes
 /// them. The state transition and audit record share one transaction so a
 /// timed-out approval can never remain actionable after its error is visible.
-fn expire_pending_approvals(db: &Database) -> Result<()> {
+pub fn expire_pending_approvals(db: &Database) -> Result<()> {
     let now = now_ms();
     let tx = db.conn().unchecked_transaction()?;
     let expired: Vec<(String, String, String, String)> = {
@@ -194,6 +190,9 @@ fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PlanProposal> 
     let updated_at: i64 = row.get(9)?;
     let expires_at = row.get::<_, Option<i64>>(10)?.map(ms_to_ts);
     let resolved_at = row.get::<_, Option<i64>>(11)?.map(ms_to_ts);
+    // This legacy column remains in SQLite for migration/read safety but is
+    // intentionally absent from the current approval contract.
+    let _legacy_feedback: Option<String> = row.get(14)?;
     Ok(PlanProposal {
         id: row.get(0)?,
         session_id: row.get(1)?,
@@ -210,7 +209,6 @@ fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PlanProposal> 
         resolved_at,
         action: row.get(12)?,
         target_permission_mode: row.get(13)?,
-        feedback: row.get(14)?,
         error_code: row.get(15)?,
         artifact,
         version: row.get(19)?,
@@ -448,52 +446,9 @@ fn resolution_from_proposal(proposal: PlanProposal) -> Result<PlanResolution> {
         status: proposal.status.clone(),
         action: proposal.action.clone(),
         target_permission_mode: proposal.target_permission_mode.clone(),
-        feedback: proposal.feedback.clone(),
         execution,
         proposal,
     })
-}
-
-fn set_plan_approval_permission_tx(tx: &rusqlite::Transaction<'_>, mode: &str) -> Result<()> {
-    let existing: Option<String> = tx
-        .query_row(
-            "SELECT value_json FROM kv WHERE ns = 'app' AND key = 'app'",
-            [],
-            |row| row.get(0),
-        )
-        .optional()?;
-    let mut settings = existing
-        .as_deref()
-        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
-        .and_then(|value| value.as_object().cloned())
-        .unwrap_or_default();
-    settings.insert(
-        "planApprovalPermissionMode".into(),
-        serde_json::Value::String(mode.to_string()),
-    );
-    tx.execute(
-        "INSERT INTO kv (ns, key, value_json, updated_at)
-         VALUES ('app', 'app', ?1, ?2)
-         ON CONFLICT(ns, key) DO UPDATE SET
-           value_json = excluded.value_json,
-           updated_at = excluded.updated_at",
-        params![serde_json::Value::Object(settings).to_string(), now_ms()],
-    )?;
-    Ok(())
-}
-
-/// The plan approval preference is deliberately independent of the general
-/// tool permission default. A missing or malformed value falls back to ask.
-#[cfg(test)]
-pub fn plan_approval_permission_mode(db: &Database) -> Result<String> {
-    let value = db.get_setting("app")?.and_then(|settings| {
-        settings
-            .get("planApprovalPermissionMode")
-            .and_then(|mode| mode.as_str())
-            .filter(|mode| valid_permission_mode(mode))
-            .map(str::to_string)
-    });
-    Ok(value.unwrap_or_else(|| "ask".into()))
 }
 
 /// Prevent renderer configuration calls from bypassing durable Plan work.
@@ -574,30 +529,54 @@ pub fn gate_session_configure(
 }
 
 impl PlanManager {
-    pub fn enter(&self, db: &Database, session_id: &str) -> Result<()> {
+    pub fn enter(
+        &self,
+        db: &Database,
+        session_id: &str,
+        turn_id: &str,
+        tool_call_id: &str,
+    ) -> Result<()> {
+        if session_id.trim().is_empty()
+            || turn_id.trim().is_empty()
+            || tool_call_id.trim().is_empty()
+        {
+            return Err(plan_error("PLAN_INVALID_ARGUMENT"));
+        }
         let Some(mode) = sessions::session_mode(db, session_id)? else {
             return Err(plan_error("PLAN_SESSION_NOT_FOUND"));
         };
         if mode != "agent" {
             return Err(plan_error("PLAN_ALREADY_ACTIVE"));
         }
-        gate_session_configure(db, session_id, "plan", None, None, None, None)?;
         let now = now_ms();
         let tx = db.conn().unchecked_transaction()?;
         let changed = tx
             .prepare_cached(
                 "UPDATE sessions SET mode = 'plan', updated_at = ?1
-                 WHERE id = ?2 AND mode = 'agent'",
+                 WHERE id = ?2 AND mode = 'agent'
+                   AND EXISTS (
+                     SELECT 1 FROM turns
+                     WHERE id = ?3 AND session_id = ?2 AND status = 'running'
+                   )
+                   AND NOT EXISTS (
+                     SELECT 1 FROM plan_approvals
+                     WHERE session_id = ?2 AND execution_state IN ('queued', 'running')
+                   )",
             )?
-            .execute(params![now, session_id])?;
+            .execute(params![now, session_id, turn_id])?;
         if changed == 0 {
-            return Err(plan_error("PLAN_ALREADY_ACTIVE"));
+            return Err(plan_error("PLAN_APPROVAL_STALE"));
         }
         audit::append_tx(
             &tx,
             "plan_entered",
             Some(session_id),
-            json!({ "sessionId": session_id, "mode": "plan" }),
+            json!({
+                "sessionId": session_id,
+                "turnId": turn_id,
+                "toolCallId": tool_call_id,
+                "mode": "plan"
+            }),
         )?;
         tx.commit()?;
         Ok(())
@@ -761,7 +740,6 @@ impl PlanManager {
             version,
             action,
             target_permission_mode,
-            feedback,
         } = params;
         expire_pending_approvals(db)?;
         let Some(current) = get_proposal(db, proposal_id)? else {
@@ -790,8 +768,6 @@ impl PlanManager {
         } else {
             None
         };
-        let feedback = feedback.map(str::trim).filter(|value| !value.is_empty());
-
         if current.status != STATUS_PENDING {
             let same_resolution = current.action.as_deref() == Some(action)
                 && (action != "approve" || current.target_permission_mode.as_deref() == selected);
@@ -842,24 +818,22 @@ impl PlanManager {
             if changed == 0 {
                 return Err(plan_error("PLAN_NOT_ACTIVE"));
             }
-            set_plan_approval_permission_tx(&tx, selected.expect("approve target"))?;
         }
         let changed = tx
             .prepare_cached(
                 "UPDATE plan_approvals
-                 SET status = ?1, action = ?2, target_permission_mode = ?3,
-                     feedback = ?4, resolved_at = ?5, updated_at = ?5,
-                     error_code = NULL, version = version + 1,
-                     execution_id = ?6, execution_state = ?7
-                 WHERE request_id = ?8 AND session_id = ?9 AND turn_id = ?10
-                   AND tool_call_id = ?11 AND status = 'pending' AND version = ?12
-                    AND expires_at > ?13",
+                  SET status = ?1, action = ?2, target_permission_mode = ?3,
+                      resolved_at = ?4, updated_at = ?4,
+                      error_code = NULL, version = version + 1,
+                      execution_id = ?5, execution_state = ?6
+                  WHERE request_id = ?7 AND session_id = ?8 AND turn_id = ?9
+                    AND tool_call_id = ?10 AND status = 'pending' AND version = ?11
+                     AND expires_at > ?12",
             )?
             .execute(params![
                 status,
                 action,
                 selected,
-                feedback,
                 now,
                 execution_id,
                 (action == "approve").then_some(EXECUTION_QUEUED),
@@ -887,7 +861,6 @@ impl PlanManager {
                 "targetPermissionMode": selected,
                 "executionId": execution_id,
                 "executionState": (action == "approve").then_some(EXECUTION_QUEUED),
-                "feedback": feedback,
             }),
         )?;
         tx.commit()?;
@@ -1143,9 +1116,65 @@ mod tests {
     }
 
     #[test]
-    fn plan_approval_permission_defaults_to_ask() {
-        let (_dir, db) = test_db();
-        assert_eq!(plan_approval_permission_mode(&db).unwrap(), "ask");
+    fn enter_plan_mode_uses_the_active_turn_and_tool_identity() {
+        let (dir, db) = test_db();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        let session = sessions::create_session(
+            &db,
+            Some("Agent".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(root.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let turn = live_turn(&db, &session.id);
+
+        PlanManager
+            .enter(&db, &session.id, &turn, "enter-plan-call")
+            .unwrap();
+
+        assert_eq!(
+            sessions::session_mode(&db, &session.id).unwrap().as_deref(),
+            Some("plan")
+        );
+        let audit_payload: String = db
+            .conn()
+            .query_row(
+                "SELECT payload_json FROM audit_log WHERE kind = 'plan_entered' ORDER BY id DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let audit_payload: serde_json::Value = serde_json::from_str(&audit_payload).unwrap();
+        assert_eq!(audit_payload["turnId"], turn);
+        assert_eq!(audit_payload["toolCallId"], "enter-plan-call");
+    }
+
+    #[test]
+    fn enter_plan_mode_rejects_a_stale_turn_without_a_mode_write() {
+        let (dir, db) = test_db();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        let session = sessions::create_session(
+            &db,
+            Some("Agent".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(root.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+
+        let error = PlanManager
+            .enter(&db, &session.id, "stale-turn", "enter-plan-call")
+            .unwrap_err();
+        assert_eq!(error.to_string(), "PLAN_APPROVAL_STALE");
+        assert_eq!(
+            sessions::session_mode(&db, &session.id).unwrap().as_deref(),
+            Some("agent")
+        );
     }
 
     #[test]
@@ -1277,12 +1306,14 @@ mod tests {
     }
 
     #[test]
-    fn reject_has_no_session_permission_or_execution_side_effects() {
+    fn reject_has_no_side_effects_and_allows_new_turn_submission() {
         let (dir, db) = test_db();
         let root = dir.path().join("workspace");
         fs::create_dir_all(&root).unwrap();
         let manager = PlanManager;
         let proposal = submit(&manager, &db, &root, "call-1");
+        let first_artifact_path = proposal.artifact.as_ref().unwrap().relative_path.clone();
+        let first_artifact_bytes = fs::read(root.join(&first_artifact_path)).unwrap();
         let before = sessions::get_session(&db, &proposal.session_id)
             .unwrap()
             .unwrap()
@@ -1299,7 +1330,6 @@ mod tests {
                     version: Some(proposal.version),
                     action: "reject",
                     target_permission_mode: None,
-                    feedback: None,
                 },
             )
             .unwrap();
@@ -1311,6 +1341,54 @@ mod tests {
         assert_eq!(before.mode, after.mode);
         assert_eq!(before.permission_mode, after.permission_mode);
         assert!(result.execution.is_none());
+        assert!(manager
+            .pending_for_session(&db, Some(&proposal.session_id))
+            .unwrap()
+            .is_empty());
+        let ended =
+            sessions::end_turn(&db, &proposal.turn_id, "completed", None, None, false).unwrap();
+        assert!(ended.updated);
+        let next_turn = live_turn(&db, &proposal.session_id);
+        let revised = manager
+            .submit(
+                &db,
+                PlanSubmitParams {
+                    workspace_root: &root,
+                    session_id: &proposal.session_id,
+                    turn_id: &next_turn,
+                    tool_call_id: "call-2",
+                    title: "Build API revised",
+                    markdown: "# Plan\n- revise",
+                    question: "Proceed with the revision?",
+                },
+            )
+            .unwrap();
+        assert_ne!(revised.id, proposal.id);
+        assert_eq!(revised.status, STATUS_PENDING);
+        assert_eq!(revised.turn_id, next_turn);
+        assert_ne!(
+            revised.artifact.as_ref().unwrap().relative_path,
+            first_artifact_path
+        );
+        assert_eq!(
+            fs::read(root.join(&first_artifact_path)).unwrap(),
+            first_artifact_bytes
+        );
+        assert_eq!(
+            manager
+                .pending_for_session(&db, Some(&proposal.session_id))
+                .unwrap()
+                .iter()
+                .map(|pending| pending.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![revised.id.as_str()]
+        );
+        let rejected = get_proposal(&db, &proposal.id).unwrap().unwrap();
+        assert_eq!(rejected.status, STATUS_REJECTED);
+        assert_eq!(
+            rejected.artifact.unwrap().relative_path,
+            first_artifact_path
+        );
         let execution_count: i64 = db
             .conn()
             .query_row(
@@ -1341,7 +1419,6 @@ mod tests {
                     version: Some(proposal.version),
                     action: "approve",
                     target_permission_mode: Some("accept-edits"),
-                    feedback: None,
                 },
             )
             .unwrap();
@@ -1354,10 +1431,7 @@ mod tests {
             .summary;
         assert_eq!(session.mode, "agent");
         assert_eq!(session.permission_mode, "accept-edits");
-        assert_eq!(
-            db.get_setting("app").unwrap().unwrap()["planApprovalPermissionMode"],
-            "accept-edits"
-        );
+        assert!(db.get_setting("app").unwrap().is_none());
         assert_eq!(manager.queued_executions(&db, None).unwrap().len(), 1);
     }
 
@@ -1380,7 +1454,6 @@ mod tests {
                     version: Some(proposal.version),
                     action: "approve",
                     target_permission_mode: Some("auto"),
-                    feedback: None,
                 },
             )
             .unwrap();
@@ -1396,7 +1469,6 @@ mod tests {
                     version: Some(proposal.version),
                     action: "approve",
                     target_permission_mode: Some("auto"),
-                    feedback: None,
                 },
             )
             .unwrap();
@@ -1415,7 +1487,6 @@ mod tests {
                         version: Some(proposal.version),
                         action: "reject",
                         target_permission_mode: None,
-                        feedback: None,
                     },
                 )
                 .unwrap_err()
@@ -1490,7 +1561,6 @@ mod tests {
                         version: Some(proposal.version),
                         action: "reject",
                         target_permission_mode: None,
-                        feedback: None,
                     },
                 )
                 .unwrap_err()
@@ -1518,7 +1588,6 @@ mod tests {
                     version: Some(proposal.version),
                     action: "approve",
                     target_permission_mode: Some("auto"),
-                    feedback: None,
                 },
             )
             .unwrap();
@@ -1602,7 +1671,6 @@ mod tests {
                     version: Some(proposal.version),
                     action: "approve",
                     target_permission_mode: Some("auto"),
-                    feedback: None,
                 },
             )
             .unwrap();

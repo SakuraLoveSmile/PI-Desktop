@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use serde_json::Value;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Storage schema v10: SQLite holds
 /// index data only; transcript content lives in per-session JSONL files
@@ -18,6 +18,15 @@ const AUDIT_RETENTION_MS: i64 = 90 * 24 * 3600 * 1000;
 const TASK_RUNS_KEEP: i64 = 100;
 /// Durable notification rows kept globally.
 pub const NOTIFICATION_KEEP: i64 = 200;
+
+const OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE: &str = "planApprovalPermissionMode";
+
+fn strip_obsolete_plan_approval_permission_mode(value: &mut Value) -> bool {
+    value
+        .as_object_mut()
+        .and_then(|object| object.remove(OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE))
+        .is_some()
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -420,15 +429,13 @@ impl Database {
             }
             7 => {
                 migrate_v7_to_v8(&conn)?;
-                migrate_v8_to_v9(&conn)?;
-                migrate_v9_to_v10(&conn)?;
+                migrate_v8_to_v10(&conn, path)?;
             }
             8 => {
-                migrate_v8_to_v9(&conn)?;
-                migrate_v9_to_v10(&conn)?;
+                migrate_v8_to_v10(&conn, path)?;
             }
             9 => {
-                migrate_v9_to_v10(&conn)?;
+                migrate_v9_to_v10(&conn, path)?;
             }
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
@@ -621,11 +628,22 @@ impl Database {
     // ---- settings compatibility shims (kv ns='app') -----------------------
 
     pub fn get_setting(&self, key: &str) -> Result<Option<Value>> {
-        self.kv_get("app", key)
+        let mut value = self.kv_get("app", key)?;
+        if key == "app" {
+            if let Some(value) = value.as_mut() {
+                strip_obsolete_plan_approval_permission_mode(value);
+            }
+        }
+        Ok(value)
     }
 
     pub fn set_setting(&self, key: &str, value: &Value) -> Result<()> {
-        self.kv_set("app", key, value)
+        if key != "app" {
+            return self.kv_set("app", key, value);
+        }
+        let mut sanitized = value.clone();
+        strip_obsolete_plan_approval_permission_mode(&mut sanitized);
+        self.kv_set("app", key, &sanitized)
     }
 
     // ---- projects ----------------------------------------------------------
@@ -690,79 +708,76 @@ fn archive_legacy_db(path: &Path, version: i64) -> Result<()> {
     Ok(())
 }
 
-fn migrate_legacy_mode_json(value: &mut Value) {
-    match value {
-        Value::Array(items) => {
-            for item in items {
-                migrate_legacy_mode_json(item);
-            }
-        }
-        Value::Object(object) => {
-            for (key, item) in object.iter_mut() {
-                if matches!(key.as_str(), "mode" | "defaultMode" | "operatingMode")
-                    && item.as_str() == Some("chat")
-                {
-                    *item = Value::String("plan".into());
-                }
-                migrate_legacy_mode_json(item);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn migrate_v7_to_v8(conn: &Connection) -> Result<()> {
-    let tx = conn.unchecked_transaction()?;
-    tx.execute("UPDATE sessions SET mode = 'plan' WHERE mode = 'chat'", [])?;
-
-    let settings: Vec<(String, String, String)> = {
-        let mut stmt =
-            tx.prepare("SELECT ns, key, value_json FROM kv WHERE value_json LIKE '%chat%'")?;
-        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
-        rows.collect::<rusqlite::Result<Vec<_>>>()?
+fn migrate_and_validate_top_level_mode(value: &mut Value, key: &str, context: &str) -> Result<()> {
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("{context} must be an object"))?;
+    let Some(item) = object.get_mut(key) else {
+        return Ok(());
     };
-    for (ns, key, raw) in settings {
-        let Ok(mut value) = serde_json::from_str::<Value>(&raw) else {
-            continue;
-        };
-        let before = value.clone();
-        migrate_legacy_mode_json(&mut value);
-        if value != before {
-            tx.execute(
-                "UPDATE kv SET value_json = ?1, updated_at = ?2 WHERE ns = ?3 AND key = ?4",
-                params![value.to_string(), now_ms(), ns, key],
-            )?;
+    let mode = item
+        .as_str()
+        .ok_or_else(|| anyhow!("{context}.{key} must be the string 'agent' or 'plan'"))?;
+    match mode {
+        "chat" => *item = Value::String("plan".into()),
+        "agent" | "plan" => {}
+        other => {
+            return Err(anyhow!(
+                "{context}.{key} has invalid mode '{other}'; expected 'agent' or 'plan'"
+            ));
         }
     }
-
-    let scheduled: Vec<(String, String)> = {
-        let mut stmt = tx.prepare(
-            "SELECT id, config_json FROM scheduled_tasks WHERE config_json LIKE '%chat%'",
-        )?;
-        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
-        rows.collect::<rusqlite::Result<Vec<_>>>()?
-    };
-    for (id, raw) in scheduled {
-        let Ok(mut value) = serde_json::from_str::<Value>(&raw) else {
-            continue;
-        };
-        let before = value.clone();
-        migrate_legacy_mode_json(&mut value);
-        if value != before {
-            tx.execute(
-                "UPDATE scheduled_tasks SET config_json = ?, updated_at = ? WHERE id = ?",
-                params![value.to_string(), now_ms(), id],
-            )?;
-        }
-    }
-
-    tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
-    tx.pragma_update(None, "user_version", 8i64)?;
-    tx.commit()?;
     Ok(())
 }
 
-fn ensure_plan_approval_permission_setting_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+fn validate_session_modes(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    let invalid: Option<(String, String)> = tx
+        .query_row(
+            "SELECT id, mode FROM sessions
+             WHERE mode NOT IN ('agent', 'plan')
+             LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    if let Some((id, mode)) = invalid {
+        return Err(anyhow!(
+            "session '{id}' has invalid mode '{mode}'; expected 'agent' or 'plan'"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_default_command_shell(
+    settings: &Value,
+    catalog: &crate::tools::shell::ShellCatalog,
+) -> Result<()> {
+    let Some(object) = settings.as_object() else {
+        return Err(anyhow!("app settings JSON must be an object"));
+    };
+    let Some(value) = object.get("defaultCommandShell") else {
+        return Ok(());
+    };
+    let shell_id = value
+        .as_str()
+        .ok_or_else(|| anyhow!("app settings defaultCommandShell must be a string"))?;
+    if !crate::tools::shell::is_known_shell_id(shell_id) {
+        return Err(anyhow!(
+            "app settings defaultCommandShell has unknown shell ID '{shell_id}'"
+        ));
+    }
+    if !catalog.choices.iter().any(|choice| choice.id == shell_id) {
+        return Err(anyhow!(
+            "app settings defaultCommandShell '{shell_id}' is unavailable on this platform"
+        ));
+    }
+    Ok(())
+}
+
+fn migrate_app_settings(
+    tx: &rusqlite::Transaction<'_>,
+    catalog: &crate::tools::shell::ShellCatalog,
+) -> Result<()> {
     let existing: Option<String> = tx
         .query_row(
             "SELECT value_json FROM kv WHERE ns = 'app' AND key = 'app'",
@@ -770,49 +785,76 @@ fn ensure_plan_approval_permission_setting_tx(tx: &rusqlite::Transaction<'_>) ->
             |row| row.get(0),
         )
         .optional()?;
-    let had_object = existing
-        .as_deref()
-        .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
-        .and_then(|value| value.as_object().cloned());
-    let mut settings = had_object.unwrap_or_else(|| {
-        serde_json::Map::from_iter([
-            ("defaultMode".into(), Value::String("agent".into())),
-            ("theme".into(), Value::String("dark".into())),
-            ("enterToSend".into(), Value::Bool(true)),
-            (
-                "contextCompaction".into(),
-                serde_json::json!({
-                    "enabled": true,
-                    "reserveTokens": 16384,
-                    "keepRecentTokens": 20000
-                }),
-            ),
-            ("onboardingDismissed".into(), Value::Bool(false)),
-        ])
-    });
-    let valid = settings
-        .get("planApprovalPermissionMode")
-        .and_then(Value::as_str)
-        .is_some_and(|mode| matches!(mode, "ask" | "accept-edits" | "auto"));
-    if !valid {
-        settings.insert(
-            "planApprovalPermissionMode".into(),
-            Value::String("ask".into()),
-        );
+    let Some(raw) = existing else {
+        return Ok(());
+    };
+    let mut settings = serde_json::from_str::<Value>(&raw)
+        .with_context(|| "app settings JSON is malformed during migration")?;
+    if !settings.is_object() {
+        return Err(anyhow!(
+            "app settings JSON must be an object during migration"
+        ));
+    }
+    let before = settings.clone();
+    strip_obsolete_plan_approval_permission_mode(&mut settings);
+    migrate_and_validate_top_level_mode(&mut settings, "defaultMode", "app settings")?;
+    validate_default_command_shell(&settings, catalog)?;
+    if settings != before {
         tx.execute(
-            "INSERT INTO kv (ns, key, value_json, updated_at)
-             VALUES ('app', 'app', ?1, ?2)
-             ON CONFLICT(ns, key) DO UPDATE SET
-               value_json = excluded.value_json,
-               updated_at = excluded.updated_at",
-            params![Value::Object(settings).to_string(), now_ms()],
+            "UPDATE kv SET value_json = ?1, updated_at = ?2
+             WHERE ns = 'app' AND key = 'app'",
+            params![settings.to_string(), now_ms()],
         )?;
     }
     Ok(())
 }
 
-fn migrate_v8_to_v9(conn: &Connection) -> Result<()> {
+fn normalize_scheduled_config_modes(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    let scheduled: Vec<(String, String)> = {
+        let mut stmt = tx.prepare("SELECT id, config_json FROM scheduled_tasks")?;
+        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    for (id, raw) in scheduled {
+        let mut value = serde_json::from_str::<Value>(&raw)
+            .with_context(|| format!("scheduled task '{id}' config_json is malformed"))?;
+        if !value.is_object() {
+            return Err(anyhow!(
+                "scheduled task '{id}' config_json must be an object"
+            ));
+        }
+        let before = value.clone();
+        migrate_and_validate_top_level_mode(
+            &mut value,
+            "mode",
+            &format!("scheduled task '{id}' config_json"),
+        )?;
+        if value != before {
+            tx.execute(
+                "UPDATE scheduled_tasks SET config_json = ?1, updated_at = ?2 WHERE id = ?3",
+                params![value.to_string(), now_ms(), id],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn migrate_v7_to_v8(conn: &Connection) -> Result<()> {
     let tx = conn.unchecked_transaction()?;
+    let shell_catalog = crate::tools::shell::catalog(None);
+    tx.execute("UPDATE sessions SET mode = 'plan' WHERE mode = 'chat'", [])?;
+    validate_session_modes(&tx)?;
+    migrate_app_settings(&tx, &shell_catalog)?;
+
+    normalize_scheduled_config_modes(&tx)?;
+
+    tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
+    tx.pragma_update(None, "user_version", 8i64)?;
+    tx.commit()?;
+    Ok(())
+}
+
+fn migrate_v8_to_v9_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
     let has_approvals: bool = tx.query_row(
         "SELECT EXISTS(
              SELECT 1 FROM sqlite_master
@@ -860,14 +902,14 @@ fn migrate_v8_to_v9(conn: &Connection) -> Result<()> {
         )?;
         tx.execute_batch("DROP TABLE plan_approvals_v8;")?;
     }
-    ensure_plan_approval_permission_setting_tx(&tx)?;
-    tx.pragma_update(None, "user_version", 9i64)?;
-    tx.commit()?;
     Ok(())
 }
 
-fn migrate_v9_to_v10(conn: &Connection) -> Result<()> {
-    let tx = conn.unchecked_transaction()?;
+fn migrate_v9_to_v10_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    let shell_catalog = crate::tools::shell::catalog(None);
+    migrate_app_settings(tx, &shell_catalog)?;
+    normalize_scheduled_config_modes(tx)?;
+    validate_session_modes(tx)?;
     let now = now_ms();
 
     // v9 did not enforce one live turn per session. Abort every old live row
@@ -890,8 +932,115 @@ fn migrate_v9_to_v10(conn: &Connection) -> Result<()> {
          WHERE status = 'pending' AND expires_at IS NULL",
         params![PLAN_APPROVAL_TIMEOUT_MS],
     )?;
-    tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
-    tx.commit()?;
+    tx.pragma_update(None, "user_version", 10i64)?;
+    Ok(())
+}
+
+fn migration_backup_path(path: &Path, version: i64) -> PathBuf {
+    path.with_extension(format!("sqlite.v{version}.bak"))
+}
+
+fn verify_migration_backup(path: &Path, expected_version: i64) -> Result<()> {
+    let backup = Connection::open(path)
+        .with_context(|| format!("open migration backup {}", path.display()))?;
+    let version: i64 = backup
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .with_context(|| format!("read migration backup version {}", path.display()))?;
+    if version != expected_version {
+        return Err(anyhow!(
+            "migration backup {} has schema version {version}, expected {expected_version}",
+            path.display()
+        ));
+    }
+    let integrity: String = backup
+        .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+        .with_context(|| format!("check migration backup integrity {}", path.display()))?;
+    if integrity != "ok" {
+        return Err(anyhow!(
+            "migration backup {} failed integrity check: {integrity}",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+fn create_migration_backup(conn: &Connection, path: &Path, version: i64) -> Result<PathBuf> {
+    let checkpoint: (i64, i64, i64) = conn
+        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })
+        .with_context(|| format!("checkpoint database before v{version} backup"))?;
+    if checkpoint.0 != 0 {
+        return Err(anyhow!(
+            "database WAL is busy; cannot create v{version} migration backup"
+        ));
+    }
+
+    let backup = migration_backup_path(path, version);
+    let backup_name = backup
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| anyhow!("migration backup path is not valid UTF-8"))?;
+    let temporary = backup.with_file_name(format!("{backup_name}.tmp"));
+    if temporary.exists() {
+        std::fs::remove_file(&temporary)
+            .with_context(|| format!("remove stale migration backup {}", temporary.display()))?;
+    }
+    if let Err(error) = std::fs::copy(path, &temporary) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(error).with_context(|| {
+            format!(
+                "copy schema v{version} database {} to temporary backup {}",
+                path.display(),
+                temporary.display()
+            )
+        });
+    }
+    if let Err(error) = verify_migration_backup(&temporary, version) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(error);
+    }
+    if backup.exists() {
+        std::fs::remove_file(&backup)
+            .with_context(|| format!("replace existing migration backup {}", backup.display()))?;
+    }
+    if let Err(error) = std::fs::rename(&temporary, &backup) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(error).with_context(|| {
+            format!(
+                "install migration backup {} from {}",
+                backup.display(),
+                temporary.display()
+            )
+        });
+    }
+    Ok(backup)
+}
+
+fn migrate_v8_to_v10(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 8)?;
+    let tx = conn.unchecked_transaction()?;
+    migrate_v8_to_v9_tx(&tx)?;
+    migrate_v9_to_v10_tx(&tx)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v8 to v10 migration; backup {} remains",
+            backup.display()
+        )
+    })?;
+    Ok(())
+}
+
+fn migrate_v9_to_v10(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 9)?;
+    let tx = conn.unchecked_transaction()?;
+    migrate_v9_to_v10_tx(&tx)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v9 to v10 migration; backup {} remains",
+            backup.display()
+        )
+    })?;
     Ok(())
 }
 
@@ -907,6 +1056,53 @@ mod tests {
         )
         .map(|n| n > 0)
         .unwrap_or(false)
+    }
+
+    fn schema_version(conn: &Connection) -> i64 {
+        conn.query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap()
+    }
+
+    fn insert_raw_app_settings(db: &Database, raw: &str) {
+        db.conn()
+            .execute(
+                "INSERT INTO kv (ns, key, value_json, updated_at)
+                 VALUES ('app', 'app', ?1, 1)
+                 ON CONFLICT(ns, key) DO UPDATE SET value_json = excluded.value_json",
+                params![raw],
+            )
+            .unwrap();
+    }
+
+    fn assert_readable_migration_backup(path: &Path, version: i64) {
+        let backup_path = migration_backup_path(path, version);
+        assert!(
+            backup_path.exists(),
+            "missing {} backup",
+            backup_path.display()
+        );
+        let backup = Connection::open(&backup_path).unwrap();
+        assert_eq!(schema_version(&backup), version);
+        let integrity: String = backup
+            .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(integrity, "ok");
+        drop(backup);
+    }
+
+    fn fail_v8_migration(path: &Path) -> String {
+        let error = match Database::open(path) {
+            Ok(db) => {
+                drop(db);
+                panic!("schema v8 migration unexpectedly succeeded")
+            }
+            Err(error) => error,
+        };
+        let source = Connection::open(path).unwrap();
+        assert_eq!(schema_version(&source), 8);
+        drop(source);
+        assert_readable_migration_backup(path, 8);
+        error.to_string()
     }
 
     #[test]
@@ -975,6 +1171,18 @@ mod tests {
             )
             .unwrap();
         assert_eq!(running_turn_index, 1);
+
+        let scheduled_mode_columns: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM pragma_table_info('scheduled_tasks')
+                 WHERE name = 'mode'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(scheduled_mode_columns, 0);
 
         // v7: transcript payloads live in per-session files, not columns.
         for (table, column) in [
@@ -1069,17 +1277,37 @@ mod tests {
             db.kv_set(
                 "app",
                 "app",
-                &serde_json::json!({ "defaultMode": "chat", "theme": "dark" }),
+                &serde_json::json!({
+                    "defaultMode": "chat",
+                    "theme": "dark",
+                    "planApprovalPermissionMode": "auto",
+                    "notification": { "mode": "silent" },
+                    "plugin": { "mode": "plugin", "defaultMode": "extension" }
+                }),
             )
             .unwrap();
             db.conn()
                 .execute(
                     "INSERT INTO scheduled_tasks
                         (id, title, prompt, config_json, created_at, updated_at)
-                     VALUES ('task-1', 'legacy', 'run', '{\"mode\":\"chat\"}', 1, 1)",
+                     VALUES (
+                         'task-1', 'legacy', 'run',
+                         '{\"mode\":\"chat\",\"notification\":{\"mode\":\"silent\"},\"plugin\":{\"defaultMode\":\"extension\",\"mode\":\"plugin\"}}',
+                         1, 1
+                     )",
                     [],
                 )
                 .unwrap();
+            db.kv_set(
+                "plugin:test",
+                "config",
+                &serde_json::json!({
+                    "mode": "chat",
+                    "defaultMode": "chat",
+                    "nested": { "operatingMode": "chat" }
+                }),
+            )
+            .unwrap();
             // Simulate a real v7 file: the approval table did not exist until
             // the migration itself creates the canonical table and indexes.
             db.conn()
@@ -1107,6 +1335,20 @@ mod tests {
             db.get_setting("app").unwrap().unwrap()["defaultMode"],
             serde_json::json!("plan")
         );
+        let settings = db.get_setting("app").unwrap().unwrap();
+        assert_eq!(settings["theme"], serde_json::json!("dark"));
+        assert_eq!(settings["notification"]["mode"], "silent");
+        assert_eq!(
+            settings["plugin"],
+            serde_json::json!({ "mode": "plugin", "defaultMode": "extension" })
+        );
+        assert!(settings
+            .get(OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE)
+            .is_none());
+        let raw_settings = db.kv_get("app", "app").unwrap().unwrap();
+        assert!(raw_settings
+            .get(OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE)
+            .is_none());
         let config: String = db
             .conn()
             .query_row(
@@ -1118,6 +1360,20 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<Value>(&config).unwrap()["mode"],
             "plan"
+        );
+        let config_value = serde_json::from_str::<Value>(&config).unwrap();
+        assert_eq!(config_value["notification"]["mode"], "silent");
+        assert_eq!(
+            config_value["plugin"],
+            serde_json::json!({ "defaultMode": "extension", "mode": "plugin" })
+        );
+        assert_eq!(
+            db.kv_get("plugin:test", "config").unwrap().unwrap(),
+            serde_json::json!({
+                "mode": "chat",
+                "defaultMode": "chat",
+                "nested": { "operatingMode": "chat" }
+            })
         );
         assert!(table_exists(db.conn(), "plan_approvals"));
         let index_count: i64 = db
@@ -1136,6 +1392,8 @@ mod tests {
             )
             .unwrap();
         assert_eq!(index_count, 5);
+        drop(db);
+        assert_readable_migration_backup(&path, 8);
     }
 
     #[test]
@@ -1154,6 +1412,15 @@ mod tests {
             db.conn()
                 .execute_batch("DROP TABLE plan_approvals;")
                 .unwrap();
+            db.kv_set(
+                "app",
+                "app",
+                &serde_json::json!({
+                    "theme": "light",
+                    "planApprovalPermissionMode": "accept-edits"
+                }),
+            )
+            .unwrap();
             db.conn()
                 .execute_batch(
                     "CREATE TABLE plan_approvals (
@@ -1223,10 +1490,248 @@ mod tests {
                 2
             )
         );
-        assert_eq!(
-            db.get_setting("app").unwrap().unwrap()["planApprovalPermissionMode"],
-            "ask"
+        let settings = db.get_setting("app").unwrap().unwrap();
+        assert_eq!(settings["theme"], serde_json::json!("light"));
+        assert!(settings
+            .get(OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE)
+            .is_none());
+        let raw_settings = db.kv_get("app", "app").unwrap().unwrap();
+        assert!(raw_settings
+            .get(OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE)
+            .is_none());
+        drop(db);
+        assert_readable_migration_backup(&path, 8);
+    }
+
+    #[test]
+    fn v8_migration_rejects_malformed_app_settings_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, mode, created_at, updated_at)
+                     VALUES ('malformed-app-session', 'agent', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            insert_raw_app_settings(&db, "{not-json");
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let error = fail_v8_migration(&path);
+        assert!(error.contains("app settings JSON is malformed"), "{error}");
+        let source = Connection::open(&path).unwrap();
+        let mode: String = source
+            .query_row(
+                "SELECT mode FROM sessions WHERE id = 'malformed-app-session'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(mode, "agent");
+        drop(source);
+    }
+
+    #[test]
+    fn v8_migration_rejects_malformed_scheduled_config_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO scheduled_tasks
+                        (id, title, prompt, config_json, created_at, updated_at)
+                     VALUES ('malformed-config-task', 'broken', 'run', '{not-json', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let error = fail_v8_migration(&path);
+        assert!(
+            error.contains("scheduled task 'malformed-config-task' config_json is malformed"),
+            "{error}"
         );
+        let source = Connection::open(&path).unwrap();
+        let config: String = source
+            .query_row(
+                "SELECT config_json FROM scheduled_tasks
+                 WHERE id = 'malformed-config-task'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(config, "{not-json");
+        drop(source);
+    }
+
+    #[test]
+    fn v8_migration_rejects_invalid_session_mode_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, mode, created_at, updated_at)
+                     VALUES ('invalid-mode-session', 'invalid', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let error = fail_v8_migration(&path);
+        assert!(
+            error.contains("session 'invalid-mode-session' has invalid mode 'invalid'"),
+            "{error}"
+        );
+        let source = Connection::open(&path).unwrap();
+        let mode: String = source
+            .query_row(
+                "SELECT mode FROM sessions WHERE id = 'invalid-mode-session'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(mode, "invalid");
+        drop(source);
+    }
+
+    #[test]
+    fn v8_migration_rejects_invalid_shell_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let invalid_shell = if cfg!(windows) {
+            crate::tools::shell::BASH_ID
+        } else {
+            crate::tools::shell::WINDOWS_POWERSHELL_ID
+        };
+        {
+            let db = Database::open(&path).unwrap();
+            insert_raw_app_settings(
+                &db,
+                &serde_json::json!({
+                    "defaultCommandShell": invalid_shell,
+                    "theme": "dark"
+                })
+                .to_string(),
+            );
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let error = fail_v8_migration(&path);
+        assert!(
+            error.contains("app settings defaultCommandShell")
+                && error.contains("unavailable on this platform"),
+            "{error}"
+        );
+        let source = Connection::open(&path).unwrap();
+        let raw: String = source
+            .query_row(
+                "SELECT value_json FROM kv WHERE ns = 'app' AND key = 'app'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&raw).unwrap()["defaultCommandShell"],
+            invalid_shell
+        );
+        drop(source);
+    }
+
+    #[test]
+    fn v8_migration_rejects_unknown_shell_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let unknown_shell = "not-a-real-command-shell";
+        {
+            let db = Database::open(&path).unwrap();
+            insert_raw_app_settings(
+                &db,
+                &serde_json::json!({
+                    "defaultCommandShell": unknown_shell,
+                    "theme": "dark"
+                })
+                .to_string(),
+            );
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let error = fail_v8_migration(&path);
+        assert!(
+            error.contains("app settings defaultCommandShell has unknown shell ID")
+                && error.contains(unknown_shell),
+            "{error}"
+        );
+        let source = Connection::open(&path).unwrap();
+        let raw: String = source
+            .query_row(
+                "SELECT value_json FROM kv WHERE ns = 'app' AND key = 'app'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&raw).unwrap()["defaultCommandShell"],
+            unknown_shell
+        );
+        drop(source);
+    }
+
+    #[test]
+    fn migration_accepts_current_platform_shell_when_catalog_marks_it_unavailable() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE kv (
+                ns TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value_json TEXT NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY (ns, key)
+            ) WITHOUT ROWID;",
+        )
+        .unwrap();
+        let shell_id = crate::tools::shell::default_shell_id();
+        conn.execute(
+            "INSERT INTO kv (ns, key, value_json, updated_at)
+             VALUES ('app', 'app', ?1, 1)",
+            params![serde_json::json!({
+                "defaultCommandShell": shell_id,
+                "defaultMode": "chat"
+            })
+            .to_string()],
+        )
+        .unwrap();
+        let catalog = crate::tools::shell::catalog_for_platform(
+            crate::tools::shell::current_platform(),
+            Some(shell_id),
+            |_| false,
+        );
+        assert!(catalog
+            .choices
+            .iter()
+            .any(|choice| { choice.id == shell_id && !choice.available }));
+
+        let tx = conn.unchecked_transaction().unwrap();
+        migrate_app_settings(&tx, &catalog).unwrap();
+        tx.commit().unwrap();
+
+        let raw: String = conn
+            .query_row(
+                "SELECT value_json FROM kv WHERE ns = 'app' AND key = 'app'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let settings = serde_json::from_str::<Value>(&raw).unwrap();
+        assert_eq!(settings["defaultCommandShell"], shell_id);
+        assert_eq!(settings["defaultMode"], "plan");
     }
 
     #[test]
@@ -1362,6 +1867,14 @@ mod tests {
                     [],
                 )
                 .unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO scheduled_tasks
+                        (id, title, prompt, config_json, created_at, updated_at)
+                     VALUES ('migration-task', 'legacy', 'run', '{\"mode\":\"chat\"}', 1, 1)",
+                    [],
+                )
+                .unwrap();
             db.conn().pragma_update(None, "user_version", 9).unwrap();
         }
 
@@ -1397,6 +1910,20 @@ mod tests {
             )
             .unwrap();
         assert!(index_exists);
+        let config: String = db
+            .conn()
+            .query_row(
+                "SELECT config_json FROM scheduled_tasks WHERE id = 'migration-task'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&config).unwrap()["mode"],
+            "plan"
+        );
+        drop(db);
+        assert_readable_migration_backup(&path, 9);
     }
 
     #[test]

@@ -410,6 +410,8 @@ pub struct ToolsExecuteParams {
     pub declared_risk: Option<String>,
     #[serde(default)]
     pub expected_command_shell_id: Option<String>,
+    #[serde(default)]
+    pub expected_command_shell_dialect: Option<String>,
     pub timeout_ms: Option<u64>,
 }
 

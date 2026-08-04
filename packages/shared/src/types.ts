@@ -17,7 +17,6 @@ export type PlanApprovalAction = "approve" | "reject";
 export type PlanApprovalStatus =
   | "pending"
   | "approved"
-  | "changes_requested"
   | "rejected"
   | "expired"
   | "interrupted";
@@ -65,7 +64,6 @@ export type PlanProposal = {
   resolvedAt?: string;
   action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
-  feedback?: string;
   errorCode?: string;
   executionId?: string;
   executionState?: PlanExecutionState;
@@ -100,7 +98,6 @@ export type PlanningStateEvent = {
   artifact?: PlanArtifact;
   version?: number;
   plan?: string;
-  feedback?: string;
   action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
   executionId?: string;
@@ -117,17 +114,24 @@ export type PlansQueuedExecutionsResult = {
   executions: PlanExecution[];
 };
 
-export type PlanResolveRequest = {
+type PlanResolveIdentity = {
   proposalId: string;
   /** Identity fields must match the live host approval row exactly. */
   sessionId: string;
   turnId: string;
   toolCallId: string;
   version?: number;
-  action: PlanApprovalAction;
-  targetPermissionMode?: GlobalPermissionMode;
-  feedback?: string;
 };
+
+export type PlanResolveRequest =
+  | (PlanResolveIdentity & {
+      action: "approve";
+      targetPermissionMode: GlobalPermissionMode;
+    })
+  | (PlanResolveIdentity & {
+      action: "reject";
+      targetPermissionMode?: never;
+    });
 
 export type PlanResolutionResult = {
   ok: boolean;
@@ -135,7 +139,6 @@ export type PlanResolutionResult = {
   state: PlanningState;
   action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
-  feedback?: string;
   execution?: PlanExecution;
 };
 export const THINKING_LEVELS = [
@@ -156,9 +159,6 @@ export const PERMISSION_MODES = ["inherit", "ask", "accept-edits", "auto"] as co
 export type PermissionMode = (typeof PERMISSION_MODES)[number];
 /** Global default: `inherit` is not meaningful at the settings level. */
 export type GlobalPermissionMode = Exclude<PermissionMode, "inherit">;
-/** Compatibility alias for existing Plan approval consumers. */
-export type PlanApprovalPermissionMode = GlobalPermissionMode;
-export const DEFAULT_PLAN_APPROVAL_PERMISSION_MODE: GlobalPermissionMode = "ask";
 
 export function isGlobalPermissionMode(
   value: unknown,
@@ -168,7 +168,7 @@ export function isGlobalPermissionMode(
 
 export function normalizeGlobalPermissionMode(
   value: unknown,
-  fallback: GlobalPermissionMode = DEFAULT_PLAN_APPROVAL_PERMISSION_MODE,
+  fallback: GlobalPermissionMode = "ask",
 ): GlobalPermissionMode {
   return isGlobalPermissionMode(value) ? value : fallback;
 }
@@ -506,8 +506,6 @@ export type AppSettings = {
   defaultCommandShell?: CommandShellId;
   /** Global permission mode default; sessions with `inherit` follow this. */
   defaultPermissionMode?: GlobalPermissionMode;
-  /** Permission mode applied when an approved plan starts execution. */
-  planApprovalPermissionMode?: GlobalPermissionMode;
   theme: "system" | "light" | "dark";
   /** UI language; `auto` (and absent) follows the OS locale. */
   language?: "auto" | "en" | "zh-CN";
@@ -713,6 +711,7 @@ export type ScheduledTask = {
   title: string;
   prompt: string;
   cadence: ScheduledTaskCadence;
+  mode: Mode;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;

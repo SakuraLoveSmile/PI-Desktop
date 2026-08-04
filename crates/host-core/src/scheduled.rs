@@ -1,10 +1,11 @@
 use anyhow::Result;
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::db::{ms_to_ts, now_ms, ts_to_ms, Database};
+use crate::sessions;
 
 /// Wire format matches the legacy Electron `scheduled-tasks.json` records so
 /// the renderer keeps working unchanged (camelCase, RFC3339 timestamps).
@@ -15,6 +16,7 @@ pub struct ScheduledTask {
     pub title: String,
     pub prompt: String,
     pub cadence: String,
+    pub mode: String,
     pub enabled: bool,
     pub created_at: String,
     pub updated_at: String,
@@ -43,21 +45,118 @@ fn normalize_cadence(value: Option<&str>) -> String {
     }
 }
 
+fn normalize_mode(value: Option<&Value>) -> String {
+    sessions::normalize_mode(value.and_then(Value::as_str))
+}
+
+fn config_input(value: &Value) -> Option<&Value> {
+    value
+        .get("configJson")
+        .or_else(|| value.get("config_json"))
+        .or_else(|| value.get("config"))
+}
+
+fn explicit_mode(value: &Value) -> Option<&Value> {
+    value.get("mode").or_else(|| value.get("operatingMode"))
+}
+
+fn config_value(value: Option<&Value>) -> Value {
+    match value {
+        Some(Value::Object(object)) => Value::Object(object.clone()),
+        Some(Value::String(raw)) => serde_json::from_str(raw)
+            .ok()
+            .filter(|parsed: &Value| parsed.is_object())
+            .unwrap_or_else(|| json!({})),
+        _ => json!({}),
+    }
+}
+
+fn config_json_value(raw: &str) -> Value {
+    config_value(Some(&Value::String(raw.to_string())))
+}
+
+fn mode_from_config(config: &Value) -> String {
+    normalize_mode(config.get("mode").or_else(|| config.get("operatingMode")))
+}
+
+fn task_mode(value: &Value) -> String {
+    if let Some(mode) = explicit_mode(value) {
+        return normalize_mode(Some(mode));
+    }
+    mode_from_config(&config_value(config_input(value)))
+}
+
+fn config_with_mode(mut config: Value, mode: &str) -> String {
+    if !config.is_object() {
+        config = json!({});
+    }
+    config
+        .as_object_mut()
+        .expect("config_json is an object")
+        .insert("mode".into(), Value::String(mode.into()));
+    config.to_string()
+}
+
+fn task_config_json(value: &Value) -> String {
+    config_with_mode(config_value(config_input(value)), &task_mode(value))
+}
+
+fn merge_config(base: &mut Value, incoming: &Value) {
+    let Some(base_object) = base.as_object_mut() else {
+        *base = json!({});
+        return merge_config(base, incoming);
+    };
+    let Some(incoming_object) = incoming.as_object() else {
+        return;
+    };
+    for (key, value) in incoming_object {
+        base_object.insert(key.clone(), value.clone());
+    }
+}
+
+fn updated_config_json(db: &Database, id: &str, params_json: &Value) -> Result<Option<String>> {
+    let raw: Option<String> = db
+        .conn()
+        .query_row(
+            "SELECT config_json FROM scheduled_tasks WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+
+    if explicit_mode(params_json).is_none() && config_input(params_json).is_none() {
+        return Ok(Some(raw));
+    }
+
+    let mut config = config_json_value(&raw);
+    if let Some(input) = config_input(params_json) {
+        merge_config(&mut config, &config_value(Some(input)));
+    }
+    let mode = explicit_mode(params_json)
+        .map(|value| normalize_mode(Some(value)))
+        .unwrap_or_else(|| mode_from_config(&config));
+    Ok(Some(config_with_mode(config, &mode)))
+}
+
 fn task_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ScheduledTask> {
     Ok(ScheduledTask {
         id: row.get(0)?,
         title: row.get(1)?,
         prompt: row.get(2)?,
         cadence: row.get(3)?,
-        enabled: row.get::<_, i64>(4)? != 0,
-        created_at: ms_to_ts(row.get(5)?),
-        updated_at: ms_to_ts(row.get(6)?),
-        last_run_at: row.get::<_, Option<i64>>(7)?.map(ms_to_ts),
+        mode: mode_from_config(&config_json_value(&row.get::<_, String>(4)?)),
+        enabled: row.get::<_, i64>(5)? != 0,
+        created_at: ms_to_ts(row.get(6)?),
+        updated_at: ms_to_ts(row.get(7)?),
+        last_run_at: row.get::<_, Option<i64>>(8)?.map(ms_to_ts),
     })
 }
 
 const TASK_SELECT: &str =
-    "SELECT id, title, prompt, cadence, enabled, created_at, updated_at, last_run_at
+    "SELECT id, title, prompt, cadence, config_json, enabled, created_at, updated_at, last_run_at
      FROM scheduled_tasks";
 
 pub fn list_tasks(db: &Database) -> Result<Vec<ScheduledTask>> {
@@ -95,14 +194,17 @@ pub fn create_task(db: &Database, params_json: &Value) -> Result<ScheduledTask> 
         .take(80)
         .collect();
     let cadence = normalize_cadence(params_json.get("cadence").and_then(|v| v.as_str()));
+    let mode = task_mode(params_json);
+    let config_json = config_with_mode(config_value(config_input(params_json)), &mode);
     let id = Uuid::new_v4().to_string();
     let now = now_ms();
     db.conn()
         .prepare_cached(
-            "INSERT INTO scheduled_tasks (id, title, prompt, cadence, enabled, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, 1, ?5, ?5)",
+            "INSERT INTO scheduled_tasks
+                (id, title, prompt, cadence, config_json, enabled, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?6)",
         )?
-        .execute(params![id, title, prompt, cadence, now])?;
+        .execute(params![id, title, prompt, cadence, config_json, now])?;
     Ok(get_task(db, &id)?.expect("task just inserted"))
 }
 
@@ -114,6 +216,9 @@ pub fn update_task(db: &Database, params_json: &Value) -> Result<Option<Schedule
         .get("cadence")
         .and_then(|v| v.as_str())
         .map(|c| normalize_cadence(Some(c)));
+    let Some(config_json) = updated_config_json(db, id, params_json)? else {
+        return Ok(None);
+    };
     let n = db
         .conn()
         .prepare_cached(
@@ -121,14 +226,16 @@ pub fn update_task(db: &Database, params_json: &Value) -> Result<Option<Schedule
                 title = COALESCE(?1, title),
                 prompt = COALESCE(?2, prompt),
                 cadence = COALESCE(?3, cadence),
-                enabled = COALESCE(?4, enabled),
-                updated_at = ?5
-             WHERE id = ?6",
+                config_json = ?4,
+                enabled = COALESCE(?5, enabled),
+                updated_at = ?6
+             WHERE id = ?7",
         )?
         .execute(params![
             params_json.get("title").and_then(|v| v.as_str()),
             params_json.get("prompt").and_then(|v| v.as_str()),
             cadence,
+            config_json,
             params_json
                 .get("enabled")
                 .and_then(|v| v.as_bool())
@@ -168,6 +275,7 @@ pub fn import_tasks(db: &Database, tasks: &[Value]) -> Result<usize> {
             .and_then(|v| v.as_str())
             .unwrap_or("Scheduled task");
         let cadence = normalize_cadence(task.get("cadence").and_then(|v| v.as_str()));
+        let config_json = task_config_json(task);
         let enabled = task
             .get("enabled")
             .and_then(|v| v.as_bool())
@@ -186,8 +294,8 @@ pub fn import_tasks(db: &Database, tasks: &[Value]) -> Result<usize> {
         let n = tx
             .prepare_cached(
                 "INSERT OR IGNORE INTO scheduled_tasks
-                    (id, title, prompt, cadence, enabled, last_run_at, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                    (id, title, prompt, cadence, enabled, config_json, last_run_at, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             )?
             .execute(params![
                 id,
@@ -195,6 +303,7 @@ pub fn import_tasks(db: &Database, tasks: &[Value]) -> Result<usize> {
                 prompt,
                 cadence,
                 if enabled { 1 } else { 0 },
+                config_json,
                 last_run,
                 created,
                 updated
@@ -291,10 +400,23 @@ mod tests {
         let db = test_db();
         let task = create_task(&db, &json!({ "prompt": "run tests", "cadence": "daily" })).unwrap();
         assert_eq!(task.cadence, "daily");
+        assert_eq!(task.mode, "agent");
+        let config: String = db
+            .conn()
+            .query_row(
+                "SELECT config_json FROM scheduled_tasks WHERE id = ?1",
+                params![&task.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&config).unwrap()["mode"],
+            "agent"
+        );
         assert!(task.enabled);
         assert_eq!(task.title, "run tests");
 
-        let updated = update_task(&db, &json!({ "id": task.id, "enabled": false }))
+        let updated = update_task(&db, &json!({ "id": task.id.clone(), "enabled": false }))
             .unwrap()
             .unwrap();
         assert!(!updated.enabled);
@@ -331,9 +453,73 @@ mod tests {
         let task = get_task(&db, "t1").unwrap().unwrap();
         assert_eq!(task.title, "Nightly");
         assert!(!task.enabled);
+        assert_eq!(task.mode, "agent");
         assert_eq!(
             ts_to_ms(&task.last_run_at.unwrap()),
             ts_to_ms("2025-06-03T00:00:00Z")
         );
+    }
+
+    #[test]
+    fn mode_roundtrips_crud_and_import_in_config_json() {
+        let db = test_db();
+        let created = create_task(
+            &db,
+            &json!({
+                "prompt": "plan this",
+                "mode": "chat",
+                "configJson": { "cron": "0 * * * *" }
+            }),
+        )
+        .unwrap();
+        assert_eq!(created.mode, "plan");
+        let created_id = created.id.clone();
+        let config: String = db
+            .conn()
+            .query_row(
+                "SELECT config_json FROM scheduled_tasks WHERE id = ?1",
+                params![&created_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let config: Value = serde_json::from_str(&config).unwrap();
+        assert_eq!(config["mode"], "plan");
+        assert_eq!(config["cron"], "0 * * * *");
+
+        let updated = update_task(&db, &json!({ "id": created_id.clone(), "mode": "agent" }))
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.mode, "agent");
+        let config: String = db
+            .conn()
+            .query_row(
+                "SELECT config_json FROM scheduled_tasks WHERE id = ?1",
+                params![&created_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&config).unwrap()["mode"],
+            "agent"
+        );
+
+        let imported = json!([{
+            "id": "legacy-plan",
+            "prompt": "legacy",
+            "configJson": { "mode": "chat", "notify": true }
+        }]);
+        assert_eq!(import_tasks(&db, imported.as_array().unwrap()).unwrap(), 1);
+        assert_eq!(get_task(&db, "legacy-plan").unwrap().unwrap().mode, "plan");
+        let config: String = db
+            .conn()
+            .query_row(
+                "SELECT config_json FROM scheduled_tasks WHERE id = 'legacy-plan'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let config: Value = serde_json::from_str(&config).unwrap();
+        assert_eq!(config["mode"], "plan");
+        assert_eq!(config["notify"], true);
     }
 }

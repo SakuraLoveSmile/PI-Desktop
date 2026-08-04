@@ -201,18 +201,9 @@ fn thinking_level_param(params: &Value) -> Result<Option<String>, JsonRpcError> 
 
 fn normalize_settings_value(mut value: Value) -> Value {
     if let Some(object) = value.as_object_mut() {
+        object.remove("planApprovalPermissionMode");
         if object.get("defaultMode").and_then(Value::as_str) == Some("chat") {
             object.insert("defaultMode".into(), Value::String("plan".into()));
-        }
-        let valid_plan_permission = object
-            .get("planApprovalPermissionMode")
-            .and_then(Value::as_str)
-            .is_some_and(|mode| matches!(mode, "ask" | "accept-edits" | "auto"));
-        if !valid_plan_permission {
-            object.insert(
-                "planApprovalPermissionMode".into(),
-                Value::String("ask".into()),
-            );
         }
         let valid_command_shell = object
             .get("defaultCommandShell")
@@ -226,6 +217,27 @@ fn normalize_settings_value(mut value: Value) -> Value {
         }
     }
     value
+}
+
+fn merge_settings_value(stored: Option<Value>, incoming: Value) -> Value {
+    let Value::Object(incoming) = incoming else {
+        return incoming;
+    };
+    let mut merged = match stored {
+        Some(Value::Object(object)) => object,
+        _ => serde_json::Map::new(),
+    };
+    merged.extend(incoming);
+    Value::Object(merged)
+}
+
+fn effective_command_shell_id(settings: Option<&Value>) -> Option<String> {
+    let configured = settings
+        .and_then(|value| value.get("defaultCommandShell"))
+        .and_then(Value::as_str);
+    tools::shell::catalog(configured)
+        .effective
+        .map(|shell| shell.id)
 }
 
 fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
@@ -259,6 +271,35 @@ fn validate_settings_value(value: &Value) -> Result<(), JsonRpcError> {
             1002,
             format!("command shell ID '{shell_id}' is unavailable on this platform"),
             "COMMAND_SHELL_INVALID",
+        ));
+    }
+    Ok(())
+}
+
+fn gate_default_command_shell_setting(state: &AppState) -> Result<(), JsonRpcError> {
+    plans::expire_pending_approvals(&state.db)
+        .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+    let blocked: bool = state
+        .db
+        .conn()
+        .query_row(
+            "SELECT EXISTS(
+                 SELECT 1 FROM turns WHERE status = 'running'
+             ) OR EXISTS(
+                 SELECT 1 FROM plan_approvals WHERE status = 'pending'
+             ) OR EXISTS(
+                 SELECT 1 FROM plan_approvals
+                 WHERE execution_state IN ('queued', 'running')
+             )",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+    if blocked {
+        return Err(rpc_err(
+            1008,
+            "defaultCommandShell can only change while all sessions are idle",
+            "PLAN_CONFIGURATION_BLOCKED",
         ));
     }
     Ok(())
@@ -301,7 +342,9 @@ fn shell_failure_result(
 fn shell_changed_result(
     p: &ToolsExecuteParams,
     expected_shell_id: &str,
+    expected_shell_dialect: Option<&str>,
     current_shell_id: Option<String>,
+    current_shell_dialect: Option<&str>,
     started: std::time::Instant,
 ) -> tools::ToolsExecuteResult {
     let current = current_shell_id
@@ -316,12 +359,19 @@ fn shell_changed_result(
         current_shell_id,
         started,
     );
-    result.content = json!({
+    let mut content = json!({
         "error": result.content["error"],
         "code": "COMMAND_SHELL_CHANGED",
         "expectedCommandShellId": expected_shell_id,
         "commandShellId": current,
     });
+    if let Some(expected_shell_dialect) = expected_shell_dialect {
+        content["expectedCommandShellDialect"] = json!(expected_shell_dialect);
+    }
+    if let Some(current_shell_dialect) = current_shell_dialect {
+        content["commandShellDialect"] = json!(current_shell_dialect);
+    }
+    result.content = content;
     result
 }
 
@@ -629,7 +679,6 @@ async fn handle_request(
                 json!({
                     "defaultMode": "agent",
                     "defaultCommandShell": tools::shell::default_shell_id(),
-                    "planApprovalPermissionMode": "ask",
                     "theme": "dark",
                     "enterToSend": true,
                     "contextCompaction": {
@@ -644,7 +693,17 @@ async fn handle_request(
         "settings.set" => {
             validate_settings_value(&params)?;
             let st = state.lock().await;
-            let settings = normalize_settings_value(params);
+            let stored = st
+                .db
+                .get_setting("app")
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let incoming_shell = params.get("defaultCommandShell").and_then(Value::as_str);
+            let current_effective_shell = effective_command_shell_id(stored.as_ref());
+            if incoming_shell.is_some_and(|shell| current_effective_shell.as_deref() != Some(shell))
+            {
+                gate_default_command_shell_setting(&st)?;
+            }
+            let settings = normalize_settings_value(merge_settings_value(stored, params));
             st.db
                 .set_setting("app", &settings)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
@@ -1204,10 +1263,22 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .filter(|id| !id.trim().is_empty())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let turn_id = params
+                .get("turnId")
+                .and_then(|id| id.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "turnId required", "INVALID_PARAMS"))?;
+            let tool_call_id = params
+                .get("toolCallId")
+                .and_then(|id| id.as_str())
+                .filter(|id| !id.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "toolCallId required", "INVALID_PARAMS"))?;
             let st = state.lock().await;
             let planning_state = {
                 let crate::state::AppState { db, plans, .. } = &*st;
-                plans.enter(db, session_id).map_err(plan_rpc_err)?;
+                plans
+                    .enter(db, session_id, turn_id, tool_call_id)
+                    .map_err(plan_rpc_err)?;
                 plans
                     .state_for_session(db, session_id)
                     .map_err(plan_rpc_err)?
@@ -1307,7 +1378,6 @@ async fn handle_request(
             let action = params.get("action").and_then(|v| v.as_str()).unwrap_or("");
             let version = params.get("version").and_then(|v| v.as_i64());
             let target = params.get("targetPermissionMode").and_then(|v| v.as_str());
-            let feedback = params.get("feedback").and_then(|v| v.as_str());
             let resolution = {
                 let guard = state.lock().await;
                 let st = &*guard;
@@ -1328,7 +1398,6 @@ async fn handle_request(
                             version,
                             action,
                             target_permission_mode: target,
-                            feedback,
                         },
                     )
                     .map_err(plan_rpc_err)?
@@ -1347,7 +1416,6 @@ async fn handle_request(
                     "proposalId": resolution.proposal.id,
                     "proposal": resolution.proposal,
                     "action": resolution.action,
-                    "feedback": resolution.feedback,
                     "targetPermissionMode": resolution.target_permission_mode,
                     "execution": resolution.execution
                 }),
@@ -1359,7 +1427,6 @@ async fn handle_request(
                 "state": state_name,
                 "action": resolution.action,
                 "targetPermissionMode": resolution.target_permission_mode,
-                "feedback": resolution.feedback,
                 "execution": resolution.execution
             }))
         }
@@ -1503,31 +1570,18 @@ async fn handle_request(
             let task = scheduled::get_task(&st.db, id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                 .ok_or_else(|| rpc_err(1007, "task not found", "NOT_FOUND"))?;
+            if task.mode == "plan" {
+                return Err(plan_rpc_err("PLAN_REQUIRES_INTERACTIVE_SESSION"));
+            }
             let settings = st
                 .db
                 .get_setting("app")
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                 .unwrap_or_else(|| json!({}));
-            let default_mode = settings
-                .get("defaultMode")
-                .and_then(|v| v.as_str())
-                .map(|mode| sessions::normalize_mode(Some(mode)))
-                .unwrap_or_else(|| "agent".into());
-            if default_mode == "plan" {
-                return Err(plan_rpc_err("PLAN_REQUIRES_INTERACTIVE_SESSION"));
-            }
             let session = sessions::create_session(
                 &st.db,
                 Some(task.title.clone()),
-                Some(
-                    settings
-                        .get("defaultMode")
-                        .and_then(|v| v.as_str())
-                        .map(|mode| sessions::normalize_mode(Some(mode)))
-                        .as_deref()
-                        .unwrap_or("agent")
-                        .to_string(),
-                ),
+                Some("agent".into()),
                 settings
                     .get("defaultProviderId")
                     .and_then(|v| v.as_str())
@@ -1627,13 +1681,15 @@ async fn handle_request(
                     return serde_json::to_value(result)
                         .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"));
                 };
-                let expected_dialect = tools::shell::dialect_for_id(expected);
+                let expected_dialect = p.expected_command_shell_dialect.as_deref();
                 if expected_dialect != Some(effective.dialect.as_str()) || expected != effective.id
                 {
                     let result = shell_changed_result(
                         &p,
                         expected,
+                        expected_dialect,
                         Some(effective.id.clone()),
+                        Some(effective.dialect.as_str()),
                         call_started,
                     );
                     return serde_json::to_value(result)
@@ -1961,14 +2017,16 @@ async fn handle_request(
                             return serde_json::to_value(result)
                                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"));
                         };
-                        if tools::shell::dialect_for_id(expected)
-                            != Some(effective.dialect.as_str())
+                        let expected_dialect = p.expected_command_shell_dialect.as_deref();
+                        if expected_dialect != Some(effective.dialect.as_str())
                             || expected != effective.id
                         {
                             let result = shell_changed_result(
                                 &p,
                                 expected,
+                                expected_dialect,
                                 Some(effective.id.clone()),
+                                Some(effective.dialect.as_str()),
                                 call_started,
                             );
                             return serde_json::to_value(result)
@@ -2521,6 +2579,7 @@ mod tests {
     use tokio::sync::{mpsc, Mutex};
 
     use super::{handle_request, resolve_tool_workspace};
+    use crate::plans::{PlanResolveParams, PlanSubmitParams};
     use crate::scheduled;
     use crate::sessions;
     use crate::state::AppState;
@@ -2528,6 +2587,14 @@ mod tests {
     fn available_test_shell_id() -> Option<String> {
         crate::tools::shell::catalog(None)
             .effective
+            .map(|shell| shell.id)
+    }
+
+    fn alternate_available_test_shell_id(current: &str) -> Option<String> {
+        crate::tools::shell::catalog(None)
+            .choices
+            .into_iter()
+            .find(|shell| shell.available && shell.id != current)
             .map(|shell| shell.id)
     }
 
@@ -2574,7 +2641,7 @@ mod tests {
         session_id: &str,
         tool_call_id: &str,
     ) {
-        for _ in 0..100 {
+        for _ in 0..500 {
             if state
                 .lock()
                 .await
@@ -2685,6 +2752,177 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn settings_set_preserves_stored_shell_when_shell_is_omitted() {
+        let Some(current_shell) = available_test_shell_id() else {
+            return;
+        };
+        let Some(stored_shell) = alternate_available_test_shell_id(&current_shell) else {
+            return;
+        };
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+
+        handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "defaultCommandShell": stored_shell.clone() }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "theme": "light" }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+
+        let settings = handle_request(state, "settings.get", json!({}), tx)
+            .await
+            .unwrap();
+        assert_eq!(settings["defaultCommandShell"], stored_shell);
+        assert_eq!(settings["theme"], "light");
+    }
+
+    #[tokio::test]
+    async fn settings_set_same_shell_is_idempotent_during_an_active_turn() {
+        let Some(current_shell) = available_test_shell_id() else {
+            return;
+        };
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Active settings".into()),
+            Some("agent".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+        let full_settings = handle_request(state.clone(), "settings.get", json!({}), tx.clone())
+            .await
+            .unwrap();
+        let turn_id = {
+            let st = state.lock().await;
+            sessions::begin_turn(&st.db, &session.id, None, None).unwrap()
+        };
+
+        let mut idempotent = full_settings;
+        idempotent["defaultCommandShell"] = json!(current_shell.clone());
+        idempotent["theme"] = json!("light");
+        handle_request(state.clone(), "settings.set", idempotent, tx.clone())
+            .await
+            .unwrap();
+
+        let settings = handle_request(state.clone(), "settings.get", json!({}), tx)
+            .await
+            .unwrap();
+        assert_eq!(settings["defaultCommandShell"], current_shell);
+        assert_eq!(settings["theme"], "light");
+
+        let st = state.lock().await;
+        sessions::end_turn(&st.db, &turn_id, "completed", None, None, false).unwrap();
+    }
+
+    #[tokio::test]
+    async fn settings_set_rejects_a_genuine_shell_change_during_an_active_turn() {
+        let Some(current_shell) = available_test_shell_id() else {
+            return;
+        };
+        let Some(changed_shell) = alternate_available_test_shell_id(&current_shell) else {
+            return;
+        };
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Shell settings".into()),
+            Some("agent".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+        handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "defaultCommandShell": current_shell }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        let turn_id = {
+            let st = state.lock().await;
+            sessions::begin_turn(&st.db, &session.id, None, None).unwrap()
+        };
+
+        let error = handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "defaultCommandShell": changed_shell }),
+            tx,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error.data.unwrap()["errorCode"],
+            "PLAN_CONFIGURATION_BLOCKED"
+        );
+
+        let st = state.lock().await;
+        sessions::end_turn(&st.db, &turn_id, "completed", None, None, false).unwrap();
+    }
+
+    #[tokio::test]
+    async fn settings_set_allows_a_genuine_shell_change_when_idle() {
+        let Some(current_shell) = available_test_shell_id() else {
+            return;
+        };
+        let Some(changed_shell) = alternate_available_test_shell_id(&current_shell) else {
+            return;
+        };
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let state = Arc::new(Mutex::new(app_state));
+        let tx = mpsc::unbounded_channel().0;
+
+        handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "defaultCommandShell": current_shell }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "defaultCommandShell": changed_shell.clone() }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+
+        let settings = handle_request(state, "settings.get", json!({}), tx)
+            .await
+            .unwrap();
+        assert_eq!(settings["defaultCommandShell"], changed_shell);
+    }
+
+    #[tokio::test]
     async fn settings_rejects_unavailable_or_cross_platform_shell() {
         let data_dir = tempfile::tempdir().unwrap();
         let mut app_state = AppState::open(data_dir.path()).unwrap();
@@ -2713,6 +2951,168 @@ mod tests {
         .await
         .unwrap_err();
         assert_eq!(error.data.unwrap()["errorCode"], "COMMAND_SHELL_INVALID");
+    }
+
+    #[tokio::test]
+    async fn default_shell_setting_is_idle_only_across_turn_and_plan_work() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project = data_dir.path().join("project");
+        fs::create_dir_all(&project).unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let agent = sessions::create_session(
+            &app_state.db,
+            Some("Agent".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let active_turn = sessions::begin_turn(&app_state.db, &agent.id, None, None).unwrap();
+        let Some(current_shell) = available_test_shell_id() else {
+            return;
+        };
+        let Some(changed_shell) = alternate_available_test_shell_id(&current_shell) else {
+            return;
+        };
+        let state = Arc::new(Mutex::new(app_state));
+
+        let active_error = handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "defaultCommandShell": changed_shell.clone() }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            active_error.data.unwrap()["errorCode"],
+            "PLAN_CONFIGURATION_BLOCKED"
+        );
+
+        {
+            let st = state.lock().await;
+            sessions::end_turn(&st.db, &active_turn, "completed", None, None, false).unwrap();
+        }
+        handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "defaultCommandShell": changed_shell.clone() }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+
+        let plan = {
+            let st = state.lock().await;
+            let plan_session = sessions::create_session(
+                &st.db,
+                Some("Plan".into()),
+                Some("plan".into()),
+                None,
+                None,
+                Some(project.to_string_lossy().into_owned()),
+            )
+            .unwrap();
+            let turn = sessions::begin_turn(&st.db, &plan_session.id, None, None).unwrap();
+            let proposal = st
+                .plans
+                .submit(
+                    &st.db,
+                    PlanSubmitParams {
+                        workspace_root: &project,
+                        session_id: &plan_session.id,
+                        turn_id: &turn,
+                        tool_call_id: "submit-shell-gate",
+                        title: "Plan",
+                        markdown: "# Plan",
+                        question: "Proceed?",
+                    },
+                )
+                .unwrap();
+            (plan_session.id, turn, proposal)
+        };
+
+        let pending_error = handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "defaultCommandShell": current_shell.clone() }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            pending_error.data.unwrap()["errorCode"],
+            "PLAN_CONFIGURATION_BLOCKED"
+        );
+
+        let execution_id = {
+            let st = state.lock().await;
+            sessions::end_turn(&st.db, &plan.1, "completed", None, None, false).unwrap();
+            let resolution = st
+                .plans
+                .resolve(
+                    &st.db,
+                    PlanResolveParams {
+                        workspace_root: Some(&project),
+                        proposal_id: &plan.2.id,
+                        session_id: &plan.0,
+                        turn_id: &plan.1,
+                        tool_call_id: &plan.2.tool_call_id,
+                        version: Some(plan.2.version),
+                        action: "approve",
+                        target_permission_mode: Some("ask"),
+                    },
+                )
+                .unwrap();
+            resolution.execution.unwrap().id
+        };
+
+        let queued_error = handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "defaultCommandShell": current_shell.clone() }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            queued_error.data.unwrap()["errorCode"],
+            "PLAN_CONFIGURATION_BLOCKED"
+        );
+
+        {
+            let st = state.lock().await;
+            st.plans.claim_execution(&st.db, &execution_id).unwrap();
+        }
+        let running_error = handle_request(
+            state.clone(),
+            "settings.set",
+            json!({ "defaultCommandShell": current_shell.clone() }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            running_error.data.unwrap()["errorCode"],
+            "PLAN_CONFIGURATION_BLOCKED"
+        );
+
+        {
+            let st = state.lock().await;
+            st.plans
+                .finish_execution(&st.db, &execution_id, "completed", None)
+                .unwrap();
+        }
+        handle_request(
+            state,
+            "settings.set",
+            json!({ "defaultCommandShell": current_shell }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -2770,6 +3170,7 @@ mod tests {
                 "toolName": "Bash",
                 "args": { "command": command },
                 "expectedCommandShellId": expected_shell_id,
+                "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(expected_shell_id),
                 "mode": "agent"
             }),
             tx,
@@ -2778,6 +3179,64 @@ mod tests {
         .unwrap();
         assert_eq!(result["errorCode"], "COMMAND_SHELL_CHANGED");
         assert_eq!(result["commandShellId"], current_shell_id);
+        assert!(!marker.exists());
+    }
+
+    #[tokio::test]
+    async fn bash_rejects_a_stale_shell_dialect_before_permission_or_spawn() {
+        let Some(current_shell_id) = available_test_shell_id() else {
+            return;
+        };
+        let current_dialect = crate::tools::shell::dialect_for_id(&current_shell_id).unwrap();
+        let stale_dialect = if current_dialect == "posix" {
+            "powershell"
+        } else {
+            "posix"
+        };
+        let data_dir = tempfile::tempdir().unwrap();
+        let project = data_dir.path().join("project");
+        fs::create_dir_all(&project).unwrap();
+        let marker = project.join("must-not-run-dialect.txt");
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Shell dialect mismatch".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let command = if cfg!(windows) {
+            format!("[IO.File]::WriteAllText('{}', 'ran')", marker.display())
+        } else {
+            format!("touch '{}'", marker.display())
+        };
+
+        let result = handle_request(
+            state,
+            "tools.execute",
+            json!({
+                "sessionId": session.id,
+                "toolCallId": "dialect-mismatch",
+                "toolName": "Bash",
+                "args": { "command": command },
+                "expectedCommandShellId": current_shell_id,
+                "expectedCommandShellDialect": stale_dialect,
+                "mode": "agent"
+            }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result["errorCode"], "COMMAND_SHELL_CHANGED");
+        assert_eq!(
+            result["content"]["expectedCommandShellDialect"],
+            stale_dialect
+        );
+        assert_eq!(result["content"]["commandShellDialect"], current_dialect);
         assert!(!marker.exists());
     }
 
@@ -2824,6 +3283,7 @@ mod tests {
                     "toolName": "Bash",
                     "args": { "command": sleeping_bash_command() },
                     "expectedCommandShellId": shell_id,
+                    "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(&shell_id),
                     "mode": "agent"
                 }),
                 tx,
@@ -2910,6 +3370,7 @@ mod tests {
                     "toolName": "Bash",
                     "args": { "command": sleeping_bash_command() },
                     "expectedCommandShellId": shell_id,
+                    "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(&shell_id),
                     "mode": "agent"
                 }),
                 tx,
@@ -3004,6 +3465,7 @@ mod tests {
                     "toolName": "Bash",
                     "args": { "command": started_command },
                     "expectedCommandShellId": shell_id,
+                    "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(&shell_id),
                     "mode": "agent"
                 }),
                 tx,
@@ -3091,6 +3553,7 @@ mod tests {
                 "toolName": "Bash",
                 "args": { "command": timeout_command },
                 "expectedCommandShellId": shell_id,
+                "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(&shell_id),
                 "timeoutMs": 1000,
                 "mode": "agent"
             }),
@@ -3115,6 +3578,7 @@ mod tests {
                 "toolName": "Bash",
                 "args": { "command": sleeping_bash_command() },
                 "expectedCommandShellId": shell_id,
+                "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(&shell_id),
                 "mode": "agent"
             }),
             tx,
@@ -3165,6 +3629,7 @@ mod tests {
                 "toolName": "Bash",
                 "args": { "command": output_bash_command() },
                 "expectedCommandShellId": shell_id,
+                "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(&shell_id),
                 "mode": "agent"
             }),
             tx,
@@ -3219,6 +3684,7 @@ mod tests {
                 "toolName": "Bash",
                 "args": { "command": "should-not-run" },
                 "expectedCommandShellId": expected_shell_id,
+                "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(expected_shell_id),
                 "mode": "agent"
             }),
             tx,
@@ -3365,7 +3831,45 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn scheduled_run_rejects_plan_default_before_creating_session_or_run() {
+    async fn plan_enter_rpc_accepts_the_active_agent_turn() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Agent".into()),
+            Some("agent".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        let turn_id = sessions::begin_turn(&app_state.db, &session.id, None, None).unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+
+        let entered = handle_request(
+            state.clone(),
+            "plans.enter",
+            json!({
+                "sessionId": session.id,
+                "turnId": turn_id,
+                "toolCallId": "enter-call"
+            }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(entered["state"], "planning");
+        assert_eq!(
+            sessions::session_mode(&state.lock().await.db, &session.id)
+                .unwrap()
+                .as_deref(),
+            Some("plan")
+        );
+    }
+
+    #[tokio::test]
+    async fn scheduled_run_rejects_task_plan_mode_before_creating_session_or_run() {
         let data_dir = tempfile::tempdir().unwrap();
         let mut app_state = AppState::open(data_dir.path()).unwrap();
         app_state.handshook = true;
@@ -3373,13 +3877,14 @@ mod tests {
             &app_state.db,
             &json!({
                 "title": "Plan schedule",
-                "prompt": "run this"
+                "prompt": "run this",
+                "mode": "plan"
             }),
         )
         .unwrap();
         app_state
             .db
-            .set_setting("app", &json!({ "defaultMode": "plan" }))
+            .set_setting("app", &json!({ "defaultMode": "agent" }))
             .unwrap();
         let state = Arc::new(Mutex::new(app_state));
         let (tx, _rx) = mpsc::unbounded_channel();
@@ -3405,6 +3910,37 @@ mod tests {
             .unwrap();
         assert_eq!(session_count, 0);
         assert_eq!(run_count, 0);
+    }
+
+    #[tokio::test]
+    async fn scheduled_agent_task_ignores_global_plan_default() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let task = scheduled::create_task(
+            &app_state.db,
+            &json!({ "title": "Agent schedule", "prompt": "run this" }),
+        )
+        .unwrap();
+        app_state
+            .db
+            .set_setting("app", &json!({ "defaultMode": "plan" }))
+            .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+
+        let result = handle_request(
+            state.clone(),
+            "scheduled.run",
+            json!({ "id": task.id }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result["task"]["mode"], "agent");
+        let st = state.lock().await;
+        let mode = sessions::session_mode(&st.db, result["sessionId"].as_str().unwrap()).unwrap();
+        assert_eq!(mode.as_deref(), Some("agent"));
+        assert!(result["runId"].as_str().is_some());
     }
 
     #[tokio::test]
@@ -3604,6 +4140,7 @@ mod tests {
                 "toolName": "Bash",
                 "args": { "command": plan_bash_command },
                 "expectedCommandShellId": command_shell_id,
+                "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(&command_shell_id),
                 "mode": "agent"
             }),
             tx.clone(),
@@ -3635,6 +4172,7 @@ mod tests {
                     "toolName": "Bash",
                     "args": { "command": "printf ask-bash" },
                     "expectedCommandShellId": command_shell_id,
+                    "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(&command_shell_id),
                     "mode": "agent"
                 }),
                 notify_tx,

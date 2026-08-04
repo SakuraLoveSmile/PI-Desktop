@@ -14,12 +14,13 @@ import {
   type PlanExecution,
   type PlanArtifact,
   type PlanResolveRequest,
+  type ScheduledTask,
   type CommandShellCatalog,
   type ToolsOutputParams,
 } from "./index.js";
 
 describe("Plan protocol contracts", () => {
-  it("uses protocol v9/schema v10 and exposes the plan and shell IPC channels", () => {
+  it("uses protocol v9/schema v10 and exposes the plan, schedule, and shell channels", () => {
     expect(PROTOCOL_VERSION).toBe(9);
     expect(SCHEMA_VERSION).toBe(10);
     expect(IPC_WHITELIST.has(IPC.invoke.plansPending)).toBe(true);
@@ -27,6 +28,11 @@ describe("Plan protocol contracts", () => {
     expect(IPC_WHITELIST.has(IPC.event.plansChanged)).toBe(true);
     expect(IPC.invoke.commandShellList).toBe("pi-desktop/commandShell/list");
     expect(IPC_WHITELIST.has(IPC.invoke.commandShellList)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.scheduledList)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.scheduledCreate)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.scheduledUpdate)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.scheduledDelete)).toBe(true);
+    expect(IPC_WHITELIST.has(IPC.invoke.scheduledRun)).toBe(true);
   });
 
   it("maps legacy Chat values to Plan while keeping Agent as fallback", () => {
@@ -34,6 +40,20 @@ describe("Plan protocol contracts", () => {
     expect(normalizeMode("plan")).toBe("plan");
     expect(normalizeMode("agent")).toBe("agent");
     expect(normalizeMode(undefined)).toBe("agent");
+  });
+
+  it("keeps scheduled mode as a normalized wire projection", () => {
+    const task: ScheduledTask = {
+      id: "task-1",
+      title: "Plan task",
+      prompt: "inspect",
+      cadence: "manual",
+      mode: normalizeMode("chat"),
+      enabled: true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    expect(task.mode).toBe("plan");
   });
 
   it("keeps approval actions and target permission modes typed", () => {
@@ -58,14 +78,11 @@ describe("Plan protocol contracts", () => {
     const statuses = [
       "pending",
       "approved",
-      "changes_requested",
       "rejected",
       "expired",
       "interrupted",
     ] as const;
     expect(statuses).toContain("pending");
-    expect(statuses).toContain("changes_requested");
-    expect(statuses).not.toContain("request_changes" as never);
   });
 
   it("normalizes the plan approval permission fallback to ask", () => {
