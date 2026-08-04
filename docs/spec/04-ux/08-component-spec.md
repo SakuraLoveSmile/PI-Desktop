@@ -5,7 +5,7 @@
 > Interaction behavior: [09-interaction-patterns.md](09-interaction-patterns.md)
 
 
-> Shell layout is Codex-aligned: left thread sidebar (~275px), main transcript, floating bottom composer with mode/model controls. Prefer neutral charcoal surfaces over blue-slate chrome.
+> Shell layout is Codex-aligned: left thread sidebar (~275px), main transcript, floating bottom composer with runtime mode/permission controls and a topbar model picker. Prefer neutral charcoal surfaces over blue-slate chrome.
 >
 > **Precedence rule**: where a metric or copy string below disagrees with a
 > Codex parity decision in [decisions-log §D](../08-meta/decisions-log.md)
@@ -130,14 +130,15 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 ### 2.1 Purpose
 
-Global controls bar: project identity, model selection, mode indicator, abort
-button. (Settings is reached from the command palette / application menu, not the
-top bar.)
+Global controls bar: project identity, task title, model selection, and window
+actions. The active session's Agent/Plan control belongs solely to the
+left-of-input Composer chip. (Settings is reached from the command palette /
+application menu, not the top bar.)
 
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [Agent | Plan] [🤖 Model] [＋ New] [🔍 Search] [⚙ Commands]
+[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [🤖 Model] [＋ New] [🔍 Search]
 ```
 
 (Icons described functionally; actual render uses Lucide SVGs. The `[☰ Sidebar]`
@@ -145,11 +146,10 @@ toggle renders **only when the sidebar is collapsed**; when the sidebar is
 expanded it owns that control, so the top bar does not duplicate it.)
 
 The conversation top bar renders for the chat route only; Pull requests, Scheduled,
-Plugins, and Settings keep the frameless drag band. The Agent/Plan control is a
-segmented toggle (not a badge) and writes the session `mode`; the model picker
-opens **downward** because the bar anchors the top of the viewport. The composer
-no longer carries the mode chip or model selector — both moved here. The Thinking
-and permission triggers remain in the composer (§11).
+Plugins, and Settings keep the frameless drag band. It owns project/title identity,
+the downward-opening model picker, and window actions only. The left-of-input
+Composer chip is the sole Agent/Plan control and writes the session `mode`; the
+Thinking and permission triggers remain in the Composer (§11).
 
 ### 2.3 Layout
 
@@ -161,7 +161,7 @@ and permission triggers remain in the composer (§11).
   lights (only when the sidebar is collapsed), Windows/Linux reserve the right
   112px for native window controls
 - Title cluster (project ▸ task title) flexes and **ellipsizes**; the right
-  cluster (Agent|Plan toggle, model picker, action icons) is `flex: 0 0 auto`
+  cluster (model picker, action icons) is `flex: 0 0 auto`
   and is never squeezed by a long title. The conversation surface keeps a
   `min-width` so its content is not crushed on narrow windows.
 - macOS fullscreen resets the left reserve to 8px (mirrors the sidebar header).
@@ -174,8 +174,7 @@ and permission triggers remain in the composer (§11).
 |---|---|---|---|---|
 | Task title | session title (or untitled) | same, plus a "Running" pill with a pulsing dot | same | same |
 | Model selector | clickable dropdown | disabled during stream | clickable | clickable (no provider warning) |
-| Mode toggle | "Agent" or "Plan" highlighted | planning/approval state, disabled while running | same | same |
-| New task / Search / Commands | icon buttons | same | same | same |
+| New task / Search | icon buttons | same | same | same |
 | Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
 | Project name | workspace folder name | same | same | "No project" muted |
 
@@ -1194,25 +1193,33 @@ execution permission mode, not an individual tool call.
 The card renders the host-issued request identity, structured title and
 question, an opener for the exact `.pi/plan/*.md` path, status, and absolute
 expiry. Opening the artifact reads the host-written file; renderer edits do
-not change the approved bytes. Inline Markdown, SHA-256, and byte size are not
-required card content.
+not change the approved bytes. Inline Markdown, SHA-256, byte size, and
+revision/feedback controls are not rendered card content.
 
 ### 10A.3 Actions and states
 
 | State | Actions | Contract |
 |---|---|---|
-| Pending | Approve, Reject, Abort | request is live and proposal/session/turn/tool-call/version scoped |
+| Pending | Approve, Reject | request is live and proposal/session/turn/tool-call/version scoped |
 | Resolving | all actions disabled | retain the proposal until host result |
 | Approved | no actions | same Agent continues in Agent with selected permission mode |
 | Queued / Running | no actions | approved execution is active and tied to the same approval row |
 | Rejected | no actions | run stops and session remains Plan |
 | Expired / Interrupted | no actions | failed closed; a new plan must be submitted unless approval already committed, in which case session remains Agent |
 
-Approve opens the explicit Ask / Accept edits / Auto choice with Ask selected.
-Reject carries no permission mode. Renderer reload calls `plans.pending` and
-restores a pending row with its original deadline while the host remains alive.
-Startup recovery interrupts pending/queued/running fields before serving RPC,
-restores no actionable stale approval, and never replays execution.
+Approve opens the explicit Ask / Accept edits / Auto choice with Ask selected for
+each new proposal, independent of any prior approval choice. Reject carries no
+permission mode. The renderer keeps the latest proposal/execution snapshot per
+session only for the current renderer lifetime from live Host events, while only
+a pending snapshot has actions or gates the Composer. Renderer reload calls
+`plans.pending` and restores a still-pending row with its original deadline while
+the host remains alive. It does not rehydrate rejected, expired,
+approved/completed, or interrupted terminal cards; a terminal card may remain
+visible and non-actionable only until reload. Startup recovery interrupts
+pending/queued/running fields before serving RPC, restores no actionable stale
+approval, and never replays execution. Pending unapproved work remains Plan and
+already-approved interrupted execution remains Agent; the UI is not required to
+present the interrupted terminal snapshot after restart.
 
 ### 10A.4 Accessibility
 
@@ -1230,13 +1237,13 @@ restores no actionable stale approval, and never replays execution.
 
 ### 11.1 Purpose
 
-Input area at the bottom of MainChat for composing and sending prompts. Supports multi-line, model/mode context display, and abort.
+Input area at the bottom of MainChat for composing and sending prompts. Supports multi-line, mode/permission context display, and abort; model selection remains in the topbar.
 
 ### 11.2 Anatomy
 
 ```text
 +----------------------------------------------+
-| [model: provider/model · mode badge]         |
+| [Agent/Plan] [Thinking] [permission mode]    |
 | ───────────────────────────                  |
 | textarea (auto-growing, 1 line → max 7)      |
 | placeholder: "Ask PI-Desktop to do anything"      |
@@ -1278,9 +1285,9 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | Plan / planning | textarea active while idle; Plan badge and permission chip visible | inspect, send, or submit plan |
-| Plan / awaiting approval | transcript shows the title/question, artifact opener, expiry, and status for the exact `.pi/plan/*.md` approval; composer remains blocked for that session | approve, reject, or abort |
+| Plan / awaiting approval | transcript shows the title/question, artifact opener, expiry, and status for the exact `.pi/plan/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
 | Plan / queued or running | Agent badge remains selected; queue/running state is visible and composer remains blocked | abort; no replay control |
-| Plan / failed closed | Plan badge remains visible with an actionable failure state | submit a new plan; no execution action |
+| Plan / planning after rejected, expired, or interrupted proposal | Plan chip remains visible and editable | send a later prompt; submit a new plan; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
 
 ### 11.5 Interactions
@@ -1304,17 +1311,13 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   `leading-none` under overflow; the model trigger still ellipsizes long IDs.
 - Agent / Plan, provider/model, permission, and shell-default changes update the
   active session/settings only while idle; they are disabled while a turn or
-  Plan pending/queued/running state exists. Plan approval actions are the
-  exception while awaiting approval.
-- Runtime chips keep descenders fully visible (D150): the Thinking and
-  permission triggers in the composer use compact line-height rather than
-  `leading-none` under overflow. The Agent/Plan mode toggle and provider/model
-  picker now live in the conversation top bar (§2); the top bar's model trigger
-  still ellipsizes long IDs.
-- Agent / Plan mode and provider/model changes (made from the conversation top
-  bar, §2) update the active session, not the app default. They are disabled
-  while a turn or Plan pending/queued/running state exists; Plan approval
-  actions are the exception while awaiting approval.
+  active pending Plan approval exists. Plan approval actions are the exception
+  while awaiting approval. The Composer-left Agent/Plan chip is the sole mode
+  control; the topbar model picker remains a model-only control.
+- Runtime chips keep descenders fully visible (D150): the Thinking, permission,
+  and Agent/Plan triggers in the Composer use compact line-height rather than
+  `leading-none` under overflow. The topbar model trigger still ellipsizes long
+  IDs.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing

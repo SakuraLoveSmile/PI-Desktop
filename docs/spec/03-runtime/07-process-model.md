@@ -42,7 +42,7 @@ the protocol.
 
 | Crash | Policy |
 |---|---|
-| Renderer crash | reload window, keep host/agent processes |
+| Renderer crash | reload window, keep host/agent processes; same-host reload restores only live pending Plan approvals and their deadlines, not terminal Plan cards |
 | Rust host crash | mark app degraded, interrupt pending/queued/running Plan work, keep pending sessions in Plan and already-approved sessions in Agent, attempt restart host, and fail active sessions closed |
 | Node agent crash | abort active turns and live Plan waiters/queue entries, keep pending sessions in Plan, preserve already-approved Agent mode in Rust, restart sidecar, and never replay an execution |
 | Electron main crash | full app exit |

@@ -75,7 +75,15 @@ open/close cycle in the intervening conversation.
 ## 7. Composer interaction while pending
 
 - user may continue editing text
-- sending another prompt in same session is blocked while turn waits on permission
+- sending another prompt or changing active-session mode/provider/model/permission
+  is blocked while a `pending` Plan approval exists
+- For a pending Plan proposal specifically, the existing draft is preserved and
+  the prompt becomes read-only. Composer mode, thinking, permission, model, and
+  send controls are disabled; the approval surface's Approve and Reject actions
+  remain enabled.
+- the left-of-input Composer Agent/Plan chip and model picker re-enable when the
+  host closes the approval as rejected, expired, or interrupted; terminal
+  proposal snapshots are not gates
 - Abort concurrently cancels the turn and explicitly denies the matching host
   permission request; late cleanup cannot clear a replacement request
 - another session remains independently editable/runnable and its own pending
@@ -100,16 +108,24 @@ artifact path, the current status, and the absolute deadline. It offers only:
 
 - **Approve** with an explicit target permission mode (`Ask`, `Accept edits`,
   or `Auto`; default `Ask`)
-- **Reject**, which stops the run and leaves Plan active
+- **Reject**, which stops the run and leaves Plan/planning active; a later turn
+  must submit a new complete snapshot/artifact
 
 The card has distinct `pending`, `resolving`, `approved`, `queued`, `running`,
 `rejected`, `expired`, and `interrupted` states. Approval is enabled only for a
 matching live proposal/session/turn/tool-call/version request and the deadline
-is exactly 30 minutes from creation. Renderer reload may restore a pending row
-without resetting its deadline. Startup interruption marks pending and
-queued/running work interrupted before RPC service, offers no stale action, and
-never replays it. Expiry uses `PLAN_APPROVAL_TIMEOUT`. An already-approved
-interrupted run keeps the session in Agent.
+is exactly 30 minutes from creation. Renderer state retains the latest
+proposal/execution snapshot per session only for the current renderer lifetime,
+driven by live Host events; only `pending` is actionable or a Composer gate.
+Renderer reload may restore a still-pending row without resetting its deadline
+while the same Host remains alive, but does not rehydrate rejected, expired,
+approved/completed, or interrupted terminal cards. Such a card may remain
+visible and non-actionable only until reload. Startup interruption marks pending
+and queued/running work interrupted
+before RPC service, offers no stale action, and never replays it. Expiry uses
+`PLAN_APPROVAL_TIMEOUT`. An already-approved interrupted run keeps the session
+in Agent; the UI is not required to present its interrupted terminal snapshot
+after a full Host/app restart.
 
 ## 10. Acceptance
 
@@ -124,8 +140,10 @@ interrupted run keeps the session in Agent.
    the request's originating session
 7. Plan approval displays title/question, opens the immutable artifact, shows
    expiry/status, and sends the selected permission mode only on approval; no
-   inline Markdown/hash/byte-size or feedback action is required
-8. reject, expiry, abort, crash, stale response, and persistence failure leave
-   pending Plan work in Plan with no execution capability
-9. host restart interrupts pending/queued/running work without replay and keeps
-   already-approved interrupted sessions in Agent
+   inline Markdown/hash/byte-size or revision/feedback action is rendered
+8. reject, expiry, abort, crash, stale response, and persistence failure close
+   pending Plan work in Plan/planning with no execution capability; a later
+   prompt may revise and submit a new immutable artifact
+9. host restart interrupts pending/queued/running work without replay or stale
+   action and keeps already-approved interrupted sessions in Agent; no terminal
+   card restoration is required after restart

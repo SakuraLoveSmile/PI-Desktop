@@ -108,9 +108,11 @@ Rules:
 6. Version 6 adds durable model-context checkpoints through
    `session.appendCompaction`; a version 5 host must be rejected before the
    runtime claims automatic context protection (ADR 0030).
-7. Version 9 adds the checkpoint Plan artifact/queue contract, shell catalog and
-   identity, and streamed command output. A v7 or incompatible v8 host must be
-   rejected before the UI becomes interactive (ADR 0039/0040).
+7. Version 9 is the frozen ADR 0039/0040 contract: it covers the checkpoint
+   Plan artifact/queue, active-turn Plan identity/CAS, explicit approval
+   permission, shell catalog identity and dialect pin, streamed command output,
+   and scheduled-task mode projection from `config_json`. A v7 or incompatible
+   v8 host must be rejected before the UI becomes interactive.
 
 Protocol v9 remains paired with host-core storage schema v10. The schema version
 is an internal persistence invariant, not an additional JSON-RPC field; the
@@ -191,11 +193,13 @@ checkpoint architecture remains host-owned.
 
 ### Plan state and approvals
 
-- `plans.enter` — enters Plan for one session and emits `plans.changed`
+- `plans.enter` — accepts only the active Agent turn's `sessionId`, `turnId`,
+  and `toolCallId`; host-core performs the mode transition with a compare-and-
+  swap update and emits `plans.changed`
 - `plans.submit` — writes the host-owned artifact and creates a pending proposal
-- `plans.pending` — returns pending approval rows and the session planning state;
-  renderer reload does not extend the absolute deadline while the host remains
-  alive
+- `plans.pending` — returns only pending approval rows and the session planning
+  state; renderer reload does not extend the absolute deadline while the host
+  remains alive and does not restore terminal cards
 - `plans.resolve` — validates one matching approve/reject response and, for
   approval, commits the selected permission mode and `execution_state = queued`
 - `plans.queuedExecutions` / `plans.claimExecution` /
@@ -203,6 +207,20 @@ checkpoint architecture remains host-owned.
   same approval row
 - `plans.abort` — marks pending approval work interrupted; it never replays or
   changes an already-approved session back to Plan
+
+### Scheduled tasks
+
+- `scheduled.list` / `scheduled.create` / `scheduled.update` /
+  `scheduled.delete`
+- `scheduled.import` — imports task records and normalizes their persisted mode
+- `scheduled.run` / `scheduled.finishRun` / `scheduled.listRuns`
+
+The wire `ScheduledTask.mode` is a normalized projection of the durable
+`config_json.mode`; create, update, and import map legacy `chat` to `plan` and
+default missing values to `agent`. `scheduled.run` reads the selected task's
+persisted mode; a `plan` task fails with `PLAN_REQUIRES_INTERACTIVE_SESSION`
+before creating a session or run. It never uses `settings.defaultMode` as the
+task mode.
 
 Canonical thinking levels at the host boundary are:
 
@@ -222,7 +240,9 @@ than appending it to answer `content`.
 
 ### Shells
 - `commandShells.list`
-- `settings.set` with `defaultCommandShell`
+- `settings.set` with a partial settings object; omitted fields are preserved,
+  and a changed effective `defaultCommandShell` is accepted only when every
+  session has no active turn and no pending/queued/running Plan work
 
 ### Permissions
 - `permissions.evaluate`
@@ -317,6 +337,8 @@ type ToolsExecuteParams = {
   /** Diagnostic/request context only; never used for authorization. */
   requestedMode?: "plan" | "agent"
   expectedCommandShellId?: CommandShellId
+  /** Bash only: dialect pinned by the same runtime turn. */
+  expectedCommandShellDialect?: "powershell" | "cmd" | "posix"
   /** Bash only: host default 60000; accepted override 1000..300000. */
   timeoutMs?: number
 }
@@ -351,7 +373,8 @@ Before generic permission evaluation, host-core applies the mode policy:
 - Plan `Bash` follows the resolved permission mode: `ask` and `accept-edits`
   emit `permissions.request`; `auto` executes without confirmation and may
   mutate. The host re-resolves the effective shell ID/dialect and requires the
-  exact `expectedCommandShellId` before spawn; it streams stdout/stderr
+  exact `expectedCommandShellId` and `expectedCommandShellDialect` before
+  permission evaluation and again before spawn; it streams stdout/stderr
   separately. A configured shell may fall back to the first available platform
   shell before the turn pin is created, but execution never changes shell
   after the pin.
@@ -394,7 +417,7 @@ type GlobalPermissionMode = "ask" | "accept-edits" | "auto";
 type PlanApprovalAction = "approve" | "reject";
 
 type PlanProposalStatus =
-  | "pending" | "approved" | "changes_requested" | "rejected"
+  | "pending" | "approved" | "rejected"
   | "expired" | "interrupted";
 
 type PlanExecutionState =
@@ -422,7 +445,6 @@ type PlanProposal = {
   resolvedAt?: string;
   action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
-  feedback?: string;
   errorCode?: string;
   artifact?: PlanArtifact;
   version: number;
@@ -447,16 +469,20 @@ type PlansPendingResult = {
   state?: PlanningState;
 };
 
-type PlanResolveRequest = {
+type PlanResolveIdentity = {
   proposalId: string;
   sessionId: string;
   turnId: string;
   toolCallId: string;
   version?: number;
-  action: PlanApprovalAction;
-  targetPermissionMode?: GlobalPermissionMode;
-  feedback?: string;
 };
+
+type PlanResolveRequest =
+  | (PlanResolveIdentity & {
+      action: "approve";
+      targetPermissionMode: GlobalPermissionMode;
+    })
+  | (PlanResolveIdentity & { action: "reject" });
 
 type PlanResolutionResult = {
   ok: boolean;
@@ -464,7 +490,6 @@ type PlanResolutionResult = {
   state: PlanningState;
   action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
-  feedback?: string;
   execution?: PlanExecution;
 };
 ```
@@ -479,7 +504,6 @@ params: {
   proposalId?: string
   proposal?: PlanProposal
   action?: PlanApprovalAction
-  feedback?: string | null
   targetPermissionMode?: GlobalPermissionMode | null
   execution?: PlanExecution | null
 }
@@ -499,8 +523,8 @@ params: ToolsOutputParams
 `plans.changed` is emitted for Plan entry, submission, resolution, execution
 claim/finish, and abort. Its top-level params are exactly the fields shown;
 fields not applicable to a transition are omitted. For `plans.resolve`, the
-host emits `feedback`, `targetPermissionMode`, and `execution` as JSON `null`
-when no value exists. Electron forwards this notification unchanged through
+host emits `targetPermissionMode` and `execution` as JSON `null` when no value
+exists. Electron forwards this notification unchanged through
 the shared `IPC.event.plansChanged` renderer channel.
 
 `plans.resolve` accepts only an authenticated, still-pending request whose
@@ -508,7 +532,8 @@ proposal, session, turn, tool-call, and version match. `approve` requires an
 explicit permission mode and atomically commits the `plan_approvals` row to
 `status = approved`, assigns `execution_id`, sets `execution_state = queued`,
 sets `sessions.mode = agent`, and stores the selected
-`sessions.permission_mode`. The same Agent then receives a new provider
+`sessions.permission_mode`; that selection is not written into app settings
+as the next approval default. Ask remains the product default. The same Agent then receives a new provider
 request with Agent tools.
 
 `reject` records `rejected` and leaves the session in Plan. The absolute
@@ -547,9 +572,10 @@ type CommandShellOutputStream = "stdout" | "stderr";
 only a catalog ID and reject unknown, unavailable, or wrong-platform IDs with
 `COMMAND_SHELL_INVALID`. If a persisted ID later becomes unavailable, the
 catalog selects the first available platform shell and sets `fallback: true`.
-A Bash request includes the pinned effective ID from the same turn; host-core
-rejects a changed ID/dialect with `COMMAND_SHELL_CHANGED`. Identity is not an
-executable path hash.
+A Bash request includes the pinned effective ID and dialect from the same turn;
+host-core rejects a changed ID or dialect with `COMMAND_SHELL_CHANGED` before
+permission evaluation and before spawn. Identity is not an executable path
+hash.
 
 ## 6. Permission request notification
 

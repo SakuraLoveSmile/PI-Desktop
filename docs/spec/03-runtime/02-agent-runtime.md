@@ -173,10 +173,8 @@ type OperatingMode = "agent" | "plan";
 type PlanningState =
   | "inactive"
   | "planning"
-  | "awaiting_approval"
-  | "queued"
-  | "running"
-  | "stopped";
+  | "awaiting_approval";
+type PlanExecutionState = "queued" | "running" | "completed" | "interrupted";
 ```
 
 `Agent / inactive` enters `Plan / planning` either when the user selects Plan
@@ -193,7 +191,11 @@ explicit permission mode, an execution ID, and `execution_state = queued` on
 the same `plan_approvals` row in one host transaction. The
 same Agent then receives a fresh model turn with the Agent tool set. Reject,
 absolute expiry, a pending interruption, stale response, or persistence
-failure leaves durable mode as Plan and grants no execution tools. If approval
+failure closes the approval row and returns the live state to editable
+`Plan / planning` without granting execution tools. A later accepted Plan prompt
+is a new turn: earlier `SubmitPlan` calls remain historical immutable
+checkpoints, and the Agent must call `SubmitPlan`
+once with a new complete Markdown snapshot to create a new artifact. If approval
 already committed and a queued/running execution is interrupted, durable mode
 remains Agent and the execution is not replayed.
 
@@ -294,10 +296,14 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 The Plan prompt tells the same Agent to understand the request, inspect the
 relevant repository/specification/test context, identify impacted files and
 risks, include focused validation and migration/recovery implications, surface
-open questions, and call `SubmitPlan` exactly when the checkpoint is ready. It
-must not claim that changes were made. The host writes the immutable
-`.pi/plan/*.md` artifact; the Agent does not write it itself and does not
-receive a request-changes flow.
+open questions. When any initial or revised plan is ready, it must call
+`SubmitPlan` immediately exactly once in the current turn with one complete
+Markdown snapshot. An accepted new Plan prompt has no prior pending approval;
+earlier submissions in the transcript are historical immutable checkpoints.
+After reject, expiry, or interruption, the Agent may revise in the new turn and
+must follow the same one-SubmitPlan rule. It must not claim that changes were
+made. The host writes the immutable `.pi/plan/*.md` artifact; the Agent does
+not write or edit it itself and does not receive a request-changes flow.
 
 The prompt may describe Bash as permission-gated and potentially mutating. It
 must not describe Plan as a strict read-only security boundary.

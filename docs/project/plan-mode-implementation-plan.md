@@ -1,12 +1,13 @@
 # Plan Checkpoint and Shell Implementation Plan
 
-- Status: Phase 1 documentation, ready for implementation review
+- Status: Implemented and accepted on 2026-08-05
 - Scope: Plan checkpoint approval/execution and selectable command shells
 - Core runtime: one `@earendil-works/pi-agent-core` Agent per session
 - Baseline: `0.4.14`
 - Host protocol: v9
 - Database schema: v10
-- Delivery: M6 remains In Progress until final verification
+- Delivery: M6 complete; Host/no-replay, pending-restore, and terminal-card
+  non-hydration evidence accepted
 
 ## 1. Executive decision
 
@@ -53,9 +54,12 @@ bounded to 1-300 seconds, and cancellation shuts down the full process tree.
 | Shell ID | `windows-powershell`, `cmd`, `git-bash`, `bash` | Host catalog/settings |
 | Shell dialect | `powershell`, `cmd`, `posix` | Effective shell option |
 
-The renderer and sidecar hold projections. They cannot authorize a mode, write
-or replace a plan artifact, choose an executable path, or revive an interrupted
-approval or execution.
+The renderer and sidecar hold projections. The renderer retains the latest Plan
+proposal/execution snapshot per session only for its current lifetime from live
+Host events. `plans.pending` rehydrates only pending approvals; terminal rows
+remain Host-owned durable records but do not rehydrate terminal cards. Neither
+renderer nor sidecar can authorize a mode, write or replace a plan artifact,
+choose an executable path, or revive an interrupted approval or execution.
 
 ## 3. State lifecycle
 
@@ -80,7 +84,8 @@ Rules:
 3. Approval resolution matches proposal, session, turn, tool-call, and version
    identity. There is no serialized process-epoch field.
 4. A pending approval has one absolute 30-minute deadline; renderer reload
-   never resets it.
+   never resets it and restores only that still-pending row through
+   `plans.pending`. Terminal proposal/execution snapshots are not rehydrated.
 5. Reject and expiry leave a pending session in Plan and grant no execution.
 6. Approval commits Agent mode before a queued/running execution begins.
 7. Startup fences prior live work transactionally before serving RPC. No
@@ -183,13 +188,21 @@ At database open, one startup transaction marks every prior `pending` approval
 and every prior `queued` or `running` execution state as `interrupted`, aborts
 associated running turns, and commits audit records before the host serves RPC.
 Renderer reload within the same host can recover a pending row and its original
-deadline. A host restart cannot recover actionable work and never replays it.
+deadline. Rejected, expired, approved/completed, and interrupted terminal cards
+are not rehydrated after reload. A host restart cannot recover actionable work,
+restores no stale action, and never replays it; the UI is not required to show
+the interrupted terminal snapshot.
 
-The v8-to-v10 migration preserves sessions, transcripts, turns, permissions,
-and legacy approval data while adding/backfilling the artifact and execution
-fields and indexes on `plan_approvals`. It maps persisted `chat` values to
-`plan`, validates the shell setting, and writes `PRAGMA user_version = 10` last.
-It does not reconstruct artifacts or queue work from transcript text.
+The v8-to-v10 path checkpoints WAL, creates an exact readable
+`pi.sqlite.v8.bak` before destructive work, and applies one atomic transaction;
+the v9 path creates `pi.sqlite.v9.bak`, while v7 first reaches v8 and then uses
+the same guarded path. The migration preserves sessions, transcripts, turns,
+permissions, and legacy approval data while adding/backfilling the artifact and
+execution fields and indexes on `plan_approvals`. It maps persisted `chat`
+values to `plan`, validates the shell setting, and writes `PRAGMA user_version =
+10` last. Malformed app settings or scheduled config, invalid modes, and an
+invalid default shell fail closed with schema v8 authoritative. It does not
+reconstruct artifacts or queue work from transcript text.
 
 ## 8. Selectable shell contract
 
@@ -265,18 +278,26 @@ group or Windows process/job tree before streams close.
 - exact 60-second default and 1-300 second override bounds;
 - timeout and user abort terminate the complete process tree.
 
-## 11. Current acceptance mapping
+## 11. Acceptance evidence
 
-The E2E plan documents these M6 scenarios: E2E-104 migration, E2E-105 host
+The E2E plan automates these M6 scenarios: E2E-104 migration, E2E-105 host
 Plan policy, E2E-106 immutable artifact approval, E2E-107 expiry, E2E-108
 startup interruption, E2E-109 no replay/Agent retention, E2E-110 scheduled
 rejection, E2E-111 active/configuration boundaries, E2E-112 shell selection and
 fallback, E2E-113 stale shell identity, E2E-114 streaming, E2E-115 timeout,
-E2E-116 process abort, and E2E-117 UX/locales. They are documentation-only
-until explicitly requested.
+E2E-116 process abort, and E2E-117 UX/locales.
 
-M6 remains In Progress on `docs/project/BOARD.md`; this plan is not evidence of
-implementation or final verification.
+Acceptance on 2026-08-05 combined the host-core suite (139/139 passed, including
+15 focused DB tests), 97 agent-runtime tests, desktop/shared/i18n suites, full
+JavaScript build/typecheck/lint, the long-timeout `test:e2e:plan` host workflow,
+and the raw-CDP
+`test:e2e:plan-ui` Electron workflow. The two host states that public RPC cannot
+manufacture safely — late approval expiry and a previously persisted shell
+becoming unavailable — are covered directly by deterministic Rust tests. The
+same-Host renderer evidence covers pending restore, same-lifetime terminal
+controls, stable Electron/Host identity, and rejected plus approved/completed
+terminal-card absence after renderer reload. E2E-108/E2E-109 cover Host restart
+interruption, stale-response rejection, and no replay.
 
 ## 12. Explicit non-goals
 

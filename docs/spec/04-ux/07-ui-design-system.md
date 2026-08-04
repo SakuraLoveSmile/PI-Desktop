@@ -641,6 +641,15 @@ The composer renders only controls connected to the active pi session:
   model. Unknown Custom/OpenAI-compatible models expose no invented reasoning
   action or graded ladder. Changing provider clamps or resets the durable
   session value before the next turn.
+- The left-of-input Composer Agent/Plan chip is the sole active-session mode
+  control. The top bar has no duplicate mode segmented control. The model
+  picker closes and is disabled while an active `pending` Plan approval exists;
+  terminal proposal snapshots do not disable it. Each new pending proposal's
+  explicit approval selector starts at Ask, regardless of the previous
+  proposal's selected mode. Live Host events update the latest checkpoint or
+  execution status retained for the current renderer lifetime. A renderer
+  reload rehydrates only a pending row through `plans.pending`; terminal cards
+  are not restored.
 - Local and branch context are non-interactive status labels; the project name
   remains an action because it opens the project picker.
 - Runtime chip labels (Agent/Plan, Thinking, permission mode, model ID) use

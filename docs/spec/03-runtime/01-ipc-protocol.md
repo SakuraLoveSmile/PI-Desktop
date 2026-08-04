@@ -118,6 +118,10 @@ type SessionConfigureRequest = {
 model, permission, and shell-default changes are rejected while a turn or a
 Plan `pending`/`queued`/`running` record exists.
 
+Only a changed effective global `defaultCommandShell` is idle-only across all
+affected sessions: any active turn or pending/queued/running Plan work blocks
+that shell change, while an omitted or idempotent shell field does not.
+
 Image and file payloads are not part of the current prompt contract.
 
 Regenerate history (D109) also uses session channels:
@@ -169,7 +173,7 @@ type GlobalPermissionMode = "ask" | "accept-edits" | "auto";
 type PlanApprovalAction = "approve" | "reject";
 
 type PlanProposalStatus =
-  | "pending" | "approved" | "changes_requested" | "rejected"
+  | "pending" | "approved" | "rejected"
   | "expired" | "interrupted";
 
 type PlanExecutionState =
@@ -203,7 +207,6 @@ type PlanProposal = {
   resolvedAt?: string;
   action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
-  feedback?: string;
   errorCode?: string;
   artifact?: PlanArtifact;
   version: number;
@@ -233,7 +236,6 @@ type PlanningStateEvent = {
   artifact?: PlanArtifact;
   version?: number;
   plan?: string;
-  feedback?: string;
   action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
   executionId?: string;
@@ -246,16 +248,20 @@ type PlansPendingResult = {
   state?: PlanningState;
 };
 
-type PlanResolveRequest = {
+type PlanResolveIdentity = {
   proposalId: string;
   sessionId: string;
   turnId: string;
   toolCallId: string;
   version?: number;
-  action: PlanApprovalAction;
-  targetPermissionMode?: GlobalPermissionMode;
-  feedback?: string;
 };
+
+type PlanResolveRequest =
+  | (PlanResolveIdentity & {
+      action: "approve";
+      targetPermissionMode: GlobalPermissionMode;
+    })
+  | (PlanResolveIdentity & { action: "reject" });
 
 type PlanResolutionResult = {
   ok: boolean;
@@ -263,7 +269,6 @@ type PlanResolutionResult = {
   state: PlanningState;
   action?: PlanApprovalAction;
   targetPermissionMode?: GlobalPermissionMode;
-  feedback?: string;
   execution?: PlanExecution;
 };
 ```
@@ -277,10 +282,16 @@ Electron forwards each host `plans.changed` notification unchanged to the
 renderer through the stable shared `IPC.event.plansChanged` channel
 (`pi-desktop/plans/event/changed`). This is the Plan change event surface; the
 renderer does not receive Plan approval transitions as AgentEvent variants.
+`plans.pending` returns only currently pending approval rows. Terminal
+`plan_approvals` rows remain durable Host records, but are not renderer
+hydration data; the renderer retains its latest Plan snapshot only for the
+current renderer lifetime while live `plans.changed` events arrive.
 
-For `approve`, host-core requires `targetPermissionMode`. Electron fills a
-missing value from `planApprovalPermissionMode` (default `ask`) before
-forwarding; the Agent cannot choose it. `reject` carries no permission mode.
+For `approve`, host-core and Electron require an explicit
+`targetPermissionMode`; Electron never fills it from stored settings. The
+renderer initializes each approval to Ask, which remains the product default,
+and the host does not persist the selection as the next approval default.
+`reject` carries no permission mode.
 Responses with a wrong proposal, session, turn, tool-call, version, or expired
 host-owned deadline fail with a stable Plan approval error. There is no
 request-changes action.
@@ -532,6 +543,15 @@ Non-sensitive config that can be returned to the UI:
 - optional `AppSettings.developerMode`; absent and `false` both keep developer
   tools disabled
 
+`settings.set` accepts a partial settings object. Host-core merges supplied
+fields into the stored app settings, so omitted fields, including
+`defaultCommandShell`, are preserved. Only an incoming shell field is shell
+validated; the idle Plan/configuration gate runs only when its effective shell
+would change. Unrelated writes and idempotent writes of the current effective
+shell remain accepted while work is active. Legacy
+`planApprovalPermissionMode` is ignored and stripped from current reads and
+writes; it is not exposed or recreated.
+
 ### shell
 
 ```ts
@@ -558,12 +578,15 @@ Preload methods:
 - `pi-desktop/commandShell/list() -> CommandShellCatalog`
 - `pi-desktop/settings/set({ defaultCommandShell }) -> { ok: true }`
 
-Settings writes accept only an available ID for the current platform and reject
-unknown, unavailable, or wrong-platform IDs. If a persisted ID later becomes
-unavailable, the catalog selects the first available platform shell and sets
-`fallback: true`; if no choice is available, Bash returns `SHELL_NOT_FOUND`.
-Each turn pins the effective ID/dialect, and host rejects a changed pin before
-spawn with `COMMAND_SHELL_CHANGED`.
+Settings shell writes accept only an available ID for the current platform and
+reject unknown, unavailable, or wrong-platform IDs. A genuine effective shell
+change is accepted only while all sessions and Plan work are idle. If a
+persisted ID later becomes unavailable, the catalog selects the first available
+platform shell and sets `fallback: true`; if no choice is available, Bash
+returns `SHELL_NOT_FOUND`.
+Each turn pins the effective ID and dialect. The runtime transports both values;
+host rejects a changed pin before permission evaluation and before spawn with
+`COMMAND_SHELL_CHANGED`.
 
 ### secrets
 - `secrets/set(providerId, apiKey)`

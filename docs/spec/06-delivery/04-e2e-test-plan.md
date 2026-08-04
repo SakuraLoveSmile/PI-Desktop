@@ -84,7 +84,7 @@ Each scenario is documented in this format:
 - **Specs linked**: relevant spec file(s)
 - **Acceptance criterion**: which A–H letter(s) this verifies
 - **Milestone**: M1–M6 target
-- **Status**: Draft | Documented | Automated | Passed
+- **Status**: Draft | Documented | Partially automated | Automated | Passed
 ```
 
 ---
@@ -124,14 +124,13 @@ Each scenario is documented in this format:
 #### E2E-003: Rust host healthcheck responds
 
 - **Preconditions**: App is running; Rust host-core sidecar started.
-- **Steps**: 1) Electron handshakes with protocol version 7. 2) Call the host
-  healthcheck RPC. 3) Repeat boot with version 6, version 5, version 4, and
-  version 3 host
+- **Steps**: 1) Electron handshakes with protocol version 9. 2) Call the host
+  healthcheck RPC. 3) Repeat boot with mismatched older and newer protocol
   fixtures.
-- **Expected**: The version 7 host returns `ok` and the handshake is logged.
-  Stale version 6 and older hosts are rejected before the conversation surface
-  becomes interactive, so Plan approval/state events and context checkpoints
-  cannot be silently lost.
+- **Expected**: The protocol v9 host returns `ok` and the handshake is logged.
+  Every version other than v9, whether older or newer, is rejected before the
+  conversation surface becomes interactive, so Plan approval/state events and
+  context checkpoints cannot be silently lost.
 - **Specs linked**: `03-runtime/05-host-core-rust.md`, `03-runtime/06-host-rpc-protocol.md`
 - **Acceptance**: A (bridge normal)
 - **Milestone**: M1
@@ -262,17 +261,19 @@ Each scenario is documented in this format:
 - **Preconditions**: Provider configured; at least one session exists.
 - **Steps**: 1) Open the chat route. 2) Inspect the 46px bar at the top of the
   conversation area. 3) Confirm it shows the active project name and
-  session/task title, the Agent|Plan segmented mode toggle, the model picker,
-  and the New task / Search / Commands action buttons; confirm the
+  session/task title, the model picker, and the New task / Search / Commands
+  action buttons; confirm the
   sidebar toggle appears **only when the sidebar is collapsed** (when expanded,
   the sidebar owns that control). 4) Switch to the Pull requests, Scheduled,
   Plugins, or Settings routes and inspect the same top region.
 - **Expected**: On the chat route the conversation top bar renders with its
-  controls; the long task title ellipsizes instead of squeezing the Agent|Plan
-  toggle, model picker, or action buttons. The sidebar toggle is present only in
-  the collapsed state (no duplicate of the sidebar's control). On every other
-  route the frameless drag band renders instead (no top-bar controls). The bar is
-  draggable to move the window; interactive controls do not start a window drag.
+  title, model picker, and actions; it has no Agent|Plan mode control. The
+  left-of-input Composer chip owns the active session's Agent/Plan switch. The
+  long task title ellipsizes instead of squeezing the model picker or action
+  buttons. The sidebar toggle is present only in the collapsed state (no
+  duplicate of the sidebar's control). On every other route the frameless drag
+  band renders instead (no top-bar controls). The bar is draggable to move the
+  window; interactive controls do not start a window drag.
   macOS leaves the left ~76px clear for traffic lights only while the sidebar is
   collapsed (8px in fullscreen); Windows/Linux leave the right 112px clear for
   native window controls.
@@ -281,16 +282,18 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
-#### E2E-088: Top-bar Agent/Plan mode toggle updates the session
+#### E2E-088: Composer Agent/Plan chip updates the session
 
 - **Preconditions**: Chat route active; a session selected.
-- **Steps**: 1) Click the Plan segment of the mode toggle. 2) Send a prompt that
-  would normally require Write/Edit and observe behavior. 3) Click the Agent
-  segment. 4) Begin a turn and try to toggle mode mid-run.
-- **Expected**: The toggle updates the active session `mode` (Plan hard-denies
-  Write/Edit and plugin tools while Bash follows the selected permission mode;
-  Agent allows its normal tools per permission settings). The toggle is
-  disabled while a turn runs and re-enables when idle.
+- **Steps**: 1) Click the left-of-input Composer mode chip to enter Plan. 2)
+  Send a prompt that would normally require Write/Edit and observe behavior. 3)
+  Click the same Composer chip to return to Agent. 4) Begin a turn and try to
+  toggle mode mid-run or while a pending Plan approval is visible.
+- **Expected**: The Composer chip updates the active session `mode` (Plan
+  hard-denies Write/Edit and plugin tools while Bash follows the selected
+  permission mode; Agent allows its normal tools per permission settings). The
+  chip is disabled while a turn or active pending approval exists and re-enables
+  after the session returns idle/planning. No top-bar mode control is rendered.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2, §11),
   `03-runtime/03-tools-and-permissions.md`
 - **Acceptance**: C
@@ -2267,20 +2270,32 @@ Each scenario is documented in this format:
 
 #### E2E-104: Legacy Plan values migrate to schema v10
 
-- **Preconditions**: A schema-v8 fixture contains sessions, app defaults, and
-  scheduled records with legacy `chat` values plus transcripts and permissions.
-- **Steps**: 1) Start host-core and allow the v8→v10 migration. 2) Inspect
-  sessions, settings, scheduled modes, and `plan_approvals` fields/indexes. 3)
-  Restart and inspect the same records.
+- **Preconditions**: Schema-v8 fixtures contain sessions, app defaults, and
+  scheduled records with legacy `chat` values plus transcripts and permissions;
+  schema-v7 and schema-v9 fixtures cover both guarded entry paths.
+- **Steps**: 1) Start host-core and allow the guarded migration (v7 first
+  reaches v8). 2) Inspect sessions, settings, scheduled modes,
+  `plan_approvals` fields/indexes, and the exact readable v8/v9 backup. 3)
+  Restart and inspect the same records. 4) Repeat with malformed app settings,
+  malformed scheduled config, invalid top-level operating modes, and an unknown
+  or wrong-platform default shell. 5) Repeat with a platform-valid persisted
+  shell marked temporarily unavailable and nested extension `mode` fields.
 - **Expected**: Every legacy mode is `plan`, Agent remains the new-session and
   new-task default, transcripts/permissions survive, `plan_approvals` retains
-  approval data and has artifact/execution fields, and migration failure leaves
-  schema v8 authoritative.
+  approval data and has artifact/execution fields, v8→v10 is one atomic
+  transaction after its WAL checkpoint and v8 backup, v9 creates a v9 backup,
+  and migration failure leaves schema v8 authoritative. Every malformed or
+  invalid fixture fails closed before schema promotion. The temporarily
+  unavailable platform-valid shell remains persisted for runtime fallback, and
+  nested extension modes remain unchanged.
 - **Specs linked**: `00-baseline.md`, `03-runtime/04-data-storage.md`,
   `03-runtime/01-ipc-protocol.md`, `04-ux/06-settings-ia.md`, ADR 0039
 - **Acceptance**: F (persistence), H (diagnostics)
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-05): host-core 139/139, including 15
+  focused DB tests, covers schema-v7→v8→v10, v8→v10, and v9→v10 guarded paths,
+  exact readable backups, fail-closed rollback, restart, transcript, settings,
+  scheduled-mode, approval-field, and index tests
 
 #### E2E-105: Plan policy remains host-authoritative
 
@@ -2298,9 +2313,10 @@ Each scenario is documented in this format:
   `03-runtime/06-host-rpc-protocol.md`, `05-security/01-security.md`, ADR 0039
 - **Acceptance**: E (tools and permissions), Security
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` plus host-core
+  permission/policy and agent-runtime tool-composition tests
 
-#### E2E-106: SubmitPlan preserves a unique artifact and approves or rejects
+#### E2E-106: SubmitPlan rejects into editable planning and resubmits a new artifact
 
 - **Preconditions**: A project-bound session is idle in Plan with a provider;
   `.pi/plan/` is absent or empty and the workspace permits host artifact
@@ -2308,21 +2324,37 @@ Each scenario is documented in this format:
 - **Steps**: 1) Let the Agent call `SubmitPlan` with fixed title, Markdown, and
   question. 2) Inspect the new `.pi/plan/*.md` file byte-for-byte and the
   `plan_approvals` row. 3) Inspect the card's title, question, artifact opener,
-  expiry, and status; confirm only Approve and Reject are offered. 4) Approve
-  one fixture with Ask selected, then submit and reject a second fixture.
+  expiry, and status; confirm only Approve and Reject are offered. 4) Reject the
+  proposal. 5) Confirm durable mode is Plan, live state is editable `planning`,
+  the approval gate is cleared, and a later prompt is accepted. 6) Let the
+  Agent revise and call `SubmitPlan` once in that new turn with a complete
+  snapshot. 7) Approve the second proposal with Ask selected.
 - **Expected**: Host preserves the exact submitted Markdown bytes in a new
   unique artifact, records its relative path/hash/size with structured
   title/question, and never lets the renderer or sidecar write or replace it.
   The card opens the artifact and does not require inline Markdown/hash/size.
-  Approval changes the same Agent to Agent and queues execution with Ask;
-  rejection carries no mode and leaves Plan.
+  Rejection is terminal for the first row, leaves durable mode Plan, and returns
+  live state to editable planning. The later prompt/resubmission creates a
+  second complete Markdown snapshot and a different `.pi/plan/*.md` artifact;
+  the first artifact bytes remain unchanged. Approving the second proposal with
+  Ask still changes the same Agent to Agent and queues execution.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, `04-ux/03-permission-ux.md`,
   `04-ux/08-component-spec.md`, `05-security/01-security.md`, ADR 0039
 - **Acceptance**: C (conversation/stream), E (permissions), F (persistence)
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-05): `test:e2e:plan` verifies the Host
+  artifact/approval lifecycle. The optional live `test:e2e:plan-ui` case
+  requires an env-provided OpenAI-compatible provider; the authorized run with
+  model `gpt-5.6-luna` passed 6/6 with zero console diagnostics. It used the
+  real controlled Composer and Send, the live Agent called `EnterPlanMode` then
+  `SubmitPlan`, normal rendered Ask approval resolved through preload/Main,
+  approved execution emitted the exact durable marker, and a private
+  env-gated WeakMap check proved the same `DesktopAgentRuntime` object before
+  and after approval. Main/Host/sidecar PIDs remained stable; credentials never
+  entered CDP or output. The default no-key run remains 5/5 with the live case
+  explicitly skipped.
 
 #### E2E-107: Plan approval uses one absolute 30-minute expiry
 
@@ -2330,16 +2362,21 @@ Each scenario is documented in this format:
 - **Steps**: 1) Record `createdAt` and `expiresAt`. 2) Reload the renderer and
   reopen the request. 3) Advance time to the deadline without resolving. 4)
   Attempt approval after expiry.
-- **Expected**: The displayed countdown retains the original absolute deadline;
-  expiry records `expired`, leaves the session Plan, returns
-  `PLAN_APPROVAL_TIMEOUT`, and rejects the late response without changing mode
-  or permission.
+- **Expected**: Renderer reload rehydrates only the still-pending row while the
+  host remains alive, and the displayed countdown retains the original absolute
+  deadline; rejected, expired, approved/completed, and interrupted terminal
+  cards are not part of reload hydration. Expiry records `expired`, leaves the
+  session Plan, returns `PLAN_APPROVAL_TIMEOUT`, and rejects the late response
+  without changing mode or permission.
 - **Specs linked**: `03-runtime/06-host-rpc-protocol.md`,
   `03-runtime/08-error-codes.md`, `03-runtime/10-session-state-machine.md`,
   `04-ux/03-permission-ux.md`, ADR 0039
 - **Acceptance**: E (permissions), H (diagnostics), Security
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan-ui` covers pending
+  renderer reload; `test:e2e:plan` and the deterministic host-core late-expiry
+  test cover the absolute deadline, timeout persistence, and fail-closed
+  resolution. No terminal-card reload hydration is claimed.
 
 #### E2E-108: Startup fence interrupts pending Plan work
 
@@ -2349,17 +2386,20 @@ Each scenario is documented in this format:
   host/app before resolution. 3) Inspect the `plan_approvals` row, turn, and
   session after startup. 4) Submit the pre-restart response.
 - **Expected**: Renderer reload while the host remains alive preserves the
-  original deadline.
-  Startup transaction marks the pending row and turn interrupted/aborted before
-  RPC service, leaves the session Plan, and returns `PLAN_APPROVAL_STALE` for
-  the old response. No actionable stale card is restored and no process epoch
+  still-pending row and original deadline. Full Host/app restart transactionally
+  marks the pending row and turn interrupted/aborted before RPC service, leaves
+  the session Plan, and returns `PLAN_APPROVAL_STALE` for the old response. No
+  actionable stale card or execution is restored, and the UI is not required to
+  present the interrupted terminal snapshot after restart. No process epoch
   field is persisted or sent.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, `03-runtime/07-process-model.md`,
   `03-runtime/10-session-state-machine.md`, `04-ux/08-component-spec.md`, ADR 0039
 - **Acceptance**: F (persistence), H (diagnostics), Security
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` performs a real
+  Host restart and host-core recovery tests verify interrupted durable state;
+  the pending renderer-reload assertion is covered by the E2E-107 UI lane.
 
 #### E2E-109: Approved Plan execution is not replayed after restart
 
@@ -2372,13 +2412,15 @@ Each scenario is documented in this format:
 - **Expected**: Queued/running execution fields become `interrupted`,
   associated turns abort, no provider/tool call is replayed, and the session
   remains Agent because approval already committed. A new turn is accepted only
-  after the user starts it.
+  after the user starts it; no interrupted terminal card or stale action is
+  required after restart.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, `03-runtime/07-process-model.md`,
   `03-runtime/10-session-state-machine.md`, ADR 0039
 - **Acceptance**: C (conversation/stream), F (persistence), H (diagnostics), Security
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` restarts real queued
+  and claimed executions and verifies no replay plus Agent retention
 
 #### E2E-110: Scheduled Plan is rejected before any work
 
@@ -2394,25 +2436,36 @@ Each scenario is documented in this format:
   `03-runtime/08-error-codes.md`, `04-ux/01-ui-ia.md`, ADR 0039
 - **Acceptance**: F (persistence), H (diagnostics), Security
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` verifies Plan
+  rejection before side effects and explicit Agent execution independent of the
+  global default
 
-#### E2E-111: Active-turn and configuration boundaries are enforced
+#### E2E-111: Active-turn, pending-approval, and configuration boundaries are enforced
 
 - **Preconditions**: A session has one active Agent turn and another session is
   idle; a Plan run can be made pending/queued/running.
 - **Steps**: 1) Attempt a second prompt, mode/provider/model/permission/shell
   configuration change, and second Plan submission during the active turn. 2)
-  Attempt a second Plan run in the same session. 3) Repeat configuration after
-  the session returns idle.
-- **Expected**: Active-turn/configuration changes and a second Plan run fail with
-  `AGENT_BUSY`/`CONFLICT`; only the originating session is blocked. Idle
-  configuration succeeds and no cross-session event or workspace root leaks.
+  Let the turn become pending approval and repeat the prompt and configuration
+  attempts. 3) Reject the approval. 4) Submit a later prompt and let the Agent
+  create a revised Plan snapshot. 5) Repeat configuration after the session is
+  editable planning.
+- **Expected**: Active-turn/configuration changes, prompts, and a second Plan
+  submission fail with `AGENT_BUSY`/`CONFLICT` while the turn or active pending
+  approval exists; only the originating session is blocked. Reject returns the
+  durable session to Plan and the live state to planning, clears the gate, and
+  permits the later prompt/new artifact. Terminal proposal snapshots do not
+  disable input, the Composer mode chip, or model selection during the current
+  renderer lifetime. Idle/planning configuration succeeds and no cross-session
+  event or workspace root leaks.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/06-host-rpc-protocol.md`,
   `03-runtime/10-session-state-machine.md`, `04-ux/08-component-spec.md`, ADR 0039
 - **Acceptance**: C (conversation/stream), E (permissions), Quality
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` verifies Host
+  boundaries and `test:e2e:plan-ui` verifies pending-only gating plus editable
+  rejected/terminal states during the current renderer lifetime
 
 #### E2E-112: Selectable shell catalog persists the default
 
@@ -2435,7 +2488,9 @@ Each scenario is documented in this format:
   `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`, ADR 0040
 - **Acceptance**: B (model/config), E (tools/permissions), F (persistence)
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` verifies catalog,
+  validation, persistence, and restart; the deterministic host-core catalog
+  test verifies first-available fallback when a stored shell becomes unavailable
 
 #### E2E-113: Stale shell identity fails closed
 
@@ -2452,7 +2507,8 @@ Each scenario is documented in this format:
   `03-runtime/08-error-codes.md`, `05-security/01-security.md`, ADR 0040
 - **Acceptance**: E (tools/permissions), H (diagnostics), Security
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` verifies stale
+  dialect rejection before marker creation plus host-core stale ID/dialect tests
 
 #### E2E-114: Bash streams stdout and stderr independently
 
@@ -2468,7 +2524,9 @@ Each scenario is documented in this format:
   `03-runtime/16-tool-result-limits.md`, `04-ux/09-interaction-patterns.md`, ADR 0040
 - **Acceptance**: C (stream), E (tools), Quality
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` verifies distinct
+  stdout/stderr notifications and final tool identity; host/runtime stream tests
+  cover bounded accumulation and session isolation
 
 #### E2E-115: Bash timeout uses 60 seconds and a bounded override
 
@@ -2485,7 +2543,9 @@ Each scenario is documented in this format:
   `03-runtime/16-tool-result-limits.md`, `05-security/01-security.md`, ADR 0040
 - **Acceptance**: E (tools), H (diagnostics), Security
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): long-timeout `test:e2e:plan`
+  measured the no-override timeout at 60,024 ms and verified in-range plus
+  invalid bounds without delayed marker writes
 
 #### E2E-116: Bash abort shuts down the complete process tree
 
@@ -2501,7 +2561,9 @@ Each scenario is documented in this format:
   `03-runtime/16-tool-result-limits.md`, `05-security/01-security.md`, ADR 0040
 - **Acceptance**: C (abort), E (tools), H (diagnostics), Security
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` aborts a real
+  descendant process tree and verifies no late marker/output; host-core tests
+  verify cancellation registry cleanup
 
 #### E2E-117: Agent/Plan UX and locales contain no Chat controls
 
@@ -2509,21 +2571,34 @@ Each scenario is documented in this format:
   Plan artifact fixture, shell settings, and command palette available.
 - **Steps**: 1) Inspect Agent/Plan, permission, artifact approval, and shell
   controls in English. 2) Enter Plan and inspect planning/approval/queue/
-  interrupted states. 3) Repeat in zh-CN. 4) Search visible commands for the
-  removed Chat mode and request-changes controls.
-- **Expected**: Agent is the default; Plan shows Ask/Accept edits/Auto, the
+  terminal states while the renderer remains alive. 3) Reload after a terminal
+  proposal and inspect the session while asserting that Electron Main and Host
+  process identities did not change. 4) Repeat in zh-CN. 5) Search visible
+  commands for the removed Chat mode and request-changes controls. Host/app
+  restart recovery is exercised separately by E2E-108 and E2E-109.
+- **Expected**: Agent is the default; the left-of-input Composer chip is the
+  sole active-session Agent/Plan control; Plan shows Ask/Accept edits/Auto, the
   submitted title/question, an artifact opener, expiry/status, approve/reject
   only, shell catalog/fallback status, and localized failed-closed states. No
   Chat mode, `/chat-mode`, request-changes action, inline Markdown/hash/size
-  requirement, or stale actionable queue is exposed; `page = "chat"` remains
-  an internal route.
+  requirement, or stale actionable queue is exposed; a terminal card may remain
+  visible and non-actionable only for the current renderer lifetime. Renderer
+  reload does not rehydrate rejected, expired, approved/completed, or
+  interrupted terminal cards. Host/app restart does not replay work or restore
+  stale actions, and the UI is not required to present the interrupted terminal
+  snapshot; `page = "chat"` remains an internal route.
 - **Specs linked**: `01-product/01-product-scope.md`, `04-ux/01-ui-ia.md`,
   `04-ux/04-builtin-commands.md`, `04-ux/03-permission-ux.md`,
   `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`,
   `04-ux/02-i18n-english-first.md`, ADR 0039, ADR 0040
 - **Acceptance**: C (conversation), Quality
 - **Milestone**: M6
-- **Status**: Documented
+- **Status**: Automated (passed 2026-08-04): raw-CDP
+  `test:e2e:plan-ui` uses an env-gated Electron Main probe against the existing
+  Host, asserts stable Electron/Host PIDs, covers pending restore, live terminal
+  controls, rejected and approved/completed terminal-card absence after
+  renderer reload, EN/zh-CN, and 1280×800 / 900×700 rendering. E2E-108/E2E-109
+  cover Host restart interruption, stale-action rejection, and no replay.
 
 ## 8. Traceability Matrix
 

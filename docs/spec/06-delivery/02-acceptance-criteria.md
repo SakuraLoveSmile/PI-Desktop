@@ -43,9 +43,10 @@ MVP passes when:
 - [x] Tool paths resolve against the project root — auto:host-core tests (`workspace::tests`)
 
 ### E. Tools and permissions
-- [ ] Plan denies Write/Edit/plugin tools under every permission mode — M6
-- [ ] Plan Bash prompts under Ask/Accept edits and runs without confirmation
-  under explicit Auto — M6
+- [x] Plan denies Write/Edit/plugin tools under every permission mode —
+  auto:`test:e2e:plan` E2E-105 + host-core permission tests
+- [x] Plan Bash prompts under Ask/Accept edits and runs without confirmation
+  under explicit Auto — auto:`test:e2e:plan` E2E-105 + host-core permission tests
 - [x] Agent mode uses permission policy for Write/Edit/Bash — manual:M3
 - [x] Permission timeout (120s) becomes deny — manual:M3 (D005)
 - [x] Read/Glob/Grep work inside the project — auto:`test:e2e` (glob tool)
@@ -57,25 +58,45 @@ MVP passes when:
 - [x] Paths outside the workspace are rejected — auto:host-core tests (`blocks_escape`)
 
 ### M6. Plan checkpoint and shell execution
-- [ ] One pi Agent owns Agent, planning, approval, and post-approval execution — M6
-- [ ] `EnterPlanMode` and UI/session Plan selection converge on the same state — M6
-- [ ] `SubmitPlan(title, markdown, question)` preserves exact Markdown bytes in
+- [x] One pi Agent owns Agent, planning, approval, and post-approval execution —
+  auto:agent-runtime + `test:e2e:plan`/`test:e2e:plan-ui`
+- [x] `EnterPlanMode` and UI/session Plan selection converge on the same state —
+  auto:host-core CAS tests + `test:e2e:plan-ui`
+- [x] `SubmitPlan(title, markdown, question)` preserves exact Markdown bytes in
   a unique `.pi/plan/*.md` artifact, keeps title/question structured in
-  `plan_approvals`, and records path/hash/size — M6
-- [ ] Approval offers only Approve/Reject; Approve requires an explicit
-  permission mode with Ask selected by default — M6
-- [ ] The approval deadline is an absolute 30 minutes and stale responses fail
-  closed — M6
-- [ ] v8→v10 migration preserves sessions/transcripts and continues
-  `plan_approvals` with artifact/execution fields — M6
-- [ ] Pending, queued, and running Plan work is interrupted on host restart with
-  no replay; an already-approved interrupted execution leaves the session Agent — M6
-- [ ] Scheduled/unattended Plan runs fail before the provider request — M6
-- [ ] Plan plugin tools remain denied despite low risk, grants, or Auto — M6
-- [ ] Shell catalog selection persists a platform-valid ID, falls back to the
+  `plan_approvals`, and records path/hash/size — auto:`test:e2e:plan` E2E-106
+- [x] Approval offers only Approve/Reject; Approve requires an explicit
+  permission mode with Ask selected by default — auto:`test:e2e:plan-ui`
+  E2E-106/E2E-117
+- [x] The approval deadline is an absolute 30 minutes and stale responses fail
+  closed — auto:`test:e2e:plan` E2E-107 + host-core late-expiry test
+- [x] Renderer retains the latest Plan proposal/execution snapshot only for the
+  current renderer lifetime; `plans.pending` rehydrates only pending rows and
+  original deadlines after renderer reload, terminal cards are not rehydrated
+  after renderer reload, and Host restart restores no stale action —
+  auto:`test:e2e:plan-ui` same-Host PID/negative reload assertions +
+  `test:e2e:plan` E2E-108/E2E-109
+- [x] Schema v7 first reaches v8 and then uses the guarded v8→v10 path; the
+  v8→v10 migration is one atomic transaction with a WAL checkpoint and exact
+  readable `pi.sqlite.v8.bak` before destructive work, while schema v9 receives
+  `pi.sqlite.v9.bak`. Malformed app settings/scheduled config, invalid
+  top-level operating modes, and unknown or wrong-platform default shells fail
+  closed with schema v8 authoritative; platform-valid shells remain migratable
+  when temporarily unavailable. Sessions, transcripts, nested extension modes,
+  and `plan_approvals` artifact/execution fields survive — auto:host-core
+  migration tests (139/139; 15 focused DB tests)
+- [x] Pending, queued, and running Plan work is interrupted on host restart with
+  no replay; an already-approved interrupted execution leaves the session Agent —
+  auto:`test:e2e:plan` E2E-108/E2E-109
+- [x] Scheduled/unattended Plan runs fail before the provider request —
+  auto:`test:e2e:plan` E2E-110
+- [x] Plan plugin tools remain denied despite low risk, grants, or Auto —
+  auto:`test:e2e:plan` E2E-105 + host-core policy tests
+- [x] Shell catalog selection persists a platform-valid ID, falls back to the
   first available platform shell when a later lookup is unavailable, rejects a
   stale turn ID/dialect, streams stdout/stderr, enforces the 60s default
-  timeout, and kills process trees on abort — M6
+  timeout, and kills process trees on abort — auto:`test:e2e:plan`
+  E2E-112–E2E-116 + host-core fallback test
 
 ### F. Persistence
 - [x] Sessions survive restart — manual:M2 (SQLite via host-core)

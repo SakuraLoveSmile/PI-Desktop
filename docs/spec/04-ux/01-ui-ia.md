@@ -109,10 +109,12 @@ destination, chat as the home surface, tools and permissions inline.
 - **Composer**: workspace-agnostic floating pill anchored to the conversation
   destination — scrollable centered stack on the empty home (D111),
   bottom-docked in a transcript, with no project / Local / branch rail (D095).
-  Its operating-mode selector contains exactly **Agent** and **Plan**. Plan
-  shows the same Agent's planning state, keeps the permission-mode chip, and
-  exposes the host-written immutable `.pi/plan/*.md` artifact opener and
-  approval surface after `SubmitPlan`.
+  Its left-of-input operating-mode chip is the sole active-session control for
+  exactly **Agent** and **Plan**. Plan shows the same Agent's planning state,
+  keeps the permission-mode chip, and exposes the host-written immutable
+  `.pi/plan/*.md` artifact opener and approval surface after `SubmitPlan`.
+  The conversation top bar retains the model picker and window actions but has
+  no duplicate Agent/Plan control.
 - **Backend status capsule**: appears under the titlebar while the backend
   restarts or is fatally degraded (D080), with an Open-logs action.
 
@@ -209,7 +211,7 @@ Plugins destination described in §3.5.
 | Overlay | Trigger | Notes |
 |---|---|---|
 | Command palette | Cmd/Ctrl+K (also Cmd/Ctrl+Shift+P per D014) | builtin + plugin commands |
-| Model menu | composer model chip | configured provider/model choices + settings entry (D091) |
+| Model menu | top-bar model picker | configured provider/model choices + settings entry (D091) |
 | Profile menu | sidebar footer | Settings / Logs / Theme cycle (D041) |
 | Notification inbox | sidebar footer bell | All/Unread views, task completion/failure rows, mark-all-read and clear actions (D130/D117) |
 | Toasts | events (plugin toast, backend restored, copy) | top-center; 4s default, 8s for errors |
@@ -272,10 +274,21 @@ Plugins destination described in §3.5.
   logs (D080); composer submits are rejected with readable errors while down.
 - Plan checkpoint → the originating session shows the structured title and
   question, an opener for its immutable `.pi/plan/*.md` artifact, absolute
-  approval deadline, and current status. Renderer reload preserves a pending
-  row while the host remains alive; startup interruption shows interrupted with
-  no replay. An already-approved interrupted execution keeps the session's
-  Agent state.
+  approval deadline, and current status. The renderer retains the latest
+  proposal/execution snapshot per session only for the current renderer
+  lifetime, updated by live Host events; only a live `pending` row forms the
+  approval gate. Reload through `plans.pending` while the same Host remains
+  alive restores a still-pending row with its original deadline. Rejected,
+  expired, approved/completed, and interrupted terminal cards are not
+  rehydrated; a terminal card may remain visible and non-actionable only until
+  renderer reload. Reject, expiry, or interruption clears the approval gate,
+  leaves the session Plan/planning and editable, and requires a later turn to
+  create a new artifact. While pending, the draft remains visible but
+  read-only and only Approve or Reject actions are enabled. Host/app restart
+  interrupts prior work before RPC with no replay or stale action; pending
+  unapproved work remains Plan, while already-approved interrupted execution
+  remains Agent. The UI is not required to present that interrupted terminal
+  snapshot after restart.
 
 ## 8. i18n
 

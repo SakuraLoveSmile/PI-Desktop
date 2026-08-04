@@ -114,8 +114,11 @@ service, with no replay; an already-approved interrupted execution leaves the
 session in Agent.
 
 The renderer may display Plan state and approval UI, but it is only a projection
-of host/runtime events. It cannot authorize a tool or choose a mode for host
-policy by sending a conflicting request field.
+of live host/runtime events for the current renderer lifetime. It retains the
+latest proposal/execution snapshot per session in renderer memory; a renderer
+reload rehydrates only a still-pending row through `plans.pending`, not a
+terminal approval or execution card. It cannot authorize a tool or choose a mode
+for host policy by sending a conflicting request field.
 
 The renderer may retain several project tabs, but this does not create several
 host workspace singletons. One project supplies visible shell context;

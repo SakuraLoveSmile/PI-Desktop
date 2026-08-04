@@ -136,9 +136,10 @@
 - ADRs: `docs/adr/`
 - Example plugin: `examples/plugins/hello`
 
-## Next Action
+## Delivery Status
 
-Continue **M6 — Plan** against these frozen details:
+**M6 — Plan** was implemented and accepted on 2026-08-05 against these frozen
+details:
 
 1. shared Plan/session/shell contracts and protocol v9
 2. schema v10 migration, immutable plan artifacts, and the `plan_approvals`
@@ -146,4 +147,9 @@ Continue **M6 — Plan** against these frozen details:
 3. Rust-authoritative Plan policy, shell identity, and process cancellation
 4. one-Agent SubmitPlan/approval/execution state transitions
 5. renderer artifact approval, shell selection, and EN/zh-CN UX
-6. focused migration, policy, streaming, timeout, and recovery verification
+6. focused migration, policy, streaming, timeout, recovery, and rendered
+   EN/zh-CN verification
+
+The frozen protocol remains v9 and storage schema remains v10. Future changes
+must preserve the automated M6 scenarios E2E-104 through E2E-117 or update the
+relevant decision record before changing the contract.

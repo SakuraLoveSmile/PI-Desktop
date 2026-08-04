@@ -495,8 +495,10 @@ Agent calls a permission-gated tool (including Plan Bash under Ask or Accept edi
    default. Host-core commits the approval, `mode = agent`, permission mode,
    and `queued` state atomically; the same Agent continues on a fresh turn with
    Agent tools.
-5. Reject stops the pending run and keeps the session in Plan. Revisions are
-   new SubmitPlan calls; there is no request-changes action.
+5. Reject stops the pending run and keeps the durable session in Plan. The live
+   state returns to editable planning; revisions are new-turn `SubmitPlan` calls
+   with a new complete Markdown snapshot and new artifact. Earlier snapshots
+   remain immutable; there is no request-changes action.
 6. Expiry, abort, persistence failure, renderer/host/sidecar crash, or stale
    response renders a failed-closed state. A host restart interrupts pending,
    queued, and running work without replay; an already-approved interruption
@@ -505,9 +507,21 @@ Agent calls a permission-gated tool (including Plan Bash under Ask or Accept edi
 The approval card is session-scoped. Background sessions may retain a pending
 approval or queued/running execution state in `plan_approvals`, but opening
 another session never covers it or moves focus; returning to the originating
-session restores the record and original deadline while the host remains alive.
+session restores the renderer-lifetime snapshot; while the host remains alive,
+`plans.pending` can rehydrate a still-pending row with its original deadline.
 Mode/provider/model/permission/shell configuration and new prompts remain
-disabled until the session is idle.
+disabled while an active `pending` approval or turn exists. During pending
+approval the existing draft remains in the textarea but is read-only; only
+Approve and Reject remain enabled on the approval surface. Reject, expiry, or
+interruption re-enables them; terminal proposal snapshots do not keep the gate
+closed. The renderer retains the latest checkpoint/execution status per session
+only for its current lifetime, so rejected, expired, interrupted, approved,
+queued, and running outcomes may remain visible across session switches. A
+renderer reload rehydrates only a pending row; terminal cards are dropped and
+are not restored. Host restart interrupts prior work without replay or stale
+action, and the UI is not required to present the interrupted terminal
+snapshot. The Composer-left Agent/Plan chip is the only active-session mode
+control.
 
 ## 6. Toast vs inline error
 

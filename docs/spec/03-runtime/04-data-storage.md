@@ -39,7 +39,8 @@ schema v7, v8, and v10:
 ~/.pi-desktop/
  ├── pi.sqlite            # index database (WAL: + -wal/-shm) — host-core only
  ├── pi.sqlite.v6.bak     # archived pre-v7 database (D119 breaking reset)
- ├── pi.sqlite.v8.bak     # pre-checkpoint schema backup before v8→v10 migration
+ ├── pi.sqlite.v8.bak     # exact readable backup before v8→v10 destructive work
+ ├── pi.sqlite.v9.bak     # exact readable backup before v9→v10 destructive work
  ├── sessions/            # transcript file store (D119) — host-core only
  │    ├── <sessionId>.jsonl           # live transcript (header + messages)
  │    └── <sessionId>.revisions.jsonl # regenerate branches, append-only
@@ -338,7 +339,11 @@ CREATE INDEX idx_sessions_project ON sessions(project_id) WHERE project_id IS NO
   is in planning state; it never selects another runtime. A live `pending` row
   in `plan_approvals` projects `awaiting_approval`; `execution_state` values
   `queued`/`running` project post-approval execution. Otherwise a Plan session is `planning` when its
-  Agent is active or ready for planning.
+  Agent is active or ready for planning. Terminal approval rows are historical
+  durable records, not renderer gates; reject, expiry, or pending interruption
+  returns live planning to editable state. The renderer may retain the latest
+  proposal/execution snapshot per session only for its current lifetime from
+  live Host events; `plans.pending` rehydrates only pending rows.
 - New sessions default to `agent`. Imported legacy `chat` values are normalized
   to `plan`; forked sessions copy the durable mode but never copy pending,
   queued, or running Plan rows.
@@ -423,13 +428,15 @@ CREATE INDEX idx_plan_approvals_execution_id
 `plan_json` is the exact Markdown snapshot kept for the approval/execution
 record; it is not a canonical wrapper. `title` and `question` are separate
 structured fields. Each artifact file is immutable and unique, so a later
-submission never replaces an earlier file. Hash and byte size authenticate the
-file before approval, but the approval UI may simply open the relative path.
+Plan turn creates a new complete snapshot/approval row and never replaces an
+earlier file. Hash and byte size authenticate the file before approval, but the
+approval UI may simply open the relative path.
 
 Approval changes `status` to `approved`, sets `execution_id` and
 `execution_state = 'queued'`, updates `sessions.mode` to `agent`, and stores
 the explicit permission mode in one transaction. Reject/expiry leave the
-session in Plan. The new protocol has no request-changes action; compatibility
+session in Plan and close the active gate; a later prompt can create a new
+pending row. The new protocol has no request-changes action; compatibility
 columns remain for older records.
 
 At startup, before serving RPC, one transaction changes every `pending` row to
@@ -437,7 +444,9 @@ At startup, before serving RPC, one transaction changes every `pending` row to
 The associated running turn is aborted. There is no serialized process-epoch
 column and no replay. A pending interruption leaves the session Plan, while an
 already-approved queued/running interruption leaves it Agent. Renderer reload
-within the same host can list the pending row and its original `expires_at`.
+within the same host can list the pending row and its original `expires_at`;
+`plans.pending` returns no terminal rows, so rejected, expired, approved,
+completed, and interrupted cards are not rehydrated.
 
 Serves: mid-session model switches ("next turn only", spec 13 §4), the
 per-message cost chip's session rollup (benchmark §3.2), failed/aborted badges
@@ -625,8 +634,12 @@ CREATE INDEX idx_task_runs ON task_runs(task_id, started_at DESC);
 A run that spawns a session gets its transcript for free via `session_id`.
 Finer schedules (cron) land in `config_json` without a migration.
 
-Scheduled task `config_json.mode` is a durable operating-mode value. The
-v8→v10 migration maps `chat` to `plan`; new scheduled tasks default to `agent`.
+Scheduled task `config_json.mode` is a durable operating-mode value. There is
+intentionally no physical `scheduled_tasks.mode` column. The v7→v8
+and v9→v10 migration paths map legacy `chat` values to `plan`; new scheduled
+tasks default to `agent`, and create/update/import normalize the same values.
+The top-level wire `ScheduledTask.mode` is only a normalized projection of this
+JSON value.
 A scheduled or unattended run whose mode is Plan is explicitly rejected before
 provider work, `.pi/plan/*.md` creation, approval, or queue insertion with
 `PLAN_REQUIRES_INTERACTIVE_SESSION`. It cannot display an approval card or
@@ -790,23 +803,35 @@ next rewrite; transcript reads dedupe repeated ids keep-last.
   the archive remains for manual recovery. All pre-v7 migration code
   (v1 `settings.sqlite` import, v2→v6 chain) is deleted.
 - Fresh installs run the full v10 DDL directly.
+- **Schema v7 first reaches v8, then uses the guarded path.** The v7→v8
+  migration is followed by the same guarded v8→v10 migration; a schema-v9
+  database takes the same guarded path and receives an exact readable
+  `pi.sqlite.v9.bak` before destructive work.
 - **v8-to-v10 is an in-place transactional migration.** Before migration,
-  host-core creates `pi.sqlite.v8.bak` and checkpoints the WAL. Within one
+  host-core checkpoints the WAL, then creates the exact readable
+  `pi.sqlite.v8.bak`; both happen before destructive work. Within one atomic
   transaction it:
   1. validates every `sessions.mode` value and maps `chat` to `plan`;
-  2. parses the structured app settings value and maps `defaultMode: "chat"`
-     to `"plan"`;
-  3. parses each scheduled task's `config_json` and maps a stored
-     `mode: "chat"` to `"plan"`;
+  2. parses the structured app settings value and maps its top-level
+     `defaultMode: "chat"` to `"plan"`;
+  3. parses each scheduled task's `config_json` and maps its top-level stored
+     `mode: "chat"` to `"plan"`, leaving nested extension modes untouched;
   4. preserves/migrates the existing `plan_approvals` table and adds its
      artifact and execution fields/indexes;
   5. preserves transcripts, turns, revisions, projects, permissions, grants,
      providers, and scheduled task history;
   6. validates all new mode values as `plan | agent`; and
-  7. validates `defaultCommandShell` against the platform catalog; and
+  7. validates `defaultCommandShell` as a known current-platform catalog ID,
+     retaining a valid ID that is temporarily unavailable so normal runtime
+     fallback can select the first available shell; and
   8. sets `PRAGMA user_version = 10` only after every change succeeds.
-  A parse, constraint, or write failure rolls back the transaction and leaves
-  schema v8 authoritative; the backup remains available for recovery.
+  A malformed app-settings value, malformed scheduled-task `config_json`,
+  invalid session or top-level scheduled mode, unknown or wrong-platform
+  `defaultCommandShell`, parse, constraint, or write failure fails closed,
+  rolls back the transaction, and leaves schema v8 authoritative; the backup
+  remains available for recovery.
+  Legacy `planApprovalPermissionMode` is removed from the app settings JSON
+  during migration; all unrelated settings remain intact.
 - Plan artifacts are never reconstructed from transcript content. On startup,
   one transaction marks every `pending` approval and every `queued` or
   `running` execution state in `plan_approvals` as `interrupted`; associated
@@ -892,13 +917,16 @@ columns for anything the host filters, joins, sums, or indexes.
 15. Notification list/unread, mark-read, mark-all-read, clear, and session
     cascade deletion use the documented indexes/transactions without changing
     turn or transcript data
-16. v8→v10 migration maps persisted session, app-default, and scheduled `chat`
-    values to `plan`, preserves session data and permission modes, continues
-    `plan_approvals` with artifact/execution fields, and rolls back with schema
-    v8 intact on failure
+16. Schema v7 first reaches v8 and then uses the guarded v8→v10 path. The
+    v8→v10 migration is one atomic transaction with a WAL checkpoint and exact
+    readable `pi.sqlite.v8.bak` before destructive work; schema v9 receives
+    `pi.sqlite.v9.bak`. Persisted session, app-default, and scheduled `chat`
+    values map to `plan`, sessions/transcripts and `plan_approvals` artifact/
+    execution fields survive, and malformed app settings/scheduled config,
+    invalid modes, or invalid default shells fail closed with schema v8 intact
 17. SubmitPlan writes exact Markdown bytes to a unique `.pi/plan/*.md` file
     with SHA-256 and size; title/question stay structured and renderer reload
-    retains the pending row and original absolute deadline
+    retains only the pending row and original absolute deadline
 18. Full process restart marks pending/queued/running Plan rows interrupted,
     aborts associated turns, performs no replay, keeps pending sessions Plan,
     keeps already-approved interrupted sessions Agent, and rejects stale responses

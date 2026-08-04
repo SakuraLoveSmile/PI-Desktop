@@ -12,7 +12,8 @@ Plan / planning
   -- SubmitPlan(title, markdown, question) --> Plan / awaiting_approval
 Plan / awaiting_approval
   -- approve(permission mode) --> Agent / queued, same Agent continues
-  -- reject | expiry | abort | crash | persistence failure --> Plan / stopped
+  -- reject | expiry | abort | crash | persistence failure
+       --> Plan / planning
 Agent / queued
   -- dispatcher starts --> Agent / running
 Agent / running
@@ -91,11 +92,15 @@ accept_prompt
     permission mode, assigns an execution ID, and changes the row's
     `execution_state` to `queued`.
 13. Approve and reject are the only resolution actions. Rejection and expiry
-    stay Plan and grant no execution tools. A pending interruption stays Plan;
-    a queued/running interruption after approval stays Agent.
+    close the pending row, then return the live state to editable Plan/planning
+    and grant no execution tools. A pending interruption does the same; a
+    queued/running interruption after approval stays Agent.
 14. A second prompt, Plan submission, configuration change, or execution is
     rejected while the session has an active turn, pending approval, or
     queued/running execution. Configuration is accepted only while idle.
+15. A later Plan turn may revise a rejected/expired/interrupted checkpoint and
+    must create a new immutable artifact rather than overwrite the earlier
+    snapshot.
 
 ## 4. Persistence points
 
@@ -113,7 +118,7 @@ transcript-file line first, index transaction second.
   `plan_approvals` row before the approval event
 - Plan approval: approval outcome, mode transition, permission mode, execution
   ID, and `queued` state in one transaction; reject/expiry/interruption retain
-  Plan
+  Plan and return live planning to editable state
 - startup recovery: transactionally interrupt pending approvals and
   queued/running execution states before serving RPC; abort associated running
   turns and never replay work
@@ -134,8 +139,9 @@ transcript-file line first, index transaction second.
    produce a child
 7. a message-scoped fork excludes later rows and begins with no source runtime
    or provider-cache state
-8. Plan and Agent use one pi Agent; UI entry and `EnterPlanMode` converge on the
-   same planning state, and approval resumes that Agent in Agent mode
+8. Plan and Agent use one pi Agent; the Composer-left mode chip, UI entry, and
+   `EnterPlanMode` converge on the same planning state, and approval resumes
+   that Agent in Agent mode
 9. Plan policy permits Bash only through the selected permission mode and
    denies Write/Edit/plugins regardless of `auto` or session grants
 10. SubmitPlan writes an exact unique `.pi/plan/*.md` artifact with hash/size,
