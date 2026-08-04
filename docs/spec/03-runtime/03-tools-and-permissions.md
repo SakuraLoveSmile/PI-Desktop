@@ -177,16 +177,18 @@ workflow is:
    that worktree with Bash and verify the resulting diff.
 3. After a failed edit or patch check, perform one fresh `Read` of the current
    target and regenerate the change once. A second failed `Edit` for the same
-   path in the prompt returns a terminating tool result, so the agent stops
-   after reporting the exact mismatch. Do not hand-edit old unified-diff hunk
-   headers or continue a repair loop.
+   path in the prompt, or a second failed shell patch command (`apply_patch`,
+   `git apply`, or `patch`), returns a terminating tool result, so the agent
+   stops after reporting the exact mismatch. Do not hand-edit old unified-diff
+   hunk headers or continue a repair loop.
 4. Keep mutations to one path sequential, even when read/search calls are
    issued in parallel.
 
-The sidecar's tool timing line includes `mutationFailureAttempt` for failed
-same-path `Edit` calls and `terminate=true` on the second failure. The latter
-is passed through pi-agent-core's runtime-only termination hint; it does not
-alter the durable tool result shape.
+The sidecar's tool timing line includes `mutationFailureKind` and
+`mutationFailureAttempt` for failed same-path `Edit` calls and recognized shell
+patch commands, with `terminate=true` on the second failure. The latter is
+passed through pi-agent-core's runtime-only termination hint; it does not alter
+the durable tool result shape.
 
 ## 5. Bash Rules
 

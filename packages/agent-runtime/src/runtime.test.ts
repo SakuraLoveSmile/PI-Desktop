@@ -92,7 +92,8 @@ describe("DesktopAgentRuntime configuration matching", () => {
     const runtime = createRuntime();
     const prompt = (runtime as any).agent.state.systemPrompt as string;
 
-    expect(prompt).toContain("Do not create or hand-edit unified-diff files");
+    expect(prompt).toContain("do not create or hand-edit unified-diff files");
+    expect(prompt).toContain("Do not invoke shell apply_patch, git apply, or patch commands");
     expect(prompt).toContain("Never issue concurrent Write/Edit calls for the same path");
     expect(prompt).toContain("regenerate the change from that current content");
 
@@ -162,6 +163,38 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect(second.terminate).toBe(true);
     await expect(
       agent.afterToolCall({ toolCall: { id: "edit-2" } }),
+    ).resolves.toEqual({ isError: true, terminate: true });
+
+    await runtime.dispose();
+  });
+
+  it("terminates repeated failed shell patch recovery", async () => {
+    const host = {
+      call: vi.fn().mockResolvedValue({
+        ok: false,
+        isError: true,
+        errorCode: "TOOL_FAILED",
+        content: { exitCode: 128, stderr: "corrupt patch" },
+      }),
+    };
+    const runtime = createRuntime({ host });
+    const agent = (runtime as any).agent;
+    const bash = agent.state.tools.find((tool: any) => tool.name === "Bash");
+    const firstArgs = { command: "apply_patch <<'PATCH'\n*** Begin Patch\nPATCH" };
+    const secondArgs = {
+      command: "git -C /tmp/project apply --check /tmp/change.patch",
+    };
+
+    const first = await bash.execute("patch-1", firstArgs);
+    await expect(
+      agent.afterToolCall({ toolCall: { id: "patch-1" } }),
+    ).resolves.toEqual({ isError: true });
+    expect(first.terminate).toBeUndefined();
+
+    const second = await bash.execute("patch-2", secondArgs);
+    expect(second.terminate).toBe(true);
+    await expect(
+      agent.afterToolCall({ toolCall: { id: "patch-2" } }),
     ).resolves.toEqual({ isError: true, terminate: true });
 
     await runtime.dispose();

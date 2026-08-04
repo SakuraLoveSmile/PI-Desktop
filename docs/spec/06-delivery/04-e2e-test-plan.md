@@ -2638,9 +2638,9 @@ Each scenario is documented in this format:
   - The non-zero Bash command is marked failed while retaining its exit code,
     stdout, and stderr for the agent and diagnostics.
   - The retry performs one fresh read and operates on the current file; a
-    second same-path mismatch returns a terminating tool result, stops the
-    mutation workflow, and does not repeatedly modify an old patch artifact or
-    its hunk headers.
+    second same-path mismatch or failed shell patch command returns a
+    terminating tool result, stops the mutation workflow, and does not
+    repeatedly modify an old patch artifact or its hunk headers.
   - The final file contains exactly the intended change, and diff/review data
     contains no partial or interleaved mutation.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`,

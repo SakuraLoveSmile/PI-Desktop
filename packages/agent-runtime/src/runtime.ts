@@ -131,7 +131,8 @@ const DEFAULT_MAX_TOKENS = 8_192;
 const PROVIDER_REQUEST_MAX_RETRIES = 1;
 const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;
 const PROVIDER_STREAM_RETRY_BACKOFF_MS = 750;
-const MAX_EDIT_RECOVERY_FAILURES = 2;
+const MAX_MUTATION_RECOVERY_FAILURES = 2;
+const BASH_PATCH_FAILURE_KEY = "__bash_patch_command__";
 const CONTEXT_COMPACTION_TOOL_NAME = "CompactContext";
 export const TOOL_SEARCH_NAME = "ToolSearch";
 const CONTEXT_NUDGE_TURN_INTERVAL = 3;
@@ -352,6 +353,19 @@ function boundedText(value: string, maxChars: number): string {
 
 function mutationFailureKey(path: unknown): string {
   return String(path).replaceAll("\\", "/").replace(/^\.\//, "");
+}
+
+function isPatchCommand(command: unknown): boolean {
+  if (typeof command !== "string") return false;
+  return (
+    /(?:^|[;&|]\s*)(?:env\s+|command\s+)?(?:\S+\/)?apply_patch(?:\s|$)/m.test(
+      command,
+    ) ||
+    /\bgit(?:\s+\S+)*\s+apply(?:\s|$)/m.test(command) ||
+    /(?:^|[;&|]\s*)(?:env\s+|command\s+)?(?:\S+\/)?patch(?:\s|$)/m.test(
+      command,
+    )
+  );
 }
 
 function delayWithAbort(ms: number, signal: AbortSignal): Promise<void> {
@@ -643,7 +657,7 @@ export class DesktopAgentRuntime {
   /** Host failures need to reach pi-agent-core's tool error channel without
    * discarding the structured diagnostics returned in `details`. */
   private failedHostToolCalls = new Set<string>();
-  /** Per-prompt Edit failures provide one fresh-read recovery, then stop. */
+  /** Per-prompt mutation failures provide one recovery attempt, then stop. */
   private mutationFailureCounts = new Map<string, number>();
   private terminatingToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
@@ -711,7 +725,7 @@ export class DesktopAgentRuntime {
     const optionalToolsPrompt = this.optionalToolsPrompt();
     const defaultSystemPrompt = [
       "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
-      "Editing workflow: use the built-in Edit or Write tool directly on the deliverable file whenever it is inside the advertised workspace. Use Edit for one small unique replacement and Write for a coherent whole-file rewrite. Do not create or hand-edit unified-diff files in scratch or repeatedly repair their hunk headers. Treat an edit failure as stale state: perform one fresh Read, regenerate the change from that current content once, then stop and report the exact mismatch instead of looping. Never issue concurrent Write/Edit calls for the same path. When a dedicated worktree is outside the advertised workspace, make one guarded, deterministic edit inside that worktree with Bash, then verify it with git diff or an equivalent check.",
+      "Editing workflow: use the built-in Edit or Write tool directly on the deliverable file whenever it is inside the advertised workspace. Use Edit for one small unique replacement and Write for a coherent whole-file rewrite. Do not invoke shell apply_patch, git apply, or patch commands; do not create or hand-edit unified-diff files in scratch or repeatedly repair their hunk headers. Treat an edit or shell patch failure as stale state: perform one fresh Read, regenerate the change from that current content once, then stop and report the exact mismatch instead of looping. Never issue concurrent Write/Edit calls for the same path. When a dedicated worktree is outside the advertised workspace, make one guarded, deterministic edit inside that worktree with Bash, then verify it with git diff or an equivalent check.",
       // Work panel browser preview (D100): workspace HTML files render
       // in the embedded browser with live reload on file changes.
       `For user-visible HTML pages, call the BrowserPreview tool once after creating the page or making the first meaningful visual edit, using its workspace-relative path (e.g. \`index.html\` or \`demo/index.html\`) to show it in PI-Desktop's built-in browser panel. Reuse that preview while iterating: it live-reloads as you edit, so no repeat call or manual refresh is needed. Skip generated, test-only, and non-visual HTML files. If BrowserPreview is not in the current tool list, load it first with ${TOOL_SEARCH_NAME}.`,
@@ -1013,8 +1027,8 @@ export class DesktopAgentRuntime {
           return `Replace one unique occurrence of old_string in a file. Use Edit for a small localized change and Write for a whole-file rewrite; never guess old_string. After one failed edit, perform one fresh Read and regenerate the edit from that content. If the second attempt fails, stop instead of looping or repairing an old patch; do not repair an old patch repeatedly. Do not edit the same path concurrently.${scratchPathHint}`;
         case "Bash":
           return this.scratchDir
-            ? "Run a non-interactive shell command in the workspace root. $PI_SCRATCH_DIR points at the session scratch directory for temporary files."
-            : "Run a non-interactive shell command in the workspace root.";
+            ? "Run a non-interactive shell command in the workspace root. $PI_SCRATCH_DIR points at the session scratch directory for temporary files. Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly."
+            : "Run a non-interactive shell command in the workspace root. Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly.";
         case "PluginScaffold":
           return "Create a PI-Desktop plugin from a template and load it for development. `directory` is workspace-relative and must be empty or new; `template` is one of panel-basic, agent-tool-basic, skill-pack, full-demo. Use this instead of hand-writing plugin files.";
         case "PluginCheck":
@@ -1077,21 +1091,36 @@ export class DesktopAgentRuntime {
         // hostRttMs spans approval + execution + IPC. Compare it against the
         // host's own "tool timing" line for the same toolCallId: the gap is
         // the stdio hops, and permissionWaitMs there explains a large value.
+        const recordParams = isRecord(params) ? params : undefined;
+        const failedToolExecution = !result.ok && result.denied !== true;
         const failedEditPath =
           toolName === "Edit" &&
-          !result.ok &&
-          isRecord(params) &&
-          typeof params.path === "string"
-            ? mutationFailureKey(params.path)
+          failedToolExecution &&
+          typeof recordParams?.path === "string"
+            ? mutationFailureKey(recordParams.path)
             : undefined;
-        const mutationFailureAttempt = failedEditPath
-          ? (this.mutationFailureCounts.get(failedEditPath) ?? 0) + 1
+        const failedPatchCommand =
+          toolName === "Bash" &&
+          failedToolExecution &&
+          isPatchCommand(recordParams?.command);
+        const failureKey = failedEditPath
+          ? failedEditPath
+          : failedPatchCommand
+            ? BASH_PATCH_FAILURE_KEY
+            : undefined;
+        const mutationFailureAttempt = failureKey
+          ? (this.mutationFailureCounts.get(failureKey) ?? 0) + 1
           : undefined;
+        const mutationFailureKind = failedEditPath
+          ? "edit"
+          : failedPatchCommand
+            ? "patch-command"
+            : undefined;
         const terminateAfterMutationFailure =
           mutationFailureAttempt !== undefined &&
-          mutationFailureAttempt >= MAX_EDIT_RECOVERY_FAILURES;
-        if (failedEditPath && mutationFailureAttempt !== undefined) {
-          this.mutationFailureCounts.set(failedEditPath, mutationFailureAttempt);
+          mutationFailureAttempt >= MAX_MUTATION_RECOVERY_FAILURES;
+        if (failureKey && mutationFailureAttempt !== undefined) {
+          this.mutationFailureCounts.set(failureKey, mutationFailureAttempt);
         }
         if (terminateAfterMutationFailure) {
           this.terminatingToolCalls.add(toolCallId);
@@ -1107,6 +1136,7 @@ export class DesktopAgentRuntime {
           instructionFallback: instructionTiming?.fallback ? "base" : undefined,
           ok: result.ok,
           errorCode: result.errorCode,
+          ...(mutationFailureKind ? { mutationFailureKind } : {}),
           ...(mutationFailureAttempt !== undefined
             ? { mutationFailureAttempt }
             : {}),
