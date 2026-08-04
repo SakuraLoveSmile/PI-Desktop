@@ -93,7 +93,9 @@ type ProjectPathTooltip = {
   left: number;
 };
 
-const FLOATING_MENU_WIDTH = 184;
+// Use the widest sidebar menu for viewport clamping so every body-level menu
+// has the same right-side placement rule, including the 210px sort menu.
+const FLOATING_MENU_WIDTH = 210;
 const VIEWPORT_PADDING = 8;
 
 function projectName(path: string, fallback?: string) {
@@ -237,8 +239,7 @@ export function Sidebar({
   const [sectionMenu, setSectionMenu] = useState<"sessions" | "projects" | null>(null);
   const [menuPosition, setMenuPosition] = useState<{
     top: number;
-    left?: number;
-    right?: number;
+    left: number;
   } | null>(null);
   const [projectPathTooltip, setProjectPathTooltip] = useState<ProjectPathTooltip | null>(null);
   const [expandedProjectSessions, setExpandedProjectSessions] = useState<Record<string, boolean>>({});
@@ -280,12 +281,21 @@ export function Sidebar({
         VIEWPORT_PADDING,
         Math.min(rect.bottom + 4, window.innerHeight - 220),
       ),
-      right: Math.max(VIEWPORT_PADDING, window.innerWidth - rect.right),
+      left: Math.max(
+        VIEWPORT_PADDING,
+        Math.min(
+          rect.right + 4,
+          Math.max(
+            VIEWPORT_PADDING,
+            window.innerWidth - FLOATING_MENU_WIDTH - VIEWPORT_PADDING,
+          ),
+        ),
+      ),
     });
   }, []);
 
-  // Context menus open to the pointer's right. At the viewport edge, clamp
-  // their left edge so the complete menu remains visible.
+  // All body-level sidebar menus open to the anchor's right. At the viewport
+  // edge, clamp their left edge so the complete menu remains visible.
   const placeMenuAtPoint = useCallback((x: number, y: number) => {
     setMenuPosition({
       top: Math.max(
@@ -1179,7 +1189,6 @@ export function Sidebar({
           onKeyDown={onMenuKeyDown}
           style={{
             top: menuPosition.top,
-            right: menuPosition.right,
             left: menuPosition.left,
           }}
         >
@@ -1209,7 +1218,6 @@ export function Sidebar({
           onKeyDown={onMenuKeyDown}
           style={{
             top: menuPosition.top,
-            right: menuPosition.right,
             left: menuPosition.left,
           }}
         >
@@ -1245,7 +1253,6 @@ export function Sidebar({
         onKeyDown={onMenuKeyDown}
         style={{
           top: menuPosition.top,
-          right: menuPosition.right,
           left: menuPosition.left,
         }}
       >
@@ -1462,16 +1469,6 @@ export function Sidebar({
               {t("nav.sessions", { defaultValue: "Sessions" })}
             </span>
             <div className="sidebar-toolbar-actions">
-              <button
-                type="button"
-                className="sidebar-toolbar-button"
-                data-action="new-standalone-session"
-                title={t("nav.newTemporarySession")}
-                aria-label={t("nav.newTemporarySession")}
-                onClick={() => void createSession({ projectPath: null })}
-              >
-                <IconNewSession size={14} />
-              </button>
               <div className="sidebar-menu-wrap">
                 <button
                   type="button"
@@ -1496,6 +1493,16 @@ export function Sidebar({
                   <IconArrowUpDown size={14} />
                 </button>
               </div>
+              <button
+                type="button"
+                className="sidebar-toolbar-button"
+                data-action="new-standalone-session"
+                title={t("nav.newTemporarySession")}
+                aria-label={t("nav.newTemporarySession")}
+                onClick={() => void createSession({ projectPath: null })}
+              >
+                <IconNewSession size={14} />
+              </button>
             </div>
           </div>
           <div

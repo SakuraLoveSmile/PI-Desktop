@@ -316,9 +316,12 @@ visually distinct from list content.
 - Conversation overflow: pin/unpin, archive/restore, Create branch, delete.
   Create branch is disabled while that conversation is running; success
   activates the independent child session and focuses the composer.
-- The sort menu remains beside the `Sessions` heading: Recently updated,
-  Created date, Oldest first, and Name; pinned rows stay ahead of unpinned rows.
-  A stored `manual` compatibility value requires no drag-reorder UI.
+- The `Sessions` toolbar places the sort button before the message-plus New Chat
+  control. The sort menu and every other body-level sidebar menu open 4px to the
+  right of their trigger or pointer, then clamp within the viewport when there
+  is not enough room. The sort choices remain Recently updated, Created date,
+  Oldest first, and Name; pinned rows stay ahead of unpinned rows. A stored
+  `manual` compatibility value requires no drag-reorder UI.
 - Project groups use compact vertical spacing so adjacent directories and
   conversation rows read as one dense navigation list rather than detached
   cards. Directory `+` and overflow actions remain hidden until hover or
@@ -725,9 +728,10 @@ SESSIONS                                      [msg+][↕]
 - Selecting a conversation with a different project first activates that
   project's workspace. A running turn in the previously selected session is
   not aborted.
-- Right-click menus for sessions, projects, and sidebar sections open to the
-  pointer's right. When that side lacks room, the menu is clamped within the
-  viewport instead of overflowing.
+- Sidebar body-level menus opened from toolbar or row triggers use the same
+  fixed rule as right-click menus: open 4px to the anchor's right, then clamp
+  within the viewport instead of overflowing. This includes the Sessions sort
+  menu, session/project overflow menus, and section create menus.
 - Keyboard: arrow up/down, Enter to select
 - Delete: row menu or command palette `builtin.session.delete`
 

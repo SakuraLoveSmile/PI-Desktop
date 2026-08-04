@@ -1103,20 +1103,23 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Two retained projects contain conversations with distinct
   titles and created/updated timestamps; archived view is initially disabled.
-- **Steps**: 1) Pin one project and one conversation. 2) Select Recently
-  updated, Created date, Oldest first, and Name in turn. 3) Archive another
-  conversation and project. 4) Enable Show archived and restore both. 5)
-  Restart the app. 6) Delete a disposable conversation through the distinct
-  Delete action.
-- **Expected**: Pinned rows remain ahead of unpinned rows under every selected
-  secondary order; each sort produces the documented stable order; archived
-  rows disappear from the default view but retain transcripts/project records
-  and reappear in Show archived; restore returns them to the selected order;
-  archiving the active row selects a visible non-archived fallback or creates
-  the documented empty fallback instead of leaving hidden active context;
-  pin/archive/sort choices survive restart; only Delete removes the disposable
-  durable session. A legacy `manual` preference loads safely without exposing
-  or implying a drag-reorder workflow.
+- **Steps**: 1) Inspect the `Sessions` toolbar and verify that Sort appears
+  before New Chat. 2) Open Sort and inspect its placement, then select Recently
+  updated, Created date, Oldest first, and Name in turn. 3) Pin one project and
+  one conversation. 4) Archive another conversation and project. 5) Enable
+  Show archived and restore both. 6) Restart the app. 7) Delete a disposable
+  conversation through the distinct Delete action.
+- **Expected**: Sort precedes New Chat in the Sessions toolbar; the sort menu
+  opens to the trigger's right, and session/project/section body-level menus use
+  the same right-side placement with viewport clamping. Pinned rows remain ahead
+  of unpinned rows under every selected secondary order; each sort produces the
+  documented stable order; archived rows disappear from the default view but
+  retain transcripts/project records and reappear in Show archived; restore
+  returns them to the selected order; archiving the active row selects a visible
+  non-archived fallback or creates the documented empty fallback instead of
+  leaving hidden active context; pin/archive/sort choices survive restart; only
+  Delete removes the disposable durable session. A legacy `manual` preference
+  loads safely without exposing or implying a drag-reorder workflow.
 - **Specs linked**: `03-runtime/04-data-storage.md`, `04-ux/01-ui-ia.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`
 - **Acceptance**: C (session organization), F (persistence)

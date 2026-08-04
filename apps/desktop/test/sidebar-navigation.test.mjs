@@ -155,16 +155,33 @@ test("sidebar section toolbars open create actions from context menus", () => {
   assert.match(sidebarSource, /addEventListener\("pointerdown"/);
 });
 
-test("sidebar session and project context menus open to the pointer's right", () => {
+test("sidebar floating menus open to the anchor's right", () => {
+  const triggerPlacement = sidebarSource.match(
+    /const placeMenu = useCallback\([\s\S]*?\n  }, \[\]\);/,
+  )?.[0] ?? "";
   const pointPlacement = sidebarSource.match(
     /const placeMenuAtPoint = useCallback\([\s\S]*?\n  }, \[\]\);/,
   )?.[0] ?? "";
 
+  assert.match(triggerPlacement, /left:\s*Math\.max\(/);
+  assert.match(triggerPlacement, /rect\.right \+ 4/);
+  assert.match(triggerPlacement, /FLOATING_MENU_WIDTH/);
+  assert.doesNotMatch(triggerPlacement, /right:\s*Math\.max/);
   assert.match(pointPlacement, /left:\s*Math\.max\(/);
   assert.match(pointPlacement, /x \+ 4/);
   assert.match(pointPlacement, /FLOATING_MENU_WIDTH/);
   assert.match(sidebarSource, /placeMenuAtPoint\(event\.clientX, event\.clientY\)/);
   assert.match(sidebarSource, /left: menuPosition\.left/);
+  assert.doesNotMatch(sidebarSource, /right: menuPosition\.right/);
+});
+
+test("sessions toolbar puts sorting before new-session creation", () => {
+  const sortIndex = sidebarSource.indexOf('data-action="session-sort"');
+  const newSessionIndex = sidebarSource.indexOf('data-action="new-standalone-session"');
+
+  assert.ok(sortIndex >= 0);
+  assert.ok(newSessionIndex >= 0);
+  assert.ok(sortIndex < newSessionIndex);
 });
 
 test("project rows expose folder actions and full-path hover", () => {

@@ -131,9 +131,10 @@ destination, chat as the home surface, tools and permissions inline.
 ### 3.2 Sidebar project groups
 
 - **Sections**: the compact `Sessions` heading precedes `Projects` and owns
-  path-less conversation creation plus the existing sort/archive-view menu.
-  Both headings keep quiet glyph actions and also accept a right-click create
-  menu on the heading or empty list chrome so section creation stays discoverable
+  path-less conversation creation plus the existing sort/archive-view menu. Its
+  toolbar places sorting before new-session creation. Both headings keep quiet
+  glyph actions and also accept a right-click create menu on the heading or empty
+  list chrome so section creation stays discoverable
   without extra chrome. Its list shows at most five compact rows (140px) before
   scrolling internally, so standalone work stays visible without displacing
   project navigation. The following `Projects` heading exposes the
