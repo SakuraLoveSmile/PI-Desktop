@@ -54,6 +54,12 @@ Supervision parameters (implemented in Electron main):
   they reach the current bridge.
 - Host persistence appends are buffered in an Electron-main-owned outbox while
   the host is unavailable and flushed sequentially after a new handshake.
+- Host-core's stdin/stdout control path uses one dedicated OS thread per
+  direction rather than Tokio's dynamic blocking pool. Transient pipe resource
+  errors are retried; control-thread creation failures are surfaced as a boot
+  error, so OS thread pressure cannot become an unhandled host panic. The
+  login-shell PATH probe is best effort and falls back to the inherited PATH if
+  its helper thread cannot be created.
 - Renderer is notified on every transition via the `hostStatus` event:
   `{ ok, component?: "host" | "sidecar", restarting?, restarted?, fatal?, message? }`.
 - Intentional shutdown (quit/dispose) never triggers restart.

@@ -66,3 +66,4 @@ Each ADR includes:
 | 0048 | Lazy per-turn tool activation | Accepted |
 | 0049 | Recover automatic context compaction failures with a retained tail | Accepted |
 | 0050 | Bounded provider stream recovery and diagnostics | Accepted |
+| 0051 | Isolate host RPC stdio from the Tokio blocking pool | Accepted |

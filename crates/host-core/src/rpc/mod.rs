@@ -1,11 +1,13 @@
+use std::io::{self, BufRead, BufReader as StdBufReader, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::sync::{mpsc, Mutex, Semaphore};
+use tokio::sync::{mpsc, oneshot, Mutex, Semaphore};
 
 use crate::artifacts;
 use crate::audit;
@@ -60,113 +62,244 @@ struct CacheModelsParams {
     models: Vec<DiscoveredModelInput>,
 }
 
+#[derive(Debug)]
+enum StdinEvent {
+    Line(String),
+    Error(String),
+}
+
+/// Tokio's stdio adapter delegates every read/write to the blocking pool. If
+/// the OS temporarily refuses another worker thread, Tokio panics instead of
+/// returning an error. The host's control pipe must not share that failure
+/// mode, so it uses two fixed, explicitly named threads instead.
+fn is_transient_io_error(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::Interrupted | io::ErrorKind::WouldBlock
+    ) || matches!(error.raw_os_error(), Some(11) | Some(35))
+}
+
+fn spawn_stdin_reader(tx: mpsc::UnboundedSender<StdinEvent>) -> io::Result<thread::JoinHandle<()>> {
+    thread::Builder::new()
+        .name("pi-host-stdin".into())
+        .spawn(move || {
+            let stdin = io::stdin();
+            let mut reader = StdBufReader::new(stdin.lock());
+            let mut line = String::new();
+
+            loop {
+                match reader.read_line(&mut line) {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        if tx
+                            .send(StdinEvent::Line(std::mem::take(&mut line)))
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(error) if is_transient_io_error(&error) => {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(error) => {
+                        let _ = tx.send(StdinEvent::Error(error.to_string()));
+                        break;
+                    }
+                }
+            }
+        })
+}
+
+fn write_stdout_message(writer: &mut impl Write, message: &str) -> io::Result<()> {
+    let bytes = message.as_bytes();
+    let mut offset = 0;
+
+    while offset < bytes.len() {
+        match writer.write(&bytes[offset..]) {
+            Ok(0) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::WriteZero,
+                    "stdout writer made no progress",
+                ));
+            }
+            Ok(written) => offset += written,
+            Err(error) if is_transient_io_error(&error) => {
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    loop {
+        match writer.flush() {
+            Ok(()) => return Ok(()),
+            Err(error) if is_transient_io_error(&error) => {
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn spawn_stdout_writer(
+    mut rx: mpsc::UnboundedReceiver<String>,
+    done_tx: oneshot::Sender<Option<String>>,
+) -> io::Result<thread::JoinHandle<()>> {
+    thread::Builder::new()
+        .name("pi-host-stdout".into())
+        .spawn(move || {
+            let stdout = io::stdout();
+            let mut writer = stdout.lock();
+            let mut writer_error = None;
+
+            while let Some(message) = rx.blocking_recv() {
+                if let Err(error) = write_stdout_message(&mut writer, &message) {
+                    writer_error = Some(error.to_string());
+                    break;
+                }
+            }
+
+            let _ = done_tx.send(writer_error);
+        })
+}
+
 pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
-    let stdin = tokio::io::stdin();
-    let mut reader = BufReader::new(stdin);
-    let mut line = String::new();
-    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+    let (tx, rx) = mpsc::unbounded_channel::<String>();
     // Keep request tasks bounded as well as tool executions. Tool calls have
     // their own class/session budgets below; this cap protects the host from
     // non-tool RPC bursts and prevents an unbounded tokio task fan-out.
     const MAX_IN_FLIGHT_RPC: usize = 32;
     let request_slots = Arc::new(Semaphore::new(MAX_IN_FLIGHT_RPC));
 
-    // Writer task — serializes all stdout writes
-    let writer = tokio::spawn(async move {
-        let mut stdout = tokio::io::stdout();
-        while let Some(msg) = rx.recv().await {
-            if stdout.write_all(msg.as_bytes()).await.is_err() {
-                break;
-            }
-            if stdout.flush().await.is_err() {
-                break;
-            }
+    // Keep stdio off Tokio's blocking pool. Under process/thread pressure,
+    // Tokio's stdio adapter can panic while trying to create a worker thread;
+    // these two dedicated threads instead report startup errors or stop on a
+    // closed pipe without taking down the async request dispatcher.
+    let (writer_done_tx, mut writer_done_rx) = oneshot::channel::<Option<String>>();
+    let _writer = spawn_stdout_writer(rx, writer_done_tx)
+        .map_err(|error| anyhow!("host stdout writer unavailable: {error}"))?;
+    let (input_tx, mut input_rx) = mpsc::unbounded_channel::<StdinEvent>();
+    let _stdin_reader = match spawn_stdin_reader(input_tx) {
+        Ok(handle) => handle,
+        Err(error) => {
+            drop(tx);
+            let _ = writer_done_rx.await;
+            return Err(anyhow!("host stdin reader unavailable: {error}"));
         }
-    });
+    };
 
-    loop {
-        line.clear();
-        let n = reader.read_line(&mut line).await?;
-        if n == 0 {
-            break;
-        }
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        let req: JsonRpcRequest = match serde_json::from_str(trimmed) {
-            Ok(r) => r,
-            Err(e) => {
-                let resp = JsonRpcResponse {
-                    jsonrpc: "2.0",
-                    id: Value::Null,
-                    result: None,
-                    error: Some(JsonRpcError {
-                        code: -32700,
-                        message: format!("parse error: {e}"),
-                        data: None,
-                    }),
+    let mut input_error = None;
+    let mut writer_done = false;
+    'serve: loop {
+        tokio::select! {
+            event = input_rx.recv() => {
+                let Some(event) = event else {
+                    break 'serve;
                 };
-                let _ = tx.send(format!("{}\n", serde_json::to_string(&resp)?));
-                continue;
-            }
-        };
-
-        if req.id.is_none() {
-            continue;
-        }
-
-        let id = req.id.clone().unwrap_or(Value::Null);
-        let method = req.method.clone();
-        let params = req.params.unwrap_or(json!({}));
-        let state = state.clone();
-        let tx = tx.clone();
-        let permit = match request_slots.clone().try_acquire_owned() {
-            Ok(permit) => permit,
-            Err(_) => {
-                let response = JsonRpcResponse {
-                    jsonrpc: "2.0",
-                    id,
-                    result: None,
-                    error: Some(rpc_err(
-                        -32029,
-                        "host RPC capacity is exhausted",
-                        "HOST_OVERLOADED",
-                    )),
+                let line = match event {
+                    StdinEvent::Line(line) => line,
+                    StdinEvent::Error(error) => {
+                        input_error = Some(format!("host stdin read failed: {error}"));
+                        break 'serve;
+                    }
                 };
-                if let Ok(raw) = serde_json::to_string(&response) {
-                    let _ = tx.send(format!("{raw}\n"));
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    continue 'serve;
                 }
-                continue;
-            }
-        };
 
-        tokio::spawn(async move {
-            let _permit = permit;
-            let out = match handle_request(state, &method, params, tx.clone()).await {
-                Ok(result) => JsonRpcResponse {
-                    jsonrpc: "2.0",
-                    id,
-                    result: Some(result),
-                    error: None,
-                },
-                Err(err) => JsonRpcResponse {
-                    jsonrpc: "2.0",
-                    id,
-                    result: None,
-                    error: Some(err),
-                },
-            };
-            if let Ok(raw) = serde_json::to_string(&out) {
-                let _ = tx.send(format!("{raw}\n"));
+                let req: JsonRpcRequest = match serde_json::from_str(trimmed) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        let resp = JsonRpcResponse {
+                            jsonrpc: "2.0",
+                            id: Value::Null,
+                            result: None,
+                            error: Some(JsonRpcError {
+                                code: -32700,
+                                message: format!("parse error: {e}"),
+                                data: None,
+                            }),
+                        };
+                        let _ = tx.send(format!("{}\n", serde_json::to_string(&resp)?));
+                        continue 'serve;
+                    }
+                };
+
+                if req.id.is_none() {
+                    continue 'serve;
+                }
+
+                let id = req.id.clone().unwrap_or(Value::Null);
+                let method = req.method.clone();
+                let params = req.params.unwrap_or(json!({}));
+                let state = state.clone();
+                let tx = tx.clone();
+                let permit = match request_slots.clone().try_acquire_owned() {
+                    Ok(permit) => permit,
+                    Err(_) => {
+                        let response = JsonRpcResponse {
+                            jsonrpc: "2.0",
+                            id,
+                            result: None,
+                            error: Some(rpc_err(
+                                -32029,
+                                "host RPC capacity is exhausted",
+                                "HOST_OVERLOADED",
+                            )),
+                        };
+                        if let Ok(raw) = serde_json::to_string(&response) {
+                            let _ = tx.send(format!("{raw}\n"));
+                        }
+                        continue 'serve;
+                    }
+                };
+
+                tokio::spawn(async move {
+                    let _permit = permit;
+                    let out = match handle_request(state, &method, params, tx.clone()).await {
+                        Ok(result) => JsonRpcResponse {
+                            jsonrpc: "2.0",
+                            id,
+                            result: Some(result),
+                            error: None,
+                        },
+                        Err(err) => JsonRpcResponse {
+                            jsonrpc: "2.0",
+                            id,
+                            result: None,
+                            error: Some(err),
+                        },
+                    };
+                    if let Ok(raw) = serde_json::to_string(&out) {
+                        let _ = tx.send(format!("{raw}\n"));
+                    }
+                });
             }
-        });
+            result = &mut writer_done_rx => {
+                writer_done = true;
+                input_error = match result {
+                    Ok(Some(error)) => Some(format!("host stdout write failed: {error}")),
+                    Ok(None) => Some("host stdout writer stopped".to_string()),
+                    Err(_) => Some("host stdout writer status unavailable".to_string()),
+                };
+                break 'serve;
+            }
+        }
     }
 
     drop(tx);
-    let _ = writer.await;
-    Ok(())
+    if !writer_done {
+        input_error = match writer_done_rx.await {
+            Ok(Some(error)) => Some(format!("host stdout write failed: {error}")),
+            Ok(None) => input_error,
+            Err(_) => Some("host stdout writer status unavailable".to_string()),
+        };
+    }
+    input_error
+        .map(|error| Err(anyhow!("{error}")))
+        .unwrap_or(Ok(()))
 }
 
 fn rpc_err(code: i64, message: impl Into<String>, error_code: &str) -> JsonRpcError {
@@ -1872,6 +2005,7 @@ async fn handle_request(
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::io::{self, Write};
     use std::sync::Arc;
 
     use serde_json::json;
@@ -1880,6 +2014,56 @@ mod tests {
     use super::{handle_request, resolve_tool_workspace};
     use crate::sessions;
     use crate::state::AppState;
+
+    #[test]
+    fn control_stdio_treats_os_resource_pressure_as_transient() {
+        assert!(super::is_transient_io_error(&io::Error::from(
+            io::ErrorKind::WouldBlock
+        )));
+        assert!(super::is_transient_io_error(&io::Error::from(
+            io::ErrorKind::Interrupted
+        )));
+        assert!(super::is_transient_io_error(&io::Error::from_raw_os_error(
+            11
+        )));
+        assert!(super::is_transient_io_error(&io::Error::from_raw_os_error(
+            35
+        )));
+        assert!(!super::is_transient_io_error(&io::Error::from(
+            io::ErrorKind::BrokenPipe
+        )));
+    }
+
+    #[test]
+    fn stdout_message_retries_partial_writes_without_duplication() {
+        struct PartialWriter {
+            bytes: Vec<u8>,
+            blocked: bool,
+        }
+
+        impl Write for PartialWriter {
+            fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+                if self.blocked {
+                    self.blocked = false;
+                    return Err(io::Error::from(io::ErrorKind::WouldBlock));
+                }
+                let written = input.len().min(2);
+                self.bytes.extend_from_slice(&input[..written]);
+                Ok(written)
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut writer = PartialWriter {
+            bytes: Vec::new(),
+            blocked: true,
+        };
+        assert!(super::write_stdout_message(&mut writer, "hello").is_ok());
+        assert_eq!(writer.bytes, b"hello");
+    }
 
     #[test]
     fn tool_workspace_follows_the_persisted_session_project() {

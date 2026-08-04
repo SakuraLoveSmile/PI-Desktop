@@ -52,6 +52,20 @@ crates/host-core/
 
 Frozen: **stdio JSON-RPC NDJSON** with Electron main (see `06-host-rpc-protocol.md`).
 
+### 5a. Control-pipe resource isolation
+
+The host's stdin reader and stdout writer each run on one named, dedicated OS
+thread. They must not use Tokio's `tokio::io::{stdin, stdout}` adapters: those
+adapters obtain a blocking-pool worker for each operation, and an exhausted OS
+thread budget can otherwise panic the host before a structured error reaches
+Electron. The dedicated threads retry `EINTR` and transient `EAGAIN`/`EWOULDBLOCK`
+(`errno` 11 or 35) with a short delay, preserve NDJSON framing, and stop only
+on EOF or an unrecoverable pipe error. Failure to create either control thread
+is a startup error rather than an unhandled panic.
+
+The best-effort login-shell PATH probe follows the same rule: a failed probe
+thread creation returns `None`, so Bash falls back to the host environment.
+
 ## 5b. RPC surface (logical)
 
 Domains:

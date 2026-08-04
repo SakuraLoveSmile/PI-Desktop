@@ -208,6 +208,8 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D185 | Lazy per-turn tool activation | **The sidecar keeps a complete local tool registry but sends only the mode core set, `CompactContext` when enabled, and local `ToolSearch` on each new prompt. `BrowserPreview`, plugin tools, `Skill`, and plugin-development helpers appear as bounded compact catalog entries and are activated by exact-name or capability search; the next turn receives their schemas, native pi-ai deferred search is used when supported, and the set resets before the next user prompt. Host permissions, containment, timeouts, and audits are unchanged.** | Full tool schemas made simple first requests disproportionately large and repeated optional capability cost across turns. A pi-style active set preserves core coding ergonomics while making ancillary tools pay-as-you-go and provider-independent. |
 | D186 | Bounded provider stream recovery and diagnostics | **Provider request setup uses one bounded pi-ai retry. A transient `STREAM_FAILED`, `NETWORK_ERROR`, or `TIMEOUT` after streaming starts is replayed once in the same turn after abortable backoff; the failed assistant is removed from model context and its visible message id is reused. A second failure is terminal. Provider `AppError.details` carries only bounded phase, timing, provider status/code, and retry-attempt diagnostics. Mutation guidance uses one fresh read/regeneration after an `Edit` mismatch; a second failed `Edit` for the same path or a second failed shell patch command returns a terminating tool hint instead of repairing old patch artifacts.** | Unbounded or regenerate-driven recovery made transient stream termination expensive and made patch loops consume turns without new information; finite runtime budgets preserve context and user control while keeping failures diagnosable (ADR 0050). |
 
+| D187 | Resource-isolated host RPC stdio | **host-core reads stdin and serializes stdout through one dedicated named OS thread per direction, never through Tokio's dynamic blocking pool. The threads retry interrupted and transient `EAGAIN`/`EWOULDBLOCK` errors while preserving NDJSON framing; inability to create a control thread is a structured startup failure. The login-shell PATH probe also treats helper-thread creation as best effort and falls back to the inherited PATH. RPC/tool admission limits remain unchanged.** | Tokio stdio can panic when OS thread creation returns `Resource temporarily unavailable` (errno 35 on macOS), turning temporary resource pressure into `HOST_UNAVAILABLE`; isolating the control pipe removes that process-level crash path while retaining bounded overload behavior (ADR 0051). |
+
 ## N. Notification decisions
 
 | ID | Topic | Decision | Rationale |
@@ -942,3 +944,17 @@ section mirrors only marketplace/catalog items still blocking nothing.
   renderer keeps the run active and shows a warning. Manual `/compact` remains
   fail-fast and never silently discards historical context.
 - Decision D158; amends ADR 0030 and adds ADR 0049.
+
+## 2026-08-04 — Resource-isolated host RPC stdio
+
+- Host-core no longer uses Tokio's stdio adapters for its NDJSON control pipe.
+  One named OS thread reads stdin and one named OS thread serializes stdout,
+  keeping per-message framing and retrying interrupted or transient
+  `EAGAIN`/`EWOULDBLOCK` errors.
+- This closes the process-exit path where Tokio's blocking pool panicked after
+  the OS refused another worker thread with `Resource temporarily unavailable`
+  (errno 35 on macOS). Failure to create a control thread is reported as a
+  startup error; it is not an unhandled thread-spawn panic.
+- The login-shell PATH probe uses `thread::Builder` as well and falls back to
+  the inherited PATH when the optional helper cannot start.
+- Decision D187; see [ADR 0051](../../adr/0051-host-rpc-stdio-resource-isolation.md).

@@ -50,6 +50,13 @@ Rules:
 | `CONFLICT` | maybe | state conflict / busy resource |
 | `TIMEOUT` | yes | generic timeout |
 
+`HOST_UNAVAILABLE` is reserved for a missing or broken host process/transport,
+not ordinary admission pressure. RPC capacity returns `HOST_OVERLOADED`, and
+an admitted shell that cannot start because the OS is temporarily out of
+process resources returns `PROCESS_RESOURCE_EXHAUSTED`. Host-core's control
+stdio is isolated from Tokio's dynamic blocking pool so the latter condition
+does not turn temporary thread pressure into a host process exit.
+
 ### 3.2 Agent / session
 
 | code | retriable | meaning |

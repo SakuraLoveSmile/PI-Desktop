@@ -20,6 +20,14 @@ MVP transport decision (**D001**):
 - Encoding: UTF-8
 - Request/response: JSON-RPC 2.0 style
 
+The control pipe is resource-isolated inside host-core. One dedicated OS
+thread reads stdin and one dedicated OS thread serializes stdout; request and
+tool tasks never perform Tokio stdio operations. This keeps temporary OS
+thread exhaustion from turning a pipe read/write into a Tokio blocking-pool
+panic. The threads retry interrupted and transient nonblocking errors while
+preserving one-message-per-line framing; an unrecoverable pipe error ends the
+host and is handled by the normal Electron supervision path.
+
 ### 2.1 Runtime admission and backpressure
 
 Host-core does not create an unbounded task or subprocess for every request.

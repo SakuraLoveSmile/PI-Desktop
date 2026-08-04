@@ -155,13 +155,16 @@ fn probe_user_login_path() -> Option<String> {
     // control — and only the last stdout line is taken, so rc banners cannot
     // contaminate the result.
     let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let output = std::process::Command::new(&shell)
-            .args(["-lic", "printf %s \"$PATH\""])
-            .stderr(Stdio::null())
-            .output();
-        let _ = tx.send(output);
-    });
+    let _probe = std::thread::Builder::new()
+        .name("pi-host-login-path".into())
+        .spawn(move || {
+            let output = std::process::Command::new(&shell)
+                .args(["-lic", "printf %s \"$PATH\""])
+                .stderr(Stdio::null())
+                .output();
+            let _ = tx.send(output);
+        })
+        .ok()?;
     // A wedged rc (waiting on input/network) must not stall the first Bash
     // call; probing is best-effort and the host PATH remains the fallback.
     let output = rx.recv_timeout(Duration::from_secs(5)).ok()?.ok()?;
