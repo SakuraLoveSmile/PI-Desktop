@@ -38,6 +38,9 @@ Permission prompts do not consume an execution slot. A full queue returns
 `HOST_OVERLOADED` with retryable semantics in the tool result instead of
 waiting indefinitely or spawning more work. The limits are host-owned so
 Electron and the sidecar cannot independently over-admit the same resources.
+The per-session mutation permit is acquired before the global mutation slot;
+queued `Write`/`Edit` calls therefore do not hold global capacity while waiting
+for an earlier mutation in the same session.
 
 ### Request
 
@@ -367,6 +370,10 @@ type ToolsExecuteResult = {
   errorCode?: string
   // Workspace Write/Edit results may include content.details.review. The
   // record is persisted with the tool message and is independent of Git.
+  // Bash command failures preserve content.exitCode/stdout/stderr while
+  // setting ok=false, isError=true, and errorCode=TOOL_FAILED.
+  // The agent runtime forwards isError into the tool transcript without
+  // dropping the structured content/details needed for recovery.
 }
 ```
 
@@ -421,7 +428,8 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 ## 8. Concurrency / ordering
 
 1. Requests may be concurrent within the dispatcher cap. Read/search tools may
-   run in parallel; mutating tools are bounded and ordered per session.
+   run in parallel; `Write`/`Edit` are bounded and FIFO-ordered per session,
+   with at most one mutation in flight for a session.
 2. Different sessions may continue concurrently across retained project tabs;
    each resolves its own project root and grants
 3. Notifications may arrive anytime after handshake

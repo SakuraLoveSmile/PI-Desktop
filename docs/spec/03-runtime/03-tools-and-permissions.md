@@ -158,6 +158,28 @@ type ReviewChange = {
 - Review snapshot files live outside the workspace and are removed with their
   session; orphaned session directories are swept on host startup.
 
+## 4d. Mutation ordering and edit recovery
+
+`Write` and `Edit` are serialized within each session. Read/search tools may
+continue in parallel, and different sessions may mutate different roots
+concurrently, but a session never has two in-flight mutations. The host holds
+the per-session mutation permit before consuming a global mutation slot, so a
+queued mutation cannot reserve capacity while it waits for an earlier edit.
+
+`Edit` requires `old_string` to match exactly one location in the current file.
+When the context is missing or ambiguous, the tool returns `TOOL_FAILED` with a
+re-read instruction instead of guessing a replacement. The agent mutation
+workflow is:
+
+1. Edit the deliverable directly with `Edit` or `Write` when it is inside the
+   advertised workspace.
+2. If a dedicated worktree is outside that root, perform one guarded edit in
+   that worktree with Bash and verify the resulting diff.
+3. After a failed edit or patch check, re-read the current target and
+   regenerate the change. Do not hand-edit old unified-diff hunk headers.
+4. Keep mutations to one path sequential, even when read/search calls are
+   issued in parallel.
+
 ## 5. Bash Rules
 
 MVP baseline:
@@ -169,6 +191,9 @@ MVP baseline:
 - Capture stdout/stderr
 - Truncate large output
 - No interactive TTY (MVP)
+- A command that exits non-zero returns `ok: false`, `isError: true`, and
+  `errorCode: TOOL_FAILED` while preserving its `exitCode`, stdout, and stderr
+  in `content` so the agent can diagnose the command without blindly retrying.
 
 Shell resolution (D084 — bash on every platform, resolved once per process):
 

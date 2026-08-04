@@ -587,6 +587,9 @@ export class DesktopAgentRuntime {
     string,
     { toolName: string; args: unknown }
   >();
+  /** Host failures need to reach pi-agent-core's tool error channel without
+   * discarding the structured diagnostics returned in `details`. */
+  private failedHostToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
   private activeCompaction?: ContextCompactionRecord;
   private compactionSettings: CompactionSettings;
@@ -652,6 +655,7 @@ export class DesktopAgentRuntime {
     const optionalToolsPrompt = this.optionalToolsPrompt();
     const defaultSystemPrompt = [
       "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
+      "Editing workflow: use the built-in Edit or Write tool directly on the deliverable file whenever it is inside the advertised workspace. Do not create or hand-edit unified-diff files in scratch and repeatedly repair their hunk headers. If a patch or edit fails, re-read the current target and regenerate the change from that current content before retrying. Never issue concurrent Write/Edit calls for the same path. When a dedicated worktree is outside the advertised workspace, make one guarded, deterministic edit inside that worktree with Bash, then verify it with git diff or an equivalent check.",
       // Work panel browser preview (D100): workspace HTML files render
       // in the embedded browser with live reload on file changes.
       `For user-visible HTML pages, call the BrowserPreview tool once after creating the page or making the first meaningful visual edit, using its workspace-relative path (e.g. \`index.html\` or \`demo/index.html\`) to show it in PI-Desktop's built-in browser panel. Reuse that preview while iterating: it live-reloads as you edit, so no repeat call or manual refresh is needed. Skip generated, test-only, and non-visual HTML files. If BrowserPreview is not in the current tool list, load it first with ${TOOL_SEARCH_NAME}.`,
@@ -693,6 +697,10 @@ export class DesktopAgentRuntime {
       convertToLlm,
       prepareNextTurnWithContext: (context, signal) =>
         this.prepareNextTurn(context, signal),
+      afterToolCall: async ({ toolCall }) => {
+        if (!this.failedHostToolCalls.delete(toolCall.id)) return undefined;
+        return { isError: true };
+      },
       initialState: {
         systemPrompt: [
           baseSystemPrompt,
@@ -935,7 +943,7 @@ export class DesktopAgentRuntime {
         case "Write":
           return `Create or overwrite a file. Deliverables go into the workspace; temporary/intermediate files go into the scratch directory.${scratchPathHint}`;
         case "Edit":
-          return `Replace text in a file (first occurrence of old_string).${scratchPathHint}`;
+          return `Replace one unique occurrence of old_string in a file. Re-read the current file after a failed edit; do not repair an old patch or edit the same path concurrently.${scratchPathHint}`;
         case "Bash":
           return this.scratchDir
             ? "Run a non-interactive shell command in the workspace root. $PI_SCRATCH_DIR points at the session scratch directory for temporary files."
@@ -1018,6 +1026,7 @@ export class DesktopAgentRuntime {
           typeof result.content === "string"
             ? result.content
             : JSON.stringify(result.content, null, 2);
+        if (!result.ok) this.failedHostToolCalls.add(toolCallId);
         return {
           content: [{ type: "text", text }],
           details: result.content,
@@ -2164,6 +2173,7 @@ export class DesktopAgentRuntime {
   async dispose(): Promise<void> {
     this.disposed = true;
     this.pathInstructionClaims.clear();
+    this.failedHostToolCalls.clear();
     this.agent.abort();
     this.compactionAbort?.abort();
   }

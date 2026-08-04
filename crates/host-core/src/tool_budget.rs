@@ -9,6 +9,7 @@ pub const MAX_IN_FLIGHT_TOOLS: usize = 16;
 pub const MAX_IN_FLIGHT_SHELL: usize = 4;
 pub const MAX_IN_FLIGHT_READS: usize = 8;
 pub const MAX_IN_FLIGHT_MUTATIONS: usize = 2;
+pub const MAX_IN_FLIGHT_MUTATIONS_PER_SESSION: usize = 1;
 pub const MAX_IN_FLIGHT_PLUGINS: usize = 4;
 pub const MAX_IN_FLIGHT_PER_SESSION: usize = 4;
 pub const MAX_QUEUED_TOOLS: usize = 64;
@@ -60,6 +61,7 @@ pub struct ToolPermit {
     _total: OwnedSemaphorePermit,
     _class: OwnedSemaphorePermit,
     _session: OwnedSemaphorePermit,
+    _session_mutation: Option<OwnedSemaphorePermit>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -81,6 +83,7 @@ pub struct ToolBudget {
     shell: Arc<Semaphore>,
     plugins: Arc<Semaphore>,
     sessions: Arc<Mutex<HashMap<String, Arc<Semaphore>>>>,
+    session_mutations: Arc<Mutex<HashMap<String, Arc<Semaphore>>>>,
     queued: Arc<AtomicUsize>,
 }
 
@@ -93,6 +96,7 @@ impl ToolBudget {
             shell: Arc::new(Semaphore::new(MAX_IN_FLIGHT_SHELL)),
             plugins: Arc::new(Semaphore::new(MAX_IN_FLIGHT_PLUGINS)),
             sessions: Arc::new(Mutex::new(HashMap::new())),
+            session_mutations: Arc::new(Mutex::new(HashMap::new())),
             queued: Arc::new(AtomicUsize::new(0)),
         }
     }
@@ -105,11 +109,16 @@ impl ToolBudget {
         let class = ToolClass::from_name(tool_name);
         let class_semaphore = self.class_semaphore(class);
         let session_semaphore = self.session_semaphore(session_id).await;
+        let session_mutation_semaphore = match class {
+            ToolClass::Mutation => Some(self.session_mutation_semaphore(session_id).await),
+            _ => None,
+        };
 
         if let Some(permit) = Self::try_acquire(
             self.total.clone(),
             class_semaphore.clone(),
             session_semaphore.clone(),
+            session_mutation_semaphore.clone(),
         ) {
             return Ok(permit);
         }
@@ -122,7 +131,12 @@ impl ToolBudget {
 
         let result = tokio::time::timeout(
             QUEUE_WAIT,
-            Self::acquire_all(self.total.clone(), class_semaphore, session_semaphore),
+            Self::acquire_all(
+                self.total.clone(),
+                class_semaphore,
+                session_semaphore,
+                session_mutation_semaphore,
+            ),
         )
         .await;
         self.queued.fetch_sub(1, Ordering::SeqCst);
@@ -163,11 +177,27 @@ impl ToolBudget {
             .clone()
     }
 
+    async fn session_mutation_semaphore(&self, session_id: &str) -> Arc<Semaphore> {
+        let mut sessions = self.session_mutations.lock().await;
+        sessions
+            .entry(session_id.to_string())
+            .or_insert_with(|| Arc::new(Semaphore::new(MAX_IN_FLIGHT_MUTATIONS_PER_SESSION)))
+            .clone()
+    }
+
     fn try_acquire(
         total: Arc<Semaphore>,
         class: Arc<Semaphore>,
         session: Arc<Semaphore>,
+        session_mutation: Option<Arc<Semaphore>>,
     ) -> Option<ToolPermit> {
+        // Reserve the narrow per-session mutation slot first. This keeps a
+        // queued second Write/Edit from consuming a global mutation permit
+        // while it waits for the first mutation in the same session.
+        let session_mutation_permit = match session_mutation {
+            Some(semaphore) => Some(semaphore.try_acquire_owned().ok()?),
+            None => None,
+        };
         let total_permit = total.try_acquire_owned().ok()?;
         let class_permit = class.try_acquire_owned().ok()?;
         let session_permit = session.try_acquire_owned().ok()?;
@@ -175,6 +205,7 @@ impl ToolBudget {
             _total: total_permit,
             _class: class_permit,
             _session: session_permit,
+            _session_mutation: session_mutation_permit,
         })
     }
 
@@ -182,7 +213,20 @@ impl ToolBudget {
         total: Arc<Semaphore>,
         class: Arc<Semaphore>,
         session: Arc<Semaphore>,
+        session_mutation: Option<Arc<Semaphore>>,
     ) -> ToolPermit {
+        // Keep the per-session mutation permit outside the global capacity
+        // wait so one session cannot reserve global slots while its earlier
+        // mutation is still running.
+        let session_mutation_permit = match session_mutation {
+            Some(semaphore) => Some(
+                semaphore
+                    .acquire_owned()
+                    .await
+                    .expect("session mutation semaphore cannot be closed"),
+            ),
+            None => None,
+        };
         let total_permit = total
             .acquire_owned()
             .await
@@ -199,6 +243,7 @@ impl ToolBudget {
             _total: total_permit,
             _class: class_permit,
             _session: session_permit,
+            _session_mutation: session_mutation_permit,
         }
     }
 }
@@ -212,6 +257,7 @@ impl Default for ToolBudget {
 #[cfg(test)]
 mod tests {
     use super::ToolBudget;
+    use std::time::Duration;
 
     #[tokio::test]
     async fn limits_shell_concurrency_and_reports_active_work() {
@@ -253,5 +299,27 @@ mod tests {
         let waiter = tokio::spawn(async move { waiting_budget.acquire("session-a", "Read").await });
         drop(first);
         assert!(waiter.await.unwrap().is_ok());
+    }
+
+    #[tokio::test]
+    async fn serializes_mutations_within_a_session() {
+        let budget = ToolBudget::new();
+        let first = budget.acquire("session-a", "Edit").await.unwrap();
+        let mut waiter = tokio::spawn({
+            let budget = budget.clone();
+            async move { budget.acquire("session-a", "Write").await }
+        });
+
+        assert!(tokio::time::timeout(Duration::from_millis(50), &mut waiter)
+            .await
+            .is_err());
+        assert_eq!(budget.snapshot().mutations, 1);
+
+        drop(first);
+        assert!(tokio::time::timeout(Duration::from_secs(1), &mut waiter)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_ok());
     }
 }

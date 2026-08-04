@@ -113,15 +113,28 @@ pub async fn execute_tool(
     };
 
     match result {
-        Ok(content) => ToolsExecuteResult {
-            tool_call_id,
-            ok: true,
-            is_error: None,
-            content,
-            duration_ms: started.elapsed().as_millis() as u64,
-            denied: None,
-            error_code: None,
-        },
+        Ok(content) => {
+            // Preserve Bash stdout/stderr/exitCode for the model, but still
+            // surface a non-zero command as a failed tool result. Previously
+            // the shell process could exit 1/128 while the outer tool stayed
+            // successful, which hid command failures from the UI and timing
+            // logs and encouraged blind patch retries.
+            let command_failed = tool_name == "Bash"
+                && match content.get("exitCode") {
+                    Some(Value::Number(code)) => code.as_i64() != Some(0),
+                    Some(Value::Null) => true,
+                    _ => false,
+                };
+            ToolsExecuteResult {
+                tool_call_id,
+                ok: !command_failed,
+                is_error: command_failed.then_some(true),
+                content,
+                duration_ms: started.elapsed().as_millis() as u64,
+                denied: None,
+                error_code: command_failed.then_some("TOOL_FAILED".into()),
+            }
+        }
         Err((code, message)) => ToolsExecuteResult {
             tool_call_id,
             ok: false,
@@ -244,8 +257,20 @@ fn tool_edit(
         resolve_tool_path(root, scratch, path).map_err(|e| (e.clone(), e))?;
     let original = std::fs::read_to_string(&resolved)
         .map_err(|e| ("TOOL_FAILED".into(), format!("read failed: {e}")))?;
-    if !original.contains(old_str) {
-        return Err(("TOOL_FAILED".into(), "old_string not found in file".into()));
+    let match_count = original.match_indices(old_str).count();
+    if match_count == 0 {
+        return Err((
+            "TOOL_FAILED".into(),
+            "old_string not found in file; re-read the current file and retry with a fresh, unique context instead of repairing an old patch".into(),
+        ));
+    }
+    if match_count > 1 {
+        return Err((
+            "TOOL_FAILED".into(),
+            format!(
+                "old_string matches {match_count} locations; re-read the current file and include more surrounding context"
+            ),
+        ));
     }
     let updated = original.replacen(old_str, new_str, 1);
     std::fs::write(&resolved, &updated)
@@ -528,7 +553,7 @@ pub fn builtin_tool_defs() -> Value {
         },
         {
             "name": "Edit",
-            "description": "Replace text in a workspace or scratch-directory file",
+            "description": "Replace one unique text occurrence in a workspace or scratch-directory file; re-read before retrying stale or ambiguous context",
             "risk": "high",
             "parameters": {
                 "type": "object",
@@ -574,6 +599,27 @@ mod tests {
         assert!(result.ok, "bash tool failed: {:?}", result.content);
         let stdout = result.content["stdout"].as_str().unwrap_or_default();
         assert_eq!(stdout.len(), 200_000, "stdout fully drained");
+    }
+
+    #[tokio::test]
+    async fn bash_nonzero_exit_preserves_output_and_marks_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Bash",
+            &serde_json::json!({
+                "command": "printf 'diagnostic' >&2; exit 7"
+            }),
+            15_000,
+        )
+        .await;
+
+        assert!(!result.ok);
+        assert_eq!(result.is_error, Some(true));
+        assert_eq!(result.error_code.as_deref(), Some("TOOL_FAILED"));
+        assert_eq!(result.content["exitCode"].as_i64(), Some(7));
+        assert_eq!(result.content["stderr"].as_str(), Some("diagnostic"));
     }
 
     #[tokio::test]
@@ -641,6 +687,49 @@ mod tests {
         assert!(result.ok);
         assert_eq!(result.content["root"].as_str(), Some("workspace"));
         assert_eq!(result.content["path"].as_str(), Some("a.txt"));
+    }
+
+    #[tokio::test]
+    async fn edit_requires_fresh_unique_context() {
+        let ws = tempfile::tempdir().unwrap();
+        let target = ws.path().join("note.txt");
+        std::fs::write(&target, "before\nbefore\n").unwrap();
+
+        let ambiguous = execute_tool(
+            Some(ws.path()),
+            None,
+            "Edit",
+            &serde_json::json!({
+                "path": "note.txt",
+                "old_string": "before",
+                "new_string": "after"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(!ambiguous.ok);
+        assert!(ambiguous.content["error"]
+            .as_str()
+            .unwrap()
+            .contains("matches 2 locations"));
+
+        let stale = execute_tool(
+            Some(ws.path()),
+            None,
+            "Edit",
+            &serde_json::json!({
+                "path": "note.txt",
+                "old_string": "missing",
+                "new_string": "after"
+            }),
+            5_000,
+        )
+        .await;
+        assert!(!stale.ok);
+        assert!(stale.content["error"]
+            .as_str()
+            .unwrap()
+            .contains("re-read the current file"));
     }
 
     #[cfg(unix)]

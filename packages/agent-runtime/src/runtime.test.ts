@@ -88,6 +88,49 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await runtime.dispose();
   });
 
+  it("guides mutation tools away from patch repair loops", async () => {
+    const runtime = createRuntime();
+    const prompt = (runtime as any).agent.state.systemPrompt as string;
+
+    expect(prompt).toContain("Do not create or hand-edit unified-diff files");
+    expect(prompt).toContain("Never issue concurrent Write/Edit calls for the same path");
+    expect(prompt).toContain("regenerate the change from that current content");
+
+    const edit = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Edit",
+    );
+    expect(edit.description).toContain("do not repair an old patch");
+    expect(edit.description).toContain("same path concurrently");
+
+    await runtime.dispose();
+  });
+
+  it("preserves host failure diagnostics while marking the agent tool result", async () => {
+    const host = {
+      call: vi.fn().mockResolvedValue({
+        ok: false,
+        isError: true,
+        errorCode: "TOOL_FAILED",
+        content: { exitCode: 7, stderr: "diagnostic" },
+      }),
+    };
+    const runtime = createRuntime({ host });
+    const bash = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Bash",
+    );
+
+    const result = await bash.execute("tool-failed", { command: "exit 7" });
+
+    expect(result.details).toEqual({ exitCode: 7, stderr: "diagnostic" });
+    expect(result.content[0].text).toContain('"exitCode": 7');
+    await expect(
+      (runtime as any).agent.afterToolCall({ toolCall: { id: "tool-failed" } }),
+    ).resolves.toEqual({ isError: true });
+    expect((runtime as any).failedHostToolCalls.size).toBe(0);
+
+    await runtime.dispose();
+  });
+
   it("recreates the runtime when project instructions change", async () => {
     const projectInstructions = {
       entries: [{ source: "AGENTS.md", content: "Run unit tests." }],
