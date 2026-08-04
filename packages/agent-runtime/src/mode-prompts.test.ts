@@ -12,9 +12,15 @@ describe("mode-specific system prompts", () => {
     expect(prompt).toContain(PLAN_MODE_SYSTEM_PROMPT);
     expect(prompt).toContain("Inspect the workspace");
     expect(prompt).toContain("SubmitPlan");
-    expect(prompt).toContain("exact Markdown snapshot");
-    expect(prompt).toContain("Do not write a plan file yourself");
-    expect(prompt).toContain("host writes the .pi/plan artifact");
+    expect(prompt).toContain("When any initial or revised plan is ready");
+    expect(prompt).toContain("immediately exactly once in the current turn");
+    expect(prompt).toContain("one complete Markdown snapshot");
+    expect(prompt).toContain("Do not write or edit a plan file yourself");
+    expect(prompt).toContain("host writes a new .pi/plan artifact");
+    expect(prompt).toContain("An accepted new Plan prompt means no prior approval is pending");
+    expect(prompt).toContain("historical immutable checkpoints");
+    expect(prompt).toContain("After reject, expiry, or interruption");
+    expect(prompt).toContain("follow the same one-SubmitPlan rule");
     expect(prompt).toContain("Do not wait for chat confirmation");
     expect(prompt).toContain("Do not use Write, Edit, plugin tools");
     expect(prompt).toContain("Bash is available under the active permission policy");

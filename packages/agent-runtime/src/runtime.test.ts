@@ -55,6 +55,7 @@ function createRuntime(
     pluginTools: PluginToolDef[];
     projectInstructions: ProjectInstructions;
     commandShell: CommandShellOption;
+    turnId: string;
     host: { call: ReturnType<typeof vi.fn>; onNotification?: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
@@ -63,6 +64,7 @@ function createRuntime(
     host: (overrides.host ?? { call: vi.fn() }) as never,
     sessionId: "session-1",
     mode: "agent",
+    turnId: overrides.turnId,
     provider: overrides.provider ?? provider,
     commandShell: overrides.commandShell ?? commandShell,
     thinkingLevel: overrides.thinkingLevel ?? "medium",
@@ -264,6 +266,7 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect(defaultCall[1]).toMatchObject({
       toolName: "Bash",
       expectedCommandShellId: "bash",
+      expectedCommandShellDialect: "posix",
       timeoutMs: 60_000,
     });
 
@@ -271,6 +274,7 @@ describe("DesktopAgentRuntime configuration matching", () => {
     const timedCall = host.call.mock.calls.at(-1)!;
     expect(timedCall[1]).toMatchObject({
       expectedCommandShellId: "bash",
+      expectedCommandShellDialect: "posix",
       timeoutMs: 1_250,
     });
 
@@ -540,7 +544,7 @@ describe("DesktopAgentRuntime mode and tool composition", () => {
 describe("DesktopAgentRuntime plan transitions", () => {
   it("guards transition batches and terminates after durable plan submission", async () => {
     const host = { call: vi.fn() };
-    const runtime = createRuntime({ host });
+    const runtime = createRuntime({ host, turnId: "turn-1" });
     const agent = (runtime as any).agent;
     const beforeToolCall = agent.beforeToolCall as Function;
 
@@ -563,6 +567,11 @@ describe("DesktopAgentRuntime plan transitions", () => {
     expect(enterResult.terminate).toBeUndefined();
     expect(runtime.getMode()).toBe("plan");
     expect(agent.state.tools.map((tool: any) => tool.name)).toContain("SubmitPlan");
+    expect(host.call).toHaveBeenNthCalledWith(1, "plans.enter", {
+      sessionId: "session-1",
+      turnId: "turn-1",
+      toolCallId: "enter-call",
+    });
 
     const exactMarkdown = "  # Implement it\n\n1. Make the change.  \n";
     const proposal = {
@@ -587,6 +596,8 @@ describe("DesktopAgentRuntime plan transitions", () => {
     };
     host.call.mockResolvedValueOnce({ status: "pending", proposal });
     const submitTool = agent.state.tools.find((tool: any) => tool.name === "SubmitPlan");
+    expect(submitTool.description).toContain("immutable historical checkpoints");
+    expect(submitTool.description).toContain("new full snapshot in this turn");
     const submitResult = await submitTool.execute("submit-call-1", {
       title: proposal.title,
       markdown: proposal.markdown,

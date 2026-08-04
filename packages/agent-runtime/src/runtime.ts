@@ -607,6 +607,7 @@ export class DesktopAgentRuntime {
   constructor(opts: AgentRuntimeOptions) {
     this.sessionId = opts.sessionId;
     this.hostTurnId = opts.turnId;
+    this.turnId = opts.turnId;
     this.mode = opts.mode;
     this.planningState = this.mode === "plan" ? "planning" : "inactive";
     this.provider = opts.provider;
@@ -767,7 +768,6 @@ export class DesktopAgentRuntime {
       artifact?: PlanProposal["artifact"];
       version?: number;
       plan?: string;
-      feedback?: string;
       action?: "approve" | "reject";
       targetPermissionMode?: "ask" | "accept-edits" | "auto";
       executionId?: string;
@@ -1193,6 +1193,7 @@ export class DesktopAgentRuntime {
               ...(isBash
                 ? {
                     expectedCommandShellId: this.commandShell.id,
+                    expectedCommandShellDialect: this.commandShell.dialect,
                     timeoutMs,
                   }
                 : {}),
@@ -1304,7 +1305,7 @@ export class DesktopAgentRuntime {
       name: "SubmitPlan",
       label: "Submit plan",
       description:
-        "Submit a complete Markdown implementation plan for user approval. Do not use this until the plan is concrete.",
+        "Submit one new complete Markdown implementation plan for user approval. Prior submissions are immutable historical checkpoints; after a rejected, expired, or interrupted approval, revise the plan and submit a new full snapshot in this turn. Do not use this until the plan is concrete.",
       parameters: Type.Object({
         title: Type.String({
           description: "A concise title for the implementation plan.",

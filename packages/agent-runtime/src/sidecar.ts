@@ -33,6 +33,41 @@ type RuntimeMap = Map<string, DesktopAgentRuntime>;
 
 const runtimes: RuntimeMap = new Map();
 const hostProxy = new ParentHostProxy();
+const testRuntimeIds = new WeakMap<DesktopAgentRuntime, string>();
+
+function testRuntimeIdentity(sessionId: string) {
+  if (process.env.PI_DESKTOP_PLAN_UI_PROBE !== "1") {
+    throw Object.assign(new Error("test runtime identity RPC is unavailable"), {
+      rpcCode: -32601,
+    });
+  }
+  const runtime = runtimes.get(sessionId);
+  if (!runtime) {
+    throw Object.assign(new Error("runtime not found for session"), {
+      rpcCode: -32000,
+      errorCode: "RUNTIME_NOT_FOUND",
+    });
+  }
+  let runtimeId = testRuntimeIds.get(runtime);
+  if (!runtimeId) {
+    runtimeId = randomUUID();
+    testRuntimeIds.set(runtime, runtimeId);
+  }
+  const status = runtime.getStatus();
+  return {
+    runtimeId,
+    sessionId: runtime.sessionId,
+    mode: runtime.getMode(),
+    modelId: status.modelId,
+    status: {
+      isRunning: status.isRunning,
+      currentTurnId: status.currentTurnId,
+      planningState: status.planningState,
+      pendingToolConfirmations: status.pendingToolConfirmations,
+      ...(status.pendingPlanId ? { pendingPlanId: status.pendingPlanId } : {}),
+    },
+  };
+}
 
 type RuntimeParams = {
   sessionId: string;
@@ -186,6 +221,9 @@ async function handle(method: string, params: any): Promise<unknown> {
     }
     case "sidecar.health":
       return { ok: true, runtimes: runtimes.size };
+    case "agent.testRuntimeIdentity": {
+      return testRuntimeIdentity(String(params.sessionId ?? ""));
+    }
     case "agent.prompt": {
       const sessionId = String(params.sessionId);
       const content = String(params.content ?? "");
