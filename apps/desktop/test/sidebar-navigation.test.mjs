@@ -175,6 +175,22 @@ test("sidebar floating menus open to the anchor's right", () => {
   assert.doesNotMatch(sidebarSource, /right: menuPosition\.right/);
 });
 
+test("portaled sort menu does not stretch to the viewport edge", () => {
+  const defaultPopoverRuleIndex = globalStyles.indexOf(
+    ".sidebar-popover {\n  top: calc(100% + 4px);\n  right: 0;\n}",
+  );
+  const floatingPopoverRuleIndex = globalStyles.indexOf(
+    ".sidebar-popover.sidebar-floating-menu",
+  );
+  const floatingPopoverRule =
+    globalStyles.match(/\.sidebar-popover\.sidebar-floating-menu\s*\{[^}]*\}/s)?.[0] ?? "";
+
+  assert.ok(defaultPopoverRuleIndex >= 0);
+  assert.ok(floatingPopoverRuleIndex > defaultPopoverRuleIndex);
+  assert.match(floatingPopoverRule, /top:\s*auto;/);
+  assert.match(floatingPopoverRule, /right:\s*auto;/);
+});
+
 test("sessions toolbar puts sorting before new-session creation", () => {
   const sortIndex = sidebarSource.indexOf('data-action="session-sort"');
   const newSessionIndex = sidebarSource.indexOf('data-action="new-standalone-session"');

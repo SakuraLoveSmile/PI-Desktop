@@ -428,6 +428,13 @@
   min-width: 210px;
 }
 
+/* Keep the portaled sort surface content-sized instead of stretching to the
+ * viewport edge. */
+.sidebar-popover.sidebar-floating-menu {
+  top: auto;
+  right: auto;
+}
+
 .sidebar-popover-title {
   padding: 4px 8px 6px;
   color: var(--ds-text-muted);

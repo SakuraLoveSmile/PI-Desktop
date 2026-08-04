@@ -188,10 +188,11 @@ may be retained while exactly one workspace supplies the visible shell context.
 - Sort, archive, restore, pin, Create branch, and close actions remain
   keyboard-reachable;
   they cannot exist only as pointer-hover affordances.
-- Sidebar body-level menus opened from toolbar or row triggers use the same
-  fixed rule as right-click menus: open 4px to the anchor's right, then clamp
-  within the viewport instead of overflowing. This includes the Sessions sort
-  menu, session/project overflow menus, and section create menus.
+- Sidebar body-level menus opened from toolbar or row triggers remain
+  content-sized and use the same fixed rule as right-click menus: open 4px to
+  the anchor's right, then clamp within the viewport instead of overflowing.
+  This includes the Sessions sort menu, session/project overflow menus, and
+  section create menus.
 
 ### 1.6 Local profile footer
 
