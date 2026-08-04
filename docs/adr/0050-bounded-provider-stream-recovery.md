@@ -37,9 +37,10 @@ PI-Desktop applies the following bounded recovery strategy:
    bodies beyond the existing capped summary.
 5. Mutation instructions select `Edit` for one small unique replacement and
    `Write` for a coherent whole-file rewrite. After an edit mismatch, the
-   agent gets one fresh read/regeneration attempt and then must stop with the
-   exact mismatch. It must not hand-edit unified-diff artifacts or issue
-   concurrent mutations for one path.
+   agent gets one fresh read/regeneration attempt. A second failed `Edit` for
+   the same path in one prompt returns pi-agent-core's terminating tool hint,
+   so the agent stops with the exact mismatch. It must not hand-edit
+   unified-diff artifacts or issue concurrent mutations for one path.
 
 ## Consequences
 
@@ -52,8 +53,9 @@ PI-Desktop applies the following bounded recovery strategy:
 - The retry budget is finite: persistent outages, authentication errors,
   context failures, and the second stream failure remain visible and
   actionable instead of entering an unbounded loop.
-- Mutation recovery is deterministic and bounded, but a genuinely stale file
-  still requires a new user/model decision after the second mismatch.
+- Mutation recovery is deterministic and bounded. A genuinely stale file
+  requires a new user/model decision after the second mismatch rather than
+  another automatic tool turn.
 
 ## Alternatives
 
@@ -74,10 +76,10 @@ and would complicate durable transcript reconciliation.
 
 ### Keep patch repair entirely prompt-driven
 
-Rejected because wording alone does not bound a model's retry loop. The host's
-unique-context checks and per-session mutation serialization remain the
-execution boundary; the runtime prompt makes the recovery sequence explicit
-and finite.
+Rejected because wording alone does not reliably bound a model's retry loop.
+The host's unique-context checks and per-session mutation serialization remain
+the execution boundary, while the runtime's terminating tool hint enforces the
+second-failure stop in pi-agent-core.
 
 ## References
 

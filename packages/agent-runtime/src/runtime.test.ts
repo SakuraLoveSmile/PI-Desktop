@@ -131,6 +131,42 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await runtime.dispose();
   });
 
+  it("terminates a repeated Edit mismatch after one recovery attempt", async () => {
+    const host = {
+      call: vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValue({
+          ok: false,
+          isError: true,
+          errorCode: "TOOL_FAILED",
+          content: { error: "old_string not found" },
+        }),
+    };
+    const runtime = createRuntime({ host });
+    const agent = (runtime as any).agent;
+    const edit = agent.state.tools.find((tool: any) => tool.name === "Edit");
+    const args = {
+      path: "src/example.ts",
+      old_string: "stale",
+      new_string: "fresh",
+    };
+
+    const first = await edit.execute("edit-1", args);
+    await expect(
+      agent.afterToolCall({ toolCall: { id: "edit-1" } }),
+    ).resolves.toEqual({ isError: true });
+    expect(first.terminate).toBeUndefined();
+
+    const second = await edit.execute("edit-2", args);
+    expect(second.terminate).toBe(true);
+    await expect(
+      agent.afterToolCall({ toolCall: { id: "edit-2" } }),
+    ).resolves.toEqual({ isError: true, terminate: true });
+
+    await runtime.dispose();
+  });
+
   it("recreates the runtime when project instructions change", async () => {
     const projectInstructions = {
       entries: [{ source: "AGENTS.md", content: "Run unit tests." }],

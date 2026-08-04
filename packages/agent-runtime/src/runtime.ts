@@ -131,6 +131,7 @@ const DEFAULT_MAX_TOKENS = 8_192;
 const PROVIDER_REQUEST_MAX_RETRIES = 1;
 const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;
 const PROVIDER_STREAM_RETRY_BACKOFF_MS = 750;
+const MAX_EDIT_RECOVERY_FAILURES = 2;
 const CONTEXT_COMPACTION_TOOL_NAME = "CompactContext";
 export const TOOL_SEARCH_NAME = "ToolSearch";
 const CONTEXT_NUDGE_TURN_INTERVAL = 3;
@@ -347,6 +348,10 @@ function boundedText(value: string, maxChars: number): string {
   const headChars = Math.ceil(available / 2);
   const tailChars = Math.floor(available / 2);
   return `${text.slice(0, headChars)}${marker}${text.slice(-tailChars)}`;
+}
+
+function mutationFailureKey(path: unknown): string {
+  return String(path).replaceAll("\\", "/").replace(/^\.\//, "");
 }
 
 function delayWithAbort(ms: number, signal: AbortSignal): Promise<void> {
@@ -638,6 +643,9 @@ export class DesktopAgentRuntime {
   /** Host failures need to reach pi-agent-core's tool error channel without
    * discarding the structured diagnostics returned in `details`. */
   private failedHostToolCalls = new Set<string>();
+  /** Per-prompt Edit failures provide one fresh-read recovery, then stop. */
+  private mutationFailureCounts = new Map<string, number>();
+  private terminatingToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
   private activeCompaction?: ContextCompactionRecord;
   private compactionSettings: CompactionSettings;
@@ -752,8 +760,13 @@ export class DesktopAgentRuntime {
       prepareNextTurnWithContext: (context, signal) =>
         this.prepareNextTurn(context, signal),
       afterToolCall: async ({ toolCall }) => {
-        if (!this.failedHostToolCalls.delete(toolCall.id)) return undefined;
-        return { isError: true };
+        const terminate = this.terminatingToolCalls.delete(toolCall.id);
+        const failed = this.failedHostToolCalls.delete(toolCall.id);
+        if (!failed) return terminate ? { terminate: true } : undefined;
+        return {
+          isError: true,
+          ...(terminate ? { terminate: true } : {}),
+        };
       },
       initialState: {
         systemPrompt: [
@@ -1064,6 +1077,25 @@ export class DesktopAgentRuntime {
         // hostRttMs spans approval + execution + IPC. Compare it against the
         // host's own "tool timing" line for the same toolCallId: the gap is
         // the stdio hops, and permissionWaitMs there explains a large value.
+        const failedEditPath =
+          toolName === "Edit" &&
+          !result.ok &&
+          isRecord(params) &&
+          typeof params.path === "string"
+            ? mutationFailureKey(params.path)
+            : undefined;
+        const mutationFailureAttempt = failedEditPath
+          ? (this.mutationFailureCounts.get(failedEditPath) ?? 0) + 1
+          : undefined;
+        const terminateAfterMutationFailure =
+          mutationFailureAttempt !== undefined &&
+          mutationFailureAttempt >= MAX_EDIT_RECOVERY_FAILURES;
+        if (failedEditPath && mutationFailureAttempt !== undefined) {
+          this.mutationFailureCounts.set(failedEditPath, mutationFailureAttempt);
+        }
+        if (terminateAfterMutationFailure) {
+          this.terminatingToolCalls.add(toolCallId);
+        }
         logTiming("tool", {
           tool: toolName,
           toolCallId,
@@ -1075,6 +1107,10 @@ export class DesktopAgentRuntime {
           instructionFallback: instructionTiming?.fallback ? "base" : undefined,
           ok: result.ok,
           errorCode: result.errorCode,
+          ...(mutationFailureAttempt !== undefined
+            ? { mutationFailureAttempt }
+            : {}),
+          ...(terminateAfterMutationFailure ? { terminate: true } : {}),
         });
         const text =
           typeof result.content === "string"
@@ -1084,6 +1120,7 @@ export class DesktopAgentRuntime {
         return {
           content: [{ type: "text", text }],
           details: result.content,
+          ...(terminateAfterMutationFailure ? { terminate: true } : {}),
         };
       },
     });
@@ -2560,6 +2597,8 @@ export class DesktopAgentRuntime {
     this.suppressProviderRetryRunEnd = false;
     this.providerRetryAbort?.abort();
     this.providerRetryAbort = undefined;
+    this.mutationFailureCounts.clear();
+    this.terminatingToolCalls.clear();
     this.turnHadError = false;
     this.requestStartedAt = Date.now();
     this.emit({
@@ -2666,6 +2705,8 @@ export class DesktopAgentRuntime {
     this.disposed = true;
     this.pathInstructionClaims.clear();
     this.failedHostToolCalls.clear();
+    this.mutationFailureCounts.clear();
+    this.terminatingToolCalls.clear();
     this.agent.abort();
     this.providerRetryAbort?.abort();
     this.compactionAbort?.abort();
