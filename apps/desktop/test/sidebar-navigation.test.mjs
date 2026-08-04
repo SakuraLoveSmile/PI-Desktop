@@ -165,11 +165,11 @@ test("sidebar floating menus open to the anchor's right", () => {
 
   assert.match(triggerPlacement, /left:\s*Math\.max\(/);
   assert.match(triggerPlacement, /rect\.right \+ 4/);
-  assert.match(triggerPlacement, /FLOATING_MENU_WIDTH/);
+  assert.doesNotMatch(triggerPlacement, /window\.innerWidth/);
   assert.doesNotMatch(triggerPlacement, /right:\s*Math\.max/);
   assert.match(pointPlacement, /left:\s*Math\.max\(/);
   assert.match(pointPlacement, /x \+ 4/);
-  assert.match(pointPlacement, /FLOATING_MENU_WIDTH/);
+  assert.doesNotMatch(pointPlacement, /window\.innerWidth/);
   assert.match(sidebarSource, /placeMenuAtPoint\(event\.clientX, event\.clientY\)/);
   assert.match(sidebarSource, /left: menuPosition\.left/);
   assert.doesNotMatch(sidebarSource, /right: menuPosition\.right/);
@@ -189,6 +189,8 @@ test("portaled sort menu does not stretch to the viewport edge", () => {
   assert.ok(floatingPopoverRuleIndex > defaultPopoverRuleIndex);
   assert.match(floatingPopoverRule, /top:\s*auto;/);
   assert.match(floatingPopoverRule, /right:\s*auto;/);
+  assert.match(globalStyles, /\.sidebar-floating-menu\s*\{[^}]*width:\s*max-content;/s);
+  assert.match(globalStyles, /\.sidebar-floating-menu\s*\{[^}]*max-width:\s*calc\(100vw - 16px\);/s);
 });
 
 test("sessions toolbar puts sorting before new-session creation", () => {

@@ -93,9 +93,6 @@ type ProjectPathTooltip = {
   left: number;
 };
 
-// Use the widest sidebar menu for viewport clamping so every body-level menu
-// has the same right-side placement rule, including the 210px sort menu.
-const FLOATING_MENU_WIDTH = 210;
 const VIEWPORT_PADDING = 8;
 
 function projectName(path: string, fallback?: string) {
@@ -281,37 +278,19 @@ export function Sidebar({
         VIEWPORT_PADDING,
         Math.min(rect.bottom + 4, window.innerHeight - 220),
       ),
-      left: Math.max(
-        VIEWPORT_PADDING,
-        Math.min(
-          rect.right + 4,
-          Math.max(
-            VIEWPORT_PADDING,
-            window.innerWidth - FLOATING_MENU_WIDTH - VIEWPORT_PADDING,
-          ),
-        ),
-      ),
+      left: Math.max(VIEWPORT_PADDING, rect.right + 4),
     });
   }, []);
 
-  // All body-level sidebar menus open to the anchor's right. At the viewport
-  // edge, clamp their left edge so the complete menu remains visible.
+  // Body-level sidebar menus always anchor their left edge to the right side
+  // of the trigger or pointer; they never flip to the left at the viewport edge.
   const placeMenuAtPoint = useCallback((x: number, y: number) => {
     setMenuPosition({
       top: Math.max(
         VIEWPORT_PADDING,
         Math.min(y + 4, window.innerHeight - 220),
       ),
-      left: Math.max(
-        VIEWPORT_PADDING,
-        Math.min(
-          x + 4,
-          Math.max(
-            VIEWPORT_PADDING,
-            window.innerWidth - FLOATING_MENU_WIDTH - VIEWPORT_PADDING,
-          ),
-        ),
-      ),
+      left: Math.max(VIEWPORT_PADDING, x + 4),
     });
   }, []);
 

@@ -311,6 +311,8 @@
   right: auto;
   z-index: 60; /* z-command-palette: body-level overlays above pane stacking */
   min-width: 184px;
+  width: max-content;
+  max-width: calc(100vw - 16px);
 }
 
 .sidebar-row-menu button,
@@ -416,7 +418,7 @@
 }
 
 .sidebar-section-menu {
-  min-width: 176px;
+  min-width: min(176px, calc(100vw - 16px));
 }
 
 .sidebar-popover {
@@ -425,7 +427,7 @@
 }
 
 .sidebar-sort-menu {
-  min-width: 210px;
+  min-width: min(210px, calc(100vw - 16px));
 }
 
 /* Keep the portaled sort surface content-sized instead of stretching to the

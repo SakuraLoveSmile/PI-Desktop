@@ -318,11 +318,11 @@ visually distinct from list content.
   activates the independent child session and focuses the composer.
 - The `Sessions` toolbar places the sort button before the message-plus New Chat
   control. The sort menu and every other body-level sidebar menu remain
-  content-sized, open 4px to the right of their trigger or pointer, then clamp
-  within the viewport when there is not enough room. The sort choices remain
-  Recently updated, Created date, Oldest first, and Name; pinned rows stay
-  ahead of unpinned rows. A stored `manual` compatibility value requires no
-  drag-reorder UI.
+  content-sized and open 4px to the right of their trigger or pointer. Their
+  left edge never flips to the trigger's left side; the surface has a viewport
+  width cap for narrow windows. The sort choices remain Recently updated,
+  Created date, Oldest first, and Name; pinned rows stay ahead of unpinned rows.
+  A stored `manual` compatibility value requires no drag-reorder UI.
 - Project groups use compact vertical spacing so adjacent directories and
   conversation rows read as one dense navigation list rather than detached
   cards. Directory `+` and overflow actions remain hidden until hover or
@@ -731,9 +731,9 @@ SESSIONS                                      [msg+][↕]
   not aborted.
 - Sidebar body-level menus opened from toolbar or row triggers remain
   content-sized and use the same fixed rule as right-click menus: open 4px to
-  the anchor's right, then clamp within the viewport instead of overflowing.
-  This includes the Sessions sort menu, session/project overflow menus, and
-  section create menus.
+  the anchor's right without flipping to the left. Their surface width is
+  capped for narrow viewports. This includes the Sessions sort menu,
+  session/project overflow menus, and section create menus.
 - Keyboard: arrow up/down, Enter to select
 - Delete: row menu or command palette `builtin.session.delete`
 

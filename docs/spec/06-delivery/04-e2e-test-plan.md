@@ -1112,9 +1112,9 @@ Each scenario is documented in this format:
   Show archived and restore both. 6) Restart the app. 7) Delete a disposable
   conversation through the distinct Delete action.
 - **Expected**: Sort precedes New Chat in the Sessions toolbar; the sort menu
-  remains content-sized, opens to the trigger's right, and
-  session/project/section body-level menus use
-  the same right-side placement with viewport clamping. Pinned rows remain ahead
+  remains content-sized, opens to the trigger's right without flipping left, and
+  session/project/section body-level menus use the same right-side rule with a
+  narrow-viewport width cap. Pinned rows remain ahead
   of unpinned rows under every selected secondary order; each sort produces the
   documented stable order; archived rows disappear from the default view but
   retain transcripts/project records and reappear in Show archived; restore
