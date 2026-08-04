@@ -65,9 +65,10 @@ interface AgentRuntime {
 5. reject if session busy
 6. persist user message
 7. start pi turn with the resolved session configuration and effective
-   thinking level; transient provider transport failures (request timeout,
-   dropped connection, 429/5xx) retry up to twice with interruptible
-   backoff before the turn is failed (D127)
+   thinking level; request setup receives one bounded pi-ai retry for transient
+   transport/provider failures, while a transient failure after streaming has
+   started receives one same-turn runtime retry before the turn is failed
+   (D127, D186)
 8. stream normalized answer and thinking events to UI
 9. on tool calls, delegate to Rust host bridge with the durable `sessionId`;
    host resolves the session-bound workspace root
@@ -77,6 +78,30 @@ interface AgentRuntime {
     same provider `AppError`; even a failure with no answer text remains a
     visible assistant error message
 11. finalize and persist successful answer/thinking blocks independently
+
+### 5d. Bounded provider stream recovery and diagnostics (D186, ADR 0050)
+
+Provider request setup uses one pi-ai retry with an interruptible backoff
+capped at 8 seconds. This covers failures before a response is established;
+it does not make the whole agent turn an unbounded retry loop.
+
+When a provider terminates or closes an incomplete stream after the assistant
+has started, the runtime classifies the event as retryable `STREAM_FAILED`.
+`NETWORK_ERROR` and `TIMEOUT` have the same bounded path when they occur during
+stream delivery. The runtime waits 750 ms with an abortable backoff, removes
+the failed assistant from the next model context, and calls `continue()` once.
+The existing assistant message id is reused, so the partial response is
+replaced in one visible bubble. The first attempt's `turn_end` and `agent_end`
+are suppressed; the retry emits the single terminal lifecycle. A second
+failure is terminal and emits the normal assistant error plus lifecycle
+`error` event. Authentication, model-selection, rate-limit, malformed-request,
+and context errors do not use this same-turn replay path.
+
+Provider failures carry bounded diagnostics in `AppError.details` when
+available: `phase` (`request` or `stream`), `providerStatus`, `providerCode`,
+`providerWaitMs`, `streamMs`, and `retryAttempt`. Provider messages remain
+redacted and capped; credentials and unrestricted response bodies never enter
+the event or log.
 
 ### 5.1 Context checkpoint protection (D158, ADR 0030)
 

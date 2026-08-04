@@ -65,3 +65,4 @@ Each ADR includes:
 | 0047 | Context usage inspector with exact and estimated token sources | Accepted |
 | 0048 | Lazy per-turn tool activation | Accepted |
 | 0049 | Recover automatic context compaction failures with a retained tail | Accepted |
+| 0050 | Bounded provider stream recovery and diagnostics | Accepted |

@@ -226,7 +226,7 @@ export type AgentEvent =
       fallback?: ContextCompactionFallback;
       error?: { code: string; message: string };
     }
-  | { type: "error"; error: { code: string; message: string; retriable?: boolean } }
+  | { type: "error"; error: AppError }
   | { type: "status"; status: AgentStatus };
 
 export type AgentEventEnvelope = {

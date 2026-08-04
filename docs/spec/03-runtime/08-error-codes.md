@@ -64,7 +64,7 @@ Rules:
 | `PROVIDER_RATE_LIMITED` | yes | provider rate limited |
 | `CONTEXT_TOO_LARGE` | no | prompt/context still exceeds the safe model budget after recovery, the second provider overflow occurred, or automatic recovery is disabled |
 | `CONTEXT_COMPACTION_FAILED` | no | automatic retained-tail recovery could not prepare, persist, or fit a checkpoint, or manual checkpoint summary generation / durable append failed; the guarded next provider request does not start |
-| `STREAM_FAILED` | yes | stream interrupted unexpectedly |
+| `STREAM_FAILED` | yes | provider stream was terminated, closed prematurely, or otherwise ended before a complete response; one same-turn retry may precede the terminal event |
 
 ### 3.3 Workspace / tools / permissions
 
@@ -143,6 +143,10 @@ Node sidecar maps provider SDK errors into:
 - `NETWORK_ERROR`
 - `STREAM_FAILED`
 
+An exact `terminated` provider message and equivalent premature stream-close
+messages map to `STREAM_FAILED`. A post-response transient failure may be
+retried once by the runtime; the second failure remains terminal.
+
 ### Permission timeout
 UI/host timeout emits `PERMISSION_TIMEOUT` internally, tool result presented as denied (`TOOL_DENIED`) to agent.
 
@@ -160,7 +164,9 @@ The assistant error message shows a localized summary and stable code, with an
 accessible details disclosure containing the redacted provider response,
 provider ID, and model ID. Provider detail is capped at 600 characters and
 common credential/header values are redacted before event emission or
-persistence.
+persistence. When available, the details disclosure and timing logs may also
+show bounded `phase`, `providerStatus`, `providerCode`, `providerWaitMs`,
+`streamMs`, and `retryAttempt` fields.
 
 ## 6. i18n key convention
 

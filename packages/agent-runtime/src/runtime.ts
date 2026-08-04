@@ -128,6 +128,9 @@ export type RuntimeProviderConfig = {
 
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_TOKENS = 8_192;
+const PROVIDER_REQUEST_MAX_RETRIES = 1;
+const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;
+const PROVIDER_STREAM_RETRY_BACKOFF_MS = 750;
 const CONTEXT_COMPACTION_TOOL_NAME = "CompactContext";
 export const TOOL_SEARCH_NAME = "ToolSearch";
 const CONTEXT_NUDGE_TURN_INTERVAL = 3;
@@ -344,6 +347,25 @@ function boundedText(value: string, maxChars: number): string {
   const headChars = Math.ceil(available / 2);
   const tailChars = Math.floor(available / 2);
   return `${text.slice(0, headChars)}${marker}${text.slice(-tailChars)}`;
+}
+
+function delayWithAbort(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(Object.assign(new Error("Request aborted"), { name: "AbortError" }));
+      return;
+    }
+    let timeout: ReturnType<typeof setTimeout>;
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(Object.assign(new Error("Request aborted"), { name: "AbortError" }));
+    };
+    timeout = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 type CheckpointPersistResult = "persisted" | "oversized" | "failed";
@@ -602,6 +624,13 @@ export class DesktopAgentRuntime {
    * which is the correct anchor: the request goes out once all have resolved. */
   private requestStartedAt?: number;
   private streamStartedAt?: number;
+  private providerResponseStatus?: number;
+  private pendingProviderRetry?: ReturnType<typeof classifyAgentError>;
+  private providerRetryAttempted = false;
+  private activeProviderRetryAttempt = 0;
+  private providerRetryInProgress = false;
+  private suppressProviderRetryRunEnd = false;
+  private providerRetryAbort?: AbortController;
   private activeToolCalls = new Map<
     string,
     { toolName: string; args: unknown }
@@ -674,7 +703,7 @@ export class DesktopAgentRuntime {
     const optionalToolsPrompt = this.optionalToolsPrompt();
     const defaultSystemPrompt = [
       "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
-      "Editing workflow: use the built-in Edit or Write tool directly on the deliverable file whenever it is inside the advertised workspace. Do not create or hand-edit unified-diff files in scratch and repeatedly repair their hunk headers. If a patch or edit fails, re-read the current target and regenerate the change from that current content before retrying. Never issue concurrent Write/Edit calls for the same path. When a dedicated worktree is outside the advertised workspace, make one guarded, deterministic edit inside that worktree with Bash, then verify it with git diff or an equivalent check.",
+      "Editing workflow: use the built-in Edit or Write tool directly on the deliverable file whenever it is inside the advertised workspace. Use Edit for one small unique replacement and Write for a coherent whole-file rewrite. Do not create or hand-edit unified-diff files in scratch or repeatedly repair their hunk headers. Treat an edit failure as stale state: perform one fresh Read, regenerate the change from that current content once, then stop and report the exact mismatch instead of looping. Never issue concurrent Write/Edit calls for the same path. When a dedicated worktree is outside the advertised workspace, make one guarded, deterministic edit inside that worktree with Bash, then verify it with git diff or an equivalent check.",
       // Work panel browser preview (D100): workspace HTML files render
       // in the embedded browser with live reload on file changes.
       `For user-visible HTML pages, call the BrowserPreview tool once after creating the page or making the first meaningful visual edit, using its workspace-relative path (e.g. \`index.html\` or \`demo/index.html\`) to show it in PI-Desktop's built-in browser panel. Reuse that preview while iterating: it live-reloads as you edit, so no repeat call or manual refresh is needed. Skip generated, test-only, and non-visual HTML files. If BrowserPreview is not in the current tool list, load it first with ${TOOL_SEARCH_NAME}.`,
@@ -702,16 +731,22 @@ export class DesktopAgentRuntime {
     this.baseSystemPrompt = baseSystemPrompt;
 
     this.agent = new Agent({
-      streamFn: (m, context, options) =>
-        models.streamSimple(m, context, {
+      streamFn: (m, context, options) => {
+        this.providerResponseStatus = undefined;
+        return models.streamSimple(m, context, {
           ...options,
-          // Transient provider failures (request timeouts, dropped
-          // connections, 429/5xx) retry with interruptible backoff instead
-          // of failing the turn. A failed turn pushes the user into
-          // regenerate, which forks the transcript and reseeds the agent —
-          // far more expensive than a retry.
-          maxRetries: 2,
-        }),
+          // Keep provider-level retries bounded. A second retry is handled
+          // only for a mid-stream transient failure, after the failed
+          // assistant has been removed from the model context.
+          maxRetries: PROVIDER_REQUEST_MAX_RETRIES,
+          maxRetryDelayMs: PROVIDER_MAX_RETRY_DELAY_MS,
+          sessionId: this.sessionId,
+          onResponse: async (response, responseModel) => {
+            this.providerResponseStatus = response.status;
+            await options?.onResponse?.(response, responseModel);
+          },
+        });
+      },
       getApiKey: async () => runtimeApiKey,
       convertToLlm,
       prepareNextTurnWithContext: (context, signal) =>
@@ -962,7 +997,7 @@ export class DesktopAgentRuntime {
         case "Write":
           return `Create or overwrite a file. Deliverables go into the workspace; temporary/intermediate files go into the scratch directory.${scratchPathHint}`;
         case "Edit":
-          return `Replace one unique occurrence of old_string in a file. Re-read the current file after a failed edit; do not repair an old patch or edit the same path concurrently.${scratchPathHint}`;
+          return `Replace one unique occurrence of old_string in a file. Use Edit for a small localized change and Write for a whole-file rewrite; never guess old_string. After one failed edit, perform one fresh Read and regenerate the edit from that content. If the second attempt fails, stop instead of looping or repairing an old patch; do not repair an old patch repeatedly. Do not edit the same path concurrently.${scratchPathHint}`;
         case "Bash":
           return this.scratchDir
             ? "Run a non-interactive shell command in the workspace root. $PI_SCRATCH_DIR points at the session scratch directory for temporary files."
@@ -1376,6 +1411,77 @@ export class DesktopAgentRuntime {
       ts: Date.now(),
       event,
     });
+  }
+
+  private shouldRetryProviderError(
+    error: ReturnType<typeof classifyAgentError>,
+  ): boolean {
+    return (
+      !this.providerRetryAttempted &&
+      error.retriable === true &&
+      (error.code === "STREAM_FAILED" ||
+        error.code === "NETWORK_ERROR" ||
+        error.code === "TIMEOUT")
+    );
+  }
+
+  private providerErrorWithDiagnostics(
+    error: ReturnType<typeof classifyAgentError>,
+    phase: "request" | "stream",
+    providerWaitMs?: number,
+    streamMs?: number,
+  ): ReturnType<typeof classifyAgentError> {
+    const existingDetails = isRecord(error.details) ? error.details : {};
+    return {
+      ...error,
+      details: {
+        ...existingDetails,
+        phase,
+        ...(providerWaitMs !== undefined ? { providerWaitMs } : {}),
+        ...(streamMs !== undefined ? { streamMs } : {}),
+        ...(this.providerResponseStatus !== undefined &&
+        existingDetails.providerStatus === undefined
+          ? { providerStatus: this.providerResponseStatus }
+          : {}),
+        ...(this.activeProviderRetryAttempt > 0
+          ? { retryAttempt: this.activeProviderRetryAttempt }
+          : {}),
+      },
+    };
+  }
+
+  private async retryPendingProviderFailure(): Promise<void> {
+    if (!this.pendingProviderRetry) return;
+    this.pendingProviderRetry = undefined;
+
+    const messages = [...this.agent.state.messages];
+    if (messages.at(-1)?.role !== "assistant") {
+      throw new Error("Cannot retry a provider stream without its failed assistant message");
+    }
+    messages.pop();
+    this.agent.state.messages = messages;
+
+    this.providerRetryInProgress = true;
+    this.requestStartedAt = Date.now();
+    this.providerRetryAbort = new AbortController();
+    try {
+      await delayWithAbort(
+        PROVIDER_STREAM_RETRY_BACKOFF_MS,
+        this.providerRetryAbort.signal,
+      );
+      if (this.disposed) throw new Error("runtime disposed");
+      // The failed attempt has already finished. Only its lifecycle events
+      // are suppressed; the retry must close the visible run normally.
+      this.suppressProviderRetryRunEnd = false;
+      this.activeProviderRetryAttempt = 1;
+      await this.agent.continue();
+      await this.agent.waitForIdle();
+    } finally {
+      this.providerRetryAbort = undefined;
+      this.activeProviderRetryAttempt = 0;
+      this.providerRetryInProgress = false;
+      this.suppressProviderRetryRunEnd = false;
+    }
   }
 
   setCompactionSettings(settings?: ContextCompactionSettings): void {
@@ -2072,8 +2178,11 @@ export class DesktopAgentRuntime {
         if (event.message.role === "assistant") {
           this.streamStartedAt = Date.now();
           const content = assistantContent((event.message as any).content);
+          const retryingAssistant = this.providerRetryInProgress
+            ? this.currentAssistant
+            : undefined;
           this.currentAssistant = {
-            id: randomUUID(),
+            id: retryingAssistant?.id ?? randomUUID(),
             role: "assistant",
             content: content.text,
             ...(content.hasThinking && content.thinking
@@ -2084,7 +2193,15 @@ export class DesktopAgentRuntime {
             modelId: this.provider.modelId,
             providerId: this.provider.id,
           };
-          this.emit({ type: "message_start", message: this.currentAssistant });
+          if (retryingAssistant) {
+            // Keep one visible assistant bubble across the bounded retry. The
+            // failed partial response is replaced instead of leaving a
+            // duplicate error row when the second request succeeds.
+            this.providerRetryInProgress = false;
+            this.emit({ type: "message_update", message: this.currentAssistant });
+          } else {
+            this.emit({ type: "message_start", message: this.currentAssistant });
+          }
         }
         // User messages are echoed and persisted by the desktop main process
         // (agentPrompt handler); re-emitting them here would duplicate the
@@ -2163,7 +2280,7 @@ export class DesktopAgentRuntime {
               : failed
                 ? "provider stream failed"
                 : undefined;
-          const classifiedError = overflow
+          let classifiedError = overflow
             ? errorMessage
               ? classifyAgentError(errorMessage)
               : {
@@ -2183,6 +2300,62 @@ export class DesktopAgentRuntime {
             : this.currentAssistant.thinking ?? "";
           const usage = usageFromPi((event.message as any).usage as Usage | undefined);
           const endedAt = Date.now();
+          const providerWaitMs =
+            this.requestStartedAt !== undefined &&
+            this.streamStartedAt !== undefined
+              ? this.streamStartedAt - this.requestStartedAt
+              : undefined;
+          const streamMs =
+            this.streamStartedAt !== undefined
+              ? Math.max(0, endedAt - this.streamStartedAt)
+              : undefined;
+          if (classifiedError) {
+            classifiedError = this.providerErrorWithDiagnostics(
+              classifiedError,
+              "stream",
+              providerWaitMs,
+              streamMs,
+            );
+          }
+          const diagnosticError = classifiedError;
+          const retryProviderError =
+            !overflow &&
+            diagnosticError !== undefined &&
+            this.shouldRetryProviderError(diagnosticError);
+          if (retryProviderError) {
+            this.pendingProviderRetry = diagnosticError;
+            this.providerRetryAttempted = true;
+            this.suppressProviderRetryRunEnd = true;
+            this.currentAssistant = {
+              ...this.currentAssistant,
+              content: nextText,
+              ...(nextThinking
+                ? { thinking: nextThinking }
+                : content.hasThinking
+                  ? { thinking: undefined }
+                  : {}),
+              status: "streaming",
+              modelId: this.provider.modelId,
+              providerId: this.provider.id,
+              ...(usage ? { usage } : {}),
+            };
+            this.emit({ type: "message_update", message: this.currentAssistant });
+            logTiming("model", {
+              model: this.provider.modelId,
+              providerId: this.provider.id,
+              sessionId: this.sessionId,
+              turnId: this.turnId,
+              providerWaitMs,
+              streamMs,
+              thinkingLevel: this.thinkingLevel,
+              outcome: "retry",
+              errorCode: diagnosticError.code,
+              retryAttempt: 1,
+              providerStatus: this.providerResponseStatus,
+            });
+            this.streamStartedAt = undefined;
+            break;
+          }
           const responseDurationMs =
             this.streamStartedAt !== undefined
               ? Math.max(0, endedAt - this.streamStartedAt)
@@ -2212,19 +2385,17 @@ export class DesktopAgentRuntime {
             turnId: this.turnId,
             // Time from "the agent could send the request" to the first
             // streamed message: provider queue + network + first token.
-            providerWaitMs:
-              this.requestStartedAt !== undefined &&
-              this.streamStartedAt !== undefined
-                ? this.streamStartedAt - this.requestStartedAt
-                : undefined,
-            streamMs:
-              this.streamStartedAt !== undefined
-                ? endedAt - this.streamStartedAt
-                : undefined,
+            providerWaitMs,
+            streamMs,
             thinkingLevel: this.thinkingLevel,
             outcome: failed ? "error" : aborted ? "aborted" : "ok",
-            errorCode: classifiedError?.code,
+            errorCode: diagnosticError?.code,
+            providerStatus: this.providerResponseStatus,
+            ...(this.activeProviderRetryAttempt > 0
+              ? { retryAttempt: this.activeProviderRetryAttempt }
+              : {}),
           });
+          this.activeProviderRetryAttempt = 0;
           this.streamStartedAt = undefined;
           this.currentAssistant = undefined;
           const canRecoverOverflow =
@@ -2239,8 +2410,8 @@ export class DesktopAgentRuntime {
           if (canRecoverOverflow) {
             this.pendingOverflow = true;
             this.suppressOverflowRunEnd = true;
-          } else if (classifiedError) {
-            this.emit({ type: "error", error: classifiedError });
+          } else if (diagnosticError) {
+            this.emit({ type: "error", error: diagnosticError });
           }
         }
         break;
@@ -2293,11 +2464,11 @@ export class DesktopAgentRuntime {
         }
         break;
       case "turn_end":
-        if (this.suppressOverflowRunEnd) break;
+        if (this.suppressOverflowRunEnd || this.suppressProviderRetryRunEnd) break;
         this.emit({ type: "turn_end" });
         break;
       case "agent_end":
-        if (this.suppressOverflowRunEnd) break;
+        if (this.suppressOverflowRunEnd || this.suppressProviderRetryRunEnd) break;
         this.emit({
           type: "agent_end",
           messageIds: [],
@@ -2382,6 +2553,13 @@ export class DesktopAgentRuntime {
     this.pendingOverflow = false;
     this.overflowRecoveryAttempted = false;
     this.suppressOverflowRunEnd = false;
+    this.pendingProviderRetry = undefined;
+    this.providerRetryAttempted = false;
+    this.activeProviderRetryAttempt = 0;
+    this.providerRetryInProgress = false;
+    this.suppressProviderRetryRunEnd = false;
+    this.providerRetryAbort?.abort();
+    this.providerRetryAbort = undefined;
     this.turnHadError = false;
     this.requestStartedAt = Date.now();
     this.emit({
@@ -2417,6 +2595,10 @@ export class DesktopAgentRuntime {
       await this.agent.prompt(content);
       await this.agent.waitForIdle();
 
+      if (this.pendingProviderRetry) {
+        await this.retryPendingProviderFailure();
+      }
+
       if (this.pendingOverflow) {
         this.pendingOverflow = false;
         this.suppressOverflowRunEnd = false;
@@ -2444,17 +2626,29 @@ export class DesktopAgentRuntime {
 
     } catch (err) {
       const classifiedError = classifyAgentError(err);
+      const diagnosticError =
+        classifiedError.code === "TURN_ABORTED"
+          ? classifiedError
+          : this.providerErrorWithDiagnostics(
+              classifiedError,
+              "request",
+              this.requestStartedAt !== undefined
+                ? Math.max(0, Date.now() - this.requestStartedAt)
+                : undefined,
+            );
       this.finalizeCurrentAssistant(
         classifiedError.code === "TURN_ABORTED" ? "aborted" : "error",
-        classifiedError.code === "TURN_ABORTED" ? undefined : classifiedError,
+        classifiedError.code === "TURN_ABORTED" ? undefined : diagnosticError,
       );
-      throw err;
+      if (classifiedError.code === "TURN_ABORTED") throw err;
+      throw Object.assign(new Error(diagnosticError.message), diagnosticError);
     }
     return { turnId: this.turnId };
   }
 
   async abort(): Promise<void> {
     this.agent.abort();
+    this.providerRetryAbort?.abort();
     this.compactionAbort?.abort();
   }
 
@@ -2473,6 +2667,7 @@ export class DesktopAgentRuntime {
     this.pathInstructionClaims.clear();
     this.failedHostToolCalls.clear();
     this.agent.abort();
+    this.providerRetryAbort?.abort();
     this.compactionAbort?.abort();
   }
 }

@@ -1053,6 +1053,10 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
           code: "MODEL_NOT_CONFIGURED",
           message: '404: {"error":{"message":"model not found"}}',
           retriable: false,
+          details: {
+            phase: "stream",
+            providerStatus: 404,
+          },
         },
       },
     });
@@ -1063,6 +1067,91 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
         retriable: false,
       },
     });
+
+    await runtime.dispose();
+  });
+
+  it("retries one transient stream failure without duplicating the assistant bubble", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    const failedMessage = {
+      role: "assistant",
+      content: [{ type: "text", text: "partial response" }],
+      api: "openai-completions",
+      provider: "local",
+      model: "local-model",
+      usage: {
+        input: 1,
+        output: 1,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 2,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: "error",
+      errorMessage: "terminated",
+      timestamp: 2,
+    };
+    const successfulMessage = {
+      role: "assistant",
+      content: [{ type: "text", text: "recovered response" }],
+      api: "openai-completions",
+      provider: "local",
+      model: "local-model",
+      usage: {
+        input: 1,
+        output: 2,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 3,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: "stop",
+      timestamp: 3,
+    };
+
+    agent.prompt = vi.fn(async () => {
+      agent.state.messages = [
+        { role: "user", content: "hello", timestamp: 1 },
+        failedMessage,
+      ];
+      await handleAgentEvent({ type: "message_start", message: failedMessage });
+      await handleAgentEvent({ type: "message_end", message: failedMessage });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    agent.continue = vi.fn(async () => {
+      expect(agent.state.messages).toHaveLength(1);
+      await handleAgentEvent({ type: "agent_start" });
+      await handleAgentEvent({ type: "turn_start" });
+      await handleAgentEvent({
+        type: "message_start",
+        message: { role: "assistant", content: [] },
+      });
+      await handleAgentEvent({ type: "message_end", message: successfulMessage });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+
+    await runtime.prompt("hello", "user-1");
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(agent.continue).toHaveBeenCalledOnce();
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(events.filter((event) => event.type === "message_start")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "agent_end")).toHaveLength(1);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({
+          status: "complete",
+          content: "recovered response",
+        }),
+      }),
+    );
 
     await runtime.dispose();
   });

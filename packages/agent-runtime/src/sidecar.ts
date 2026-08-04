@@ -156,7 +156,26 @@ async function runtimeFor(
 }
 
 function classifiedRuntimeError(err: unknown) {
-  const errorCode = (err as { errorCode?: unknown })?.errorCode;
+  const candidate = err as {
+    code?: unknown;
+    message?: unknown;
+    retriable?: unknown;
+    details?: unknown;
+    errorCode?: unknown;
+  };
+  if (
+    typeof candidate?.code === "string" &&
+    typeof candidate.message === "string" &&
+    typeof candidate.retriable === "boolean"
+  ) {
+    return {
+      code: candidate.code,
+      message: candidate.message,
+      retriable: candidate.retriable,
+      ...(candidate.details !== undefined ? { details: candidate.details } : {}),
+    };
+  }
+  const errorCode = candidate?.errorCode;
   if (typeof errorCode === "string") {
     return {
       code: errorCode,

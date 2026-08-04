@@ -12,6 +12,8 @@ export type ClassifiedAgentError = {
   code: string;
   message: string;
   retriable: boolean;
+  /** Safe, low-cardinality diagnostics for logs and the error details panel. */
+  details?: Record<string, unknown>;
 };
 
 /** Keep envelopes/persisted rows small; provider bodies can be huge. */
@@ -22,6 +24,9 @@ const NETWORK_PATTERN =
 
 const CONTEXT_PATTERN =
   /context[ _-]?length|maximum context|context window|too many tokens|prompt is too long|input token count|exceeds the (?:maximum|model)|token limit/i;
+
+const STREAM_TERMINATION_PATTERN =
+  /\bterminated\b|stream ended without finish_reason|premature(?:ly)?\s+(?:closed|ended)|(?:stream|response).*(?:closed|interrupted)/i;
 
 function redactSensitiveErrorText(message: string): string {
   return message
@@ -76,6 +81,23 @@ function hasNetworkCause(err: unknown, message: string): boolean {
   return false;
 }
 
+function extractErrorCode(err: unknown): string | number | undefined {
+  let current: any = err;
+  for (let depth = 0; depth < 4 && current; depth += 1) {
+    if (typeof current.code === "number") {
+      return Number.isSafeInteger(current.code) ? current.code : undefined;
+    }
+    if (
+      typeof current.code === "string" &&
+      /^[A-Za-z0-9_.:-]{1,64}$/.test(current.code)
+    ) {
+      return current.code;
+    }
+    current = current.cause;
+  }
+  return undefined;
+}
+
 export function classifyAgentError(err: unknown): ClassifiedAgentError {
   const rawMessage =
     typeof err === "string"
@@ -88,10 +110,17 @@ export function classifyAgentError(err: unknown): ClassifiedAgentError {
     safeMessage.length > MAX_ERROR_MESSAGE_CHARS
       ? `${safeMessage.slice(0, MAX_ERROR_MESSAGE_CHARS)}…`
       : safeMessage;
+  const status = extractStatus(err, rawMessage);
+  const providerCode = extractErrorCode(err);
+  const details = {
+    ...(status !== undefined ? { providerStatus: status } : {}),
+    ...(providerCode !== undefined ? { providerCode } : {}),
+  };
   const result = (code: string, retriable: boolean): ClassifiedAgentError => ({
     code,
     message,
     retriable,
+    ...(Object.keys(details).length > 0 ? { details } : {}),
   });
 
   if (/CONTEXT_COMPACTION_FAILED/i.test(rawMessage)) {
@@ -109,7 +138,6 @@ export function classifyAgentError(err: unknown): ClassifiedAgentError {
     return result("NETWORK_ERROR", true);
   }
 
-  const status = extractStatus(err, rawMessage);
   if (status !== undefined) {
     if (status === 401 || status === 403) return result("PROVIDER_UNAUTHORIZED", false);
     if (status === 408) return result("TIMEOUT", true);
@@ -140,7 +168,7 @@ export function classifyAgentError(err: unknown): ClassifiedAgentError {
   if (/timeout|timed out/i.test(rawMessage)) {
     return result("TIMEOUT", true);
   }
-  if (/stream/i.test(rawMessage)) {
+  if (STREAM_TERMINATION_PATTERN.test(rawMessage) || /stream/i.test(rawMessage)) {
     return result("STREAM_FAILED", true);
   }
   return result("PROVIDER_ERROR", true);

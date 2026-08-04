@@ -212,6 +212,14 @@ Automatic summary failures may still produce a successful lifecycle event with
 checkpoint was installed and the run may continue with reduced historical
 context. Manual compaction never silently falls back.
 
+Provider `error` events may include bounded diagnostic fields in
+`AppError.details`: `phase` (`request` or `stream`), `providerStatus`,
+`providerCode`, `providerWaitMs`, `streamMs`, and `retryAttempt`. These fields
+are additive and redacted; they never carry credentials or an unrestricted
+provider response. A transient stream failure may be replayed once inside the
+same turn without a terminal `error` event or a duplicate assistant message.
+The second failure emits the terminal normalized `STREAM_FAILED` error.
+
 ## 6a. Notification API (D117, protocol v4)
 
 Durable inbox requests are allowlisted preload invokes that Electron forwards

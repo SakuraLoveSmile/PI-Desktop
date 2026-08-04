@@ -79,6 +79,33 @@ describe("classifyAgentError", () => {
     });
   });
 
+  it("classifies a provider termination as a retryable stream failure", () => {
+    expect(classifyAgentError("terminated")).toMatchObject({
+      code: "STREAM_FAILED",
+      retriable: true,
+    });
+  });
+
+  it("keeps provider diagnostics bounded to status and safe error codes", () => {
+    const classified = classifyAgentError(
+      Object.assign(new Error("terminated"), {
+        status: 200,
+        code: "ERR_STREAM_PREMATURE_CLOSE",
+      }),
+    );
+    expect(classified.details).toEqual({
+      providerStatus: 200,
+      providerCode: "ERR_STREAM_PREMATURE_CLOSE",
+    });
+
+    const unsafe = classifyAgentError(
+      Object.assign(new Error("terminated"), {
+        code: "Bearer secret-token",
+      }),
+    );
+    expect(unsafe.details).toBeUndefined();
+  });
+
   it("redacts secrets before exposing provider error details", () => {
     const classified = classifyAgentError(
       '401: {"api_key":"sk-secret","Authorization":"Bearer token-secret"}',

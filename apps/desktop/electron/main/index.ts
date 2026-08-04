@@ -2126,7 +2126,11 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
     logger.app("session", "error", "agent turn failed", {
       sessionId: envelope.sessionId,
       code: event.error.code,
-      data: { message: event.error.message, retriable: event.error.retriable },
+      data: {
+        message: event.error.message,
+        retriable: event.error.retriable,
+        details: event.error.details,
+      },
     });
     finishTurn(
       envelope.sessionId,

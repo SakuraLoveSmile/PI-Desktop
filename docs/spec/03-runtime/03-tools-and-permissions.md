@@ -1,6 +1,6 @@
 # 03. Tools and Permissions
 
-> Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115, D181
+> Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115, D181, D186
 
 ## 0. Frozen policy summary
 
@@ -175,8 +175,10 @@ workflow is:
    advertised workspace.
 2. If a dedicated worktree is outside that root, perform one guarded edit in
    that worktree with Bash and verify the resulting diff.
-3. After a failed edit or patch check, re-read the current target and
-   regenerate the change. Do not hand-edit old unified-diff hunk headers.
+3. After a failed edit or patch check, perform one fresh `Read` of the current
+   target and regenerate the change once. If that edit also fails, stop and
+   report the exact mismatch; do not hand-edit old unified-diff hunk headers or
+   continue a repair loop.
 4. Keep mutations to one path sequential, even when read/search calls are
    issued in parallel.
 
