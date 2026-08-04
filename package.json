@@ -20,6 +20,8 @@
     "test": "pnpm -r --if-present test && cargo test -p host-core",
     "test:host": "cargo test -p host-core",
     "test:e2e": "node scripts/e2e-smoke.mjs",
+    "test:e2e:plan": "node scripts/e2e-plan.mjs",
+    "test:e2e:plan-ui": "node scripts/e2e-plan-ui.mjs",
     "test:e2e:boot": "node scripts/e2e-electron-boot.mjs",
     "test:e2e:supervision": "node scripts/e2e-supervision.mjs",
     "lint": "pnpm -r --if-present lint",

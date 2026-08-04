@@ -130,15 +130,14 @@ test("app quit waits for one idempotent teardown before allowing the follow-up q
 });
 
 test("settings writes validate without applying read defaults", () => {
-  assert.match(mainSource, /validatePlanApprovalSettingsWrite\(settings\)/);
+  assert.match(mainSource, /validateSettingsWrite\(settings\)/);
   assert.match(mainSource, /host\.call\("settings\.set", validatedSettings\)/);
   assert.doesNotMatch(mainSource, /host\.call\("settings\.set", normalizedSettings\)/);
   assert.match(apiSource, /export function validateSettingsWrite/);
   assert.match(apiSource, /invoke\(IPC\.invoke\.settingsSet, validateSettingsWrite\(settings\)\)/);
   assert.match(mainSource, /hasOwnProperty\.call\(value, "defaultCommandShell"\)/);
   assert.match(mainSource, /COMMAND_SHELL_INVALID/);
-  assert.match(mainSource, /hasOwnProperty\.call\(value, "planApprovalPermissionMode"\)/);
-  assert.match(mainSource, /PLAN_PERMISSION_MODE_INVALID/);
   assert.match(apiSource, /hasOwnProperty\.call\(value, "defaultCommandShell"\)/);
-  assert.match(apiSource, /hasOwnProperty\.call\(value, "planApprovalPermissionMode"\)/);
+  assert.doesNotMatch(mainSource, /planApprovalPermissionMode/);
+  assert.doesNotMatch(apiSource, /planApprovalPermissionMode/);
 });

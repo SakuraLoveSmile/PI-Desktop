@@ -7,7 +7,7 @@ const readDesktop = (relativePath) =>
 const readPackage = (relativePath) =>
   readFile(new URL(`../../../packages/i18n/${relativePath}`, import.meta.url), "utf8");
 
-const [approvalBar, apiSource, storeSource, settingsPage, settingsSearch, styles, english, chinese] =
+const [approvalBar, apiSource, storeSource, settingsPage, settingsSearch, styles, english, chinese, planStateSource, composerSource] =
   await Promise.all([
     readDesktop("src/components/PlanApprovalBar.tsx"),
     readDesktop("src/lib/api.ts"),
@@ -17,6 +17,8 @@ const [approvalBar, apiSource, storeSource, settingsPage, settingsSearch, styles
     readDesktop("src/styles/globals.css"),
     readPackage("src/locales/en/index.ts"),
     readPackage("src/locales/zh-CN/index.ts"),
+    readDesktop("src/lib/plan-mode-state.ts"),
+    readDesktop("src/components/Composer.tsx"),
   ]);
 
 test("plan approval exposes the submitted artifact and safe default mode", () => {
@@ -25,15 +27,12 @@ test("plan approval exposes the submitted artifact and safe default mode", () =>
   assert.match(approvalBar, /fileWorkPanelTab\(artifactPath\)/);
   assert.match(approvalBar, /openWorkPanelTabForSession/);
   assert.match(approvalBar, /proposal\.expiresAt/);
-  assert.match(approvalBar, /proposal\.feedback/);
-  assert.match(
-    approvalBar,
-    /normalizeGlobalPermissionMode\(\s*settings\?\.planApprovalPermissionMode,\s*"ask",/s,
-  );
-  assert.match(
-    apiSource,
-    /planApprovalPermissionMode:[\s\S]*?normalizeGlobalPermissionMode\([\s\S]*?"ask",/s,
-  );
+  assert.match(approvalBar, /const isPending = proposal\.status === "pending"/);
+  assert.match(approvalBar, /PLAN_APPROVAL_DEFAULT_MODE/);
+  assert.match(approvalBar, /setApprovalMode\(PLAN_APPROVAL_DEFAULT_MODE\)/);
+  assert.doesNotMatch(approvalBar, /planApprovalPermissionMode|feedback|changes_requested/);
+  assert.doesNotMatch(apiSource, /planApprovalPermissionMode/);
+  assert.doesNotMatch(storeSource, /planApprovalPermissionMode/);
   assert.match(approvalBar, /t\("plan\.autoWarning"\)/);
   assert.match(approvalBar, /data-testid="plan-open-artifact"/);
   assert.doesNotMatch(approvalBar, /request_changes|requestChanges/);
@@ -51,15 +50,24 @@ test("plan expiry and canonical timeout reconcile host state without stale actio
   assert.match(approvalBar, /restorePendingPlan\(proposal\.sessionId\)/);
   assert.match(approvalBar, /ErrorCodes\.PLAN_APPROVAL_TIMEOUT/);
   assert.match(approvalBar, /disabled=\{busy\}/);
-  assert.match(approvalBar, /\}, \[proposal\.id, proposal\.status\]\);/);
+  assert.match(
+    approvalBar,
+    /\}, \[isPending, proposal\.expiresAt, proposal\.sessionId, restorePendingPlan\]\);/,
+  );
   assert.match(
     storeSource,
     /PendingPlanRefreshResult = "pending" \| "terminal" \| "unavailable"/,
   );
   assert.match(
     storeSource,
-    /pendingPlanLoads = new Map<string, Promise<PendingPlanRefreshResult>>/,
+    /const generation = nextPlanSyncGeneration\(sessionId\)/,
   );
+  assert.match(storeSource, /await api\.pendingPlans\(sessionId\)/);
+  assert.match(
+    storeSource,
+    /if \(generation !== planSyncGeneration\(sessionId\)\) return "unavailable"/,
+  );
+  assert.doesNotMatch(storeSource, /pendingPlanLoads|pendingPlanLoadGenerations|pendingPlanFollowUps/);
   const resolveBlock =
     storeSource.match(/resolvePlan: async \(resolution\)[\s\S]*?\n  showToast:/)?.[0] ?? "";
   assert.match(resolveBlock, /ErrorCodes\.PLAN_APPROVAL_TIMEOUT/);
@@ -69,8 +77,24 @@ test("plan expiry and canonical timeout reconcile host state without stale actio
   );
   assert.match(
     storeSource,
-    /return proposal\?\.status === "pending" \? "pending" : "terminal"/,
+    /return activeProposal \? "pending" : "terminal"/,
   );
+  assert.match(storeSource, /isPendingPlan\(checkpoint\)/);
+  assert.match(storeSource, /pendingPlans\[sessionId\]\?\.status === "pending"/);
+  assert.match(storeSource, /pendingPlans\[resolution\.sessionId\]/);
+  assert.match(storeSource, /planCheckpoints: checkpoint/);
+});
+
+test("terminal execution snapshots are represented and do not gate a later prompt", () => {
+  assert.match(planStateSource, /executionState === "queued"/);
+  assert.match(planStateSource, /executionState === "running"/);
+  assert.match(planStateSource, /executionState === "completed"/);
+  assert.match(planStateSource, /status === "rejected"/);
+  assert.match(planStateSource, /status === "expired"/);
+  assert.match(planStateSource, /return "interrupted"/);
+  assert.match(composerSource, /const composerBlocked = isRunning \|\| executionActive \|\| approvalPending/);
+  assert.match(composerSource, /planCheckpoint \? <PlanApprovalBar/);
+  assert.doesNotMatch(approvalBar, /request_changes|requestChanges/);
 });
 
 test("command-shell settings are catalog-driven and use the existing save flow", () => {

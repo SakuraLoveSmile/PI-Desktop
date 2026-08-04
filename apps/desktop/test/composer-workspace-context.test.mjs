@@ -12,7 +12,7 @@ const globalStyles = await readFile(
 );
 
 test("composer omits the workspace context rail", () => {
-  assert.match(composerSource, /className="composer-shell"/);
+  assert.match(composerSource, /composer-shell/);
   assert.doesNotMatch(composerSource, /composer-chips/);
   assert.doesNotMatch(composerSource, /chat\.(?:workspaceContext|localWorkspace|local|branch)/);
   assert.doesNotMatch(composerSource, /Icon(?:Computer|GitBranch)/);
