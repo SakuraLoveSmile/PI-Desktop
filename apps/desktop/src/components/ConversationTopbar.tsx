@@ -1,23 +1,11 @@
-import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import type { Mode, ThinkingLevel } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
-import { thinkingLevelForProvider } from "./Composer";
 import { ModelSelect } from "./ModelSelect";
 import {
   IconSidebar,
   IconNewSession,
   IconSearch,
 } from "./icons";
-
-function isThinkingLevel(value: unknown): value is ThinkingLevel {
-  return (
-    typeof value === "string" &&
-    ["off", "minimal", "low", "medium", "high", "xhigh", "max"].includes(
-      value as ThinkingLevel,
-    )
-  );
-}
 
 function projectName(path?: string | null, name?: string | null) {
   if (name) return name;
@@ -51,22 +39,8 @@ export function ConversationTopbar({
   const runningSessions = useAppStore((s) => s.runningSessions);
   const isRunning = useAppStore((s) => s.isRunning);
   const workspace = useAppStore((s) => s.workspace);
-  const settings = useAppStore((s) => s.settings);
-  const providers = useAppStore((s) => s.providers);
-  const configureActiveSession = useAppStore((s) => s.configureActiveSession);
-  const showToast = useAppStore((s) => s.showToast);
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
-  const mode = activeSession?.mode ?? settings?.defaultMode ?? "agent";
-  const provider = providers.find(
-    (candidate) =>
-      candidate.id === (activeSession?.providerId ?? settings?.defaultProviderId),
-  );
-  const modelId =
-    activeSession?.modelId ?? settings?.defaultModelId ?? provider?.defaultModelId;
-  const thinkingLevel: ThinkingLevel = isThinkingLevel(activeSession?.thinkingLevel)
-    ? activeSession!.thinkingLevel
-    : "off";
 
   const taskTitle = isDefaultSessionTitle(activeSession?.title)
     ? t("chat.untitledTask")
@@ -74,23 +48,6 @@ export function ConversationTopbar({
   const project = projectName(workspace?.path, workspace?.name);
   const sessionRunning = Boolean(activeSessionId && runningSessions[activeSessionId]);
   const busy = isRunning || sessionRunning;
-
-  const setMode = useCallback(
-    async (next: Mode) => {
-      if (busy) return;
-      try {
-        await configureActiveSession({
-          mode: next,
-          providerId: provider?.id,
-          modelId,
-          thinkingLevel: thinkingLevelForProvider(provider, thinkingLevel),
-        });
-      } catch (e) {
-        showToast(e instanceof Error ? e.message : String(e), { variant: "error" });
-      }
-    },
-    [busy, configureActiveSession, provider, modelId, thinkingLevel, showToast],
-  );
 
   return (
     <div
@@ -125,27 +82,6 @@ export function ConversationTopbar({
       </div>
 
       <div className="ct-right">
-        <div className="ct-mode" role="group" aria-label={t("settings.mode")}>
-          <button
-            type="button"
-            className={`ct-mode-btn ${mode === "plan" ? "active" : ""}`}
-            aria-pressed={mode === "plan"}
-            disabled={busy}
-            onClick={() => void setMode("plan")}
-          >
-            {t("settings.modePlan")}
-          </button>
-          <button
-            type="button"
-            className={`ct-mode-btn ${mode === "agent" ? "active" : ""}`}
-            aria-pressed={mode === "agent"}
-            disabled={busy}
-            onClick={() => void setMode("agent")}
-          >
-            {t("settings.modeAgent")}
-          </button>
-        </div>
-
         <ModelSelect />
 
         <div className="ct-actions">

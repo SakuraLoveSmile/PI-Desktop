@@ -56,9 +56,7 @@ import type {
 import {
   defaultCommandShellForPlatform,
   IPC,
-  isGlobalPermissionMode,
   isCommandShellId,
-  normalizeGlobalPermissionMode,
   normalizeMode,
 } from "@pi-desktop/shared";
 
@@ -137,18 +135,12 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
       ? (settings as { defaultCommandShell: AppSettings["defaultCommandShell"] })
           .defaultCommandShell
       : defaultCommandShellForPlatform(window.piDesktop?.platform ?? ""),
-    planApprovalPermissionMode: normalizeGlobalPermissionMode(
-      (settings as { planApprovalPermissionMode?: unknown })
-        .planApprovalPermissionMode,
-      "ask",
-    ),
   };
 }
 
 export function validateSettingsWrite(settings: AppSettings): AppSettings {
   const value = settings as AppSettings & {
     defaultCommandShell?: unknown;
-    planApprovalPermissionMode?: unknown;
   };
   if (
     Object.prototype.hasOwnProperty.call(value, "defaultCommandShell") &&
@@ -156,14 +148,6 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
   ) {
     throw Object.assign(new Error("defaultCommandShell is invalid"), {
       errorCode: "COMMAND_SHELL_INVALID",
-    });
-  }
-  if (
-    Object.prototype.hasOwnProperty.call(value, "planApprovalPermissionMode") &&
-    !isGlobalPermissionMode(value.planApprovalPermissionMode)
-  ) {
-    throw Object.assign(new Error("planApprovalPermissionMode is invalid"), {
-      errorCode: "PLAN_PERMISSION_MODE_INVALID",
     });
   }
   return settings;
@@ -177,6 +161,37 @@ function normalizePendingPlans(result: PlansPendingResult): PlansPendingResult {
   return {
     ...result,
     plans: result.plans.map(normalizePlanProposal),
+  };
+}
+
+function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
+  const raw = (value ?? {}) as PlanningStateEvent & {
+    execution?: {
+      id?: unknown;
+      proposalId?: unknown;
+      state?: unknown;
+    };
+  };
+  const execution = raw.execution;
+  if (!execution) return raw;
+  const executionState =
+    execution.state === "queued" ||
+    execution.state === "running" ||
+    execution.state === "completed" ||
+    execution.state === "interrupted"
+      ? execution.state
+      : undefined;
+  return {
+    ...raw,
+    ...(raw.proposalId || typeof execution.proposalId !== "string"
+      ? {}
+      : { proposalId: execution.proposalId }),
+    ...(raw.executionId || typeof execution.id !== "string"
+      ? {}
+      : { executionId: execution.id }),
+    ...(raw.executionState || !executionState
+      ? {}
+      : { executionState }),
   };
 }
 
@@ -516,7 +531,7 @@ export const api = {
   onPlansChanged: (listener: (event: PlanningStateEvent) => void) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.plansChanged, (payload) =>
-      listener(payload as PlanningStateEvent),
+      listener(normalizePlansChangedEvent(payload)),
     );
   },
   onToast: (listener: (message: string) => void) => {

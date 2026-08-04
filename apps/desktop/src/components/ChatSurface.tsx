@@ -37,8 +37,10 @@ export const ChatSurface = memo(function ChatSurface() {
       ? state.pendingPermissions[state.activeSessionId]
       : undefined,
   );
-  const activePlan = useAppStore((state) =>
-    state.activeSessionId ? state.pendingPlans[state.activeSessionId] : undefined,
+  const planCheckpoint = useAppStore((state) =>
+    state.activeSessionId
+      ? state.planCheckpoints[state.activeSessionId]
+      : undefined,
   );
   const activePlanningState = useAppStore((state) =>
     state.activeSessionId
@@ -63,12 +65,13 @@ export const ChatSurface = memo(function ChatSurface() {
       messages,
       isRunning,
       pendingPermission: activePermission,
-      approvalPending: Boolean(activePlan),
+      approvalPending: planCheckpoint?.status === "pending",
+      planCheckpoint,
       planningState: activePlanningState,
     }),
     [
       activePermission,
-      activePlan,
+      planCheckpoint,
       activePlanningState,
       activeSessionId,
       isRunning,
@@ -92,6 +95,7 @@ export const ChatSurface = memo(function ChatSurface() {
 
   const hasTranscript =
     transcriptView.approvalPending ||
+    Boolean(transcriptView.planCheckpoint) ||
     Boolean(transcriptView.pendingPermission) ||
     (transcriptView.isRunning && transcriptView.planningState === "planning") ||
     transcriptView.messages.some((message) => {

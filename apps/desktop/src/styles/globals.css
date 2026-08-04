@@ -665,10 +665,10 @@ html {
 }
 
 /* Conversation top bar (Codex/WorkBuddy-style): replaces the empty chat
- * titlebar band with a real toolbar — session title, Agent/Chat mode, model
- * picker, and action buttons. It mirrors the frameless drag semantics of the
- * old .main-titlebar: an absolute 46px band that is draggable, with the
- * interactive controls opting back into pointer events. */
+ * titlebar band with a real toolbar — session title, model picker, and action
+ * buttons. It mirrors the frameless drag semantics of the old .main-titlebar:
+ * an absolute 46px band that is draggable, with the interactive controls
+ * opting back into pointer events. */
 .conversation-topbar {
   position: absolute;
   inset-inline: 0;
@@ -780,44 +780,6 @@ html {
 
 .conversation-topbar .ct-icon-btn:disabled {
   opacity: 0.4;
-  cursor: default;
-}
-
-.conversation-topbar .ct-mode {
-  display: inline-flex;
-  height: 28px;
-  padding: 2px;
-  gap: 2px;
-  border-radius: var(--radius-md);
-  background: var(--ds-bg-secondary);
-  border: 1px solid var(--ds-border-subtle);
-}
-
-.conversation-topbar .ct-mode-btn {
-  appearance: none;
-  border: none;
-  background: transparent;
-  color: var(--ds-text-secondary);
-  font-size: var(--text-sm);
-  height: 100%;
-  padding: 0 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.conversation-topbar .ct-mode-btn:hover:not(:disabled) {
-  color: var(--ds-text-primary);
-}
-
-.conversation-topbar .ct-mode-btn.active {
-  background: var(--ds-bg-primary);
-  color: var(--ds-text-primary);
-}
-
-.conversation-topbar .ct-mode-btn:disabled {
-  opacity: 0.45;
   cursor: default;
 }
 
@@ -1795,6 +1757,10 @@ html {
   opacity: 0.72;
 }
 
+.composer-shell.is-gated .composer-input {
+  cursor: default;
+}
+
 .composer-toolbar {
   display: flex;
   align-items: center;
@@ -2277,7 +2243,7 @@ html {
 }
 
 .plan-approval-expiry,
-.plan-approval-terminal {
+.plan-approval-status {
   min-width: 0;
   color: var(--ds-text-muted);
   font-size: var(--text-xs-plus);
@@ -2285,19 +2251,37 @@ html {
   overflow-wrap: anywhere;
 }
 
-.plan-approval-terminal {
+.plan-approval-status {
   display: inline-flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 4px 8px;
 }
 
-.plan-approval-terminal-status {
-  color: var(--ds-text-secondary);
-  font-weight: var(--font-weight-medium);
+.plan-approval-status > svg {
+  flex: 0 0 auto;
 }
 
-.plan-approval-terminal-feedback {
-  white-space: pre-wrap;
+.plan-approval-status-approved,
+.plan-approval-status-completed {
+  color: var(--ds-success);
+}
+
+.plan-approval-status-rejected,
+.plan-approval-status-expired,
+.plan-approval-status-interrupted {
+  color: var(--ds-error);
+}
+
+.plan-approval-status-running {
+  color: var(--ds-accent);
+}
+
+.plan-approval-status-queued,
+.plan-approval-status-pending,
+.plan-approval-status-resolving {
+  color: var(--ds-text-secondary);
+  font-weight: var(--font-weight-medium);
 }
 
 .plan-approval-actions {

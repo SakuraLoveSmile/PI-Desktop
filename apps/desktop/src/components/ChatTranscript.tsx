@@ -1123,7 +1123,9 @@ export const ChatTranscript = memo(function ChatTranscript({
 }) {
   const { t } = useTranslation();
   const approvalPending = useAppStore((state) =>
-    Boolean(sessionId && state.pendingPlans[sessionId]),
+    Boolean(
+      sessionId && state.pendingPlans[sessionId]?.status === "pending",
+    ),
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);

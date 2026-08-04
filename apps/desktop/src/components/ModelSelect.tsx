@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { ThinkingLevel } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
+import { isActivePlanExecution } from "../lib/plan-mode-state";
 import { thinkingLevelForProvider } from "./Composer";
 import { IconChevronDown, IconCheck, IconSearch } from "./icons";
 
@@ -32,6 +33,9 @@ export function ModelSelect() {
   const configureActiveSession = useAppStore((s) => s.configureActiveSession);
   const showToast = useAppStore((s) => s.showToast);
   const isRunning = useAppStore((s) => s.isRunning);
+  const planCheckpoint = useAppStore((s) =>
+    s.activeSessionId ? s.planCheckpoints[s.activeSessionId] : undefined,
+  );
 
   const [modelOpen, setModelOpen] = useState(false);
   const [modelQuery, setModelQuery] = useState("");
@@ -57,6 +61,9 @@ export function ModelSelect() {
     : "off";
 
   const modelLabel = modelId || t("chat.model");
+  const approvalPending = planCheckpoint?.status === "pending";
+  const executionActive = isActivePlanExecution(planCheckpoint);
+  const modelBlocked = isRunning || executionActive || approvalPending;
   const modelReady =
     !!provider &&
     provider.enabled &&
@@ -136,6 +143,10 @@ export function ModelSelect() {
   }, [modelOpen]);
 
   useEffect(() => {
+    if (modelBlocked) setModelOpen(false);
+  }, [modelBlocked]);
+
+  useEffect(() => {
     if (!modelOpen) return;
     setModelHighlight(
       modelQueryNeedle ? (flatModels.length ? 0 : -1) : activeFlatIndex,
@@ -203,7 +214,7 @@ export function ModelSelect() {
         title={`${provider?.name || t("chat.provider")} · ${modelLabel}`}
         aria-haspopup="menu"
         aria-expanded={modelOpen}
-        disabled={isRunning}
+        disabled={modelBlocked}
         onClick={() => setModelOpen((open) => !open)}
         onContextMenu={(e) => {
           e.preventDefault();

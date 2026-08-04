@@ -5,13 +5,22 @@ import type {
   GlobalPermissionMode,
   PlanProposal,
 } from "@pi-desktop/shared";
-import { ErrorCodes, normalizeGlobalPermissionMode } from "@pi-desktop/shared";
+import { ErrorCodes } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { fileWorkPanelTab } from "../lib/work-panel-tabs";
 import {
+  PLAN_APPROVAL_DEFAULT_MODE,
+  planCheckpointStatus,
+  type PlanCheckpointStatus,
+} from "../lib/plan-mode-state";
+import {
   IconCheck,
   IconChevronDown,
+  IconCircleAlert,
+  IconCircleCheck,
+  IconClock,
   IconFileText,
+  IconSparkles,
   IconTriangleAlert,
 } from "./icons";
 
@@ -39,11 +48,13 @@ function isApprovalMode(value: string | undefined): value is GlobalPermissionMod
   return value === "ask" || value === "accept-edits" || value === "auto";
 }
 
-const TERMINAL_STATUS_LABEL_KEYS: Partial<
-  Record<PlanProposal["status"], string>
-> = {
+const PLAN_STATUS_LABEL_KEYS: Record<PlanCheckpointStatus, string> = {
+  pending: "plan.statusPending",
+  resolving: "plan.statusResolving",
   approved: "plan.statusApproved",
-  changes_requested: "plan.statusNeedsRevision",
+  queued: "plan.statusQueued",
+  running: "plan.statusRunning",
+  completed: "plan.statusCompleted",
   rejected: "plan.statusRejected",
   expired: "plan.statusExpired",
   interrupted: "plan.statusInterrupted",
@@ -65,7 +76,6 @@ function formatPlanTimestamp(value: string | undefined, locale: string | undefin
 
 export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   const { t, i18n } = useTranslation();
-  const settings = useAppStore((state) => state.settings);
   const resolvePlan = useAppStore((state) => state.resolvePlan);
   const restorePendingPlan = useAppStore((state) => state.restorePendingPlan);
   const showToast = useAppStore((state) => state.showToast);
@@ -75,22 +85,20 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [reconciling, setReconciling] = useState(false);
+  const [approvalMode, setApprovalMode] = useState<GlobalPermissionMode>(
+    PLAN_APPROVAL_DEFAULT_MODE,
+  );
   const menuRef = useRef<HTMLDivElement>(null);
   const chevronRef = useRef<HTMLButtonElement>(null);
   const artifactPath = proposal.artifact?.relativePath?.trim() || null;
   const isPending = proposal.status === "pending";
-  const rememberedMode = normalizeGlobalPermissionMode(
-    settings?.planApprovalPermissionMode,
-    "ask",
-  );
   const expiryTime = formatPlanTimestamp(
     proposal.expiresAt,
     i18n.resolvedLanguage || i18n.language,
   );
-  const terminalStatusKey = TERMINAL_STATUS_LABEL_KEYS[proposal.status];
-  const terminalStatus = terminalStatusKey ? t(terminalStatusKey) : null;
-  const terminalFeedback = !isPending ? proposal.feedback?.trim() || null : null;
   const busy = resolving || reconciling;
+  const status = planCheckpointStatus(proposal, resolving);
+  const statusText = t(PLAN_STATUS_LABEL_KEYS[status]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -159,10 +167,14 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   }, [isPending, proposal.expiresAt, proposal.sessionId, restorePendingPlan]);
 
   useEffect(() => {
+    setApprovalMode(PLAN_APPROVAL_DEFAULT_MODE);
     setMenuOpen(false);
+  }, [proposal.id]);
+
+  useEffect(() => {
     setResolving(false);
     setReconciling(false);
-  }, [proposal.id, proposal.status]);
+  }, [proposal.id, proposal.status, proposal.executionState]);
 
   const focusComposer = () => {
     if (useAppStore.getState().activeSessionId !== proposal.sessionId) return;
@@ -179,17 +191,23 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
     setMenuOpen(false);
     setResolving(true);
     try {
-      await resolvePlan({
+      const identity = {
         proposalId: proposal.id,
         sessionId: proposal.sessionId,
         turnId: proposal.turnId,
         toolCallId: proposal.toolCallId,
         version: proposal.version,
-        action,
-        ...(action === "approve" && targetPermissionMode
-          ? { targetPermissionMode }
-          : {}),
-      });
+      };
+      await resolvePlan(
+        action === "approve"
+          ? {
+              ...identity,
+              action,
+              targetPermissionMode:
+                targetPermissionMode ?? PLAN_APPROVAL_DEFAULT_MODE,
+            }
+          : { ...identity, action },
+      );
       focusComposer();
     } catch (error) {
       showToast(error instanceof Error ? error.message : String(error), {
@@ -227,6 +245,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
       )?.dataset.approvalMode;
       if (isApprovalMode(mode)) {
         event.preventDefault();
+        setApprovalMode(mode);
         void resolve("approve", mode);
       }
       return;
@@ -260,10 +279,11 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
       aria-label={t("plan.approvalRegion")}
       aria-busy={busy}
       data-status={proposal.status}
+      data-execution-state={proposal.executionState || ""}
       data-testid="plan-approval-bar"
     >
       <span className="sr-only" role="status" aria-live="polite">
-        {t("plan.readyAnnouncement")}
+        {isPending ? t("plan.readyAnnouncement") : statusText}
       </span>
       <div className="plan-approval-copy">
         <div className="plan-approval-label">{t("plan.approvalRegion")}</div>
@@ -295,20 +315,21 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
               {t("plan.expiresAt", { time: expiryTime })}
             </span>
           ) : null}
-          {terminalStatus || terminalFeedback ? (
-            <div className="plan-approval-terminal" role="status">
-              {terminalStatus ? (
-                <span className="plan-approval-terminal-status">
-                  {terminalStatus}
-                </span>
-              ) : null}
-              {terminalFeedback ? (
-                <span className="plan-approval-terminal-feedback">
-                  {terminalFeedback}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
+          <span
+            className={`plan-approval-status plan-approval-status-${status}`}
+            role="status"
+          >
+            {status === "approved" || status === "completed" ? (
+              <IconCircleCheck size={13} aria-hidden />
+            ) : status === "rejected" || status === "expired" || status === "interrupted" ? (
+              <IconCircleAlert size={13} aria-hidden />
+            ) : status === "running" ? (
+              <IconSparkles size={13} aria-hidden />
+            ) : (
+              <IconClock size={13} aria-hidden />
+            )}
+            <span>{statusText}</span>
+          </span>
         </div>
       </div>
       {isPending ? (
@@ -330,12 +351,12 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
               type="button"
               className="plan-approval-approve-main"
               disabled={busy}
-              aria-label={t(APPROVE_LABEL_KEYS[rememberedMode])}
-              onClick={() => void resolve("approve", rememberedMode)}
+              aria-label={t(APPROVE_LABEL_KEYS[approvalMode])}
+              onClick={() => void resolve("approve", approvalMode)}
             >
               {resolving
                 ? t("plan.approving")
-                : t(APPROVE_LABEL_KEYS[rememberedMode])}
+                : t(APPROVE_LABEL_KEYS[approvalMode])}
             </button>
             <button
               ref={chevronRef}
@@ -362,13 +383,16 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
                     type="button"
                     className="plan-approval-menu-item"
                     role="menuitemradio"
-                    aria-checked={rememberedMode === candidate}
+                    aria-checked={approvalMode === candidate}
                     data-approval-mode={candidate}
                     disabled={busy}
-                    onClick={() => void resolve("approve", candidate)}
+                    onClick={() => {
+                      setApprovalMode(candidate);
+                      void resolve("approve", candidate);
+                    }}
                   >
                     <span>{t(APPROVAL_MODE_LABEL_KEYS[candidate])}</span>
-                    {rememberedMode === candidate ? (
+                    {approvalMode === candidate ? (
                       <IconCheck size={13} aria-hidden />
                     ) : null}
                   </button>
@@ -378,7 +402,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
           </div>
         </div>
       ) : null}
-      {isPending && rememberedMode === "auto" ? (
+      {isPending && approvalMode === "auto" ? (
         <div className="plan-approval-warning" role="note">
           <IconTriangleAlert size={13} aria-hidden />
           <span>{t("plan.autoWarning")}</span>

@@ -26,7 +26,6 @@ import type {
 import {
   ErrorCodes,
   highestSupportedThinkingLevel,
-  normalizeGlobalPermissionMode,
   normalizeMode,
   PROTOCOL_VERSION,
 } from "@pi-desktop/shared";
@@ -81,6 +80,13 @@ import {
   WORK_PANEL_MAX_WIDTH,
   WORK_PANEL_MIN_WIDTH,
 } from "../lib/work-panel-resize";
+import {
+  isActivePlanExecution,
+  isPendingPlan,
+  latestPlanProposal,
+  mergePlanCheckpoint,
+  terminalizeMissingPlan,
+} from "../lib/plan-mode-state";
 
 export type { WorkPanelTab } from "../lib/work-panel-tabs";
 
@@ -124,7 +130,6 @@ const navigationIntents = createNavigationIntentController();
 let pendingSessionSelection: { id: string; intent: number } | null = null;
 let sessionWorkspaceQueue: Promise<void> = Promise.resolve();
 const sessionTranscriptCache = new Map<string, UiMessage[]>();
-const pendingPlanLoads = new Map<string, Promise<PendingPlanRefreshResult>>();
 const planResolutionRequests = new Map<string, Promise<PlanResolutionResult>>();
 const planSyncGenerations = new Map<string, number>();
 const sessionDetailLoads = new Map<
@@ -308,9 +313,10 @@ export type AppState = {
   pendingPermissions: Record<string, PendingPermission>;
   /** Planning state is durable per session, including sessions outside view. */
   planningStates: Record<string, PlanningState>;
-  /** Live host approval rows keyed by session; terminal rows are removed only
-   * after the host confirms the resolution. */
+  /** Live host approval rows keyed by session; only pending rows form the gate. */
   pendingPlans: Record<string, PlanProposal>;
+  /** Latest immutable Plan checkpoint/execution snapshot per session. */
+  planCheckpoints: Record<string, PlanProposal>;
   toasts: ToastItem[];
   notifications: AppNotification[];
   unreadNotificationCount: number;
@@ -403,6 +409,7 @@ export type AppState = {
   /** Drop a session's sidebar outcome badge and read its task notifications. */
   acknowledgeSessionOutcome: (sessionId: string) => Promise<void>;
   restorePendingPlan: (sessionId: string) => Promise<PendingPlanRefreshResult>;
+  refreshPlanCheckpoints: () => Promise<void>;
   handleAgentEvent: (envelope: AgentEventEnvelope) => void;
   handlePlansChanged: (event: PlanningStateEvent) => void;
   setPage: (page: AppState["page"], opts?: { record?: boolean }) => void;
@@ -615,6 +622,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingPermissions: {},
   planningStates: {},
   pendingPlans: {},
+  planCheckpoints: {},
   page: "chat",
   settingsTab: "general",
   settingsAnchor: null,
@@ -711,8 +719,18 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? upsertWorkspace(openProjects, currentWorkspace)
         : openProjects;
       const hydratedSessions = decorateSessions(sessions.sessions, get().sessionMeta);
+      const latestPlanCheckpoints = Object.fromEntries(
+        hydratedSessions.flatMap((session) => {
+          const proposal = latestPlanProposal(
+            pendingPlansResult.plans,
+            session.id,
+          );
+          return proposal ? [[session.id, proposal] as const] : [];
+        }),
+      );
+      const activePendingPlans = pendingPlansResult.plans.filter(isPendingPlan);
       const pendingPlans = Object.fromEntries(
-        pendingPlansResult.plans.map((proposal) => [proposal.sessionId, proposal]),
+        activePendingPlans.map((proposal) => [proposal.sessionId, proposal]),
       );
       const planningStates: Record<string, PlanningState> = Object.fromEntries(
         hydratedSessions.map((session) => [
@@ -720,7 +738,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           session.mode === "plan" ? ("planning" as const) : ("inactive" as const),
         ]),
       );
-      for (const proposal of pendingPlansResult.plans) {
+      for (const proposal of activePendingPlans) {
         planningStates[proposal.sessionId] = "awaiting_approval";
       }
       set({
@@ -739,11 +757,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         plugins: plugins.plugins,
         planningStates,
         pendingPlans,
+        planCheckpoints: latestPlanCheckpoints,
         notifications: notifications.notifications,
         unreadNotificationCount: notifications.unreadCount,
         sessionOutcomes: latestSessionOutcomes(notifications.notifications),
       });
-      for (const proposal of pendingPlansResult.plans) {
+      for (const proposal of activePendingPlans) {
         openPlanArtifact(proposal, get().openWorkPanelTabForSession);
       }
       saveSidebarPreferences(preferencesFromState(get()));
@@ -758,7 +777,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // restoring a prior transcript as the first paint. A live host plan is
       // the exception: its owning session must be visible so approval can be
       // restored after a renderer reload.
-      const livePlanSessionId = pendingPlansResult.plans[0]?.sessionId;
+      const livePlanSessionId = activePendingPlans[0]?.sessionId;
       if (livePlanSessionId) {
         await get().selectSession(livePlanSessionId);
       } else {
@@ -780,52 +799,78 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   restorePendingPlan: async (sessionId) => {
     if (!sessionId) return "unavailable";
-    const existing = pendingPlanLoads.get(sessionId);
-    if (existing) return existing;
     const generation = nextPlanSyncGeneration(sessionId);
-    const request = (async (): Promise<PendingPlanRefreshResult> => {
-      try {
-        const result = await api.pendingPlans(sessionId);
-        if (generation !== planSyncGeneration(sessionId)) return "unavailable";
-        const proposal = result.plans.find((candidate) => candidate.sessionId === sessionId);
-        const nextState =
-          result.state ??
-          (proposal ? "awaiting_approval" : "inactive");
-        set((state) => ({
-          planningStates: {
-            ...state.planningStates,
-            [sessionId]: nextState,
-          },
-          pendingPlans: proposal
-            ? { ...state.pendingPlans, [sessionId]: proposal }
-            : withoutRecordKey(state.pendingPlans, sessionId),
-          sessions: state.sessions.map((session) =>
-            session.id === sessionId
-              ? {
-                  ...session,
-                  mode: sessionModeForPlanningState(nextState),
-                }
-              : session,
-          ),
-        }));
-        if (proposal) {
-          openPlanArtifact(proposal, get().openWorkPanelTabForSession);
-        }
-        return proposal?.status === "pending" ? "pending" : "terminal";
-      } catch {
-        // A transient host failure must not erase a live approval already held
-        // by the renderer; the next host event or activation retries it.
-        return "unavailable";
-      }
-    })();
-    pendingPlanLoads.set(sessionId, request);
     try {
-      return await request;
-    } finally {
-      if (pendingPlanLoads.get(sessionId) === request) {
-        pendingPlanLoads.delete(sessionId);
+      const result = await api.pendingPlans(sessionId);
+      if (generation !== planSyncGeneration(sessionId)) return "unavailable";
+      const existingCheckpoint = get().planCheckpoints[sessionId];
+      const wasPending = existingCheckpoint?.status === "pending";
+      const proposal = latestPlanProposal(result.plans, sessionId);
+      const durableMode = get().sessions.find(
+        (session) => session.id === sessionId,
+      )?.mode;
+      const nextState =
+        result.state ??
+        (proposal?.status === "pending"
+          ? "awaiting_approval"
+          : durableMode === "plan"
+            ? "planning"
+            : "inactive");
+      const checkpoint =
+        proposal ??
+        (existingCheckpoint?.status === "pending" &&
+        nextState === "awaiting_approval"
+          ? existingCheckpoint
+          : terminalizeMissingPlan(existingCheckpoint, nextState));
+      const activeProposal =
+        nextState === "awaiting_approval" && isPendingPlan(checkpoint)
+          ? checkpoint
+          : undefined;
+      const executionActive = isActivePlanExecution(checkpoint);
+      const planRunSettled = Boolean(activeProposal || executionActive || wasPending);
+      set((state) => ({
+        planningStates: {
+          ...state.planningStates,
+          [sessionId]: nextState,
+        },
+        planCheckpoints: checkpoint
+          ? { ...state.planCheckpoints, [sessionId]: checkpoint }
+          : state.planCheckpoints,
+        pendingPlans: activeProposal
+          ? { ...state.pendingPlans, [sessionId]: activeProposal }
+          : withoutRecordKey(state.pendingPlans, sessionId),
+        runningSessions: planRunSettled
+          ? { ...state.runningSessions, [sessionId]: executionActive }
+          : state.runningSessions,
+        isRunning:
+          state.activeSessionId === sessionId && planRunSettled
+            ? executionActive
+            : state.isRunning,
+        sessions: state.sessions.map((session) =>
+          session.id === sessionId
+            ? {
+                ...session,
+                mode: sessionModeForPlanningState(nextState),
+              }
+            : session,
+        ),
+      }));
+      if (checkpoint && activeProposal) {
+        openPlanArtifact(checkpoint, get().openWorkPanelTabForSession);
       }
+      return activeProposal ? "pending" : "terminal";
+    } catch {
+      // A transient host failure must not erase a live approval already held
+      // by the renderer; the next host event or activation retries it.
+      return "unavailable";
     }
+  },
+
+  refreshPlanCheckpoints: async () => {
+    const sessionIds = get().sessions.map((session) => session.id);
+    await Promise.allSettled(
+      sessionIds.map((sessionId) => get().restorePendingPlan(sessionId)),
+    );
   },
 
   prefetchSession: async (id) => {
@@ -1158,6 +1203,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   configureActiveSession: async (config) => {
     const sessionId = get().activeSessionId;
     if (!sessionId || get().runningSessions[sessionId]) return;
+    if (get().pendingPlans[sessionId]?.status === "pending") return;
     const result = await api.configureSession(sessionId, config);
     set((state) => ({
       sessions: state.sessions.map((session) =>
@@ -1178,11 +1224,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   sendPrompt: async (content) => {
     let sessionId = get().activeSessionId;
+    if (sessionId && get().pendingPlans[sessionId]?.status === "pending") return;
     if (!sessionId) {
       await get().newSession();
       sessionId = get().activeSessionId;
     }
     if (!sessionId) throw new Error("No active session");
+    if (get().pendingPlans[sessionId]?.status === "pending") return;
     const startedIn = sessionId;
     set((s) => ({
       isRunning: true,
@@ -1203,6 +1251,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         } catch {
           // non-fatal
         }
+      }
+      if (get().pendingPlans[sessionId]?.status === "pending") {
+        set((s) => ({
+          isRunning: s.activeSessionId === startedIn ? false : s.isRunning,
+          runningSessions: { ...s.runningSessions, [startedIn]: false },
+        }));
+        return;
       }
       await api.prompt({ sessionId, content });
     } catch (e) {
@@ -1290,6 +1345,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (state.isRunning) return false;
     const sessionId = state.activeSessionId;
     if (!sessionId) return false;
+    if (state.pendingPlans[sessionId]?.status === "pending") return false;
     const prompt = content.trim();
     if (!prompt) return false;
     const userIndex = state.messages.findIndex(
@@ -1352,6 +1408,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (state.isRunning) return;
     const sessionId = state.activeSessionId;
     if (!sessionId) return;
+    if (state.pendingPlans[sessionId]?.status === "pending") return;
     let userIndex = -1;
     for (let i = state.messages.length - 1; i >= 0; i -= 1) {
       const candidate = state.messages[i];
@@ -1785,6 +1842,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       const planningStates = withoutRecordKey(state.planningStates, id);
       const pendingPlans = withoutRecordKey(state.pendingPlans, id);
+      const planCheckpoints = withoutRecordKey(state.planCheckpoints, id);
       const workspaceReviewSessions = withoutRecordKey(
         state.workspaceReviewSessions,
         id,
@@ -1809,6 +1867,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         pendingPermissions,
         planningStates,
         pendingPlans,
+        planCheckpoints,
         workspaceReviewSessions,
         navStack,
         navIndex: Math.min(state.navIndex, navStack.length - 1),
@@ -2143,27 +2202,39 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!event?.sessionId) return;
     nextPlanSyncGeneration(event.sessionId);
     set((state) => {
-      const current = state.pendingPlans[event.sessionId];
-      let pendingPlans = state.pendingPlans;
-      if (event.state === "awaiting_approval") {
-        if (event.proposal?.status === "pending") {
-          pendingPlans = {
-            ...pendingPlans,
-            [event.sessionId]: event.proposal,
-          };
-        } else if (event.proposal && current?.id === event.proposal.id) {
-          pendingPlans = withoutRecordKey(pendingPlans, event.sessionId);
-        }
-      } else {
-        pendingPlans = withoutRecordKey(pendingPlans, event.sessionId);
-      }
+      const previousCheckpoint = state.planCheckpoints[event.sessionId];
+      const checkpoint = mergePlanCheckpoint(
+        previousCheckpoint,
+        event,
+      );
+      const activeProposal =
+        event.state === "awaiting_approval" &&
+        isPendingPlan(checkpoint)
+          ? checkpoint
+          : undefined;
+      const pendingPlans = activeProposal
+        ? { ...state.pendingPlans, [event.sessionId]: activeProposal }
+        : withoutRecordKey(state.pendingPlans, event.sessionId);
       const nextMode = sessionModeForPlanningState(event.state);
+      const executionActive = isActivePlanExecution(checkpoint);
+      const planExecutionWasActive = isActivePlanExecution(previousCheckpoint);
+      const planExecutionRunChanged = executionActive || planExecutionWasActive;
       return {
         planningStates: {
           ...state.planningStates,
           [event.sessionId]: event.state,
         },
+        planCheckpoints: checkpoint
+          ? { ...state.planCheckpoints, [event.sessionId]: checkpoint }
+          : state.planCheckpoints,
         pendingPlans,
+        runningSessions: planExecutionRunChanged
+          ? { ...state.runningSessions, [event.sessionId]: executionActive }
+          : state.runningSessions,
+        isRunning:
+          state.activeSessionId === event.sessionId && planExecutionRunChanged
+            ? executionActive
+            : state.isRunning,
         sessions: state.sessions.map((session) =>
           session.id === event.sessionId
             ? { ...session, mode: nextMode }
@@ -2171,8 +2242,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         ),
       };
     });
-    if (event.state === "awaiting_approval" && event.proposal?.status === "pending") {
-      openPlanArtifact(event.proposal, get().openWorkPanelTabForSession);
+    const checkpoint = get().planCheckpoints[event.sessionId];
+    if (event.state === "awaiting_approval" && isPendingPlan(checkpoint)) {
+      openPlanArtifact(checkpoint, get().openWorkPanelTabForSession);
     }
     if (event.state === "awaiting_approval" && !event.proposal) {
       void get().restorePendingPlan(event.sessionId);
@@ -2224,24 +2296,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (event.type === "planning_state") {
       nextPlanSyncGeneration(envelope.sessionId);
-      set((state) => ({
-        planningStates: {
-          ...state.planningStates,
-          [envelope.sessionId]: event.state,
-        },
-        pendingPlans:
-          event.state === "awaiting_approval" && event.proposal?.status === "pending"
-            ? { ...state.pendingPlans, [envelope.sessionId]: event.proposal }
-            : state.pendingPlans,
-        sessions: state.sessions.map((session) =>
-          session.id === envelope.sessionId
-            ? { ...session, mode: sessionModeForPlanningState(event.state) }
-            : session,
-        ),
-      }));
+      set((state) => {
+        const checkpoint = mergePlanCheckpoint(
+          state.planCheckpoints[envelope.sessionId],
+          { ...event, sessionId: envelope.sessionId },
+        );
+        const activeProposal =
+          event.state === "awaiting_approval" && isPendingPlan(checkpoint)
+            ? checkpoint
+            : undefined;
+        return {
+          planningStates: {
+            ...state.planningStates,
+            [envelope.sessionId]: event.state,
+          },
+          planCheckpoints: checkpoint
+            ? { ...state.planCheckpoints, [envelope.sessionId]: checkpoint }
+            : state.planCheckpoints,
+          pendingPlans: activeProposal
+            ? { ...state.pendingPlans, [envelope.sessionId]: activeProposal }
+            : withoutRecordKey(state.pendingPlans, envelope.sessionId),
+        };
+      });
       if (event.state === "awaiting_approval") {
-        if (event.proposal?.status === "pending") {
-          openPlanArtifact(event.proposal, get().openWorkPanelTabForSession);
+        const checkpoint = get().planCheckpoints[envelope.sessionId];
+        if (isPendingPlan(checkpoint)) {
+          openPlanArtifact(checkpoint, get().openWorkPanelTabForSession);
         }
         void get().restorePendingPlan(envelope.sessionId);
       }
@@ -2601,30 +2681,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const activeRequest = planResolutionRequests.get(resolution.proposalId);
     if (activeRequest) return activeRequest;
     const pending = get().pendingPlans[resolution.sessionId];
-    if (!pending || pending.id !== resolution.proposalId) {
+    if (!pending || pending.status !== "pending" || pending.id !== resolution.proposalId) {
       throw new Error("Plan approval is no longer available");
     }
     const request = (async () => {
       try {
         const result = await api.resolvePlan(resolution);
-        if (resolution.action === "approve") {
-          const targetPermissionMode =
-            result.targetPermissionMode ?? resolution.targetPermissionMode;
-          if (targetPermissionMode) {
-            set((state) =>
-              state.settings
-                ? {
-                    settings: {
-                      ...state.settings,
-                      planApprovalPermissionMode: normalizeGlobalPermissionMode(
-                        targetPermissionMode,
-                      ),
-                    },
-                  }
-                : {},
-            );
-          }
-        }
         // The response is authoritative host success. The matching
         // plans.changed event is also accepted by handlePlansChanged; neither
         // path clears a proposal before the host has confirmed the action.
@@ -2635,7 +2697,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           proposalId: result.proposal.id,
           action: result.action,
           targetPermissionMode: result.targetPermissionMode,
-          feedback: result.feedback,
         });
         return result;
       } catch (error) {

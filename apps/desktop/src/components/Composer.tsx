@@ -9,6 +9,7 @@ import type {
 import { PERMISSION_MODES } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
+import { isActivePlanExecution } from "../lib/plan-mode-state";
 import { runPaletteCommand } from "../lib/commands";
 import {
   resolveComposerCommand,
@@ -132,8 +133,8 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const showToast = useAppStore((s) => s.showToast);
   const composerPrefill = useAppStore((s) => s.composerPrefill);
   const clearComposerPrefill = useAppStore((s) => s.clearComposerPrefill);
-  const pendingPlan = useAppStore((s) =>
-    s.activeSessionId ? s.pendingPlans[s.activeSessionId] : undefined,
+  const planCheckpoint = useAppStore((s) =>
+    s.activeSessionId ? s.planCheckpoints[s.activeSessionId] : undefined,
   );
   const [value, setValue] = useState("");
   const [cursor, setCursor] = useState(0);
@@ -145,13 +146,16 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
   const thinkingRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
-  const approvalPending = Boolean(pendingPlan);
+  const approvalPending = planCheckpoint?.status === "pending";
+  const executionActive = isActivePlanExecution(planCheckpoint);
+  const composerBlocked = isRunning || executionActive || approvalPending;
+  const runActive = isRunning || executionActive;
 
   useEffect(() => {
-    if (!approvalPending) return;
+    if (!composerBlocked) return;
     setPermissionOpen(false);
     setThinkingOpen(false);
-  }, [approvalPending]);
+  }, [composerBlocked]);
 
   useEffect(() => {
     if (!composerPrefill) return;
@@ -283,7 +287,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
 
   const submit = async () => {
     const content = value.trim();
-    if (!content || isRunning || approvalPending) return;
+    if (!content || composerBlocked) return;
     // Slash dispatch (D123): builtin/plugin aliases execute locally without
     // a session or a model; templates and unknown /names stay prompt text
     // (main expands templates). Runs before the model-ready gate on purpose.
@@ -312,7 +316,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
     value,
     cursor,
     composing,
-    enabled: !isRunning && !approvalPending,
+    enabled: !composerBlocked,
   });
 
   const acceptCompletion = (index: number) => {
@@ -354,8 +358,8 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
       className={`composer-dock composer-dock-${variant}`}
     >
       <div className="composer-stack">
-        {pendingPlan ? <PlanApprovalBar proposal={pendingPlan} /> : null}
-        <div className="composer-shell">
+        {planCheckpoint ? <PlanApprovalBar proposal={planCheckpoint} /> : null}
+        <div className={`composer-shell${composerBlocked ? " is-gated" : ""}`}>
           {inputFocused ? (
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
           ) : null}
@@ -363,6 +367,8 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
             <textarea
               ref={ref}
               className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}
+              readOnly={composerBlocked}
+              aria-readonly={composerBlocked}
               rows={2}
               placeholder={t(variant === "home" ? "chat.placeholderHome" : "chat.placeholder")}
               spellCheck={false}
@@ -426,7 +432,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
               <button
                 className="icon-btn mode-chip"
                 title={t("settings.mode")}
-                disabled={isRunning || approvalPending || !activeSession}
+                disabled={composerBlocked || !activeSession}
                 onClick={async () => {
                   setThinkingOpen(false);
                   setPermissionOpen(false);
@@ -466,7 +472,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                     title={`${t("chat.thinking")} · ${thinkingLabel}`}
                     aria-haspopup="menu"
                     aria-expanded={thinkingOpen}
-                    disabled={isRunning || approvalPending || !activeSession}
+                    disabled={composerBlocked || !activeSession}
                     onClick={() => {
                       setPermissionOpen(false);
                       setThinkingOpen((open) => !open);
@@ -494,6 +500,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                             }`}
                             role="menuitemradio"
                             aria-checked={thinkingLevel === level}
+                            disabled={composerBlocked}
                             onClick={async () => {
                               try {
                                 await configureActiveSession({
@@ -542,7 +549,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                     }
                     aria-haspopup="menu"
                     aria-expanded={permissionOpen}
-                    disabled={isRunning || approvalPending || !activeSession}
+                    disabled={composerBlocked || !activeSession}
                     onClick={() => {
                       setThinkingOpen(false);
                       setPermissionOpen((open) => !open);
@@ -562,7 +569,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                             type="button"
                             role="menuitemradio"
                             aria-checked={effectivePermissionMode === candidate}
-                            disabled={isRunning || approvalPending}
+                            disabled={composerBlocked}
                             className={`composer-plus-item ${
                               effectivePermissionMode === candidate ? "active" : ""
                             }`}
@@ -600,7 +607,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
             </div>
 
             <div className="composer-right">
-              {isRunning ? (
+              {runActive ? (
                 <button className="stop-btn" title={t("chat.abort")} onClick={() => void abort()}>
                   <IconStop size={14} />
                 </button>
@@ -612,7 +619,7 @@ export function Composer({ variant = "docked" }: { variant?: "home" | "docked" }
                   }
                   disabled={
                     !value.trim() ||
-                    approvalPending ||
+                    composerBlocked ||
                     (!modelReady && !value.trim().startsWith("/"))
                   }
                   onClick={() => void submit()}

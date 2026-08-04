@@ -416,6 +416,7 @@ function AppShell() {
         setBackendDown(null);
         if (status.restarted) {
           showToast(t("status.restored"), { variant: "success" });
+          void useAppStore.getState().refreshPlanCheckpoints();
         }
       } else {
         setBackendDown({
