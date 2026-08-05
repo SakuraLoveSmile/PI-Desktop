@@ -2831,6 +2831,85 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (host-core `tools` tests, `runtime.test.ts` prompt
   assertions); full provider/UI journey Draft
 
+#### E2E-100: A pasted MCP server runs, and only where it is scoped
+
+- **Preconditions**: Two projects on disk, `~/work/api` and `~/personal/site`.
+  A local stdio MCP server available on PATH. An Agent session per project.
+- **Steps**:
+  1. Extensions → MCP → Import from JSON. Paste a `mcpServers` document holding
+     three servers: one valid stdio entry, one remote entry with `url` and no
+     `type`, and one stdio entry with no `command`.
+  2. Confirm the import, then open the imported stdio server and press Test
+     connection.
+  3. Leave the server at **Everywhere** and ask the agent in each project to
+     list its available tools.
+  4. Set the server to **These projects**, with only `~/work/api` picked.
+  5. Ask again in each project.
+  6. In the already-open `~/personal/site` session — assembled while the server
+     was global — ask the agent to call one of the server's tools by name.
+  7. Edit the server's `env` and save; ask in `~/work/api` again.
+  8. Rename the server and re-scope it; ask once more.
+  9. Point the server's command at a binary that does not exist, save, and open
+     a new session.
+- **Expected**:
+  - Two servers import; the third is listed as skipped with "a stdio server
+     requires command". The remote entry lands as `http` with its url intact.
+  - Test reports connected with the tool names it found, and the row's glyph
+     turns from connecting to ready.
+  - While global, both sessions see `mcp_<serverId>_<tool>` names.
+  - After narrowing, only the `~/work/api` session sees them; the summary chip
+     reads "1 project" and names it.
+  - The stale call from step 6 fails with `TOOL_NOT_FOUND` and "not active for
+     this session" — scope holds at dispatch, not only in the catalog.
+  - The `env` edit drops the connection: the next assembly re-handshakes, and
+     the tool's behaviour reflects the new value. The rename in step 8 does not
+     reconnect anything.
+  - The broken command records `failed` with a message, contributes no tools,
+     and is not re-dialled on the following session assembly; pressing Test
+     retries it.
+- **Specs linked**: `07-plugins/01-plugin-system.md` §12,
+  `03-runtime/01-ipc-protocol.md` §12a, `08-meta/decisions-log.md` (D192, D193)
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`apps/desktop/test/user-mcp.test.mjs`,
+  `packages/shared/src/mcp-import.test.ts`, host-core `mcp_servers` tests); full
+  UI journey Draft
+
+#### E2E-101: A user skill is written once and scoped per project
+
+- **Preconditions**: Two projects on disk. An Agent session in each.
+- **Steps**:
+  1. Extensions → Skills → New. Save with an empty description.
+  2. Fill in a description, write a body, and save.
+  3. Ask the agent in each project to use the skill by name.
+  4. Set the skill to **These projects** with only the first project picked,
+     then switch it Off and back to **These projects**.
+  5. Ask again in each project.
+  6. In the first project's session, narrow the skill to the *second* project
+     and immediately ask the agent to invoke it.
+  7. Paste a body over 128 KB.
+  8. Switch the app language to 中文 and revisit every surface above.
+- **Expected**:
+  - Saving without a description is refused with a message naming the field:
+    the description is the only part that enters the prompt.
+  - The base prompt carries the skill's id, name and trimmed description and
+    not its body; the body arrives only through the `Skill` tool.
+  - Toggling Off and back restores the picked project without re-picking it.
+  - After narrowing, only the scoped project's session can invoke it; the other
+    gets "not enabled for this project".
+  - Step 6 fails in the already-open session too — the scope is re-read when the
+    body is loaded, not trusted from the catalog that listed it.
+  - The byte counter warns before the 128 KB cap and the save is refused past it.
+  - Every label, empty state, error and count renders in Chinese, with counts
+    reading naturally at 0, 1 and many.
+- **Specs linked**: `07-plugins/01-plugin-system.md` §12.3,
+  `03-runtime/01-ipc-protocol.md` §12b, `08-meta/decisions-log.md` (D174, D192,
+  D194)
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (host-core `user_skills` tests,
+  `apps/desktop/test/extensions-page.test.mjs`); full UI journey Draft
+
 ## 8. Traceability Matrix
 
 
@@ -2843,12 +2922,12 @@ Each scenario is documented in this format:
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
 | C — Chat & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-AGENTS-001 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099 |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-AGENTS-001 |
 | G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-AGENTS-001 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-AGENTS-001 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -2856,7 +2935,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-AGENTS-001 (+ packaging scenarios in release runbook) |
+| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-AGENTS-001 (+ packaging scenarios in release runbook) |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the

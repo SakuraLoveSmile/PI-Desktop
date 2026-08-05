@@ -68,3 +68,4 @@ Each ADR includes:
 | 0050 | Bounded provider stream recovery and diagnostics | Accepted |
 | 0051 | Isolate host RPC stdio from the Tokio blocking pool | Accepted |
 | 0052 | Agent-only mode; Chat becomes an internal read-only profile | Accepted |
+| 0053 | User-owned MCP servers and skills, with a shared activation scope | Accepted |

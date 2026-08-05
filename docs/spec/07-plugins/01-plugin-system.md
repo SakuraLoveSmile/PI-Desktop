@@ -7,6 +7,10 @@
 - uninstall deletes plugin data by default (D016)
 - plugin settings secrets not allowed in MVP (D018)
 - runtime target remains separate process; M4 may use host-managed sandboxed runtime (D009)
+- every extension carries `enabled` plus an activation scope; both plugins and the
+  user's own MCP servers and skills are global or limited to named projects (D192)
+- user MCP tools use the prefix `mcp_<serverId>_<toolName>`, disjoint from D015's
+  plugin namespace (D193)
 
 ## 1. Goals
 
@@ -363,15 +367,26 @@ Failure policy:
 - load failure: mark error, do not affect host startup
 - tool execution failure: return a tool error, do not crash the main process
 
-## 12. Plugin management UI
+## 12. Extensions UI
 
-Use the app shell's dedicated **Plugins** destination for plugin management.
-Do not duplicate plugin management in Settings.
+The app shell's dedicated **Extensions** destination owns everything a user adds
+to the app. Do not duplicate any of it in Settings.
 
-Features:
+Four tabs, because the three kinds are created in completely different ways —
+installed, configured, written — and one merged list would have to hide that
+behind a lowest-common-denominator row:
+
+| Tab | Contents |
+|---|---|
+| Installed | Plugins, grouped: needs attention, updates, active, disabled |
+| MCP | The user's own MCP servers (D193) |
+| Skills | The user's own skill documents (D194) |
+| Marketplace | Browse and install |
+
+Plugin features:
 - Local install (choose directory / zip)
 - Developer load (path)
-- Enable / disable
+- Activation scope (off / this project / everywhere)
 - Uninstall
 - View permissions
 - View logs
@@ -382,6 +397,39 @@ Status indicators:
 - disabled
 - error
 - dev-loaded
+
+### 12.1 The activation-scope control
+
+One control serves all three kinds (D192). It is a three-segment track ordered
+by increasing reach — **Off → These projects → Everywhere** — so widening and
+narrowing are the same gesture in opposite directions, plus a summary chip that
+opens the project picker when the middle segment is active.
+
+Rules the control encodes:
+- Choosing "these projects" with nothing picked yet seeds the currently open
+  project, so the common case is one click.
+- Switching to "everywhere" or "off" keeps the project list, so going back
+  restores it.
+- A project already scoped but no longer in the recent list still appears in the
+  picker, or the scope could never be undone.
+- A project-scoped extension with an empty list warns instead of silently doing
+  nothing.
+
+### 12.2 MCP tab
+
+- **Import from JSON** is the primary action: a pasted `mcpServers` block is what
+  users have on hand. Bad entries are listed with a reason, not fatal (D193).
+- Each row's leading glyph doubles as the connection light — idle, connecting,
+  ready, failed — so "is this working" is the first thing read.
+- The editor sheet has stdio and HTTP transport cards, key/value rows for env or
+  headers, and a **Test connection** button that reports the tool names it found.
+
+### 12.3 Skills tab
+
+- Create writes `SKILL.md`; import copies an existing document in.
+- The description is required and sits above the body, because it is the only
+  part that enters the prompt (D174, D194).
+- A live byte counter against the 128KB document cap.
 
 ## 13. Developer experience
 

@@ -507,6 +507,7 @@ Minimal interface:
 - `plugin/uninstall(id)`
 - `plugin/getPermissions(id)`
 - `plugin/setPermission(id, permission, allowed)` (optional fine-grained)
+- `plugin/setScope(id, scope)` (D192)
 
 Returned summary:
 
@@ -520,8 +521,73 @@ type PluginSummary = {
  status: "ready" | "error" | "disabled"
  errorMessage?: string
  permissions: string[]
+ scope?: ActivationScope
 }
 ```
+
+## 12a. User MCP server API (D193)
+
+Servers the user configured with no plugin around them. host-core owns the
+records (`<data>/mcp/servers.json`); Electron main owns the connections.
+
+- `mcp/list` → `{ servers: McpServerRecord[]; statuses: McpServerStatus[] }`
+- `mcp/upsert(server)` — the id decides create vs replace
+- `mcp/remove(id)`
+- `mcp/setEnabled(id, enabled)`
+- `mcp/setScope(id, scope)`
+- `mcp/test(id)` → `{ status }` — forces one handshake and keeps it
+- `mcp/import({ text })` → `{ imported, failed: [{ id, reason }] }`
+
+`import` accepts a pasted `mcpServers` block; a malformed entry is reported in
+`failed`, never fatal for the rest of the paste.
+
+```ts
+type McpServerStatus = {
+ serverId: string
+ state: "idle" | "connecting" | "ready" | "failed"
+ toolCount: number
+ toolNames?: string[]
+ message?: string
+ updatedAt: number
+}
+```
+
+Tools reach the agent as `mcp_<serverId>_<toolName>`, disjoint from the plugin
+bridge's `plugin_` namespace (D015).
+
+## 12b. User skill API (D194)
+
+One Markdown document each, under `<data>/skills/<id>/SKILL.md`.
+
+- `skill/list` → `{ skills: UserSkillRecord[] }`
+- `skill/create(skill)`
+- `skill/import()` — native picker; `{ canceled: true }` when backed out
+- `skill/update(id, skill)`
+- `skill/read(id)` → `{ skill, body }` — the only call that returns the document
+- `skill/remove(id)`
+- `skill/setEnabled(id, enabled)`
+- `skill/setScope(id, scope)`
+- `skill/reveal(id)`
+
+The body is not in `list`: only the description enters the prompt, and the
+document is fetched when the model invokes `Skill` (D174).
+
+## 12c. Activation scope (D192)
+
+Every `setScope` call above takes the same shape, and `PluginSummary`,
+`McpServerRecord` and `UserSkillRecord` all carry it beside `enabled`:
+
+```ts
+type ActivationScope = {
+ mode: "global" | "projects"
+ /** Absolute paths; read only in "projects" mode, kept across mode changes. */
+ projects: string[]
+}
+```
+
+Matching is case-insensitive, trailing-separator-insensitive, and includes
+subdirectories of a scoped path. A missing scope means global. A `projects`-mode
+extension is inactive in a session with no project.
 
 ## 13. Command Palette API
 

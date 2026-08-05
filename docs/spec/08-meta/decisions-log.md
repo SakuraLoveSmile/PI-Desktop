@@ -285,6 +285,14 @@ section mirrors only marketplace/catalog items still blocking nothing.
 |---|---|---|---|
 | D126 | Three-platform release delivery (lifts D010) | **Tag builds publish every artifact the matrix produces to the GitHub Release: macOS dmg/zip (arm64), Windows NSIS x64, Linux AppImage + deb (x64), each with blockmaps and the platform's `latest*.yml` electron-updater feed. Publishing the feeds activates D120's in-app update lanes for Windows NSIS and Linux AppImage; macOS stays in notify-and-link mode until a signed channel is qualified. The NSIS artifact name is pinned space-free (`PI-Desktop-Setup-${version}.${ext}`) because GitHub asset URLs mangle spaces. D010's macOS-only scope is lifted per the baseline-bump rule (baseline `0.4.7`); the release pipeline itself was qualified end-to-end on v0.1.1-rc.1/v0.1.1.** | The pipeline builds and validates all three platforms on every tag anyway; keeping installers as expiring Actions artifacts (90-day retention) withheld them from users without adding safety. Publishing the update feeds is the point of shipping: platforms with in-app lanes update silently, and future platform regressions surface through real installs instead of unused artifacts. |
 
+## V. Extension activation decisions
+
+| ID | Topic | Decision | Rationale |
+|---|---|---|---|
+| D192 | Activation scope shared by every extension kind | **Plugins, user MCP servers and user skills each carry `enabled: boolean` plus `scope: { mode: "global" \| "projects"; projects: string[] }`. `enabled` stays separate so switching an extension off never discards its project list, and the three-state control (`off` / `projects` / `global`) is derived, not stored. Matching is case-insensitive, trailing-separator-insensitive and subdirectory-inclusive; a missing scope resolves to global; a `projects`-mode extension is inactive in a session with no project. Scope is enforced both when a per-turn catalog is assembled and again at dispatch (`tools.execute`, `UserMcpRuntime.callTool`, `loadUserSkillBody`, command execution). Agent-facing surfaces filter on the session's project, app-facing surfaces on the active window's; themes are not scoped at all.** | A single boolean made every extension global, so a work-only MCP server spent context in every unrelated session and the only remedy was toggling by hand on each project switch. One scope shape lets one control and one predicate serve all three kinds, and enforcing at dispatch closes the window in which a session still remembers a tool the user has just scoped away (ADR 0053). |
+| D193 | User-owned MCP servers need no plugin | **host-core owns `McpServerRecord` values in `<data>/mcp/servers.json` behind `mcp.list` / `active` / `upsert` / `remove` / `setEnabled` / `setScope`; Electron main owns the processes in `UserMcpRuntime`, reusing ADR 0038's `McpServerClient`. Tools are exposed as `mcp_<serverId>_<tool>`, distinct from D015's `plugin_` namespace. A server connects on first use by a session that can see it and caches its tool list; a failed handshake stays failed until the user edits it or presses Test; saving a change to transport, command, args, env, url or headers drops the connection while label, description and scope do not. Cap 16 live processes, 64 tools per server, `commandPolicy: "trusted"` with the user's home as cwd. Adding one is primarily a pasted `mcpServers` block: `parseMcpImport` accepts the `mcpServers` / `servers` / bare-map / single-object spellings, infers `http` from a `url`, coerces non-string env and header values, honours `disabled: true`, caps at 32 entries, and reports per-entry reasons instead of failing the whole paste.** | Every MCP server in the wild ships as three lines of JSON; requiring a manifest, a package and a signature to run them was a wrapper around nothing. Caching plus sticky failure keeps session assembly off the connect timeout, and invalidating only on identity changes avoids serving a stale tool list after an edit (ADR 0053). |
+| D194 | User-owned skills are one Markdown document | **host-core stores `<data>/skills/<id>/SKILL.md` with a `registry.json` index behind `skills.list` / `active` / `create` / `import` / `update` / `read` / `remove` / `setEnabled` / `setScope`. D174's delivery contract is unchanged: only the description enters the prompt, the body is fetched when the model invokes `Skill`, 128KB per document. The editor therefore requires a description and places it above the body. User skill ids are bare and plugin skill ids contain `/`, so `loadUserSkillBody` rejects any id with a separator and falls through to the plugin catalog with no registry lookup.** | A skill is a single Markdown file; the plugin path made the smallest possible extension carry the largest possible envelope. Keeping the id shapes disjoint separates the two catalogs without a lookup, and keeping D174's contract means user skills cost the same context as plugin ones (ADR 0053). |
+
 ## 2026-07-28 — Plugin marketplace, panels, and high-risk APIs
 
 - Official local marketplace provider can browse/search/install `.piplug` packages with checksum verification.
@@ -1049,3 +1057,39 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Decision D191; tool schemas widen without breaking callers and prompt text is
   not an interface, so no ADR. See `03-runtime/16-tool-result-limits.md`,
   `03-runtime/02-agent-runtime.md` §7, and E2E-099.
+
+## 2026-08-05 — MCP servers and skills the user owns, scoped per project
+
+- Plugins, user MCP servers and user skills now share one activation shape:
+  `enabled` plus `{ mode: "global" | "projects", projects: [] }`. The boolean
+  stays separate from the scope so switching something off keeps the project
+  list it was narrowed to, and the `off` / `projects` / `global` control the UI
+  renders is derived from the pair rather than stored as a third mode.
+- Matching is case-insensitive and trailing-separator-insensitive because macOS
+  and Windows both hand us case-varying spellings of one directory, and a scoped
+  path covers its subdirectories so a monorepo root does not have to be listed
+  package by package. A `projects`-scoped extension is inactive in a session
+  with no project: "these projects" is a claim about projects.
+- Scope is checked when the per-turn catalog is built **and** again at dispatch.
+  A session outlives the prompt that listed its tools, and a tool the model can
+  see is a tool it will try to call, so filtering in one place leaves a hole
+  between re-scoping and the next prompt. Themes stay unscoped — appearance is
+  app-wide, not a per-project capability.
+- Adding an MCP server is a paste. `parseMcpImport` reads the `mcpServers`
+  document every README prints plus the `servers`, bare-map and single-object
+  variants, infers `http` from a `url` because half the configs omit `type`, and
+  reports per-entry skip reasons so one bad entry in fifteen is not fatal.
+- A user MCP server connects on first use and caches its tools; a failed
+  handshake stays failed until the user edits it or presses Test. Saving a change
+  to what the server *is* drops the connection, renaming it does not — a stale
+  tool list is worse than a missing one.
+- A user skill is one `SKILL.md`. D174's contract is untouched, which is why the
+  editor requires a description and puts it above the body: the description is
+  the only part that enters the prompt.
+- Four tabs rather than one merged list. Plugins are installed, MCP servers are
+  configured, skills are written; their rows need a connection light, a byte
+  counter and a permissions matrix respectively, and one list would hide all of
+  that behind a lowest-common-denominator row.
+- Decisions D192, D193, D194; new host-core registries, new RPC methods and a
+  new main-process runtime, so ADR 0053. See `07-plugins/01-plugin-system.md`
+  and `07-plugins/03-plugin-api.md`.
