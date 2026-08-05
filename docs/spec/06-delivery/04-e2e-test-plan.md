@@ -2780,6 +2780,53 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`runtime.test.ts`); full provider/UI journey Draft
 
+#### E2E-099: Scoped search stays inside its budget and the agent narrates
+
+- **Preconditions**: A project-bound Agent session; the workspace contains a
+  multi-megabyte source file, a minified bundle with a `.map` sibling (one line,
+  megabytes long), a binary file, and a dependency tree excluded by `.gitignore`.
+- **Steps**:
+  1. Inspect `tools.list` for `Read`, `Glob`, and `Grep`.
+  2. Read the multi-megabyte file, then read it again from the reported next
+     offset.
+  3. Grep a token that hits the minified bundle and its `.map`.
+  4. Grep the same token with `path` pointing into the ignored dependency tree,
+     then with `include` narrowing to one extension, then with
+     `outputMode: filesWithMatches` and `count`.
+  5. Glob a broad pattern, and Glob with `path` and `limit`.
+  6. Read the binary file.
+  7. Run a shell command that prints far past the shell budget on stdout, then
+     one that fails after printing progress noise on stderr, and open the spill
+     file named in each marker.
+  8. Ask a question that needs several tool batches, and watch the transcript
+     between batches.
+- **Expected**:
+  - Every description carries its parameters and the real limit numbers.
+  - No single tool result exceeds its budget: 48 KB for Read/Glob/Grep, 96 KB
+    for Bash. Read reports `offset`, `lineCount`, `fileBytes`, and a next-offset
+    `notice`; the second read continues without overlap and reports `totalLines`
+    once the end is reached.
+  - No file size is ever refused. Lines from the bundle and the `.map` arrive
+    clipped at 2000 chars and the clip count appears in `notice`, so one line
+    cannot consume the result.
+  - An explicit `path` reaches into the ignored tree; without it the same search
+    returns nothing from there. `include`, `outputMode`, and `headLimit` each
+    shrink the payload, and results order newest-modified first.
+  - The binary read fails with `TOOL_BINARY_CONTENT` and no binary reaches the
+    model; Grep skips it silently.
+  - Bash stdout keeps its head, stderr keeps its tail, both markers name which
+    end survived and the spill path, and each spill file opens with the fuller
+    output.
+  - The agent answers in the language the user wrote in, precedes each tool
+    batch with a sentence about what it is doing, never leaves more than one
+    batch without new visible text, and ends with a self-contained result.
+- **Specs linked**: `03-runtime/16-tool-result-limits.md`,
+  `03-runtime/02-agent-runtime.md` §7, `08-meta/decisions-log.md` (D191)
+- **Acceptance**: C (chat & stream), E (tools & permissions), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (host-core `tools` tests, `runtime.test.ts` prompt
+  assertions); full provider/UI journey Draft
+
 ## 8. Traceability Matrix
 
 
@@ -2790,14 +2837,14 @@ Each scenario is documented in this format:
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
-| C — Chat & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-AGENTS-001 |
+| C — Chat & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-AGENTS-001 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097 |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-AGENTS-001 |
 | G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-025, E2E-026 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-AGENTS-001 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-AGENTS-001 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -2805,7 +2852,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-AGENTS-001 (+ packaging scenarios in release runbook) |
+| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-AGENTS-001 (+ packaging scenarios in release runbook) |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the

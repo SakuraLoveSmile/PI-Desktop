@@ -1020,3 +1020,32 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Decision D190; recovery inside the existing loop contract, so no ADR. See
   `03-runtime/02-agent-runtime.md` §5e, `03-runtime/08-error-codes.md` §3.2,
   and E2E-098.
+
+## 2026-08-05 — Per-tool output budgets, scoped search, and stated collaboration rules
+
+- The single 256KB / 4000-line cap is replaced by per-tool budgets: 48KB for
+  Read/Glob/Grep, 96KB for Bash stdout, 96KB tail-kept for Bash stderr, 2000
+  chars per line everywhere. Search results are re-fetchable — narrow the
+  pattern, advance the offset — so they earn the tighter half; a failing
+  command's last line is the actionable one, so stderr keeps its tail.
+- `Read` paginates with `offset` / `limit` and never refuses on file size. The
+  old >512KB rejection said "use Grep or Bash to sample it", which is how an
+  unpaginated read became an unbounded `sed` pipeline. `Grep` takes `path`,
+  `include`, `outputMode`, `headLimit`; `Glob` takes `path`, `limit`; both order
+  by modification time, newest first.
+- An explicit `path` disables parent ignore files. Without that, scoping a
+  search to `node_modules` or `dist` returned zero and pushed the model back to
+  shell — and Grep could not read its own spill files.
+- Over-budget Bash output spills into the per-session scratch dir so the marker
+  names a real file. Read/Glob/Grep embed no marker: `content` stays
+  byte-faithful so text copied out of it still matches for `Edit`, and the
+  window metadata plus `notice` carry the same facts as sibling fields.
+- The system prompt now states collaboration rules outright — answer in the
+  user's language, a sentence before each tool batch, never more than one batch
+  without visible text, answer in text rather than only in reasoning, finish end
+  to end — and states a preference for the scoped tools over shell equivalents.
+  "Prefer concise, actionable answers" was the only nearby rule, and a reasoning
+  model executed it as saying nothing.
+- Decision D191; tool schemas widen without breaking callers and prompt text is
+  not an interface, so no ADR. See `03-runtime/16-tool-result-limits.md`,
+  `03-runtime/02-agent-runtime.md` §7, and E2E-099.
