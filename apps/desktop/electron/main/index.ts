@@ -27,15 +27,21 @@ import {
   THINKING_LEVELS,
   WINDOW_CONTROL_ACTIONS,
   err,
+  isActiveInProject,
   ok,
+  parseMcpImport,
+  type ActivationScope,
   type AgentEventEnvelope,
   type AppMenuCommand,
   type AppNotification,
   type KeybindingOverrides,
+  type McpServerInput,
+  type McpServerRecord,
   type Mode,
   type NativeMenuAction,
   type Result,
   type ThinkingLevel,
+  type UserSkillRecord,
   type WindowControlAction,
 } from "@pi-desktop/shared";
 import {
@@ -54,6 +60,7 @@ import { HostProcess } from "./host-process";
 import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
 import { PluginRuntime } from "./plugin-runtime";
+import { UserMcpRuntime } from "./user-mcp";
 import { builtinSkills, loadBuiltinSkillBody } from "./builtin-skills";
 import { registerPluginDevTools } from "./plugin-dev-tools";
 import { PluginPanelHost } from "./plugin-panel-host";
@@ -216,6 +223,25 @@ const ptys = new PtyManager({
   onExit: (termId, exitCode) =>
     sendToRenderer(IPC.event.terminalExit, { termId, exitCode }),
 });
+const userMcp = new UserMcpRuntime({
+  audit: (entry) => logger.app("plugin", "info", "mcp.api", entry),
+  log: (level, message, data) => logger.app("plugin", level, message, { data }),
+});
+/**
+ * Activation scopes for the loaded plugins, keyed by plugin id.
+ *
+ * host-core is the source of truth; this cache exists because scope has to be
+ * consulted on every session assembly and every tool dispatch, which are hot
+ * paths that must not wait on an RPC round trip. It is refreshed whenever the
+ * plugin list is read.
+ */
+const pluginScopes = new Map<string, ActivationScope>();
+/**
+ * Project path per live session, so a tool dispatch can be scope-checked
+ * without asking host-core which project the session belongs to. Two windows
+ * can hold sessions on different projects, so this cannot be a single value.
+ */
+const sessionProjects = new Map<string, string | null>();
 const browserPane = new BrowserPane((state) =>
   sendToRenderer(IPC.event.browserState, state),
 );
@@ -322,6 +348,96 @@ function enrichSession<T extends RuntimeSession>(
   };
 }
 
+/**
+ * Refresh the cached plugin scopes from a `plugins.list` payload.
+ *
+ * Anything that changes a scope goes through host-core, so every read of the
+ * list is also the moment to re-learn them.
+ */
+function rememberPluginScopes(list: Array<{ id?: string; scope?: ActivationScope }>): void {
+  pluginScopes.clear();
+  for (const plugin of list) {
+    if (typeof plugin?.id === "string" && plugin.scope) {
+      pluginScopes.set(plugin.id, plugin.scope);
+    }
+  }
+}
+
+/**
+ * Whether a loaded plugin's contributions apply to `projectPath`.
+ *
+ * `enabled` is already implied — a disabled plugin is never loaded into the
+ * runtime — so only the scope is consulted here. A plugin with no cached scope
+ * counts as global, which is what every plugin installed before scopes existed
+ * was.
+ */
+function pluginActiveInProject(pluginId: string, projectPath: string | null | undefined): boolean {
+  const scope = pluginScopes.get(pluginId);
+  if (!scope) return true;
+  return isActiveInProject({ enabled: true, scope }, projectPath);
+}
+
+/** One-line message for an error of unknown shape, for user-facing lists. */
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message.slice(0, 300);
+  return String(error).slice(0, 300);
+}
+
+/** Pull the user's MCP server records from host-core into the local runtime. */
+async function refreshUserMcp(): Promise<McpServerRecord[]> {
+  if (!host) return [];
+  try {
+    const result = await host.call<{ servers: McpServerRecord[] }>("mcp.list");
+    const servers = result.servers ?? [];
+    userMcp.setRecords(servers);
+    return servers;
+  } catch (error) {
+    logger.app("plugin", "warn", "mcp list failed", { data: String(error) });
+    return [];
+  }
+}
+
+/** The user's own skills, filtered to the ones a session on this project sees. */
+async function activeUserSkills(
+  projectPath: string | undefined,
+): Promise<UserSkillRecord[]> {
+  if (!host) return [];
+  try {
+    const result = await host.call<{ skills: UserSkillRecord[] }>("skills.active", {
+      projectPath: projectPath ?? null,
+    });
+    return result.skills ?? [];
+  } catch (error) {
+    logger.app("plugin", "warn", "skills list failed", { data: String(error) });
+    return [];
+  }
+}
+
+/**
+ * Load one of the user's own skill documents by id, or `null` if there is no
+ * such skill — so the caller can fall through to the plugin catalog.
+ *
+ * The scope check is repeated here rather than trusted from the catalog: a
+ * session can outlive the prompt that listed the skill, and re-scoping a skill
+ * mid-session should take effect immediately.
+ */
+async function loadUserSkillBody(
+  id: string,
+  projectPath: string | null,
+): Promise<{ id: string; name: string; body: string } | null> {
+  if (!host || id.includes("/")) return null;
+  const result = await host.call<{
+    skill: UserSkillRecord | null;
+    body: string | null;
+  }>("skills.read", { id });
+  const skill = result.skill;
+  if (!skill || typeof result.body !== "string") return null;
+  if (!isActiveInProject(skill, projectPath)) {
+    throw new Error(`skill "${id}" is not enabled for this project`);
+  }
+  return { id: skill.id, name: skill.name, body: result.body };
+}
+
 async function resolveAgentRuntimeLaunch(
   sessionId: string,
   session: any,
@@ -376,15 +492,32 @@ async function resolveAgentRuntimeLaunch(
       ? session.projectPath.trim()
       : undefined;
   const projectInstructions = await loadInstructionChain(projectPath);
+  sessionProjects.set(sessionId, projectPath ?? null);
+  // Everything below is filtered by activation scope: a plugin, MCP server or
+  // skill limited to certain projects must be invisible to a session on any
+  // other one — not merely refused when called, since a tool the model can see
+  // is a tool it will try.
+  const userSkills = await activeUserSkills(projectPath);
+  const userMcpTools = await userMcp.toolsForProject(projectPath ?? null);
   // Skill catalog (D174): only id/name/description cross to the sidecar; the
   // document body is fetched on demand through the local `Skill` tool. Host
-  // skills come first so a plugin's entry reads as a refinement of them.
+  // skills come first so a plugin's entry reads as a refinement of them, and
+  // the user's own skills come last so they win a name clash in the model's
+  // reading order.
   const pluginSkills = [
     ...builtinSkills({
       workspacePath: projectPath,
       pluginPaths: plugins.listLoaded().map((loaded) => loaded.path),
     }),
-    ...plugins.getSkills().map((skill) => ({
+    ...plugins
+      .getSkills()
+      .filter((skill) => pluginActiveInProject(skill.pluginId, projectPath))
+      .map((skill) => ({
+        id: skill.id,
+        name: skill.name,
+        description: skill.description,
+      })),
+    ...userSkills.map((skill) => ({
       id: skill.id,
       name: skill.name,
       description: skill.description,
@@ -415,11 +548,21 @@ async function resolveAgentRuntimeLaunch(
         supportedThinkingLevels: thinkingCapabilities.supportedThinkingLevels,
         ...(modelConfig ? { modelConfig } : {}),
       },
-      pluginTools: plugins.getTools().map((tool) => ({
-        name: tool.fullName,
-        description: tool.description,
-        parameters: tool.schema ?? { type: "object", properties: {} },
-      })),
+      pluginTools: [
+        ...plugins
+          .getTools()
+          .filter((tool) => pluginActiveInProject(tool.pluginId, projectPath))
+          .map((tool) => ({
+            name: tool.fullName,
+            description: tool.description,
+            parameters: tool.schema ?? { type: "object", properties: {} },
+          })),
+        ...userMcpTools.map((tool) => ({
+          name: tool.fullName,
+          description: tool.description,
+          parameters: tool.schema ?? { type: "object", properties: {} },
+        })),
+      ],
       // Plugin skills (D174): only the catalog crosses to the sidecar; the
       // document body is fetched on demand through the local `Skill` tool.
       pluginSkills,
@@ -1808,22 +1951,50 @@ function wireHost(h: HostProcess) {
       };
       sendToRenderer(IPC.event.agentMessage, envelope);
     } else if (method === "plugins.execute") {
-      // Host dispatches plugin_* tools to us; run the plugin JS and answer.
+      // Host dispatches plugin_* and mcp_* tools to us; run them and answer.
       void (async () => {
         const q = params as {
           executionId: string;
+          sessionId?: string;
           toolCallId?: string;
           toolName: string;
           args: unknown;
         };
+        const projectPath = q.sessionId
+          ? (sessionProjects.get(q.sessionId) ?? null)
+          : null;
         const tool = plugins.getTools().find((t) => t.fullName === q.toolName);
         let payload: Record<string, unknown>;
-        if (!tool) {
+        if (q.toolName.startsWith("mcp_")) {
+          try {
+            const result = await userMcp.callTool(q.toolName, q.args, projectPath);
+            payload = { executionId: q.executionId, ok: true, content: result ?? null };
+          } catch (e) {
+            payload = {
+              executionId: q.executionId,
+              ok: false,
+              errorCode:
+                (e as { errorCode?: string })?.errorCode ?? "TOOL_FAILED",
+              content: { error: e instanceof Error ? e.message : String(e) },
+            };
+          }
+        } else if (!tool) {
           payload = {
             executionId: q.executionId,
             ok: false,
             errorCode: "TOOL_NOT_FOUND",
             content: { error: `plugin tool not loaded: ${q.toolName}` },
+          };
+        } else if (!pluginActiveInProject(tool.pluginId, projectPath)) {
+          // The catalog already hid it, but a session assembled before the
+          // scope changed can still ask.
+          payload = {
+            executionId: q.executionId,
+            ok: false,
+            errorCode: "TOOL_NOT_FOUND",
+            content: {
+              error: `plugin tool ${q.toolName} is not enabled for this project`,
+            },
           };
         } else {
           try {
@@ -1992,7 +2163,7 @@ async function startSidecar(): Promise<void> {
   // Plugin skills (D174): the model loads a declared skill document by id.
   // Served in main because the plugin runtime — and the plugin directories —
   // live here, not in host-core.
-  s.setLocalTool("Skill", async ({ args }) => {
+  s.setLocalTool("Skill", async ({ args, sessionId }) => {
     const id = String((args as { id?: unknown })?.id ?? "").trim();
     if (!id) {
       return {
@@ -2001,9 +2172,15 @@ async function startSidecar(): Promise<void> {
         content: "Skill: `id` is required. Use an id from the Skills section.",
       };
     }
+    const projectPath = sessionProjects.get(sessionId) ?? null;
     try {
-      // Bundled skills answer first; they are not owned by any plugin.
-      const skill = loadBuiltinSkillBody(id) ?? plugins.loadSkillBody(id);
+      // Bundled skills answer first; they are not owned by any plugin. A user
+      // skill is looked up next, and only then a plugin's — the ids cannot
+      // collide, since a plugin skill id always carries a `<pluginId>/` prefix.
+      const skill =
+        loadBuiltinSkillBody(id) ??
+        (await loadUserSkillBody(id, projectPath)) ??
+        plugins.loadSkillBody(id);
       return {
         ok: true,
         content: `# Skill: ${skill.name} (${skill.id})\n\n${skill.body}`,
@@ -2011,6 +2188,7 @@ async function startSidecar(): Promise<void> {
     } catch (error) {
       const available = plugins
         .getSkills()
+        .filter((skill) => pluginActiveInProject(skill.pluginId, projectPath))
         .map((skill) => skill.id)
         .join(", ");
       return {
@@ -2375,6 +2553,7 @@ async function bootBackends() {
   // Restore enabled plugins
   try {
     const listed = await host!.call<{ plugins: any[] }>("plugins.list");
+    rememberPluginScopes(listed.plugins ?? []);
     for (const p of listed.plugins ?? []) {
       if (p.enabled && p.path) {
         try {
@@ -2394,6 +2573,11 @@ async function bootBackends() {
   } catch (e) {
     logger.app("plugin", "error", "plugin list failed", { data: String(e) });
   }
+
+  // The user's MCP servers are only *registered* here; each one connects the
+  // first time a session that can see it is assembled, so a project-scoped
+  // server costs nothing until that project is open.
+  await refreshUserMcp();
 }
 
 function registerIpc() {
@@ -2697,6 +2881,7 @@ function registerIpc() {
         .call("agent.disposeSession", { sessionId: id })
         .catch(() => undefined);
     }
+    sessionProjects.delete(id);
     logger.app("session", "info", "session deleted", { sessionId: id });
     return res;
   });
@@ -3413,13 +3598,18 @@ function registerIpc() {
       ...(template.argumentHint ? { argumentHint: template.argumentHint } : {}),
       source: template.source,
     }));
-    const pluginCommands = plugins.getCommands().map((command) => ({
-      name: command.id,
-      kind: "plugin" as const,
-      title: command.title,
-      ...(command.category ? { description: command.category } : {}),
-      id: command.id,
-    }));
+    // App-facing surfaces scope against the *window's* project, not a session's:
+    // this menu belongs to whatever folder is open in front of the user.
+    const pluginCommands = plugins
+      .getCommands()
+      .filter((command) => pluginActiveInProject(command.pluginId, root))
+      .map((command) => ({
+        name: command.id,
+        kind: "plugin" as const,
+        title: command.title,
+        ...(command.category ? { description: command.category } : {}),
+        id: command.id,
+      }));
     // One namespace: builtin aliases win, then project templates, then user
     // templates, then plugin commands (spec 04 §7).
     const merged = new Map<
@@ -3906,7 +4096,9 @@ function registerIpc() {
 
   handle(IPC.invoke.pluginList, async () => {
     if (!host) throw new Error("host unavailable");
-    return host.call("plugins.list");
+    const result = await host.call<{ plugins: any[] }>("plugins.list");
+    rememberPluginScopes(result.plugins ?? []);
+    return result;
   });
 
   handle(IPC.invoke.pluginLoadDev, async () => {
@@ -4065,6 +4257,186 @@ function registerIpc() {
     });
   });
 
+  handle(
+    IPC.invoke.pluginSetScope,
+    async (payload: { id: string; scope: ActivationScope }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call<{ plugin?: { id?: string; scope?: ActivationScope } }>(
+        "plugins.setScope",
+        { id: payload.id, scope: payload.scope },
+      );
+      // Keep the dispatch-path cache honest without waiting for the next list.
+      if (res.plugin?.id && res.plugin.scope) {
+        pluginScopes.set(res.plugin.id, res.plugin.scope);
+      }
+      logger.app("plugin", "info", "plugin scope changed", {
+        pluginId: payload.id,
+        data: { mode: payload.scope?.mode, projects: payload.scope?.projects?.length ?? 0 },
+      });
+      sendToRenderer(IPC.event.pluginChanged, { reason: "scope", pluginId: payload.id });
+      return res;
+    },
+  );
+
+  // --- MCP servers the user owns -------------------------------------------
+  // host-core persists and validates; this side owns the connections, so every
+  // mutation is followed by a refresh that drops stale ones.
+
+  handle(IPC.invoke.mcpList, async () => {
+    const servers = await refreshUserMcp();
+    return { servers, statuses: userMcp.listStatuses() };
+  });
+
+  handle(IPC.invoke.mcpUpsert, async (server: McpServerInput) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call<{ server: McpServerRecord }>("mcp.upsert", { server });
+    await refreshUserMcp();
+    sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: res.server?.id });
+    return res;
+  });
+
+  handle(IPC.invoke.mcpRemove, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call("mcp.remove", { id });
+    await refreshUserMcp();
+    sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: id });
+    return res;
+  });
+
+  handle(
+    IPC.invoke.mcpSetEnabled,
+    async (payload: { id: string; enabled: boolean }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call("mcp.setEnabled", payload);
+      await refreshUserMcp();
+      sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: payload.id });
+      return res;
+    },
+  );
+
+  handle(
+    IPC.invoke.mcpSetScope,
+    async (payload: { id: string; scope: ActivationScope }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call("mcp.setScope", payload);
+      await refreshUserMcp();
+      sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: payload.id });
+      return res;
+    },
+  );
+
+  handle(IPC.invoke.mcpTest, async (id: string) => {
+    await refreshUserMcp();
+    const status = await userMcp.test(id);
+    sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: id });
+    return { status };
+  });
+
+  /**
+   * Import a pasted MCP configuration. Servers are saved one at a time so a
+   * single bad entry costs that entry rather than the whole paste.
+   */
+  handle(IPC.invoke.mcpImport, async (payload: { text: string }) => {
+    if (!host) throw new Error("host unavailable");
+    const parsed = parseMcpImport(String(payload?.text ?? ""));
+    const imported: McpServerRecord[] = [];
+    const failed = [...parsed.skipped];
+    for (const server of parsed.servers) {
+      try {
+        const res = await host.call<{ server: McpServerRecord }>("mcp.upsert", { server });
+        imported.push(res.server);
+      } catch (error) {
+        failed.push({ id: server.id, reason: describeError(error) });
+      }
+    }
+    await refreshUserMcp();
+    if (imported.length) {
+      sendToRenderer(IPC.event.pluginChanged, { reason: "mcp" });
+    }
+    return { imported, failed };
+  });
+
+  // --- Skills the user owns -------------------------------------------------
+
+  handle(IPC.invoke.skillList, async () => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("skills.list");
+  });
+
+  handle(IPC.invoke.skillCreate, async (skill: Record<string, unknown>) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call("skills.create", { skill });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+    return res;
+  });
+
+  /** Import a `SKILL.md`, any markdown file, or a folder holding one. */
+  handle(IPC.invoke.skillImport, async () => {
+    if (!host) throw new Error("host unavailable");
+    const picked = await dialog.showOpenDialog({
+      title: "Import skill",
+      properties: ["openFile", "openDirectory"],
+      filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return { canceled: true };
+    const res = await host.call("skills.import", { path: picked.filePaths[0] });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+    return res;
+  });
+
+  handle(
+    IPC.invoke.skillUpdate,
+    async (payload: { id: string } & Record<string, unknown>) => {
+      if (!host) throw new Error("host unavailable");
+      const { id, ...skill } = payload;
+      const res = await host.call("skills.update", { id, skill });
+      sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      return res;
+    },
+  );
+
+  handle(IPC.invoke.skillRead, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("skills.read", { id });
+  });
+
+  handle(IPC.invoke.skillRemove, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call("skills.remove", { id });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+    return res;
+  });
+
+  handle(
+    IPC.invoke.skillSetEnabled,
+    async (payload: { id: string; enabled: boolean }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call("skills.setEnabled", payload);
+      sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      return res;
+    },
+  );
+
+  handle(
+    IPC.invoke.skillSetScope,
+    async (payload: { id: string; scope: ActivationScope }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call("skills.setScope", payload);
+      sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      return res;
+    },
+  );
+
+  /** Show a skill document in the OS file manager. */
+  handle(IPC.invoke.skillReveal, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call<{ skill: UserSkillRecord | null }>("skills.read", { id });
+    const path = res.skill?.path;
+    if (!path) throw new Error("skill not found");
+    shell.showItemInFolder(path);
+    return { ok: true };
+  });
+
   handle(IPC.invoke.pluginOpenPanel, async (id: string) => {
     const loaded = plugins.getLoaded(id);
     if (!loaded) throw new Error("plugin not loaded");
@@ -4085,6 +4457,12 @@ function registerIpc() {
 
   // Plugin themes: the renderer needs the sanitized CSS itself, so this
   // channel returns the payload rather than only the catalog.
+  //
+  // Deliberately *not* scope-filtered. The selected theme is one global app
+  // setting, so filtering here would make the whole window repaint when the
+  // user opened a different folder, and strand them on a theme that no longer
+  // resolves. Project scope governs what a plugin may *do* in a project, not
+  // how the app looks.
   handle(IPC.invoke.pluginThemes, async () => plugins.getThemes());
 
   // Resident service supervision state; refreshed on the pluginChanged event.
@@ -4151,14 +4529,18 @@ function registerIpc() {
   handle(IPC.invoke.commandPaletteSearch, async (query: string) => {
     const q = (query || "").toLowerCase();
     const builtin = builtinPaletteItems();
-    const pluginCmds = plugins.getCommands().map((c) => ({
-      id: c.id,
-      title: c.title,
-      category: c.category,
-      keywords: c.keywords,
-      source: "plugin" as const,
-      pluginId: c.pluginId,
-    }));
+    const root = await optionalWorkspaceRoot();
+    const pluginCmds = plugins
+      .getCommands()
+      .filter((c) => pluginActiveInProject(c.pluginId, root))
+      .map((c) => ({
+        id: c.id,
+        title: c.title,
+        category: c.category,
+        keywords: c.keywords,
+        source: "plugin" as const,
+        pluginId: c.pluginId,
+      }));
     return {
       commands: [...builtin, ...pluginCmds].filter((c) => {
         if (!q) return true;
@@ -4174,6 +4556,13 @@ function registerIpc() {
     }
     const cmd = plugins.getCommands().find((c) => c.id === commandId);
     if (!cmd) throw new Error("command not found");
+    // A command can be typed into the composer by name, so the scope has to be
+    // re-checked here and not only where the lists are built.
+    if (!pluginActiveInProject(cmd.pluginId, await optionalWorkspaceRoot())) {
+      throw Object.assign(new Error("command not available in this project"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
     await cmd.run();
     for (const toast of plugins.drainToasts()) {
       sendToRenderer(IPC.event.toast, { message: toast });
@@ -4345,6 +4734,7 @@ app.on("before-quit", () => {
   logger.app("lifecycle", "info", "app shutdown");
   ptys.disposeAll();
   plugins.disposeWatchers();
+  userMcp.disposeAll();
   browserPane.dispose();
   void host?.dispose();
   void sidecar?.dispose();

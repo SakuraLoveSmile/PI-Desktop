@@ -69,7 +69,7 @@ test("a reloaded plugin re-indexes its skills, so an edit needs no restart", () 
 
 test("main forwards the skill catalog and serves the Skill tool locally", () => {
   assert.match(mainSrc, /const pluginSkills = \[/);
-  assert.match(mainSrc, /\.\.\.plugins\.getSkills\(\)\.map\(/);
+  assert.match(mainSrc, /\.\.\.plugins\s*\n?\s*\.getSkills\(\)/);
   assert.match(mainSrc, /\n\s+pluginSkills,\n/);
   assert.match(mainSrc, /setLocalTool\("Skill"/);
   assert.match(mainSrc, /loadSkillBody\(id\)/);
@@ -91,9 +91,14 @@ test("the built-in plugin skill only activates for plugin workspaces", () => {
 });
 
 test("the built-in skill body loads through the same Skill tool", () => {
-  // Host-owned skills are not in the plugin registry, so main tries them first.
+  // Host-owned skills are not in any registry, so main tries them first, then
+  // the user's own skills, then a plugin's — bare ids cannot collide with the
+  // `<pluginId>/<skillId>` form.
   assert.match(builtinSrc, /export function loadBuiltinSkillBody/);
-  assert.match(mainSrc, /loadBuiltinSkillBody\(id\) \?\? plugins\.loadSkillBody\(id\)/);
+  assert.match(
+    mainSrc,
+    /loadBuiltinSkillBody\(id\) \?\?\s*\(await loadUserSkillBody\(id, projectPath\)\) \?\?\s*plugins\.loadSkillBody\(id\)/,
+  );
 });
 
 test("the built-in skill ships as a packaged resource with a dev fallback", () => {

@@ -1,4 +1,5 @@
 import type {
+  ActivationScope,
   AgentEventEnvelope,
   AgentCompactRequest,
   AgentCompactResponse,
@@ -20,6 +21,9 @@ import type {
   HostHealth,
   HostStatusEvent,
   ModelInfo,
+  McpServerInput,
+  McpServerRecord,
+  McpServerStatus,
   OnboardingState,
   PluginSummary,
   PluginServiceStatus,
@@ -41,6 +45,8 @@ import type {
   TerminalDataEvent,
   TerminalExitEvent,
   ToolPermissionResolution,
+  UserSkillInput,
+  UserSkillRecord,
   WorkspaceDiff,
   AppMenuCommand,
   AppNotification,
@@ -285,6 +291,52 @@ export const api = {
   uninstallPlugin: (id: string) => invoke(IPC.invoke.pluginUninstall, id),
   setPluginAutoUpdate: (id: string, enabled: boolean) =>
     invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
+  /**
+   * Where a plugin's contributions apply. Separate from enable/disable so
+   * narrowing a plugin to two projects and then switching it off keeps the list.
+   */
+  setPluginScope: (id: string, scope: ActivationScope) =>
+    invoke<{ plugin?: PluginSummary }>(IPC.invoke.pluginSetScope, { id, scope }),
+
+  // --- MCP servers the user owns -------------------------------------------
+  listMcpServers: () =>
+    invoke<{ servers: McpServerRecord[]; statuses: McpServerStatus[] }>(IPC.invoke.mcpList),
+  /** Create or replace a server; the id decides which. */
+  upsertMcpServer: (server: McpServerInput) =>
+    invoke<{ server: McpServerRecord }>(IPC.invoke.mcpUpsert, server),
+  removeMcpServer: (id: string) => invoke(IPC.invoke.mcpRemove, id),
+  setMcpServerEnabled: (id: string, enabled: boolean) =>
+    invoke(IPC.invoke.mcpSetEnabled, { id, enabled }),
+  setMcpServerScope: (id: string, scope: ActivationScope) =>
+    invoke(IPC.invoke.mcpSetScope, { id, scope }),
+  /** Force one handshake and report what happened, for the editor's test button. */
+  testMcpServer: (id: string) =>
+    invoke<{ status: McpServerStatus }>(IPC.invoke.mcpTest, id),
+  /** Accept a pasted `mcpServers` block; bad entries are reported, not fatal. */
+  importMcpServers: (text: string) =>
+    invoke<{
+      imported: McpServerRecord[];
+      failed: Array<{ id: string; reason: string }>;
+    }>(IPC.invoke.mcpImport, { text }),
+
+  // --- Skills the user owns -------------------------------------------------
+  listUserSkills: () => invoke<{ skills: UserSkillRecord[] }>(IPC.invoke.skillList),
+  createUserSkill: (skill: UserSkillInput) =>
+    invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillCreate, skill),
+  /** Opens a native picker; `canceled` when the user backed out. */
+  importUserSkill: () =>
+    invoke<{ canceled?: boolean; skill?: UserSkillRecord }>(IPC.invoke.skillImport),
+  updateUserSkill: (id: string, skill: Omit<UserSkillInput, "id">) =>
+    invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillUpdate, { id, ...skill }),
+  /** The record plus the document body, for the editor. */
+  readUserSkill: (id: string) =>
+    invoke<{ skill: UserSkillRecord | null; body?: string }>(IPC.invoke.skillRead, id),
+  removeUserSkill: (id: string) => invoke(IPC.invoke.skillRemove, id),
+  setUserSkillEnabled: (id: string, enabled: boolean) =>
+    invoke(IPC.invoke.skillSetEnabled, { id, enabled }),
+  setUserSkillScope: (id: string, scope: ActivationScope) =>
+    invoke(IPC.invoke.skillSetScope, { id, scope }),
+  revealUserSkill: (id: string) => invoke(IPC.invoke.skillReveal, id),
   openPluginPanel: (id: string) => invoke(IPC.invoke.pluginOpenPanel, id),
   listPluginThemes: () => invoke<PluginTheme[]>(IPC.invoke.pluginThemes),
   listPluginServices: () => invoke<PluginServiceStatus[]>(IPC.invoke.pluginServices),

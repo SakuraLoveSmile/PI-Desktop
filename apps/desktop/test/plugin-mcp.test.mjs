@@ -105,7 +105,7 @@ test("a stdio mcp server is handshaken, paginated and callable", async (t) => {
   const audits = [];
   const client = new McpServerClient({
     pluginId: "com.example.mcp",
-    pluginPath: dir,
+    rootPath: dir,
     server: { id: "stub", label: "Stub", transport: "stdio", command: "node", args: ["./server.mjs"] },
     values: { STUB_TOKEN: "t0ken", STUB_PID_FILE: pidFile },
     audit: (entry) => audits.push(entry),
@@ -148,7 +148,7 @@ test("a stdio server only sees the values the plugin declared", async (t) => {
   });
   const client = new McpServerClient({
     pluginId: "com.example.mcp",
-    pluginPath: dir,
+    rootPath: dir,
     server: { id: "stub", transport: "stdio", command: "node", args: ["./server.mjs"] },
     values: { STUB_TOKEN: "t0ken", STUB_PID_FILE: join(dir, "pid") },
     connectTimeoutMs: 5_000,
@@ -165,7 +165,7 @@ test("an mcp tool error surfaces as TOOL_FAILED and is audited", async (t) => {
   const audits = [];
   const client = new McpServerClient({
     pluginId: "com.example.mcp",
-    pluginPath: dir,
+    rootPath: dir,
     server: { id: "stub", transport: "stdio", command: "node", args: ["./server.mjs"] },
     values: { STUB_PID_FILE: join(dir, "pid") },
     audit: (entry) => audits.push(entry),
@@ -187,7 +187,7 @@ test("a server-initiated request is refused instead of ignored", async (t) => {
   const dir = stdioPlugin();
   const client = new McpServerClient({
     pluginId: "com.example.mcp",
-    pluginPath: dir,
+    rootPath: dir,
     server: { id: "stub", transport: "stdio", command: "node", args: ["./server.mjs"] },
     values: { STUB_PID_FILE: join(dir, "pid") },
     connectTimeoutMs: 5_000,
@@ -204,7 +204,7 @@ test("closing the client kills the stdio child", async () => {
   const pidFile = join(dir, "pid");
   const client = new McpServerClient({
     pluginId: "com.example.mcp",
-    pluginPath: dir,
+    rootPath: dir,
     server: { id: "stub", transport: "stdio", command: "node", args: ["./server.mjs"] },
     values: { STUB_PID_FILE: pidFile },
     connectTimeoutMs: 5_000,
@@ -231,7 +231,7 @@ test("a stdio server that cannot start fails the handshake, not the process", as
   const audits = [];
   const client = new McpServerClient({
     pluginId: "com.example.mcp",
-    pluginPath: dir,
+    rootPath: dir,
     server: { id: "stub", transport: "stdio", command: "node", args: ["./missing-server.mjs"] },
     values: {},
     audit: (entry) => audits.push(entry),
@@ -249,7 +249,7 @@ test("a slow server times out instead of hanging the load", async (t) => {
   writeFileSync(join(dir, "server.mjs"), "setInterval(() => {}, 1000);\n");
   const client = new McpServerClient({
     pluginId: "com.example.mcp",
-    pluginPath: dir,
+    rootPath: dir,
     server: { id: "stub", transport: "stdio", command: "node", args: ["./server.mjs"] },
     values: {},
     connectTimeoutMs: 250,
@@ -326,7 +326,7 @@ test("a remote mcp server negotiates over http and keeps its session", async (t)
   const { url, requests } = await startHttpServer(t);
   const client = new McpServerClient({
     pluginId: "com.example.remote",
-    pluginPath: mkdtempSync(join(tmpdir(), "pi-mcp-http-")),
+    rootPath: mkdtempSync(join(tmpdir(), "pi-mcp-http-")),
     server: { id: "remote", transport: "http", url },
     values: { "x-api-key": "sk-test" },
     connectTimeoutMs: 5_000,
@@ -351,7 +351,7 @@ test("an http failure is reported as HTTP_ERROR", async (t) => {
   const { url } = await startHttpServer(t);
   const client = new McpServerClient({
     pluginId: "com.example.remote",
-    pluginPath: mkdtempSync(join(tmpdir(), "pi-mcp-http-")),
+    rootPath: mkdtempSync(join(tmpdir(), "pi-mcp-http-")),
     server: { id: "remote", transport: "http", url },
     values: {},
     connectTimeoutMs: 5_000,

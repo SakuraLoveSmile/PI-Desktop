@@ -1309,7 +1309,7 @@ export class PluginRuntime {
 
       const client = new McpServerClient({
         pluginId,
-        pluginPath: loaded.path,
+        rootPath: loaded.path,
         server,
         values: refs.values,
         audit: this.services.audit,

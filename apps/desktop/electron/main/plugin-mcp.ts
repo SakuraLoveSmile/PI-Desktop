@@ -1,5 +1,5 @@
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
-import { resolve, sep } from "node:path";
+import { isAbsolute, resolve, sep } from "node:path";
 import type { PluginMcpServerContrib } from "@pi-desktop/plugin-sdk";
 
 /** MCP revision we advertise during the handshake. */
@@ -54,14 +54,16 @@ function mcpError(code: string, message: string): McpError {
 
 /**
  * Environment for a stdio MCP server: the host's own env carries provider keys
- * and shell secrets, so only the values the plugin declared cross over (D018).
+ * and shell secrets, so only the values the caller declared cross over (D018).
+ * `pluginId` is absent for a server the user configured directly, which has no
+ * plugin identity to announce.
  */
 export function mcpProcessEnv(
-  pluginId: string,
+  pluginId: string | undefined,
   values: Record<string, string>,
 ): Record<string, string> {
   const env: Record<string, string> = {
-    PI_PLUGIN_ID: pluginId,
+    ...(pluginId ? { PI_PLUGIN_ID: pluginId } : {}),
     NODE_ENV: process.env.NODE_ENV ?? "production",
   };
   for (const key of ["PATH", "SystemRoot", "windir", "TEMP", "TMP", "TMPDIR", "LANG"]) {
@@ -72,13 +74,33 @@ export function mcpProcessEnv(
 }
 
 /**
- * Resolve the executable. A bare name is looked up on PATH; anything with a
- * separator must stay inside the plugin directory (the manifest already
- * rejected absolute paths and `..`, this is defense in depth).
+ * How much freedom a stdio command string has.
+ *
+ * `confined` is for plugin-declared servers: anything with a path separator must
+ * resolve inside the plugin directory. `trusted` is for servers the user typed
+ * into the MCP editor — they may name any binary on the machine, exactly as they
+ * could in a terminal — but relative traversal is still refused so a stored
+ * command means the same thing wherever it runs from.
  */
-export function resolveMcpCommand(pluginPath: string, command: string): string {
+export type McpCommandPolicy = "confined" | "trusted";
+
+/** Resolve the executable for a stdio server under the given policy. */
+export function resolveMcpCommand(
+  rootPath: string,
+  command: string,
+  policy: McpCommandPolicy = "confined",
+): string {
   if (!/[\\/]/.test(command)) return command;
-  const root = resolve(pluginPath);
+  if (policy === "trusted") {
+    if (command.split(/[\\/]/).some((part) => part === "..")) {
+      throw mcpError("INVALID_ARGUMENT", `mcp command must not contain "..": ${command}`);
+    }
+    if (!isAbsolute(command)) {
+      throw mcpError("INVALID_ARGUMENT", `mcp command must be a name or an absolute path: ${command}`);
+    }
+    return command;
+  }
+  const root = resolve(rootPath);
   const target = resolve(root, command);
   const prefix = root.endsWith(sep) ? root : root + sep;
   if (target === root || !target.startsWith(prefix)) {
@@ -89,8 +111,8 @@ export function resolveMcpCommand(pluginPath: string, command: string): string {
 
 function createStdioTransport(
   options: {
-    pluginId: string;
-    pluginPath: string;
+    rootPath: string;
+    commandPolicy: McpCommandPolicy;
     command: string;
     args: string[];
     env: Record<string, string>;
@@ -100,10 +122,10 @@ function createStdioTransport(
 ): McpTransport {
   const spawnImpl = options.spawnImpl ?? nodeSpawn;
   const child: ChildProcess = spawnImpl(
-    resolveMcpCommand(options.pluginPath, options.command),
+    resolveMcpCommand(options.rootPath, options.command, options.commandPolicy),
     options.args,
     {
-      cwd: options.pluginPath,
+      cwd: options.rootPath,
       env: options.env,
       stdio: ["pipe", "pipe", "pipe"],
       // Never route through a shell: arguments stay literal.
@@ -248,12 +270,18 @@ function createHttpTransport(
 }
 
 export type McpServerClientOptions = {
-  pluginId: string;
-  pluginPath: string;
+  /** Owning plugin, when there is one. User-configured servers have none. */
+  pluginId?: string;
+  /** Working directory for a stdio server, and the `confined` sandbox root. */
+  rootPath: string;
+  /** Defaults to `confined`, the stricter plugin rule. */
+  commandPolicy?: McpCommandPolicy;
   server: PluginMcpServerContrib;
   /** Resolved env (stdio) or headers (http); never inherited from the host. */
   values: Record<string, string>;
   audit?: (entry: Record<string, unknown>) => void;
+  /** Audit `api` namespace: `plugin.mcp` for plugins, `mcp` for user servers. */
+  auditScope?: string;
   connectTimeoutMs?: number;
   callTimeoutMs?: number;
   /** Test seams. */
@@ -262,7 +290,8 @@ export type McpServerClientOptions = {
 };
 
 /**
- * One plugin-declared MCP server (spec 07 §3, ADR 0038).
+ * One MCP server (spec 07 §3, ADR 0038) — declared by a plugin, or configured
+ * by the user in the Extensions page.
  *
  * The client speaks the slice of MCP the desktop needs — `initialize`,
  * `tools/list`, `tools/call` — over stdio or streamable HTTP. It connects on
@@ -352,7 +381,7 @@ export class McpServerClient {
       this.tools = await this.listTools(timeoutMs);
       this.opts.audit?.({
         pluginId: this.opts.pluginId,
-        api: "plugin.mcp.connect",
+        api: this.auditApi("connect"),
         ok: true,
         serverId: this.serverId,
         transport: this.transportKind,
@@ -367,7 +396,7 @@ export class McpServerClient {
       this.failPending(mcpError("UNAVAILABLE", "mcp handshake failed"));
       this.opts.audit?.({
         pluginId: this.opts.pluginId,
-        api: "plugin.mcp.connect",
+        api: this.auditApi("connect"),
         ok: false,
         serverId: this.serverId,
         transport: this.transportKind,
@@ -391,8 +420,8 @@ export class McpServerClient {
     if (this.opts.server.transport === "stdio") {
       return createStdioTransport(
         {
-          pluginId: this.opts.pluginId,
-          pluginPath: this.opts.pluginPath,
+          rootPath: this.opts.rootPath,
+          commandPolicy: this.opts.commandPolicy ?? "confined",
           command: String(this.opts.server.command ?? ""),
           args: this.opts.server.args ?? [],
           env: mcpProcessEnv(this.opts.pluginId, this.opts.values),
@@ -428,7 +457,7 @@ export class McpServerClient {
         if (collected.length >= MAX_MCP_TOOLS_PER_SERVER) {
           this.opts.audit?.({
             pluginId: this.opts.pluginId,
-            api: "plugin.mcp.tools.truncated",
+            api: this.auditApi("tools.truncated"),
             ok: false,
             errorCode: "LIMIT_EXCEEDED",
             serverId: this.serverId,
@@ -507,10 +536,14 @@ export class McpServerClient {
     this.pending.clear();
   }
 
+  private auditApi(suffix: string): string {
+    return `${this.opts.auditScope ?? "plugin.mcp"}.${suffix}`;
+  }
+
   private audit(ok: boolean, toolName: string, durationMs: number, error?: unknown): void {
     this.opts.audit?.({
       pluginId: this.opts.pluginId,
-      api: "plugin.mcp.call",
+      api: this.auditApi("call"),
       ok,
       serverId: this.serverId,
       transport: this.transportKind,
