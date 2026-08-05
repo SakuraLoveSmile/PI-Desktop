@@ -23,6 +23,16 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.4.3",
+    date: "2026-08-05",
+    highlights: [
+      "Complete the Agent-only Plan workflow with durable Markdown checkpoints, approval, and queued execution.",
+      "Add project-scoped MCP servers and Skills with one Extensions scope control.",
+      "Harden external path permissions and native search scoping across workspaces.",
+      "Make Plan approval surfaces close after resolution and mode commands switch the active session.",
+    ],
+  },
+  {
     version: "0.4.2",
     date: "2026-08-03",
     highlights: [
@@ -189,6 +199,16 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.4.3",
+    date: "2026-08-05",
+    highlights: [
+      "完善 Agent-only 规划流程，支持持久化 Markdown 规划、审批与排队执行。",
+      "新增项目级 MCP 服务器和 Skill，并用一个扩展作用域控件统一管理。",
+      "强化跨工作区的外部路径权限与原生搜索范围控制。",
+      "规划审批完成后自动收起审批界面，命令切换可直接更新当前会话模式。",
+    ],
+  },
   {
     version: "0.4.2",
     date: "2026-08-03",
