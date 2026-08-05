@@ -72,6 +72,7 @@ does not turn temporary thread pressure into a host process exit.
 | `CONTEXT_TOO_LARGE` | no | prompt/context still exceeds the safe model budget after recovery, the second provider overflow occurred, or automatic recovery is disabled |
 | `CONTEXT_COMPACTION_FAILED` | no | automatic retained-tail recovery could not prepare, persist, or fit a checkpoint, or manual checkpoint summary generation / durable append failed; the guarded next provider request does not start |
 | `STREAM_FAILED` | yes | provider stream was terminated, closed prematurely, or otherwise ended before a complete response; one same-turn retry may precede the terminal event |
+| `EMPTY_MODEL_RESPONSE` | yes | the model ended its turn with no tool call and no visible text twice: once as streamed, once after the automatic re-run (spec 02-agent-runtime §5e) |
 
 ### 3.3 Workspace / tools / permissions
 
@@ -130,8 +131,9 @@ Until emitted, implementations use the canonical parent code shown.
 Historical aliases (never use in new code): `PROVIDER_AUTH_FAILED` →
 `PROVIDER_UNAUTHORIZED`; `PROVIDER_STREAM_INTERRUPTED` → `STREAM_FAILED`;
 `WORKSPACE_OUTSIDE_ROOT` → `PATH_OUTSIDE_WORKSPACE`; `SECRET_MISSING` →
-`PROVIDER_SECRET_MISSING`. Truncation is not an error: truncated tool output
-carries the inline marker `[truncated: output exceeded 256KB or 4000 lines]`
+`PROVIDER_SECRET_MISSING`. Truncation is not an error: a bounded tool result
+carries a marker naming which end survived and where the rest is, or reports
+the bounded window in sibling result fields
 (see [16-tool-result-limits](16-tool-result-limits.md)).
 
 ## 4. Mapping rules

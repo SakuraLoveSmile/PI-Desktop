@@ -103,6 +103,38 @@ available: `phase` (`request` or `stream`), `providerStatus`, `providerCode`,
 redacted and capped; credentials and unrestricted response bodies never enter
 the event or log.
 
+### 5e. Silent-turn recovery
+
+A turn that ends with no tool call and no visible assistant text is invisible
+to the user: reasoning is never rendered, so a conclusion written only there
+did not arrive. 15 of 255 recorded sessions ended a turn that way, and the
+user's only recourse was typing "继续".
+
+The runtime detects it at `message_end`: the stop was neither an error nor an
+abort, the message requested no tools (no `toolCall` content part), and the
+visible text is blank after trimming. Reasoning content does not exempt a turn
+— a thinking-only turn is exactly the case that needs recovery.
+
+Recovery mirrors §5d and is bounded the same way: at most one re-run per user
+prompt. The silent assistant is dropped from the model context (`continue()`
+refuses a transcript ending in an assistant message, and an empty one is not
+worth resending), a short no-output instruction is appended to the system
+prompt for that one continuation, and the bubble id is reused so a recovered
+turn leaves no empty row behind. The silent attempt's `turn_end` and
+`agent_end` are suppressed; the re-run emits the single terminal lifecycle.
+
+The one-shot instruction rides on the agent's system prompt rather than the
+`prepareNextTurn` hook, because that hook only shapes turns inside a live run
+and this run has already ended. It is removed afterwards unless a path-scoped
+instruction reload rewrote the prompt meanwhile, in which case the newer
+rebuild wins.
+
+If the re-run is silent too, the turn ends as a visible assistant error with
+retriable `EMPTY_MODEL_RESPONSE`, which gives the transcript its normal retry
+action. No empty assistant message is persisted in either case.
+
+Decision D190; see E2E-098.
+
 ### 5.1 Context checkpoint protection (D158, ADR 0030)
 
 The complete visible transcript and the model context are separate views of
@@ -279,6 +311,28 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 + [project instruction chain, when present]
 + [optional user custom instructions]
 ```
+
+The base prompt states collaboration rules explicitly, because omitting them
+is what produced silent sessions: "prefer concise, actionable answers" was the
+only relevant line, and a reasoning model executed it as saying nothing at all.
+Required behaviours, each one an observed failure inverted:
+
+- answer in the language the user writes in
+- one sentence before each tool batch, and no silence longer than one tool
+  batch or 60 seconds of work
+- anything the user asked is answered in visible text; reasoning is not shown
+  to them and does not count as an answer
+- the final message is self-contained
+- work is carried through end to end rather than stopping at analysis
+- tool calls go through the native tool-call interface; a call written as prose
+  (notably an OpenAI-style `multi_tool_use.parallel` wrapper) does not run, and
+  the runtime logs it when a model emits one
+
+It also states a search preference that matches the host-side budgets in
+[16-tool-result-limits](16-tool-result-limits.md): scope `Read`, `Grep`, and
+`Glob` with their own parameters instead of hand-rolling `cat`/`sed`/`grep`/
+`find`, use `rg` with build output excluded when Bash is genuinely needed, and
+do not repeat a search whose answer is already in context.
 
 ### 7.1 Active tool context and on-demand loading (D185, ADR 0048)
 

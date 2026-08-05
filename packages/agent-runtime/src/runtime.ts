@@ -193,6 +193,20 @@ const CONTEXT_COMPACTION_NUDGE = [
 ].join("\n");
 
 /**
+ * Appended for one automatic re-run after a turn that produced nothing the
+ * user can see. Two shapes were observed: a wholly empty response, and a
+ * finished conclusion written into reasoning while the visible text stayed
+ * empty. The same nudge covers both, because both need the same next move.
+ */
+const SILENT_TURN_NUDGE = [
+  "<no_output_recovery>",
+  "Your previous turn ended with no visible text and no tool call, so the user saw nothing happen.",
+  "Your reasoning is never shown to the user. If you already reached the answer, state it now in plain text.",
+  "Otherwise continue the unfinished work, starting with one sentence about what you are doing.",
+  "</no_output_recovery>",
+].join("\n");
+
+/**
  * Some OpenAI-style models emit their internal parallel-call wrapper as
  * assistant text (`to=multi_tool_use.parallel code:{"tool_uses":[…]}`) instead
  * of real tool calls. PI-Desktop has no such tool, so the whole batch lands as
@@ -353,6 +367,17 @@ function assistantContent(content: unknown): AssistantContent {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Tool calls ride in the assistant content array as `type: "toolCall"`. A
+ * message that requested any is never a silent turn: the loop keeps going and
+ * the user sees the tool activity. */
+function messageRequestsTools(message: unknown): boolean {
+  const content = isRecord(message) ? message.content : undefined;
+  return (
+    Array.isArray(content) &&
+    content.some((part) => isRecord(part) && part.type === "toolCall")
+  );
 }
 
 function boundedText(value: string, maxChars: number): string {
@@ -664,6 +689,14 @@ export class DesktopAgentRuntime {
   private providerRetryInProgress = false;
   private suppressProviderRetryRunEnd = false;
   private providerRetryAbort?: AbortController;
+  /* Silent-turn recovery: a turn that ends with no tool call and no visible
+   * text is invisible to the user. 15 of 255 recorded sessions ended a turn
+   * that way, and every one of them was followed by the user typing "继续".
+   * One automatic re-run per prompt, then the failure becomes visible. */
+  private pendingSilentTurnRerun = false;
+  private silentTurnRerunAttempted = false;
+  private silentTurnRerunInProgress = false;
+  private suppressSilentTurnRunEnd = false;
   private activeToolCalls = new Map<
     string,
     { toolName: string; args: unknown }
@@ -1580,6 +1613,43 @@ export class DesktopAgentRuntime {
     }
   }
 
+  /**
+   * Re-run the request that came back silent, once, with SILENT_TURN_NUDGE
+   * appended. The nudge goes on `agent.state.systemPrompt` rather than through
+   * `prepareNextTurn`, because that hook only shapes turns inside a live run
+   * and this run has already ended; `continue()` rebuilds its context from
+   * state. It is restored afterwards unless a path-scoped instruction reload
+   * rewrote the prompt in the meantime — that rebuild is newer, so it wins.
+   */
+  private async rerunSilentTurn(): Promise<void> {
+    if (!this.pendingSilentTurnRerun) return;
+    this.pendingSilentTurnRerun = false;
+    this.suppressSilentTurnRunEnd = false;
+
+    // agentLoopContinue refuses a transcript ending in an assistant message,
+    // and this one carries nothing worth resending anyway.
+    const messages = [...this.agent.state.messages];
+    if (messages.at(-1)?.role === "assistant") messages.pop();
+    this.agent.state.messages = messages;
+
+    const promptBefore = this.agent.state.systemPrompt;
+    const promptWithNudge = `${promptBefore}\n\n${SILENT_TURN_NUDGE}`;
+    this.agent.state.systemPrompt = promptWithNudge;
+    this.silentTurnRerunInProgress = true;
+    this.requestStartedAt = Date.now();
+    try {
+      if (this.disposed) throw new Error("runtime disposed");
+      await this.agent.continue();
+      await this.agent.waitForIdle();
+    } finally {
+      if (this.agent.state.systemPrompt === promptWithNudge) {
+        this.agent.state.systemPrompt = promptBefore;
+      }
+      this.silentTurnRerunInProgress = false;
+      this.suppressSilentTurnRunEnd = false;
+    }
+  }
+
   setCompactionSettings(settings?: ContextCompactionSettings): void {
     this.compactionSettings = normalizeCompactionSettings(settings);
     this.pendingModelCompaction = undefined;
@@ -2274,9 +2344,10 @@ export class DesktopAgentRuntime {
         if (event.message.role === "assistant") {
           this.streamStartedAt = Date.now();
           const content = assistantContent((event.message as any).content);
-          const retryingAssistant = this.providerRetryInProgress
-            ? this.currentAssistant
-            : undefined;
+          const retryingAssistant =
+            this.providerRetryInProgress || this.silentTurnRerunInProgress
+              ? this.currentAssistant
+              : undefined;
           this.currentAssistant = {
             id: retryingAssistant?.id ?? randomUUID(),
             role: "assistant",
@@ -2292,8 +2363,10 @@ export class DesktopAgentRuntime {
           if (retryingAssistant) {
             // Keep one visible assistant bubble across the bounded retry. The
             // failed partial response is replaced instead of leaving a
-            // duplicate error row when the second request succeeds.
+            // duplicate error row when the second request succeeds. The same
+            // applies to a silent-turn re-run: one bubble, no empty row.
             this.providerRetryInProgress = false;
+            this.silentTurnRerunInProgress = false;
             this.emit({ type: "message_update", message: this.currentAssistant });
           } else {
             this.emit({ type: "message_start", message: this.currentAssistant });
@@ -2421,6 +2494,67 @@ export class DesktopAgentRuntime {
               streamMs,
             );
           }
+          // A turn with no tool call and no visible text ends the run while
+          // leaving the user with nothing: the reasoning that may hold the
+          // answer is never rendered. Re-run once with a nudge before letting
+          // that surface as a finished turn.
+          const silentTurn =
+            !failed &&
+            !aborted &&
+            nextText.trim().length === 0 &&
+            !messageRequestsTools(event.message);
+          if (silentTurn && !this.silentTurnRerunAttempted) {
+            this.silentTurnRerunAttempted = true;
+            this.pendingSilentTurnRerun = true;
+            this.suppressSilentTurnRunEnd = true;
+            // Hold the bubble open. The re-run streams into this same one, so
+            // a recovered turn leaves no empty message behind in the
+            // transcript and the user never learns it happened.
+            this.currentAssistant = {
+              ...this.currentAssistant,
+              content: nextText,
+              ...(nextThinking
+                ? { thinking: nextThinking }
+                : content.hasThinking
+                  ? { thinking: undefined }
+                  : {}),
+              status: "streaming",
+              modelId: this.provider.modelId,
+              providerId: this.provider.id,
+              ...(usage ? { usage } : {}),
+            };
+            this.emit({ type: "message_update", message: this.currentAssistant });
+            logTiming("model", {
+              model: this.provider.modelId,
+              providerId: this.provider.id,
+              sessionId: this.sessionId,
+              turnId: this.turnId,
+              providerWaitMs,
+              streamMs,
+              thinkingLevel: this.thinkingLevel,
+              outcome: "silent",
+              thinkingOnly: nextThinking.trim().length > 0,
+            });
+            this.streamStartedAt = undefined;
+            break;
+          }
+          if (silentTurn) {
+            // The re-run came back silent too. Stop guessing and say so: an
+            // error row with a retriable code gives the UI its "continue"
+            // affordance instead of leaving the user to invent one.
+            classifiedError = this.providerErrorWithDiagnostics(
+              {
+                code: "EMPTY_MODEL_RESPONSE",
+                message:
+                  "The model ended its turn without producing any output",
+                retriable: true,
+              },
+              "stream",
+              providerWaitMs,
+              streamMs,
+            );
+          }
+          const emptyResponse = silentTurn;
           const diagnosticError = classifiedError;
           const retryProviderError =
             !overflow &&
@@ -2472,7 +2606,11 @@ export class DesktopAgentRuntime {
               : content.hasThinking
                 ? { thinking: undefined }
                 : {}),
-            status: failed ? "error" : aborted ? "aborted" : "complete",
+            status: failed || emptyResponse
+              ? "error"
+              : aborted
+                ? "aborted"
+                : "complete",
             modelId: this.provider.modelId,
             providerId: this.provider.id,
             ...(usage ? { usage } : {}),
@@ -2492,7 +2630,11 @@ export class DesktopAgentRuntime {
             providerWaitMs,
             streamMs,
             thinkingLevel: this.thinkingLevel,
-            outcome: failed ? "error" : aborted ? "aborted" : "ok",
+            outcome: failed || emptyResponse
+              ? "error"
+              : aborted
+                ? "aborted"
+                : "ok",
             errorCode: diagnosticError?.code,
             providerStatus: this.providerResponseStatus,
             ...(this.activeProviderRetryAttempt > 0
@@ -2506,7 +2648,7 @@ export class DesktopAgentRuntime {
             this.compactionSettings.enabled &&
             overflow &&
             !this.overflowRecoveryAttempted;
-          if (!failed && !aborted) {
+          if (!failed && !aborted && !emptyResponse) {
             this.appendLiveEntry(assistantId, event.message);
           } else {
             this.turnHadError = true;
@@ -2568,11 +2710,21 @@ export class DesktopAgentRuntime {
         }
         break;
       case "turn_end":
-        if (this.suppressOverflowRunEnd || this.suppressProviderRetryRunEnd) break;
+        if (
+          this.suppressOverflowRunEnd ||
+          this.suppressProviderRetryRunEnd ||
+          this.suppressSilentTurnRunEnd
+        )
+          break;
         this.emit({ type: "turn_end" });
         break;
       case "agent_end":
-        if (this.suppressOverflowRunEnd || this.suppressProviderRetryRunEnd) break;
+        if (
+          this.suppressOverflowRunEnd ||
+          this.suppressProviderRetryRunEnd ||
+          this.suppressSilentTurnRunEnd
+        )
+          break;
         this.emit({
           type: "agent_end",
           messageIds: [],
@@ -2662,6 +2814,10 @@ export class DesktopAgentRuntime {
     this.activeProviderRetryAttempt = 0;
     this.providerRetryInProgress = false;
     this.suppressProviderRetryRunEnd = false;
+    this.pendingSilentTurnRerun = false;
+    this.silentTurnRerunAttempted = false;
+    this.silentTurnRerunInProgress = false;
+    this.suppressSilentTurnRunEnd = false;
     this.providerRetryAbort?.abort();
     this.providerRetryAbort = undefined;
     this.mutationFailureCounts.clear();
@@ -2728,6 +2884,12 @@ export class DesktopAgentRuntime {
         this.requestStartedAt = Date.now();
         await this.agent.continue();
         await this.agent.waitForIdle();
+      }
+
+      // Last, so a turn that went silent after overflow recovery still gets
+      // its one re-run, and a re-run that goes silent again is not re-run.
+      if (this.pendingSilentTurnRerun) {
+        await this.rerunSilentTurn();
       }
 
     } catch (err) {

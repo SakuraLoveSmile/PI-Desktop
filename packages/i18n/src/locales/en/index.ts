@@ -960,6 +960,8 @@ export const en = {
     NETWORK_ERROR: "Can't reach the AI provider. Check your network or base URL.",
     TIMEOUT: "The request to the AI provider timed out.",
     STREAM_FAILED: "The reply was interrupted.",
+    EMPTY_MODEL_RESPONSE:
+      "The model finished its turn without saying anything, twice in a row. Try again, or rephrase your request.",
     CONTEXT_TOO_LARGE: "This chat is still too long after context recovery. Shorten your message or start a new chat.",
     CONTEXT_COMPACTION_FAILED: "Couldn't compact this conversation's model context.",
     AGENT_BUSY: "This chat is already working. Wait for it to finish, or stop it first.",

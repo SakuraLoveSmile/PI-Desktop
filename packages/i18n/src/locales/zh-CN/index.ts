@@ -959,6 +959,7 @@ export const zhCN = {
     NETWORK_ERROR: "无法连接 AI 服务，请检查网络或接口地址。",
     TIMEOUT: "请求 AI 服务超时。",
     STREAM_FAILED: "回复中断了。",
+    EMPTY_MODEL_RESPONSE: "模型连续两轮都没有输出内容。可以重试，或换一种说法。",
     CONTEXT_TOO_LARGE: "上下文恢复后对话仍然过长。请缩短消息内容或新开对话。",
     CONTEXT_COMPACTION_FAILED: "无法压缩当前对话的模型上下文。",
     AGENT_BUSY: "此对话正在处理中。请等待完成，或先停止当前任务。",

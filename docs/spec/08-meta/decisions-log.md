@@ -998,3 +998,25 @@ section mirrors only marketplace/catalog items still blocking nothing.
   800 lines; lists and diffs are capped and report the hidden remainder.
 - Decision D189; renderer-only presentation, so no ADR. See
   `04-ux/08-component-spec.md` §9 and E2E-097.
+
+## 2026-08-05 — A silent assistant turn re-runs once before it is an error
+
+- A turn that ends with no tool call and no visible text is no longer reported
+  as complete. The runtime pops the empty assistant out of model context,
+  appends a no-output nudge to the system prompt, and calls `agent.continue()`
+  once — reusing the visible bubble id and swallowing the first attempt's
+  `turn_end` / `agent_end`, so a successful recovery is invisible to the user.
+- Blank visible text triggers it even when reasoning content is present. The
+  observed failure was exactly that shape: a 2830-character conclusion in
+  thinking and an empty `text`, which reached the user as nothing. The timing
+  log keeps `thinkingOnly` so the two shapes stay distinguishable.
+- The nudge rides on `state.systemPrompt` rather than `prepareNextTurn`, which
+  only shapes in-flight turns and whose context is discarded once the loop
+  stops. It is restored only if still unchanged, so a concurrent prompt rebuild
+  wins.
+- A second silence is terminal: retriable `EMPTY_MODEL_RESPONSE`, which the
+  existing assistant error row renders with a "Try again" action. One re-run per
+  prompt, so overflow recovery in the same prompt cannot multiply attempts.
+- Decision D190; recovery inside the existing loop contract, so no ADR. See
+  `03-runtime/02-agent-runtime.md` §5e, `03-runtime/08-error-codes.md` §3.2,
+  and E2E-098.

@@ -68,6 +68,30 @@ function createRuntime(
   });
 }
 
+/** Minimal pi-ai assistant message; overrides carry the shape under test. */
+function assistantMessage(overrides: {
+  content: unknown[];
+  stopReason?: string;
+}) {
+  return {
+    role: "assistant",
+    api: "openai-completions",
+    provider: "local",
+    model: "local-model",
+    usage: {
+      input: 1,
+      output: 1,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 2,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: overrides.stopReason ?? "stop",
+    timestamp: 2,
+    content: overrides.content,
+  };
+}
+
 describe("DesktopAgentRuntime configuration matching", () => {
   it("accepts no-auth providers and reuses only an exact pi configuration", async () => {
     const runtime = createRuntime();
@@ -1267,6 +1291,181 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
           status: "complete",
           content: "recovered response",
         }),
+      }),
+    );
+
+    await runtime.dispose();
+  });
+
+  it("recovers a silent turn with one automatic re-run", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    // The observed shape: a full conclusion in reasoning, empty visible text,
+    // no tool call — the turn ends and the user sees nothing.
+    const silentMessage = assistantMessage({
+      content: [{ type: "thinking", thinking: "the answer is provider B" }],
+    });
+    const recoveredMessage = assistantMessage({
+      content: [{ type: "text", text: "provider B, because …" }],
+    });
+
+    let promptDuringRerun: string | undefined;
+    agent.prompt = vi.fn(async () => {
+      agent.state.messages = [
+        { role: "user", content: "which provider?", timestamp: 1 },
+        silentMessage,
+      ];
+      await handleAgentEvent({ type: "message_start", message: silentMessage });
+      await handleAgentEvent({ type: "message_end", message: silentMessage });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    agent.continue = vi.fn(async () => {
+      promptDuringRerun = agent.state.systemPrompt;
+      // The silent assistant must be gone: agentLoopContinue rejects a
+      // transcript that ends with one.
+      expect(agent.state.messages).toHaveLength(1);
+      await handleAgentEvent({ type: "agent_start" });
+      await handleAgentEvent({ type: "turn_start" });
+      await handleAgentEvent({
+        type: "message_start",
+        message: { role: "assistant", content: [] },
+      });
+      await handleAgentEvent({
+        type: "message_end",
+        message: recoveredMessage,
+      });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+
+    await runtime.prompt("which provider?", "user-1");
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(agent.continue).toHaveBeenCalledOnce();
+    expect(promptDuringRerun).toContain("<no_output_recovery>");
+    // One-shot: the nudge does not ride along on later prompts.
+    expect(agent.state.systemPrompt).not.toContain("<no_output_recovery>");
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    // One bubble, and the user never sees the empty turn it replaced.
+    expect(events.filter((event) => event.type === "message_start")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "agent_end")).toHaveLength(1);
+    expect(
+      events.filter(
+        (event) =>
+          event.type === "message_end" && event.message?.status === "complete",
+      ),
+    ).toHaveLength(1);
+    expect(events.at(-1)?.type).toBe("agent_end");
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({
+          status: "complete",
+          content: "provider B, because …",
+        }),
+      }),
+    );
+
+    await runtime.dispose();
+  });
+
+  it("reports an empty response when the re-run stays silent", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    const silentMessage = assistantMessage({ content: [] });
+
+    agent.prompt = vi.fn(async () => {
+      agent.state.messages = [
+        { role: "user", content: "continue", timestamp: 1 },
+        silentMessage,
+      ];
+      await handleAgentEvent({ type: "message_start", message: silentMessage });
+      await handleAgentEvent({ type: "message_end", message: silentMessage });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    agent.continue = vi.fn(async () => {
+      await handleAgentEvent({ type: "agent_start" });
+      await handleAgentEvent({ type: "turn_start" });
+      await handleAgentEvent({
+        type: "message_start",
+        message: { role: "assistant", content: [] },
+      });
+      await handleAgentEvent({ type: "message_end", message: silentMessage });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+
+    await runtime.prompt("continue", "user-1");
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    // Exactly one re-run, then the failure becomes visible instead of looping.
+    expect(agent.continue).toHaveBeenCalledOnce();
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({
+          status: "error",
+          isError: true,
+          error: expect.objectContaining({
+            code: "EMPTY_MODEL_RESPONSE",
+            retriable: true,
+          }),
+        }),
+      }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "error",
+        error: expect.objectContaining({ code: "EMPTY_MODEL_RESPONSE" }),
+      }),
+    );
+    // An assistant message with nothing in it is not worth resending.
+    expect((runtime as any).fullEntries).toHaveLength(0);
+
+    await runtime.dispose();
+  });
+
+  it("treats a tool-calling turn with no text as normal work", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    const toolTurn = assistantMessage({
+      content: [
+        { type: "toolCall", id: "call-1", name: "Read", arguments: {} },
+      ],
+      stopReason: "toolUse",
+    });
+
+    agent.prompt = vi.fn(async () => {
+      agent.state.messages = [
+        { role: "user", content: "read it", timestamp: 1 },
+        toolTurn,
+      ];
+      await handleAgentEvent({ type: "message_start", message: toolTurn });
+      await handleAgentEvent({ type: "message_end", message: toolTurn });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+    agent.waitForIdle = vi.fn(async () => undefined);
+    agent.continue = vi.fn(async () => undefined);
+
+    await runtime.prompt("read it", "user-1");
+
+    expect(agent.continue).not.toHaveBeenCalled();
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({ status: "complete" }),
       }),
     );
 
