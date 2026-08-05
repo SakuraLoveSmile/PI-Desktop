@@ -315,24 +315,55 @@ export function Composer({
     // a session or a model; templates and unknown /names stay prompt text
     // (main expands templates). Runs before the model-ready gate on purpose.
     if (content.startsWith("/")) {
-      const name = content.slice(1).split(/\s/, 1)[0];
+      const commandEnd = content.search(/\s/);
+      const name = content.slice(
+        1,
+        commandEnd === -1 ? undefined : commandEnd,
+      );
       const command = name ? await resolveComposerCommand(name) : null;
       if (command && command.kind !== "template" && command.id) {
-        setValue("");
-        try {
-          if (command.kind === "builtin") await runPaletteCommand(command.id);
-          else await api.executeCommand(command.id);
-        } catch (e) {
-          showToast(e instanceof Error ? e.message : String(e), {
-            variant: "error",
-          });
+        const commandBody =
+          commandEnd === -1 ? "" : content.slice(commandEnd).trim();
+        const isModeCommand =
+          command.id === "builtin.mode.agent" ||
+          command.id === "builtin.mode.plan";
+
+        // Mode aliases can prefix a real prompt, e.g. `/plan-mode inspect
+        // this change`. Switch first, then send only the prompt body through
+        // the normal agent path so the user's message remains visible.
+        if (isModeCommand && commandBody) {
+          try {
+            await runPaletteCommand(command.id);
+            const accepted = await sendPrompt(commandBody);
+            if (accepted) setValue("");
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : String(e), {
+              variant: "error",
+            });
+          }
+          return;
         }
-        return;
+
+        // A local command is consumed only when it has no trailing text. A
+        // command with unsupported arguments falls through as prompt text;
+        // never silently discard a draft the user typed after the alias.
+        if (!commandBody) {
+          try {
+            if (command.kind === "builtin") await runPaletteCommand(command.id);
+            else await api.executeCommand(command.id);
+            setValue("");
+          } catch (e) {
+            showToast(e instanceof Error ? e.message : String(e), {
+              variant: "error",
+            });
+          }
+          return;
+        }
       }
     }
     if (!modelReady) return;
-    setValue("");
-    await sendPrompt(content);
+    const accepted = await sendPrompt(content);
+    if (accepted) setValue("");
   };
 
   const composerAc = useComposerAutocomplete({

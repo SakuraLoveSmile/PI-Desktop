@@ -1502,6 +1502,12 @@ Anatomy:
 - Accepting always inserts text (`/name ` / `@path ` / `@dir/`); dispatch
   happens only at send time (D123). Builtin/plugin dispatch bypasses the
   model-ready gate since no prompt is sent.
+- The Agent/Plan mode aliases can prefix a prompt in the same draft:
+  `/agent-mode <prompt>` and `/plan-mode <prompt>` apply the mode first, then
+  send `<prompt>` through the normal prompt path so the user turn remains in
+  the transcript. An alias-only mode command remains local. The composer is
+  cleared only after the local action or prompt dispatch is accepted; a failed
+  dispatch retains the complete draft for retry.
 - Sent template invocations render in the transcript as a monospace command
   chip from the message's `command` field instead of the expanded body.
 - States: keyboard-active row uses the shared `kb-active` treatment; empty

@@ -59,3 +59,26 @@ test("cross-session agent_end cannot clear the active session's running flag", (
   const agentEnd = handleEvents.match(/case "agent_end":\s*set\(\{ isRunning: false \}\)/);
   assert.ok(agentEnd, "active-session agent_end clears isRunning");
 });
+
+test("mode slash prefixes send the trailing prompt and retain failed drafts", () => {
+  const submit = composer.match(
+    /const submit = async \(\) => \{[\s\S]*?\n  \};\n\n  const composerAc/,
+  )?.[0] ?? "";
+  assert.ok(submit.length > 0, "composer submit implementation not found");
+  assert.match(submit, /const commandBody =/);
+  assert.match(submit, /const isModeCommand =/);
+  assert.match(
+    submit,
+    /if \(isModeCommand && commandBody\)[\s\S]*?await runPaletteCommand\(command\.id\);[\s\S]*?await sendPrompt\(commandBody\)[\s\S]*?if \(accepted\) setValue\(""\);/,
+  );
+  assert.match(
+    submit,
+    /const accepted = await sendPrompt\(content\);[\s\S]*?if \(accepted\) setValue\(""\);/,
+  );
+  assert.match(store, /sendPrompt: \(content: string\) => Promise<boolean>/);
+  const sendPrompt = store.match(
+    /sendPrompt: async \(content\)[\s\S]*?\n  compactContext:/,
+  )?.[0] ?? "";
+  assert.match(sendPrompt, /return false;/);
+  assert.match(sendPrompt, /await api\.prompt\(\{ sessionId, content \}\);[\s\S]*?return true;/);
+});
