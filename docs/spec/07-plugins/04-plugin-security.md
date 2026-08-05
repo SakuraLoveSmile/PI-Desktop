@@ -183,17 +183,18 @@ The host should be able to:
 ## 10. Security acceptance
 
 1. Writing a file fails without the `fs.write.workspace` permission
-2. After disabling a plugin, its tools are no longer visible
-3. A plugin cannot read API keys
-4. A plugin panel cannot call arbitrary host IPC
-5. An uncaught exception from a plugin does not cause the app to exit
-6. A theme CSS file with `@import` or a remote `url()` is refused, and disabling
+2. Deleting a file fails without the `fs.delete.workspace` permission and never deletes recursively
+3. After disabling a plugin, its tools are no longer visible
+4. A plugin cannot read API keys
+5. A plugin panel cannot call arbitrary host IPC
+6. An uncaught exception from a plugin does not cause the app to exit
+7. A theme CSS file with `@import` or a remote `url()` is refused, and disabling
    the providing plugin drops the app back to the `system` theme
-7. Publishing to an undeclared topic fails, and a publisher never receives its
+8. Publishing to an undeclared topic fails, and a publisher never receives its
    own message
-8. An MCP server declared with an absolute `command` or a plain-`http` remote
+9. An MCP server declared with an absolute `command` or a plain-`http` remote
    `url` fails manifest validation
-9. A low-risk or granted plugin tool still fails closed in Plan
+10. A low-risk or granted plugin tool still fails closed in Plan
 
 
 ## 11. Implementation status

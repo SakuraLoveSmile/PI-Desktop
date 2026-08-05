@@ -113,6 +113,7 @@ Example:
 ```text
 + net.fetch
 + fs.write.workspace
++ fs.delete.workspace
 ```
 
 ## 9. Rollback

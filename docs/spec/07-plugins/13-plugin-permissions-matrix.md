@@ -15,6 +15,7 @@ Provide a permission–capability–risk–default-policy reference table for re
 | `notify` | low | `ui.notify` | Can be granted by default | Avoid notification-spam abuse |
 | `fs.read.workspace` | medium | `fs.readText` / `fs.glob` | Confirm on first use | Workspace only |
 | `fs.write.workspace` | high | `fs.writeText` | Confirm each time or per session | High risk |
+| `fs.delete.workspace` | high | `fs.remove` | Confirm each time or per session | Non-recursive; workspace root is protected |
 | `agent.tool.register` | high | Register an agent tool | Confirm at install | Tool execution is audited separately |
 | `agent.prompt.inject` | high | Inject a system prompt; activates `contributes.skills` | Deny by default / strong confirmation | Easily leads to behavior hijacking |
 | `net.fetch` | high | `net.fetch` | Deny by default | Must show target-domain policy (later) |
@@ -51,6 +52,7 @@ English is the primary copy. The zh-CN column holds the localized example string
 |---|---|---|
 | `fs.read.workspace` | Read files in the current project | 读取当前项目文件 |
 | `fs.write.workspace` | Modify files in the current project | 修改当前项目文件 |
+| `fs.delete.workspace` | Delete files in the current project | 删除当前项目文件 |
 | `agent.tool.register` | Provide executable tools to the AI Agent | 向 AI Agent 提供可执行工具 |
 | `agent.prompt.inject` | Adjust agent instructions | 调整智能体指令 |
 | `net.fetch` | Access the network | 访问网络 |

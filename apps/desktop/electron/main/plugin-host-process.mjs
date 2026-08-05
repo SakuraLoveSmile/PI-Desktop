@@ -134,6 +134,7 @@ function buildApi() {
       readText: (path) => call("fs.readText", [path]),
       writeText: (path, content) => call("fs.writeText", [path, content]),
       glob: (pattern) => call("fs.glob", [pattern]),
+      remove: (path) => call("fs.remove", [path]),
     },
     agent: {
       registerTool: async (tool) => {
@@ -286,6 +287,15 @@ async function handleInit(message) {
 
 async function handleParentCall(method, payload) {
   switch (method) {
+    case "panel.invoke": {
+      const invoke = pluginModule?.onPanelInvoke;
+      if (typeof invoke !== "function") {
+        const error = new Error("plugin does not expose panel operations");
+        error.code = "UNSUPPORTED";
+        throw error;
+      }
+      return invoke(String(payload?.channel ?? ""), payload?.payload ?? {});
+    }
     case "command.run": {
       const run = commands.get(String(payload?.id ?? ""));
       if (!run) {

@@ -27,6 +27,7 @@ test("plugin host calls pass an allowlist and time out", () => {
     "PLUGIN_HOOK_TIMEOUT_MS",
     "PLUGIN_COMMAND_TIMEOUT_MS",
     "PLUGIN_TOOL_TIMEOUT_MS",
+    "PLUGIN_PANEL_TIMEOUT_MS",
   ]) {
     assert.match(runtimeSrc, new RegExp(token));
   }
@@ -197,6 +198,32 @@ test("plugin host process registers contributions and round-trips tool calls", a
 
   await host.call("lifecycle.unload", {});
   assert.deepEqual(toasts, ["ran", "unloaded"]);
+});
+
+test("plugin host process routes panel calls and workspace removal", async (t) => {
+  const { dir, manifest } = writePlugin(`
+    async function onPanelInvoke(channel, payload) {
+      return { channel, removed: await pi.fs.remove(payload.path) };
+    }
+    module.exports = { onPanelInvoke };
+  `);
+  const removed = [];
+  const host = startHostProcess(dir, manifest, {
+    "fs.remove": (path) => {
+      removed.push(path);
+      return "removed";
+    },
+  });
+  t.after(() => host.stop());
+
+  await host.init();
+  const result = await host.call("panel.invoke", {
+    channel: "skill.remove",
+    payload: { path: "skills/alpha/SKILL.md" },
+  });
+  assert.deepEqual(result, { channel: "skill.remove", removed: "removed" });
+  assert.deepEqual(removed, ["skills/alpha/SKILL.md"]);
+  assert.equal(host.calls().some((message) => message.api === "fs.remove"), true);
 });
 
 test("plugin host process reports denied host APIs and failing tools as errors", async (t) => {

@@ -16,6 +16,7 @@ const protocolSrc = readFileSync(join(repoRoot, "packages/shared/src/protocol.ts
 test("plugin runtime exposes gated high-risk host APIs", () => {
   for (const token of [
     "fs.write.workspace",
+    "fs.delete.workspace",
     "net.fetch",
     "shell.openExternal",
     "clipboard.read",
@@ -24,6 +25,14 @@ test("plugin runtime exposes gated high-risk host APIs", () => {
   ]) {
     assert.match(runtimeSrc, new RegExp(token.replaceAll(".", "\\.")));
   }
+});
+
+test("workspace deletion and panel operations stay bounded", () => {
+  assert.match(runtimeSrc, /PANEL_SKILL_CHANNELS/);
+  assert.match(runtimeSrc, /method: "panel.invoke"/);
+  assert.match(runtimeSrc, /"fs.remove"/);
+  assert.match(runtimeSrc, /recursive: false/);
+  assert.match(runtimeSrc, /cannot remove workspace root/);
 });
 
 test("plugin panels use sandboxed isolated host windows", () => {

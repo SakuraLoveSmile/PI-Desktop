@@ -161,6 +161,7 @@ Developer mode can load a local path directly, without copying it into `installe
  "clipboard.write",
  "notify",
  "fs.read.workspace",
+ "fs.delete.workspace",
  "agent.tool.register"
  ],
  "engines": {
@@ -286,6 +287,7 @@ therefore applies only to brokered APIs until runtime sandboxing is delivered.
 | `notify` | low | System notification |
 | `fs.read.workspace` | medium | Read workspace |
 | `fs.write.workspace` | high | Write workspace |
+| `fs.delete.workspace` | high | Delete workspace files |
 | `agent.tool.register` | high | Register agent tool |
 | `agent.prompt.inject` | high | Inject prompt; activates `contributes.skills` |
 | `net.fetch` | high | Network request |

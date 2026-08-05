@@ -70,13 +70,13 @@ Every permission is declared in the manifest and granted at install time; an und
 fails at runtime. Ask for the least you need — the plugins page shows the risk tier to the
 user.
 
-- High risk: `net.fetch`, `fs.write.workspace`, `agent.prompt.inject`, `agent.tool.register`
+- High risk: `net.fetch`, `fs.write.workspace`, `fs.delete.workspace`, `agent.prompt.inject`, `agent.tool.register`
 - Medium: `fs.read.workspace`, `clipboard.read`, `clipboard.write`, `shell.openExternal`
 - Low: `ui.panel`, `notify`
 
 Host APIs, and nothing else: `app.getVersion`, `app.getLocale`, `plugin.getSettings`,
 `plugin.setSettings`, `plugin.getDataPath`, `ui.openPanel`, `ui.closePanel`, `ui.showToast`,
-`ui.notify`, `workspace.get`, `fs.readText`, `fs.writeText`, `fs.glob`, `clipboard.readText`,
+`ui.notify`, `workspace.get`, `fs.readText`, `fs.writeText`, `fs.glob`, `fs.remove`, `clipboard.readText`,
 `clipboard.writeText`, `shell.openExternal`, `net.fetch`. There is no archive, process or
 network-server API.
 

@@ -80,6 +80,7 @@ type RiskTier = "high" | "medium" | "low";
 const PERMISSION_RISK: Record<string, RiskTier> = {
   "net.fetch": "high",
   "fs.write.workspace": "high",
+  "fs.delete.workspace": "high",
   "agent.prompt.inject": "high",
   "agent.tool.register": "high",
   "fs.read.workspace": "medium",

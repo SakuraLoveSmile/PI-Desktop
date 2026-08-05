@@ -14,6 +14,7 @@ import { MAX_PACKAGE_BYTES, MAX_PACKAGE_FILES, walkPluginDir } from "./walk.js";
 export const HIGH_RISK_PERMISSIONS = [
   "net.fetch",
   "fs.write.workspace",
+  "fs.delete.workspace",
   "agent.prompt.inject",
   "agent.tool.register",
 ] as const;
@@ -26,6 +27,7 @@ const PERMISSION_API_HINTS: Record<string, string[]> = {
   "clipboard.write": ["clipboard.writeText"],
   "fs.read.workspace": ["fs.readText", "fs.glob"],
   "fs.write.workspace": ["fs.writeText"],
+  "fs.delete.workspace": ["fs.remove"],
   "agent.tool.register": ["agent.registerTool"],
   "net.fetch": ["net.fetch"],
   "shell.openExternal": ["shell.openExternal"],

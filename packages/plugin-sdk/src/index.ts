@@ -168,6 +168,7 @@ export type PluginHostApi = {
     readText: (pathFromWorkspaceRoot: string) => Promise<string>;
     writeText: (pathFromWorkspaceRoot: string, content: string) => Promise<void>;
     glob: (pattern: string) => Promise<string[]>;
+    remove: (pathFromWorkspaceRoot: string) => Promise<void>;
   };
   agent: {
     registerTool: (tool: PluginTool) => Promise<void>;
@@ -215,6 +216,8 @@ export type PluginHostApi = {
 export type PluginModule = {
   onLoad?: () => Promise<void> | void;
   onUnload?: () => Promise<void> | void;
+  /** Optional fixed-channel operations for an isolated plugin panel. */
+  onPanelInvoke?: (channel: string, payload: unknown) => Promise<unknown> | unknown;
 };
 
 export const PLUGIN_PERMISSIONS = [
@@ -225,6 +228,7 @@ export const PLUGIN_PERMISSIONS = [
   "notify",
   "fs.read.workspace",
   "fs.write.workspace",
+  "fs.delete.workspace",
   "agent.tool.register",
   "agent.prompt.inject",
   "net.fetch",

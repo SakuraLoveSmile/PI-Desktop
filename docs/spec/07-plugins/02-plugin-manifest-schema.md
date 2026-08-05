@@ -146,6 +146,7 @@ type PluginPermission =
  | "notify"
  | "fs.read.workspace"
  | "fs.write.workspace"
+ | "fs.delete.workspace"
  | "agent.tool.register"
  | "agent.prompt.inject"
  | "net.fetch"

@@ -536,6 +536,7 @@
       <tr><td><code>shell.openExternal</code></td><td><span class="pill med">中</span></td><td><code>shell.openExternal</code></td><td>仅 <code>http(s)</code> / <code>mailto</code>，否则 <code>INVALID_ARGUMENT</code></td></tr>
       <tr><td><code>fs.read.workspace</code></td><td><span class="pill med">中</span></td><td><code>fs.readText</code> · <code>fs.glob</code></td><td><code>ensureWithinRoot</code> 拦路径逃逸；glob 结果截断到 500</td></tr>
       <tr><td><code>fs.write.workspace</code></td><td><span class="pill high">高</span></td><td><code>fs.writeText</code></td><td>同样限工作区内；自动建父目录</td></tr>
+      <tr><td><code>fs.delete.workspace</code></td><td><span class="pill high">高</span></td><td><code>fs.remove</code></td><td>限工作区内；非递归；拒绝删除工作区根目录</td></tr>
       <tr><td><code>agent.tool.register</code></td><td><span class="pill high">高</span></td><td><code>agent.registerTool</code></td><td>强制改名 <code>plugin_&lt;id&gt;_&lt;tool&gt;</code>；卸载即摘除</td></tr>
       <tr><td><code>agent.prompt.inject</code></td><td><span class="pill high">高</span></td><td><code>contributes.skills</code> 注入</td><td>未授权时整包技能跳过并记 <code>plugin.skills.denied</code></td></tr>
       <tr><td><code>net.fetch</code></td><td><span class="pill high">高</span></td><td><code>net.fetch</code></td><td>仅 <code>http(s)</code>；默认 15s 超时；记 url + status</td></tr>
@@ -692,7 +693,7 @@ const DETAILS = {
     "app.getVersion / getLocale",
     "plugin.getSettings / setSettings / getDataPath",
     "ui.openPanel / closePanel / showToast / notify",
-    "workspace.get · fs.readText / writeText / glob",
+    "workspace.get · fs.readText / writeText / glob / remove",
     "clipboard.readText / writeText · shell.openExternal · net.fetch",
     "commands.* 与 agent.* 走独立分支（需要在宿主侧建代理），不在这张表里"]],
   "gateway": ["权限闸门", "assertPermission()", [

@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, statSync, rmSync } from "node:fs";
 import { join, dirname, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import {
@@ -153,6 +153,7 @@ const HOST_API_ALLOWLIST = new Set([
   "fs.readText",
   "fs.writeText",
   "fs.glob",
+  "fs.remove",
   "clipboard.readText",
   "clipboard.writeText",
   "shell.openExternal",
@@ -170,6 +171,16 @@ const PLUGIN_HOOK_TIMEOUT_MS = 5_000;
 const PLUGIN_COMMAND_TIMEOUT_MS = 30_000;
 /** Kept under host-core's 120s tool budget so the plugin-side error wins. */
 const PLUGIN_TOOL_TIMEOUT_MS = 110_000;
+/** Fixed panel operations are user-facing and must not hang the renderer. */
+const PLUGIN_PANEL_TIMEOUT_MS = 30_000;
+const PANEL_SKILL_CHANNELS = new Set([
+  "skill.list",
+  "skill.read",
+  "skill.create",
+  "skill.update",
+  "skill.remove",
+  "skill.setEnabled",
+]);
 /** A plugin may teach at most this many skills; the rest are ignored. */
 const MAX_SKILLS_PER_PLUGIN = 32;
 /** Skill documents above this size are refused (prompt budget, not disk). */
@@ -696,6 +707,17 @@ export class PluginRuntime {
   ): Promise<unknown> {
     const loaded = this.loaded.get(pluginId);
     if (!loaded) throw apiError("NOT_FOUND", `plugin not loaded: ${pluginId}`);
+    if (PANEL_SKILL_CHANNELS.has(channel)) {
+      return this.sendToChild(
+        loaded,
+        {
+          t: "call",
+          method: "panel.invoke",
+          payload: { channel, payload: payload ?? {} },
+        },
+        PLUGIN_PANEL_TIMEOUT_MS,
+      );
+    }
     const api = this.hostApi(loaded);
     switch (channel) {
       case "ui.showToast":
@@ -1810,6 +1832,28 @@ export class PluginRuntime {
           };
           visit(root);
           return matches.slice(0, 500);
+        },
+        remove: async (pathFromWorkspaceRoot: string) => {
+          this.assertPermission(loaded, "fs.delete.workspace");
+          const root = this.services.getWorkspacePath();
+          if (!root) throw apiError("NOT_FOUND", "No workspace is open");
+          const full = ensureWithinRoot(root, pathFromWorkspaceRoot);
+          if (full === resolve(root)) {
+            throw apiError("INVALID_ARGUMENT", "cannot remove workspace root");
+          }
+          if (!existsSync(full)) {
+            throw apiError("NOT_FOUND", `workspace path not found: ${pathFromWorkspaceRoot}`);
+          }
+          // Never recurse: Skill removal may delete a file or an empty directory,
+          // but it must fail closed for a non-empty directory.
+          rmSync(full, { recursive: false, force: false });
+          this.services.audit?.({
+            pluginId,
+            api: "fs.remove",
+            ok: true,
+            ts: Date.now(),
+            path: pathFromWorkspaceRoot,
+          });
         },
       },
       clipboard: {

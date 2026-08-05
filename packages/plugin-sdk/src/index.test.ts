@@ -99,6 +99,7 @@ describe("PLUGIN_PERMISSIONS", () => {
       "bus.publish",
       "bus.subscribe",
       "agent.prompt.inject",
+      "fs.delete.workspace",
     ]) {
       expect(PLUGIN_PERMISSIONS).toContain(permission);
     }
