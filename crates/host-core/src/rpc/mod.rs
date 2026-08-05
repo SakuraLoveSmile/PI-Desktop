@@ -456,6 +456,57 @@ fn plugin_err(err: impl ToString) -> JsonRpcError {
     }
 }
 
+/// Validation failures from the user-owned MCP registry are the user's typo,
+/// not an internal fault, so they get a distinct code the UI can show inline.
+fn scope_err(err: impl ToString) -> JsonRpcError {
+    let msg = err.to_string();
+    if msg.contains("MCP_INVALID") {
+        rpc_err(1015, msg, "MCP_INVALID")
+    } else {
+        rpc_err(1000, msg, "INTERNAL")
+    }
+}
+
+fn skill_err(err: impl ToString) -> JsonRpcError {
+    let msg = err.to_string();
+    if msg.contains("SKILL_INVALID") {
+        rpc_err(1016, msg, "SKILL_INVALID")
+    } else {
+        rpc_err(1000, msg, "INTERNAL")
+    }
+}
+
+/// Read the create/import/update payload for a user skill. Absent fields stay
+/// absent so `update` can distinguish "unchanged" from "cleared".
+fn parse_skill_input(params: &Value) -> Result<crate::user_skills::UserSkillInput, JsonRpcError> {
+    let raw = params
+        .get("skill")
+        .cloned()
+        .unwrap_or_else(|| params.clone());
+    serde_json::from_value(raw).map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))
+}
+
+fn require_id(params: &Value) -> Result<String, JsonRpcError> {
+    params
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))
+}
+
+/// Read an `ActivationScope` from request params, accepting either a nested
+/// `scope` object or the flat `mode`/`projects` pair the renderer sends.
+fn parse_scope(params: &Value) -> Result<crate::activation::ActivationScope, JsonRpcError> {
+    let raw = match params.get("scope") {
+        Some(scope) => scope.clone(),
+        None => json!({
+            "mode": params.get("mode").cloned().unwrap_or(json!("global")),
+            "projects": params.get("projects").cloned().unwrap_or(json!([])),
+        }),
+    };
+    serde_json::from_value(raw).map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))
+}
+
 async fn handle_request(
     state: Arc<Mutex<AppState>>,
     method: &str,
@@ -1340,6 +1391,9 @@ async fn handle_request(
                     let reason = match p.tool_name.as_str() {
                         "Write" | "Edit" => "Modifies files in your workspace",
                         "Bash" => "Runs a shell command in your workspace",
+                        name if name.starts_with("mcp_") => {
+                            "MCP server tool requires approval"
+                        }
                         name if name.starts_with("plugin_") => {
                             "Plugin-provided tool requires approval"
                         }
@@ -1504,7 +1558,7 @@ async fn handle_request(
                 );
                 None
             });
-            let mut result = if p.tool_name.starts_with("plugin_") {
+            let mut result = if tools::is_desktop_dispatched(&p.tool_name) {
                 execute_plugin_tool(&state, &tx, &p, timeout).await
             } else {
                 tools::execute_tool(
@@ -1869,6 +1923,145 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "plugin": plugin }))
         }
+        "plugins.setScope" => {
+            let id = params
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
+            let scope = parse_scope(&params)?;
+            let mut st = state.lock().await;
+            let plugin = st
+                .plugins
+                .set_scope(id, scope)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "plugin": plugin }))
+        }
+
+        "mcp.list" => {
+            let st = state.lock().await;
+            Ok(json!({ "servers": st.mcp_servers.list() }))
+        }
+        "mcp.active" => {
+            // The agent-facing view: what a session on this project may reach.
+            let project_path = params.get("projectPath").and_then(|v| v.as_str());
+            let st = state.lock().await;
+            Ok(json!({ "servers": st.mcp_servers.active_for(project_path) }))
+        }
+        "mcp.upsert" => {
+            let input: crate::mcp_servers::McpServerInput =
+                serde_json::from_value(params.get("server").cloned().unwrap_or(params.clone()))
+                    .map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))?;
+            let mut st = state.lock().await;
+            let server = st.mcp_servers.upsert(input).map_err(scope_err)?;
+            Ok(json!({ "server": server }))
+        }
+        "mcp.remove" => {
+            let id = require_id(&params)?;
+            let mut st = state.lock().await;
+            let ok = st
+                .mcp_servers
+                .remove(&id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": ok }))
+        }
+        "mcp.setEnabled" => {
+            let id = require_id(&params)?;
+            let enabled = params
+                .get("enabled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let mut st = state.lock().await;
+            let server = st
+                .mcp_servers
+                .set_enabled(&id, enabled)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "server": server }))
+        }
+        "mcp.setScope" => {
+            let id = require_id(&params)?;
+            let scope = parse_scope(&params)?;
+            let mut st = state.lock().await;
+            let server = st
+                .mcp_servers
+                .set_scope(&id, scope)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "server": server }))
+        }
+
+        "skills.list" => {
+            let st = state.lock().await;
+            Ok(json!({ "skills": st.user_skills.list() }))
+        }
+        "skills.active" => {
+            let project_path = params.get("projectPath").and_then(|v| v.as_str());
+            let st = state.lock().await;
+            Ok(json!({ "skills": st.user_skills.active_for(project_path) }))
+        }
+        "skills.create" => {
+            let input = parse_skill_input(&params)?;
+            let mut st = state.lock().await;
+            let skill = st.user_skills.create(input).map_err(skill_err)?;
+            Ok(json!({ "skill": skill }))
+        }
+        "skills.import" => {
+            let source = params
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?
+                .to_string();
+            let input = parse_skill_input(&params)?;
+            let mut st = state.lock().await;
+            let skill = st.user_skills.import(&source, input).map_err(skill_err)?;
+            Ok(json!({ "skill": skill }))
+        }
+        "skills.update" => {
+            let id = require_id(&params)?;
+            let input = parse_skill_input(&params)?;
+            let mut st = state.lock().await;
+            let skill = st.user_skills.update(&id, input).map_err(skill_err)?;
+            Ok(json!({ "skill": skill }))
+        }
+        "skills.read" => {
+            let id = require_id(&params)?;
+            let st = state.lock().await;
+            match st.user_skills.read(&id).map_err(skill_err)? {
+                Some((skill, body)) => Ok(json!({ "skill": skill, "body": body })),
+                None => Ok(json!({ "skill": null, "body": null })),
+            }
+        }
+        "skills.remove" => {
+            let id = require_id(&params)?;
+            let mut st = state.lock().await;
+            let ok = st
+                .user_skills
+                .remove(&id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": ok }))
+        }
+        "skills.setEnabled" => {
+            let id = require_id(&params)?;
+            let enabled = params
+                .get("enabled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let mut st = state.lock().await;
+            let skill = st
+                .user_skills
+                .set_enabled(&id, enabled)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "skill": skill }))
+        }
+        "skills.setScope" => {
+            let id = require_id(&params)?;
+            let scope = parse_scope(&params)?;
+            let mut st = state.lock().await;
+            let skill = st
+                .user_skills
+                .set_scope(&id, scope)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "skill": skill }))
+        }
+
         "market.refresh" => {
             let force = params
                 .get("force")

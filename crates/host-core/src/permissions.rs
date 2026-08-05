@@ -80,13 +80,14 @@ impl PermissionManager {
         match tool_name {
             "Read" | "Glob" | "Grep" => Risk::Low,
             "Write" | "Edit" | "Bash" => Risk::High,
-            name if name.starts_with("plugin_") => Risk::Low,
+            name if crate::tools::is_desktop_dispatched(name) => Risk::Low,
             _ => Risk::Medium,
         }
     }
 
     pub fn read_only_mode_allows(tool_name: &str) -> bool {
-        matches!(tool_name, "Read" | "Glob" | "Grep") || tool_name.starts_with("plugin_")
+        matches!(tool_name, "Read" | "Glob" | "Grep")
+            || crate::tools::is_desktop_dispatched(tool_name)
     }
 
     pub fn evaluate_auto(

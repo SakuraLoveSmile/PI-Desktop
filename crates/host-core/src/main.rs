@@ -1,6 +1,8 @@
+mod activation;
 mod artifacts;
 mod audit;
 mod db;
+mod mcp_servers;
 mod notifications;
 mod permissions;
 mod plugins;
@@ -15,6 +17,7 @@ mod state;
 mod tools;
 mod transcripts;
 mod tool_budget;
+mod user_skills;
 mod workspace;
 
 use std::sync::Arc;
@@ -46,6 +49,8 @@ async fn main() -> anyhow::Result<()> {
     std::fs::create_dir_all(data_dir.join("plugins/data"))?;
     std::fs::create_dir_all(data_dir.join("plugins/market"))?;
     std::fs::create_dir_all(data_dir.join("plugins/cache/download"))?;
+    std::fs::create_dir_all(data_dir.join("mcp"))?;
+    std::fs::create_dir_all(data_dir.join("skills"))?;
     std::fs::create_dir_all(data_dir.join("cache"))?;
     std::fs::create_dir_all(data_dir.join("scratch"))?;
 

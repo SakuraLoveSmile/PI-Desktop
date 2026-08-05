@@ -401,6 +401,17 @@ fn clip_chars(text: String, max_chars: usize) -> (String, bool) {
     }
 }
 
+/// Tools host-core gates but does not run itself: the plugin bridge and the
+/// user's MCP servers both live in Electron main, so both are forwarded over
+/// `plugins.execute` instead of being executed here.
+///
+/// `mcp_` is treated exactly like `plugin_` for risk and read-only-mode
+/// purposes: the user typed the command or URL into the MCP editor themselves,
+/// which is at least as deliberate as accepting a plugin's manifest.
+pub fn is_desktop_dispatched(tool_name: &str) -> bool {
+    tool_name.starts_with("plugin_") || tool_name.starts_with("mcp_")
+}
+
 pub async fn execute_tool(
     workspace: Option<&Path>,
     scratch: Option<&Path>,
@@ -425,11 +436,9 @@ pub async fn execute_tool(
         "Write" => tool_write(workspace, scratch, args),
         "Edit" => tool_edit(workspace, scratch, args),
         "Bash" => tool_bash(workspace, scratch, args, timeout_ms).await,
-        other if other.starts_with("plugin_") => Err((
+        other if is_desktop_dispatched(other) => Err((
             "TOOL_NOT_FOUND".into(),
-            format!(
-                "plugin tool {other} requires the desktop runner (dispatched via plugins.execute)"
-            ),
+            format!("{other} requires the desktop runner (dispatched via plugins.execute)"),
         )),
         other => Err(("TOOL_NOT_FOUND".into(), format!("unknown tool: {other}"))),
     };

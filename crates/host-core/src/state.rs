@@ -4,10 +4,12 @@ use std::time::Instant;
 use anyhow::Result;
 
 use crate::db::Database;
+use crate::mcp_servers::McpServerRegistry;
 use crate::permissions::PermissionManager;
 use crate::plugins::PluginManager;
 use crate::secrets::SecretStore;
 use crate::tool_budget::ToolBudget;
+use crate::user_skills::UserSkillRegistry;
 use crate::workspace::WorkspaceState;
 
 pub const PROTOCOL_VERSION: u32 = 6;
@@ -20,6 +22,10 @@ pub struct AppState {
     pub workspace: WorkspaceState,
     pub permissions: PermissionManager,
     pub plugins: PluginManager,
+    /// MCP servers the user configured directly, without a plugin around them.
+    pub mcp_servers: McpServerRegistry,
+    /// Skill documents the user wrote or imported directly.
+    pub user_skills: UserSkillRegistry,
     pub started_at: Instant,
     pub handshook: bool,
     /// session_id -> toolName grants
@@ -35,6 +41,8 @@ impl AppState {
         let db = Database::open_in_dir(data_dir)?;
         let secrets = SecretStore::open(data_dir)?;
         let plugins = PluginManager::new(data_dir);
+        let mcp_servers = McpServerRegistry::new(data_dir);
+        let user_skills = UserSkillRegistry::new(data_dir);
         Ok(Self {
             data_dir: data_dir.to_path_buf(),
             db,
@@ -42,6 +50,8 @@ impl AppState {
             workspace: WorkspaceState::default(),
             permissions: PermissionManager::default(),
             plugins,
+            mcp_servers,
+            user_skills,
             started_at: Instant::now(),
             handshook: false,
             session_grants: HashMap::new(),

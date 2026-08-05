@@ -8,6 +8,8 @@ use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
+use crate::activation::ActivationScope;
+
 const MAX_PACKAGE_BYTES: u64 = 50 * 1024 * 1024;
 const MAX_PACKAGE_FILES: usize = 2000;
 
@@ -18,6 +20,11 @@ pub struct PluginSummary {
     pub name: String,
     pub version: String,
     pub enabled: bool,
+    /// Where the plugin's contributions apply. Absent in registries written
+    /// before scopes existed, and `default()` is global — which is what those
+    /// installs already did.
+    #[serde(default)]
+    pub scope: ActivationScope,
     pub source: String,
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -376,6 +383,7 @@ impl PluginManager {
             name: manifest.name.clone(),
             version: manifest.version.clone(),
             enabled: true,
+            scope: ActivationScope::default(),
             source: "dev".into(),
             status: "ready".into(),
             error_message: None,
@@ -488,6 +496,12 @@ impl PluginManager {
                 name: manifest.name.clone(),
                 version: manifest.version.clone(),
                 enabled: opts.enable,
+                // An update must not silently widen a project-scoped plugin
+                // back to every project.
+                scope: existing
+                    .as_ref()
+                    .map(|p| p.scope.clone())
+                    .unwrap_or_default(),
                 source: opts.source.clone(),
                 status: if opts.enable {
                     "ready".into()
@@ -546,6 +560,19 @@ impl PluginManager {
             } else {
                 "disabled".into()
             };
+            plugin.updated_at = Some(Utc::now().to_rfc3339());
+            let out = plugin.clone();
+            self.save()?;
+            return Ok(Some(out));
+        }
+        Ok(None)
+    }
+
+    /// Move a plugin between "everywhere" and "these projects". Kept separate
+    /// from `set_enabled` so switching a plugin off never discards its list.
+    pub fn set_scope(&mut self, id: &str, scope: ActivationScope) -> Result<Option<PluginSummary>> {
+        if let Some(plugin) = self.runtime.iter_mut().find(|p| p.id == id) {
+            plugin.scope = scope.normalized();
             plugin.updated_at = Some(Utc::now().to_rfc3339());
             let out = plugin.clone();
             self.save()?;
