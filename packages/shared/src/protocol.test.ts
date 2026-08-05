@@ -96,7 +96,7 @@ describe("Plan protocol contracts", () => {
 
   it("keeps the artifact and queued execution wire shapes explicit", () => {
     const artifact: PlanArtifact = {
-      relativePath: ".pi/plans/plan.md",
+      relativePath: ".pi/plan/plan.md",
       sha256: "sha256",
       sizeBytes: 6,
     };

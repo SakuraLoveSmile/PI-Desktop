@@ -8,5 +8,4 @@ export * from "./plugin-skills-prompt.js";
 export * from "./prompt-templates.js";
 export * from "./project-instructions.js";
 export * from "./project-instructions-prompt.js";
-export * from "./plugin-skills-prompt.js";
 export * from "./timing.js";
