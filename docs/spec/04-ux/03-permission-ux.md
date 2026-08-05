@@ -11,7 +11,7 @@ Make high-risk local actions visible, interruptible, and predictable.
 | Agent | allow | allow | permission policy | permission policy | registered risk policy |
 | Plan | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | deny |
 
-Decision source: **D003/D170/D171**.
+Decision source: **D003/D189/D190**.
 
 Plan keeps this permission-mode control visible. It is planning intent, not a
 strict read-only security profile: a Bash command can mutate workspace or

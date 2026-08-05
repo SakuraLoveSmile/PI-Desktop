@@ -67,3 +67,6 @@ Each ADR includes:
 | 0049 | Recover automatic context compaction failures with a retained tail | Accepted |
 | 0050 | Bounded provider stream recovery and diagnostics | Accepted |
 | 0051 | Isolate host RPC stdio from the Tokio blocking pool | Accepted |
+| 0052 | Plan operating state and approval boundary | Superseded by 0053 |
+| 0053 | Plan checkpoint artifact, approval, and execution epoch | Accepted for implementation |
+| 0054 | Selectable command shell catalog and execution identity | Accepted for implementation |

@@ -1,8 +1,8 @@
-# ADR 0039: Plan checkpoint artifact, approval, and execution epoch
+# ADR 0053: Plan checkpoint artifact, approval, and execution epoch
 
 - Status: Accepted for implementation
 - Date: 2026-07-31
-- Supersedes: ADR 0038 and D169
+- Supersedes: ADR 0052 and D188
 - Baseline: `0.4.14`
 - Protocol: v9
 - Storage schema: v10
@@ -166,7 +166,7 @@ size, and approval identity.
 
 ## Related docs
 
-- `docs/adr/0040-selectable-command-shell-catalog.md`
+- `docs/adr/0054-selectable-command-shell-catalog.md`
 - `docs/spec/00-baseline.md`
 - `docs/spec/03-runtime/01-ipc-protocol.md`
 - `docs/spec/03-runtime/02-agent-runtime.md`
@@ -184,4 +184,4 @@ size, and approval identity.
 - `docs/spec/05-security/01-security.md`
 - `docs/spec/06-delivery/02-acceptance-criteria.md`
 - `docs/spec/06-delivery/04-e2e-test-plan.md`
-- `docs/spec/08-meta/decisions-log.md` (D170)
+- `docs/spec/08-meta/decisions-log.md` (D189)

@@ -235,7 +235,7 @@ group or Windows process/job tree before streams close.
 
 ## 9. Delivery slices
 
-1. **Contract freeze**: ADR 0039/0040, D170/D171, baseline 0.4.14, protocol v9,
+1. **Contract freeze**: ADR 0053/0054, D189/D190, baseline 0.4.14, protocol v9,
    schema v10, and E2E-104-E2E-117.
 2. **Storage/host boundary**: immutable artifact writer, `plan_approvals`
    fields/indexes, startup interruption transaction, queue transitions,

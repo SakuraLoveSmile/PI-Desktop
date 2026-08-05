@@ -1,4 +1,4 @@
-# ADR 0040: Selectable command shell catalog and execution identity
+# ADR 0054: Selectable command shell catalog and execution identity
 
 - Status: Accepted for implementation
 - Date: 2026-07-31
@@ -101,7 +101,7 @@ audit matrix without adding authority.
 
 ## Related docs
 
-- `docs/adr/0039-plan-checkpoint-artifact-and-execution-epoch.md`
+- `docs/adr/0053-plan-checkpoint-artifact-and-execution-epoch.md`
 - `docs/spec/03-runtime/01-ipc-protocol.md`
 - `docs/spec/03-runtime/03-tools-and-permissions.md`
 - `docs/spec/03-runtime/05-host-core-rust.md`
@@ -115,4 +115,4 @@ audit matrix without adding authority.
 - `docs/spec/04-ux/09-interaction-patterns.md`
 - `docs/spec/05-security/01-security.md`
 - `docs/spec/06-delivery/04-e2e-test-plan.md`
-- `docs/spec/08-meta/decisions-log.md` (D171)
+- `docs/spec/08-meta/decisions-log.md` (D190)

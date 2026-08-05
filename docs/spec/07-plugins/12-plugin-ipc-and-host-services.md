@@ -100,7 +100,8 @@ handler is logged, never fatal. This is the same channel that finally makes
 
 ### Query
 - The command palette only queries contributions that are enabled + loaded successfully
-- The Agent only sees registered tools
+- Agent sees registered tools; Plan receives no plugin tools regardless of risk
+  or grant state
 
 ### Deregistration
 - Remove everything on disable/unload/uninstall, including stopping resident
@@ -154,10 +155,13 @@ permission gate and result envelope stay in host-core:
 
 1. Model calls `plugin_<pluginIdSafe>_<toolName>`; the sidecar forwards it
    to host `tools.execute` like any built-in tool.
-2. host-core runs the normal permission flow (risk, session grants,
-   120s timeout), then emits notification `plugins.execute`
+2. host-core resolves the durable operating mode first. In Agent it runs the
+   normal permission flow (risk, session grants, 120s timeout), then emits
+   notification `plugins.execute`
    `{ executionId, sessionId, toolCallId, toolName, args }`.
-3. Electron main executes the registered plugin tool JS and answers via RPC
+3. Plan calls fail at the host policy step with `PLUGIN_DISABLED_IN_PLAN`; they
+   never reach Electron or the plugin runtime. Agent calls continue with
+   Electron main executing the registered plugin tool JS and answering via RPC
    `plugins.resolveExecution` `{ executionId, ok, content, errorCode? }`.
 4. host-core resolves the pending execution and returns a standard
    `ToolsExecuteResult` to the sidecar. Dispatch timeout maps to

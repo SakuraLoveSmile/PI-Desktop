@@ -4,7 +4,7 @@
 
 **Rust host-core owns SQLite exclusively (D002), and the transcript file
 store with it (D119). Plan artifacts and queue records are also host-owned
-(D170); shell defaults are host settings (D171).**
+(D189); shell defaults are host settings (D190).**
 
 - Node pi sidecar does not open the DB or transcript files directly
 - Electron main does not write DB or transcript files directly

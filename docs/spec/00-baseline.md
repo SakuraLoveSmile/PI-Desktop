@@ -37,19 +37,19 @@
 > leading brand mark through D160 / ADR 0031 while preserving shell branding
 > elsewhere.
 > `0.4.13` replaces the Chat operating profile with the Plan operating state
-> through D169 / ADR 0038. Plan is the same pi Agent in planning state, keeps
+> through D188 / ADR 0052. Plan is the same pi Agent in planning state, keeps
 > permission-mode selection, exposes Bash subject to that policy, denies
 > Write/Edit/plugin tools, and submits structured plans through a separate
 > host-owned approval transition. The host protocol is v7 and storage schema
 > v8; persisted Chat values migrate to Plan while Agent remains the default.
 > `0.4.14` replaces that proposal with immutable host-written Markdown
-> checkpoints under `<workspaceRoot>/.pi/plan/*.md` through D170 / ADR 0039.
+> checkpoints under `<workspaceRoot>/.pi/plan/*.md` through D189 / ADR 0053.
 > SubmitPlan accepts title, Markdown, and question; the Markdown bytes are
 > preserved exactly while title/question remain structured approval fields.
 > Approval is approve/reject only with explicit permission selection defaulting
 > to Ask, and opens the artifact for review. Pending, queued, and running work
 > is interrupted by the startup process fence without replay, while an
-> already-approved session remains Agent. ADR 0040 adds the selectable shell
+> already-approved session remains Agent. ADR 0054 adds the selectable shell
 > catalog while retaining the Bash protocol name. The host protocol is v9 and
 > storage schema is v10.
 
