@@ -1,17 +1,19 @@
 # 03. Tools and Permissions
 
-> Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115, D181, D186
+> Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115, D181, D186,
+> D189, D190
 
 ## 0. Frozen policy summary
 
 | Topic | Decision |
 |---|---|
 | Default mode | Agent |
-| Chat tools | Read / Glob / Grep only |
 | Agent tools | Read / Glob / Grep / Write / Edit / Bash |
+| Plan tools | Read / Glob / Grep / BrowserPreview / Bash / CompactContext / SubmitPlan |
+| Plan hard deny | Write / Edit / all plugin tools / unknown tools |
 | Permission timeout | 120s → deny |
 | allow-session scope | toolName |
-| Bash style (M3) | non-interactive (no PTY) |
+| Bash style | non-interactive; selected host catalog shell with streamed output |
 
 ## 1. Goal
 
@@ -24,6 +26,10 @@ Let the agent get things done, but stay under control by default.
 | `Read` | low | Read files within the workspace |
 | `Glob` | low | List files by pattern |
 | `Grep` | low | Content search |
+| `BrowserPreview` | low | Open a workspace-relative preview in the user-driven Browser panel |
+| `CompactContext` | low | Create a model-context checkpoint without workspace mutation |
+| `EnterPlanMode` | low | Move the same Agent from Agent to Plan after host validation |
+| `SubmitPlan` | low | Preserve exact Markdown bytes in a new `.pi/plan/*.md` artifact and request approval |
 | `Write` | high | Create/overwrite files |
 | `Edit` | high | Modify files |
 | `Bash` | high | Execute commands |
@@ -32,11 +38,10 @@ Let the agent get things done, but stay under control by default.
 
 ### 2.1 Deferred ancillary tools (D185, ADR 0048)
 
-The six Agent tools and three Chat tools above remain available in their
-respective modes. Following pi's coding-agent default, the first Agent request
-activates only `Read`, `Bash`, `Edit`, and `Write`; `Glob` and `Grep` are loaded
-on demand. Chat keeps its read-only `Read`/`Glob`/`Grep` core. The runtime also
-registers capabilities without sending their full schemas up front:
+Following pi's coding-agent default, the first Agent request activates only
+`Read`, `Bash`, `Edit`, and `Write`; `Glob` and `Grep` are loaded on demand.
+Plan keeps its read/inspection core. The runtime also registers capabilities
+without sending their full schemas up front:
 
 - `Glob` and `Grep` in Agent mode
 - `BrowserPreview`
@@ -97,8 +102,10 @@ session gets a scratch directory outside the workspace:
 - **Permissions.** `Write`/`Edit` whose `path` is lexically inside the
   session's scratch root auto-allow without a permission card — they cannot
   touch the project. The lexical check only skips the prompt; execution still
-  goes through the full resolver, so it is not an escape vector. Chat mode
-  still denies Write/Edit/Bash entirely (D004 unchanged).
+  goes through the full resolver, so it is not an escape vector. Plan does not
+  expose Write/Edit, so the scratch auto-allow rule cannot make those tools
+  available in Plan. A Plan Bash call may still create or mutate scratch data
+  when its permission mode allows it.
 - **Artifacts.** Successful scratch writes are not recorded in the
   `artifacts` table; artifact-driven file tabs represent workspace
   deliverables only, while the Files surface may still browse the active
@@ -192,20 +199,29 @@ the durable tool result shape.
 
 ## 5. Bash Rules
 
-MVP baseline:
+Host execution baseline:
 
 - A project-bound session workspace is required
 - Default cwd = the originating session's `workspaceRoot`
 - Confirmation required by default
-- Set a timeout (e.g. 60s, configurable)
-- Capture stdout/stderr
-- Truncate large output
+- Set a mandatory 60s timeout; accept only a bounded 1s–300s override
+- Stream stdout and stderr separately, then return bounded final output
+- Truncate large output without mixing the two streams
 - No interactive TTY (MVP)
 - A command that exits non-zero returns `ok: false`, `isError: true`, and
   `errorCode: TOOL_FAILED` while preserving its `exitCode`, stdout, and stderr
   in `content` so the agent can diagnose the command without blindly retrying.
 
-Shell resolution (D084 — bash on every platform, resolved once per process):
+Shell catalog (D190) exposes the stable IDs `windows-powershell`, `cmd`,
+`git-bash`, and `bash` where supported by the platform. The host persists
+`defaultCommandShell`; if that persisted choice later becomes unavailable, the
+effective catalog selection intentionally falls back to the first available
+platform shell. A turn pins the effective shell ID and dialect. `Bash` remains
+the tool/protocol name, and the request carries the pinned shell ID separately.
+Host-core resolves the entry again before spawn and rejects a changed ID/dialect
+with `COMMAND_SHELL_CHANGED`; settings writes reject unavailable or
+wrong-platform IDs with `COMMAND_SHELL_INVALID`. No arbitrary executable path
+or executable path hash is accepted as shell identity.
 
 1. `PI_DESKTOP_BASH` env override (path to a bash executable)
 2. Unix: well-known locations (`/bin/bash`, `/usr/bin/bash`, `/usr/local/bin/bash`, Homebrew), then PATH
@@ -222,6 +238,10 @@ Shell resolution (D084 — bash on every platform, resolved once per process):
   to the host PATH unchanged. Agent commands stay POSIX bash (D181 / ADR 0045).
 - No bash bundled in the installer: Git for Windows is the Windows prerequisite (the app requires git anyway)
 - Resolution failure returns stable `SHELL_NOT_FOUND` with install guidance
+- Windows PowerShell and cmd use their native non-interactive invocation.
+- Git Bash uses the discovered Git for Windows executable.
+- Unix Bash uses an approved system Bash entry.
+- User abort and timeout terminate the complete process tree before returning.
 
 Initial denylist (extensible):
 
@@ -269,14 +289,19 @@ Rules:
 - The session value is stored in `sessions.permission_mode`
   (`inherit | ask | accept-edits | auto`, default `inherit`, schema v5) and
   set via `session.configure` `permissionMode`.
-- **Chat mode's hard deny wins over every permission mode** — `auto` cannot
-  re-enable Write/Edit/Bash in chat (D004 unchanged).
+- Plan's hard deny wins over every permission mode for Write/Edit and plugin
+  tools. `auto` cannot re-enable a hidden or denied tool.
 - Low-risk tools (`Read`/`Glob`/`Grep`) auto-allow in every mode, as before.
+- `BrowserPreview` is an explicit read-only UI inspection capability and is
+  available in both operating modes.
+- Plan retains the permission-mode selector. Bash is confirmed under `ask` and
+  `accept-edits`, and is auto-allowed under `auto`; therefore Plan is planning
+  intent, not a strict read-only security profile.
 - `allow-session` grants continue to work under `ask` and stay scoped to the
   session; under `accept-edits`/`auto` they are simply never needed.
 - Scratch-directory writes (D114) stay prompt-free in every mode.
-- UI: Settings → segmented global default; composer shows a per-session chip
-  (agent mode only) whose menu offers the three effective modes without a
+- UI: Settings → segmented global default; composer shows a per-session chip in
+  both Agent and Plan whose menu offers the three effective modes without a
   separate global-default/inherit entry. The chip and selected menu item
   display the effective mode; choosing an item stores that explicit session
   override. Existing inherited sessions continue to resolve through the
@@ -319,35 +344,56 @@ Each tool call records:
 
 MVP may start by writing to SQLite or a log file.
 
-Timing is recorded in segments, not as one duration (D137): `prompted`
+Timing is recorded in segments, not as one duration (D183): `prompted`
 (whether a permission card was shown), `permissionWaitMs`, `durationMs` (the
 tool body), `overheadMs` (host bookkeeping), and `totalMs`. Denied calls carry
 the same fields with a zero tool body. See
 [09. Logging and Observability](09-logging-and-observability.md) for the
 matching log lines.
 
-## 10. Mode matrix (Chat vs Agent)
+## 10. Operating-mode matrix
 
-| Mode | Read/Glob/Grep | Write/Edit | Bash |
-|---|---|---|---|
-| Chat | allow | deny | deny |
-| Agent | allow | confirm | confirm |
+| Mode | Read/Glob/Grep | BrowserPreview | Write/Edit | Bash | Plugins |
+|---|---|---|---|---|---|
+| Agent | allow | allow | permission policy | permission policy | registered risk policy |
+| Plan | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | deny |
 
 ### Notes
-- Chat mode hard-denies high-risk tools before permission UI
-- Agent mode uses permission cards for Write/Edit/Bash
+- Plan hard-denies Write/Edit/plugin tools before permission UI; a direct host
+  call cannot bypass the matrix.
+- Agent mode uses permission cards or the selected automatic policy for
+  Write/Edit/Bash and registered plugin tools.
+- Plan Bash may mutate workspace or scratch state when the user selected Auto;
+  the UI must make that tradeoff visible.
 - allow-session is remembered per toolName for the active session only
 - Session grants follow `sessionId` across project-tab switches and are never
   inherited by another session or Temporary conversation
 
+### 10.1 Plan control and context tools
+
+`CompactContext` is available when automatic context protection permits it and
+does not mutate the workspace. `SubmitPlan` is available only in Plan and must
+be the only tool call in its assistant batch. It preserves the exact Markdown
+bytes in a new unique `.pi/plan/*.md` artifact
+through host-core before creating one pending approval. `EnterPlanMode` is
+available only in Agent and must be the only tool call in its batch. The host
+validates the durable mode and active-turn/configuration boundary before either
+transition; the visible tool list is guidance, not the security boundary.
+
 ## 11. Plugin Tools
 
-Plugins can contribute tools via `agentTools`:
+Plugins can contribute tools via `agentTools` in Agent only:
 
 1. manifest declaration
 2. user grants `agent.tool.register`
 3. PluginManager registers them into the ToolHost
 4. execution goes through the unified permission/audit/timeout wrapper
+
+No plugin tool is visible or executable in Plan, regardless of manifest risk,
+declared permission, session grant, or `auto`. A direct attempt returns
+`PLUGIN_DISABLED_IN_PLAN` and is audited as a Plan policy denial. Missing or
+invalid plugin risk defaults to `medium` for Agent and never grants Plan
+access.
 
 Naming:
 - Internal full name: `plugin.<pluginId>.<toolName>`

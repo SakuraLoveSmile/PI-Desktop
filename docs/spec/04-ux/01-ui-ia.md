@@ -103,9 +103,15 @@ destination, chat as the home surface, tools and permissions inline.
   visible panel (D163, ADR 0033).
   Replaces the former context-panel overlay; workspace/model/status info lives
   in the composer chips and Settings instead.
-- **Composer**: workspace-agnostic floating pill anchored to the chat
+- **Composer**: workspace-agnostic floating pill anchored to the conversation
   destination — scrollable centered stack on the empty home (D111),
   bottom-docked in a transcript, with no project / Local / branch rail (D095).
+  Its left-of-input operating-mode chip is the sole active-session control for
+  exactly **Agent** and **Plan**. Plan shows the same Agent's planning state,
+  keeps the permission-mode chip, and exposes the host-written immutable
+  `.pi/plan/*.md` artifact opener and approval surface after `SubmitPlan`.
+  The conversation top bar retains the model picker and window actions but has
+  no duplicate Agent/Plan control.
 - **Backend status capsule**: appears under the titlebar while the backend
   restarts or is fatally degraded (D080), with an Open-logs action.
 
@@ -178,6 +184,12 @@ title, status badge, branch meta, external link, and "Review with agent"
 ### 3.4 Scheduled
 Create card + task rows (cadence/enabled badges, prompt preview, last run,
 Run now / toggle / Delete). Run now opens a session seeded with the prompt.
+New tasks default to Agent. A migrated Plan task is allowed to remain stored,
+but an unattended run is explicitly rejected before provider, artifact, or
+queue work with `PLAN_REQUIRES_INTERACTIVE_SESSION`; it cannot display or
+auto-approve a plan.
+The user must explicitly switch it to Agent before enabling unattended
+execution.
 
 ### 3.5 Plugins
 Overview band (installed / enabled / updates / high-risk access) above a
@@ -215,14 +227,15 @@ Plugins destination described in §3.5.
 | Overlay | Trigger | Notes |
 |---|---|---|
 | Command palette | Cmd/Ctrl+K (also Cmd/Ctrl+Shift+P per D014) | builtin + plugin commands |
-| Model menu | composer model chip | configured provider/model choices + settings entry (D091) |
+| Model menu | top-bar model picker | configured provider/model choices + settings entry (D091) |
 | Profile menu | sidebar footer | Settings / Logs / Theme cycle (D041) |
 | Notification inbox | sidebar footer bell | All/Unread views, task completion/failure rows, mark-all-read and clear actions (D130/D117) |
 | Toasts | events (plugin toast, backend restored, copy) | top-center; 4s default, 8s for errors |
 
 ## 5. Navigation model
 
-- `page` state: `chat | pulls | scheduled | plugins | settings`; the project
+- `page` state: `chat | pulls | scheduled | plugins | settings`; `chat` is the
+  conversation-surface route, not an operating mode. The project
   archive is the `projects` settings tab rather than a standalone page.
 - Destination history is linear; `Cmd/Ctrl+[` and `Cmd/Ctrl+]` traverse it
   without persistent back/forward chrome.
@@ -275,6 +288,23 @@ Plugins destination described in §3.5.
   event never navigates by itself; only explicit activation does.
 - Backend degraded → status capsule (restarting) or fatal banner with Open
   logs (D080); composer submits are rejected with readable errors while down.
+- Plan checkpoint → the originating session shows the structured title and
+  question, an opener for its immutable `.pi/plan/*.md` artifact, absolute
+  approval deadline, and current status. The renderer retains the latest
+  proposal/execution snapshot per session only for the current renderer
+  lifetime, updated by live Host events; only a live `pending` row forms the
+  approval gate. Reload through `plans.pending` while the same Host remains
+  alive restores a still-pending row with its original deadline. Rejected,
+  expired, approved/completed, and interrupted terminal cards are not
+  rehydrated; a terminal card may remain visible and non-actionable only until
+  renderer reload. Reject, expiry, or interruption clears the approval gate,
+  leaves the session Plan/planning and editable, and requires a later turn to
+  create a new artifact. While pending, the draft remains visible but
+  read-only and only Approve or Reject actions are enabled. Host/app restart
+  interrupts prior work before RPC with no replay or stale action; pending
+  unapproved work remains Plan, while already-approved interrupted execution
+  remains Agent. The UI is not required to present that interrupted terminal
+  snapshot after restart.
 
 ## 8. i18n
 

@@ -8,6 +8,22 @@ use crate::db::{ms_to_ts, now_ms, ts_to_ms, Database};
 use crate::notifications::{self, Notification};
 use crate::transcripts::{self, CompactionRecord, MessageRecord, RevisionRecord};
 
+pub const MODES: [&str; 2] = ["plan", "agent"];
+
+/// Compatibility normalization for v7 callers and imported records. The
+/// persisted operating profile is now always `plan` or `agent`.
+pub fn normalize_mode(mode: Option<&str>) -> String {
+    match mode {
+        Some("plan") | Some("chat") => "plan".into(),
+        Some("agent") => "agent".into(),
+        _ => "agent".into(),
+    }
+}
+
+pub fn is_valid_mode(mode: &str) -> bool {
+    MODES.contains(&mode)
+}
+
 /// Values accepted by the persisted per-session thinking selector.  Keep this
 /// list in the host boundary so old clients cannot write arbitrary provider
 /// options into the session row.
@@ -688,7 +704,7 @@ pub fn create_session_with_thinking(
     let now = now_ms();
     let id = Uuid::new_v4().to_string();
     let title = title.unwrap_or_else(|| "New task".into());
-    let mode = mode.unwrap_or_else(|| "agent".into());
+    let mode = normalize_mode(mode.as_deref());
     let thinking_level = thinking_level.unwrap_or_else(default_thinking_level);
     validate_thinking_level(&thinking_level)?;
     let project_id = match project_path
@@ -740,6 +756,17 @@ pub fn session_permission_mode(db: &Database, id: &str) -> Result<Option<String>
         .prepare_cached("SELECT permission_mode FROM sessions WHERE id = ?1")?
         .query_row(params![id], |row| row.get(0))
         .optional()?)
+}
+
+/// Resolve the durable operating mode for authorization. Unknown sessions
+/// return None so callers can fail closed instead of trusting sidecar input.
+pub fn session_mode(db: &Database, id: &str) -> Result<Option<String>> {
+    Ok(db
+        .conn()
+        .prepare_cached("SELECT mode FROM sessions WHERE id = ?1")?
+        .query_row(params![id], |row| row.get::<_, String>(0))
+        .optional()?
+        .map(|mode| normalize_mode(Some(&mode))))
 }
 
 pub fn get_session(db: &Database, id: &str) -> Result<Option<SessionDetail>> {
@@ -798,10 +825,8 @@ pub fn fork_session_through(
     if has_running_turn {
         return Ok(ForkSessionResult::Busy);
     }
-    let mut source_records = dedupe_records(transcripts::read_transcript(
-        db.data_dir(),
-        source_id,
-    )?);
+    let mut source_records =
+        dedupe_records(transcripts::read_transcript(db.data_dir(), source_id)?);
     if let Some(message_id) = through_message_id
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -904,20 +929,31 @@ pub fn configure_session_with_thinking(
     thinking_level: Option<&str>,
     permission_mode: Option<&str>,
 ) -> Result<Option<SessionSummary>> {
-    if !matches!(mode, "chat" | "agent") {
-        return Err(anyhow!("mode must be chat or agent"));
+    if !(is_valid_mode(mode) || mode == "chat") {
+        return Err(anyhow!("mode must be plan or agent"));
     }
+    let mode = normalize_mode(Some(mode));
     if let Some(level) = thinking_level {
         validate_thinking_level(level)?;
     }
     if let Some(mode) = permission_mode {
         validate_permission_mode(mode)?;
     }
+    crate::plans::gate_session_configure(
+        db,
+        id,
+        &mode,
+        provider_id,
+        model_id,
+        thinking_level,
+        permission_mode,
+    )?;
     let changed = db
         .conn()
         .prepare_cached(
             "UPDATE sessions
-             SET mode = ?2, provider_id = ?3, model_id = ?4,
+             SET mode = ?2, provider_id = COALESCE(?3, provider_id),
+                 model_id = COALESCE(?4, model_id),
                  thinking_level = COALESCE(?5, thinking_level),
                  permission_mode = COALESCE(?6, permission_mode), updated_at = ?7
              WHERE id = ?1",
@@ -1061,7 +1097,14 @@ pub fn replace_messages(db: &Database, session_id: &str, messages: &[UiMessage])
     tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
         .execute(params![session_id])?;
     for (seq, record) in records.iter().enumerate() {
-        insert_index_row(&tx, session_id, seq as i64, None, record, texts[seq].as_deref())?;
+        insert_index_row(
+            &tx,
+            session_id,
+            seq as i64,
+            None,
+            record,
+            texts[seq].as_deref(),
+        )?;
     }
     tx.prepare_cached("UPDATE sessions SET last_seq = ?1, updated_at = ?2 WHERE id = ?3")?
         .execute(params![records.len() as i64, now_ms(), session_id])?;
@@ -1087,8 +1130,7 @@ pub fn update_tool_review_state(
         if message.id != message_id || message.role != "tool" {
             continue;
         }
-        let Some(tool_result) = message.tool_result.as_mut().and_then(Value::as_object_mut)
-        else {
+        let Some(tool_result) = message.tool_result.as_mut().and_then(Value::as_object_mut) else {
             continue;
         };
         let Some(details) = tool_result
@@ -1112,7 +1154,6 @@ pub fn update_tool_review_state(
     }
     Ok(changed)
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1288,7 +1329,14 @@ pub fn activate_message_revision(
     tx.prepare_cached("DELETE FROM messages WHERE session_id = ?1")?
         .execute(params![session_id])?;
     for (seq, record) in records.iter().enumerate() {
-        insert_index_row(&tx, session_id, seq as i64, None, record, texts[seq].as_deref())?;
+        insert_index_row(
+            &tx,
+            session_id,
+            seq as i64,
+            None,
+            record,
+            texts[seq].as_deref(),
+        )?;
     }
     tx.prepare_cached("UPDATE sessions SET last_seq = ?1, updated_at = ?2 WHERE id = ?3")?
         .execute(params![records.len() as i64, now_ms(), session_id])?;
@@ -1305,6 +1353,7 @@ pub fn import_session(
     messages: &[UiMessage],
 ) -> Result<bool> {
     validate_thinking_level(&summary.thinking_level)?;
+    let mode = normalize_mode(Some(&summary.mode));
     let conn = db.conn();
     let exists: i64 = conn.query_row(
         "SELECT COUNT(*) FROM sessions WHERE id = ?1",
@@ -1346,7 +1395,7 @@ pub fn import_session(
             project_id,
             summary.provider_id,
             summary.model_id,
-            summary.mode,
+            mode,
             summary.thinking_level,
             source,
             records.len() as i64,
@@ -1354,7 +1403,14 @@ pub fn import_session(
             ts_to_ms(&summary.updated_at),
         ])?;
         for (seq, record) in records.iter().enumerate() {
-            insert_index_row(&tx, &summary.id, seq as i64, None, record, texts[seq].as_deref())?;
+            insert_index_row(
+                &tx,
+                &summary.id,
+                seq as i64,
+                None,
+                record,
+                texts[seq].as_deref(),
+            )?;
         }
         tx.commit()?;
         Ok(())
@@ -1383,12 +1439,38 @@ pub fn begin_turn(
     model_id: Option<&str>,
 ) -> Result<String> {
     let id = Uuid::new_v4().to_string();
-    db.conn()
+    let inserted = db
+        .conn()
         .prepare_cached(
             "INSERT INTO turns (id, session_id, provider_id, model_id, started_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+             SELECT ?1, ?2, ?3, ?4, ?5
+             WHERE EXISTS (SELECT 1 FROM sessions WHERE id = ?2)
+               AND NOT EXISTS (
+                 SELECT 1 FROM turns WHERE session_id = ?2 AND status = 'running'
+               )",
         )?
-        .execute(params![id, session_id, provider_id, model_id, now_ms()])?;
+        .execute(params![id, session_id, provider_id, model_id, now_ms()])
+        .map_err(|error| {
+            let message = error.to_string();
+            if message.contains("turns.session_id")
+                || message.contains("idx_turns_one_running_session")
+            {
+                anyhow!("AGENT_BUSY")
+            } else {
+                error.into()
+            }
+        })?;
+    if inserted == 0 {
+        let session_exists: bool = db.conn().query_row(
+            "SELECT EXISTS(SELECT 1 FROM sessions WHERE id = ?1)",
+            params![session_id],
+            |row| row.get(0),
+        )?;
+        if !session_exists {
+            return Err(anyhow!("session not found: {session_id}"));
+        }
+        return Err(anyhow!("AGENT_BUSY"));
+    }
     Ok(id)
 }
 
@@ -1581,22 +1663,18 @@ mod tests {
         );
 
         replace_messages(&db, &session.id, &messages[..2]).unwrap();
-        assert!(
-            get_session(&db, &session.id)
-                .unwrap()
-                .unwrap()
-                .compaction
-                .is_some()
-        );
+        assert!(get_session(&db, &session.id)
+            .unwrap()
+            .unwrap()
+            .compaction
+            .is_some());
 
         replace_messages(&db, &session.id, &messages[..1]).unwrap();
-        assert!(
-            get_session(&db, &session.id)
-                .unwrap()
-                .unwrap()
-                .compaction
-                .is_none()
-        );
+        assert!(get_session(&db, &session.id)
+            .unwrap()
+            .unwrap()
+            .compaction
+            .is_none());
     }
 
     #[test]
@@ -1672,7 +1750,7 @@ mod tests {
         .unwrap()
         .unwrap();
 
-        assert_eq!(configured.mode, "chat");
+        assert_eq!(configured.mode, "plan");
         assert_eq!(configured.provider_id.as_deref(), Some("provider-1"));
         assert_eq!(configured.model_id.as_deref(), Some("model-1"));
         assert_eq!(configured.thinking_level, "high");
@@ -1717,7 +1795,7 @@ mod tests {
             .canonicalize()
             .unwrap()
             .to_string_lossy()
-            .to_string();
+            .replace('\\', "/");
         assert_eq!(session.project_path.as_deref(), Some(canonical.as_str()));
         assert_eq!(
             get_session(&db, &session.id)
@@ -1895,14 +1973,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(update_tool_review_state(
-            &db,
-            &session.id,
-            "m2",
-            "snapshot-1",
-            "rolledBack",
-        )
-        .unwrap());
+        assert!(
+            update_tool_review_state(&db, &session.id, "m2", "snapshot-1", "rolledBack",).unwrap()
+        );
         let updated = get_session(&db, &session.id).unwrap().unwrap();
         assert_eq!(
             updated.messages[1].tool_result,
@@ -1991,7 +2064,10 @@ mod tests {
         );
         assert_eq!(detail.messages[0].content, "final answer");
         assert_eq!(detail.messages[0].model_id.as_deref(), Some("model-1"));
-        assert_eq!(detail.messages[0].provider_id.as_deref(), Some("provider-1"));
+        assert_eq!(
+            detail.messages[0].provider_id.as_deref(),
+            Some("provider-1")
+        );
         let usage = detail.messages[0].usage.as_ref().expect("usage");
         assert_eq!(usage.input_tokens, 12);
         assert_eq!(usage.output_tokens, 34);
@@ -2206,7 +2282,7 @@ mod tests {
         assert_eq!(fork.summary.project_path, source.project_path);
         assert_eq!(fork.summary.provider_id.as_deref(), Some("provider-1"));
         assert_eq!(fork.summary.model_id.as_deref(), Some("model-1"));
-        assert_eq!(fork.summary.mode, "chat");
+        assert_eq!(fork.summary.mode, "plan");
         assert_eq!(fork.summary.thinking_level, "high");
         assert_eq!(fork.summary.permission_mode, "auto");
         assert_eq!(fork.messages.len(), 2);
@@ -2258,7 +2334,7 @@ mod tests {
         let source_final = get_session(&db, &source.id).unwrap().unwrap();
         let fork_final = get_session(&db, &fork.summary.id).unwrap().unwrap();
         assert_eq!(source_final.messages.len(), 2);
-        assert_eq!(source_final.summary.mode, "chat");
+        assert_eq!(source_final.summary.mode, "plan");
         assert_eq!(source_final.summary.model_id.as_deref(), Some("model-1"));
         assert_eq!(fork_final.messages.len(), 3);
         assert_eq!(fork_final.summary.mode, "agent");
@@ -2371,6 +2447,19 @@ mod tests {
             .unwrap();
         assert_eq!(status, "completed");
         assert_eq!((input, output), (10, 20));
+    }
+
+    #[test]
+    fn begin_turn_rejects_a_second_running_turn_with_agent_busy() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let first = begin_turn(&db, &session.id, None, None).unwrap();
+
+        let error = begin_turn(&db, &session.id, None, None).unwrap_err();
+        assert_eq!(error.to_string(), "AGENT_BUSY");
+
+        end_turn(&db, &first, "aborted", None, None, false).unwrap();
+        assert!(begin_turn(&db, &session.id, None, None).is_ok());
     }
 
     #[test]

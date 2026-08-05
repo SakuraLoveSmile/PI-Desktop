@@ -31,6 +31,13 @@ export type ComposerTemplateDirs = {
   user: string;
 };
 
+function normalizeTemplateName(name: string): string {
+  const normalized = name.replace(/\\/g, "/").replace(/\/+$/, "");
+  const slashIndex = normalized.lastIndexOf("/");
+  const basename = slashIndex === -1 ? normalized : normalized.slice(slashIndex + 1);
+  return basename.replace(/\.md$/i, "");
+}
+
 /** Template directories for a workspace (project dir absent without one). */
 export function composerTemplateDirs(
   workspaceRoot: string | null | undefined,
@@ -83,13 +90,15 @@ export async function loadComposerTemplates(
   const byName = new Map<string, ComposerTemplate>();
   for (const { promptTemplate, source } of loaded.promptTemplates) {
     // Inputs are ordered project-first, so the first occurrence wins.
-    if (byName.has(promptTemplate.name)) continue;
+    const name = normalizeTemplateName(promptTemplate.name);
+    if (byName.has(name)) continue;
     const dir = source === "project" ? dirs.project : dirs.user;
     const argumentHint = dir
-      ? await readArgumentHint(join(dir, `${promptTemplate.name}.md`))
+      ? await readArgumentHint(join(dir, `${name}.md`))
       : undefined;
-    byName.set(promptTemplate.name, {
+    byName.set(name, {
       ...promptTemplate,
+      name,
       source,
       ...(argumentHint ? { argumentHint } : {}),
     });

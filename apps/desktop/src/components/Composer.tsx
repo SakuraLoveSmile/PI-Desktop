@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type {
+  Mode,
   PermissionMode,
   ProviderPublic,
   ThinkingLevel,
@@ -9,18 +9,21 @@ import type {
 import { PERMISSION_MODES } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
+import { isActivePlanExecution } from "../lib/plan-mode-state";
 import { runPaletteCommand } from "../lib/commands";
 import {
   resolveComposerCommand,
   useComposerAutocomplete,
 } from "../lib/use-composer-autocomplete";
 import { ComposerAutocomplete } from "./ComposerAutocomplete";
+import { PlanApprovalBar } from "./PlanApprovalBar";
 import {
   IconArrowUp,
+  IconShield,
   IconStop,
   IconChevronDown,
   IconCheck,
-  IconSearch,
+  IconListChecks,
   IconSparkles,
 } from "./icons";
 
@@ -141,6 +144,9 @@ export function Composer({
   const showToast = useAppStore((s) => s.showToast);
   const composerPrefill = useAppStore((s) => s.composerPrefill);
   const clearComposerPrefill = useAppStore((s) => s.clearComposerPrefill);
+  const planCheckpoint = useAppStore((s) =>
+    s.activeSessionId ? s.planCheckpoints[s.activeSessionId] : undefined,
+  );
   const [value, setValue] = useState("");
   const [cursor, setCursor] = useState(0);
   const [composing, setComposing] = useState(false);
@@ -150,10 +156,17 @@ export function Composer({
   const [thinkingOpen, setThinkingOpen] = useState(false);
   const thinkingRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
-  const modelRef = useRef<HTMLDivElement>(null);
-  const modelSearchRef = useRef<HTMLInputElement>(null);
-  const modelListRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
+  const approvalPending = planCheckpoint?.status === "pending";
+  const executionActive = isActivePlanExecution(planCheckpoint);
+  const composerBlocked = isRunning || executionActive || approvalPending;
+  const runActive = isRunning || executionActive;
+
+  useEffect(() => {
+    if (!composerBlocked) return;
+    setPermissionOpen(false);
+    setThinkingOpen(false);
+  }, [composerBlocked]);
 
   useEffect(() => {
     if (!composerPrefill) return;
@@ -239,7 +252,9 @@ export function Composer({
   }, [thinkingOpen]);
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
-  const mode = activeSession?.mode ?? settings?.defaultMode ?? "agent";
+  const mode: Mode = activeSession
+    ? activeSession.mode
+    : settings?.defaultMode ?? "agent";
   // Permission mode (D115/D132): inherited sessions still resolve through the
   // global setting, but the composer presents only the effective mode.
   const globalPermissionMode: PermissionMode =
@@ -295,7 +310,7 @@ export function Composer({
 
   const submit = async () => {
     const content = value.trim();
-    if (!content || isRunning) return;
+    if (!content || composerBlocked) return;
     // Slash dispatch (D123): builtin/plugin aliases execute locally without
     // a session or a model; templates and unknown /names stay prompt text
     // (main expands templates). Runs before the model-ready gate on purpose.
@@ -324,7 +339,7 @@ export function Composer({
     value,
     cursor,
     composing,
-    enabled: !isRunning,
+    enabled: !composerBlocked,
   });
 
   const acceptCompletion = (index: number) => {
@@ -366,7 +381,8 @@ export function Composer({
       className={`composer-dock composer-dock-${variant}`}
     >
       <div className="composer-stack">
-        <div className="composer-shell">
+        {planCheckpoint ? <PlanApprovalBar proposal={planCheckpoint} /> : null}
+        <div className={`composer-shell${composerBlocked ? " is-gated" : ""}`}>
           {inputFocused ? (
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
           ) : null}
@@ -374,6 +390,8 @@ export function Composer({
             <textarea
               ref={ref}
               className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}
+              readOnly={composerBlocked}
+              aria-readonly={composerBlocked}
               rows={2}
               placeholder={t(variant === "home" ? "chat.placeholderHome" : "chat.placeholder")}
               spellCheck={false}
@@ -434,6 +452,39 @@ export function Composer({
 
           <div className="composer-toolbar">
             <div className="composer-left">
+              <button
+                className="icon-btn mode-chip"
+                title={t("settings.mode")}
+                disabled={composerBlocked || !activeSession}
+                onClick={async () => {
+                  setThinkingOpen(false);
+                  setPermissionOpen(false);
+                  const next: Mode = mode === "agent" ? "plan" : "agent";
+                  try {
+                    await configureActiveSession({
+                      mode: next,
+                      providerId: provider?.id,
+                      modelId,
+                      thinkingLevel,
+                    });
+                  } catch (e) {
+                    showToast(e instanceof Error ? e.message : String(e), {
+                      variant: "error",
+                    });
+                  }
+                }}
+              >
+                {mode === "plan" ? (
+                  <IconListChecks size={14} />
+                ) : (
+                  <IconShield size={14} />
+                )}
+                <span className="text-sm">
+                  {mode === "plan"
+                    ? t("settings.modePlan")
+                    : t("settings.modeAgent")}
+                </span>
+              </button>
               {thinkingProvider?.supportsReasoning &&
               availableThinkingLevels.length ? (
                 <div className="composer-thinking" ref={thinkingRef}>
@@ -444,7 +495,7 @@ export function Composer({
                     title={`${t("chat.thinking")} · ${thinkingLabel}`}
                     aria-haspopup="menu"
                     aria-expanded={thinkingOpen}
-                    disabled={isRunning || !activeSession}
+                    disabled={composerBlocked || !activeSession}
                     onClick={() => {
                       setPermissionOpen(false);
                       setThinkingOpen((open) => !open);
@@ -472,6 +523,7 @@ export function Composer({
                             }`}
                             role="menuitemradio"
                             aria-checked={thinkingLevel === level}
+                            disabled={composerBlocked}
                             onClick={async () => {
                               try {
                                 await configureActiveSession({
@@ -509,14 +561,18 @@ export function Composer({
                   ) : null}
                 </div>
               ) : null}
-              {mode === "agent" ? (
+              {mode === "agent" || mode === "plan" ? (
                 <div className="composer-permission" ref={permissionRef}>
                   <button
                     className={`icon-btn mode-chip ${permissionOpen ? "active" : ""}`}
-                    title={t("chat.permissionMode")}
+                    title={
+                      mode === "plan" && effectivePermissionMode === "auto"
+                        ? `${t("chat.permissionMode")} · ${t("plan.autoWarning")}`
+                        : t("chat.permissionMode")
+                    }
                     aria-haspopup="menu"
                     aria-expanded={permissionOpen}
-                    disabled={isRunning || !activeSession}
+                    disabled={composerBlocked || !activeSession}
                     onClick={() => {
                       setThinkingOpen(false);
                       setPermissionOpen((open) => !open);
@@ -536,6 +592,7 @@ export function Composer({
                             type="button"
                             role="menuitemradio"
                             aria-checked={effectivePermissionMode === candidate}
+                            disabled={composerBlocked}
                             className={`composer-plus-item ${
                               effectivePermissionMode === candidate ? "active" : ""
                             }`}
@@ -573,7 +630,7 @@ export function Composer({
             </div>
 
             <div className="composer-right">
-              {isRunning ? (
+              {runActive ? (
                 <button className="stop-btn" title={t("chat.abort")} onClick={() => void abort()}>
                   <IconStop size={14} />
                 </button>
@@ -585,6 +642,7 @@ export function Composer({
                   }
                   disabled={
                     !value.trim() ||
+                    composerBlocked ||
                     (!modelReady && !value.trim().startsWith("/"))
                   }
                   onClick={() => void submit()}

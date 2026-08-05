@@ -226,8 +226,7 @@ mod tests {
     fn tool_path_relative_resolves_to_workspace() {
         let ws = tempdir().unwrap();
         let scratch = tempdir().unwrap();
-        let (p, root) =
-            resolve_tool_path(ws.path(), Some(scratch.path()), "notes.txt").unwrap();
+        let (p, root) = resolve_tool_path(ws.path(), Some(scratch.path()), "notes.txt").unwrap();
         assert_eq!(root, ToolRoot::Workspace);
         assert!(p.starts_with(ws.path().canonicalize().unwrap()));
     }
@@ -237,12 +236,8 @@ mod tests {
         let ws = tempdir().unwrap();
         let scratch = tempdir().unwrap();
         let input = scratch.path().join("tmp.json");
-        let (p, root) = resolve_tool_path(
-            ws.path(),
-            Some(scratch.path()),
-            input.to_str().unwrap(),
-        )
-        .unwrap();
+        let (p, root) =
+            resolve_tool_path(ws.path(), Some(scratch.path()), input.to_str().unwrap()).unwrap();
         assert_eq!(root, ToolRoot::Scratch);
         assert!(p.starts_with(scratch.path().canonicalize().unwrap()));
     }
@@ -252,12 +247,8 @@ mod tests {
         let ws = tempdir().unwrap();
         let scratch = tempdir().unwrap();
         let input = scratch.path().join("a/../../evil.txt");
-        let err = resolve_tool_path(
-            ws.path(),
-            Some(scratch.path()),
-            input.to_str().unwrap(),
-        )
-        .unwrap_err();
+        let err = resolve_tool_path(ws.path(), Some(scratch.path()), input.to_str().unwrap())
+            .unwrap_err();
         assert_eq!(err, "PATH_OUTSIDE_WORKSPACE");
     }
 
@@ -269,12 +260,8 @@ mod tests {
         let outside = tempdir().unwrap();
         std::os::unix::fs::symlink(outside.path(), scratch.path().join("link")).unwrap();
         let input = scratch.path().join("link/new.txt");
-        let err = resolve_tool_path(
-            ws.path(),
-            Some(scratch.path()),
-            input.to_str().unwrap(),
-        )
-        .unwrap_err();
+        let err = resolve_tool_path(ws.path(), Some(scratch.path()), input.to_str().unwrap())
+            .unwrap_err();
         assert_eq!(err, "PATH_OUTSIDE_WORKSPACE");
     }
 
@@ -282,19 +269,25 @@ mod tests {
     fn tool_path_absolute_outside_both_roots_blocked() {
         let ws = tempdir().unwrap();
         let scratch = tempdir().unwrap();
-        let err =
-            resolve_tool_path(ws.path(), Some(scratch.path()), "/etc/hosts").unwrap_err();
+        let err = resolve_tool_path(ws.path(), Some(scratch.path()), "/etc/hosts").unwrap_err();
         assert_eq!(err, "PATH_OUTSIDE_WORKSPACE");
     }
 
     #[test]
     fn lexically_inside_checks() {
-        let root = Path::new("/data/scratch/s1");
-        assert!(lexically_inside(root, "/data/scratch/s1/a.txt"));
-        assert!(lexically_inside(root, "/data/scratch/s1/sub/./b.txt"));
-        assert!(!lexically_inside(root, "/data/scratch/s1/../s2/a.txt"));
-        assert!(!lexically_inside(root, "/data/other/a.txt"));
-        assert!(!lexically_inside(root, "relative/a.txt"));
+        let dir = tempdir().unwrap();
+        let data = dir.path().join("data");
+        let root = data.join("scratch").join("s1");
+        let inside = root.join("a.txt");
+        let normalized_inside = root.join("sub").join(".").join("b.txt");
+        let sibling = root.join("..").join("s2").join("a.txt");
+        let other = data.join("other").join("a.txt");
+
+        assert!(lexically_inside(&root, inside.to_str().unwrap()));
+        assert!(lexically_inside(&root, normalized_inside.to_str().unwrap()));
+        assert!(!lexically_inside(&root, sibling.to_str().unwrap()));
+        assert!(!lexically_inside(&root, other.to_str().unwrap()));
+        assert!(!lexically_inside(&root, "relative/a.txt"));
     }
 
     #[test]

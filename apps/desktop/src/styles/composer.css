@@ -9,6 +9,8 @@
   display: flex;
   justify-content: center;
   width: 100%;
+  container-type: inline-size;
+  container-name: composer-stack;
 }
 
 /* Thread mode: floating bottom dock with fade */
@@ -231,4 +233,283 @@
 
 .new-task-btn:hover {
   background: var(--ds-bg-hover);
+}
+
+/* Plan approval surface. Keep the gate in the composer layer so it remains
+   adjacent to the input and follows the same container width as the dock. */
+.plan-approval-bar {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 10px 14px;
+  margin-bottom: 8px;
+  padding: 7px 9px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-secondary);
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
+}
+
+.plan-approval-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.plan-approval-label {
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-tight);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.plan-approval-title {
+  min-width: 0;
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-md-plus);
+  font-weight: var(--font-weight-strong);
+  line-height: var(--leading-compact);
+  overflow-wrap: anywhere;
+}
+
+.plan-approval-question {
+  min-width: 0;
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.plan-approval-details {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 2px;
+}
+
+.plan-approval-artifact {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-3xs);
+  padding: 2px 5px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-compact);
+  text-align: left;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.plan-approval-artifact:hover,
+.plan-approval-artifact:focus-visible {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.plan-approval-artifact > svg,
+.plan-approval-status > svg,
+.plan-approval-warning svg {
+  flex: 0 0 auto;
+}
+
+.plan-approval-artifact-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.plan-approval-artifact-path {
+  min-width: 0;
+  max-width: min(38vw, 320px);
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-approval-expiry,
+.plan-approval-status {
+  min-width: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}
+
+.plan-approval-status {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.plan-approval-status-approved,
+.plan-approval-status-completed {
+  color: var(--ds-success);
+}
+
+.plan-approval-status-rejected,
+.plan-approval-status-expired,
+.plan-approval-status-interrupted {
+  color: var(--ds-error);
+}
+
+.plan-approval-status-running {
+  color: var(--ds-accent);
+}
+
+.plan-approval-status-queued,
+.plan-approval-status-pending,
+.plan-approval-status-resolving {
+  color: var(--ds-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.plan-approval-actions {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-self: end;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.plan-approval-reject,
+.plan-approval-approve-main,
+.plan-approval-approve-menu {
+  min-height: 30px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-compact);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    border-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.plan-approval-reject {
+  flex: 0 0 auto;
+  padding: 0 9px;
+  color: var(--ds-text-secondary);
+  white-space: nowrap;
+}
+
+.plan-approval-reject:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.plan-approval-split {
+  position: relative;
+  display: flex;
+  width: 220px;
+  min-width: 0;
+  flex: 0 1 220px;
+  align-items: stretch;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+}
+
+.plan-approval-approve-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0 10px;
+  border-radius: var(--radius-3xs) 0 0 var(--radius-3xs);
+  color: var(--ds-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.plan-approval-approve-main:hover:not(:disabled),
+.plan-approval-approve-menu:hover:not(:disabled) {
+  background: var(--ds-bg-hover);
+}
+
+.plan-approval-approve-menu {
+  display: inline-flex;
+  width: 30px;
+  flex: 0 0 30px;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--ds-border-strong);
+  border-radius: 0 var(--radius-3xs) var(--radius-3xs) 0;
+  color: var(--ds-text-secondary);
+}
+
+.plan-approval-warning {
+  display: inline-flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 5px;
+  grid-column: 1 / -1;
+  color: var(--ds-warning);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-body);
+  overflow-wrap: anywhere;
+}
+
+.plan-approval-warning svg {
+  margin-top: 1px;
+}
+
+@container composer-stack (max-width: 520px) {
+  .plan-approval-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plan-approval-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .plan-approval-artifact-path {
+    max-width: min(48vw, 320px);
+  }
+}
+
+@container composer-stack (max-width: 360px) {
+  .plan-approval-actions {
+    justify-content: stretch;
+  }
+
+  .plan-approval-reject,
+  .plan-approval-split {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+}
+
+@container composer-stack (max-width: 280px) {
+  .plan-approval-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .plan-approval-reject,
+  .plan-approval-split {
+    width: 100%;
+    flex: 0 0 auto;
+  }
+
+  .plan-approval-warning {
+    width: 100%;
+  }
 }

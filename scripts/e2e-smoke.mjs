@@ -14,22 +14,32 @@ import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { PROTOCOL_VERSION } from "../packages/shared/dist/protocol.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
-const hostBin =
-  process.env.PI_DESKTOP_HOST_BIN ||
-  join(root, "target/debug/pi-desktop-host-core");
+const hostBinCandidates = [];
+const configuredHostBin = process.env.PI_DESKTOP_HOST_BIN?.trim();
+if (configuredHostBin) {
+  const configured = resolve(configuredHostBin);
+  hostBinCandidates.push(configured);
+  if (process.platform === "win32" && !configured.toLowerCase().endsWith(".exe")) {
+    hostBinCandidates.push(`${configured}.exe`);
+  }
+}
+const hostBinaryName = `pi-desktop-host-core${process.platform === "win32" ? ".exe" : ""}`;
+hostBinCandidates.push(join(root, "target", "debug", hostBinaryName));
+hostBinCandidates.push(join(root, "..", "..", "..", "target", "debug", hostBinaryName));
+const hostBin = hostBinCandidates.find((candidate) => existsSync(candidate));
 
 const BASE_URL = process.env.PI_DESKTOP_TEST_BASE_URL || "https://api.oj.ink/v1";
 const MODEL = process.env.PI_DESKTOP_TEST_MODEL || "mimo-v2.5";
 const API_KEY = process.env.PI_DESKTOP_TEST_API_KEY || "";
 
-if (!existsSync(hostBin)) {
-  console.error("host binary missing:", hostBin);
+if (!hostBin) {
+  console.error("host binary missing; tried:", hostBinCandidates.join(", "));
   process.exit(1);
 }
 
@@ -48,6 +58,9 @@ function skip(id, detail) {
 
 class Host {
   constructor(bin, dataDir) {
+    if (process.env.DEBUG_HOST) {
+      console.error(`[e2e host] spawn ${bin} dataDir=${dataDir}`);
+    }
     this.child = spawn(bin, [], {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, PI_DESKTOP_DATA_DIR: dataDir },
@@ -60,6 +73,7 @@ class Host {
     });
     const rl = createInterface({ input: this.child.stdout });
     rl.on("line", (line) => {
+      if (process.env.DEBUG_HOST) console.error(`[e2e host stdout] ${line}`);
       let msg;
       try {
         msg = JSON.parse(line);
@@ -77,6 +91,19 @@ class Host {
         this.notifications.push(msg);
       }
     });
+    this.child.on("error", (error) => {
+      for (const pending of this.pending.values()) pending.reject(error);
+      this.pending.clear();
+    });
+    this.child.on("exit", (code, signal) => {
+      if (process.env.DEBUG_HOST) {
+        console.error(`[e2e host] exit code=${code} signal=${signal}`);
+      }
+      for (const pending of this.pending.values()) {
+        pending.reject({ message: `host exited code=${code} signal=${signal}` });
+      }
+      this.pending.clear();
+    });
   }
   call(method, params = {}) {
     const id = randomUUID();
@@ -93,8 +120,15 @@ class Host {
       }, 30_000);
     });
   }
-  dispose() {
+  async dispose() {
+    if (this.child.exitCode !== null) return;
+    const exited = new Promise((resolve) => this.child.once("exit", resolve));
     this.child.kill();
+    await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 2_000))]);
+    if (this.child.exitCode === null) {
+      this.child.kill("SIGKILL");
+      await exited;
+    }
   }
 }
 
@@ -253,18 +287,23 @@ async function main() {
       escape.errorCode || escape.content?.code,
     );
 
-    // chat mode hard-denies write
-    const chatWrite = await host.call("tools.execute", {
-      sessionId: session.session.id,
+    // Durable Plan mode hard-denies write even when the request forges Agent.
+    const planSession = await host.call("session.create", {
+      title: "E2E Plan session",
+      mode: "plan",
+      projectPath: sample,
+    });
+    const planWrite = await host.call("tools.execute", {
+      sessionId: planSession.session.id,
       toolCallId: randomUUID(),
       toolName: "Write",
       args: { path: "x.txt", content: "nope" },
-      mode: "chat",
+      mode: "agent",
     });
     record(
-      "E2E-018-chat-write-denied",
-      chatWrite.denied === true || chatWrite.ok === false,
-      chatWrite.errorCode,
+      "E2E-018-plan-write-denied",
+      planWrite.denied === true && planWrite.errorCode === "WRITE_DISABLED_IN_PLAN",
+      planWrite.errorCode,
     );
 
     // plugin load
@@ -284,6 +323,7 @@ async function main() {
         sessionId: session.session.id,
         toolCallId: randomUUID(),
         toolName,
+        declaredRisk: "low",
         args: { text: "roundtrip" },
         mode: "agent",
       });
@@ -379,7 +419,7 @@ async function main() {
 
     // agent-runtime unit-ish import check
     try {
-      await import(join(root, "packages/agent-runtime/dist/index.js"));
+      await import(pathToFileURL(join(root, "packages/agent-runtime/dist/index.js")).href);
       record("E2E-runtime-module", true);
     } catch (e) {
       record("E2E-runtime-module", false, String(e));
@@ -387,8 +427,13 @@ async function main() {
   } catch (e) {
     record("E2E-fatal", false, e?.message || String(e));
   } finally {
-    host.dispose();
-    rmSync(dataDir, { recursive: true, force: true });
+    await host.dispose();
+    rmSync(dataDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    });
   }
 
   const failed = results.filter((r) => !r.ok);
