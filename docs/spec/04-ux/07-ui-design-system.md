@@ -405,7 +405,10 @@ row and reserve the rightmost 112px for three frameless-window controls. Each
 control owns its full share of the 46px-high reserved band. Main, Settings, and
 work-panel drag regions must terminate before this reservation rather than
 overlap it and rely only on descendant `no-drag`, so every visible control
-pixel remains clickable. No application menu is rendered inside the window.
+pixel remains clickable. The band floats over the destination pages, so on
+Windows/Linux a page frame and any right-edge detail sheet start below it
+instead of placing their own header actions or close control under the window
+controls. No application menu is rendered inside the window.
 Other menu popovers use the standard opaque elevated-menu surface, `radius-sm`,
 subtle border, and dialog shadow; they are never translucent over readable
 content.

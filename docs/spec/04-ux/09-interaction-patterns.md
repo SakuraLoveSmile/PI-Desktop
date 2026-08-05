@@ -68,7 +68,9 @@
   controls and remains available through the renderer shortcuts. The first
   transcript row starts below the 46px titlebar control band so user and
   assistant content cannot overlap the minimize, maximize/restore, or close
-  targets. F10 and Shift+F10 are not consumed by shell chrome.
+  targets. Destination pages and the plugin detail sheet start below the same
+  band, so page header actions and the sheet close control never stack under
+  those targets. F10 and Shift+F10 are not consumed by shell chrome.
 - Windows/Linux keep New Task, Open Project, Settings, close-window,
   zoom, fullscreen, search, command-palette, and sidebar shortcuts through
   renderer key handling. Standard editing shortcuts remain native web-content

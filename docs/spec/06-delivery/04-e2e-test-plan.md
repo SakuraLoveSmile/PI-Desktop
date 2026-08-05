@@ -1869,7 +1869,10 @@ Each scenario is documented in this format:
   open, confirm the panel collapse button is flush with the main-pane right
   divider and does not retain the 112px outer-window control clearance. In the
   main chat, send a first user message and confirm its full bubble starts below
-  the 46px titlebar control band. Click the center plus the top, bottom, and
+  the 46px titlebar control band. Open the Plugins page and confirm its header
+  actions, then the detail sheet's close button, also start below that band and
+  take their own clicks instead of moving the window. Click the center plus the
+  top, bottom, and
   titlebar-facing edges of each right-side control to minimize, maximize,
   restore, and close the window. 5) Start
   the renderer while its native window is already maximized and inspect the
@@ -1892,7 +1895,8 @@ Each scenario is documented in this format:
   drag rectangle overlaps the reserved control zone. Window controls remain
   clickable across their full 46px-high hit targets, match native state, and
   have accessible names; the first user or assistant transcript row never
-  paints beneath them. Unknown actions fail closed. Each package contains
+  paints beneath them, and neither do the Plugins page header actions or the
+  plugin detail sheet close button. Unknown actions fail closed. Each package contains
   the target-native host binary (`.exe` only on Windows). Passing this scenario
   on Windows/Linux proves shell readiness, not first-release qualification.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,

@@ -25,6 +25,10 @@
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
+  /* The page sits under the absolute titlebar band, which is a native drag
+     rectangle: without this the window moves instead of the button reacting. */
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 /* Overview band: four counters reading the installed set at a glance. */
@@ -1014,6 +1018,18 @@
   gap: 12px;
   padding: 16px 16px 14px;
   border-bottom: 1px solid var(--ds-border-subtle);
+  /* The head reaches the window's top edge, where the titlebar drag rectangle
+     lives; its close button must take the click instead of moving the window. */
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* On Windows/Linux the window controls own the top-right 112px of that band —
+   exactly where the sheet's close button lands. Drop the sheet below the band
+   so the two close targets never stack. */
+:root[data-platform="win32"] .plugins-sheet,
+:root[data-platform="linux"] .plugins-sheet {
+  padding-top: var(--ds-toolbar-height);
 }
 
 .plugins-sheet-ident {

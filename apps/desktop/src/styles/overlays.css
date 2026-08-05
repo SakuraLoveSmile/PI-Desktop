@@ -720,6 +720,16 @@
   padding: 28px 28px 48px;
 }
 
+/* Frameless Windows/Linux paint the window controls in the rightmost 112px of
+ * the 46px titlebar band, which floats over the destination pages. A page
+ * header keeps its actions in that top-right corner, so start the frame below
+ * the band — the same reservation .thread-content makes for the transcript —
+ * instead of letting minimize/maximize/close sit on top of them. */
+:root[data-platform="win32"] .page-frame,
+:root[data-platform="linux"] .page-frame {
+  padding-top: calc(var(--ds-toolbar-height) + 8px);
+}
+
 .route-page > .thread-scroll {
   flex: 1;
 }

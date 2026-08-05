@@ -60,3 +60,28 @@ test("plugins installed list lets row menus escape the panel", () => {
   assert.match(section, /\.plugins-row:last-child\s*\{[\s\S]*?border-bottom-left-radius/);
   assert.match(section, /\.plugins-menu\.is-up\s*\{[\s\S]*?bottom:\s*calc\(100% \+ 5px\)/);
 });
+
+// The 46px titlebar band floats over the destination pages: it is a native drag
+// rectangle, and on Windows/Linux the renderer-drawn window controls own its
+// rightmost 112px. The plugins page is the one destination page with controls in
+// that corner (header actions, detail-sheet close), so both must clear the band.
+test("plugins page keeps its top-right controls clear of the window controls", () => {
+  assert.match(
+    stylesSource,
+    /:root\[data-platform="win32"\] \.page-frame,\s*:root\[data-platform="linux"\] \.page-frame\s*\{[^}]*padding-top:\s*calc\(var\(--ds-toolbar-height\) \+ 8px\)/,
+  );
+
+  const section = pluginsSection(stylesSource);
+
+  assert.match(
+    section,
+    /:root\[data-platform="win32"\] \.plugins-sheet,\s*:root\[data-platform="linux"\] \.plugins-sheet\s*\{[^}]*padding-top:\s*var\(--ds-toolbar-height\)/,
+  );
+  for (const selector of ["\\.plugins-header-actions", "\\.plugins-sheet-head"]) {
+    assert.match(
+      section,
+      new RegExp(`${selector}\\s*\\{[^}]*-webkit-app-region:\\s*no-drag`),
+      `${selector} must opt out of the titlebar drag rectangle`,
+    );
+  }
+});
