@@ -1092,21 +1092,27 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
 ### 9.1 Purpose
 
 Lightweight inline disclosure row showing a semantic tool action, its primary
-argument hint, status, input, and output. It follows D071 and is intentionally
-not an elevated card.
+argument hint, status, and a readable rendering of the result. It follows D071
+and is intentionally not an elevated card.
 
 Consecutive tool calls form one ChatGPT-style processing group. The group is
 collapsed by default and its header shows `Processing · 12s` while active or
 `Processed for 12s` after completion. Expanding it reveals the ordered tool
-activity rows and their nested input/output disclosures.
+activity rows and their nested result disclosures.
 
 ### 9.2 Anatomy
 
 ```text
-[sparkle] Processed for 12s  3 steps      [›]
-          ├─ [file] Read /src/foo.ts      [›]
-          ├─ [search] Searched tool-row   [›]
-          └─ [terminal] Ran pnpm test     [›]
+[sparkle] Processed for 12s  3 steps        [›]
+          ├─ [file] Read /src/foo.ts        [›]
+          ├─ [search] Searched TODO  24 matches   [›]
+          └─ [terminal] Ran pnpm test  exit 1     [›]
+             ├─ Command      [copy]
+             │  pnpm test
+             ├─ Output       [copy]
+             │  3 passing
+             └─ Errors       [copy]
+                1 failing
 ```
 
 - The leading Lucide icon reflects the action type: file, folder, search,
@@ -1116,51 +1122,85 @@ activity rows and their nested input/output disclosures.
 - The visible label is a natural-language action (`Read`, `Ran`, `Searched`),
   not the raw function name. Running actions use the progressive form.
 - The primary argument is a clamped single-line monospace hint.
+- Result chips follow the hint: exit code (error hue), match/file counts,
+  replacement count, written size, `truncated`, `scratch`. A successful exit
+  earns no chip — the row status already says so.
 - The disclosure chevron is quiet until hover/focus or expansion.
 
-### 9.3 Layout
+### 9.3 Expanded blocks
+
+The expanded body is a list of labeled blocks, never a JSON dump (D189). The
+pi-ai result envelope carries the structured payload in `details` and repeats it
+as text for the model; only the structured half is rendered, so no byte appears
+twice.
+
+| Tool | Blocks |
+|---|---|
+| Read | `File content` — syntax highlighted from the file extension |
+| Write | `Written content` — highlighted from the target extension |
+| Edit | `Changes` — compact diff, only when no ReviewChangeCard owns one |
+| Bash | `Command` (shell), `Output`, `Errors` (error hue); empty channels omitted |
+| Glob | `Files` — clickable workspace paths |
+| Grep | `Matches` — grouped by file, `line` gutter, clickable path headings |
+| any failure | `Error` — message plus code, listed first |
+| unmapped payload | scalar entries as label/value fields; long or multi-line strings as their own labeled block; nested objects as JSON |
+
+- Arguments appear as an `Input` field block only when the result blocks did not
+  already carry them, or for opaque tools (`use`, `fork`, `fetch`) whose
+  arguments are the interesting part. The argument already shown as the row hint
+  is not repeated.
+- Every block exposes a compact copy action that copies the full payload, not
+  the visible slice.
+
+### 9.4 Layout
 
 - Outer row: transparent, borderless, shadowless, approximately 24px high
 - Icon: 15–16px; disclosure chevron: 12px
 - Header gap: 4px; expanded body inset: 24px
-- Input/output: `font-mono text-sm`, independently copyable, capped at 220px
-  with internal scrolling
+- Chips: monospace `--text-2xs`, hairline border, error hue for exit codes
+- Code, file list, match list and field blocks: `font-mono text-sm`,
+  independently copyable, capped at 260px with internal scrolling
+- Diff blocks reuse the review card's `.diff-line` rails
 - Only expanded content receives an inset surface and subtle border
 
-### 9.4 States
+### 9.5 States
 
 | State | Header treatment | Expanded content |
 |---|---|---|
 | Running | Progressive action + shimmer + spinner | Latest partial output |
-| Success | Past-tense action; no green success badge | Final output, then raw input |
-| Error | Past-tense action + compact danger status; auto-expanded | Error output, then raw input |
+| Success | Past-tense action + result chips; no green success badge | Result blocks, then arguments if not already shown |
+| Error | Past-tense action + compact danger status; auto-expanded | Error note first, then arguments |
 | Denied | Muted `Denied` status | Permission result when available |
 
-### 9.5 Interactions
+### 9.6 Interactions
 
-- Click the row: expand/collapse output and input; successful rows default
+- Click the row: expand/collapse the result blocks; successful rows default
   collapsed and failed rows open automatically.
 - Click the processing header: expand/collapse the ordered activity list.
   Processing groups default collapsed, including while the turn is active.
 - Failed groups use an explicit `Failed after {elapsed}` header. Expansion uses
   a short height/opacity transition and keeps collapsed content inert.
-- Running updates replace the latest partial output in place.
-- Output is presented before raw input so the primary result has higher
+- Running updates replace the latest partial output in place. Blocks are built
+  on expansion only, so streaming ticks stay cheap.
+- Results are presented before arguments so the primary result has higher
   information priority.
-- Input and output each expose a compact copy action.
+- File paths and Grep hit headings open in the work panel when they resolve
+  under the workspace root; paths outside it stay plain text.
 - Host truncation markers remain visible and cannot be bypassed by expansion.
+  Rendered lists and diffs are capped and report the hidden remainder.
+- Syntax highlighting is skipped above 100 KB or 800 lines.
 
-### 9.6 Accessibility
+### 9.7 Accessibility
 
 - `role="region"` with `aria-label="Tool call: {toolName}"`
 - Status announced through localized `aria-label` text
 - Expand/collapse: `aria-expanded` + `aria-controls`
+- Copy actions carry `aria-label="Copy {block label}"`
 - Keyboard focus uses the standard inset focus ring
 
-### 9.7 MVP constraints
+### 9.8 MVP constraints
 
-- No inline diff rendering for Edit/Write results
-- No file path click-to-open (deferred)
+- No word-level diff refinement; the Edit diff is line-based
 - No cross-row activity grouping until turn boundaries are available to the
   transcript component
 
@@ -1188,6 +1228,10 @@ Inline transcript card requesting user approval for a high-risk tool call. See
 | Timeout: 120s countdown                       |
 +----------------------------------------------+
 ```
+
+The redacted args preview uses the ToolCallRow block presentation (§9.3): a
+command reads as shell, file content as code, everything else as label/value
+fields. It is never a JSON dump.
 
 ### 10.3 Session scope
 

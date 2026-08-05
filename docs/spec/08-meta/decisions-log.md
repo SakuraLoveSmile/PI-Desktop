@@ -973,3 +973,25 @@ section mirrors only marketplace/catalog items still blocking nothing.
 - Database open rewrites `sessions.mode = 'chat'` and a stored `defaultMode` of
   `chat` to `agent` — a data fix-up inside schema v7, not a version bump.
 - Decision D188; see [ADR 0052](../../adr/0052-agent-only-mode.md).
+
+## 2026-08-05 — Structured tool-result presentation in the transcript
+
+- Expanded tool rows no longer render `JSON.stringify` of the arguments and the
+  result. A pure renderer module maps each known payload to labeled blocks: file
+  and written content as highlighted code, commands as shell, stdout and stderr
+  as separate blocks, Glob results as clickable paths, Grep hits grouped per
+  file, failures as an error note. Unmapped plugin payloads degrade to
+  label/value fields and labeled blocks; only nested objects keep a JSON body.
+- The pi-ai result envelope carries the structured payload in `details` and
+  repeats it as text for the model. Only the structured half is rendered, so no
+  byte is shown twice.
+- Collapsed rows carry outcome chips (exit code, match/file counts, replacement
+  count, written size, `truncated`, `scratch`) so a result reads without
+  expanding. A successful exit earns no chip.
+- Edit rows draw their own diff only when no ReviewChangeCard owns one, keeping
+  workspace edits single-sourced. The inline permission card shares the same
+  block renderer for its args preview.
+- Blocks are built on expansion only and highlighting is skipped above 100 KB or
+  800 lines; lists and diffs are capped and report the hidden remainder.
+- Decision D189; renderer-only presentation, so no ADR. See
+  `04-ux/08-component-spec.md` §9 and E2E-097.
