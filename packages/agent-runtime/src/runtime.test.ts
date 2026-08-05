@@ -3,6 +3,7 @@ import { estimateTokens } from "@earendil-works/pi-agent-core";
 import {
   DesktopAgentRuntime,
   PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
+  looksLikePseudoToolCall,
   type RuntimeProviderConfig,
 } from "./runtime.js";
 import type {
@@ -104,6 +105,53 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect(edit.description).toContain("same path concurrently");
 
     await runtime.dispose();
+  });
+
+  it("requires visible progress updates and the user's language", async () => {
+    const runtime = createRuntime();
+    const prompt = (runtime as any).agent.state.systemPrompt as string;
+
+    expect(prompt).toContain("answer in the same language the user writes in");
+    expect(prompt).toContain(
+      "never leave the user with no new text for more than one tool batch or 60 seconds",
+    );
+    // The observed failure: a 2830-character conclusion written into thinking
+    // while the visible text stayed empty, twice in a row.
+    expect(prompt).toContain("must be answered in your visible text");
+    expect(prompt).toContain("Make the final message self-contained");
+    expect(prompt).toContain("Carry the work through end to end");
+
+    await runtime.dispose();
+  });
+
+  it("steers search through the scopeable tools instead of shell pipelines", async () => {
+    const runtime = createRuntime();
+    const prompt = (runtime as any).agent.state.systemPrompt as string;
+
+    expect(prompt).toContain(
+      "prefer the Read, Grep, and Glob tools over shell",
+    );
+    expect(prompt).toContain("`outputMode`");
+    expect(prompt).toContain("paginates any file, however large");
+    expect(prompt).toContain("use `rg` and exclude build output");
+    expect(prompt).toContain("Do not re-run a search whose answer you already have");
+    expect(prompt).toContain("Never write a tool call as text");
+
+    await runtime.dispose();
+  });
+
+  it("recognizes a tool call leaked into assistant text", () => {
+    expect(
+      looksLikePseudoToolCall(
+        'to=multi_tool_use.parallel code:{"tool_uses":[{"recipient_name":"functions.Read"}]}',
+      ),
+    ).toBe(true);
+    expect(looksLikePseudoToolCall('{"tool_uses": [{"recipient_name": "x"}]}')).toBe(
+      true,
+    );
+    expect(
+      looksLikePseudoToolCall("I will read the file and then run the tests."),
+    ).toBe(false);
   });
 
   it("preserves host failure diagnostics while marking the agent tool result", async () => {

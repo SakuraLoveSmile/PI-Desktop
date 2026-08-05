@@ -192,6 +192,20 @@ const CONTEXT_COMPACTION_NUDGE = [
   "</context_management>",
 ].join("\n");
 
+/**
+ * Some OpenAI-style models emit their internal parallel-call wrapper as
+ * assistant text (`to=multi_tool_use.parallel code:{"tool_uses":[…]}`) instead
+ * of real tool calls. PI-Desktop has no such tool, so the whole batch lands as
+ * prose and silently does nothing — the turn looks finished while no work ran.
+ * Rare (2 occurrences across 255 recorded sessions) but indistinguishable from
+ * a stuck agent when it happens.
+ */
+export function looksLikePseudoToolCall(text: string): boolean {
+  return (
+    text.includes("multi_tool_use.parallel") || text.includes('{"tool_uses":')
+  );
+}
+
 function normalizeCompactionSettings(
   value?: Partial<ContextCompactionSettings>,
 ): CompactionSettings {
@@ -725,6 +739,21 @@ export class DesktopAgentRuntime {
     const optionalToolsPrompt = this.optionalToolsPrompt();
     const defaultSystemPrompt = [
       "You are PI-Desktop, a local-first coding agent. Prefer concise, actionable answers. Use tools when they help.",
+      // Collaboration rules. Measured sessions ran hours with 380 assistant
+      // messages and exactly one non-empty text body: a reasoning model reads
+      // "prefer concise" as "say nothing", writes its conclusion into thinking
+      // (which the user never sees), and the user is left sending "继续" to
+      // find out whether anything happened. Every clause below is one of those
+      // observed failures stated as a hard rule.
+      "Collaboration: answer in the same language the user writes in. Before each batch of tool calls, write one short sentence saying what you are about to do; never leave the user with no new text for more than one tool batch or 60 seconds of work. Whatever the user asked must be answered in your visible text — your reasoning is not shown to them, so a conclusion that lives only there never reached them. Make the final message self-contained: the outcome, what you changed, and anything still open, without asking the user to re-read intermediate updates. Carry the work through end to end; when you hit a blocker, try to clear it yourself and report what you tried, instead of stopping at analysis or a half-finished change.",
+      // Search-tool steering. Read/Grep/Glob are host-bounded and scopeable;
+      // hand-rolled shell pipelines are not, and unbounded shell output is
+      // what exhausted context and forced repeated re-searching.
+      "Searching and reading: prefer the Read, Grep, and Glob tools over shell `cat`, `sed`, `head`, `grep`, or `find`, and scope them with their own parameters — Grep takes `path`, `include`, `outputMode`, and `headLimit`; Glob takes `path` and `limit`; Read takes `offset` and `limit` and paginates any file, however large. These tools bound their own output; a shell pipeline does not, and one unscoped search over a whole workspace costs context you will need later. When a search genuinely needs Bash, use `rg` and exclude build output (`dist`, `*.min.*`, `*.map`). Do not re-run a search whose answer you already have.",
+      // Observed leak: OpenAI-style models sometimes emit the internal
+      // `multi_tool_use.parallel` wrapper as assistant text. PI-Desktop has no
+      // such tool, so the whole batch is silently lost as prose.
+      "Call tools through the native tool-call interface only. Never write a tool call as text, and never emit a `multi_tool_use.parallel` / `{\"tool_uses\": [...]}` wrapper — there is no such tool here, and a call written as prose does not run. To run several tools at once, emit several real tool calls in one assistant message.",
       "Editing workflow: use the built-in Edit or Write tool directly on the deliverable file whenever it is inside the advertised workspace. Use Edit for one small unique replacement and Write for a coherent whole-file rewrite. Do not invoke shell apply_patch, git apply, or patch commands; do not create or hand-edit unified-diff files in scratch or repeatedly repair their hunk headers. Treat an edit or shell patch failure as stale state: perform one fresh Read, regenerate the change from that current content once, then stop and report the exact mismatch instead of looping. Never issue concurrent Write/Edit calls for the same path. When a dedicated worktree is outside the advertised workspace, make one guarded, deterministic edit inside that worktree with Bash, then verify it with git diff or an equivalent check.",
       // Work panel browser preview (D100): workspace HTML files render
       // in the embedded browser with live reload on file changes.
@@ -2365,6 +2394,14 @@ export class DesktopAgentRuntime {
           const nextThinking = content.hasThinking
             ? content.thinking
             : this.currentAssistant.thinking ?? "";
+          if (looksLikePseudoToolCall(nextText)) {
+            // The visible text is a lost tool batch, not an answer. Logging it
+            // separates "the model went quiet" from "the model tried to act and
+            // the call never reached the host" when a session is reviewed.
+            process.stderr.write(
+              `[agent-runtime] assistant emitted a tool call as text (session=${this.sessionId} turn=${this.turnId})\n`,
+            );
+          }
           const usage = usageFromPi((event.message as any).usage as Usage | undefined);
           const endedAt = Date.now();
           const providerWaitMs =
