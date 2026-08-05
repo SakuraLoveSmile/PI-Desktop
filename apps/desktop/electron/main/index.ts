@@ -61,6 +61,11 @@ import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
 import { PluginRuntime } from "./plugin-runtime";
 import { UserMcpRuntime } from "./user-mcp";
+import {
+  MCP_CALL_TIMEOUT_MS,
+  MCP_CONNECT_TIMEOUT_MS,
+  McpServerClient,
+} from "./plugin-mcp";
 import { builtinSkills, loadBuiltinSkillBody } from "./builtin-skills";
 import { registerPluginDevTools } from "./plugin-dev-tools";
 import { PluginPanelHost } from "./plugin-panel-host";
@@ -224,6 +229,9 @@ const ptys = new PtyManager({
     sendToRenderer(IPC.event.terminalExit, { termId, exitCode }),
 });
 const userMcp = new UserMcpRuntime({
+  createClient: (config) => new McpServerClient(config),
+  connectTimeoutMs: MCP_CONNECT_TIMEOUT_MS,
+  callTimeoutMs: MCP_CALL_TIMEOUT_MS,
   audit: (entry) => logger.app("plugin", "info", "mcp.api", entry),
   log: (level, message, data) => logger.app("plugin", level, message, { data }),
 });

@@ -5,12 +5,7 @@ import {
   type McpServerStatus,
 } from "@pi-desktop/shared";
 import { userMcpToolName } from "@pi-desktop/plugin-sdk";
-import {
-  MCP_CALL_TIMEOUT_MS,
-  MCP_CONNECT_TIMEOUT_MS,
-  McpServerClient,
-  type McpTool,
-} from "./plugin-mcp";
+import type { McpServerClient, McpTool } from "./plugin-mcp";
 
 /**
  * MCP servers the user configured directly, with no plugin around them.
@@ -30,24 +25,34 @@ export type UserMcpToolDescriptor = {
   schema?: unknown;
 };
 
+/** The slice of {@link McpServerClient} this runtime drives. */
+export type UserMcpClient = Pick<
+  McpServerClient,
+  "connect" | "callTool" | "getTools" | "isConnected" | "close"
+>;
+
+export type UserMcpClientConfig = ConstructorParameters<typeof McpServerClient>[0];
+
 export type UserMcpRuntimeOptions = {
+  /**
+   * How a connection is made.
+   *
+   * Injected rather than imported because every value import would make this
+   * module unloadable by the test runner, which reads it with Node's
+   * type-stripping loader and cannot resolve extensionless specifiers. Keeping
+   * the import type-only is what lets the runtime be tested against real
+   * servers.
+   */
+  createClient: (config: UserMcpClientConfig) => UserMcpClient;
   audit?: (entry: Record<string, unknown>) => void;
   log?: (level: "info" | "warn" | "error", message: string, data?: unknown) => void;
   connectTimeoutMs?: number;
   callTimeoutMs?: number;
-  /** Test seams, mirroring `McpServerClientOptions`. */
-  spawnImpl?: McpServerClientOptionsSeams["spawnImpl"];
-  fetchImpl?: McpServerClientOptionsSeams["fetchImpl"];
-};
-
-type McpServerClientOptionsSeams = {
-  spawnImpl?: ConstructorParameters<typeof McpServerClient>[0]["spawnImpl"];
-  fetchImpl?: ConstructorParameters<typeof McpServerClient>[0]["fetchImpl"];
 };
 
 type Entry = {
   record: McpServerRecord;
-  client: McpServerClient;
+  client: UserMcpClient;
   status: McpServerStatus;
 };
 
@@ -57,8 +62,13 @@ const MAX_ACTIVE_SERVERS = 16;
 export class UserMcpRuntime {
   private entries = new Map<string, Entry>();
   private records: McpServerRecord[] = [];
+  private options: UserMcpRuntimeOptions;
 
-  constructor(private options: UserMcpRuntimeOptions = {}) {}
+  // Spelled out rather than a constructor parameter property, because the test
+  // runner loads this file with Node's type-stripping loader, which rejects them.
+  constructor(options: UserMcpRuntimeOptions) {
+    this.options = options;
+  }
 
   /**
    * Adopt a fresh list from host-core. Servers whose configuration changed —
@@ -260,7 +270,7 @@ export class UserMcpRuntime {
   }
 
   private createEntry(record: McpServerRecord): Entry {
-    const client = new McpServerClient({
+    const client = this.options.createClient({
       // No plugin owns this server; `rootPath` is only the child's cwd, and the
       // user's own command may live anywhere on the machine.
       rootPath: homedir(),
@@ -278,10 +288,8 @@ export class UserMcpRuntime {
       values: record.transport === "stdio" ? (record.env ?? {}) : (record.headers ?? {}),
       audit: this.options.audit,
       auditScope: "mcp",
-      connectTimeoutMs: this.options.connectTimeoutMs ?? MCP_CONNECT_TIMEOUT_MS,
-      callTimeoutMs: this.options.callTimeoutMs ?? MCP_CALL_TIMEOUT_MS,
-      spawnImpl: this.options.spawnImpl,
-      fetchImpl: this.options.fetchImpl,
+      connectTimeoutMs: this.options.connectTimeoutMs,
+      callTimeoutMs: this.options.callTimeoutMs,
     });
     const entry: Entry = {
       record,
