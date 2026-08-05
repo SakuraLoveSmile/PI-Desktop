@@ -1,0 +1,1178 @@
+/*
+ * Extensions: MCP servers, user skills, and the activation-scope control the
+ * three extension kinds share.
+ *
+ * Kept beside plugins.css rather than inside it because these surfaces are new
+ * and self-contained, and because the scope control is used from the plugin rows
+ * too — one file that owns it is easier to keep coherent than a block wedged
+ * into the middle of the plugin page's styles.
+ */
+
+/* ---------------------------------------------------------------- section */
+
+.ext-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.ext-section-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ext-section-copy {
+  display: flex;
+  flex: 1 1 320px;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ext-section-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium-plus);
+  letter-spacing: var(--tracking-tight);
+}
+
+.ext-section-sub {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+}
+
+.ext-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.ext-inline-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-error) 10%, transparent);
+  box-shadow: inset 0 0 0 0.5px color-mix(in oklab, var(--ds-error) 40%, transparent);
+  padding: 9px 12px;
+  color: var(--ds-error);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+}
+
+.ext-inline-error > svg {
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+
+/* Empty states reuse the plugin page's proportions so the tabs feel like one page. */
+.ext-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 36px 24px 30px;
+  text-align: center;
+}
+
+.ext-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 6px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  color: var(--ds-text-secondary);
+}
+
+.ext-empty-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-medium-plus);
+}
+
+.ext-empty-body {
+  margin: 0;
+  max-width: 48ch;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+}
+
+.ext-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* -------------------------------------------------------------------- rows */
+
+.ext-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: visible;
+}
+
+.ext-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.ext-row:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+.ext-row:last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+.ext-row + .ext-row {
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.ext-row:hover,
+.ext-row:focus-within,
+.ext-row.menu-open {
+  background: var(--ds-bg-hover);
+}
+
+/*
+ * The glyph doubles as the connection light: colour comes from the MCP state, so
+ * the answer to "is this thing working" is the first thing in the row.
+ */
+.ext-row-glyph {
+  position: relative;
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-secondary);
+  flex: 0 0 auto;
+}
+
+.ext-row-glyph.is-ready {
+  background: color-mix(in oklab, var(--ds-success) 14%, transparent);
+  color: var(--ds-success);
+}
+
+.ext-row-glyph.is-connecting {
+  background: color-mix(in oklab, var(--ds-warning) 14%, transparent);
+  color: var(--ds-warning);
+}
+
+.ext-row-glyph.is-failed {
+  background: color-mix(in oklab, var(--ds-error) 14%, transparent);
+  color: var(--ds-error);
+}
+
+.ext-row.is-off .ext-row-glyph {
+  opacity: 0.55;
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  color: var(--ds-text-muted);
+}
+
+.ext-row-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ext-row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ext-row-name {
+  color: var(--ds-text-primary);
+  font-size: var(--text-md-plus);
+  font-weight: var(--font-weight-medium-plus);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-row.is-off .ext-row-name {
+  color: var(--ds-text-secondary);
+}
+
+.ext-row-id,
+.ext-row-cmd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-plus);
+  color: var(--ds-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ext-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+}
+
+.ext-row-desc {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+}
+
+.ext-row-desc.is-muted {
+  color: var(--ds-text-faint);
+  font-style: italic;
+}
+
+.ext-row-error {
+  margin: 0;
+  color: var(--ds-error);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  word-break: break-word;
+}
+
+.ext-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding-top: 2px;
+}
+
+/* Quiet row actions surface on hover; the scope control always shows. */
+.ext-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  opacity: 0;
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.ext-row:hover .ext-row-actions,
+.ext-row:focus-within .ext-row-actions,
+.ext-row.menu-open .ext-row-actions {
+  opacity: 1;
+}
+
+.ext-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  padding: 1px 7px;
+  line-height: var(--leading-normal);
+}
+
+.ext-state-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  padding: 1px 7px;
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-normal);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-secondary);
+}
+
+.ext-state-tag.is-ready {
+  background: color-mix(in oklab, var(--ds-success) 15%, transparent);
+  color: var(--ds-success);
+}
+
+.ext-state-tag.is-connecting {
+  background: color-mix(in oklab, var(--ds-warning) 15%, transparent);
+  color: var(--ds-warning);
+}
+
+.ext-state-tag.is-failed {
+  background: color-mix(in oklab, var(--ds-error) 15%, transparent);
+  color: var(--ds-error);
+}
+
+.ext-tool-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ext-tool-chip {
+  border-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs);
+  padding: 1px 6px;
+  line-height: var(--leading-normal);
+}
+
+.ext-tool-chip.is-more {
+  font-family: inherit;
+}
+
+/* --------------------------------------------------------- scope control */
+
+.scope-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.scope-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-subtle);
+}
+
+.scope-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.scope-control.is-compact .scope-seg {
+  padding: 0 7px;
+}
+
+.scope-seg > svg {
+  flex: 0 0 auto;
+}
+
+.scope-seg:hover:not(.is-active) {
+  color: var(--ds-text-primary);
+}
+
+.scope-seg.is-active {
+  background: var(--ds-bg-elevated-opaque, var(--ds-bg-primary));
+  color: var(--ds-text-primary);
+  box-shadow: 0 0 0 0.5px var(--ds-border-default), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* Off reads as off: the active segment stays quiet instead of looking selected. */
+.scope-seg.is-active:first-child {
+  color: var(--ds-text-secondary);
+}
+
+.scope-seg:last-child.is-active {
+  color: var(--ds-text-primary);
+}
+
+.scope-seg:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.scope-projects {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 190px;
+  border-radius: var(--radius-full);
+  padding: 2px 9px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-default);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.scope-chip > svg {
+  flex: 0 0 auto;
+  color: var(--ds-text-faint);
+}
+
+.scope-chip:hover,
+.scope-chip.is-open {
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.scope-chip.is-empty {
+  color: var(--ds-warning);
+  box-shadow: inset 0 0 0 0.5px color-mix(in oklab, var(--ds-warning) 45%, transparent);
+}
+
+/* Always its own line: the warning is a sentence, and beside the chip it would
+   stretch the row it lives in. */
+.scope-warn {
+  flex: 0 0 100%;
+  color: var(--ds-warning);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+  max-width: 24ch;
+  text-align: right;
+}
+
+.scope-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 304px;
+  max-height: 320px;
+  border-radius: var(--radius-md-plus);
+  background: var(--ds-bg-elevated-opaque, var(--ds-bg-primary));
+  box-shadow: 0 0 0 0.5px var(--ds-border-default), 0 14px 38px rgba(0, 0, 0, 0.22);
+  animation: scope-popover-in var(--motion-duration-fast) var(--motion-ease-out) both;
+  overflow: hidden;
+}
+
+.scope-popover.is-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+@keyframes scope-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.scope-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 8px 12px;
+}
+
+.scope-popover-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium-plus);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-popover-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-faint);
+  flex: 0 0 auto;
+}
+
+.scope-popover-close:hover {
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.scope-popover-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 10px 6px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-subtle);
+  padding: 0 9px;
+  height: 28px;
+  color: var(--ds-text-faint);
+}
+
+.scope-popover-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  outline: none;
+}
+
+.scope-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 6px 6px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.scope-popover-empty {
+  margin: 0;
+  padding: 14px 8px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.scope-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border-radius: var(--radius-2xs);
+  padding: 6px 8px;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.scope-option:hover {
+  background: var(--ds-bg-hover);
+}
+
+.scope-option-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  border-radius: var(--radius-2xs);
+  box-shadow: inset 0 0 0 1px var(--ds-border-strong);
+  color: transparent;
+  flex: 0 0 auto;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.scope-option.is-on .scope-option-check {
+  background: var(--ds-accent);
+  box-shadow: none;
+  color: var(--ds-bg-primary);
+}
+
+.scope-option-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.scope-option-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-option-tag {
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-muted);
+  font-size: var(--text-3xs);
+  padding: 0 6px;
+}
+
+.scope-option-path {
+  color: var(--ds-text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-popover-foot {
+  margin: 0;
+  border-top: 1px solid var(--ds-border-subtle);
+  padding: 7px 12px;
+  color: var(--ds-text-faint);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+}
+
+/*
+ * Inside a form the control is a field like any other, so it reads from the left
+ * edge and its popover opens the same way. In a list row it stays right-aligned
+ * with the other row controls.
+ */
+.ext-field-group > .scope-control {
+  align-items: flex-start;
+}
+
+.ext-field-group > .scope-control .scope-projects {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.ext-field-group > .scope-control .scope-warn {
+  text-align: left;
+}
+
+/*
+ * In a sheet the picker expands in place instead of floating: the sheet body
+ * scrolls, and a popover positioned inside a scrolling box gets clipped exactly
+ * when it matters — near the bottom, which is where this field sits.
+ */
+.ext-field-group > .scope-control .scope-popover {
+  position: static;
+  flex: 0 0 100%;
+  width: 100%;
+  max-height: 268px;
+  margin-top: 2px;
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-default);
+}
+
+/* ------------------------------------------------------------------ sheets */
+
+.ext-sheet-overlay {
+  align-items: flex-start;
+  padding: 40px 24px;
+  overflow-y: auto;
+}
+
+.ext-sheet {
+  display: flex;
+  width: min(100%, 560px);
+  max-height: calc(100vh - 80px);
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  margin: auto;
+}
+
+.ext-sheet.is-narrow {
+  width: min(100%, 480px);
+}
+
+.ext-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid var(--ds-border-subtle);
+  padding: 16px 16px 13px 18px;
+}
+
+.ext-sheet-head > div:first-child {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ext-sheet-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-medium-plus);
+  letter-spacing: var(--tracking-tight);
+}
+
+.ext-sheet-sub {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+}
+
+.ext-sheet-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-faint);
+  flex: 0 0 auto;
+}
+
+.ext-sheet-close:hover {
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.ext-sheet-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  overflow-y: auto;
+}
+
+.ext-sheet-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--ds-border-subtle);
+  padding: 12px 18px;
+}
+
+.ext-sheet-actions-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.ext-sheet-note {
+  color: var(--ds-text-faint);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-normal);
+  max-width: 30ch;
+}
+
+.ext-sheet-error {
+  margin: 0;
+  border-top: 1px solid color-mix(in oklab, var(--ds-error) 30%, transparent);
+  padding: 8px 18px 12px;
+  color: var(--ds-error);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.ext-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ext-field-label {
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+}
+
+.ext-field-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ext-field-hint {
+  margin: -2px 0 2px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-body);
+}
+
+.ext-field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* The transport choice is two cards, not a select: it changes the whole form. */
+.ext-transport-pick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.ext-transport-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  text-align: left;
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-default);
+  padding: 10px 11px;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.ext-transport-card:hover {
+  background: var(--ds-bg-hover);
+}
+
+.ext-transport-card.is-active {
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--ds-accent);
+}
+
+.ext-transport-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-secondary);
+  flex: 0 0 auto;
+}
+
+.ext-transport-card.is-active .ext-transport-icon {
+  color: var(--ds-text-primary);
+}
+
+.ext-transport-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ext-transport-name {
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+}
+
+.ext-transport-hint {
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+}
+
+.ext-test-result {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+  padding: 9px 12px;
+  font-size: var(--text-sm-plus);
+  color: var(--ds-text-secondary);
+}
+
+.ext-test-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--ds-text-faint);
+  flex: 0 0 auto;
+  transform: translateY(-1px);
+}
+
+.ext-test-result.is-ready {
+  background: color-mix(in oklab, var(--ds-success) 10%, transparent);
+  color: var(--ds-success);
+}
+
+.ext-test-result.is-ready .ext-test-dot {
+  background: var(--ds-success);
+}
+
+.ext-test-result.is-connecting .ext-test-dot {
+  background: var(--ds-warning);
+}
+
+.ext-test-result.is-failed {
+  background: color-mix(in oklab, var(--ds-error) 10%, transparent);
+  color: var(--ds-error);
+}
+
+.ext-test-result.is-failed .ext-test-dot {
+  background: var(--ds-error);
+}
+
+.ext-test-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: var(--leading-body);
+  word-break: break-word;
+}
+
+.ext-test-tools {
+  flex: 1 1 100%;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  word-break: break-word;
+}
+
+.ext-byte-count {
+  color: var(--ds-text-faint);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ext-byte-count.is-near {
+  color: var(--ds-warning);
+}
+
+.ext-byte-count.is-over {
+  color: var(--ds-error);
+}
+
+.ext-skill-body {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+  resize: vertical;
+}
+
+/* ------------------------------------------------------------ paste import */
+
+.ext-import-box {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  resize: vertical;
+}
+
+.ext-import-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-error) 10%, transparent);
+  padding: 8px 11px;
+  color: var(--ds-error);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.ext-import-error > svg {
+  margin-top: 1px;
+  flex: 0 0 auto;
+}
+
+.ext-import-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-subtle);
+  padding: 8px;
+}
+
+.ext-import-count {
+  padding: 0 4px 4px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.ext-import-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--radius-2xs);
+  padding: 5px 6px;
+  min-width: 0;
+}
+
+.ext-import-row:hover {
+  background: var(--ds-bg-hover);
+}
+
+.ext-import-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-text-faint);
+  flex: 0 0 auto;
+}
+
+.ext-import-row.is-skipped .ext-import-icon {
+  color: var(--ds-warning);
+}
+
+.ext-import-name {
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium);
+  flex: 0 0 auto;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-import-row.is-skipped .ext-import-name {
+  color: var(--ds-text-muted);
+  text-decoration: line-through;
+}
+
+.ext-import-detail {
+  flex: 1;
+  min-width: 0;
+  color: var(--ds-text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------- key/value editor */
+
+.kv-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kv-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kv-key {
+  flex: 0 1 40%;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.kv-value {
+  flex: 1 1 60%;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.kv-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-faint);
+  flex: 0 0 auto;
+}
+
+.kv-remove:hover {
+  background: color-mix(in oklab, var(--ds-error) 12%, transparent);
+  color: var(--ds-error);
+}
+
+.kv-add {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 5px;
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-xs-plus);
+  font-weight: var(--font-weight-medium);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-default);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.kv-add:hover {
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  color: var(--ds-text-primary);
+}
+
+/*
+ * Narrow layout: the row controls drop below the copy rather than squeezing the
+ * name into two characters, and the scope popover spans the row.
+ */
+@media (max-width: 720px) {
+  .ext-row {
+    flex-wrap: wrap;
+  }
+
+  .ext-row-controls {
+    width: 100%;
+    justify-content: space-between;
+    padding-left: 42px;
+  }
+
+  .ext-field-pair,
+  .ext-transport-pick {
+    grid-template-columns: 1fr;
+  }
+
+  .scope-popover {
+    width: min(304px, calc(100vw - 56px));
+  }
+}

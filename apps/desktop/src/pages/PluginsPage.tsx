@@ -20,16 +20,27 @@ import {
   IconX,
 } from "../components/icons";
 import { Markdown } from "../components/Markdown";
+import { ScopeControl } from "../components/extensions/ScopeControl";
+import { McpSection } from "../components/extensions/McpSection";
+import { SkillsSection } from "../components/extensions/SkillsSection";
 import type {
+  ActivationScope,
   MarketPluginDetail,
   MarketPluginSummary,
   PluginCapability,
   PluginServiceStatus,
   PluginSummary,
+  ProjectRecord,
   ProjectWorkspace,
 } from "@pi-desktop/shared";
 
-type TabId = "installed" | "market";
+/**
+ * The four things a user extends the app with. Plugins, MCP servers and skills
+ * are separate tabs rather than one merged list because they are created in
+ * completely different ways — installed, configured, written — and a single list
+ * would have to hide that behind a lowest-common-denominator row.
+ */
+type TabId = "installed" | "mcp" | "skills" | "market";
 
 /**
  * Always-visible sections of the installed index. Broken plugins come first and
@@ -324,9 +335,17 @@ export function PluginsPage() {
   const showToast = useAppStore((s) => s.showToast);
   const openUrlInWorkPanel = useAppStore((s) => s.openUrlInWorkPanel);
   const activateProject = useAppStore((s) => s.activateProject);
+  /**
+   * The folder open in this window. Scoping something to "this project" is only
+   * meaningful relative to it, so the control needs it as its default target.
+   */
+  const currentProjectPath = useAppStore((s) => s.workspace?.path ?? null);
 
   const [tab, setTab] = useState<TabId>("installed");
   const [installedQuery, setInstalledQuery] = useState("");
+  /** Shared by the MCP and Skills tabs; both lists are short enough to filter live. */
+  const [extQuery, setExtQuery] = useState("");
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [market, setMarket] = useState<MarketPluginSummary[]>([]);
@@ -419,6 +438,15 @@ export function PluginsPage() {
     setDetail(null);
     setSelectedVersion("");
   };
+
+  // Every scope control offers the same folder list, so it is fetched once here
+  // and handed down rather than re-queried per row.
+  useEffect(() => {
+    void api
+      .listProjects()
+      .then((res) => setProjects(res.projects ?? []))
+      .catch(() => setProjects([]));
+  }, []);
 
   // The marketplace query drives a debounced provider search: typing is the only
   // control, so there is no separate Search button that can fall out of sync.
@@ -736,12 +764,7 @@ export function PluginsPage() {
             <div className="page-subtitle">{t("plugins.subtitle")}</div>
           </div>
           <div className="plugins-header-actions">
-            {tab === "installed" ? (
-              <Button variant="primary" onClick={() => setTab("market")}>
-                <IconDownload size={14} />
-                {t("plugins.browseMarket")}
-              </Button>
-            ) : (
+            {tab === "market" ? (
               <Button
                 variant="primary"
                 onClick={() => void refreshMarket(query, { refreshRemote: true })}
@@ -749,7 +772,12 @@ export function PluginsPage() {
                 <IconCloudDown size={14} />
                 {t("plugins.refreshMarket")}
               </Button>
-            )}
+            ) : tab === "installed" ? (
+              <Button variant="primary" onClick={() => setTab("market")}>
+                <IconDownload size={14} />
+                {t("plugins.browseMarket")}
+              </Button>
+            ) : null}
             <div
               className="plugins-menu-wrap"
               ref={headerMenu ? headerMenuRef : undefined}
@@ -786,18 +814,20 @@ export function PluginsPage() {
           </div>
         </div>
 
-        <section className="plugins-hero" aria-label={t("plugins.overview")}>
-          <dl className="plugins-hero-stats">
-            {summary.map((cell) => (
-              <div key={cell.key} className="plugins-stat">
-                <dt className="plugins-stat-label">{t(cell.labelKey)}</dt>
-                <dd className="plugins-stat-value">{cell.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+        {tab === "installed" || tab === "market" ? (
+          <section className="plugins-hero" aria-label={t("plugins.overview")}>
+            <dl className="plugins-hero-stats">
+              {summary.map((cell) => (
+                <div key={cell.key} className="plugins-stat">
+                  <dt className="plugins-stat-label">{t(cell.labelKey)}</dt>
+                  <dd className="plugins-stat-value">{cell.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ) : null}
 
-        {stats.updates > 0 ? (
+        {stats.updates > 0 && tab !== "mcp" && tab !== "skills" ? (
           <div className="plugins-alert" role="status">
             <span className="plugins-alert-icon" aria-hidden>
               <IconCloudDown size={15} />
@@ -827,6 +857,28 @@ export function PluginsPage() {
             >
               {t("plugins.tabInstalled")}
               <span className="plugins-segment-count">{stats.total}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="plugins-tab-mcp"
+              aria-selected={tab === "mcp"}
+              aria-controls="plugins-panel-mcp"
+              className={cx("plugins-segment-btn", tab === "mcp" && "active")}
+              onClick={() => setTab("mcp")}
+            >
+              {t("extensions.tabMcp")}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="plugins-tab-skills"
+              aria-selected={tab === "skills"}
+              aria-controls="plugins-panel-skills"
+              className={cx("plugins-segment-btn", tab === "skills" && "active")}
+              onClick={() => setTab("skills")}
+            >
+              {t("extensions.tabSkills")}
             </button>
             <button
               type="button"
@@ -861,7 +913,7 @@ export function PluginsPage() {
                 />
               </div>
             ) : null
-          ) : (
+          ) : tab === "market" ? (
             <div className="plugins-toolbar-end">
               {marketLoading ? (
                 <span className="plugins-result-count" aria-live="polite">
@@ -874,10 +926,48 @@ export function PluginsPage() {
                 placeholder={t("plugins.marketSearchPlaceholder")}
               />
             </div>
+          ) : (
+            <div className="plugins-toolbar-end">
+              <SearchField
+                value={extQuery}
+                onChange={setExtQuery}
+                placeholder={
+                  tab === "mcp"
+                    ? t("extensions.mcp.searchPlaceholder")
+                    : t("extensions.skills.searchPlaceholder")
+                }
+              />
+            </div>
           )}
         </div>
 
-        {tab === "installed" ? (
+        {tab === "mcp" ? (
+          <div
+            id="plugins-panel-mcp"
+            role="tabpanel"
+            aria-labelledby="plugins-tab-mcp"
+            className="plugins-panel"
+          >
+            <McpSection
+              projects={projects}
+              currentProjectPath={currentProjectPath}
+              query={extQuery}
+            />
+          </div>
+        ) : tab === "skills" ? (
+          <div
+            id="plugins-panel-skills"
+            role="tabpanel"
+            aria-labelledby="plugins-tab-skills"
+            className="plugins-panel"
+          >
+            <SkillsSection
+              projects={projects}
+              currentProjectPath={currentProjectPath}
+              query={extQuery}
+            />
+          </div>
+        ) : tab === "installed" ? (
           <div
             id="plugins-panel-installed"
             role="tabpanel"
@@ -1020,6 +1110,25 @@ export function PluginsPage() {
                                   : t("plugins.updateNow")}
                               </Button>
                             ) : null}
+                            <ScopeControl
+                              target={plugin}
+                              label={plugin.name}
+                              projects={projects}
+                              currentProjectPath={currentProjectPath}
+                              onSetEnabled={(enabled) =>
+                                run(async () => {
+                                  if (enabled) await api.enablePlugin(plugin.id);
+                                  else await api.disablePlugin(plugin.id);
+                                  await refreshPlugins();
+                                })
+                              }
+                              onSetScope={(scope: ActivationScope) =>
+                                run(async () => {
+                                  await api.setPluginScope(plugin.id, scope);
+                                  await refreshPlugins();
+                                })
+                              }
+                            />
                             <div className="plugins-row-actions">
                               {plugin.ui?.panel ? (
                                 <button
@@ -1108,27 +1217,6 @@ export function PluginsPage() {
                                 ) : null}
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              className={cx("settings-toggle", plugin.enabled && "on")}
-                              role="switch"
-                              aria-checked={plugin.enabled}
-                              aria-label={
-                                plugin.enabled ? t("plugins.disable") : t("plugins.enable")
-                              }
-                              title={
-                                plugin.enabled ? t("plugins.disable") : t("plugins.enable")
-                              }
-                              onClick={() =>
-                                void run(async () => {
-                                  if (plugin.enabled) await api.disablePlugin(plugin.id);
-                                  else await api.enablePlugin(plugin.id);
-                                  await refreshPlugins();
-                                })
-                              }
-                            >
-                              <span className="settings-toggle-thumb" />
-                            </button>
                           </div>
                         </div>
                       );

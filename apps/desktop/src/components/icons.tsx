@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   AtSign,
   Bell,
+  BookOpen,
   Bot,
   Camera,
   Check,
@@ -19,6 +20,7 @@ import {
   CircleAlert,
   CircleCheck,
   CircleHelp,
+  ClipboardPaste,
   Clock,
   CloudDownload,
   Code2,
@@ -29,6 +31,7 @@ import {
   FileDiff,
   FileText,
   Folder,
+  FolderOpen,
   FolderPlus,
   Globe2,
   GitFork,
@@ -49,8 +52,10 @@ import {
   PawPrint,
   PencilLine,
   Pin,
+  Play,
   Plug,
   Plus,
+  Power,
   RefreshCcw,
   RefreshCw,
   RotateCw,
@@ -87,6 +92,11 @@ function icon(Lucide: LucideIcon) {
 }
 
 export const IconPlus = icon(Plus);
+export const IconPower = icon(Power);
+export const IconPlay = icon(Play);
+export const IconBookOpen = icon(BookOpen);
+/** Paste-from-clipboard actions (MCP config import). */
+export const IconClipboard = icon(ClipboardPaste);
 export const IconArchive = icon(Archive);
 export const IconArchiveRestore = icon(ArchiveRestore);
 export const IconArrowUpDown = icon(ArrowUpDown);
@@ -95,6 +105,7 @@ export const IconChat = icon(MessageSquare);
 /** Session creation affordance. Keep it distinct from generic add actions. */
 export const IconNewSession = icon(MessageSquarePlus);
 export const IconFolder = icon(Folder);
+export const IconFolderOpen = icon(FolderOpen);
 export const IconNewProject = icon(FolderPlus);
 export const IconFileText = icon(FileText);
 export const IconGlobe = icon(Globe2);
