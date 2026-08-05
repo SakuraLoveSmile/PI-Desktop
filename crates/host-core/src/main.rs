@@ -13,9 +13,9 @@ mod scratch;
 mod secrets;
 mod sessions;
 mod state;
+mod tool_budget;
 mod tools;
 mod transcripts;
-mod tool_budget;
 mod workspace;
 
 use std::sync::Arc;

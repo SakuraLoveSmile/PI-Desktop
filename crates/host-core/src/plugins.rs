@@ -1624,10 +1624,9 @@ fn validate_contributions(root: &Path, manifest: &PluginManifest) -> Result<()> 
         for entry in entries {
             let path = match entry {
                 Value::String(s) => s.as_str(),
-                Value::Object(obj) => obj
-                    .get("path")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| anyhow!("PLUGIN_INVALID: contributes.skills entry needs path"))?,
+                Value::Object(obj) => obj.get("path").and_then(Value::as_str).ok_or_else(|| {
+                    anyhow!("PLUGIN_INVALID: contributes.skills entry needs path")
+                })?,
                 _ => bail!("PLUGIN_INVALID: contributes.skills entry must be a string or object"),
             };
             let resolved = safe_join(root, path)?;
@@ -1644,9 +1643,9 @@ fn validate_contributions(root: &Path, manifest: &PluginManifest) -> Result<()> 
         }
         let mut seen: Vec<&str> = Vec::new();
         for entry in entries {
-            let obj = entry
-                .as_object()
-                .ok_or_else(|| anyhow!("PLUGIN_INVALID: contributes.themes entry must be an object"))?;
+            let obj = entry.as_object().ok_or_else(|| {
+                anyhow!("PLUGIN_INVALID: contributes.themes entry must be an object")
+            })?;
             let id = obj
                 .get("id")
                 .and_then(Value::as_str)
@@ -1709,7 +1708,9 @@ fn validate_contributions(root: &Path, manifest: &PluginManifest) -> Result<()> 
                         .and_then(Value::as_str)
                         .map(str::trim)
                         .filter(|c| !c.is_empty())
-                        .ok_or_else(|| anyhow!("PLUGIN_INVALID: mcp server {id} requires command"))?;
+                        .ok_or_else(|| {
+                            anyhow!("PLUGIN_INVALID: mcp server {id} requires command")
+                        })?;
                     if command.contains('/') || command.contains('\\') {
                         let resolved = safe_join(root, command)?;
                         if !resolved.exists() {
@@ -1731,7 +1732,9 @@ fn validate_contributions(root: &Path, manifest: &PluginManifest) -> Result<()> 
                 }
                 Some("http") => {
                     require_permission(manifest, "mcp.server.remote", "remote mcp servers")?;
-                    if obj.contains_key("command") || obj.contains_key("args") || obj.contains_key("env")
+                    if obj.contains_key("command")
+                        || obj.contains_key("args")
+                        || obj.contains_key("env")
                     {
                         bail!("PLUGIN_INVALID: mcp server {id} must not set command, args or env");
                     }
@@ -1772,7 +1775,10 @@ fn validate_contributions(root: &Path, manifest: &PluginManifest) -> Result<()> 
         let obj = bus
             .as_object()
             .ok_or_else(|| anyhow!("PLUGIN_INVALID: contributes.bus must be an object"))?;
-        let publish = obj.get("publish").map(|v| array_of(v, "contributes.bus.publish")).transpose()?;
+        let publish = obj
+            .get("publish")
+            .map(|v| array_of(v, "contributes.bus.publish"))
+            .transpose()?;
         let subscribe = obj
             .get("subscribe")
             .map(|v| array_of(v, "contributes.bus.subscribe"))
@@ -2296,9 +2302,7 @@ mod tests {
         let manifest = PluginManager::read_manifest(&root).unwrap();
         assert_eq!(
             derive_capabilities(&manifest),
-            vec![
-                "panel", "commands", "tools", "skills", "themes", "mcp", "services", "bus"
-            ]
+            vec!["panel", "commands", "tools", "skills", "themes", "mcp", "services", "bus"]
         );
 
         let data = tempdir().unwrap();
