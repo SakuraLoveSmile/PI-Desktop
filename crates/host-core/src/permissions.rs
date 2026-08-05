@@ -139,6 +139,7 @@ impl PermissionManager {
         )
     }
 
+    #[cfg(test)]
     pub fn evaluate_auto_with_permission_mode_and_risk(
         &self,
         session_id: &str,
@@ -148,11 +149,51 @@ impl PermissionManager {
         session_grants: &HashMap<String, Vec<String>>,
         declared_risk: Option<&str>,
     ) -> Option<PermissionDecision> {
+        self.evaluate_auto_with_permission_mode_and_risk_and_path(
+            session_id,
+            tool_name,
+            mode,
+            permission_mode,
+            session_grants,
+            declared_risk,
+            false,
+        )
+    }
+
+    /// Evaluate a tool that explicitly targets a path outside the session's
+    /// workspace and scratch roots. Outside-path access is an exception to the
+    /// normal low-risk auto-allow rule: `auto` allows it, while every other
+    /// mode needs a card (unless the session already granted this tool).
+    pub fn evaluate_auto_with_permission_mode_and_risk_and_path(
+        &self,
+        session_id: &str,
+        tool_name: &str,
+        mode: &str,
+        permission_mode: &str,
+        session_grants: &HashMap<String, Vec<String>>,
+        declared_risk: Option<&str>,
+        requires_external_path_permission: bool,
+    ) -> Option<PermissionDecision> {
         // Plan's tool allowlist is authoritative. This check intentionally
         // precedes low-risk classification, auto, grants, and scratch paths.
         if mode == "plan" && !Self::plan_mode_allows(tool_name) {
             return Some(PermissionDecision::Deny);
         }
+
+        if requires_external_path_permission {
+            if permission_mode == "auto" {
+                return Some(PermissionDecision::AllowOnce);
+            }
+            if session_grants
+                .get(session_id)
+                .map(|g| g.iter().any(|t| t == tool_name))
+                .unwrap_or(false)
+            {
+                return Some(PermissionDecision::AllowSession);
+            }
+            return None;
+        }
+
         let risk = Self::tool_risk_with_declared(tool_name, declared_risk);
         if matches!(risk, Risk::Low) {
             return Some(PermissionDecision::AllowOnce);
@@ -424,6 +465,47 @@ mod tests {
             let d = pm.evaluate_auto_with_permission_mode("s", "Read", "agent", mode, &no_grants());
             assert_eq!(d, Some(PermissionDecision::AllowOnce), "Read + {mode}");
         }
+    }
+
+    #[test]
+    fn external_paths_prompt_for_low_risk_tools_outside_auto() {
+        let pm = PermissionManager::default();
+        for mode in ["ask", "accept-edits"] {
+            let decision = pm.evaluate_auto_with_permission_mode_and_risk_and_path(
+                "s",
+                "Read",
+                "agent",
+                mode,
+                &no_grants(),
+                None,
+                true,
+            );
+            assert_eq!(
+                decision, None,
+                "Read outside workspace must prompt in {mode}"
+            );
+        }
+        let auto = pm.evaluate_auto_with_permission_mode_and_risk_and_path(
+            "s",
+            "Read",
+            "agent",
+            "auto",
+            &no_grants(),
+            None,
+            true,
+        );
+        assert_eq!(auto, Some(PermissionDecision::AllowOnce));
+    }
+
+    #[test]
+    fn external_path_session_grant_still_applies() {
+        let pm = PermissionManager::default();
+        let mut grants = HashMap::new();
+        grants.insert("s".to_string(), vec!["Grep".to_string()]);
+        let decision = pm.evaluate_auto_with_permission_mode_and_risk_and_path(
+            "s", "Grep", "plan", "ask", &grants, None, true,
+        );
+        assert_eq!(decision, Some(PermissionDecision::AllowSession));
     }
 
     #[test]

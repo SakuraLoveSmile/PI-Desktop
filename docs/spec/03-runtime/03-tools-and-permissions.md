@@ -1,7 +1,7 @@
 # 03. Tools and Permissions
 
 > Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115, D181, D186,
-> D189, D190
+> D189, D190, D195 (ADR 0057)
 
 ## 0. Frozen policy summary
 
@@ -74,13 +74,37 @@ Every tool must have:
   persisted project binding. It is not read from the mutable active sidebar
   tab at execution time.
 - All file paths are relative to the resolved `workspaceRoot` by default
-- After normalization they must still reside within the workspace
-- `..` escapes are forbidden
-- Symlinks that escape the workspace are rejected
+- After normalization they must still reside within the workspace unless the
+  call receives explicit outside-path permission
+- `..` escapes and symlink escapes are outside-path requests, not implicit
+  access
+- Symlinks are resolved again immediately before execution, after permission
+  approval, so approval cannot skip the canonicalization step
 - Exception (D114): absolute paths inside the session scratch directory are a
   second legal root for `Read`/`Write`/`Edit` — see §4b. Both roots run the
-  same lexical + symlink containment defense; everything else remains
-  `PATH_OUTSIDE_WORKSPACE`.
+  same lexical + symlink containment defense. `Read`/`Glob`/`Grep`/`Write`/`Edit`
+  may address an explicit path outside both roots only through the permission
+  policy below; a denied or unapproved request returns `TOOL_DENIED`.
+
+### 4a. Explicit outside-path permission
+
+An explicit `path` argument that resolves outside the session workspace and
+scratch roots is a separate capability. The host checks it before the normal
+low-risk auto-allow decision:
+
+- `auto` allows the outside path without a card;
+- `ask` and `accept-edits` emit the ordinary permission card;
+- `allow-once` executes only the current call, while `allow-session` follows
+  the existing per-tool session grant scope;
+- denial, timeout, or cancellation never executes the operation;
+- relative `..` escapes and symlink escapes use the same rule as absolute
+  paths;
+- successful external `Read`/`Write`/`Edit` results carry `root: "external"`
+  and an absolute canonical path; external `Glob`/`Grep` matches are absolute
+  so the access remains visible in the transcript.
+
+The exception applies only to the explicit path argument. It does not expand
+the workspace root, Bash's working directory, or any implicit directory walk.
 
 ## 4b. Session scratch directory (D114)
 
@@ -111,8 +135,11 @@ session gets a scratch directory outside the workspace:
   deliverables only, while the Files surface may still browse the active
   workspace. Tool results carry `root: "workspace" | "scratch"` to make this
   decision and the UI rendering explicit.
-- **Tool coverage.** `Read`/`Write`/`Edit` are dual-root. `Glob`/`Grep`
-  remain workspace-only (the model lists scratch via `ls $PI_SCRATCH_DIR`).
+- **Tool coverage.** `Read`/`Write`/`Edit` use the workspace and scratch roots;
+  `Glob`/`Grep` use the workspace root by default and may search an explicitly
+  scoped scratch directory or an explicitly approved external directory. The
+  model should use bounded native search tools instead of shell directory
+  walks.
   `BrowserPreview` remains workspace-relative in v1. Its Main-process handler
   resolves the root from the originating durable session, and the renderer
   event carries `sessionId`; the selected foreground workspace is never used
@@ -254,7 +281,7 @@ Initial denylist (extensible):
 
 | risk | Example | Default policy |
 |---|---|---|
-| low | Read/Glob/Grep | Auto-allow |
+| low | Read/Glob/Grep inside the session roots | Auto-allow |
 | medium | low-risk network/metadata | Confirm or allow by policy |
 | high | Write/Edit/Bash | Confirm by default |
 
@@ -278,6 +305,9 @@ How high-risk tool calls get approved is governed by a **permission mode**:
 | `accept-edits` | auto-allow | confirm |
 | `auto` | auto-allow | auto-allow |
 
+An explicit outside-workspace path is an exception to the low-risk row: it is
+auto-allowed only in `auto`; `ask` and `accept-edits` both confirm it.
+
 Resolution order per tool call (host-core `tools.execute`):
 
 1. Session's persisted `permission_mode`, unless it is `inherit`
@@ -291,7 +321,8 @@ Rules:
   set via `session.configure` `permissionMode`.
 - Plan's hard deny wins over every permission mode for Write/Edit and plugin
   tools. `auto` cannot re-enable a hidden or denied tool.
-- Low-risk tools (`Read`/`Glob`/`Grep`) auto-allow in every mode, as before.
+- Low-risk tools (`Read`/`Glob`/`Grep`) inside the session roots auto-allow in
+  every mode, as before.
 - `BrowserPreview` is an explicit read-only UI inspection capability and is
   available in both operating modes.
 - Plan retains the permission-mode selector. Bash is confirmed under `ask` and
@@ -338,6 +369,7 @@ Each tool call records:
 - toolCallId
 - toolName
 - args hash / preview
+- externalPathPermission classification when an explicit path is present
 - decision
 - duration
 - success / error code

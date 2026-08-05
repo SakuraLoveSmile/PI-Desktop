@@ -54,6 +54,7 @@ impl WorkspaceState {
 pub enum ToolRoot {
     Workspace,
     Scratch,
+    External,
 }
 
 /// Lexically resolve `.` / `..` components without touching the filesystem.
@@ -71,6 +72,53 @@ fn normalize_lexical(path: &Path) -> PathBuf {
         }
     }
     out
+}
+
+/// Compare path components using the platform's filesystem semantics.
+/// Windows paths are case-insensitive even though `Path` comparisons are not.
+fn path_is_within(root: &Path, candidate: &Path) -> bool {
+    let root_components: Vec<_> = root.components().collect();
+    let candidate_components: Vec<_> = candidate.components().collect();
+    root_components.len() <= candidate_components.len()
+        && root_components
+            .iter()
+            .zip(candidate_components.iter())
+            .all(|(root, candidate)| {
+                #[cfg(windows)]
+                {
+                    root.as_os_str()
+                        .to_string_lossy()
+                        .eq_ignore_ascii_case(&candidate.as_os_str().to_string_lossy())
+                }
+                #[cfg(not(windows))]
+                {
+                    root == candidate
+                }
+            })
+}
+
+/// Resolve a normalized path by canonicalizing its deepest existing ancestor.
+/// The same resolver is used for contained and explicitly approved paths so
+/// symlink behavior does not change when a permission card is accepted.
+fn resolve_with_existing_ancestor(normalized: PathBuf) -> Result<PathBuf, String> {
+    let mut existing = normalized;
+    let mut tail: Vec<std::ffi::OsString> = Vec::new();
+    while !existing.exists() {
+        match (existing.parent(), existing.file_name()) {
+            (Some(parent), Some(name)) => {
+                tail.push(name.to_os_string());
+                existing = parent.to_path_buf();
+            }
+            _ => break,
+        }
+    }
+    let mut resolved = existing
+        .canonicalize()
+        .map_err(|e| format!("path canonicalize failed: {e}"))?;
+    for part in tail.iter().rev() {
+        resolved.push(part);
+    }
+    Ok(resolved)
 }
 
 /// Resolve a user-provided path against workspace root and ensure it stays inside.
@@ -91,34 +139,33 @@ pub fn resolve_in_workspace(workspace_root: &Path, input: &str) -> Result<PathBu
     };
 
     let normalized = normalize_lexical(&candidate);
-    if !normalized.starts_with(&root) {
+    if !path_is_within(&root, &normalized) {
         return Err("PATH_OUTSIDE_WORKSPACE".into());
     }
 
     // Canonicalize the deepest existing ancestor (resolves symlinks), then
     // re-append the not-yet-existing tail.
-    let mut existing = normalized.clone();
-    let mut tail: Vec<std::ffi::OsString> = Vec::new();
-    while !existing.exists() {
-        match (existing.parent(), existing.file_name()) {
-            (Some(parent), Some(name)) => {
-                tail.push(name.to_os_string());
-                existing = parent.to_path_buf();
-            }
-            _ => break,
-        }
-    }
-    let mut resolved = existing
-        .canonicalize()
-        .map_err(|e| format!("path canonicalize failed: {e}"))?;
-    for part in tail.iter().rev() {
-        resolved.push(part);
-    }
+    let resolved = resolve_with_existing_ancestor(normalized)?;
 
-    if !resolved.starts_with(&root) {
+    if !path_is_within(&root, &resolved) {
         return Err("PATH_OUTSIDE_WORKSPACE".into());
     }
     Ok(resolved)
+}
+
+/// Resolve an explicitly approved path without applying workspace
+/// containment. Relative paths still use the session workspace as their base;
+/// only the permission decision can opt a tool into this resolver.
+pub fn resolve_external_path(workspace_root: &Path, input: &str) -> Result<PathBuf, String> {
+    let root = workspace_root
+        .canonicalize()
+        .map_err(|e| format!("workspace canonicalize failed: {e}"))?;
+    let candidate = if Path::new(input).is_absolute() {
+        PathBuf::from(input)
+    } else {
+        root.join(input)
+    };
+    resolve_with_existing_ancestor(normalize_lexical(&candidate))
 }
 
 /// Resolve a tool path against the workspace root, falling back to the
@@ -156,6 +203,25 @@ pub fn resolve_tool_path(
     Err(workspace_err)
 }
 
+/// Resolve a tool path after the host has granted explicit outside-workspace
+/// access for this call. Contained workspace and scratch paths keep their
+/// normal roots; only an otherwise rejected path becomes `External`.
+pub fn resolve_tool_path_with_external(
+    workspace_root: &Path,
+    scratch_root: Option<&Path>,
+    input: &str,
+    allow_external: bool,
+) -> Result<(PathBuf, ToolRoot), String> {
+    match resolve_tool_path(workspace_root, scratch_root, input) {
+        Ok(result) => Ok(result),
+        Err(error) if allow_external && error == "PATH_OUTSIDE_WORKSPACE" => Ok((
+            resolve_external_path(workspace_root, input)?,
+            ToolRoot::External,
+        )),
+        Err(error) => Err(error),
+    }
+}
+
 /// Purely lexical containment check: does `input` (absolute) normalize to a
 /// path under `root`? Used only to decide whether a scratch write can skip
 /// the permission prompt — execution still runs the full symlink-aware
@@ -165,7 +231,7 @@ pub fn lexically_inside(root: &Path, input: &str) -> bool {
     if !candidate.is_absolute() {
         return false;
     }
-    normalize_lexical(candidate).starts_with(normalize_lexical(root))
+    path_is_within(&normalize_lexical(root), &normalize_lexical(candidate))
 }
 
 #[cfg(test)]
@@ -271,6 +337,38 @@ mod tests {
         let scratch = tempdir().unwrap();
         let err = resolve_tool_path(ws.path(), Some(scratch.path()), "/etc/hosts").unwrap_err();
         assert_eq!(err, "PATH_OUTSIDE_WORKSPACE");
+    }
+
+    #[test]
+    fn approved_external_path_resolves_and_keeps_absolute_identity() {
+        let ws = tempdir().unwrap();
+        let outside = tempdir().unwrap();
+        let input = outside.path().join("outside.txt");
+        fs::write(&input, "outside").unwrap();
+
+        let (resolved, root) =
+            resolve_tool_path_with_external(ws.path(), None, input.to_str().unwrap(), true)
+                .unwrap();
+        assert_eq!(root, ToolRoot::External);
+        assert_eq!(resolved, input.canonicalize().unwrap());
+    }
+
+    #[test]
+    fn relative_escape_can_be_resolved_only_after_external_approval() {
+        let parent = tempdir().unwrap();
+        let ws = parent.path().join("workspace");
+        let outside = parent.path().join("outside.txt");
+        fs::create_dir_all(&ws).unwrap();
+        fs::write(&outside, "outside").unwrap();
+
+        let input = "../outside.txt";
+        assert_eq!(
+            resolve_tool_path(&ws, None, input).unwrap_err(),
+            "PATH_OUTSIDE_WORKSPACE"
+        );
+        let (resolved, root) = resolve_tool_path_with_external(&ws, None, input, true).unwrap();
+        assert_eq!(root, ToolRoot::External);
+        assert_eq!(resolved, outside.canonicalize().unwrap());
     }
 
     #[test]

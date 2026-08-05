@@ -498,15 +498,45 @@ Each scenario is documented in this format:
 - **Milestone**: M3
 - **Status**: Documented (M6; no E2E execution requested)
 
-#### E2E-019: Workspace-outside paths are rejected
+#### E2E-019: Workspace-outside paths follow permission mode
 
-- **Preconditions**: Agent mode; project open.
-- **Steps**: 1) Ask agent to read a file outside the project root. 2) Observe result.
-- **Expected**: Tool rejects out-of-scope path; no data returned from outside workspace.
-- **Specs linked**: `03-runtime/15-workspace-ignore-rules.md`
-- **Acceptance**: E (workspace-outside rejected)
+- **Preconditions**: Agent or Plan mode; project open; a readable file exists
+  outside both the session project and scratch roots.
+- **Steps**: 1) With Ask selected, ask the agent to `Read` the external file and
+  observe the inline permission card. 2) Deny once and verify no content is
+  returned. 3) Repeat and allow once; verify the tool result carries
+  `root: "external"` and the canonical absolute path. 4) Switch to Auto and
+  repeat with `Grep` or `Glob`; verify no card appears and the bounded result
+  returns. 5) Repeat with Accept edits; verify the external read/search still
+  asks for permission.
+- **Expected**: An explicit outside path never hard-fails before the user can
+  decide. Ask and Accept edits request permission; Auto executes. Denial,
+  timeout, or cancellation returns `TOOL_DENIED` and performs no operation.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
+  `03-runtime/15-workspace-ignore-rules.md`, `04-ux/03-permission-ux.md`
+- **Acceptance**: E (workspace-outside permission policy)
 - **Milestone**: M3
-- **Status**: Automated (protocol smoke: PATH_OUTSIDE_WORKSPACE)
+- **Status**: Automated (host-core protocol/unit coverage; desktop journey pending)
+
+#### E2E-019e: Bounded search parameters stay portable across platforms
+
+- **Preconditions**: Agent or Plan mode; project open; the host tool catalog is
+  available on macOS, Linux, or Windows.
+- **Steps**: 1) Activate `Glob`/`Grep` when deferred and inspect their schemas.
+  2) Search with workspace-relative `path`, `include`, `headLimit`, and
+  `outputMode: "filesWithMatches"` or `"count"`. 3) Repeat with the platform's
+  native shell selected, without changing the tool arguments.
+- **Expected**: The schemas expose the same bounded search controls on every
+  platform; `filesWithMatches` is accepted as the canonical output mode; search
+  results use workspace-relative paths inside the project and absolute paths
+  only for approved external directories. No shell-specific path syntax is
+  required and oversized results remain bounded.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
+  `03-runtime/16-tool-result-limits.md`, ADR 0057
+- **Acceptance**: E (bounded cross-platform search)
+- **Milestone**: M5
+- **Status**: Unit-covered (host-core and agent-runtime); live multi-platform
+  protocol capture pending
 
 #### E2E-019a: Scratch-directory writes stay out of the workspace (D114)
 

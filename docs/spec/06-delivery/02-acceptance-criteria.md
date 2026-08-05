@@ -55,7 +55,8 @@ MVP passes when:
   session — unit:desktop permission contracts; full UI manual:M5
 - [x] Deny prevents execution — manual:M3
 - [x] Allow returns the result to model and UI — manual:M3
-- [x] Paths outside the workspace are rejected — auto:host-core tests (`blocks_escape`)
+- [x] Paths outside the workspace are permission-gated — auto:host-core tests
+  (outside-path prompt/deny/allow and Auto execution)
 
 ### M6. Plan checkpoint and shell execution
 - [x] One pi Agent owns Agent, planning, approval, and post-approval execution —

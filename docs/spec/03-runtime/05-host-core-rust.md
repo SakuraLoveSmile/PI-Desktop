@@ -12,7 +12,8 @@ It does **not** replace pi. It provides safe host capabilities to:
 
 ## 2. Responsibilities
 
-1. Workspace path canonicalization and boundary checks
+1. Workspace path canonicalization, boundary checks, and permission-gated
+   explicit outside paths
 2. Builtin tool execution (Read/Glob/Grep/Write/Edit/Bash)
 3. Authoritative durable session-mode and tool-policy evaluation
 4. Permission policy evaluation, including Plan Bash prompts
@@ -104,7 +105,8 @@ notification.list
 
 ## 6. Security invariants
 
-1. No unchecked path escape from workspace tools or `.pi/plan/*.md`
+1. No unchecked path escape from workspace tools or `.pi/plan/*.md`; an
+   explicit outside path is resolved only after host permission evaluation
 2. Host resolves the durable session mode; request-supplied mode is never
    authoritative
 3. Plan denies Write/Edit/plugin/unknown tools before permission evaluation

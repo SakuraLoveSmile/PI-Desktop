@@ -1111,3 +1111,29 @@ D193, and D194.
 - Decisions D192, D193, D194; new host-core registries, new RPC methods and a
   new main-process runtime, so ADR 0053. See `07-plugins/01-plugin-system.md`
   and `07-plugins/03-plugin-api.md`.
+
+## 2026-08-05 — Permission-gated external paths and portable native search
+
+- Explicit `path` arguments for `Read`, `Glob`, `Grep`, `Write`, and `Edit` are
+  classified against the durable session workspace and scratch roots before
+  the normal risk matrix. In `ask` and `accept-edits`, an outside path emits
+  the existing permission card with the requested path preview; in `auto`, it
+  executes without a card. Allow-once and the existing tool-scoped
+  allow-session grant remain available, while denial, timeout, and cancellation
+  return `TOOL_DENIED` without touching the path.
+- The approved resolver canonicalizes the deepest existing ancestor again at
+  execution time, so `..` and symlink escapes cannot skip the boundary. The
+  outside location is not promoted to a workspace root; external reads and
+  searches retain absolute paths, and external mutations stay outside Review
+  and workspace artifact records.
+- The sidecar exposes the host's bounded search controls (`Read.offset/limit`,
+  `Glob.path/limit`, and `Grep.path/include/outputMode/headLimit`) with the
+  canonical `filesWithMatches` spelling; the host normalizes common
+  `files_with_matches` and `files-with-matches` provider aliases. Guidance
+  prefers native tools and portable workspace-relative paths, with shell search
+  as a bounded, platform-specific fallback.
+- Decision D195; the external path capability and widened search schemas change
+  the host/runtime boundary, so ADR 0057. See
+  `03-runtime/03-tools-and-permissions.md`, `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/15-workspace-ignore-rules.md`, `03-runtime/16-tool-result-limits.md`,
+  and E2E-019/E2E-019e.
