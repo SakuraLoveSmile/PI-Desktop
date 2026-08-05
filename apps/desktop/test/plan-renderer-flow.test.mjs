@@ -32,7 +32,7 @@ test("terminal proposals and execution states stay session-scoped and readable",
     assert.match(planState, new RegExp(`"${status}"`));
   }
   assert.match(store, /planCheckpoints: Record<string, PlanProposal>/);
-  assert.match(composer, /\{planCheckpoint \? <PlanApprovalBar proposal=\{planCheckpoint\} \/> : null\}/);
+  assert.match(composer, /planCheckpoint\?\.status === "pending"[\s\S]*<PlanApprovalBar proposal=\{planCheckpoint\} \/>/);
   assert.match(approvalBar, /data-execution-state=\{proposal\.executionState \|\| ""\}/);
   assert.doesNotMatch(approvalBar, /changes_requested|request_changes|requestChanges|feedback/);
   assert.doesNotMatch(store, /planApprovalPermissionMode/);

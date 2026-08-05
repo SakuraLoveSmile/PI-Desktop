@@ -381,7 +381,9 @@ export function Composer({
       className={`composer-dock composer-dock-${variant}`}
     >
       <div className="composer-stack">
-        {planCheckpoint ? <PlanApprovalBar proposal={planCheckpoint} /> : null}
+        {planCheckpoint?.status === "pending" ? (
+          <PlanApprovalBar proposal={planCheckpoint} />
+        ) : null}
         <div className={`composer-shell${composerBlocked ? " is-gated" : ""}`}>
           {inputFocused ? (
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />

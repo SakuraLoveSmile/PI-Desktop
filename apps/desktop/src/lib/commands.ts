@@ -32,7 +32,19 @@ export async function runPaletteCommand(commandId: string): Promise<void> {
     case "builtin.mode.agent":
     case "builtin.mode.plan": {
       const mode: Mode = commandId.endsWith("plan") ? "plan" : "agent";
-      if (store.settings) {
+      const activeSession = store.activeSessionId
+        ? store.sessions.find((session) => session.id === store.activeSessionId)
+        : undefined;
+      if (activeSession) {
+        await store.configureActiveSession({
+          mode,
+          providerId: activeSession.providerId,
+          modelId: activeSession.modelId,
+          thinkingLevel: activeSession.thinkingLevel,
+        });
+      } else if (store.settings) {
+        // Keep the command useful from the empty home, where no session has
+        // been created yet. The next session will inherit this default.
         const next = { ...store.settings, defaultMode: mode };
         await api.setSettings(next);
         useAppStore.setState({ settings: next });

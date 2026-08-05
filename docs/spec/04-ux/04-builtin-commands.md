@@ -44,6 +44,9 @@ builtin.<domain>.<action>
 - `SubmitPlan` is a model tool, not a palette command. Mode commands are
   accepted only for an idle session; there is no Chat mode or request-changes
   alias.
+- Mode commands use the same active-session configuration path as the Composer
+  Agent/Plan chip. When no session is active, they update the persisted default
+  for the next session; a running session or pending approval is not changed.
 
 ## 5. Execution results
 

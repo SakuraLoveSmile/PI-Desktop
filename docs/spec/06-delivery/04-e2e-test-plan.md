@@ -3036,19 +3036,25 @@ Each scenario is documented in this format:
   Plan artifact fixture, shell settings, and command palette available.
 - **Steps**: 1) Inspect Agent/Plan, permission, artifact approval, and shell
   controls in English. 2) Enter Plan and inspect planning/approval/queue/
-  terminal states while the renderer remains alive. 3) Reload after a terminal
-  proposal and inspect the session while asserting that Electron Main and Host
-  process identities did not change. 4) Repeat in zh-CN. 5) Search visible
-  commands for the removed Chat mode and request-changes controls. Host/app
-  restart recovery is exercised separately by E2E-108 and E2E-109.
+  terminal states while the renderer remains alive. 3) Approve and reject a
+  proposal, confirming that the approval surface disappears after host
+  confirmation. 4) Use the command palette and `/plan-mode` / `/agent-mode`
+  slash aliases to switch the active idle session, confirming the Composer chip
+  changes immediately. 5) Reload after a terminal proposal and inspect the
+  session while asserting that Electron Main and Host process identities did
+  not change. 6) Repeat in zh-CN. 7) Search visible commands for the removed
+  Chat mode and request-changes controls. Host/app restart recovery is
+  exercised separately by E2E-108 and E2E-109.
 - **Expected**: Agent is the default; the left-of-input Composer chip is the
   sole active-session Agent/Plan control; Plan shows Ask/Accept edits/Auto, the
   submitted title/question, an artifact opener, expiry/status, approve/reject
   only, shell catalog/fallback status, and localized failed-closed states. No
   Chat mode, `/chat-mode`, request-changes action, inline Markdown/hash/size
-  requirement, or stale actionable queue is exposed; a terminal card may remain
-  visible and non-actionable only for the current renderer lifetime. Renderer
-  reload does not rehydrate rejected, expired, approved/completed, or
+  requirement, or stale actionable queue is exposed; terminal checkpoint
+  metadata may remain non-actionable only for the current renderer lifetime,
+  while the composer approval surface is removed after host-confirmed
+  resolution.
+  Renderer reload does not rehydrate rejected, expired, approved/completed, or
   interrupted terminal cards. Host/app restart does not replay work or restore
   stale actions, and the UI is not required to present the interrupted terminal
   snapshot; `page = "chat"` remains an internal route.

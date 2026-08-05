@@ -150,14 +150,26 @@ test("plan approval sends exact identities and waits for host confirmation", () 
   assert.doesNotMatch(resolveBlock, /finally[\s\S]*pendingPlans/);
 });
 
-test("terminal Plan checkpoints remain visible without preserving approval actions", () => {
+test("terminal Plan checkpoints stop rendering the approval bar", () => {
   for (const status of ["rejected", "expired", "interrupted", "approved", "queued", "running"]) {
     assert.match(planStateSource, new RegExp(`"${status}"`));
   }
   assert.match(barSource, /planCheckpointStatus\(proposal, resolving\)/);
   assert.match(barSource, /data-execution-state=\{proposal\.executionState \|\| ""\}/);
-  assert.match(composerSource, /\{planCheckpoint \? <PlanApprovalBar proposal=\{planCheckpoint\} \/> : null\}/);
+  assert.match(
+    composerSource,
+    /planCheckpoint\?\.status === "pending"[\s\S]*<PlanApprovalBar proposal=\{planCheckpoint\} \/>/,
+  );
   assert.doesNotMatch(barSource, /feedback|changes_requested|request_changes|requestChanges/);
+});
+
+test("mode commands configure the active session instead of only changing defaults", () => {
+  const modeCommandBlock =
+    commandsSource.match(/case "builtin\.mode\.agent"[\s\S]*?\n    }/)?.[0] ?? "";
+  assert.match(modeCommandBlock, /activeSession/);
+  assert.match(modeCommandBlock, /await store\.configureActiveSession\(/);
+  assert.match(modeCommandBlock, /thinkingLevel: activeSession\.thinkingLevel/);
+  assert.match(modeCommandBlock, /else if \(store\.settings\)/);
 });
 
 test("pending approval keeps the draft while gating every composer control", () => {

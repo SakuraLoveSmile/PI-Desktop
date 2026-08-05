@@ -1420,7 +1420,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   active session/settings only while idle; they are disabled while a turn or
   active pending Plan approval exists. Plan approval actions are the exception
   while awaiting approval. The Composer-left Agent/Plan chip is the sole mode
-  control; the topbar model picker remains a model-only control.
+  control; the topbar model picker remains a model-only control. Palette and
+  Composer slash mode commands use the same active-session configuration path;
+  after host confirmation resolves a Plan approval, the approval surface is
+  removed rather than remaining as a terminal action card.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing
