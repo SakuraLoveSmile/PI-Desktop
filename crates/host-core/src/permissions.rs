@@ -85,7 +85,7 @@ impl PermissionManager {
         }
     }
 
-    pub fn chat_mode_allows(tool_name: &str) -> bool {
+    pub fn read_only_mode_allows(tool_name: &str) -> bool {
         matches!(tool_name, "Read" | "Glob" | "Grep") || tool_name.starts_with("plugin_")
     }
 
@@ -109,8 +109,10 @@ impl PermissionManager {
     ///
     /// `permission_mode` is the already-resolved effective mode — the
     /// caller collapses `inherit` against the global default before calling.
-    /// Chat mode's hard deny for mutating tools stays above every permission
-    /// mode: `auto` cannot re-enable Write/Edit/Bash in chat.
+    /// The read-only session mode's hard deny for mutating tools stays above
+    /// every permission mode: `auto` cannot re-enable Write/Edit/Bash there.
+    /// The gate is negative (anything that is not `agent` is read-only) so an
+    /// unknown or legacy `mode` string can never widen the tool surface.
     pub fn evaluate_auto_with_permission_mode(
         &self,
         session_id: &str,
@@ -119,7 +121,7 @@ impl PermissionManager {
         permission_mode: &str,
         session_grants: &HashMap<String, Vec<String>>,
     ) -> Option<PermissionDecision> {
-        if mode == "chat" && !Self::chat_mode_allows(tool_name) {
+        if mode != "agent" && !Self::read_only_mode_allows(tool_name) {
             return Some(PermissionDecision::Deny);
         }
         let risk = Self::tool_risk(tool_name);
@@ -269,11 +271,23 @@ mod tests {
     }
 
     #[test]
-    fn chat_mode_denies_regardless_of_permission_mode() {
+    fn read_only_mode_denies_regardless_of_permission_mode() {
         let pm = PermissionManager::default();
-        for mode in ["ask", "accept-edits", "auto"] {
-            let d = pm.evaluate_auto_with_permission_mode("s", "Write", "chat", mode, &no_grants());
-            assert_eq!(d, Some(PermissionDecision::Deny), "chat + {mode}");
+        for session_mode in ["read-only", "chat"] {
+            for mode in ["ask", "accept-edits", "auto"] {
+                let d = pm.evaluate_auto_with_permission_mode(
+                    "s",
+                    "Write",
+                    session_mode,
+                    mode,
+                    &no_grants(),
+                );
+                assert_eq!(
+                    d,
+                    Some(PermissionDecision::Deny),
+                    "{session_mode} + {mode}"
+                );
+            }
         }
     }
 

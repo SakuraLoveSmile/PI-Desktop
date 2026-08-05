@@ -414,6 +414,24 @@ impl Database {
             params![NOTIFICATION_KEEP],
         )?;
         let _ = self.conn.execute_batch("PRAGMA incremental_vacuum;");
+        self.migrate_chat_sessions_to_agent()?;
+        Ok(())
+    }
+
+    /// D188 fix-up: the desktop UI no longer offers a mode switch, so a
+    /// session left on the old `chat` profile could never be switched back to
+    /// `agent`. Move those rows (and the stored `defaultMode`) to `agent`
+    /// once, at open. Idempotent: after the first run nothing matches.
+    fn migrate_chat_sessions_to_agent(&self) -> Result<()> {
+        self.conn
+            .execute("UPDATE sessions SET mode = 'agent' WHERE mode = 'chat'", [])?;
+        self.conn.execute(
+            "UPDATE kv SET value_json = json_set(value_json, '$.defaultMode', 'agent')
+             WHERE ns = 'app' AND key = 'app'
+               AND json_valid(value_json)
+               AND json_extract(value_json, '$.defaultMode') = 'chat'",
+            [],
+        )?;
         Ok(())
     }
 
@@ -642,6 +660,42 @@ mod tests {
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION);
         assert!(table_exists(db.conn(), "messages"));
+    }
+
+    #[test]
+    fn boot_moves_legacy_chat_sessions_and_default_to_agent() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, title, mode, created_at, updated_at)
+                     VALUES ('s-chat', 'Legacy', 'chat', 1, 1),
+                            ('s-agent', 'Agent', 'agent', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.set_setting(
+                "app",
+                &serde_json::json!({ "defaultMode": "chat", "theme": "dark" }),
+            )
+            .unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        let modes: Vec<String> = db
+            .conn()
+            .prepare("SELECT mode FROM sessions ORDER BY id")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(modes, vec!["agent".to_string(), "agent".to_string()]);
+        let settings = db.get_setting("app").unwrap().unwrap();
+        assert_eq!(settings["defaultMode"], "agent");
+        assert_eq!(settings["theme"], "dark", "unrelated keys survive");
     }
 
     #[test]

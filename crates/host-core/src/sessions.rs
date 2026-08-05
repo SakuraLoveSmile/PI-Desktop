@@ -21,6 +21,24 @@ fn default_thinking_level() -> String {
     "off".to_string()
 }
 
+/// Per-session tool profile (D188). `agent` is the only mode the desktop UI
+/// offers; `read-only` is the former `chat` profile, still enforced by
+/// host-core so legacy and imported rows keep their narrow tool surface.
+pub const SESSION_MODES: [&str; 2] = ["agent", "read-only"];
+
+/// Folds the pre-D188 `chat` spelling into `read-only` and rejects anything
+/// else. Callers store the returned value, never the raw input.
+fn normalize_session_mode(mode: &str) -> Result<String> {
+    match mode {
+        "agent" => Ok("agent".into()),
+        "read-only" | "chat" => Ok("read-only".into()),
+        other => Err(anyhow!(
+            "mode must be one of {} (got {other})",
+            SESSION_MODES.join(", ")
+        )),
+    }
+}
+
 /// Per-session permission mode (D115). `inherit` defers to the global
 /// default in settings; the rest override it for this session only.
 pub const PERMISSION_MODES: [&str; 4] = ["inherit", "ask", "accept-edits", "auto"];
@@ -688,7 +706,10 @@ pub fn create_session_with_thinking(
     let now = now_ms();
     let id = Uuid::new_v4().to_string();
     let title = title.unwrap_or_else(|| "New task".into());
-    let mode = mode.unwrap_or_else(|| "agent".into());
+    let mode = match mode {
+        Some(mode) => normalize_session_mode(&mode)?,
+        None => "agent".to_string(),
+    };
     let thinking_level = thinking_level.unwrap_or_else(default_thinking_level);
     validate_thinking_level(&thinking_level)?;
     let project_id = match project_path
@@ -904,9 +925,7 @@ pub fn configure_session_with_thinking(
     thinking_level: Option<&str>,
     permission_mode: Option<&str>,
 ) -> Result<Option<SessionSummary>> {
-    if !matches!(mode, "chat" | "agent") {
-        return Err(anyhow!("mode must be chat or agent"));
-    }
+    let mode = normalize_session_mode(mode)?;
     if let Some(level) = thinking_level {
         validate_thinking_level(level)?;
     }
@@ -1305,6 +1324,7 @@ pub fn import_session(
     messages: &[UiMessage],
 ) -> Result<bool> {
     validate_thinking_level(&summary.thinking_level)?;
+    let mode = normalize_session_mode(&summary.mode)?;
     let conn = db.conn();
     let exists: i64 = conn.query_row(
         "SELECT COUNT(*) FROM sessions WHERE id = ?1",
@@ -1346,7 +1366,7 @@ pub fn import_session(
             project_id,
             summary.provider_id,
             summary.model_id,
-            summary.mode,
+            mode,
             summary.thinking_level,
             source,
             records.len() as i64,
@@ -1663,7 +1683,7 @@ mod tests {
         let configured = configure_session_with_thinking(
             &db,
             &session.id,
-            "chat",
+            "read-only",
             Some("provider-1"),
             Some("model-1"),
             Some("high"),
@@ -1672,13 +1692,13 @@ mod tests {
         .unwrap()
         .unwrap();
 
-        assert_eq!(configured.mode, "chat");
+        assert_eq!(configured.mode, "read-only");
         assert_eq!(configured.provider_id.as_deref(), Some("provider-1"));
         assert_eq!(configured.model_id.as_deref(), Some("model-1"));
         assert_eq!(configured.thinking_level, "high");
         // Omitting the new field is backwards-compatible and preserves the
         // configured value rather than resetting it to off.
-        let preserved = configure_session(&db, &session.id, "chat", None, None)
+        let preserved = configure_session(&db, &session.id, "read-only", None, None)
             .unwrap()
             .unwrap();
         assert_eq!(preserved.thinking_level, "high");
@@ -1686,7 +1706,7 @@ mod tests {
         assert!(configure_session_with_thinking(
             &db,
             &session.id,
-            "chat",
+            "read-only",
             None,
             None,
             Some("turbo"),
@@ -2163,7 +2183,7 @@ mod tests {
         let source = create_session_with_thinking(
             &db,
             Some("Source".into()),
-            Some("chat".into()),
+            Some("read-only".into()),
             Some("provider-1".into()),
             Some("model-1".into()),
             Some("/tmp/project".into()),
@@ -2173,7 +2193,7 @@ mod tests {
         configure_session_with_thinking(
             &db,
             &source.id,
-            "chat",
+            "read-only",
             Some("provider-1"),
             Some("model-1"),
             Some("high"),
@@ -2206,7 +2226,7 @@ mod tests {
         assert_eq!(fork.summary.project_path, source.project_path);
         assert_eq!(fork.summary.provider_id.as_deref(), Some("provider-1"));
         assert_eq!(fork.summary.model_id.as_deref(), Some("model-1"));
-        assert_eq!(fork.summary.mode, "chat");
+        assert_eq!(fork.summary.mode, "read-only");
         assert_eq!(fork.summary.thinking_level, "high");
         assert_eq!(fork.summary.permission_mode, "auto");
         assert_eq!(fork.messages.len(), 2);
@@ -2258,7 +2278,7 @@ mod tests {
         let source_final = get_session(&db, &source.id).unwrap().unwrap();
         let fork_final = get_session(&db, &fork.summary.id).unwrap().unwrap();
         assert_eq!(source_final.messages.len(), 2);
-        assert_eq!(source_final.summary.mode, "chat");
+        assert_eq!(source_final.summary.mode, "read-only");
         assert_eq!(source_final.summary.model_id.as_deref(), Some("model-1"));
         assert_eq!(fork_final.messages.len(), 3);
         assert_eq!(fork_final.summary.mode, "agent");

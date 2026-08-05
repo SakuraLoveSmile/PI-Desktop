@@ -608,7 +608,7 @@ async fn handle_request(
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(stored.unwrap_or_else(|| {
                 json!({
-                    "defaultMode": "chat",
+                    "defaultMode": "agent",
                     "theme": "dark",
                     "enterToSend": true,
                     "contextCompaction": {
@@ -1208,7 +1208,7 @@ async fn handle_request(
                     settings
                         .get("defaultMode")
                         .and_then(|v| v.as_str())
-                        .unwrap_or("chat")
+                        .unwrap_or("agent")
                         .to_string(),
                 ),
                 settings
@@ -1422,16 +1422,17 @@ async fn handle_request(
                     outcome = "denied",
                     "tool timing"
                 );
-                let error_code =
-                    if p.mode == "chat" && !PermissionManager::chat_mode_allows(&p.tool_name) {
-                        if p.tool_name == "Bash" {
-                            "BASH_DISABLED_IN_CHAT"
-                        } else {
-                            "WRITE_DISABLED_IN_CHAT"
-                        }
+                let error_code = if p.mode != "agent"
+                    && !PermissionManager::read_only_mode_allows(&p.tool_name)
+                {
+                    if p.tool_name == "Bash" {
+                        "BASH_DISABLED_IN_READ_ONLY"
                     } else {
-                        "TOOL_DENIED"
-                    };
+                        "WRITE_DISABLED_IN_READ_ONLY"
+                    }
+                } else {
+                    "TOOL_DENIED"
+                };
                 return Ok(json!({
                     "toolCallId": p.tool_call_id,
                     "ok": false,
