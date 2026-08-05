@@ -9,6 +9,7 @@ import type {
   AgentStatus,
   AgentInstructionFile,
   AppSettings,
+  CommandShellCatalog,
   AppVersionInfo,
   BrowserAction,
   BrowserState,
@@ -47,10 +48,20 @@ import type {
   NativeMenuAction,
   NotificationListResult,
   ReviewRollbackResult,
+  PlanProposal,
+  PlanResolveRequest,
+  PlanResolutionResult,
+  PlanningStateEvent,
+  PlansPendingResult,
   UpdateState,
   WindowControlAction,
 } from "@pi-desktop/shared";
-import { IPC } from "@pi-desktop/shared";
+import {
+  defaultCommandShellForPlatform,
+  IPC,
+  isCommandShellId,
+  normalizeMode,
+} from "@pi-desktop/shared";
 
 export type ImportSource = "claude-code" | "opencode" | "codex" | "pi";
 
@@ -101,6 +112,92 @@ async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   return result.data;
 }
 
+function normalizeSession(session: SessionSummary): SessionSummary {
+  return {
+    ...session,
+    mode: normalizeMode((session as { mode?: unknown }).mode),
+  };
+}
+
+function normalizeSessionDetail(detail: SessionDetail | null): SessionDetail | null {
+  return detail
+    ? {
+        ...detail,
+        mode: normalizeMode((detail as { mode?: unknown }).mode),
+      }
+    : null;
+}
+
+export function normalizeSettings(settings: AppSettings): AppSettings {
+  return {
+    ...settings,
+    defaultMode: normalizeMode((settings as { defaultMode?: unknown }).defaultMode),
+    defaultCommandShell: isCommandShellId(
+      (settings as { defaultCommandShell?: unknown }).defaultCommandShell,
+    )
+      ? (settings as { defaultCommandShell: AppSettings["defaultCommandShell"] })
+          .defaultCommandShell
+      : defaultCommandShellForPlatform(window.piDesktop?.platform ?? ""),
+  };
+}
+
+export function validateSettingsWrite(settings: AppSettings): AppSettings {
+  const value = settings as AppSettings & {
+    defaultCommandShell?: unknown;
+  };
+  if (
+    Object.prototype.hasOwnProperty.call(value, "defaultCommandShell") &&
+    !isCommandShellId(value.defaultCommandShell)
+  ) {
+    throw Object.assign(new Error("defaultCommandShell is invalid"), {
+      errorCode: "COMMAND_SHELL_INVALID",
+    });
+  }
+  return settings;
+}
+
+function normalizePlanProposal(proposal: PlanProposal): PlanProposal {
+  return { ...proposal };
+}
+
+function normalizePendingPlans(result: PlansPendingResult): PlansPendingResult {
+  return {
+    ...result,
+    plans: result.plans.map(normalizePlanProposal),
+  };
+}
+
+function normalizePlansChangedEvent(value: unknown): PlanningStateEvent {
+  const raw = (value ?? {}) as PlanningStateEvent & {
+    execution?: {
+      id?: unknown;
+      proposalId?: unknown;
+      state?: unknown;
+    };
+  };
+  const execution = raw.execution;
+  if (!execution) return raw;
+  const executionState =
+    execution.state === "queued" ||
+    execution.state === "running" ||
+    execution.state === "completed" ||
+    execution.state === "interrupted"
+      ? execution.state
+      : undefined;
+  return {
+    ...raw,
+    ...(raw.proposalId || typeof execution.proposalId !== "string"
+      ? {}
+      : { proposalId: execution.proposalId }),
+    ...(raw.executionId || typeof execution.id !== "string"
+      ? {}
+      : { executionId: execution.id }),
+    ...(raw.executionState || !executionState
+      ? {}
+      : { executionState }),
+  };
+}
+
 export const api = {
   getVersion: () => invoke<AppVersionInfo>(IPC.invoke.appGetVersion),
   health: () => invoke<HostHealth>(IPC.invoke.appHealth),
@@ -130,17 +227,25 @@ export const api = {
       sessionId,
     }),
   listSessions: () =>
-    invoke<{ sessions: SessionSummary[] }>(IPC.invoke.sessionList),
+    invoke<{ sessions: SessionSummary[] }>(IPC.invoke.sessionList).then((result) => ({
+      ...result,
+      sessions: result.sessions.map(normalizeSession),
+    })),
   createSession: (input?: Partial<SessionSummary>) =>
-    invoke<{ session: SessionSummary }>(IPC.invoke.sessionCreate, input ?? {}),
+    invoke<{ session: SessionSummary }>(IPC.invoke.sessionCreate, input ?? {}).then(
+      (result) => ({ ...result, session: normalizeSession(result.session) }),
+    ),
   forkSession: (sessionId: string, title?: string, throughMessageId?: string) =>
     invoke<{ session: SessionDetail }>(IPC.invoke.sessionFork, {
       sessionId,
       title,
       throughMessageId,
-    }),
+    }).then((result) => ({ ...result, session: normalizeSessionDetail(result.session)! })),
   getSession: (id: string) =>
-    invoke<{ session: SessionDetail | null }>(IPC.invoke.sessionGet, id),
+    invoke<{ session: SessionDetail | null }>(IPC.invoke.sessionGet, id).then((result) => ({
+      ...result,
+      session: normalizeSessionDetail(result.session),
+    })),
   deleteSession: (id: string) => invoke(IPC.invoke.sessionDelete, id),
   openProjectFolder: (path: string) =>
     invoke<{ ok: boolean; path: string }>(IPC.invoke.projectOpenFolder, path),
@@ -155,14 +260,16 @@ export const api = {
       IPC.invoke.sessionConfigure,
       id,
       config,
-    ),
+    ).then((result) => ({ ...result, session: normalizeSession(result.session) })),
   scanImportSessions: () =>
     invoke<{ sessions: ImportCandidate[] }>(IPC.invoke.sessionImportScan),
   runImportSessions: (items: ImportCandidate[]) =>
     invoke<ImportRunResult>(IPC.invoke.sessionImportRun, items),
-  getSettings: () => invoke<AppSettings>(IPC.invoke.settingsGet),
+  getSettings: () => invoke<AppSettings>(IPC.invoke.settingsGet).then(normalizeSettings),
   setSettings: (settings: AppSettings) =>
-    invoke(IPC.invoke.settingsSet, settings),
+    invoke(IPC.invoke.settingsSet, validateSettingsWrite(settings)),
+  listCommandShells: () =>
+    invoke<CommandShellCatalog>(IPC.invoke.commandShellList),
   listProviders: () =>
     invoke<{ providers: ProviderPublic[] }>(IPC.invoke.providersList),
   createProvider: (input: ProviderCreateInput) =>
@@ -267,6 +374,13 @@ export const api = {
     }),
   resolvePermission: (resolution: ToolPermissionResolution) =>
     invoke(IPC.invoke.toolResolvePermission, resolution),
+  pendingPlans: (sessionId?: string) =>
+    invoke<PlansPendingResult>(
+      IPC.invoke.plansPending,
+      sessionId ? { sessionId } : {},
+    ).then(normalizePendingPlans),
+  resolvePlan: (resolution: PlanResolveRequest) =>
+    invoke<PlanResolutionResult>(IPC.invoke.plansResolve, resolution),
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
   loadDevPlugin: () => invoke(IPC.invoke.pluginLoadDev),
@@ -429,6 +543,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.agentMessage, (payload) =>
       listener(payload as AgentEventEnvelope),
+    );
+  },
+  onPlansChanged: (listener: (event: PlanningStateEvent) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.plansChanged, (payload) =>
+      listener(normalizePlansChangedEvent(payload)),
     );
   },
   onToast: (listener: (message: string) => void) => {

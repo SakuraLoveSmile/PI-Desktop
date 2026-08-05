@@ -26,7 +26,7 @@ describe("loadProjectInstructions", () => {
     });
   });
 
-  it("layers root and nested instructions in precedence order", async () => {
+  it("layers root and nested instructions with stable slash-normalized sources", async () => {
     root = await mkdtemp(join(tmpdir(), "pi-desktop-instructions-"));
     await mkdir(join(root, "packages", "api"), { recursive: true });
     await writeFile(join(root, "AGENTS.md"), "Use the root convention.");

@@ -16,11 +16,11 @@ builtin.<domain>.<action>
 
 | id | title | keywords | category | risk | behavior |
 |---|---|---|---|---|---|
-| `builtin.session.new` | New Chat | new, chat, session | Session | low | create session and focus composer |
+| `builtin.session.new` | New Task | new, task, session | Session | low | create session and focus composer |
 | `builtin.session.delete` | Delete Current Session | delete, session | Session | medium | confirm then delete active session |
 | `builtin.session.rename` | Rename Current Session | rename, session | Session | low | open rename UI |
-| `builtin.mode.chat` | Switch to Chat Mode | mode, chat, readonly | Mode | low | set session mode=chat |
-| `builtin.mode.agent` | Switch to Agent Mode | mode, agent | Mode | low | set session mode=agent |
+| `builtin.mode.plan` | Switch to Plan | mode, plan, planning | Mode | low | set idle session mode=plan |
+| `builtin.mode.agent` | Switch to Agent | mode, agent, execute | Mode | low | set idle session mode=agent |
 | `builtin.agent.abort` | Abort Active Turn | abort, stop | Agent | low | abort current turn/permission wait |
 | `builtin.agent.compact` | Compact Conversation Context | compact, context, tokens | Agent | low | create a model-context checkpoint for the idle active session |
 | `builtin.project.open` | Open Project | open, project, folder | Project | low | open folder picker and bind workspace |
@@ -41,6 +41,9 @@ builtin.<domain>.<action>
 - Debug commands may be hidden in production release builds
 - Plugin management commands always available
 - Project commands available even without active session
+- `SubmitPlan` is a model tool, not a palette command. Mode commands are
+  accepted only for an idle session; there is no Chat mode or request-changes
+  alias.
 
 ## 5. Execution results
 
@@ -56,7 +59,8 @@ type CommandExecutionResult =
 
 1. All builtin IDs are unique and prefixed
 2. Palette search matches title/keywords
-3. Mode switch commands update session mode immediately
+3. Mode switch commands update the idle session mode immediately; Plan and
+   Agent refer to the same pi Agent
 4. Abort command works during stream and permission pending
 5. Compact works while idle even when automatic context protection is disabled
    and returns `AGENT_BUSY` during an active turn/checkpoint
@@ -74,7 +78,7 @@ defined in the same registry that feeds palette search
 | `/abort` | `builtin.agent.abort` |
 | `/compact` | `builtin.agent.compact` |
 | `/agent-mode` | `builtin.mode.agent` |
-| `/chat-mode` | `builtin.mode.chat` |
+| `/plan-mode` | `builtin.mode.plan` |
 | `/open-project` | `builtin.project.open` |
 | `/clear-project` | `builtin.project.clear` |
 | `/settings` | `builtin.settings.open` |

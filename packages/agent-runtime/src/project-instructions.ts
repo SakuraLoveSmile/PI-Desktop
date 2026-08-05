@@ -28,6 +28,10 @@ function isWithinRoot(root: string, path: string): boolean {
   return path === root || path.startsWith(`${root}${sep}`);
 }
 
+function normalizeStablePath(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
 function limitUtf8(content: string, maxBytes: number): string {
   if (Buffer.byteLength(content, "utf8") <= maxBytes) return content;
   let bytes = 0;
@@ -55,7 +59,7 @@ async function readInstruction(
       const content = (await readFile(file, "utf8")).trim();
       if (!content) continue;
       return {
-        source: relative(workspaceRoot, file) || name,
+        source: normalizeStablePath(relative(workspaceRoot, file) || name),
         content: limitUtf8(content, remaining),
       };
     } catch {

@@ -402,6 +402,7 @@ dependencies = [
  "globset",
  "hex",
  "ignore",
+ "libc",
  "rand",
  "regex",
  "rusqlite",
@@ -415,6 +416,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "walkdir",
+ "windows-sys",
 ]
 
 [[package]]
