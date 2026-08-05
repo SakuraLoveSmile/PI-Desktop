@@ -218,8 +218,8 @@
   white-space: nowrap;
 }
 
-.ext-row.is-off .ext-row-name {
-  color: var(--ds-text-secondary);
+.ext-row.is-off .ext-row-copy {
+  opacity: 0.5;
 }
 
 .ext-row-id,
@@ -424,10 +424,9 @@
 .scope-projects {
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
   flex: 0 0 auto;
 }
 
@@ -466,14 +465,14 @@
   box-shadow: inset 0 0 0 0.5px color-mix(in oklab, var(--ds-warning) 45%, transparent);
 }
 
-/* Always its own line: the warning is a sentence, and beside the chip it would
-   stretch the row it lives in. */
+/* Stacked rather than wrapped: `flex-basis: 100%` resolves against a
+   max-content container, so the warning sat beside the chip and folded into a
+   ragged two-line block instead of taking a line of its own. */
 .scope-warn {
-  flex: 0 0 100%;
   color: var(--ds-warning);
   font-size: var(--text-2xs);
   line-height: var(--leading-normal);
-  max-width: 24ch;
+  max-width: 34ch;
   text-align: right;
 }
 
@@ -803,10 +802,15 @@
 .ext-sheet-error {
   margin: 0;
   border-top: 1px solid color-mix(in oklab, var(--ds-error) 30%, transparent);
-  padding: 8px 18px 12px;
+  background: color-mix(in oklab, var(--ds-error) 6%, transparent);
+  padding: 8px 18px;
   color: var(--ds-error);
   font-size: var(--text-sm);
   line-height: var(--leading-body);
+}
+
+.ext-sheet-error + .ext-sheet-actions {
+  border-top-color: color-mix(in oklab, var(--ds-error) 30%, transparent);
 }
 
 .ext-field-group {

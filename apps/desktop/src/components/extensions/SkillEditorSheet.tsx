@@ -125,6 +125,9 @@ export function SkillEditorSheet({
   const { t } = useTranslation();
   const [nameTouched, setNameTouched] = useState(!!editing);
   const errorKey = skillDraftError(draft);
+  // The starter document means a new skill draft is never empty; what makes it
+  // pristine is that the parts only the user can write are still blank.
+  const pristine = !editing && !draft.name.trim() && !draft.description.trim();
   const bytes = new TextEncoder().encode(draft.body).length;
   const slug = draft.id || skillSlug(draft.name);
 
@@ -245,6 +248,7 @@ export function SkillEditorSheet({
           </div>
         </div>
 
+        {errorKey && !pristine ? <p className="ext-sheet-error">{t(errorKey)}</p> : null}
         <div className="ext-sheet-actions">
           {editing && onReveal ? (
             <Button variant="ghost" onClick={onReveal}>
@@ -268,7 +272,6 @@ export function SkillEditorSheet({
             </Button>
           </div>
         </div>
-        {errorKey ? <p className="ext-sheet-error">{t(errorKey)}</p> : null}
       </div>
     </div>
   );

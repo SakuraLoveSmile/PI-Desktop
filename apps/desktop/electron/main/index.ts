@@ -1722,7 +1722,8 @@ async function createWindow() {
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-scheduled-live");
             await mainWindow!.webContents.executeJavaScript(
-              `window.__PI_DESKTOP__?.seedPlugins?.(4)`,
+              `window.__PI_DESKTOP__?.seedPlugins?.(4);
+               window.__PI_DESKTOP__?.seedExtensions?.(3)`,
             );
             await setPage("plugins");
             await new Promise((r) => setTimeout(r, 350));
@@ -1745,25 +1746,72 @@ async function createWindow() {
               `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
             );
             await new Promise((r) => setTimeout(r, 150));
-            // Marketplace tab of the same page (D169 segmented control).
+            // The extension tabs, in order: installed, MCP, skills, marketplace.
+            const extTab = async (index: number, settle = 350) => {
+              await mainWindow!.webContents.executeJavaScript(`
+                (() => {
+                  const tabs = [...document.querySelectorAll('.plugins-segment-btn')];
+                  tabs[${index}]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                })()
+              `);
+              await new Promise((r) => setTimeout(r, settle));
+            };
+            // MCP tab: one row per connection state and per activation state, so
+            // the glyph colours and the scope chip are all on screen at once.
+            await extTab(1);
+            await shot("pi-extensions-mcp");
+            // The scope popover has to escape the panel's rounded-corner clip,
+            // so it is opened on the last row where a clip would show.
             await mainWindow!.webContents.executeJavaScript(`
               (() => {
-                const tabs = [...document.querySelectorAll('.plugins-segment-btn')];
-                tabs[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                const rows = [...document.querySelectorAll('.ext-row')];
+                const last = rows[rows.length - 1];
+                last?.scrollIntoView({ block: 'center' });
+                last?.querySelector('.scope-chip')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+                  ?? last?.querySelector('.scope-seg:nth-child(2)')
+                    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
               })()
             `);
-            await new Promise((r) => setTimeout(r, 900));
+            await new Promise((r) => setTimeout(r, 300));
+            await shot("pi-extensions-scope");
+            await mainWindow!.webContents.executeJavaScript(
+              `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
+            );
+            await new Promise((r) => setTimeout(r, 150));
+            // Editor sheet: transport cards, key/value rows, and the in-sheet
+            // scope field that renders in place instead of floating.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                document.querySelector('.ext-section-actions button:last-of-type')
+                  ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 300));
+            await shot("pi-extensions-mcp-editor");
+            await mainWindow!.webContents.executeJavaScript(
+              `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
+            );
+            await new Promise((r) => setTimeout(r, 200));
+            // Skills tab: the byte counter and the disabled row read differently
+            // from the MCP rows, so it gets its own scene.
+            await extTab(2);
+            await shot("pi-extensions-skills");
+            await extTab(1, 250);
+            await setTheme("dark");
+            await new Promise((r) => setTimeout(r, 300));
+            await shot("pi-extensions-mcp-dark");
+            await setTheme("light");
+            await new Promise((r) => setTimeout(r, 250));
+            // Marketplace tab of the same page (D169 segmented control).
+            await extTab(3, 900);
             await shot("pi-plugins-market");
             // Template picker behind the overflow menu (D171). Selecting a
             // template only sets state, so no folder dialog opens here.
+            await extTab(0, 250);
             await mainWindow!.webContents.executeJavaScript(`
-              (() => {
-                const tabs = [...document.querySelectorAll('.plugins-segment-btn')];
-                tabs[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-                document
-                  .querySelector('.plugins-menu-wrap .plugins-icon-btn')
-                  ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-              })()
+              document
+                .querySelector('.plugins-menu-wrap .plugins-icon-btn')
+                ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
             `);
             await new Promise((r) => setTimeout(r, 250));
             await shot("pi-plugins-menu");
@@ -1784,6 +1832,7 @@ async function createWindow() {
             await new Promise((r) => setTimeout(r, 200));
             await mainWindow!.webContents.executeJavaScript(
               `window.__PI_DESKTOP__?.seedPlugins?.(0);
+               window.__PI_DESKTOP__?.seedExtensions?.(0);
                window.__PI_DESKTOP__?.seedPluginThemes?.(2)`,
             );
             await setPage("settings");

@@ -40,7 +40,14 @@ import {
   IconNewSession,
   IconSidebar,
 } from "./components/icons";
-import type { PluginSummary, PluginTheme } from "@pi-desktop/shared";
+import type {
+  McpServerRecord,
+  McpServerStatus,
+  PluginSummary,
+  PluginTheme,
+  ProjectRecord,
+  UserSkillRecord,
+} from "@pi-desktop/shared";
 
 const MODIFIER_ONLY_KEYS = new Set([
   "Alt",
@@ -565,6 +572,9 @@ function AppShell() {
     const originalRefreshNotifications =
       useAppStore.getState().refreshNotifications;
     const originalListPluginServices = api.listPluginServices;
+    const originalListMcpServers = api.listMcpServers;
+    const originalListUserSkills = api.listUserSkills;
+    const originalListProjects = api.listProjects;
     (window as any).__PI_DESKTOP__ = {
       setPage: (page: string) => useAppStore.getState().setPage(page as any),
       refreshProviders: () => useAppStore.getState().refreshProviders(),
@@ -732,6 +742,156 @@ function AppShell() {
           },
         ];
         useAppStore.setState({ plugins: samples.slice(0, count) });
+      },
+      seedExtensions: (count = 3) => {
+        // Capture-only fixture for the MCP and Skills tabs. Those sections read
+        // straight from IPC into local state rather than the store, so the rig
+        // has to stand in for the host rather than seed a slice; count 0 puts
+        // the real calls back.
+        if (!(window as any).__PI_CAPTURE__) return;
+        if (count <= 0) {
+          (api as any).listMcpServers = originalListMcpServers;
+          (api as any).listUserSkills = originalListUserSkills;
+          (api as any).listProjects = originalListProjects;
+          return;
+        }
+        const projects: ProjectRecord[] = [
+          {
+            id: 1,
+            path: "/Users/pi/work/api",
+            name: "api",
+            pinned: true,
+            createdAt: 0,
+            lastOpenedAt: 0,
+          },
+          {
+            id: 2,
+            path: "/Users/pi/work/web",
+            name: "web",
+            pinned: false,
+            createdAt: 0,
+            lastOpenedAt: 0,
+          },
+          {
+            id: 3,
+            path: "/Users/pi/personal/site",
+            name: "site",
+            pinned: false,
+            createdAt: 0,
+            lastOpenedAt: 0,
+          },
+        ];
+        // One server per connection state, so the row glyph's whole colour range
+        // is exercised, and one per activation state.
+        const stamp = "2026-08-04T09:00:00.000Z";
+        const servers: McpServerRecord[] = (
+          [
+          {
+            id: "context7",
+            label: "Context7",
+            description: "Up-to-date library documentation.",
+            transport: "stdio",
+            command: "npx",
+            args: ["-y", "@upstash/context7-mcp"],
+            env: {},
+            enabled: true,
+            scope: { mode: "global", projects: [] },
+          },
+          {
+            id: "linear",
+            label: "Linear",
+            description: "Issues and cycles for the work tracker.",
+            transport: "http",
+            url: "https://mcp.linear.app/sse",
+            headers: { Authorization: "Bearer •••" },
+            enabled: true,
+            scope: { mode: "projects", projects: ["/Users/pi/work/api"] },
+          },
+          {
+            id: "postgres",
+            label: "Postgres",
+            description: "Runs read-only queries against the dev database.",
+            transport: "stdio",
+            command: "mcp-server-postgres",
+            args: ["postgresql://localhost/dev"],
+            env: {},
+            enabled: true,
+            scope: { mode: "projects", projects: [] },
+          },
+          {
+            id: "figma",
+            label: "Figma",
+            description: "Reads frames and design tokens from a file.",
+            transport: "stdio",
+            command: "figma-mcp",
+            args: [],
+            env: {},
+            enabled: false,
+            scope: { mode: "global", projects: [] },
+          },
+          ] as Array<Omit<McpServerRecord, "createdAt" | "updatedAt">>
+        ).map((server) => ({ ...server, createdAt: stamp, updatedAt: stamp }));
+        const statuses: McpServerStatus[] = [
+          {
+            serverId: "context7",
+            state: "ready",
+            toolCount: 2,
+            toolNames: ["resolve-library-id", "get-library-docs"],
+            updatedAt: 0,
+          },
+          { serverId: "linear", state: "connecting", toolCount: 0, updatedAt: 0 },
+          {
+            serverId: "postgres",
+            state: "failed",
+            toolCount: 0,
+            message: "spawn mcp-server-postgres ENOENT",
+            updatedAt: 0,
+          },
+          { serverId: "figma", state: "idle", toolCount: 0, updatedAt: 0 },
+        ];
+        const skills: UserSkillRecord[] = [
+          {
+            id: "release-notes",
+            name: "Release Notes",
+            description:
+              "Turn a range of commits into release notes grouped by user-visible change.",
+            enabled: true,
+            scope: { mode: "global", projects: [] },
+            source: "created",
+            path: "/Users/pi/.pi-desktop/skills/release-notes/SKILL.md",
+            sizeBytes: 2_412,
+            createdAt: "2026-07-30T10:00:00.000Z",
+            updatedAt: "2026-08-04T09:12:00.000Z",
+          },
+          {
+            id: "api-review",
+            name: "API Review",
+            description:
+              "Check a handler against the house rules for pagination, errors, and auth.",
+            enabled: true,
+            scope: { mode: "projects", projects: ["/Users/pi/work/api"] },
+            source: "created",
+            path: "/Users/pi/.pi-desktop/skills/api-review/SKILL.md",
+            sizeBytes: 7_940,
+            createdAt: "2026-07-12T10:00:00.000Z",
+            updatedAt: "2026-08-01T16:30:00.000Z",
+          },
+          {
+            id: "incident-writeup",
+            name: "Incident Writeup",
+            description: "Draft a blameless postmortem from a timeline of events.",
+            enabled: false,
+            scope: { mode: "global", projects: [] },
+            source: "imported",
+            path: "/Users/pi/.pi-desktop/skills/incident-writeup/SKILL.md",
+            sizeBytes: 118_400,
+            createdAt: "2026-06-02T10:00:00.000Z",
+            updatedAt: "2026-06-02T10:00:00.000Z",
+          },
+        ];
+        (api as any).listProjects = async () => ({ projects });
+        (api as any).listMcpServers = async () => ({ servers, statuses });
+        (api as any).listUserSkills = async () => ({ skills: skills.slice(0, count) });
       },
       seedPluginThemes: (count = 2) => {
         // Capture-only theme fixture: plugin themes share the built-in grid on

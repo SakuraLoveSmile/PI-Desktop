@@ -190,6 +190,14 @@ export function McpEditorSheet({
   const { t } = useTranslation();
   const [idTouched, setIdTouched] = useState(!!editing);
   const errorKey = mcpDraftError(draft);
+  // A form the user has not started saying "an identifier is required" scolds
+  // them for opening it. The message appears once there is something to correct.
+  const pristine =
+    !editing &&
+    !draft.id.trim() &&
+    !draft.label.trim() &&
+    !draft.command.trim() &&
+    !draft.url.trim();
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -398,6 +406,7 @@ export function McpEditorSheet({
           ) : null}
         </div>
 
+        {errorKey && !pristine ? <p className="ext-sheet-error">{t(errorKey)}</p> : null}
         <div className="ext-sheet-actions">
           {editing ? (
             <Button variant="ghost" disabled={testing} onClick={onTest}>
@@ -421,7 +430,6 @@ export function McpEditorSheet({
             </Button>
           </div>
         </div>
-        {errorKey ? <p className="ext-sheet-error">{t(errorKey)}</p> : null}
       </div>
     </div>
   );

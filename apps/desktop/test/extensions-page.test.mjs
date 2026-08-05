@@ -200,6 +200,34 @@ test("the scope popover is not clipped by the surface it opens on", () => {
   assert.match(components.get("ScopeControl.tsx"), /useLayoutEffect/);
 });
 
+// All three caught by looking at the rendered page rather than the stylesheet.
+test("a validation message sits above the buttons it blocks, once there is one", () => {
+  for (const name of ["McpEditorSheet.tsx", "SkillEditorSheet.tsx"]) {
+    const sheet = components.get(name);
+    const errorAt = sheet.indexOf('className="ext-sheet-error"');
+    const actionsAt = sheet.indexOf('className="ext-sheet-actions"');
+    assert.ok(errorAt > 0 && actionsAt > 0, name);
+    assert.ok(errorAt < actionsAt, `${name} renders the error below the action row`);
+    // A form nobody has typed into yet has nothing to complain about.
+    assert.match(sheet, /errorKey && !pristine/, name);
+    assert.match(sheet, /const pristine =\s*\n?\s*!editing/, name);
+  }
+  // Two adjacent top borders would read as a stray rule between them.
+  assert.match(styles, /\.ext-sheet-error \+ \.ext-sheet-actions\s*\{/);
+});
+
+// `flex-basis: 100%` resolves against a max-content container, so the warning
+// shared the chip's line and folded into a ragged block.
+test("the empty-scope warning gets a line of its own", () => {
+  const projects = styles.slice(styles.indexOf(".scope-projects {"));
+  assert.match(projects.slice(0, 220), /flex-direction:\s*column/);
+  assert.doesNotMatch(styles, /\.scope-warn\s*\{[^}]*flex:\s*0 0 100%/);
+});
+
+test("an extension that is off reads as off", () => {
+  assert.match(styles, /\.ext-row\.is-off \.ext-row-copy\s*\{[\s\S]*?opacity/);
+});
+
 test("extensions styles use design tokens and respect reduced motion", () => {
   const start = styles.indexOf("/*\n * Extensions: MCP servers");
   assert.ok(start > 0, "extensions.css section missing from the cascade");
