@@ -970,10 +970,12 @@ returning to a roomier work area restores the original chat width. Renderer code
 sets this target only for the currently visible session: background artifacts
 cannot change visible reservation geometry.
 
-## 13c. Composer input APIs (D123/D124, ADR 0024)
+## 13c. Composer input APIs (D123/D124/D197, ADR 0024/0059)
 
-Electron-only channels backing the composer autocomplete. Both are
-read-only, fail soft, and do not touch host-core or the host RPC protocol
+Electron-only channels backing composer autocomplete and clipboard file
+references. `composer/commands` and `fs/index` are read-only and fail soft;
+`composer/pasteFiles` writes only to the originating session's Electron-owned
+scratch directory. None adds a host RPC method or changes the host protocol
 version.
 
 ### composer/commands
@@ -1011,6 +1013,36 @@ Workspace-rooted relative paths for the `@` menu: `git ls-files -co
 directories derived from file paths, 8000-entry cap with `truncated: true`,
 short TTL cache per root. Fails closed to an empty list without a
 workspace. Fuzzy filtering happens renderer-side.
+
+### composer/pasteFiles
+
+```ts
+composer/pasteFiles({ sessionId, files }) -> {
+  files: ComposerPastedFile[];
+}
+
+type ComposerPasteFile = {
+  name?: string;
+  mimeType?: string;
+  data: ArrayBuffer;
+};
+
+type ComposerPastedFile = {
+  path: string;
+  name: string;
+  mimeType: string;
+  size: number;
+};
+```
+
+Electron main verifies that `sessionId` resolves to a durable host session,
+limits the request to 20 files, 64 MiB per file, and 128 MiB total, strips
+renderer-provided directory components, and writes unique names below
+`<data_dir>/scratch/<sessionId>/pasted/` with exclusive-create semantics. The
+returned absolute paths are inserted into the text prompt as `@` references;
+clipboard bytes never enter the persisted prompt or host agent message.
+Invalid sessions and malformed/oversized payloads fail with an IPC error, and
+the operation cannot write to the workspace.
 
 ## 14. Error Codes — Initial registry (extensible)
 

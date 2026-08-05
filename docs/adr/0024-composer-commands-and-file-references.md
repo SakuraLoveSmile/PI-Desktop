@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-07-27
 - Deciders: PI-Desktop core
-- Related: D123, D124, D125, ADR 0019 (work panel subsystems), D114 (scratch dir), D119 (transcript file store)
+- Related: D123, D124, D125, D197, ADR 0019 (work panel subsystems), ADR 0059 (clipboard file paste), D114 (scratch dir), D119 (transcript file store)
 
 ## Context
 
@@ -48,8 +48,9 @@ exported by the installed package and directly reusable.
    inserts `@relative/path ` (quoted `@"a b.txt"` when the path contains
    spaces, `@dir/` without trailing space for directories). Both chat and
    agent modes carry Read/Glob/Grep, so references work in both. No content
-   inlining, no image attachment plumbing (pi-ai `ImageContent` exists but
-   the desktop prompt contract stays text-only for now).
+   inlining or binary content enters the prompt. OS clipboard file/image paste
+   is materialized as a session-scratch file reference by ADR 0059; it does
+   not use pi-ai `ImageContent` or change the text-only prompt contract.
 4. **Workspace file index is served by Electron main**, not agent tools —
    same rationale as ADR 0019: user-initiated browsing must not spam
    permission prompts or the audit trail. New read-only channel
@@ -82,4 +83,5 @@ exported by the installed package and directly reusable.
   PI-Desktop.
 - The transcript user-message schema gains an optional `command` field;
   renderers that ignore it keep working.
-- Image/file attachments remain deferred and untouched by this ADR.
+- Inline binary attachments and preview chips remain deferred. Clipboard
+  files/images use session-scratch `@` references as defined by ADR 0059.

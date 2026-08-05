@@ -116,6 +116,12 @@ session gets a scratch directory outside the workspace:
 <data_dir>/scratch/<sessionId>/
 ```
 
+OS clipboard files and images pasted into the composer are materialized by
+Electron main below `<data_dir>/scratch/<sessionId>/pasted/` before their
+absolute paths are inserted as `@` references. They use the same session
+lifecycle as other scratch data and do not enter the workspace, artifacts, or
+the persisted prompt as binary content.
+
 - **Addressing.** The model addresses scratch by absolute path only; the path
   is advertised in the system prompt. Relative tool paths always resolve
   against the workspace. `Bash` additionally exports `PI_SCRATCH_DIR`.
@@ -144,10 +150,11 @@ session gets a scratch directory outside the workspace:
   resolves the root from the originating durable session, and the renderer
   event carries `sessionId`; the selected foreground workspace is never used
   for a background preview.
-- **Lifecycle.** Created lazily on the first `Write`/`Edit`/`Bash` of a
-  session. Deleted with `session.delete`. A startup sweep removes scratch
-  dirs whose session no longer exists and dirs untouched for over 7 days
-  (crash/force-quit fallback; no scheduled job needed).
+- **Lifecycle.** Created lazily on the first `Write`/`Edit`/`Bash` or
+  composer clipboard paste of a session. Deleted with `session.delete`. A
+  startup sweep removes scratch dirs whose session no longer exists and dirs
+  untouched for over 7 days (crash/force-quit fallback; no scheduled job
+  needed).
 - A project switch does not redirect or cancel a background session's tools;
   sessions A and B remain sandboxed to projects A and B respectively.
 - A Temporary/path-less session has no workspace root, even if another project

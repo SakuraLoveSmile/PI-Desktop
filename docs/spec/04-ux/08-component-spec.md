@@ -1463,11 +1463,16 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 
 ### 11.7 MVP constraints
 
-- No file attachment (deferred)
-- No image/appshot attachment stubs
+- Pasting one or more OS clipboard files or images saves their bytes into the
+  originating session's scratch directory and inserts `@<absolute-path>` text;
+  text-only paste keeps the browser's native textarea behavior (D197,
+  ADR 0059)
+- No inline binary/ImageContent payloads or attachment preview chips; the
+  prompt remains text-only and the agent follows the inserted paths with its
+  file tools
 - No voice input
 
-### 11.8 Slash commands and @ file references (D123–D125, ADR 0024)
+### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, ADR 0024, ADR 0059)
 
 The composer owns an inline autocomplete menu — one component serving two
 modes. Focus never leaves the textarea (D125).
@@ -1508,6 +1513,24 @@ Anatomy:
   the transcript. An alias-only mode command remains local. The composer is
   cleared only after the local action or prompt dispatch is accepted; a failed
   dispatch retains the complete draft for retry.
+- A paste containing files is intercepted only when the clipboard exposes at
+  least one `File`. The renderer transfers bounded file bytes, name, and MIME
+  metadata to Electron main with the durable session id. Main validates the
+  session, writes unique sanitized files under
+  `<data_dir>/scratch/<sessionId>/pasted/`, and returns absolute paths. The
+  composer inserts each path using the same `@` reference formatting as the
+  file menu; paths containing whitespace are quoted. A home composer creates
+  or reuses a durable session before saving. The scratch lifecycle removes
+  pasted files with the session and never dirties the workspace git tree.
+- A paste containing files is intercepted only when the clipboard exposes at
+  least one `File`. The renderer transfers bounded file bytes, name, and MIME
+  metadata to Electron main with the durable session id. Main validates the
+  session, writes unique sanitized files under
+  `<data_dir>/scratch/<sessionId>/pasted/`, and returns absolute paths. The
+  composer inserts each path using the same `@` reference formatting as the
+  file menu; paths containing whitespace are quoted. A home composer creates
+  or reuses a durable session before saving. The scratch lifecycle removes
+  pasted files with the session and never dirties the workspace git tree.
 - Sent template invocations render in the transcript as a monospace command
   chip from the message's `command` field instead of the expanded body.
 - States: keyboard-active row uses the shared `kb-active` treatment; empty

@@ -702,8 +702,8 @@ Work-panel width resizing is implemented in MVP:
 The following gestures remain reserved for future milestones:
 
 - Drag project/session items to assign manual order
-- File drag into the composer has no attachment behavior until the pi prompt
-  contract supports persisted file payloads
+- File drag into the composer remains unhandled; clipboard file/image paste
+  uses the session-scratch reference flow below
 
 ### 8.2 Spec reservation
 
@@ -714,7 +714,7 @@ When drag/drop is implemented, these patterns should apply:
 - Cancel drag with Escape
 - Drag feedback: opacity 0.5 on source, accent outline on target
 
-## 8a. Composer autocomplete (D123–D125)
+## 8a. Composer autocomplete and clipboard files (D123–D125, D197)
 
 ### 8a.1 Triggers
 
@@ -728,6 +728,20 @@ When drag/drop is implemented, these patterns should apply:
   token (`@"…`) is treated as one token until the closing quote.
 - Pasting text never opens a menu unless the caret lands inside a valid
   trigger token.
+
+### 8a.4 Clipboard files
+
+- A paste containing one or more OS `File` objects is intercepted in the
+  textarea; text-only paste stays native.
+- While bytes are being transferred, the textarea is read-only and exposes
+  `aria-busy="true"`; the send and autocomplete controls are disabled.
+- Electron main saves bounded bytes under the originating session's scratch
+  root and returns unique absolute paths. The composer inserts each as an
+  `@` reference at the current selection, quoting paths with whitespace, then
+  restores focus and places the caret after the inserted references.
+- If the home composer has no active session, it creates or reuses one before
+  writing. Failure leaves the existing draft unchanged and shows the error in
+  the normal toast surface.
 
 ### 8a.2 Keyboard while open
 

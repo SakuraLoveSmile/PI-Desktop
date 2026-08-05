@@ -52,8 +52,10 @@ schema v7, v8, and v10:
  ├── review-changes/<sessionId>/<snapshotId>/
  │    ├── before          # bounded pre-tool bytes, when reversible
  │    └── meta.json       # path, hashes, diff state, and ownership
- └── scratch/<sessionId>/ # per-session agent temp files (D114) — deleted with
-                          # the session; startup sweep removes orphans/stale
+ └── scratch/<sessionId>/ # per-session agent temp files (D114), including
+                          # composer pasted files under pasted/ — deleted
+                          # with the session; startup sweep removes orphans
+                          # and stale dirs
 ```
 
 One database file keeps cross-entity writes transactional (e.g. session +
