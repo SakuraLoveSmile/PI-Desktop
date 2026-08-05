@@ -785,6 +785,21 @@ export type ComposerCommand = {
   id?: string;
 };
 
+/** One clipboard file transferred from the renderer to the composer bridge. */
+export type ComposerPasteFile = {
+  name?: string;
+  mimeType?: string;
+  data: ArrayBuffer;
+};
+
+/** A clipboard file materialized in the originating session's scratch root. */
+export type ComposerPastedFile = {
+  path: string;
+  name: string;
+  mimeType: string;
+  size: number;
+};
+
 export type AppVersionInfo = {
   name: string;
   version: string;

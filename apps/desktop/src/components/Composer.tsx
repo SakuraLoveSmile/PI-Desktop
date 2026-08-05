@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   Mode,
@@ -6,7 +6,7 @@ import type {
   ProviderPublic,
   ThinkingLevel,
 } from "@pi-desktop/shared";
-import { PERMISSION_MODES } from "@pi-desktop/shared";
+import { formatFileInsert, PERMISSION_MODES } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import { isActivePlanExecution } from "../lib/plan-mode-state";
@@ -29,6 +29,18 @@ import {
 
 const COMPOSER_MIN_HEIGHT_PX = 28;
 const COMPOSER_MAX_VISIBLE_ROWS = 7;
+
+function clipboardFiles(data: DataTransfer): File[] {
+  const files = Array.from(data.files);
+  if (files.length === 0) {
+    for (const item of Array.from(data.items)) {
+      if (item.kind !== "file") continue;
+      const file = item.getAsFile();
+      if (file) files.push(file);
+    }
+  }
+  return files;
+}
 
 /**
  * Keep the display order in sync with the runtime's extended thinking
@@ -139,6 +151,7 @@ export function Composer({
   const settings = useAppStore((s) => s.settings);
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const newSession = useAppStore((s) => s.newSession);
   const providers = useAppStore((s) => s.providers);
   const configureActiveSession = useAppStore((s) => s.configureActiveSession);
   const showToast = useAppStore((s) => s.showToast);
@@ -154,12 +167,13 @@ export function Composer({
   const [permissionOpen, setPermissionOpen] = useState(false);
   const permissionRef = useRef<HTMLDivElement>(null);
   const [thinkingOpen, setThinkingOpen] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const thinkingRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
   const approvalPending = planCheckpoint?.status === "pending";
   const executionActive = isActivePlanExecution(planCheckpoint);
-  const composerBlocked = isRunning || executionActive || approvalPending;
+  const composerBlocked = isRunning || executionActive || approvalPending || pasting;
   const runActive = isRunning || executionActive;
 
   useEffect(() => {
@@ -310,7 +324,7 @@ export function Composer({
 
   const submit = async () => {
     const content = value.trim();
-    if (!content || composerBlocked) return;
+    if (!content || composerBlocked || pasting) return;
     // Slash dispatch (D123): builtin/plugin aliases execute locally without
     // a session or a model; templates and unknown /names stay prompt text
     // (main expands templates). Runs before the model-ready gate on purpose.
@@ -364,6 +378,58 @@ export function Composer({
     if (!modelReady) return;
     const accepted = await sendPrompt(content);
     if (accepted) setValue("");
+  };
+
+  const pasteClipboardFiles = async (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    if (composerBlocked || pasting) return;
+    const files = clipboardFiles(event.clipboardData);
+    if (!files.length) return;
+
+    event.preventDefault();
+    const input = ref.current;
+    const current = input?.value ?? value;
+    const start = input?.selectionStart ?? current.length;
+    const end = input?.selectionEnd ?? start;
+    setPasting(true);
+    try {
+      const payload = await Promise.all(
+        files.map(async (file) => ({
+          name: file.name || undefined,
+          mimeType: file.type || undefined,
+          data: await file.arrayBuffer(),
+        })),
+      );
+      let sessionId = activeSessionId;
+      if (!sessionId) {
+        await newSession();
+        sessionId = useAppStore.getState().activeSessionId;
+      }
+      if (!sessionId) throw new Error("session unavailable");
+
+      const result = await api.pasteFiles(sessionId, payload);
+      const insertion = result.files
+        .map((file) => formatFileInsert(file.path, "file"))
+        .join("");
+      const next = current.slice(0, start) + insertion + current.slice(end);
+      const nextCursor = start + insertion.length;
+      setValue(next);
+      setCursor(nextCursor);
+      requestAnimationFrame(() => {
+        const el = ref.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(nextCursor, nextCursor);
+      });
+      showToast(t("chat.filesPasted", { count: result.files.length }), {
+        variant: "success",
+      });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), {
+        variant: "error",
+      });
+    } finally {
+      setPasting(false);
+    }
   };
 
   const composerAc = useComposerAutocomplete({
@@ -425,12 +491,14 @@ export function Composer({
               className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}
               readOnly={composerBlocked}
               aria-readonly={composerBlocked}
+              aria-busy={pasting}
               rows={2}
               placeholder={t(variant === "home" ? "chat.placeholderHome" : "chat.placeholder")}
               spellCheck={false}
               autoCorrect="off"
               autoCapitalize="off"
               value={value}
+              onPaste={pasteClipboardFiles}
               onChange={(e) => {
                 setValue(e.target.value);
                 setCursor(e.target.selectionStart ?? e.target.value.length);

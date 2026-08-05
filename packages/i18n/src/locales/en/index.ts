@@ -164,6 +164,7 @@ export const en = {
     addPhotos: "Add photos",
     captureAppshot: "Capture screenshot",
     filesAttached: "Added {{count}} item(s) to the draft",
+    filesPasted: "Saved {{count}} pasted file(s) to the session scratch folder",
     appshotSoon: "Screenshot capture is coming soon",
     slashMenu: "Commands",
     slashGroupTemplates: "Prompt templates",

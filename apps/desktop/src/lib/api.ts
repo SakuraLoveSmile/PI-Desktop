@@ -16,6 +16,8 @@ import type {
   BrowserState,
   CommandItem,
   ComposerCommand,
+  ComposerPasteFile,
+  ComposerPastedFile,
   FsEntry,
   FsIndexResult,
   FsReadResult,
@@ -313,6 +315,11 @@ export const api = {
     invoke<{ paths: string[]; canceled?: boolean }>(IPC.invoke.composerPickFiles),
   pickPhotos: () =>
     invoke<{ paths: string[]; canceled?: boolean }>(IPC.invoke.composerPickPhotos),
+  pasteFiles: (sessionId: string, files: ComposerPasteFile[]) =>
+    invoke<{ files: ComposerPastedFile[] }>(IPC.invoke.composerPasteFiles, {
+      sessionId,
+      files,
+    }),
   clearProject: () => invoke(IPC.invoke.projectClear),
   setProject: (path: string) =>
     invoke<{ workspace: ProjectWorkspace | null }>(IPC.invoke.projectSet, path),

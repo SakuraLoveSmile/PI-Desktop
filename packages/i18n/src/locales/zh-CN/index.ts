@@ -163,6 +163,7 @@ export const zhCN = {
     addPhotos: "添加图片",
     captureAppshot: "截取屏幕",
     filesAttached: "已将 {{count}} 项加入草稿",
+    filesPasted: "已将 {{count}} 个粘贴文件保存到会话临时目录",
     appshotSoon: "截图功能即将推出",
     slashMenu: "指令",
     slashGroupTemplates: "提示词模板",
