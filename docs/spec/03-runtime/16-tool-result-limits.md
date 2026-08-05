@@ -4,33 +4,75 @@
 
 Keep agent context healthy and UI responsive by bounding tool outputs without silent data corruption.
 
-## 2. Default limits (MVP)
+## 2. Default limits
+
+Budgets are per tool class, not one shared cap. A single 256KB cap governing
+everything meant no cap in practice: measured sessions averaged 154KB per
+`Read` and spent 56% of their whole context on read/search results, which
+forced compaction and made the agent re-search what it had already found.
+
+Read/Glob/Grep get the tighter budget because their results are re-fetchable on
+demand (narrow the pattern, advance the offset); shell output is not.
 
 | channel | limit | action when exceeded |
 |---|---|---|
-| tool result total bytes | 256 KB | truncate + marker |
-| tool result max lines | 4000 lines | truncate + marker |
-| single Read file bytes | 512 KB | refuse range/smaller read |
-| Grep max matches | 200 | stop with partial flag |
-| Glob max entries | 2000 | stop with partial flag |
-| Bash stdout+stderr | 256 KB | truncate |
+| Read / Glob / Grep result (`BUDGET_SEARCH`) | 48 KB, 2000 lines | bound the window + `notice` naming the next step |
+| Bash stdout (`BUDGET_SHELL`) | 96 KB, 4000 lines, head | truncate + marker + spill |
+| Bash stderr (`BUDGET_SHELL_ERR`) | 96 KB, 4000 lines, **tail** | truncate + marker + spill |
+| any single line (`MAX_LINE_CHARS`) | 2000 chars | clip, count it in `notice` |
+| Read window | 2000 lines default, `offset`/`limit` | paginate; never refuse on file size |
+| Grep matches (`headLimit`) | 200 default | stop with `truncated: true` |
+| Glob entries (`limit`) | 100 default, 1000 max | stop with `truncated: true` |
+| spilled full output (`SPILL_MAX_BYTES`) | 512 KB | stop retaining; marker still names the file |
 | Bash timeout | 60s default | kill + error |
 
-Limits are host-enforced where possible.
+Limits are host-enforced. Tool descriptions in `builtin_tool_defs()` carry the
+numbers and the scoping parameters verbatim: a tool that looks incapable of the
+scoped thing gets routed around through Bash, and hand-rolled shell pipelines
+are what exhausted context in the first place.
+
+Read never refuses on file size. The former >512KB rejection told the model to
+"use Grep or Bash to sample it", which is exactly how an unpaginated read became
+a `sed`/`awk` pipeline whose output nothing bounded.
 
 ## 3. Truncation marker format
 
-Implemented marker (host-core `truncate_output`):
+Implemented markers (host-core `truncate_to`), appended for a head cut and
+prepended for a tail cut:
 
 ```text
-[truncated: output exceeded 256KB or 4000 lines]
+[truncated: kept the first 4000 of 51234 lines; limit 4000 lines / 96KB. Full output saved to <path> — Grep it, or Read it with offset/limit.]
+[truncated: kept the last 1200 of 51234 lines; limit 4000 lines / 96KB. Narrow the request to see more.]
+[truncated: no complete line fits the 96KB limit; kept 98304 bytes of a single 4200000-byte line. Full output saved to <path> — Grep it, or Read it with offset/limit.]
 ```
 
-The marker is appended to the host-truncated payload. A future richer marker
-may add tool name, original size, and applied limit; until then this exact
-string is the host-result truncation vocabulary across host, UI, and specs.
+A marker always states which end survived, how much was kept out of the total,
+the limit that applied, and where to get the rest. The spill sentence appears
+only when a full copy was actually written.
+
+Read/Glob/Grep do not embed a marker in their payload: `content` stays
+byte-faithful so text copied out of it still matches for `Edit`, and the window
+metadata (`offset`, `lineCount`, `totalLines`, `truncated`) plus a `notice`
+string carry the same information as sibling fields.
+
 Checkpoint-only aggregate truncation uses the distinct model-context marker in
 §4 so diagnostics can distinguish where information was shortened.
+
+## 3a. Spill files
+
+When Bash output exceeds its budget, the fuller copy (up to `SPILL_MAX_BYTES`)
+is written to `<data_dir>/scratch/<session_id>/tool-output/<label>-<ms>-<seq>.log`
+and named in the marker. That reuses the per-session scratch lifecycle
+(`scratch::remove_session_dir` / `sweep`), so spills die with their session and
+stale ones are swept at startup — no separate retention policy.
+
+The directory is created on first spill, not on session start, so sessions that
+stayed under budget leave nothing behind. A failed spill costs the hint only,
+never the tool result.
+
+Grep can read spill files, because an explicit `path` argument stops parent
+ignore files from applying — the same rule that lets `path` reach into
+`node_modules` or `dist`.
 
 ## 4. Model-facing vs UI-facing
 
@@ -53,37 +95,60 @@ Checkpoint-only aggregate truncation uses the distinct model-context marker in
 
 ## 5. Partial result flags
 
-Tool response envelope:
+Every bounded tool reports `truncated: boolean`. Read/Glob/Grep additionally
+report what was bounded and how to continue:
 
 ```ts
-type ToolResultEnvelope = {
-  ok: boolean
-  content: string
-  truncated?: boolean
-  partial?: boolean
-  stats?: {
-    bytes?: number
-    lines?: number
-    matches?: number
-    entries?: number
-  }
-  error?: AppError
+type ReadResult = {
+  path: string; root: "workspace" | "scratch"
+  content: string          // byte-faithful window, no markers or line numbers
+  offset: number; lineCount: number
+  totalLines?: number      // present only once end of file was reached
+  fileBytes: number
+  truncated: boolean
+  notice?: string          // next offset, budget stop, clipped-line count
 }
+
+type GrepResult =
+  | { matches: { path: string; line: number; text: string }[]; count: number; files: number; truncated: boolean; notice?: string }
+  | { files: string[]; count: number; truncated: boolean; notice?: string }        // outputMode: filesWithMatches
+  | { counts: { path: string; count: number }[]; count: number; truncated: boolean; notice?: string }  // outputMode: count
+
+type GlobResult = { matches: string[]; count: number; truncated: boolean; notice?: string }
 ```
+
+`notice` is model-facing prose, not a stable contract: it names the next offset,
+the budget that stopped the scan, or how many lines were clipped. `truncated`
+and the counts are the stable signals.
 
 ## 6. Priority rules
 
 1. never omit truncation marker when truncated
-2. prefer head+tail retention for Bash logs if easy; else head-only in MVP
-3. binary files: do not dump raw binary into model; return metadata error `TOOL_BINARY_CONTENT`
-4. aggregate checkpoint truncation must preserve every provider-valid assistant
+2. Bash stdout keeps its head; Bash stderr keeps its **tail**, because a failing
+   command's actionable message is the last thing it printed and dropping it for
+   96KB of progress noise is what makes the model retry blindly
+3. binary files: do not dump raw binary into model; return metadata error
+   `TOOL_BINARY_CONTENT`. Detected by extension blacklist plus a sniff of the
+   first 4KB (any NUL byte, or >30% non-printable). Grep skips binary files
+   silently rather than matching lossily-decoded bytes
+4. a single line longer than the whole budget yields a char-boundary-safe prefix
+   (or suffix, for a tail cut), never an empty payload
+5. aggregate checkpoint truncation must preserve every provider-valid assistant
    tool-call/result pair and re-estimate the resulting tail before persistence
+6. relevance ordering for Glob and Grep is file modification time, newest first,
+   so a capped result keeps the half more likely to be asked about
 
 ## 7. Acceptance criteria
 
-- [ ] oversize Bash output truncates with marker
-- [ ] Grep stops at max matches with partial=true
-- [ ] Read oversize file fails with actionable error or bounded preview policy
-- [ ] truncated results still valid UTF-8 text
+- [x] oversize Bash output truncates with marker and spills the fuller copy
+- [x] Bash stderr retains its final lines when truncated
+- [x] Grep stops at `headLimit` with `truncated: true`
+- [x] Grep and Read clip lines at 2000 chars
+- [x] Read paginates a multi-megabyte file instead of refusing it, and reports
+  the next offset
+- [x] Read refuses binary content with `TOOL_BINARY_CONTENT`
+- [x] an explicit `path` reaches into an ignored tree (`node_modules`, spill dir)
+- [x] Glob and Grep order results by modification time, newest first
+- [x] truncated results still valid UTF-8 text
 - [ ] an oversized parallel result batch compacts to a bounded marked tail,
   survives restart, and leaves the original transcript results unchanged
