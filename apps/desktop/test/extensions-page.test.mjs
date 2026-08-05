@@ -89,6 +89,12 @@ test("the extensions page separates the four things a user installs or writes", 
   );
 });
 
+test("the extensions page uses tabs instead of a four-number overview band", () => {
+  assert.doesNotMatch(pageSrc, /plugins-hero|plugins-stat|const summary\s*=/);
+  assert.doesNotMatch(styles, /\.plugins-hero|\.plugins-stat/);
+  assert.match(pageSrc, /className="plugins-segment"/);
+});
+
 // Scoping something to "this project" only means anything relative to the folder
 // the window has open, and the picker cannot offer folders it was never given.
 test("both new sections receive the project list and the open project", () => {

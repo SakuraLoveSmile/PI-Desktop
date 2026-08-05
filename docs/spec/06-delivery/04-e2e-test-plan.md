@@ -766,7 +766,7 @@ Each scenario is documented in this format:
 #### E2E-022: Load local plugin
 
 - **Preconditions**: App running; sample plugin available at local path.
-- **Steps**: 1) Open Plugins from the app sidebar. 2) Choose Load local plugin from the header overflow menu. 3) Enable it with the row switch.
+- **Steps**: 1) Open Extensions from the app sidebar. 2) Choose Load local plugin from the header overflow menu. 3) Enable it with the row switch.
 - **Expected**: Plugin loads; manifest validated; contributions registered; the row appears under Active with a Local tag.
 - **Specs linked**: `07-plugins/01-plugin-system.md`, `07-plugins/05-plugin-lifecycle.md`
 - **Acceptance**: G (load local plugin)
@@ -776,7 +776,7 @@ Each scenario is documented in this format:
 #### E2E-022A: Create a plugin from a template
 
 - **Preconditions**: App running; an empty folder available.
-- **Steps**: 1) Open Plugins. 2) Choose New plugin from template in the header overflow menu (or use the empty-state button). 3) Pick each of the four templates in turn and read its description. 4) Choose the folder. 5) Cancel the folder picker on a second attempt.
+- **Steps**: 1) Open Extensions. 2) Choose New plugin from template in the header overflow menu (or use the empty-state button). 3) Pick each of the four templates in turn and read its description. 4) Choose the folder. 5) Cancel the folder picker on a second attempt.
 - **Expected**: The picker lists exactly `panel-basic`, `agent-tool-basic`, `skill-pack`, `full-demo`, each named and described in the active locale; choosing a folder writes the template files, loads the plugin as a development plugin, refreshes the list, then opens that folder as the active project — the app lands on chat with the new folder as the workspace, it appears in the sidebar project list, and the toast reads "<name> created, loaded, and opened for development"; the plugin's contributions are immediately usable and the built-in plugin-development skill is active in the new workspace; a canceled folder picker changes nothing and reports no error.
 - **Specs linked**: `07-plugins/10-plugin-devex.md`, ADR 0039
 - **Acceptance**: G (create plugin from template)
@@ -826,7 +826,7 @@ Each scenario is documented in this format:
 #### E2E-024G: Marketplace detail sheet shows README, permissions, versions
 
 - **Preconditions**: Official marketplace catalog available.
-- **Steps**: 1) Open Plugins → Marketplace. 2) Open details for `demo.workspace-summary`. 3) Inspect README / risk-grouped permissions / version rows. 4) Pick a version and install after permission review. 5) Dismiss the sheet with Escape and by clicking the scrim.
+- **Steps**: 1) Open Extensions → Marketplace. 2) Open details for `demo.workspace-summary`. 3) Inspect README / risk-grouped permissions / version rows. 4) Pick a version and install after permission review. 5) Dismiss the sheet with Escape and by clicking the scrim.
 - **Expected**: Detail sheet loads via `market.getDetail`; README, safety notes, and per-risk permission explanations render; the picked version drives the sticky install action; Escape and scrim both close the sheet without closing the permission dialog underneath.
 - **Specs linked**: `07-plugins/07-plugin-marketplace.md`
 - **Acceptance**: G (marketplace detail UX)
@@ -835,7 +835,7 @@ Each scenario is documented in this format:
 #### E2E-024F: Refresh official remote marketplace repository
 
 - **Preconditions**: Network available to GitHub raw content.
-- **Steps**: 1) Open Plugins → Marketplace. 2) Use the header Refresh marketplace action. 3) Confirm the source line points at `vastsa/pi-desktop-plugins`.
+- **Steps**: 1) Open Extensions → Marketplace. 2) Use the header Refresh marketplace action. 3) Confirm the source line points at `vastsa/pi-desktop-plugins`.
 - **Expected**: Catalog refreshes from the remote official repo; card grid updates; offline fallback still works if fetch fails.
 - **Specs linked**: `07-plugins/07-plugin-marketplace.md`
 - **Acceptance**: G (remote marketplace source)
@@ -844,8 +844,8 @@ Each scenario is documented in this format:
 #### E2E-024B: Marketplace install with permission review
 
 - **Preconditions**: App running; official market catalog available.
-- **Steps**: 1) Open Plugins → Marketplace. 2) Install `demo.workspace-notes`. 3) Read the risk-tiered permission dialog. 4) Accept high-risk permissions.
-- **Expected**: Permissions are grouped High / Medium / Low with plain-language explanations before any download; plugin installed from the marketplace package, checksum verified, permissions granted, panel/tools available; the overview band's high-risk counter increases.
+- **Steps**: 1) Open Extensions → Marketplace. 2) Install `demo.workspace-notes`. 3) Read the risk-tiered permission dialog. 4) Accept high-risk permissions.
+- **Expected**: Permissions are grouped High / Medium / Low with plain-language explanations before any download; plugin installed from the marketplace package, checksum verified, permissions granted, panel/tools available; the installed tab and risk-grouped rows reflect the new plugin without a separate overview card row.
 - **Specs linked**: `07-plugins/07-plugin-marketplace.md`, `07-plugins/13-plugin-permissions-matrix.md`
 - **Acceptance**: G (marketplace install + permission review)
 - **Status**: Documented / host-core covered by unit tests + protocol methods
@@ -862,7 +862,7 @@ Each scenario is documented in this format:
 #### E2E-024H: Installed plugins surface state, risk, and failures
 
 - **Preconditions**: At least one enabled plugin, one disabled plugin, and one plugin whose load failed.
-- **Steps**: 1) Open Plugins → Installed. 2) Read the overview band counters. 3) Confirm the failed plugin sits under Needs attention with its error message. 4) Search by author and by permission. 5) Clear the search.
+- **Steps**: 1) Open Extensions → Installed. 2) Read the tab and group counts. 3) Confirm the failed plugin sits under Needs attention with its error message. 4) Search by author and by permission. 5) Clear the search.
 - **Expected**: Rows group as Needs attention / Updates available / Active / Turned off with counts; `status: "error" | "load_error"` renders the error message inline instead of being silent; permission chips are tinted by risk tier with overflow collapsed; the result count reflects the filtered subset and clearing restores every group.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `07-plugins/13-plugin-permissions-matrix.md`
 - **Acceptance**: G (installed plugin management)
@@ -916,7 +916,7 @@ Each scenario is documented in this format:
 #### E2E-024L: Resident plugin service is supervised and visible
 
 - **Preconditions**: `examples/plugins/hello` enabled with `background.service` granted.
-- **Steps**: 1) Open Plugins → Installed and read the `Greeter heartbeat` chip. 2) Kill the plugin's utility process and watch the chip. 3) Kill it repeatedly past the restart ceiling. 4) Disable and re-enable the plugin. 5) Revoke `background.service` and reload.
+- **Steps**: 1) Open Extensions → Installed and read the `Greeter heartbeat` chip. 2) Kill the plugin's utility process and watch the chip. 3) Kill it repeatedly past the restart ceiling. 4) Disable and re-enable the plugin. 5) Revoke `background.service` and reload.
 - **Expected**: The chip reports `running` after load; a kill shows `failed` then `running` again with an incremented restart count and backoff between attempts; past five attempts the plugin stays `failed` and stops retrying; manual disable/enable cancels the pending timer and resets the counter; without the permission the service never starts and the skip is audited.
 - **Specs linked**: `07-plugins/05-plugin-lifecycle.md` §3.1, ADR 0040, D177
 - **Acceptance**: G (resident services)
@@ -931,10 +931,30 @@ Each scenario is documented in this format:
 - **Acceptance**: G (message bus) + Security
 - **Status**: Unit-covered (`plugin-bus.test.mjs` delivery, filtering, caps); two-plugin manual scenario Draft
 
+#### E2E-024N: Extensions page density and theme-readable actions
+
+- **Preconditions**: App running with at least one installed extension and one
+  available marketplace action; dark and light themes available.
+- **Steps**: 1) Open Extensions in dark theme. 2) Confirm the header and
+  Installed / MCP / Skills / Marketplace tabs reach the content without a
+  four-card numeric overview band. 3) Use the contextual primary action and a
+  secondary update/action button. 4) Switch to light theme and repeat. 5)
+  Keyboard-focus each action.
+- **Expected**: The four numeric overview cards are absent; tab counts,
+  installed group counts, and any update alert remain available in their
+  relevant surfaces. Primary and secondary buttons keep visible semantic
+  surfaces, text, borders, hover states, and focus rings in both themes, and
+  keyboard focus does not depend on pointer hover.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
+  `07-plugins/07-plugin-marketplace.md`, ADR 0058, D196
+- **Acceptance**: G (Extensions page) + Quality
+- **Status**: Unit-covered (`extensions-page.test.mjs`,
+  `plugins-page-style.test.mjs`); visual scenario Draft
+
 #### E2E-025: Disable plugin removes contributions
 
 - **Preconditions**: Plugin enabled and contributions visible.
-- **Steps**: 1) Disable the plugin on the Plugins page. 2) Check global search and agent tools.
+- **Steps**: 1) Disable the plugin on the Extensions page. 2) Check global search and agent tools.
 - **Expected**: Commands and tools disappear; no leftover contributions.
 - **Specs linked**: `07-plugins/05-plugin-lifecycle.md`
 - **Acceptance**: G (disable removes contributions)
@@ -1580,8 +1600,9 @@ Each scenario is documented in this format:
 - **Expected**: No blue brand accent remains. Interactive accent, markdown
   links/rules, and plugin primary actions resolve through the neutral gray
   accent tokens (`white/gray` dark, dark-ink light). The plugins
-  installed/market UI (tabs, search, cards, permission modal) uses only
-  `--ds-*` tokens with no blue-slate fallbacks in either theme. Semantic
+  installed/market UI (tabs, search, cards, permission modal, and primary /
+  secondary buttons) uses only `--ds-*` tokens with no blue-slate fallbacks in
+  either theme; button surfaces and ink remain visible in dark mode. Semantic
   success/warning/error colors are unchanged.
 - **Specs linked**: `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`
@@ -1897,7 +1918,7 @@ Each scenario is documented in this format:
   open, confirm the panel collapse button is flush with the main-pane right
   divider and does not retain the 112px outer-window control clearance. In the
   main chat, send a first user message and confirm its full bubble starts below
-  the 46px titlebar control band. Open the Plugins page and confirm its header
+  the 46px titlebar control band. Open the Extensions page and confirm its header
   actions, then the detail sheet's close button, also start below that band and
   take their own clicks instead of moving the window. Click the center plus the
   top, bottom, and
@@ -1923,7 +1944,7 @@ Each scenario is documented in this format:
   drag rectangle overlaps the reserved control zone. Window controls remain
   clickable across their full 46px-high hit targets, match native state, and
   have accessible names; the first user or assistant transcript row never
-  paints beneath them, and neither do the Plugins page header actions or the
+  paints beneath them, and neither do the Extensions page header actions or the
   plugin detail sheet close button. Unknown actions fail closed. Each package contains
   the target-native host binary (`.exe` only on Windows). Passing this scenario
   on Windows/Linux proves shell readiness, not first-release qualification.
@@ -2079,7 +2100,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: PI-Desktop is open with the expanded sidebar and a chat
   session is active.
-- **Steps**: 1) Open Plugins on macOS windowed mode. 2) Inspect the expanded
+- **Steps**: 1) Open Extensions on macOS windowed mode. 2) Inspect the expanded
   sidebar titlebar. 3) Confirm no PI-Desktop logo/title is visible and Search
   then Collapse sidebar appear at the right of the traffic lights. 4) Enter
   fullscreen and inspect the same row. 5) On Windows/Linux, confirm the brand
@@ -3286,10 +3307,10 @@ Each scenario is documented in this format:
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
 | E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-025, E2E-026, E2E-105, E2E-117 |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-025, E2E-026, E2E-105, E2E-117 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-AGENTS-001, E2E-024N, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -3627,7 +3648,7 @@ This test plan spec is accepted when:
 - Model configuration contains the provider studio hero, default mode/model, Enter-to-send
   switch, and card-based Providers management with an add-provider dialog.
 - Plugin load/enable/disable/uninstall remains available from the app shell's
-  independent Plugins destination.
+  independent Extensions destination.
 - Dark: rail `#000`, main `#181818`, cards elevated `#212121`.
 
 ### US-UI-38 Composer workspace context omitted

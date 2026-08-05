@@ -1,8 +1,8 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.14`
-- Date: `2026-07-31`
-- Status: `Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v9 + schema v10 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release)`
+- Baseline Version: `0.4.15`
+- Date: `2026-08-05`
+- Status: `Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v9 + schema v10 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release + Extensions page density and theme-readable actions)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -52,6 +52,10 @@
 > already-approved session remains Agent. ADR 0054 adds the selectable shell
 > catalog while retaining the Bash protocol name. The host protocol is v9 and
 > storage schema is v10.
+> `0.4.15` amends the D169 Extensions presentation through D196 / ADR 0058:
+> the four-card numeric overview band is removed, and shared button surfaces
+> use semantic theme tokens so primary and secondary actions remain visible in
+> dark and light themes. No host protocol or storage schema changes.
 
 ## Frozen Decisions
 

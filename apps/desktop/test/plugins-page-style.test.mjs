@@ -38,6 +38,15 @@ test("plugins page styles use design tokens in both themes", () => {
   assert.match(section, /\.plugins-modal\s*\{[\s\S]*?--ds-bg-elevated-opaque/);
   assert.match(section, /\.plugins-installed-mark\s*\{[\s\S]*?--ds-success/);
   assert.match(section, /:root\[data-theme="light"\] \.plugins-modal-backdrop/);
+
+  assert.match(
+    stylesSource,
+    /\.btn-primary\s*\{[\s\S]*?background:\s*var\(--ds-accent\);[\s\S]*?color:\s*var\(--ds-bg-primary\);/,
+  );
+  assert.match(
+    stylesSource,
+    /\.btn-secondary\s*\{[\s\S]*?background:\s*var\(--ds-bg-secondary\);[\s\S]*?color:\s*var\(--ds-text-primary\);[\s\S]*?--ds-border-default/,
+  );
 });
 
 test("plugins page styles tier permission risk with semantic tokens", () => {
@@ -45,7 +54,7 @@ test("plugins page styles tier permission risk with semantic tokens", () => {
 
   assert.match(section, /\.plugins-perm-chip\.risk-high\s*\{[\s\S]*?--ds-warning/);
   assert.match(section, /\.plugins-risk-group\.risk-high\s*\{[\s\S]*?--ds-error/);
-  assert.match(section, /\.plugins-hero\s*\{/);
+  assert.doesNotMatch(section, /\.plugins-hero|\.plugins-stat/);
   assert.match(section, /\.plugins-sheet\s*\{/);
   assert.match(section, /@media \(prefers-reduced-motion: reduce\)/);
 });

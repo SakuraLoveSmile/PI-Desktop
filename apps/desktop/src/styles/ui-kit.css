@@ -62,23 +62,23 @@
 }
 
 .btn-primary {
-  background: var(--gray-0);
-  color: var(--gray-1000);
-}
-:root[data-theme="light"] .btn-primary {
-  background: var(--gray-1000);
-  color: var(--gray-0);
+  background: var(--ds-accent);
+  color: var(--ds-bg-primary);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-default);
 }
 .btn-primary:hover:not(:disabled) {
-  opacity: 0.9;
+  background: var(--ds-accent-hover);
+  opacity: 1;
 }
 
 .btn-secondary {
-  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  background: var(--ds-bg-secondary);
   color: var(--ds-text-primary);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-default);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--ds-text-primary) 12%, transparent);
+  background: var(--ds-bg-tertiary);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-strong);
 }
 
 .btn-ghost {

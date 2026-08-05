@@ -531,20 +531,11 @@ export function PluginsPage() {
   }, [plugins]);
 
   const stats = useMemo(() => {
-    let enabled = 0;
     let updates = 0;
-    let highRisk = 0;
     for (const plugin of plugins) {
-      if (plugin.enabled) enabled += 1;
       if (plugin.updateAvailable) updates += 1;
-      if (
-        plugin.enabled &&
-        (plugin.permissions ?? []).some((perm) => permissionRisk(perm) === "high")
-      ) {
-        highRisk += 1;
-      }
     }
-    return { total: plugins.length, enabled, updates, highRisk };
+    return { total: plugins.length, updates };
   }, [plugins]);
 
   const filteredInstalled = useMemo(
@@ -742,13 +733,6 @@ export function PluginsPage() {
     },
   ];
 
-  const summary = [
-    { key: "installed", labelKey: "plugins.statInstalled", value: stats.total },
-    { key: "enabled", labelKey: "plugins.statEnabled", value: stats.enabled },
-    { key: "updates", labelKey: "plugins.statUpdates", value: stats.updates },
-    { key: "highRisk", labelKey: "plugins.statHighRisk", value: stats.highRisk },
-  ];
-
   const installTarget = activeVersion?.version || detail?.latestVersion;
   const installedDetail = detail ? installedById.get(detail.id) : undefined;
   const detailPermissions = orderPermissions(
@@ -814,19 +798,6 @@ export function PluginsPage() {
             </div>
           </div>
         </div>
-
-        {tab === "installed" || tab === "market" ? (
-          <section className="plugins-hero" aria-label={t("plugins.overview")}>
-            <dl className="plugins-hero-stats">
-              {summary.map((cell) => (
-                <div key={cell.key} className="plugins-stat">
-                  <dt className="plugins-stat-label">{t(cell.labelKey)}</dt>
-                  <dd className="plugins-stat-value">{cell.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-        ) : null}
 
         {stats.updates > 0 && tab !== "mcp" && tab !== "skills" ? (
           <div className="plugins-alert" role="status">

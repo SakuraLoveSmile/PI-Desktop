@@ -4,16 +4,6 @@
 */
 
 @media (max-width: 720px) {
-  .plugins-hero-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 14px;
-  }
-
-  .plugins-stat:nth-child(3) {
-    padding-left: 0;
-    border-left: 0;
-  }
-
   .plugins-toolbar-end {
     flex: 1 1 100%;
     justify-content: flex-start;

@@ -18,7 +18,7 @@ destination, chat as the home surface, tools and permissions inline.
 +------------------+--------------------------------+------------------+
 | Sidebar (~275px) | Main pane (active destination) | Work panel       |
 |  New task        |  chat home / transcript        |  (optional,      |
-|  Plugins         |  or Plugins page               |   resizable      |
+|  Extensions      |  or Extensions page            |   resizable      |
 |                  |                                |   244–720px)     |
 |  Sessions     +↕ |                                | surface          |
 |   Recent rows ↕  |                                |                  |
@@ -29,7 +29,7 @@ destination, chat as the home surface, tools and permissions inline.
 +------------------+--------------------------------+------------------+
 ```
 
-- **Sidebar**: primary navigation — New task, the Plugins destination,
+- **Sidebar**: primary navigation — New task, the Extensions destination,
   path-less conversations under a compact **Sessions** section with new-session
   and sort actions, retained open-project groups under a following **Projects**
   section with a persistent new-project action, and the
@@ -191,18 +191,20 @@ auto-approve a plan.
 The user must explicitly switch it to Agent before enabling unattended
 execution.
 
-### 3.5 Plugins
-Overview band (installed / enabled / updates / high-risk access) above a
-segmented Installed / Marketplace switch carrying counts (D169). Installed
-groups rows by state — Needs attention / Updates available / Active /
+### 3.5 Extensions
+The Extensions destination uses a compact header and a four-part segmented
+control — Installed / MCP / Skills / Marketplace — with relevant tab counts;
+it does not render a separate numeric overview band (D196 amends D169).
+Installed groups rows by state — Needs attention / Updates available / Active /
 Turned off — inside one hairline-separated panel; each row shows the plugin
 glyph, name, version, state tags, author meta, risk-tinted permission chips,
 and reveals quiet icon actions on hover (open panel, overflow menu with
-auto-update and Uninstall) beside an always-visible enable switch. Marketplace
-is a card grid with category chips and skeleton placeholders. Details open in a
-right-side sheet (about, links, safety notes, risk-labeled permissions, version
-picker, readme). Installing opens a permission dialog that groups requests by
-risk tier and marks permissions new to an upgrade.
+auto-update and Uninstall) beside an always-visible enable switch. MCP and
+Skills provide their own scoped configuration and authoring surfaces.
+Marketplace is a card grid with category chips and skeleton placeholders.
+Details open in a right-side sheet (about, links, safety notes, risk-labeled
+permissions, version picker, readme). Installing opens a permission dialog
+that groups requests by risk tier and marks permissions new to an upgrade.
 
 ### 3.6 Settings (full-page takeover)
 Settings replaces the whole shell (D063): back-to-app + search + a compact
@@ -219,8 +221,8 @@ with all groups collapsed. Project archive owns the durable D086 Projects index
 (search, add, expand, pin, archive/restore, close, and reopen) and always includes
 archived records. Opening or switching a project retains a sidebar tab, selects
 that project as the active workspace, and returns to chat. Other retained tabs
-stay open. Plugin management remains solely on the app shell's independent
-Plugins destination described in §3.5.
+stay open. Extension management remains solely on the app shell's independent
+Extensions destination described in §3.5.
 
 ## 4. Overlays
 

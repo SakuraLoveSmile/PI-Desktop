@@ -163,6 +163,13 @@ Neutral gray scale only — no blue-slate surfaces. Chrome components must consu
 
 **Invariant:** never paint chrome text with raw `gray-0` (`#fff`) under `data-theme="light"`. Use `--ds-text-primary` / `--ds-text-secondary`.
 
+Shared buttons must use semantic theme tokens for both their surface and ink:
+primary actions pair `--ds-accent` with `--ds-bg-primary`, while secondary
+actions use the opaque `--ds-bg-secondary` surface with primary text and a
+visible semantic border. Hover states use the corresponding accent/tertiary
+tokens rather than opacity-only changes, so actions remain legible in dark
+and light themes.
+
 Light-surface polish (D148):
 
 - Docked work panel uses quiet inset paper (`#fafafa`) with a white header band and a combined create trigger in the header so the tool column stays on content without a heavy divider.

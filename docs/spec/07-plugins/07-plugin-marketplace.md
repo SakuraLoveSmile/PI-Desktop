@@ -149,11 +149,12 @@ Strategy:
 ## 7. Marketplace UI information architecture
 
 ```text
-Plugins
-├─ Overview band (installed / enabled / updates / high-risk access)
+Extensions
 ├─ Installed
 │ ├─ Search + result count
 │ └─ Groups: Needs attention · Updates available · Active · Turned off
+├─ MCP
+├─ Skills
 ├─ Marketplace
 │ ├─ Search
 │ ├─ Categories
@@ -162,10 +163,13 @@ Plugins
 └─ Permission dialog (install / upgrade)
 ```
 
-Both tabs live under one segmented control that carries per-tab counts. The
-header keeps a single contextual primary action (Browse marketplace / Refresh
-marketplace) and moves Check for updates, Apply automatic updates, Install
-package, and Load local plugin into an overflow menu (D169).
+All four surfaces live under one segmented control that carries relevant
+per-tab counts. There is no separate numeric overview band; the update alert,
+tab counts, and installed group counts retain the actionable state without
+duplicating it in a static card row (D196). The header keeps a single
+contextual primary action (Browse marketplace / Refresh marketplace) and moves
+Check for updates, Apply automatic updates, Install package, and Load local
+plugin into an overflow menu (D169).
 
 The Detail sheet must show:
 - Permissions, grouped and labeled by risk tier
@@ -240,7 +244,7 @@ All download metadata must include `shasum`.
 
 ## 12. Implementation status
 
-Desktop Plugins page now includes a Marketplace tab that calls:
+Desktop Extensions page now includes a Marketplace tab that calls:
 
 - `market.search`
 - `market.getDetail`
@@ -280,7 +284,7 @@ PI_DESKTOP_PLUGIN_MARKET_URL=https://raw.githubusercontent.com/<owner>/<repo>/<r
 
 ## 14. Marketplace detail UX
 
-The Plugins page opens details as a right-side sheet (scrim + Escape + outside
+The Extensions destination opens details as a right-side sheet (scrim + Escape + outside
 click dismiss) that loads `market.getDetail` and shows:
 
 - about text, author, and repository / homepage links (opened in the work
@@ -300,4 +304,3 @@ Contribution docs live in the official warehouse:
 
 - https://github.com/vastsa/pi-desktop-plugins/blob/main/CONTRIBUTING.md
 - Practical template: `plugins/demo.workspace-summary`
-

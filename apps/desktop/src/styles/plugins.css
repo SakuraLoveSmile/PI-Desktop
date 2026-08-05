@@ -1,11 +1,11 @@
 /*
-  Plugins page — hero and stats, alerts, search and segmented filters, plugin
-  rows and cards, the detail sheet (permissions, versions, readme), and the
-  install/permission modals.
+  Plugins page — alerts, search and segmented filters, plugin rows and cards,
+  the detail sheet (permissions, versions, readme), and install/permission
+  modals.
 */
 
 /* ---- Plugins marketplace / permission review ----
-   One cohesive section for the whole Plugins page: page shell, overview band,
+   One cohesive section for the whole Plugins page: page shell,
    segmented tabs, installed index, marketplace grid, detail sheet, and the
    risk-tiered permission dialog. Every color goes through a --ds-* token so the
    page renders correctly in both themes. */
@@ -29,61 +29,6 @@
      rectangle: without this the window moves instead of the button reacting. */
   -webkit-app-region: no-drag;
   app-region: no-drag;
-}
-
-/* Overview band: four counters reading the installed set at a glance. */
-.plugins-hero {
-  border-radius: var(--radius-lg);
-  padding: 16px 20px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in oklab, var(--ds-text-primary) 4.5%, transparent),
-    color-mix(in oklab, var(--ds-text-primary) 2%, transparent)
-  );
-  box-shadow: 0 0 0 0.5px var(--ds-border-default);
-}
-
-:root[data-theme="light"] .plugins-hero {
-  background: linear-gradient(180deg, #ffffff, #fbfbfb);
-  box-shadow: 0 0 0 0.5px color-mix(in oklab, #1a1c1f 9%, transparent);
-}
-
-.plugins-hero-stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: 0;
-}
-
-.plugins-stat {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 3px;
-  padding: 2px 16px;
-  min-width: 0;
-  border-left: 1px solid var(--ds-border-subtle);
-}
-
-.plugins-stat:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-
-.plugins-stat-value {
-  margin: 0;
-  color: var(--ds-text-primary);
-  font-size: var(--text-xl);
-  font-weight: var(--font-weight-strong);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--tracking-tighter);
-  line-height: var(--leading-none);
-}
-
-.plugins-stat-label {
-  color: var(--ds-text-muted);
-  font-size: var(--text-3xs);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
 }
 
 /* Pending-update banner: shown only while updates exist. */

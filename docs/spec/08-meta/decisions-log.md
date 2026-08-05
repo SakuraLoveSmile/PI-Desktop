@@ -1,7 +1,7 @@
 # Decisions Log
 
-> Baseline delta: `0.3.0` → `0.4.14`
-> Date: `2026-07-31`
+> Baseline delta: `0.3.0` → `0.4.15`
+> Date: `2026-08-05`
 > Status: Accepted for implementation
 
 This log freezes previously open questions into concrete decisions.
@@ -590,9 +590,9 @@ section mirrors only marketplace/catalog items still blocking nothing.
   unchanged.
 - Decision D168; supersedes D133's flat-list presentation.
 
-## 2026-07-31 — Plugins page redesign
+## 2026-07-31 — Plugins page redesign (presentation amended by D196)
 
-- The Plugins page is rebuilt as four bands: an overview band with four derived
+- The original Plugins page was rebuilt as four bands: an overview band with four derived
   counters (installed, enabled, updates, high-risk access), a header that keeps
   one contextual primary action and moves check-updates / apply-auto-updates /
   install-package / load-local into an overflow menu, a segmented
@@ -1137,3 +1137,17 @@ D193, and D194.
   `03-runtime/03-tools-and-permissions.md`, `03-runtime/06-host-rpc-protocol.md`,
   `03-runtime/15-workspace-ignore-rules.md`, `03-runtime/16-tool-result-limits.md`,
   and E2E-019/E2E-019e.
+
+## 2026-08-05 — Extensions page density and theme-readable actions
+
+- The Extensions destination no longer renders the four-card numeric overview
+  band. Installed, MCP, Skills, and Marketplace remain separate tabs; tab
+  counts, installed state-group counts, and the pending-update alert retain
+  actionable state without duplicating it in a static summary row.
+- Shared primary and secondary buttons use semantic accent, surface, text, and
+  border tokens. Primary actions invert the current theme surface; secondary
+  actions keep an opaque elevated surface and visible border in both themes.
+- Decision D196 amends the presentation portion of D169 without changing
+  plugin, MCP, skill, marketplace, permission, or runtime contracts. See ADR
+  0058, `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
+  `07-plugins/07-plugin-marketplace.md`, and E2E-024N/E2E-060b.
