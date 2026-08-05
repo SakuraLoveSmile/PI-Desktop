@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import type { FsEntry, FsReadResult } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
+import { Markdown } from "../Markdown";
 import { cx } from "../ui";
 import {
   ensureLang,
@@ -64,6 +65,10 @@ function langForPath(path: string): string | null {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   const lang = EXT_LANG[ext] ?? ext;
   return resolveLang(lang);
+}
+
+function isMarkdownPath(path: string): boolean {
+  return /\.(?:md|markdown)$/i.test(path);
 }
 
 function formatSize(size: number): string {
@@ -333,6 +338,10 @@ export function FilesTab() {
             </div>
           ) : !file ? (
             <div className="file-tree-note">{t("panel.files.loading")}</div>
+          ) : file.kind === "text" && isMarkdownPath(selected) ? (
+            <div className="file-viewer-markdown prose-chat">
+              <Markdown source={file.content ?? ""} />
+            </div>
           ) : file.kind === "text" ? (
             <HighlightedText path={selected} content={file.content ?? ""} />
           ) : file.kind === "image" ? (

@@ -121,30 +121,22 @@ const PROVIDER_SELECT: &str =
             default_model_id, api_style, config_json, created_at, updated_at
      FROM providers";
 
-const CANONICAL_THINKING_LEVELS: &[&str] = &[
-    "off",
-    "minimal",
-    "low",
-    "medium",
-    "high",
-    "xhigh",
-    "max",
-];
+const CANONICAL_THINKING_LEVELS: &[&str] =
+    &["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
 fn config_value(raw: &str) -> Option<serde_json::Value> {
     serde_json::from_str::<serde_json::Value>(raw).ok()
 }
 
 fn config_reasoning_override(raw: &str) -> Option<bool> {
-    config_value(raw)
-        .and_then(|v| v.get("compatibility")?.get("supportsReasoning")?.as_bool())
+    config_value(raw).and_then(|v| v.get("compatibility")?.get("supportsReasoning")?.as_bool())
 }
 
 fn normalize_thinking_levels(levels: &[String]) -> Vec<String> {
     let mut out = Vec::new();
     for level in levels {
         let trimmed = level.trim();
-        if !CANONICAL_THINKING_LEVELS.iter().any(|candidate| *candidate == trimmed) {
+        if !CANONICAL_THINKING_LEVELS.contains(&trimmed) {
             continue;
         }
         if !out.iter().any(|existing| existing == trimmed) {
@@ -185,7 +177,9 @@ fn ensure_config_object(raw: &str) -> Result<serde_json::Value> {
     let config: serde_json::Value = serde_json::from_str(raw)
         .map_err(|e| anyhow::anyhow!("provider config_json is invalid: {e}"))?;
     if !config.is_object() {
-        return Err(anyhow::anyhow!("provider config_json must be a JSON object"));
+        return Err(anyhow::anyhow!(
+            "provider config_json must be a JSON object"
+        ));
     }
     Ok(config)
 }
@@ -199,9 +193,9 @@ fn compatibility_object(
     let compatibility = object
         .entry("compatibility")
         .or_insert_with(|| serde_json::json!({}));
-    compatibility.as_object_mut().ok_or_else(|| {
-        anyhow::anyhow!("provider config_json.compatibility must be a JSON object")
-    })
+    compatibility
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("provider config_json.compatibility must be a JSON object"))
 }
 
 fn limits_object(
@@ -210,7 +204,9 @@ fn limits_object(
     let object = config
         .as_object_mut()
         .ok_or_else(|| anyhow::anyhow!("provider config_json must be a JSON object"))?;
-    let limits = object.entry("limits").or_insert_with(|| serde_json::json!({}));
+    let limits = object
+        .entry("limits")
+        .or_insert_with(|| serde_json::json!({}));
     limits
         .as_object_mut()
         .ok_or_else(|| anyhow::anyhow!("provider config_json.limits must be a JSON object"))
@@ -218,11 +214,7 @@ fn limits_object(
 
 /// Set or clear a `limits.<key>` override. `None` removes the key so runtime
 /// defaults apply again.
-fn config_with_limit(
-    raw: &str,
-    key: &str,
-    value: Option<serde_json::Value>,
-) -> Result<String> {
+fn config_with_limit(raw: &str, key: &str, value: Option<serde_json::Value>) -> Result<String> {
     let mut config = ensure_config_object(raw)?;
     let limits = limits_object(&mut config)?;
     match value {
@@ -248,15 +240,11 @@ fn limit_temperature_value(value: f64) -> Option<serde_json::Value> {
 
 fn config_with_reasoning_override(raw: &str, value: bool) -> Result<String> {
     let mut config = ensure_config_object(raw)?;
-    compatibility_object(&mut config)?
-        .insert("supportsReasoning".into(), serde_json::json!(value));
+    compatibility_object(&mut config)?.insert("supportsReasoning".into(), serde_json::json!(value));
     Ok(config.to_string())
 }
 
-fn config_with_thinking_levels_override(
-    raw: &str,
-    levels: Option<&[String]>,
-) -> Result<String> {
+fn config_with_thinking_levels_override(raw: &str, levels: Option<&[String]>) -> Result<String> {
     let mut config = ensure_config_object(raw)?;
     let compatibility = compatibility_object(&mut config)?;
     match levels {
@@ -297,8 +285,10 @@ fn build_provider_config_json(
     if let Some(levels) = supported_thinking_levels {
         let normalized = normalize_thinking_levels(levels);
         if !normalized.is_empty() {
-            compatibility_object(&mut config)?
-                .insert("supportedThinkingLevels".into(), serde_json::json!(normalized));
+            compatibility_object(&mut config)?.insert(
+                "supportedThinkingLevels".into(),
+                serde_json::json!(normalized),
+            );
         }
     }
     if let Some(value) = limits.context_window.and_then(limit_u32_value) {
@@ -332,10 +322,7 @@ fn merge_provider_config_overrides(
         next = config_with_reasoning_override(&next, value)?;
     }
     if let Some(levels) = supported_thinking_levels {
-        next = config_with_thinking_levels_override(
-            &next,
-            levels.as_deref(),
-        )?;
+        next = config_with_thinking_levels_override(&next, levels.as_deref())?;
     }
     if let Some(value) = limits.context_window {
         next = config_with_limit(&next, "contextWindow", limit_u32_value(value))?;

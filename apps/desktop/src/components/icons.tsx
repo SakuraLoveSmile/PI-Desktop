@@ -37,6 +37,7 @@ import {
   Info,
   Keyboard,
   Link,
+  ListChecks,
   Mic,
   MessageSquare,
   MessageSquarePlus,
@@ -138,6 +139,7 @@ export const IconPlug = icon(Plug);
 export const IconSlash = icon(Slash);
 export const IconUser = icon(UserRound);
 export const IconSparkles = icon(Sparkles);
+export const IconListChecks = icon(ListChecks);
 export const IconBrowser = icon(AppWindow);
 export const IconHook = icon(Webhook);
 export const IconWorkflow = icon(Workflow);

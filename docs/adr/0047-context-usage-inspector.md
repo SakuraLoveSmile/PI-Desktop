@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-02
 - Related: [D103](../spec/08-meta/decisions-log.md) ·
-  [D137](../spec/08-meta/decisions-log.md) ·
+  [D183](../spec/08-meta/decisions-log.md) ·
   [D184](../spec/08-meta/decisions-log.md) ·
   [IPC protocol](../spec/03-runtime/01-ipc-protocol.md) ·
   [Component spec](../spec/04-ux/08-component-spec.md)

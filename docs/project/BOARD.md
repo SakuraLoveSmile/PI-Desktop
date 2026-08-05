@@ -17,7 +17,7 @@ Until that is enabled, track delivery with:
 | Review | Waiting validation |
 | Done | Completed |
 
-## Status snapshot (2026-07-25, evening)
+## Status snapshot (2026-08-05)
 
 | Milestone | GitHub | Local status |
 |---|---|---|
@@ -27,6 +27,7 @@ Until that is enabled, track delivery with:
 | M3 Workspace Tools | [closed](https://github.com/vastsa/PI-Desktop/milestone/4) | Done |
 | M4 Plugin Foundation | [closed](https://github.com/vastsa/PI-Desktop/milestone/5) | Done |
 | M5 Desktop Hardening | [open](https://github.com/vastsa/PI-Desktop/milestone/6) | Done except notarization (credential-gated) |
+| M6 Plan Operating State | planned | Complete (2026-08-05) |
 
 Open issue:
 - [#6 M5: Packaging and desktop hardening](https://github.com/vastsa/PI-Desktop/issues/6)
@@ -70,6 +71,12 @@ Open issue:
   synced to real automation, decisions-log restructured (A–I) with
   supersession chains, acceptance criteria evidence-tagged
 - Codex visual parity pass (D034–D072 series; capture suite)
+- M6 Plan operating state implementation: one-Agent Agent/Plan transitions,
+  immutable `.pi/plan/*.md` checkpoints, approve/reject with explicit
+  Ask-defaulted permission selection, restart interruption without replay,
+  scheduled Plan rejection, selectable shell identity/stream/timeout/abort
+  handling, and English/Simplified Chinese renderer coverage
+  (E2E-104–E2E-117)
 
 ### In Progress
 - Codex visual gold polish (ongoing capture-driven iteration)
@@ -86,33 +93,29 @@ Open issue:
 - Windows/Linux release qualification (native CI, signing, upgrade tests)
 - Skills depth / MCP / additional locales (post-MVP)
 
-## Validation snapshot (2026-07-25, late evening — post impl-audit fixes)
+## Validation snapshot (2026-08-05 — M6 Plan acceptance)
 
-- `cargo test -p host-core` — pass (11: workspace escape/symlink suite,
-  bash pipe-drain, oversized-read refusal, shell module)
-- `pnpm --filter @pi-desktop/shared test` — pass (4)
-- `pnpm typecheck` — pass (all 5 packages)
-- `node scripts/e2e-smoke.mjs` — 14/14 pass without live key incl. new
-  E2E-024 plugin tool dispatch (16/16 with live-model lane)
-- `node scripts/e2e-electron-boot.mjs` — PASS (sandboxed preload + IPC
-  round-trip, dev build AND packaged .app)
-- `node scripts/e2e-supervision.mjs` — PASS (host-core SIGKILL →
-  supervised restart → healthy RPC)
-- `electron-builder --mac --arm64` — DMG built with icon + resources;
-  packaged-app boot probe PASS
-
-Impl-audit hardening landed: workspace write-escape closed, bash >64KB
-deadlock fixed, sidecar host-proxy allowlist, AGENT_BUSY + turnId +
-provider error mapping, D003 default-mode restored, cross-session event
-bleed fixed, permission countdown + timeout auto-close, onboarding
-checklist UI, palette session-delete + spec-conformant builtins,
-plugin agent tools wired to the model (E2E-024), real provider network
-test, capture fixtures gated. Plugin marketplace browse/install, .piplug package install, isolated
-plugin panels, auto-update policy, and gated high-risk plugin APIs are
-implemented. Official source is the dedicated repo vastsa/pi-desktop-plugins, with a practical template plugin and marketplace detail pane (README/changelog/versions). Remaining deferred (documented):
-full separate-process plugin runtime (ADR 0008 target), model catalog +
-native Anthropic/Google adapters (11-provider §5 status), session-
-scoped mode (02-agent-runtime §11).
+- `cargo test -p host-core --locked` — 139/139 passed; 15 focused DB tests passed
+- `pnpm --filter @pi-desktop/desktop test` — 353 passed, one
+  platform-conditional skip
+- `pnpm --filter @pi-desktop/agent-runtime test` — 97 passed
+- `pnpm --filter @pi-desktop/shared test` — 114 passed after building `dist`
+  (57 source cases executed in source and built form)
+- `pnpm --filter @pi-desktop/i18n test` — 7 passed
+- `pnpm build:js`, `pnpm typecheck`, `pnpm lint`, and
+  `cargo fmt --all -- --check` — passed
+- `PI_DESKTOP_E2E_LONG_TIMEOUT=1 pnpm test:e2e:plan` — 13 passed; the two
+  public-RPC fixture skips have direct deterministic Rust coverage
+- `pnpm test:e2e:plan-ui` — default no-key run 5/5 passed at 1280×800 and
+  900×700 with the live case explicitly skipped; the optional env-gated live
+  case requires an OpenAI-compatible provider. The authorized run with model
+  `gpt-5.6-luna` passed 6/6 with zero console diagnostics: real Composer/Send,
+  live `EnterPlanMode` → `SubmitPlan`, rendered Ask approval through
+  preload/Main, exact durable marker after approval, private WeakMap proof of
+  the same `DesktopAgentRuntime` object before/after approval, and stable
+  Main/Host/sidecar PIDs; credentials never entered CDP or output
+- `pnpm test:e2e` — 20/20 passed with credentials; no skips
+- `pnpm test:e2e:boot` and `pnpm test:e2e:supervision` — passed on Windows
 
 ## Upgrade to GitHub Projects later
 
