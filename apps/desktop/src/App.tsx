@@ -156,6 +156,7 @@ function AppShell() {
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const showToast = useAppStore((s) => s.showToast);
   const handleAgentEvent = useAppStore((s) => s.handleAgentEvent);
+  const handlePlansChanged = useAppStore((s) => s.handlePlansChanged);
   const abort = useAppStore((s) => s.abort);
   const settings = useAppStore((s) => s.settings);
   const workPanelOpen = useAppStore((s) => s.workPanelOpen);
@@ -417,6 +418,7 @@ function AppShell() {
   useEffect(() => {
     void bootstrap();
     const offEvent = api.onAgentEvent(handleAgentEvent);
+    const offPlansChanged = api.onPlansChanged(handlePlansChanged);
     // Host-pushed toasts (plugin runtime etc.) are informational.
     const offToast = api.onToast((message) => showToast(message));
     // Agent-driven HTML preview: surface the browser tab when the agent
@@ -434,6 +436,7 @@ function AppShell() {
         setBackendDown(null);
         if (status.restarted) {
           showToast(t("status.restored"), { variant: "success" });
+          void useAppStore.getState().refreshPlanCheckpoints();
         }
       } else {
         setBackendDown({
@@ -542,6 +545,7 @@ function AppShell() {
     window.addEventListener("keydown", onKey);
     return () => {
       offEvent();
+      offPlansChanged();
       offToast();
       offBrowserPreview();
       offHostStatus();
@@ -552,6 +556,7 @@ function AppShell() {
   }, [
     bootstrap,
     handleAgentEvent,
+    handlePlansChanged,
     showToast,
     abort,
     t,

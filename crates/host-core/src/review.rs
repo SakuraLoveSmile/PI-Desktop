@@ -160,7 +160,9 @@ fn before_path(dir: &Path) -> PathBuf {
 }
 
 fn relative_path(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
+    let canonical_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    path.strip_prefix(&canonical_root)
+        .or_else(|_| path.strip_prefix(root))
         .unwrap_or(path)
         .to_string_lossy()
         .replace('\\', "/")
