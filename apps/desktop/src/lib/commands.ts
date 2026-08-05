@@ -28,16 +28,6 @@ export async function runPaletteCommand(commandId: string): Promise<void> {
     case "builtin.agent.compact":
       await store.compactContext();
       break;
-    case "builtin.mode.agent":
-    case "builtin.mode.chat": {
-      const mode = commandId.endsWith("agent") ? "agent" : "chat";
-      if (store.settings) {
-        const next = { ...store.settings, defaultMode: mode as "agent" | "chat" };
-        await api.setSettings(next);
-        useAppStore.setState({ settings: next });
-      }
-      break;
-    }
     case "builtin.openProject":
     case "builtin.project.open":
       await store.openProject();

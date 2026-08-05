@@ -24,9 +24,14 @@ const storeSource = await readFile(
   "utf8",
 );
 // The Agent/Chat mode control moved out of the composer into the conversation
-// top bar (8f09dd2); `mode-chip` is now just the shared composer chip class.
+// top bar (8f09dd2) and was removed entirely with D188; the top bar now carries
+// the model select, which owns the session thinking-level write.
 const topbarSource = await readFile(
   new URL("../src/components/ConversationTopbar.tsx", import.meta.url),
+  "utf8",
+);
+const modelSelectSource = await readFile(
+  new URL("../src/components/ModelSelect.tsx", import.meta.url),
   "utf8",
 );
 // Provider thinking config lives in the provider settings components, not the
@@ -65,7 +70,7 @@ test("composer exposes the runtime thinking level order and provider filtering",
   assert.match(composerSource, /availableThinkingLevels/);
 });
 
-test("reasoning-capable models lead the composer chip row, mode sits in the top bar", () => {
+test("reasoning-capable models lead the composer chip row, no mode control remains", () => {
   const leftToolbar = composerSource.slice(
     composerSource.indexOf('<div className="composer-left">'),
     composerSource.indexOf('<div className="composer-right">'),
@@ -73,12 +78,13 @@ test("reasoning-capable models lead the composer chip row, mode sits in the top 
   const thinkingControl = leftToolbar.indexOf('className="composer-thinking"');
   const permissionControl = leftToolbar.indexOf('className="composer-permission"');
 
-  // Mode is a top-bar segmented control, so the composer row starts at thinking.
+  // D188: Agent is the only mode, so the composer row starts at thinking and
+  // the top bar keeps only the model select plus task actions.
   assert.ok(thinkingControl >= 0);
   assert.ok(permissionControl > thinkingControl);
-  assert.match(topbarSource, /className="ct-mode"/);
-  assert.match(topbarSource, /ct-mode-btn[\s\S]*?mode === "chat"/);
-  assert.match(topbarSource, /ct-mode-btn[\s\S]*?mode === "agent"/);
+  assert.doesNotMatch(topbarSource, /ct-mode/);
+  assert.doesNotMatch(stylesSource, /\.ct-mode\b/);
+  assert.doesNotMatch(stylesSource, /\.ct-mode-btn\b/);
   assert.match(
     leftToolbar,
     /thinkingProvider\?\.supportsReasoning\s*&&\s*availableThinkingLevels\.length/,
@@ -97,12 +103,12 @@ test("switching to a provider without reasoning resets the session level", () =>
     composerSource,
     /if\s*\(!provider\?\.supportsReasoning\)\s*return\s*"off"/,
   );
-  // Composer still owns the guard, but the session write moved to the top bar.
+  // Composer still owns the guard; the session write lives in the model select.
   assert.match(
     composerSource,
     /const thinkingLevel = thinkingLevelForProvider\(\s*thinkingProvider,\s*configuredThinkingLevel,\s*\)/,
   );
-  assert.match(topbarSource, /thinkingLevel:\s*thinkingLevelForProvider\(/);
+  assert.match(modelSelectSource, /thinkingLevel:\s*thinkingLevelForProvider\(/);
 });
 
 test("new sessions default to the strongest level of a reasoning model", () => {

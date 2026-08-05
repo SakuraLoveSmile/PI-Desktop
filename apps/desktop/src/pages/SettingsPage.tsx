@@ -928,31 +928,6 @@ export function SettingsPage() {
               </SettingsCard>
 
               <SettingsCard title={t("settings.defaultsTitle")}>
-                <SettingsRow title={t("settings.mode")} description={t("settings.modeDesc")}>
-                  <div
-                    className="settings-segment"
-                    role="group"
-                    aria-label={t("settings.mode")}
-                  >
-                    {([
-                      ["agent", "settings.modeAgent"],
-                      ["chat", "settings.modeChat"],
-                    ] as const).map(([value, labelKey]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        className={cx(
-                          "settings-segment-item",
-                          settings.defaultMode === value && "active",
-                        )}
-                        aria-pressed={settings.defaultMode === value}
-                        onClick={() => void saveSettings({ defaultMode: value })}
-                      >
-                        {t(labelKey)}
-                      </button>
-                    ))}
-                  </div>
-                </SettingsRow>
                 <SettingsRow
                   title={t("settings.enterToSend")}
                   description={t("settings.enterToSendDesc")}

@@ -32,6 +32,7 @@ import {
   type AppMenuCommand,
   type AppNotification,
   type KeybindingOverrides,
+  type Mode,
   type NativeMenuAction,
   type Result,
   type ThinkingLevel,
@@ -2779,7 +2780,7 @@ function registerIpc() {
     async (
       id: string,
       config: {
-        mode: "chat" | "agent";
+        mode: Mode;
         providerId?: string;
         modelId?: string;
         thinkingLevel?: ThinkingLevel;

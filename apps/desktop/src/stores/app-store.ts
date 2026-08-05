@@ -7,6 +7,7 @@ import type {
   AppSettings,
   AppVersionInfo,
   ModelInfo,
+  Mode,
   OnboardingState,
   PluginSummary,
   PluginTheme,
@@ -318,7 +319,7 @@ export type AppState = {
   forkSession: (id: string) => Promise<void>;
   forkAssistantMessage: (messageId: string) => Promise<void>;
   configureActiveSession: (config: {
-    mode: "chat" | "agent";
+    mode: Mode;
     providerId?: string;
     modelId?: string;
     thinkingLevel: ThinkingLevel;
@@ -605,9 +606,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           api.listNotifications({ limit: 200 }),
         ]);
       let settings = settingsRaw;
-      // First-run default per D003: Agent. Never force-rewrite an existing
-      // user choice on boot (a previous build reset it to chat each launch).
-      if (settings && !settings.defaultMode) {
+      // D003/D188: Agent is the only mode the UI offers, so a settings blob
+      // without it (or left on a legacy value) is normalized once on boot.
+      if (settings && settings.defaultMode !== "agent") {
         const next = { ...settings, defaultMode: "agent" as const };
         try {
           await api.setSettings(next);
@@ -880,7 +881,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // The Composer pins both onto the session when the user chooses a model.
     const created = await api.createSession({
       title: untitledTaskTitle(),
-      mode: settings?.defaultMode ?? "chat",
+      mode: settings?.defaultMode ?? "agent",
       thinkingLevel: defaultThinkingLevel,
       projectPath: requestedProjectPath ?? undefined,
     });

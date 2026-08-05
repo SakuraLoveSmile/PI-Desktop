@@ -14,8 +14,6 @@ export const BUILTIN_COMMANDS: BuiltinCommandDef[] = [
   { id: "builtin.session.delete", title: "Delete current task", category: "Session", keywords: ["delete", "remove", "session"], source: "builtin", slash: "delete-task" },
   { id: "builtin.agent.abort", title: "Abort current run", category: "Session", keywords: ["stop", "abort", "cancel"], source: "builtin", slash: "abort" },
   { id: "builtin.agent.compact", title: "Compact conversation context", category: "Session", keywords: ["compact", "context", "tokens"], source: "builtin", slash: "compact" },
-  { id: "builtin.mode.agent", title: "Switch to Agent mode", category: "Session", keywords: ["mode", "agent"], source: "builtin", slash: "agent-mode" },
-  { id: "builtin.mode.chat", title: "Switch to Chat mode (read-only)", category: "Session", keywords: ["mode", "chat", "read-only"], source: "builtin", slash: "chat-mode" },
   { id: "builtin.project.open", title: "Open project", category: "Project", keywords: ["open", "folder", "workspace"], source: "builtin", slash: "open-project" },
   { id: "builtin.project.clear", title: "Clear project", category: "Project", keywords: ["clear", "close", "workspace"], source: "builtin", slash: "clear-project" },
   { id: "builtin.settings.open", title: "Open settings", category: "App", keywords: ["settings", "preferences"], source: "builtin", slash: "settings" },
