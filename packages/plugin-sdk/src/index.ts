@@ -370,6 +370,18 @@ export function pluginMcpToolKey(serverId: string, toolName: string): string {
   return `${serverId}_${toolName}`;
 }
 
+/**
+ * Forced tool name prefix for a tool on an MCP server the user configured
+ * themselves. `mcp_` rather than `plugin_` keeps the two provenances legible in
+ * the timeline and in audit records: one came from installed code, the other
+ * from a command the user typed.
+ */
+export function userMcpToolName(serverId: string, toolName: string): string {
+  const safeServer = serverId.replace(/[^a-zA-Z0-9_]/g, "_");
+  const safeTool = toolName.replace(/[^a-zA-Z0-9_]/g, "_");
+  return `mcp_${safeServer}_${safeTool}`;
+}
+
 /** Stable, globally unique id for a skill contributed by a plugin. */
 export function pluginSkillId(pluginId: string, skillId: string): string {
   return `${pluginId}/${skillId}`;

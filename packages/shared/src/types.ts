@@ -1,3 +1,4 @@
+import type { ActivationScope } from "./activation.js";
 import type { AppError } from "./errors.js";
 import type { KeybindingOverrides } from "./keyboard-shortcuts.js";
 
@@ -440,6 +441,8 @@ export type PluginSummary = {
   name: string;
   version: string;
   enabled: boolean;
+  /** Where the plugin is allowed to run; absent records predate scopes. */
+  scope?: ActivationScope;
   source: "installed" | "dev" | "marketplace";
   status: "ready" | "error" | "disabled" | "load_error";
   errorMessage?: string;
@@ -455,6 +458,101 @@ export type PluginSummary = {
   autoUpdate?: boolean;
   updateAvailable?: PluginUpdateInfo;
   ui?: PluginUiMeta;
+};
+
+/** Transport of an MCP server the user configured themselves. */
+export type McpTransport = "stdio" | "http";
+
+/**
+ * An MCP server the user added directly, without a plugin around it.
+ *
+ * The shape deliberately mirrors `contributes.mcpServers` (ADR 0038) so both
+ * kinds go through one client implementation; what differs is ownership. A user
+ * server has no plugin to grant permissions to, so its consent is the act of
+ * typing the command or the URL, and its credentials come from `env`/`headers`
+ * on the record instead of a plugin's settings.
+ */
+export type McpServerRecord = {
+  id: string;
+  label: string;
+  description?: string;
+  transport: McpTransport;
+  /** stdio: executable name or absolute path. */
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  /** http: absolute endpoint; https unless the host is loopback. */
+  url?: string;
+  headers?: Record<string, string>;
+  enabled: boolean;
+  scope?: ActivationScope;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Fields accepted when creating or editing a user MCP server. */
+export type McpServerInput = {
+  id: string;
+  label?: string;
+  description?: string;
+  transport: McpTransport;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  enabled?: boolean;
+  scope?: ActivationScope;
+};
+
+export type McpConnectionState = "idle" | "connecting" | "ready" | "failed";
+
+/** Live connection state of one user MCP server, as the Extensions page shows it. */
+export type McpServerStatus = {
+  serverId: string;
+  state: McpConnectionState;
+  /** Tools discovered by the last successful `tools/list`. */
+  toolCount: number;
+  toolNames?: string[];
+  message?: string;
+  updatedAt: number;
+};
+
+/** A user MCP server plus whatever the runtime knows about its connection. */
+export type McpServerView = McpServerRecord & {
+  status?: McpServerStatus;
+};
+
+/**
+ * A skill document the user owns, stored under `<data>/skills/<id>/SKILL.md`.
+ *
+ * Reaches the model through the same catalog-plus-`Skill`-tool path as built-in
+ * and plugin skills (D174), so the three are indistinguishable once loaded.
+ */
+export type UserSkillRecord = {
+  /** Slug used both as the directory name and as the id the model passes. */
+  id: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  scope?: ActivationScope;
+  /** `created` writes a template; `imported` copies an existing document. */
+  source: "created" | "imported";
+  /** Absolute path of the document, for opening it in the editor. */
+  path: string;
+  /** Bytes of the document, so the list can flag one that grew past the cap. */
+  sizeBytes: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UserSkillInput = {
+  id?: string;
+  name: string;
+  description?: string;
+  body?: string;
+  enabled?: boolean;
+  scope?: ActivationScope;
 };
 
 export type MarketPluginSummary = {
