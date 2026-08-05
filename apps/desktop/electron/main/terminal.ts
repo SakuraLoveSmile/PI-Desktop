@@ -11,10 +11,9 @@ import type { IPty } from "node-pty";
  * restores scrollback when the renderer reattaches. Everything dies with
  * the app via disposeAll().
  *
- * Shell policy mirrors the agent's Bash tool (host-core D084): bash on
- * every platform so the panel and the agent share one command dialect —
- * macOS/Linux run bash directly, Windows runs the bash.exe shipped with
- * Git for Windows. `PI_DESKTOP_BASH` overrides on any platform.
+ * This interactive terminal has an independent PTY shell policy from the
+ * agent's non-interactive Bash protocol tool. It prefers Git Bash on Windows,
+ * bash on macOS/Linux, and honors `PI_DESKTOP_BASH` on any platform.
  */
 
 function isExecutable(path: string): boolean {

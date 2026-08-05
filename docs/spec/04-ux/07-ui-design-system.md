@@ -626,12 +626,13 @@ appears on project home and in the thread-docked composer.
 
 The composer renders only controls connected to the active pi session:
 
-- Chat / Agent updates the durable session mode and changes the next pi toolset.
+- Agent / Plan updates the durable session mode and changes the next pi toolset;
+  Plan is the same Agent in planning state.
 - The model trigger shows only the active model ID. Its menu selects a
   configured provider/default-model pair for the active session and links to
   Agent.
 - A reasoning-capable model exposes a separate Thinking trigger immediately to
-  the right of Chat / Agent in the left toolbar group. The trigger shows the
+  the right of Agent / Plan in the left toolbar group. The trigger shows the
   current level and opens the model's real `supportedThinkingLevels` as a
   compact single-column list with a check on the selected row. The menu fits its
   content, caps at 160px and the available viewport width, and truncates labels
@@ -645,9 +646,18 @@ The composer renders only controls connected to the active pi session:
   model. Unknown Custom/OpenAI-compatible models expose no invented reasoning
   action or graded ladder. Changing provider clamps or resets the durable
   session value before the next turn.
+- The left-of-input Composer Agent/Plan chip is the sole active-session mode
+  control. The top bar has no duplicate mode segmented control. The model
+  picker closes and is disabled while an active `pending` Plan approval exists;
+  terminal proposal snapshots do not disable it. Each new pending proposal's
+  explicit approval selector starts at Ask, regardless of the previous
+  proposal's selected mode. Live Host events update the latest checkpoint or
+  execution status retained for the current renderer lifetime. A renderer
+  reload rehydrates only a pending row through `plans.pending`; terminal cards
+  are not restored.
 - Local and branch context are non-interactive status labels; the project name
   remains an action because it opens the project picker.
-- Runtime chip labels (Chat/Agent, Thinking, permission mode, model ID) use
+- Runtime chip labels (Agent/Plan, Thinking, permission mode, model ID) use
   `--text-sm` with `--leading-compact` inside the 28px hit target. They must not
   use `leading-none` with overflow clipping: descenders on glyphs such as
   `g`/`y`/`p` stay fully visible. Long model IDs still truncate horizontally via

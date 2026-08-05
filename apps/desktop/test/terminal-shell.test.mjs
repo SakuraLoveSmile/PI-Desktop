@@ -6,13 +6,8 @@ const terminalSource = await readFile(
   new URL("../electron/main/terminal.ts", import.meta.url),
   "utf8",
 );
-const runtimeSource = await readFile(
-  new URL("../../../packages/agent-runtime/src/runtime.ts", import.meta.url),
-  "utf8",
-);
-
-test("PTY shell mirrors the agent Bash dialect: bash everywhere", () => {
-  // The old default broke on Windows and diverged from the agent's shell.
+test("PTY shell policy remains independent from the agent Bash tool", () => {
+  assert.match(terminalSource, /independent PTY shell policy/);
   assert.doesNotMatch(terminalSource, /process\.env\.SHELL \|\| "\/bin\/zsh"/);
   assert.match(terminalSource, /export function resolveShell\(\)/);
   assert.match(terminalSource, /const \{ shell, args \} = resolveShell\(\);/);
@@ -34,11 +29,4 @@ test("Windows PTY resolves Git Bash, skipping the WSL launcher", () => {
   assert.match(winBranch, /system32/i);
   // Without Git for Windows the panel still opens via cmd.exe.
   assert.match(terminalSource, /process\.env\.COMSPEC \|\| "cmd\.exe"/);
-});
-
-test("agent prompt teaches the platform shell dialect", () => {
-  assert.match(runtimeSource, /process\.platform === "win32"/);
-  assert.match(runtimeSource, /Git Bash \(POSIX bash on Windows\)/);
-  assert.match(runtimeSource, /never cmd\.exe or PowerShell syntax/);
-  assert.match(runtimeSource, /Shell commands run in bash\./);
 });

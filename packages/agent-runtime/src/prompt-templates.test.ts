@@ -89,13 +89,14 @@ describe("loadComposerTemplates", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it("merges dirs with project shadowing user and extracts hints", async () => {
+  it("derives basename names, shadows user templates, and extracts hints", async () => {
     const { templates } = await loadComposerTemplates(root, {
       project: projectDir,
       user: userDir,
     });
     const names = templates.map((t) => t.name).sort();
     expect(names).toEqual(["explain", "review"]);
+    expect(templates.every((template) => !/[\\/]/.test(template.name))).toBe(true);
 
     const review = templates.find((t) => t.name === "review")!;
     expect(review.source).toBe("project");

@@ -5,7 +5,7 @@
 > Interaction behavior: [09-interaction-patterns.md](09-interaction-patterns.md)
 
 
-> Shell layout is Codex-aligned: left thread sidebar (~275px), main transcript, floating bottom composer with mode/model controls. Prefer neutral charcoal surfaces over blue-slate chrome.
+> Shell layout is Codex-aligned: left thread sidebar (~275px), main transcript, floating bottom composer with runtime mode/permission controls and a topbar model picker. Prefer neutral charcoal surfaces over blue-slate chrome.
 >
 > **Precedence rule**: where a metric or copy string below disagrees with a
 > Codex parity decision in [decisions-log §D](../08-meta/decisions-log.md)
@@ -130,14 +130,15 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 ### 2.1 Purpose
 
-Global controls bar: project identity, model selection, mode indicator, abort
-button. (Settings is reached from the command palette / application menu, not the
-top bar.)
+Global controls bar: project identity, task title, model selection, and window
+actions. The active session's Agent/Plan control belongs solely to the
+left-of-input Composer chip. (Settings is reached from the command palette /
+application menu, not the top bar.)
 
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [Agent | Chat] [🤖 Model] [＋ New] [🔍 Search] [⚙ Commands]
+[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [🤖 Model] [＋ New] [🔍 Search]
 ```
 
 (Icons described functionally; actual render uses Lucide SVGs. The `[☰ Sidebar]`
@@ -145,11 +146,10 @@ toggle renders **only when the sidebar is collapsed**; when the sidebar is
 expanded it owns that control, so the top bar does not duplicate it.)
 
 The conversation top bar renders for the chat route only; Pull requests, Scheduled,
-Plugins, and Settings keep the frameless drag band. The Agent/Chat control is a
-segmented toggle (not a badge) and writes the session `mode`; the model picker
-opens **downward** because the bar anchors the top of the viewport. The composer
-no longer carries the mode chip or model selector — both moved here. The Thinking
-and permission triggers remain in the composer (§11).
+Plugins, and Settings keep the frameless drag band. It owns project/title identity,
+the downward-opening model picker, and window actions only. The left-of-input
+Composer chip is the sole Agent/Plan control and writes the session `mode`; the
+Thinking and permission triggers remain in the Composer (§11).
 
 ### 2.3 Layout
 
@@ -161,7 +161,7 @@ and permission triggers remain in the composer (§11).
   lights (only when the sidebar is collapsed), Windows/Linux reserve the right
   112px for native window controls
 - Title cluster (project ▸ task title) flexes and **ellipsizes**; the right
-  cluster (Agent|Chat toggle, model picker, action icons) is `flex: 0 0 auto`
+  cluster (model picker, action icons) is `flex: 0 0 auto`
   and is never squeezed by a long title. The conversation surface keeps a
   `min-width` so its content is not crushed on narrow windows.
 - macOS fullscreen resets the left reserve to 8px (mirrors the sidebar header).
@@ -174,8 +174,8 @@ and permission triggers remain in the composer (§11).
 |---|---|---|---|---|
 | Task title | session title (or untitled) | same, plus a "Running" pill with a pulsing dot | same | same |
 | Model selector | clickable dropdown | disabled during stream | clickable | clickable (no provider warning) |
-| Mode toggle | "Agent" or "Chat" highlighted | same, disabled while running | same | same |
-| New task / Search / Commands | icon buttons | same | same | same |
+| New task / Search | icon buttons | same | same | same |
+| Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
 | Project name | workspace folder name | same | same | "No project" muted |
 
 ### 2.5 Accessibility
@@ -213,7 +213,7 @@ Expanded (~275px, D034/D070):
 +---------------------------+
 | [lights]          [⌕][◧] |  macOS
 | [π] PI-Desktop    [⌕][◧] |  Windows/Linux
-| [message+ New Chat] button |
+| [message+ New Task] button |
 | Plugins                   |
 | SESSIONS         [msg+][↕]|
 |   • Path-less session   ↕|
@@ -291,7 +291,7 @@ visually distinct from list content.
   transcript prefetch. Selection reuses an in-flight or recent cached result,
   revalidates it in the background, and never waits for an older superseded
   session read before starting the latest read.
-- Click the message-plus New Chat control: create/reuse a draft in the current workspace scope
+- Click the message-plus New Task control: create/reuse a draft in the current workspace scope
 - On Windows/Linux, click the PI-Desktop brand to return the main pane to the
   chat home while preserving the active conversation and workspace; macOS
   intentionally omits this brand control from the sidebar header
@@ -1239,17 +1239,71 @@ Inline transcript card requesting user approval for a high-risk tool call. See
 
 ---
 
+## 10A. PlanApprovalCard
+
+### 10A.1 Purpose
+
+Inline approval surface for the exact Markdown bytes submitted by the same pi
+Agent and preserved in a new immutable `.pi/plan/*.md` artifact. It is distinct
+from `PermissionCard`: it approves a Plan → Agent transition and an explicit
+execution permission mode, not an individual tool call.
+
+### 10A.2 Content
+
+The card renders the host-issued request identity, structured title and
+question, an opener for the exact `.pi/plan/*.md` path, status, and absolute
+expiry. Opening the artifact reads the host-written file; renderer edits do
+not change the approved bytes. Inline Markdown, SHA-256, byte size, and
+revision/feedback controls are not rendered card content.
+
+### 10A.3 Actions and states
+
+| State | Actions | Contract |
+|---|---|---|
+| Pending | Approve, Reject | request is live and proposal/session/turn/tool-call/version scoped |
+| Resolving | all actions disabled | retain the proposal until host result |
+| Approved | no actions | same Agent continues in Agent with selected permission mode |
+| Queued / Running | no actions | approved execution is active and tied to the same approval row |
+| Rejected | no actions | run stops and session remains Plan |
+| Expired / Interrupted | no actions | failed closed; a new plan must be submitted unless approval already committed, in which case session remains Agent |
+
+Approve opens the explicit Ask / Accept edits / Auto choice with Ask selected for
+each new proposal, independent of any prior approval choice. Reject carries no
+permission mode. The renderer keeps the latest proposal/execution snapshot per
+session only for the current renderer lifetime from live Host events, while only
+a pending snapshot has actions or gates the Composer. Renderer reload calls
+`plans.pending` and restores a still-pending row with its original deadline while
+the host remains alive. It does not rehydrate rejected, expired,
+approved/completed, or interrupted terminal cards; a terminal card may remain
+visible and non-actionable only until reload. Startup recovery interrupts
+pending/queued/running fields before serving RPC, restores no actionable stale
+approval, and never replays execution. Pending unapproved work remains Plan and
+already-approved interrupted execution remains Agent; the UI is not required to
+present the interrupted terminal snapshot after restart.
+
+### 10A.4 Accessibility
+
+- The card is a session-scoped `region` with a localized plan title.
+- Approval, reject, and abort controls have explicit labels and
+  keyboard focus.
+- The selected permission mode exposes radio semantics and its Plan Bash
+  consequence is available in the accessible description.
+- Resolution does not navigate to another session or take focus from a
+  different session.
+
+---
+
 ## 11. Composer
 
 ### 11.1 Purpose
 
-Input area at the bottom of MainChat for composing and sending prompts. Supports multi-line, model/mode context display, and abort.
+Input area at the bottom of MainChat for composing and sending prompts. Supports multi-line, mode/permission context display, and abort; model selection remains in the topbar.
 
 ### 11.2 Anatomy
 
 ```text
 +----------------------------------------------+
-| [model: provider/model · mode badge]         |
+| [Agent/Plan] [Thinking] [permission mode]    |
 | ───────────────────────────                  |
 | textarea (auto-growing, 1 line → max 7)      |
 | placeholder: "Ask PI-Desktop to do anything"      |
@@ -1276,7 +1330,8 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   layer.
 - Border: border-default top
 - Padding: px-4 py-3 inner textarea
-- Font: font-mono text-sm for agent mode; font-sans text-sm for chat mode
+- Font: text-sm for both Agent and Plan; mode changes semantics and tool
+  controls, not the typography
 - Bottom-anchored: fixed at bottom of MainChat area
 
 ### 11.4 States
@@ -1290,6 +1345,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | Running | textarea disabled, abort button visible | Abort active, Send hidden |
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
+| Plan / planning | textarea active while idle; Plan badge and permission chip visible | inspect, send, or submit plan |
+| Plan / awaiting approval | transcript shows the title/question, artifact opener, expiry, and status for the exact `.pi/plan/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
+| Plan / queued or running | Agent badge remains selected; queue/running state is visible and composer remains blocked | abort; no replay control |
+| Plan / planning after rejected, expired, or interrupted proposal | Plan chip remains visible and editable | send a later prompt; submit a new plan; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
 
 ### 11.5 Interactions
@@ -1308,21 +1367,25 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Text correction off (D145): composer textarea sets `spellCheck={false}`,
   `autoCorrect="off"`, and `autoCapitalize="off"` so browser/OS spelling and
   autocorrect never rewrite coding prompts
-- Runtime chips keep descenders fully visible (D150): the Thinking and
-  permission triggers in the composer use compact line-height rather than
-  `leading-none` under overflow. The Agent/Chat mode toggle and provider/model
-  picker now live in the conversation top bar (§2); the top bar's model trigger
-  still ellipsizes long IDs.
-- Chat / Agent mode and provider/model changes (made from the conversation top
-  bar, §2) update the active session, not the app default. They are disabled
-  while a turn runs.
+- Runtime chips keep descenders fully visible (D150): mode, thinking,
+  permission, and model triggers use compact line-height rather than
+  `leading-none` under overflow; the model trigger still ellipsizes long IDs.
+- Agent / Plan, provider/model, permission, and shell-default changes update the
+  active session/settings only while idle; they are disabled while a turn or
+  active pending Plan approval exists. Plan approval actions are the exception
+  while awaiting approval. The Composer-left Agent/Plan chip is the sole mode
+  control; the topbar model picker remains a model-only control.
+- Runtime chips keep descenders fully visible (D150): the Thinking, permission,
+  and Agent/Plan triggers in the Composer use compact line-height rather than
+  `leading-none` under overflow. The topbar model trigger still ellipsizes long
+  IDs.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing
   an existing session preserves its durable selection.
 - The model menu lists only enabled, runnable providers with a default model.
 - For a reasoning-capable active model, a separate Thinking trigger appears
-  immediately to the right of Chat / Agent and before the Agent permission
+  immediately to the right of Agent / Plan and before the permission
   control. It shows the current level and opens only the exact model's supported
   levels in a compact single-column list and canonical order; the selected row
   carries a trailing check. The menu width fits its content up to 160px and is
@@ -1337,6 +1400,11 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Switching provider preserves an available level, otherwise uses the nearest
   supported level (upward first, then downward); a non-reasoning provider
   persists `off`.
+- The Plan permission chip remains visible beside the mode selector. It shows
+  the effective Ask / Accept edits / Auto posture. In Plan, its help text says
+  that Bash is confirmed under Ask or Accept edits and may mutate without a
+  confirmation under Auto; it does not imply that Write/Edit/plugin tools are
+  available.
 
 ### 11.6 Accessibility
 
@@ -1505,10 +1573,9 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 
 | Context | Message | Action |
 |---|---|---|
-| No sessions | "Start your first conversation" | "New Chat" button → focus composer |
+| No sessions | "Start your first conversation" | "New Task" button → focus composer |
 | No provider | "No model provider configured" | "Add provider" link → Settings → Agent → Providers |
-| No project (Agent mode) | "No project open — local tools unavailable" | "Open folder" button → ProjectPicker |
-| No project (Chat mode) | "Open a project for context" (muted warning) | "Open folder" button |
+| No project (Agent or Plan) | "No project open — workspace tools unavailable" | "Open folder" button → ProjectPicker |
 | Session empty (first message) | "Ask PI-Desktop to do anything" placeholder (home variant "Ask anything", D094/D066) | N/A |
 
 ### 15.3 Layout
@@ -1545,11 +1612,11 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 | ───────────────────────────                  |
 | Results list (scrollable)                    |
 |   Category: Session                          |
-|     ▸ New Chat                               |
+   |     ▸ New Task                               |
 |     ▸ Delete Current Session                 |
 |   Category: Mode                             |
-|     ▸ Switch to Chat Mode                    |
-|     ▸ Switch to Agent Mode                   |
+   |     ▸ Switch to Plan                         |
+   |     ▸ Switch to Agent                        |
 | ...                                          |
 +----------------------------------------------+
 ```
