@@ -94,4 +94,8 @@ defined in the same registry that feeds palette search
 Aliases share one namespace with template and plugin command names; builtin
 aliases win collisions, then project templates, then user templates, then
 plugin commands. Selecting an alias inserts `/alias `; sending executes it
-locally without creating a session or a prompt.
+locally without creating a session or a prompt when the alias is sent alone.
+The Agent/Plan aliases also support a prompt body: `/agent-mode <prompt>` or
+`/plan-mode <prompt>` switches the idle session (or the next-session default)
+and sends `<prompt>` through the normal prompt path. The prompt body remains
+the visible user turn; a failed dispatch does not clear the composer draft.

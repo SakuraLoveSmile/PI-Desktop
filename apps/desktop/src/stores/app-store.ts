@@ -367,7 +367,8 @@ export type AppState = {
     thinkingLevel: ThinkingLevel;
     permissionMode?: PermissionMode;
   }) => Promise<void>;
-  sendPrompt: (content: string) => Promise<void>;
+  /** Returns true once the prompt has been handed to Electron Main. */
+  sendPrompt: (content: string) => Promise<boolean>;
   compactContext: () => Promise<void>;
   retryAssistantMessage: (messageId: string) => Promise<void>;
   /** Replace a user prompt and regenerate from it; the old branch stays in the revision pager. */
@@ -1236,13 +1237,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   sendPrompt: async (content) => {
     let sessionId = get().activeSessionId;
-    if (sessionId && get().pendingPlans[sessionId]?.status === "pending") return;
+    if (sessionId && get().pendingPlans[sessionId]?.status === "pending") {
+      return false;
+    }
     if (!sessionId) {
       await get().newSession();
       sessionId = get().activeSessionId;
     }
     if (!sessionId) throw new Error("No active session");
-    if (get().pendingPlans[sessionId]?.status === "pending") return;
+    if (get().pendingPlans[sessionId]?.status === "pending") return false;
     const startedIn = sessionId;
     set((s) => ({
       isRunning: true,
@@ -1270,9 +1273,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           isRunning: s.activeSessionId === startedIn ? false : s.isRunning,
           runningSessions: { ...s.runningSessions, [startedIn]: false },
         }));
-        return;
+        return false;
       }
       await api.prompt({ sessionId, content });
+      return true;
     } catch (e) {
       const messageError = messageErrorFromUnknown(e);
       set((s) => ({
@@ -1294,6 +1298,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ? { messages: [...s.messages, assistantErrorMessage(messageError)] }
           : {}),
       }));
+      return false;
     }
   },
 

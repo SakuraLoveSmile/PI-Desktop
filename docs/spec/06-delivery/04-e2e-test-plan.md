@@ -3079,7 +3079,11 @@ Each scenario is documented in this format:
   proposal, confirming that the approval surface disappears after host
   confirmation. 4) Use the command palette and `/plan-mode` / `/agent-mode`
   slash aliases to switch the active idle session, confirming the Composer chip
-  changes immediately. 5) Reload after a terminal proposal and inspect the
+  changes immediately. Type a prompt after either alias in the same draft and
+  send it; confirm the mode changes and the prompt remains as a visible user
+  turn. Send an alias alone and confirm it remains a local mode switch without
+  creating an empty transcript turn. If prompt dispatch fails, confirm the
+  complete draft remains editable. 5) Reload after a terminal proposal and inspect the
   session while asserting that Electron Main and Host process identities did
   not change. 6) Repeat in zh-CN. 7) Search visible commands for the removed
   Chat mode and request-changes controls. Host/app restart recovery is
