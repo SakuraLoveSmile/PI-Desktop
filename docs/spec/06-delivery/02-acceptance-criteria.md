@@ -43,7 +43,7 @@ MVP passes when:
 - [x] Tool paths resolve against the project root — auto:host-core tests (`workspace::tests`)
 
 ### E. Tools and permissions
-- [x] Chat mode cannot run Write/Edit/Bash — manual:M3 (D004)
+- [x] Read-only mode cannot run Write/Edit/Bash — manual:M3 (D004; UI-unreachable since D188)
 - [x] Permission timeout (120s) becomes deny — manual:M3 (D005)
 - [x] Read/Glob/Grep work inside the project — auto:`test:e2e` (glob tool)
 - [x] Write/Edit/Bash trigger an inline, session-scoped confirmation card — manual:M3

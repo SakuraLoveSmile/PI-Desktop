@@ -137,7 +137,7 @@ top bar.)
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [Agent | Chat] [🤖 Model] [＋ New] [🔍 Search] [⚙ Commands]
+[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [🤖 Model] [＋ New] [🔍 Search]
 ```
 
 (Icons described functionally; actual render uses Lucide SVGs. The `[☰ Sidebar]`
@@ -145,11 +145,11 @@ toggle renders **only when the sidebar is collapsed**; when the sidebar is
 expanded it owns that control, so the top bar does not duplicate it.)
 
 The conversation top bar renders for the chat route only; Pull requests, Scheduled,
-Plugins, and Settings keep the frameless drag band. The Agent/Chat control is a
-segmented toggle (not a badge) and writes the session `mode`; the model picker
-opens **downward** because the bar anchors the top of the viewport. The composer
-no longer carries the mode chip or model selector — both moved here. The Thinking
-and permission triggers remain in the composer (§11).
+Plugins, and Settings keep the frameless drag band. There is no mode control:
+Agent is the only mode (D188). The model picker opens **downward** because the bar
+anchors the top of the viewport. The composer no longer carries the model
+selector — it moved here. The Thinking and permission triggers remain in the
+composer (§11).
 
 ### 2.3 Layout
 
@@ -161,7 +161,7 @@ and permission triggers remain in the composer (§11).
   lights (only when the sidebar is collapsed), Windows/Linux reserve the right
   112px for native window controls
 - Title cluster (project ▸ task title) flexes and **ellipsizes**; the right
-  cluster (Agent|Chat toggle, model picker, action icons) is `flex: 0 0 auto`
+  cluster (model picker, action icons) is `flex: 0 0 auto`
   and is never squeezed by a long title. The conversation surface keeps a
   `min-width` so its content is not crushed on narrow windows.
 - macOS fullscreen resets the left reserve to 8px (mirrors the sidebar header).
@@ -174,8 +174,7 @@ and permission triggers remain in the composer (§11).
 |---|---|---|---|---|
 | Task title | session title (or untitled) | same, plus a "Running" pill with a pulsing dot | same | same |
 | Model selector | clickable dropdown | disabled during stream | clickable | clickable (no provider warning) |
-| Mode toggle | "Agent" or "Chat" highlighted | same, disabled while running | same | same |
-| New task / Search / Commands | icon buttons | same | same | same |
+| New task / Search | icon buttons | same | same | same |
 | Project name | workspace folder name | same | same | "No project" muted |
 
 ### 2.5 Accessibility
@@ -1276,7 +1275,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   layer.
 - Border: border-default top
 - Padding: px-4 py-3 inner textarea
-- Font: font-mono text-sm for agent mode; font-sans text-sm for chat mode
+- Font: font-mono text-sm (Agent is the only mode, D188)
 - Bottom-anchored: fixed at bottom of MainChat area
 
 ### 11.4 States
@@ -1310,20 +1309,18 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   autocorrect never rewrite coding prompts
 - Runtime chips keep descenders fully visible (D150): the Thinking and
   permission triggers in the composer use compact line-height rather than
-  `leading-none` under overflow. The Agent/Chat mode toggle and provider/model
-  picker now live in the conversation top bar (§2); the top bar's model trigger
-  still ellipsizes long IDs.
-- Chat / Agent mode and provider/model changes (made from the conversation top
-  bar, §2) update the active session, not the app default. They are disabled
-  while a turn runs.
+  `leading-none` under overflow. The provider/model picker now lives in the
+  conversation top bar (§2); the top bar's model trigger still ellipsizes long
+  IDs.
+- Provider/model changes (made from the conversation top bar, §2) update the
+  active session, not the app default. They are disabled while a turn runs.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing
   an existing session preserves its durable selection.
 - The model menu lists only enabled, runnable providers with a default model.
-- For a reasoning-capable active model, a separate Thinking trigger appears
-  immediately to the right of Chat / Agent and before the Agent permission
-  control. It shows the current level and opens only the exact model's supported
+- For a reasoning-capable active model, the Thinking trigger leads the composer
+  chip row and sits before the Agent permission control. It shows the current level and opens only the exact model's supported
   levels in a compact single-column list and canonical order; the selected row
   carries a trailing check. The menu width fits its content up to 160px and is
   further constrained by the viewport; longer localized labels truncate. The
@@ -1508,7 +1505,6 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 | No sessions | "Start your first conversation" | "New Chat" button → focus composer |
 | No provider | "No model provider configured" | "Add provider" link → Settings → Agent → Providers |
 | No project (Agent mode) | "No project open — local tools unavailable" | "Open folder" button → ProjectPicker |
-| No project (Chat mode) | "Open a project for context" (muted warning) | "Open folder" button |
 | Session empty (first message) | "Ask PI-Desktop to do anything" placeholder (home variant "Ask anything", D094/D066) | N/A |
 
 ### 15.3 Layout
@@ -1547,9 +1543,8 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 |   Category: Session                          |
 |     ▸ New Chat                               |
 |     ▸ Delete Current Session                 |
-|   Category: Mode                             |
-|     ▸ Switch to Chat Mode                    |
-|     ▸ Switch to Agent Mode                   |
+|   Category: Agent                            |
+|     ▸ Abort Active Turn                      |
 | ...                                          |
 +----------------------------------------------+
 ```

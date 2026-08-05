@@ -343,7 +343,7 @@ type ToolsExecuteParams = {
   toolCallId: string
   toolName: string
   args: unknown
-  mode: "chat" | "agent"
+  mode: "read-only" | "agent"   // D188: only `agent` is UI-reachable
   timeoutMs?: number
 }
 ```

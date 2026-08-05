@@ -85,7 +85,7 @@ the permission runtime.
 
 ## 9. Acceptance
 
-1. Chat mode cannot execute Bash/Write/Edit
+1. Read-only mode cannot execute Bash/Write/Edit
 2. Agent mode prompts for high-risk tools
 3. timeout becomes deny in UI + tool result
 4. allow-session suppresses repeat prompts for same toolName only

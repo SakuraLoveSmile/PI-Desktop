@@ -69,7 +69,7 @@ docs/spec/
 4. pi agent engine in Node sidecar
 5. Host RPC = stdio JSON-RPC NDJSON
 6. SQLite owned by Rust only
-7. Default mode = Agent; Chat read-only
+7. Only mode = Agent; read-only profile kept host-side (D188)
 8. Permission timeout 120s deny
 9. Local user-installable plugins (market later)
 10. Tag releases = macOS arm64, Windows x64, and Linux x64 (D126)

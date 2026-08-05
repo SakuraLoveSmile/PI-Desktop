@@ -26,7 +26,7 @@ Each ADR includes:
 | 0008 | Plugin runtime isolation target = separate process | Accepted (Target) |
 | 0009 | English-first globalization | Accepted |
 | 0010 | Rust backend host core | Accepted |
-| 0011 | Freeze host RPC, storage ownership, and mode defaults | Accepted |
+| 0011 | Freeze host RPC, storage ownership, and mode defaults | Accepted (mode defaults amended by 0052) |
 | 0012 | Universal provider & model coverage | Accepted |
 | 0013 | Consolidate settings navigation into four destinations | Superseded in part by 0026 |
 | 0014 | Adopt host-owned storage schema v2 | Accepted |
@@ -67,3 +67,4 @@ Each ADR includes:
 | 0049 | Recover automatic context compaction failures with a retained tail | Accepted |
 | 0050 | Bounded provider stream recovery and diagnostics | Accepted |
 | 0051 | Isolate host RPC stdio from the Tokio blocking pool | Accepted |
+| 0052 | Agent-only mode; Chat becomes an internal read-only profile | Accepted |

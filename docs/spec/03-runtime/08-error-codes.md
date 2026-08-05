@@ -87,8 +87,8 @@ does not turn temporary thread pressure into a host process exit.
 | `SHELL_NOT_FOUND` | no | no usable bash on the machine; message carries install guidance |
 | `PERMISSION_TIMEOUT` | no | permission prompt timed out (mapped to deny) |
 | `PERMISSION_REQUIRED` | no | waiting for user decision |
-| `BASH_DISABLED_IN_CHAT` | no | chat mode hard-deny for bash |
-| `WRITE_DISABLED_IN_CHAT` | no | chat mode hard-deny for write/edit |
+| `BASH_DISABLED_IN_READ_ONLY` | no | read-only mode hard-deny for bash |
+| `WRITE_DISABLED_IN_READ_ONLY` | no | read-only mode hard-deny for write/edit |
 
 ### 3.4 Secrets / settings
 
@@ -192,5 +192,5 @@ Examples:
 
 1. Every IPC failure returns `AppError.code`
 2. No raw untyped string-only failures on main paths
-3. Chat hard-denies use explicit mode codes
+3. Read-only hard-denies use explicit mode codes
 4. Host numeric codes map to stable string codes

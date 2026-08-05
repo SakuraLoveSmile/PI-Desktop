@@ -298,7 +298,7 @@ CREATE TABLE sessions (
   project_id  INTEGER REFERENCES projects(id) ON DELETE SET NULL,
   provider_id TEXT,                            -- loose ref, see below
   model_id    TEXT,
-  mode        TEXT NOT NULL DEFAULT 'agent',   -- chat | agent
+  mode        TEXT NOT NULL DEFAULT 'agent',   -- agent | read-only (D188)
   thinking_level TEXT NOT NULL DEFAULT 'off'
                 CHECK (thinking_level IN ('off', 'minimal', 'low', 'medium',
                                           'high', 'xhigh', 'max')),
@@ -729,6 +729,11 @@ next rewrite; transcript reads dedupe repeated ids keep-last.
   gone, file present) are preserved, not garbage-collected: the file is the
   source of truth and a future re-index can recover it.
 - logs rotate at the file layer (D082); sessions are never auto-deleted.
+- **D188 value fix-up**: the boot pass rewrites `sessions.mode = 'chat'` to
+  `'agent'` and folds a stored `app.defaultMode` of `chat` into `agent`. This
+  is a data repair inside the existing schema, not a version bump: the UI no
+  longer offers a mode switch, so a session left on the old read-only profile
+  could never be moved back. Idempotent — after the first open nothing matches.
 - Attachment GC (later): sweep `attachments/` for hashes unreferenced by any
   transcript file.
 

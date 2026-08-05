@@ -185,8 +185,9 @@ persistence completes.
 
 ## 5b. Mode defaults
 
-- Default product mode: **Agent**
-- Chat mode is available as a safer read-only profile
+- Only product mode: **Agent** (D188)
+- `read-only` (the former Chat profile) is still enforced host-side for legacy
+  and imported rows, but no UI surface can select it
 - Mode is session-scoped and persisted with session metadata
 - Thinking level is session-scoped and persisted with session metadata
 - Composer configuration is mutable only while the session is idle
@@ -272,7 +273,7 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 
 ```text
 [base product prompt in English]
-+ [mode prompt: chat/agent]
++ [mode prompt: agent]
 + [workspace info]
 + [tool instructions]
 + [project instruction chain, when present]
@@ -286,12 +287,12 @@ registered schema into every provider request. Each new user prompt starts with
 the mode's core set plus `CompactContext` when automatic compaction is enabled:
 
 - Agent: `Read`, `Bash`, `Edit`, and `Write` (matching pi's coding-agent core)
-- Chat: `Read`, `Glob`, and `Grep`
+- Read-only: `Read`, `Glob`, and `Grep`
 - both modes: `ToolSearch` when at least one deferred capability exists
 
 In Agent mode, `Glob` and `Grep` join `BrowserPreview`, plugin tools, `Skill`,
-and plugin-development helpers in the deferred set. In Chat mode, `Glob` and
-`Grep` remain part of the read-only core. Deferred tools are registered but
+and plugin-development helpers in the deferred set. In read-only mode, `Glob`
+and `Grep` remain part of the read-only core. Deferred tools are registered but
 their names and compact one-line descriptions appear in an `# On-demand tools`
 catalog; parameter schemas do not. The catalog is bounded so a plugin with
 many tools cannot recreate the original prompt bloat.

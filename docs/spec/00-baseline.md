@@ -52,8 +52,8 @@
 11. Host services transport: **Rust sidecar + stdio JSON-RPC (NDJSON)**
 12. Storage ownership: **Rust host-core owns SQLite exclusively**
 13. MVP domain: **local coding agent**
-14. Default mode: **Agent**
-15. Chat mode tools: **read-only** (`Read` / `Glob` / `Grep`)
+14. Only mode: **Agent** (D188)
+15. Read-only mode tools: **read-only** (`Read` / `Glob` / `Grep`), host-enforced only
 16. MVP Agent tools: **Read / Glob / Grep / Write / Edit / Bash**
 17. Permission timeout: **120s → deny**
 18. Session grant scope: **by toolName**

@@ -29,7 +29,6 @@ There is no account, no subscription, and no cloud in the middle: you connect th
 ## Highlights
 
 - **Any model, your keys.** Anthropic, OpenAI, or anything that speaks an OpenAI-compatible API — hosted relays as well as local gateways like Ollama or LM Studio. Model IDs are free-form (no hardcoded allowlist), with per-model context window, output limit, temperature, and thinking-mode controls.
-- **Agent and Chat modes.** Agent mode reads, edits, and runs commands to get things done. Chat mode is strictly read-only — safe for asking questions about an unfamiliar codebase.
 - **You approve every change.** File writes and shell commands ask first, with session-scoped grants and a configurable default policy. Unanswered prompts deny by default.
 - **A real workbench.** Review the agent's edits as diffs, open a terminal, preview in a browser, and browse project files — all in a side panel, without leaving the conversation.
 - **Projects and sessions.** Sessions are grouped by project in a multi-project sidebar, with pinning, archiving, sorting, and throwaway scratch sessions.
@@ -70,7 +69,7 @@ Packaged builds check GitHub Releases for new versions and show an in-app update
 
 1. **Add a model provider.** Open **Settings → Models → Add provider**: pick the API style, paste the base URL and your API key, then choose or type a model ID. The key is stored in your OS keychain and never shown again.
 2. **Open a project.** Add a project folder from the sidebar — sessions, tools, and permissions are scoped to it.
-3. **Describe the task.** Start in Agent mode to make changes or Chat mode to explore read-only. Approve edits and commands as they come up, and check the result in the **Review** diff panel before you commit anything.
+3. **Describe the task.** Approve edits and commands as they come up, and check the result in the **Review** diff panel before you commit anything.
 
 ## How it works
 

@@ -19,8 +19,6 @@ builtin.<domain>.<action>
 | `builtin.session.new` | New Chat | new, chat, session | Session | low | create session and focus composer |
 | `builtin.session.delete` | Delete Current Session | delete, session | Session | medium | confirm then delete active session |
 | `builtin.session.rename` | Rename Current Session | rename, session | Session | low | open rename UI |
-| `builtin.mode.chat` | Switch to Chat Mode | mode, chat, readonly | Mode | low | set session mode=chat |
-| `builtin.mode.agent` | Switch to Agent Mode | mode, agent | Mode | low | set session mode=agent |
 | `builtin.agent.abort` | Abort Active Turn | abort, stop | Agent | low | abort current turn/permission wait |
 | `builtin.agent.compact` | Compact Conversation Context | compact, context, tokens | Agent | low | create a model-context checkpoint for the idle active session |
 | `builtin.project.open` | Open Project | open, project, folder | Project | low | open folder picker and bind workspace |
@@ -56,7 +54,7 @@ type CommandExecutionResult =
 
 1. All builtin IDs are unique and prefixed
 2. Palette search matches title/keywords
-3. Mode switch commands update session mode immediately
+3. No mode-switch command is registered: Agent is the only mode (D188)
 4. Abort command works during stream and permission pending
 5. Compact works while idle even when automatic context protection is disabled
    and returns `AGENT_BUSY` during an active turn/checkpoint
@@ -73,8 +71,6 @@ defined in the same registry that feeds palette search
 | `/delete-task` | `builtin.session.delete` |
 | `/abort` | `builtin.agent.abort` |
 | `/compact` | `builtin.agent.compact` |
-| `/agent-mode` | `builtin.mode.agent` |
-| `/chat-mode` | `builtin.mode.chat` |
 | `/open-project` | `builtin.project.open` |
 | `/clear-project` | `builtin.project.clear` |
 | `/settings` | `builtin.settings.open` |

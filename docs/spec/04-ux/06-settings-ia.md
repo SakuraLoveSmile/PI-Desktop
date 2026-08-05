@@ -38,8 +38,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     Auto card shows the detected language inline (e.g. "当前：简体中文")
   - native select triggers and their opened option lists use the active theme's
     readable foreground/background pairing on macOS, Windows, and Linux
-- **Defaults** card retains the host-backed default mode and Enter-to-send
-  controls.
+- **Defaults** card retains the host-backed Enter-to-send control. The default
+  mode control is gone: Agent is the only mode (D188).
 - File-open target, menu-bar behavior, and bottom-panel behavior are not
   rendered until their host-backed settings schemas and runtime effects exist.
 
@@ -75,7 +75,6 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ### Model configuration (`agent` tab)
 - **Studio hero**: provider count, ready count, and current default provider/model summary
 - **Defaults** card:
-  - default mode via segmented control (Agent / Chat)
   - default model id
   - Enter to send as a switch (local preference; not on Codex General gold)
 - **Providers** studio:

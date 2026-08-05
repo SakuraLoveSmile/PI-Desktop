@@ -97,7 +97,7 @@ session gets a scratch directory outside the workspace:
 - **Permissions.** `Write`/`Edit` whose `path` is lexically inside the
   session's scratch root auto-allow without a permission card — they cannot
   touch the project. The lexical check only skips the prompt; execution still
-  goes through the full resolver, so it is not an escape vector. Chat mode
+  goes through the full resolver, so it is not an escape vector. Read-only mode
   still denies Write/Edit/Bash entirely (D004 unchanged).
 - **Artifacts.** Successful scratch writes are not recorded in the
   `artifacts` table; artifact-driven file tabs represent workspace
@@ -269,8 +269,10 @@ Rules:
 - The session value is stored in `sessions.permission_mode`
   (`inherit | ask | accept-edits | auto`, default `inherit`, schema v5) and
   set via `session.configure` `permissionMode`.
-- **Chat mode's hard deny wins over every permission mode** — `auto` cannot
-  re-enable Write/Edit/Bash in chat (D004 unchanged).
+- **Read-only mode's hard deny wins over every permission mode** — `auto`
+  cannot re-enable Write/Edit/Bash there (D004 unchanged). The gate is
+  negative: anything that is not `agent` gets the read-only surface, so an
+  unknown or legacy `mode` string can never widen the tool set (D188).
 - Low-risk tools (`Read`/`Glob`/`Grep`) auto-allow in every mode, as before.
 - `allow-session` grants continue to work under `ask` and stay scoped to the
   session; under `accept-edits`/`auto` they are simply never needed.
@@ -326,15 +328,17 @@ the same fields with a zero tool body. See
 [09. Logging and Observability](09-logging-and-observability.md) for the
 matching log lines.
 
-## 10. Mode matrix (Chat vs Agent)
+## 10. Mode matrix (read-only vs Agent)
 
 | Mode | Read/Glob/Grep | Write/Edit | Bash |
 |---|---|---|---|
-| Chat | allow | deny | deny |
+| read-only | allow | deny | deny |
 | Agent | allow | confirm | confirm |
 
 ### Notes
-- Chat mode hard-denies high-risk tools before permission UI
+- `agent` is the only mode the UI can select or display (D188); `read-only`
+  survives as the fail-safe profile for legacy and imported rows
+- Read-only mode hard-denies high-risk tools before permission UI
 - Agent mode uses permission cards for Write/Edit/Bash
 - allow-session is remembered per toolName for the active session only
 - Session grants follow `sessionId` across project-tab switches and are never

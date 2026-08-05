@@ -336,14 +336,14 @@ Each scenario is documented in this format:
 - **Preconditions**: Provider configured; at least one session exists.
 - **Steps**: 1) Open the chat route. 2) Inspect the 46px bar at the top of the
   conversation area. 3) Confirm it shows the active project name and
-  session/task title, the Agent|Chat segmented mode toggle, the model picker,
-  and the New task / Search / Commands action buttons; confirm the
+  session/task title, the model picker, and the New task / Search action
+  buttons; confirm there is **no** mode toggle (D188); confirm the
   sidebar toggle appears **only when the sidebar is collapsed** (when expanded,
   the sidebar owns that control). 4) Switch to the Pull requests, Scheduled,
   Plugins, or Settings routes and inspect the same top region.
 - **Expected**: On the chat route the conversation top bar renders with its
-  controls; the long task title ellipsizes instead of squeezing the Agent|Chat
-  toggle, model picker, or action buttons. The sidebar toggle is present only in
+  controls; the long task title ellipsizes instead of squeezing the model picker
+  or action buttons. The sidebar toggle is present only in
   the collapsed state (no duplicate of the sidebar's control). On every other
   route the frameless drag band renders instead (no top-bar controls). The bar is
   draggable to move the window; interactive controls do not start a window drag.
@@ -355,18 +355,28 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
-#### E2E-088: Top-bar Agent/Chat mode toggle updates the session
+#### E2E-088: Agent is the only reachable mode (D188)
 
-- **Preconditions**: Chat route active; a session selected.
-- **Steps**: 1) Click the Chat segment of the mode toggle. 2) Send a prompt that
-  would normally require Write/Edit and observe behavior. 3) Click the Agent
-  segment. 4) Begin a turn and try to toggle mode mid-run.
-- **Expected**: The toggle updates the active session `mode` (Chat hard-denies
-  Write/Edit; Agent allows them per permission settings). The toggle is disabled
-  while a turn runs and re-enables when idle.
+- **Preconditions**: A data directory whose `sessions` table still holds a row
+  with `mode = 'chat'` and whose stored settings still hold
+  `defaultMode: "chat"` (write them before first launch).
+- **Steps**: 1) Launch the app and inspect the conversation top bar, the
+  composer chip row, and Settings → Basics → Defaults. 2) Open the command
+  palette and search for "mode", "chat", and "read-only"; type `/chat-mode` and
+  `/agent-mode` in the composer. 3) Open the pre-seeded legacy session and ask
+  the agent to write a workspace file. 4) Create a new session and inspect its
+  stored `mode`.
+- **Expected**: No mode control renders anywhere — no top-bar segmented toggle,
+  no composer chip, no Settings row, no localized mode labels. The palette
+  returns no mode-switch command and neither slash alias resolves. The legacy
+  session was migrated to `agent` at open, so the Write goes through the normal
+  permission path instead of a hard deny; the stored `defaultMode` reads
+  `agent`. The new session is created with `mode = "agent"`. Restarting the app
+  does not reintroduce a `chat` value.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2, §11),
-  `03-runtime/03-tools-and-permissions.md`
-- **Acceptance**: C
+  `03-runtime/03-tools-and-permissions.md` (§10),
+  `03-runtime/04-data-storage.md` (§8), `adr/0052-agent-only-mode.md`
+- **Acceptance**: C, E
 - **Milestone**: M2
 - **Status**: Draft
 
@@ -425,7 +435,7 @@ Each scenario is documented in this format:
 - **Steps**: 1) Ask agent to read a file in the project. 2) Observe result.
 - **Expected**: `Read` returns immediately within project scope. In Agent mode,
   the agent activates `Glob` or `Grep` through `ToolSearch` before using it;
-  Chat mode keeps both tools active from the first request. All results remain
+  read-only mode keeps both tools active from the first request. All results remain
   within project scope.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`
 - **Acceptance**: E (Read/Glob/Grep work), D (tools based on project)
@@ -476,16 +486,20 @@ Each scenario is documented in this format:
 - **Milestone**: M3
 - **Status**: Draft
 
-#### E2E-018: Chat mode cannot run Write/Edit/Bash
+#### E2E-018: Read-only mode cannot run Write/Edit/Bash
 
-- **Preconditions**: Chat mode active.
-- **Steps**: 1) Ask agent to write a file in Chat mode. 2) Observe behavior.
-- **Expected**: Write/Edit/Bash not available in Chat mode; only Read/Glob/Grep
-  work, with all three active in the first Chat request.
+- **Preconditions**: A session persisted with `mode = "read-only"` (the UI
+  cannot produce one since D188 — set it through the host RPC or a seeded row).
+- **Steps**: 1) Ask agent to write a file. 2) Observe behavior. 3) Repeat with a
+  `mode` value the host does not know (e.g. `"future"`).
+- **Expected**: Write/Edit/Bash not available in read-only mode; only
+  Read/Glob/Grep work, with all three active in the first read-only request. An
+  unknown mode value normalizes to `read-only` rather than widening the tool
+  surface.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`
-- **Acceptance**: E (Chat read-only)
+- **Acceptance**: E (read-only profile)
 - **Milestone**: M3
-- **Status**: Automated (protocol smoke: WRITE_DISABLED_IN_CHAT)
+- **Status**: Automated (protocol smoke: WRITE_DISABLED_IN_READ_ONLY)
 
 #### E2E-019: Workspace-outside paths are rejected
 
@@ -510,8 +524,8 @@ Each scenario is documented in this format:
 #### E2E-019b: Scratch containment matches workspace defenses (D114)
 
 - **Preconditions**: Agent mode; project open.
-- **Steps**: 1) Attempt Write with `..` traversal from the scratch root. 2) Attempt Write through a symlink planted inside scratch pointing outside. 3) Attempt scratch writes in Chat mode.
-- **Expected**: Both escapes return `PATH_OUTSIDE_WORKSPACE`; Chat mode still returns `WRITE_DISABLED_IN_CHAT` even for scratch paths.
+- **Steps**: 1) Attempt Write with `..` traversal from the scratch root. 2) Attempt Write through a symlink planted inside scratch pointing outside. 3) Attempt scratch writes in a session persisted as read-only.
+- **Expected**: Both escapes return `PATH_OUTSIDE_WORKSPACE`; read-only mode still returns `WRITE_DISABLED_IN_READ_ONLY` even for scratch paths.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md §4b`
 - **Acceptance**: E (scratch root cannot be escaped)
 - **Milestone**: M5
@@ -520,8 +534,8 @@ Each scenario is documented in this format:
 #### E2E-019c: Permission modes govern high-risk approval (D115/D132)
 
 - **Preconditions**: Agent mode; project open; global default `ask`.
-- **Steps**: 1) With a newly inherited session and global default Ask every time, open the composer menu — expect Ask every time to be selected with no global-default/inherit label — then ask the agent to write a workspace file and expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Create another inherited session after setting the global default to Accept edits in Settings — expect the composer chip and menu selection to display Accept edits directly and Write/Edit to be auto-allowed. 5) Switch the session to Chat mode with Auto set — expect Write denied (`WRITE_DISABLED_IN_CHAT`).
-- **Expected**: Effective mode = session override → global default → ask; chat-mode hard deny outranks every mode; the composer chip and menu always display the effective mode without default/inherit provenance.
+- **Steps**: 1) With a newly inherited session and global default Ask every time, open the composer menu — expect Ask every time to be selected with no global-default/inherit label — then ask the agent to write a workspace file and expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Create another inherited session after setting the global default to Accept edits in Settings — expect the composer chip and menu selection to display Accept edits directly and Write/Edit to be auto-allowed. 5) With Auto set, point the session at the read-only profile through the host RPC — expect Write denied (`WRITE_DISABLED_IN_READ_ONLY`).
+- **Expected**: Effective mode = session override → global default → ask; the read-only hard deny outranks every mode; the composer chip and menu always display the effective mode without default/inherit provenance.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md §6`, `03-runtime/04-data-storage.md`, `08-meta/decisions-log.md` (D115/D132)
 - **Acceptance**: E (permission modes resolve and enforce host-side)
 - **Milestone**: M5
@@ -1184,10 +1198,10 @@ Each scenario is documented in this format:
 - **Preconditions**: One catalogued reasoning model, one non-reasoning model,
   and one unknown free-form model id.
 - **Steps**: 1) Select each provider/model in turn. 2) Inspect the composer
-  controls beside Chat / Agent. 3) Open the Thinking trigger and choose multiple
+  chip row. 3) Open the Thinking trigger and choose multiple
   supported levels. 4) Inspect the unknown model's menu and Provider Settings.
-- **Expected**: Reasoning models show the current Thinking level immediately to
-  the right of Chat / Agent, expose only their sparse supported levels as a
+- **Expected**: Reasoning models show the current Thinking level leading the
+  composer chip row, expose only their sparse supported levels as a
   single-column list in canonical order, mark the selected row with a trailing
   check, expose no inherit/default row, size the menu to its content without
   exceeding 160px or the available viewport, truncate overlong labels, and close
@@ -1207,11 +1221,12 @@ Each scenario is documented in this format:
 #### E2E-051: Thinking level persists with the session
 
 - **Preconditions**: A reasoning-capable session is idle.
-- **Steps**: 1) Select `high`. 2) Change Chat/Agent mode without changing the
-  thinking level. 3) Restart the app and reopen the session. 4) Switch to
+- **Steps**: 1) Select `high`. 2) Change the permission mode without changing
+  the thinking level. 3) Restart the app and reopen the session. 4) Switch to
   another session and back.
 - **Expected**: Every configuration update sends the complete session config;
-  `high` survives mode change, session switches, host reload, and app restart.
+  `high` survives the permission-mode change, session switches, host reload, and
+  app restart.
   A v2 database migrates the same field to `off` without transcript loss.
 - **Specs linked**: `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, `04-ux/08-component-spec.md`, ADR 0018
@@ -2785,14 +2800,14 @@ This test plan spec is accepted when:
 ### US-UI-04 Composer without workspace context
 - With a git workspace open, composer does not show project, Local, or branch
   labels above the prompt surface.
-- Permission toggle switches between Agent and Request approval (chat mode).
+- Permission toggle switches between Agent and Request approval.
 
 ### US-UI-05 Locale chrome
 - On a zh-CN system locale, sidebar labels render in Chinese (新建任务 / 项目 /
   插件 / 临时会话), without 拉取请求 or 已安排 entries.
 - Empty-thread hero remains the English PI-Desktop shell copy: "What should we build?".
-- Composer omits the 本地 workspace label and shows Chat mode plus the active
-  model ID.
+- Composer omits the 本地 workspace label; the top bar shows the active model
+  ID and no mode control (D188).
 
 ### US-UI-06 Session auto-title
 - Create a new task and send a first prompt such as "同步代码".
@@ -2869,8 +2884,8 @@ This test plan spec is accepted when:
 - On chat home and a docked thread, inspect every composer control.
 - Expect no file, photo, or appshot controls while those payloads are
   unsupported by the pi runtime. Exact reasoning-capable models expose the
-  current Thinking level immediately to the right of Chat / Agent; unsupported
-  models show no trigger. Unknown compatible models can explicitly enable
+  current Thinking level leading the composer chip row; unsupported models show
+  no trigger. Unknown compatible models can explicitly enable
   thinking from the model menu, and changes update the durable session.
 - Expect no project, Local, or branch context labels in the composer.
 - Every visible composer control changes the active session, opens its menu, or
@@ -2889,12 +2904,12 @@ This test plan spec is accepted when:
 ### US-UI-21 Top-bar model menu configures pi
 - Create a session with provider A/model A, then open the top-bar model menu.
 - Expect enabled, runnable provider/default-model pairs and an Agent entry. The
-  model trigger shows only the model ID; a capability-gated Thinking trigger is
-  placed beside Chat / Agent instead of being nested in the model menu.
+  model trigger shows only the model ID; a capability-gated Thinking trigger
+  lives in the composer chip row instead of being nested in the model menu.
 - Select provider B/model B, send a prompt, and expect the main-to-sidecar
   `agent.prompt` payload and pi runtime to use B for that session.
 - Switch away and back; expect B to remain selected. While a turn runs, expect
-  mode/model controls to be disabled.
+  the model control to be disabled.
 
 ### US-UI-22 Profile footer menu
 - On the sidebar footer, click the `Custom` / `Local profile` trigger.
@@ -3351,8 +3366,8 @@ This test plan spec is accepted when:
 ### US-UI-71 Composer runtime chip descenders (D150)
 - Open empty home and a docked thread with a model ID that contains descenders
   (for example `gpt`, `gemini`, or any id with `g`/`y`/`p`/`q`/`j`).
-- Inspect Chat/Agent, Thinking (when present), permission mode (Agent), and the
-  model chip in light and dark.
+- Inspect Thinking (when present), permission mode (Agent), and the model chip
+  in light and dark.
 - Expect every chip label to show full glyph ink — bottoms of `g`/`y`/`p` are not
   clipped by the 28px capsule — while long model IDs still ellipsize horizontally.
 - **Specs linked**: `04-ux/07-ui-design-system.md` §8.2, `04-ux/08-component-spec.md` §11.5, decisions-log D150

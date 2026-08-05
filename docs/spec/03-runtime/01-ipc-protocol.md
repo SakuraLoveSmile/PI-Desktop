@@ -104,7 +104,7 @@ type ThinkingLevel =
 
 type SessionConfigureRequest = {
   id: string;
-  mode: "chat" | "agent";
+  mode: "read-only" | "agent";
   providerId?: string;
   modelId?: string;
   thinkingLevel: ThinkingLevel;
@@ -306,7 +306,7 @@ type SessionSummary = {
  projectPath?: string;
  modelId?: string;
  providerId?: string;
- mode: "chat" | "agent";
+ mode: "read-only" | "agent";   // D188: the UI only ever sends `agent`
  thinkingLevel: ThinkingLevel;
  supportsReasoning?: boolean;
  supportedThinkingLevels?: ThinkingLevel[];

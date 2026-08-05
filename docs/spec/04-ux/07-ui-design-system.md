@@ -626,12 +626,12 @@ appears on project home and in the thread-docked composer.
 
 The composer renders only controls connected to the active pi session:
 
-- Chat / Agent updates the durable session mode and changes the next pi toolset.
+- There is no mode control: Agent is the only mode (D188).
 - The model trigger shows only the active model ID. Its menu selects a
   configured provider/default-model pair for the active session and links to
   Agent.
-- A reasoning-capable model exposes a separate Thinking trigger immediately to
-  the right of Chat / Agent in the left toolbar group. The trigger shows the
+- A reasoning-capable model exposes a Thinking trigger leading the left toolbar
+  group. The trigger shows the
   current level and opens the model's real `supportedThinkingLevels` as a
   compact single-column list with a check on the selected row. The menu fits its
   content, caps at 160px and the available viewport width, and truncates labels
@@ -647,7 +647,7 @@ The composer renders only controls connected to the active pi session:
   session value before the next turn.
 - Local and branch context are non-interactive status labels; the project name
   remains an action because it opens the project picker.
-- Runtime chip labels (Chat/Agent, Thinking, permission mode, model ID) use
+- Runtime chip labels (Thinking, permission mode, model ID) use
   `--text-sm` with `--leading-compact` inside the 28px hit target. They must not
   use `leading-none` with overflow clipping: descenders on glyphs such as
   `g`/`y`/`p` stay fully visible. Long model IDs still truncate horizontally via

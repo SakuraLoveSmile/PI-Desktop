@@ -19,8 +19,8 @@ Freeze the following defaults for implementation:
 
 1. Transport = **Rust sidecar + stdio JSON-RPC (NDJSON)**
 2. SQLite ownership = **Rust host-core only**
-3. Default mode = **Agent**
-4. Chat mode = **read-only tools**
+3. Default mode = **Agent** *(the only mode since D188 / ADR 0052)*
+4. Read-only mode = **read-only tools** *(renamed from Chat and UI-removed by ADR 0052)*
 5. Permission timeout = **120s deny**
 6. Session grants = **by toolName**
 7. First release platform = **macOS arm64 only**
