@@ -409,7 +409,9 @@ Authoritative mode and workspace resolution are session-scoped:
    A conflicting `requestedMode` is ignored for authorization and recorded only
    as diagnostic data.
 3. That path becomes the tool sandbox root for permission preview, execution,
-   artifact paths, and audit context.
+   artifact paths, and audit context. A tool's explicit `path` may name an
+   outside location only after the host applies the outside-path permission
+   rule; successful external results retain an absolute canonical path.
 4. The mutable `workspace.get` selection is not consulted for a valid durable
    session, so switching a retained project tab cannot redirect a background
    call.
@@ -421,6 +423,14 @@ Authoritative mode and workspace resolution are session-scoped:
    `sessionId`.
 7. A database/session-resolution error returns `INTERNAL` and fails closed;
    only a confirmed missing session may use the legacy fallback.
+
+For `Read`/`Glob`/`Grep`/`Write`/`Edit`, the host classifies an explicit path
+outside the workspace and scratch roots before the low-risk auto-allow rule.
+`auto` executes it, while `ask` and `accept-edits` emit
+`permissions.request`; denial, timeout, or cancellation returns `TOOL_DENIED`
+without executing the operation. Relative `..` and symlink escapes use the
+same classification. Bash's working directory and implicit recursive walks do
+not inherit this exception.
 
 Before generic permission evaluation, host-core applies the mode policy:
 
@@ -678,7 +688,7 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 | 1000 | INTERNAL | unexpected host failure |
 | 1001 | UNAUTHORIZED | missing/invalid handshake or capability |
 | 1002 | INVALID_PARAMS | schema validation failed |
-| 1003 | PATH_OUTSIDE_WORKSPACE | path sandbox violation |
+| 1003 | PATH_OUTSIDE_WORKSPACE | path sandbox violation before an explicit outside-path permission decision |
 | 1004 | TOOL_DENIED | permission denied |
 | 1005 | TOOL_TIMEOUT | tool exceeded timeout |
 | 1006 | WORKSPACE_REQUIRED | no workspace bound |

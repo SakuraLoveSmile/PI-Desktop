@@ -376,8 +376,12 @@ Required behaviours, each one an observed failure inverted:
 It also states a search preference that matches the host-side budgets in
 [16-tool-result-limits](16-tool-result-limits.md): scope `Read`, `Grep`, and
 `Glob` with their own parameters instead of hand-rolling `cat`/`sed`/`grep`/
-`find`, use `rg` with build output excluded when Bash is genuinely needed, and
-do not repeat a search whose answer is already in context.
+`find`; use `Read.offset/limit`, `Glob.path/limit`, and
+`Grep.path/include/outputMode/headLimit`; use `filesWithMatches` or `count`
+when content is unnecessary; use workspace-relative paths for portability; and
+fall back to a bounded command in the active shell only when the native tools
+are insufficient. `rg` is optional rather than assumed, and the agent must not
+repeat a search whose answer is already in context.
 
 ### 7.1 Active tool context and on-demand loading (D185, ADR 0048)
 

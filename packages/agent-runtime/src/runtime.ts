@@ -929,7 +929,7 @@ export class DesktopAgentRuntime {
       // Search-tool steering. Read/Grep/Glob are host-bounded and scopeable;
       // hand-rolled shell pipelines are not, and unbounded shell output is
       // what exhausted context and forced repeated re-searching.
-      "Searching and reading: prefer the Read, Grep, and Glob tools over shell `cat`, `sed`, `head`, `grep`, or `find`, and scope them with their own parameters — Grep takes `path`, `include`, `outputMode`, and `headLimit`; Glob takes `path` and `limit`; Read takes `offset` and `limit` and paginates any file, however large. These tools bound their own output; a shell pipeline does not, and one unscoped search over a whole workspace costs context you will need later. When a search genuinely needs Bash, use `rg` and exclude build output (`dist`, `*.min.*`, `*.map`). Do not re-run a search whose answer you already have.",
+      "Searching and reading: prefer the Read, Grep, and Glob tools over shell `cat`, `sed`, `head`, `grep`, or `find`. Scope every search with the native parameters: Grep takes `path`, `include`, `outputMode`, and `headLimit`; Glob takes `path` and `limit`; Read takes `offset` and `limit` and paginates any file, however large. Use `outputMode: \"filesWithMatches\"` or `\"count\"` when file contents are not needed, and use `include` to avoid scanning generated or vendor trees. These tools bound their own output; a shell pipeline does not, and one unscoped search over a whole workspace costs context you will need later. Workspace-relative paths are portable across macOS, Linux, and Windows; an explicit path outside the workspace and session scratch roots asks for permission unless the effective mode is Auto, so do not retry a denied path blindly. When a search genuinely needs Bash, use the active shell's syntax and a bounded command; use `rg` only when it is available, and never assume POSIX utilities, `/`-based paths, or PowerShell commands on every platform. Do not re-run a search whose answer you already have.",
       // Observed leak: OpenAI-style models sometimes emit the internal
       // `multi_tool_use.parallel` wrapper as assistant text. PI-Desktop has no
       // such tool, so the whole batch is silently lost as prose.
@@ -1287,16 +1287,37 @@ export class DesktopAgentRuntime {
     const scratchPathHint = this.scratchDir
       ? " `path` is workspace-relative, or an absolute path inside the session scratch directory."
       : "";
+    const externalPathHint =
+      " An explicit path outside the workspace and session scratch roots requires permission unless the effective mode is Auto.";
     const describe = (toolName: string): string => {
       switch (toolName) {
         case "BrowserPreview":
           return "Open a workspace HTML file in PI-Desktop's built-in browser panel. `path` is workspace-relative (e.g. \"demo/index.html\"). The preview live-reloads on later edits to the file or its sibling assets, so call once per page.";
         case "Read":
-          return `Read a file.${scratchPathHint}`;
+          return (
+            "Read a bounded window from a text file. Use `offset` and `limit` " +
+            "to paginate large files." +
+            `${scratchPathHint}${externalPathHint}`
+          );
+        case "Glob":
+          return (
+            "List files by glob pattern, newest first. Use `path` to scope the " +
+            "directory and `limit` to bound results; patterns use `/` as a " +
+            "portable separator." +
+            `${scratchPathHint}${externalPathHint}`
+          );
+        case "Grep":
+          return (
+            "Search file contents with a Rust-compatible regex. Use `path` and " +
+            "`include` to narrow the scan, `headLimit` to bound results, and " +
+            'outputMode: "filesWithMatches" or "count" when content is unnecessary; ' +
+            "`path` accepts portable relative paths." +
+            `${scratchPathHint}${externalPathHint}`
+          );
         case "Write":
-          return `Create or overwrite a file. Deliverables go into the workspace; temporary/intermediate files go into the scratch directory.${scratchPathHint}`;
+          return `Create or overwrite a file. Deliverables go into the workspace; temporary/intermediate files go into the scratch directory.${scratchPathHint}${externalPathHint}`;
         case "Edit":
-          return `Replace one unique occurrence of old_string in a file. Use Edit for a small localized change and Write for a whole-file rewrite; never guess old_string. After one failed edit, perform one fresh Read and regenerate the edit from that content. If the second attempt fails, stop instead of looping or repairing an old patch; do not repair an old patch repeatedly. Do not edit the same path concurrently.${scratchPathHint}`;
+          return `Replace one unique occurrence of old_string in a file. Use Edit for a small localized change and Write for a whole-file rewrite; never guess old_string. After one failed edit, perform one fresh Read and regenerate the edit from that content. If the second attempt fails, stop instead of looping or repairing an old patch; do not repair an old patch repeatedly. Do not edit the same path concurrently.${scratchPathHint}${externalPathHint}`;
         case "Bash":
           return `${commandShellToolDescription(this.commandShell, this.scratchDir)} Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly.`;
         case "PluginScaffold":
@@ -1312,11 +1333,49 @@ export class DesktopAgentRuntime {
     // One entry per tool: the shapes diverge enough that a chain of ternaries
     // stopped being readable.
     const parameters: Record<string, Parameters<typeof Type.Object>[0]> = {
-      Read: { path: Type.String() },
+      Read: {
+        path: Type.String({ description: "Workspace-relative or explicitly approved file path." }),
+        offset: Type.Optional(
+          Type.Number({ minimum: 0, description: "0-based line offset; defaults to 0." }),
+        ),
+        limit: Type.Optional(
+          Type.Number({ minimum: 1, description: "Maximum lines to return; defaults to 2000." }),
+        ),
+      },
       BrowserPreview: { path: Type.String() },
-      Glob: { pattern: Type.String() },
+      Glob: {
+        pattern: Type.String({ description: "Glob pattern, for example **/*.ts." }),
+        path: Type.Optional(
+          Type.String({
+            description:
+              "Directory to search; defaults to the workspace root and accepts an absolute scratch path.",
+          }),
+        ),
+        limit: Type.Optional(
+          Type.Number({ minimum: 1, description: "Maximum entries; defaults to 100." }),
+        ),
+      },
       Grep: {
-        pattern: Type.String(),
+        pattern: Type.String({ description: "Rust-compatible regex matched per line." }),
+        path: Type.Optional(
+          Type.String({
+            description:
+              "Directory to search; defaults to the workspace root and accepts an absolute scratch path.",
+          }),
+        ),
+        include: Type.Optional(
+          Type.String({ description: "Glob filter, for example **/*.{ts,tsx}." }),
+        ),
+        outputMode: Type.Optional(
+          Type.Union([
+            Type.Literal("content"),
+            Type.Literal("filesWithMatches"),
+            Type.Literal("count"),
+          ]),
+        ),
+        headLimit: Type.Optional(
+          Type.Number({ minimum: 1, description: "Maximum matches or files; defaults to 200." }),
+        ),
         caseInsensitive: Type.Optional(Type.Boolean()),
       },
       Write: { path: Type.String(), content: Type.String() },

@@ -1023,5 +1023,5 @@ workspace. Fuzzy filtering happens renderer-side.
 | `TOOL_DENIED` | Permission denied |
 | `TOOL_TIMEOUT` | Tool timed out |
 | `WORKSPACE_REQUIRED` | Project directory required |
-| `PATH_OUTSIDE_WORKSPACE` | Path out of bounds |
+| `PATH_OUTSIDE_WORKSPACE` | Path out of bounds before an explicit outside-path permission decision |
 | `INTERNAL` | Uncategorized internal error |

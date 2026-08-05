@@ -110,7 +110,7 @@ report what was bounded and how to continue:
 
 ```ts
 type ReadResult = {
-  path: string; root: "workspace" | "scratch"
+  path: string; root: "workspace" | "scratch" | "external"
   content: string          // byte-faithful window, no markers or line numbers
   offset: number; lineCount: number
   totalLines?: number      // present only once end of file was reached
@@ -126,6 +126,11 @@ type GrepResult =
 
 type GlobResult = { matches: string[]; count: number; truncated: boolean; notice?: string }
 ```
+
+For an approved external path, `path` is absolute; `Read` also reports
+`root: "external"`. `Glob` and `Grep` use absolute paths for their external
+matches. The sidecar emits `filesWithMatches`; host-core also normalizes the
+common `files_with_matches` and `files-with-matches` provider spellings.
 
 `notice` is model-facing prose, not a stable contract: it names the next offset,
 the budget that stopped the scan, or how many lines were clipped. `truncated`

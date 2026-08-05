@@ -16,7 +16,7 @@ use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::process::{ChildStderr, ChildStdin, ChildStdout, Command};
 use tokio::sync::{mpsc, watch};
 
-use crate::workspace::{resolve_tool_path, ToolRoot};
+use crate::workspace::{resolve_tool_path_with_external, ToolRoot};
 
 pub mod shell;
 
@@ -928,6 +928,7 @@ pub async fn execute_tool(
     .await
 }
 
+#[cfg(test)]
 pub async fn execute_tool_with_options(
     workspace: Option<&Path>,
     scratch: Option<&Path>,
@@ -935,6 +936,29 @@ pub async fn execute_tool_with_options(
     args: &Value,
     timeout_ms: Option<u64>,
     bash_options: Option<BashExecutionOptions>,
+) -> ToolsExecuteResult {
+    execute_tool_with_path_access(
+        workspace,
+        scratch,
+        tool_name,
+        args,
+        timeout_ms,
+        bash_options,
+        false,
+    )
+    .await
+}
+
+/// Execute a builtin tool after the host permission gate has decided whether
+/// an explicit outside-workspace path is allowed for this call.
+pub async fn execute_tool_with_path_access(
+    workspace: Option<&Path>,
+    scratch: Option<&Path>,
+    tool_name: &str,
+    args: &Value,
+    timeout_ms: Option<u64>,
+    bash_options: Option<BashExecutionOptions>,
+    allow_external_paths: bool,
 ) -> ToolsExecuteResult {
     let started = Instant::now();
     let timeout_ms = effective_timeout_ms(tool_name, timeout_ms);
@@ -954,11 +978,11 @@ pub async fn execute_tool_with_options(
         }
     }
     let result = match tool_name {
-        "Read" => tool_read(workspace, scratch, args),
-        "Glob" => tool_glob(workspace, scratch, args),
-        "Grep" => tool_grep(workspace, scratch, args),
-        "Write" => tool_write(workspace, scratch, args),
-        "Edit" => tool_edit(workspace, scratch, args),
+        "Read" => tool_read(workspace, scratch, args, allow_external_paths),
+        "Glob" => tool_glob(workspace, scratch, args, allow_external_paths),
+        "Grep" => tool_grep(workspace, scratch, args, allow_external_paths),
+        "Write" => tool_write(workspace, scratch, args, allow_external_paths),
+        "Edit" => tool_edit(workspace, scratch, args, allow_external_paths),
         "Bash" => {
             let options = bash_options.unwrap_or_else(|| {
                 let id = shell::catalog(None)
@@ -1023,7 +1047,7 @@ fn require_workspace(workspace: Option<&Path>) -> Result<&Path, (String, String)
 fn display_tool_path(root_kind: ToolRoot, workspace_root: &Path, resolved: &Path) -> String {
     match root_kind {
         ToolRoot::Workspace => relative_display(workspace_root, resolved),
-        ToolRoot::Scratch => resolved.to_string_lossy().to_string(),
+        ToolRoot::Scratch | ToolRoot::External => resolved.to_string_lossy().to_string(),
     }
 }
 
@@ -1031,6 +1055,7 @@ fn root_label(root_kind: ToolRoot) -> &'static str {
     match root_kind {
         ToolRoot::Workspace => "workspace",
         ToolRoot::Scratch => "scratch",
+        ToolRoot::External => "external",
     }
 }
 
@@ -1038,6 +1063,7 @@ fn tool_read(
     workspace: Option<&Path>,
     scratch: Option<&Path>,
     args: &Value,
+    allow_external_paths: bool,
 ) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let path = args
@@ -1045,7 +1071,8 @@ fn tool_read(
         .and_then(|v| v.as_str())
         .ok_or_else(|| ("INVALID_ARGUMENT".into(), "path required".into()))?;
     let (resolved, root_kind) =
-        resolve_tool_path(root, scratch, path).map_err(|e| (e.clone(), e))?;
+        resolve_tool_path_with_external(root, scratch, path, allow_external_paths)
+            .map_err(|e| (e.clone(), e))?;
     let offset = args
         .get("offset")
         .and_then(|v| v.as_u64())
@@ -1191,6 +1218,7 @@ fn tool_write(
     workspace: Option<&Path>,
     scratch: Option<&Path>,
     args: &Value,
+    allow_external_paths: bool,
 ) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let path = args
@@ -1202,7 +1230,8 @@ fn tool_write(
         .and_then(|v| v.as_str())
         .ok_or_else(|| ("INVALID_ARGUMENT".into(), "content required".into()))?;
     let (resolved, root_kind) =
-        resolve_tool_path(root, scratch, path).map_err(|e| (e.clone(), e))?;
+        resolve_tool_path_with_external(root, scratch, path, allow_external_paths)
+            .map_err(|e| (e.clone(), e))?;
     if let Some(parent) = resolved.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| ("TOOL_FAILED".into(), format!("mkdir failed: {e}")))?;
@@ -1220,6 +1249,7 @@ fn tool_edit(
     workspace: Option<&Path>,
     scratch: Option<&Path>,
     args: &Value,
+    allow_external_paths: bool,
 ) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let path = args
@@ -1237,7 +1267,8 @@ fn tool_edit(
         .and_then(|v| v.as_str())
         .ok_or_else(|| ("INVALID_ARGUMENT".into(), "new_string required".into()))?;
     let (resolved, root_kind) =
-        resolve_tool_path(root, scratch, path).map_err(|e| (e.clone(), e))?;
+        resolve_tool_path_with_external(root, scratch, path, allow_external_paths)
+            .map_err(|e| (e.clone(), e))?;
     let original = std::fs::read_to_string(&resolved)
         .map_err(|e| ("TOOL_FAILED".into(), format!("read failed: {e}")))?;
     let match_count = original.match_indices(old_str).count();
@@ -1300,6 +1331,7 @@ fn search_root(
     root: &Path,
     scratch: Option<&Path>,
     args: &Value,
+    allow_external_paths: bool,
 ) -> Result<(PathBuf, ToolRoot, bool), (String, String)> {
     match args
         .get("path")
@@ -1309,7 +1341,8 @@ fn search_root(
     {
         Some(path) => {
             let (resolved, kind) =
-                resolve_tool_path(root, scratch, path).map_err(|e| (e.clone(), e))?;
+                resolve_tool_path_with_external(root, scratch, path, allow_external_paths)
+                    .map_err(|e| (e.clone(), e))?;
             if !resolved.is_dir() {
                 return Err((
                     "INVALID_ARGUMENT".into(),
@@ -1371,6 +1404,7 @@ fn tool_glob(
     workspace: Option<&Path>,
     scratch: Option<&Path>,
     args: &Value,
+    allow_external_paths: bool,
 ) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let pattern = args
@@ -1378,7 +1412,7 @@ fn tool_glob(
         .and_then(|v| v.as_str())
         .unwrap_or("**/*");
     let set = build_glob_set(pattern)?;
-    let (search_dir, root_kind, scoped) = search_root(root, scratch, args)?;
+    let (search_dir, root_kind, scoped) = search_root(root, scratch, args, allow_external_paths)?;
     let limit = args
         .get("limit")
         .and_then(|v| v.as_u64())
@@ -1421,6 +1455,7 @@ fn tool_grep(
     workspace: Option<&Path>,
     scratch: Option<&Path>,
     args: &Value,
+    allow_external_paths: bool,
 ) -> Result<Value, (String, String)> {
     let root = require_workspace(workspace)?;
     let pattern = args
@@ -1435,7 +1470,7 @@ fn tool_grep(
         )
         .build()
         .map_err(|e| ("INVALID_ARGUMENT".into(), e.to_string()))?;
-    let (search_dir, root_kind, scoped) = search_root(root, scratch, args)?;
+    let (search_dir, root_kind, scoped) = search_root(root, scratch, args, allow_external_paths)?;
     let include = args
         .get("include")
         .and_then(|v| v.as_str())
@@ -1443,10 +1478,11 @@ fn tool_grep(
         .filter(|p| !p.is_empty())
         .map(build_glob_set)
         .transpose()?;
-    let mode = args
-        .get("outputMode")
-        .and_then(|v| v.as_str())
-        .unwrap_or("content");
+    let mode = match args.get("outputMode").and_then(|v| v.as_str()) {
+        Some("files_with_matches") | Some("files-with-matches") => "filesWithMatches",
+        Some(value) => value,
+        None => "content",
+    };
     if !matches!(mode, "content" | "filesWithMatches" | "count") {
         return Err((
             "INVALID_ARGUMENT".into(),
@@ -2663,6 +2699,108 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn approved_external_paths_work_for_read_and_search_tools() {
+        let workspace = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(outside.path().join("src")).unwrap();
+        let file = outside.path().join("src/outside.rs");
+        std::fs::write(&file, "const needle = 1;\n").unwrap();
+        let canonical_file = file.canonicalize().unwrap();
+
+        let read = execute_tool_with_path_access(
+            Some(workspace.path()),
+            None,
+            "Read",
+            &serde_json::json!({ "path": file.to_str().unwrap() }),
+            None,
+            None,
+            true,
+        )
+        .await;
+        assert!(read.ok, "external read failed: {:?}", read.content);
+        assert_eq!(read.content["root"].as_str(), Some("external"));
+        assert_eq!(read.content["content"].as_str(), Some("const needle = 1;"));
+
+        let grep = execute_tool_with_path_access(
+            Some(workspace.path()),
+            None,
+            "Grep",
+            &serde_json::json!({
+                "pattern": "needle",
+                "path": outside.path().to_str().unwrap(),
+            }),
+            None,
+            None,
+            true,
+        )
+        .await;
+        assert!(grep.ok, "external grep failed: {:?}", grep.content);
+        assert_eq!(grep.content["count"].as_u64(), Some(1));
+        assert_eq!(
+            grep.content["matches"][0]["path"].as_str(),
+            Some(canonical_file.to_str().unwrap())
+        );
+
+        let glob = execute_tool_with_path_access(
+            Some(workspace.path()),
+            None,
+            "Glob",
+            &serde_json::json!({
+                "pattern": "*.rs",
+                "path": outside.path().join("src").to_str().unwrap(),
+            }),
+            None,
+            None,
+            true,
+        )
+        .await;
+        assert!(glob.ok, "external glob failed: {:?}", glob.content);
+        assert_eq!(glob.content["count"].as_u64(), Some(1));
+        assert_eq!(
+            glob.content["matches"][0].as_str(),
+            Some(canonical_file.to_str().unwrap())
+        );
+    }
+
+    #[tokio::test]
+    async fn approved_external_paths_work_for_write_and_edit() {
+        let workspace = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let file = outside.path().join("outside.txt");
+
+        let write = execute_tool_with_path_access(
+            Some(workspace.path()),
+            None,
+            "Write",
+            &serde_json::json!({ "path": file.to_str().unwrap(), "content": "before" }),
+            None,
+            None,
+            true,
+        )
+        .await;
+        assert!(write.ok, "external write failed: {:?}", write.content);
+        assert_eq!(write.content["root"].as_str(), Some("external"));
+
+        let edit = execute_tool_with_path_access(
+            Some(workspace.path()),
+            None,
+            "Edit",
+            &serde_json::json!({
+                "path": file.to_str().unwrap(),
+                "old_string": "before",
+                "new_string": "after",
+            }),
+            None,
+            None,
+            true,
+        )
+        .await;
+        assert!(edit.ok, "external edit failed: {:?}", edit.content);
+        assert_eq!(edit.content["root"].as_str(), Some("external"));
+        assert_eq!(std::fs::read_to_string(file).unwrap(), "after");
+    }
+
+    #[tokio::test]
     async fn grep_scopes_clips_and_bounds_results() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("src")).unwrap();
@@ -2723,6 +2861,27 @@ mod tests {
             .map(|v| v.as_str().unwrap())
             .collect();
         assert_eq!(listed.len(), 3, "every file listed once: {listed:?}");
+
+        // Providers sometimes normalize the camel-case enum into a shell-style
+        // spelling. Keep the canonical schema while accepting those harmless
+        // compatibility aliases at the host boundary.
+        let aliased_files = execute_tool(
+            Some(dir.path()),
+            None,
+            "Grep",
+            &serde_json::json!({
+                "pattern": "needle",
+                "outputMode": "files_with_matches",
+            }),
+            5_000,
+        )
+        .await;
+        assert!(
+            aliased_files.ok,
+            "grep alias failed: {:?}",
+            aliased_files.content
+        );
+        assert_eq!(aliased_files.content["files"].as_array().unwrap().len(), 3);
 
         let counts = execute_tool(
             Some(dir.path()),

@@ -11,7 +11,13 @@ Make high-risk local actions visible, interruptible, and predictable.
 | Agent | allow | allow | permission policy | permission policy | registered risk policy |
 | Plan | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | deny |
 
-Decision source: **D003/D189/D190**.
+The Read/Glob/Grep `allow` cells apply to paths inside the session workspace
+and scratch roots. An explicit path outside both roots is an exception:
+`auto` allows it, while `ask` and `accept-edits` show the same inline card as
+other permission-gated tools. The card's argument preview includes the
+requested path, and the external result remains absolute in the transcript.
+
+Decision source: **D003/D189/D190/D195 (ADR 0057)**.
 
 Plan keeps this permission-mode control visible. It is planning intent, not a
 strict read-only security profile: a Bash command can mutate workspace or

@@ -1,5 +1,5 @@
 use std::io::{self, BufRead, BufReader as StdBufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -555,6 +555,35 @@ fn resolve_tool_workspace(
         Ok(None) => Ok(state.workspace.path.clone()),
         Err(error) => Err(rpc_err(1000, error.to_string(), "INTERNAL")),
     }
+}
+
+/// Read/search tools are low risk inside their normal roots, but an explicit
+/// path outside both roots is a separate capability. The check is deliberately
+/// based on the same resolver used for execution so `..` and symlink escapes
+/// cannot avoid the permission card. Scratch paths are recognized lexically
+/// before the lazy scratch directory exists.
+fn requires_external_path_permission(
+    workspace_path: Option<&str>,
+    scratch_path: Option<&Path>,
+    tool_name: &str,
+    args: &Value,
+) -> bool {
+    if !matches!(tool_name, "Read" | "Glob" | "Grep" | "Write" | "Edit") {
+        return false;
+    }
+    let Some(path) = args.get("path").and_then(Value::as_str) else {
+        return false;
+    };
+    if scratch_path.is_some_and(|root| workspace::lexically_inside(root, path)) {
+        return false;
+    }
+    let Some(workspace_path) = workspace_path else {
+        return false;
+    };
+    matches!(
+        workspace::resolve_tool_path(Path::new(workspace_path), scratch_path, path),
+        Err(error) if error == "PATH_OUTSIDE_WORKSPACE"
+    )
 }
 
 /// Plans are owned by the session's persisted project. Unlike the legacy
@@ -1989,6 +2018,7 @@ async fn handle_request(
                     auto_decision,
                     workspace_path,
                     scratch_path,
+                    external_path_permission,
                     pending_rx,
                     request_opt,
                     permission_shell_id,
@@ -2019,14 +2049,6 @@ async fn handle_request(
                             .filter(|m| sessions::is_valid_permission_mode(m) && m != "inherit")
                             .unwrap_or_else(|| "ask".to_string()),
                     };
-                    let mut auto = st.permissions.evaluate_auto_with_permission_mode_and_risk(
-                        &p.session_id,
-                        &p.tool_name,
-                        &durable_mode,
-                        &effective_pm,
-                        &st.session_grants,
-                        p.declared_risk.as_deref(),
-                    );
                     // Resolve the tool root from the persisted session instead of
                     // the mutable global workspace. This keeps background turns
                     // isolated when the renderer switches between project tabs.
@@ -2034,6 +2056,23 @@ async fn handle_request(
                     // known sessions.
                     let ws = resolve_tool_workspace(&st, &p.session_id)?;
                     let scratch = scratch::session_dir(&st.data_dir, &p.session_id);
+                    let external_path_permission = requires_external_path_permission(
+                        ws.as_deref(),
+                        scratch.as_deref(),
+                        &p.tool_name,
+                        &p.args,
+                    );
+                    let mut auto = st
+                        .permissions
+                        .evaluate_auto_with_permission_mode_and_risk_and_path(
+                            &p.session_id,
+                            &p.tool_name,
+                            &durable_mode,
+                            &effective_pm,
+                            &st.session_grants,
+                            p.declared_risk.as_deref(),
+                            external_path_permission,
+                        );
                     // Write/Edit targeting the session scratch dir never touch
                     // the user's project — skip the prompt (D114). The lexical
                     // pre-check only decides prompting; execution still goes
@@ -2057,21 +2096,26 @@ async fn handle_request(
                             Some(decision),
                             ws,
                             scratch,
+                            external_path_permission,
                             None,
                             None,
                             command_shell_id.clone(),
                         )
                     } else {
-                        let reason = match p.tool_name.as_str() {
-                            "Write" | "Edit" => "Modifies files in your workspace",
-                            "Bash" => "Runs a shell command in your workspace",
-                            name if name.starts_with("mcp_") => {
-                                "MCP server tool requires approval"
+                        let reason = if external_path_permission {
+                            "Accesses a path outside the session workspace"
+                        } else {
+                            match p.tool_name.as_str() {
+                                "Write" | "Edit" => "Modifies files in your workspace",
+                                "Bash" => "Runs a shell command in your workspace",
+                                name if name.starts_with("mcp_") => {
+                                    "MCP server tool requires approval"
+                                }
+                                name if name.starts_with("plugin_") => {
+                                    "Plugin-provided tool requires approval"
+                                }
+                                _ => "High-risk tool requires approval",
                             }
-                            name if name.starts_with("plugin_") => {
-                                "Plugin-provided tool requires approval"
-                            }
-                            _ => "High-risk tool requires approval",
                         };
                         let (req, rx) = st.permissions.create_request_with_risk_and_shell(
                             crate::permissions::PermissionRequestParams {
@@ -2093,6 +2137,7 @@ async fn handle_request(
                             None,
                             ws,
                             scratch,
+                            external_path_permission,
                             Some(rx),
                             Some(req),
                             command_shell_id.clone(),
@@ -2176,6 +2221,7 @@ async fn handle_request(
                         "toolName": p.tool_name,
                         "toolCallId": p.tool_call_id,
                         "mode": durable_mode,
+                        "externalPathPermission": external_path_permission,
                         "prompted": prompted,
                         "permissionWaitMs": permission_wait_ms,
                         "totalMs": call_started.elapsed().as_millis() as u64
@@ -2360,13 +2406,14 @@ async fn handle_request(
                     // command-shell timeout semantics apply only to Bash.
                     execute_plugin_tool(&state, &tx, &p, p.timeout_ms.unwrap_or(60_000)).await
                 } else {
-                    tools::execute_tool_with_options(
+                    tools::execute_tool_with_path_access(
                         ws_path.as_deref(),
                         scratch_path.as_deref(),
                         &p.tool_name,
                         &p.args,
                         execution_timeout_ms,
                         bash_options,
+                        external_path_permission,
                     )
                     .await
                 };
@@ -2404,9 +2451,11 @@ async fn handle_request(
                 // Scratch files are temp by definition: keep them out of the
                 // artifacts table so the work panel file list only shows
                 // workspace deliverables (D114).
-                let in_scratch =
-                    result.content.get("root").and_then(|v| v.as_str()) == Some("scratch");
-                if result.ok && !in_scratch && matches!(p.tool_name.as_str(), "Write" | "Edit") {
+                let result_root = result.content.get("root").and_then(|v| v.as_str());
+                if result.ok
+                    && result_root == Some("workspace")
+                    && matches!(p.tool_name.as_str(), "Write" | "Edit")
+                {
                     if let Some(rel) = result.content.get("path").and_then(|v| v.as_str()) {
                         let abs = match ws_path.as_deref() {
                             Some(root) => root.join(rel).to_string_lossy().to_string(),
@@ -2436,6 +2485,7 @@ async fn handle_request(
                 let mut execute_audit = json!({
                     "toolName": p.tool_name,
                     "toolCallId": p.tool_call_id,
+                    "externalPathPermission": external_path_permission,
                     "ok": result.ok,
                     "durationMs": result.duration_ms,
                     "errorCode": result.error_code,
@@ -2526,17 +2576,30 @@ async fn handle_request(
                         })
                 })
                 .unwrap_or_else(|| "ask".into());
-            let decision = st.permissions.evaluate_auto_with_permission_mode_and_risk(
-                session_id,
+            let workspace_path = resolve_tool_workspace(&st, session_id)?;
+            let scratch_path = scratch::session_dir(&st.data_dir, session_id);
+            let args = params.get("args").cloned().unwrap_or_else(|| json!({}));
+            let external_path_permission = requires_external_path_permission(
+                workspace_path.as_deref(),
+                scratch_path.as_deref(),
                 tool_name,
-                &mode,
-                &effective_pm,
-                &st.session_grants,
-                declared_risk,
+                &args,
             );
+            let decision = st
+                .permissions
+                .evaluate_auto_with_permission_mode_and_risk_and_path(
+                    session_id,
+                    tool_name,
+                    &mode,
+                    &effective_pm,
+                    &st.session_grants,
+                    declared_risk,
+                    external_path_permission,
+                );
             Ok(json!({
                 "decision": decision,
-                "risk": PermissionManager::tool_risk_with_declared(tool_name, declared_risk)
+                "risk": PermissionManager::tool_risk_with_declared(tool_name, declared_risk),
+                "externalPathPermission": external_path_permission
             }))
         }
         "permissions.resolve" => {
@@ -4587,6 +4650,143 @@ mod tests {
             total_ms - execute_ms - permission_wait_ms,
             "segments add up to the total"
         );
+    }
+
+    #[tokio::test]
+    async fn outside_paths_prompt_in_plan_and_auto_allows_after_mode_switch() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project = data_dir.path().join("project");
+        let outside = data_dir.path().join("outside");
+        fs::create_dir_all(&project).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        let outside_file = outside.join("note.txt");
+        fs::write(&outside_file, "outside content").unwrap();
+
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("External path permission".into()),
+            Some("plan".into()),
+            None,
+            None,
+            Some(project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        sessions::configure_session_with_thinking(
+            &app_state.db,
+            &session.id,
+            "plan",
+            None,
+            None,
+            None,
+            Some("ask"),
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (notify_tx, mut notify_rx) = mpsc::unbounded_channel();
+        let request_state = state.clone();
+        let session_id = session.id.clone();
+        let path = outside_file.to_string_lossy().into_owned();
+        let path_for_request = path.clone();
+        let pending = tokio::spawn(async move {
+            handle_request(
+                request_state,
+                "tools.execute",
+                json!({
+                    "sessionId": session_id,
+                    "toolCallId": "outside-plan-read",
+                    "toolName": "Read",
+                    "args": { "path": path_for_request },
+                    "mode": "agent"
+                }),
+                notify_tx,
+            )
+            .await
+        });
+
+        let notification = notify_rx.recv().await.unwrap();
+        let notification: Value = serde_json::from_str(&notification).unwrap();
+        assert_eq!(notification["method"], "permissions.request");
+        assert_eq!(
+            notification["params"]["reason"],
+            "Accesses a path outside the session workspace"
+        );
+        assert_eq!(notification["params"]["argsPreview"]["path"], path);
+        let request_id = notification["params"]["requestId"].as_str().unwrap();
+        handle_request(
+            state.clone(),
+            "permissions.resolve",
+            json!({ "requestId": request_id, "decision": "deny" }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        let denied = pending.await.unwrap().unwrap();
+        assert_eq!(denied["ok"], false);
+        assert_eq!(denied["errorCode"], "TOOL_DENIED");
+
+        let request_state = state.clone();
+        let session_id = session.id.clone();
+        let path_for_request = path.clone();
+        let (notify_tx2, mut notify_rx2) = mpsc::unbounded_channel();
+        let allowed_pending = tokio::spawn(async move {
+            handle_request(
+                request_state,
+                "tools.execute",
+                json!({
+                    "sessionId": session_id,
+                    "toolCallId": "outside-plan-read-allowed",
+                    "toolName": "Read",
+                    "args": { "path": path_for_request },
+                    "mode": "agent"
+                }),
+                notify_tx2,
+            )
+            .await
+        });
+        let notification = notify_rx2.recv().await.unwrap();
+        let notification: Value = serde_json::from_str(&notification).unwrap();
+        let request_id = notification["params"]["requestId"].as_str().unwrap();
+        handle_request(
+            state.clone(),
+            "permissions.resolve",
+            json!({ "requestId": request_id, "decision": "allow-once" }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        let allowed = allowed_pending.await.unwrap().unwrap();
+        assert_eq!(allowed["ok"], true);
+        assert_eq!(allowed["content"]["root"], "external");
+        assert_eq!(allowed["content"]["content"], "outside content");
+
+        sessions::configure_session_with_thinking(
+            &state.lock().await.db,
+            &session.id,
+            "plan",
+            None,
+            None,
+            None,
+            Some("auto"),
+        )
+        .unwrap();
+        let auto = handle_request(
+            state.clone(),
+            "tools.execute",
+            json!({
+                "sessionId": session.id,
+                "toolCallId": "outside-plan-auto-read",
+                "toolName": "Read",
+                "args": { "path": outside_file.to_string_lossy() },
+                "mode": "agent"
+            }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(auto["ok"], true);
+        assert_eq!(auto["content"]["root"], "external");
     }
 
     #[tokio::test]

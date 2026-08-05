@@ -191,9 +191,42 @@ describe("DesktopAgentRuntime configuration matching", () => {
     );
     expect(prompt).toContain("`outputMode`");
     expect(prompt).toContain("paginates any file, however large");
-    expect(prompt).toContain("use `rg` and exclude build output");
+    expect(prompt).toContain("use `rg` only when it is available");
+    expect(prompt).toContain("Workspace-relative paths are portable");
+    expect(prompt).toContain(
+      "an explicit path outside the workspace and session scratch roots asks for permission",
+    );
     expect(prompt).toContain("Do not re-run a search whose answer you already have");
     expect(prompt).toContain("Never write a tool call as text");
+
+    await runtime.dispose();
+  });
+
+  it("exposes bounded, scopeable search parameters to the model", async () => {
+    const runtime = createRuntime({ mode: "chat" });
+    const tools = (runtime as any).agent.state.tools as Array<any>;
+    const byName = (name: string) => tools.find((tool) => tool.name === name);
+
+    expect(byName("Read").parameters.properties).toEqual(
+      expect.objectContaining({ offset: expect.any(Object), limit: expect.any(Object) }),
+    );
+    expect(byName("Glob").parameters.properties).toEqual(
+      expect.objectContaining({ path: expect.any(Object), limit: expect.any(Object) }),
+    );
+    expect(byName("Grep").parameters.properties).toEqual(
+      expect.objectContaining({
+        path: expect.any(Object),
+        include: expect.any(Object),
+        outputMode: expect.any(Object),
+        headLimit: expect.any(Object),
+      }),
+    );
+    expect(byName("Grep").parameters.properties.outputMode.anyOf).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ const: "filesWithMatches" }),
+        expect.objectContaining({ const: "count" }),
+      ]),
+    );
 
     await runtime.dispose();
   });

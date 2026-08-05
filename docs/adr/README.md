@@ -72,3 +72,4 @@ Each ADR includes:
 | 0054 | Selectable command shell catalog and execution identity | Accepted for implementation |
 | 0055 | Agent-only mode; Chat becomes an internal read-only profile | Superseded by 0052 / 0053 |
 | 0056 | User-owned MCP servers and skills, with a shared activation scope | Accepted |
+| 0057 | Permission-gated external paths and portable native search | Accepted for implementation |

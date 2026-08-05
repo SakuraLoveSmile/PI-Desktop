@@ -61,10 +61,13 @@ Required (all **implemented**):
 
 ## 4. Workspace sandbox
 
-- File tools are restricted to the project root by default
+- File tools are restricted to the project root by default; an explicit path
+  outside the session workspace and scratch roots requires the host permission
+  decision described in `03-runtime/03-tools-and-permissions.md`
 - Path normalization + root boundary check in host-core
   (`workspace::tests::blocks_escape` covers escape attempts)
-- Symlink targets outside the root are rejected when detectable
+- Symlink targets outside the root are rejected when detectable unless the
+  explicit path was approved by the host permission layer
 
 Plan is not itself the workspace security boundary. Host-core resolves the
 durable session mode for every `tools.execute` call and applies the Plan matrix
