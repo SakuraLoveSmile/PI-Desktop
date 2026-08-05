@@ -182,6 +182,11 @@ function matchesQuery(query: string, ...fields: Array<string | undefined>): bool
   return fields.some((field) => field?.toLocaleLowerCase().includes(needle));
 }
 
+/** Development-only sample plugins are fixtures, not client product offerings. */
+function isClientVisibleMarketPlugin(plugin: Pick<MarketPluginSummary, "id">): boolean {
+  return !plugin.id.startsWith("demo.");
+}
+
 function groupOf(plugin: PluginSummary): GroupId {
   if (plugin.status === "error" || plugin.status === "load_error") return "attention";
   if (plugin.updateAvailable) return "updates";
@@ -389,7 +394,7 @@ export function PluginsPage() {
         );
       }
       const res = await api.marketSearch(q);
-      setMarket(res.plugins ?? []);
+      setMarket((res.plugins ?? []).filter(isClientVisibleMarketPlugin));
       if (!marketSource) {
         setMarketSource(
           res.providerId === "official"

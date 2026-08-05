@@ -35,6 +35,14 @@ The host is responsible for:
 - Package URLs may be absolute `https://` / `http://` / `file://`, or relative paths resolved against the catalog URL
 - HTTPS fetch uses `curl` in host-core
 
+### Client-visible catalog policy
+
+Development-only sample entries whose stable ID starts with `demo.` remain
+available as offline fixtures and direct install targets for plugin development,
+but the desktop client filters them before updating its marketplace state. They
+do not appear as cards, categories, or search results. An already-installed
+sample remains visible in Installed so it can still be disabled or uninstalled.
+
 ### Phase C (partial ✅)
 - Auto-update policy + permission-diff gating implemented
 - Ratings / mandatory signing still planned

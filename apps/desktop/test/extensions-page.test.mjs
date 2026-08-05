@@ -95,6 +95,15 @@ test("the extensions page uses tabs instead of a four-number overview band", () 
   assert.match(pageSrc, /className="plugins-segment"/);
 });
 
+test("the client hides development-only demo plugins from marketplace results", () => {
+  assert.match(pageSrc, /function isClientVisibleMarketPlugin/);
+  assert.match(pageSrc, /!plugin\.id\.startsWith\("demo\."\)/);
+  assert.match(
+    pageSrc,
+    /setMarket\(\(res\.plugins \?\? \[\]\)\.filter\(isClientVisibleMarketPlugin\)\)/,
+  );
+});
+
 // Scoping something to "this project" only means anything relative to the folder
 // the window has open, and the picker cannot offer folders it was never given.
 test("both new sections receive the project list and the open project", () => {

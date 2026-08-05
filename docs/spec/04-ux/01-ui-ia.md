@@ -202,6 +202,9 @@ and reveals quiet icon actions on hover (open panel, overflow menu with
 auto-update and Uninstall) beside an always-visible enable switch. MCP and
 Skills provide their own scoped configuration and authoring surfaces.
 Marketplace is a card grid with category chips and skeleton placeholders.
+Development-only marketplace fixtures whose IDs begin with `demo.` are
+filtered from the client cards and search results; installed copies remain
+manageable in Installed.
 Details open in a right-side sheet (about, links, safety notes, risk-labeled
 permissions, version picker, readme). Installing opens a permission dialog
 that groups requests by risk tier and marks permissions new to an upgrade.
