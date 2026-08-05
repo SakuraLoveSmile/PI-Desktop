@@ -1123,8 +1123,8 @@ activity rows and their nested result disclosures.
   not the raw function name. Running actions use the progressive form.
 - The primary argument is a clamped single-line monospace hint.
 - Result chips follow the hint: exit code (error hue), match/file counts,
-  replacement count, written size, `truncated`, `scratch`. A successful exit
-  earns no chip — the row status already says so.
+  replacement count, written or read size, `truncated`, `scratch`. A successful
+  exit earns no chip — the row status already says so.
 - The disclosure chevron is quiet until hover/focus or expansion.
 
 ### 9.3 Expanded blocks
@@ -1141,7 +1141,8 @@ twice.
 | Edit | `Changes` — compact diff, only when no ReviewChangeCard owns one |
 | Bash | `Command` (shell), `Output`, `Errors` (error hue); empty channels omitted |
 | Glob | `Files` — clickable workspace paths |
-| Grep | `Matches` — grouped by file, `line` gutter, clickable path headings |
+| Grep | `Matches` — grouped by file with a `line` gutter and clickable path headings for `outputMode: content`; a clickable path list for `filesWithMatches`; `path` → hit count fields for `count` |
+| any host `notice` | `Note` — neutral, after the blocks it qualifies (search scoping, clipped long lines, Read window) |
 | any failure | `Error` — message plus code, listed first |
 | unmapped payload | scalar entries as label/value fields; long or multi-line strings as their own labeled block; nested objects as JSON |
 

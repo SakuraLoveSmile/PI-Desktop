@@ -194,6 +194,86 @@ test("Glob lists files and Grep groups hits by path", () => {
   assert.deepEqual(toolResultChips(grep), [{ role: "matches", count: 3 }]);
 });
 
+test("Grep's other output modes and host notices stay readable", () => {
+  // outputMode: "filesWithMatches" answers with paths, not hits.
+  const paths = {
+    toolName: "Grep",
+    toolArgs: { pattern: "TODO", outputMode: "filesWithMatches" },
+    toolResult: envelope({
+      files: ["src/a.ts", "src/b.ts"],
+      count: 7,
+      truncated: false,
+    }),
+  };
+  const pathBlocks = buildToolPresentation(paths, { hideSummaryArg: true });
+  assert.deepEqual(roles(pathBlocks), ["files"]);
+  assert.deepEqual(pathBlocks[0].paths, ["src/a.ts", "src/b.ts"]);
+  assert.deepEqual(toolResultChips(paths), [{ role: "matches", count: 7 }]);
+
+  // outputMode: "count" answers with per-file totals.
+  const counted = {
+    toolName: "Grep",
+    toolArgs: { pattern: "TODO", outputMode: "count" },
+    toolResult: envelope({
+      counts: [
+        { path: "src/a.ts", count: 2 },
+        { path: "src/b.ts", count: 5 },
+      ],
+      count: 7,
+      truncated: false,
+    }),
+  };
+  const countBlocks = buildToolPresentation(counted, { hideSummaryArg: true });
+  assert.deepEqual(roles(countBlocks), ["matches"]);
+  assert.deepEqual(countBlocks[0].rows, [
+    { label: "src/a.ts", value: "2" },
+    { label: "src/b.ts", value: "5" },
+  ]);
+
+  // A scoping notice qualifies the block it follows and is not error-hued.
+  const noticed = buildToolPresentation(
+    {
+      toolName: "Glob",
+      toolArgs: { pattern: "src/**" },
+      toolResult: envelope({
+        matches: ["src/a.ts"],
+        count: 1,
+        truncated: true,
+        notice: "more files match; raise limit or narrow pattern/path",
+      }),
+    },
+    { hideSummaryArg: true },
+  );
+  assert.deepEqual(roles(noticed), ["files", "notice"]);
+  assert.equal(noticed[1].kind, "note");
+  assert.match(noticed[1].text, /raise limit/);
+});
+
+test("a paginated Read window keeps its content, size and notice", () => {
+  const message = {
+    toolName: "Read",
+    toolArgs: { path: "big.txt", offset: 200, limit: 2 },
+    toolResult: envelope({
+      path: "big.txt",
+      root: "workspace",
+      content: "line 201\nline 202",
+      truncated: true,
+      offset: 200,
+      lineCount: 2,
+      fileBytes: 2048,
+      totalLines: 900,
+      notice: "showing lines 201-202 of 900",
+    }),
+  };
+  const blocks = buildToolPresentation(message, { hideSummaryArg: true });
+  assert.deepEqual(roles(blocks), ["content", "notice"]);
+  assert.equal(blocks[0].text, "line 201\nline 202");
+  assert.deepEqual(toolResultChips(message), [
+    { role: "size", text: "2.0 KB" },
+    { role: "truncated" },
+  ]);
+});
+
 test("a failed tool leads with the error note and keeps the arguments", () => {
   const blocks = buildToolPresentation(
     {

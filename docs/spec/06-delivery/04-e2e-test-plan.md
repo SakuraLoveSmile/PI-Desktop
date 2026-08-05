@@ -2712,8 +2712,9 @@ Each scenario is documented in this format:
   workspace contains a file large enough to trip host truncation.
 - **Steps**:
   1. Run one turn that reads a source file, globs a directory, greps a token,
-     edits a workspace file, edits a scratch-root file, runs a failing shell
-     command, and calls the plugin tool.
+     greps again with `outputMode: filesWithMatches` and `count`, edits a
+     workspace file, edits a scratch-root file, runs a failing shell command,
+     and calls the plugin tool.
   2. Inspect each collapsed activity row, then expand every row in light and
      dark.
   3. Click a Glob path and a Grep hit heading.
@@ -2723,15 +2724,17 @@ Each scenario is documented in this format:
   - No expanded row shows escaped JSON, and no payload appears twice.
   - Read/Write show highlighted content; Bash shows command, output, and
     error-hued stderr as separate blocks with empty channels omitted; Glob shows
-    a path list; Grep shows hits grouped per file with line numbers; the failing
-    command carries an `exit 1` chip.
+    a path list; Grep shows hits grouped per file with line numbers in `content`
+    mode, a path list in `filesWithMatches`, and per-file totals in `count`; the
+    failing command carries an `exit 1` chip.
   - The workspace edit shows no inline diff (its ReviewChangeCard owns it); the
     scratch edit shows a compact diff and a `scratch` chip.
   - The plugin result renders label/value fields and labeled blocks, not a blob.
   - Clicking a path opens it in the work panel; paths outside the workspace root
     are not clickable.
   - The permission card's args preview uses the same blocks.
-  - Host truncation markers stay visible, a `truncated` chip appears, capped
+  - Host truncation markers stay visible, a `truncated` chip appears, a host
+    `notice` renders as a neutral note under the block it qualifies, capped
     lists report the hidden remainder, and copy yields the full payload.
 - **Specs linked**: `04-ux/08-component-spec.md` §9, §10.2,
   `08-meta/decisions-log.md` (D189)

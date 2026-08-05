@@ -77,10 +77,13 @@ test("tool block bodies stay bounded and role-coded", () => {
     stylesSource,
     /\.tool-file-list,\s*\.tool-match-list \{[\s\S]*?max-height:\s*260px;[\s\S]*?overflow:\s*auto;/,
   );
-  // stderr and error notes carry the error hue, stdout does not.
+  // stderr and error notes carry the error hue, host notices stay neutral.
   assert.match(stylesSource, /\.tool-row-content\.is-error \{[\s\S]*?var\(--ds-error\)/);
   assert.match(stylesSource, /\.tool-chip\.is-error \{[\s\S]*?var\(--ds-error\)/);
-  assert.match(stylesSource, /\.tool-note \{[\s\S]*?var\(--ds-error\)/);
+  assert.match(stylesSource, /\.tool-note\.is-error \{[\s\S]*?var\(--ds-error\)/);
+  const note = stylesSource.match(/\.tool-note \{([^}]*)\}/)?.[1];
+  assert.ok(note);
+  assert.doesNotMatch(note, /--ds-error/);
   // The permission card is a block container now, not a <pre>.
   const permissionArgs = stylesSource.match(/\.permission-card-args \{([^}]*)\}/)?.[1];
   assert.ok(permissionArgs);

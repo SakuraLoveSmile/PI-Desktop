@@ -986,8 +986,11 @@ section mirrors only marketplace/catalog items still blocking nothing.
   repeats it as text for the model. Only the structured half is rendered, so no
   byte is shown twice.
 - Collapsed rows carry outcome chips (exit code, match/file counts, replacement
-  count, written size, `truncated`, `scratch`) so a result reads without
+  count, written or read size, `truncated`, `scratch`) so a result reads without
   expanding. A successful exit earns no chip.
+- Search results follow the host's `outputMode`: grouped hits, a path list, or
+  per-file totals. A host `notice` (scoping, clipped lines, Read window) renders
+  as a neutral note under the blocks it qualifies, never as an error.
 - Edit rows draw their own diff only when no ReviewChangeCard owns one, keeping
   workspace edits single-sourced. The inline permission card shares the same
   block renderer for its args preview.

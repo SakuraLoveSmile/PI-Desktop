@@ -254,6 +254,7 @@ export const zhCN = {
     toolBlockFiles: "文件",
     toolBlockMatches: "匹配",
     toolBlockDetails: "详情",
+    toolBlockNotice: "说明",
     toolBlockError: "错误",
     toolBlockMore: "还有 {{count}} 项未显示",
     toolChipExit: "退出码 {{count}}",

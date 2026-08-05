@@ -254,6 +254,7 @@ export const en = {
     toolBlockFiles: "Files",
     toolBlockMatches: "Matches",
     toolBlockDetails: "Details",
+    toolBlockNotice: "Note",
     toolBlockError: "Error",
     toolBlockMore: "{{count}} more hidden",
     toolChipExit: "exit {{count}}",

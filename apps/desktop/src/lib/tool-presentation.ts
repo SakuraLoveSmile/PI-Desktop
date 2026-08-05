@@ -3,7 +3,7 @@ import { getToolAction, getToolSummaryKey, type ToolAction } from "./tool-displa
 import { reviewChangeFromMessage } from "./workspace-review";
 
 /*
- * Structured presentation of one tool call (D188).
+ * Structured presentation of one tool call (D189).
  *
  * Tool payloads are well-shaped — Read returns file content, Bash returns
  * stdout/stderr/exitCode, Grep returns path/line hits — so the transcript
@@ -54,6 +54,7 @@ export type ToolBlockRole =
   | "details"
   | "output"
   | "input"
+  | "notice"
   | "error";
 
 export type ToolDiffLine = { type: "add" | "del" | "context"; text: string };
@@ -297,6 +298,20 @@ function stringArray(value: unknown): string[] | null {
     : null;
 }
 
+/** Grep's `count` output mode: one row per file, `path` → number of hits. */
+function countsBlock(value: unknown): ToolBlock | null {
+  if (!Array.isArray(value)) return null;
+  const rows: ToolFieldRow[] = [];
+  for (const entry of value.slice(0, MAX_LIST_ITEMS)) {
+    const record = asRecord(entry);
+    const path = stringAt(record, "path", "file");
+    const count = numberAt(record, "count");
+    if (!path || count === null) continue;
+    rows.push({ label: path, value: String(count) });
+  }
+  return rows.length > 0 ? { kind: "fields", role: "matches", rows } : null;
+}
+
 /**
  * Readable rendering for payloads with no per-tool mapping (plugin tools, MCP
  * results): scalars become field rows, long or multi-line strings become their
@@ -363,14 +378,18 @@ export function toolResultChips(message: ToolPresentationMessage): ToolChip[] {
     chips.push({ role: "exit", count: exitCode });
   }
   const count = numberAt(details, "count");
-  if (count !== null && Array.isArray(details.matches)) {
+  const counted =
+    Array.isArray(details.matches) ||
+    Array.isArray(details.files) ||
+    Array.isArray(details.counts);
+  if (count !== null && counted) {
     chips.push({ role: action === "list" ? "files" : "matches", count });
   }
   const replacements = numberAt(details, "replacements");
   if (replacements !== null && replacements > 0) {
     chips.push({ role: "replacements", count: replacements });
   }
-  const bytes = numberAt(details, "bytes");
+  const bytes = numberAt(details, "bytes") ?? numberAt(details, "fileBytes");
   if (bytes !== null) chips.push({ role: "size", text: formatBytes(bytes) });
   if (details.truncated === true) chips.push({ role: "truncated" });
   if (details.root === "scratch") chips.push({ role: "scratch" });
@@ -456,19 +475,31 @@ function resultBlocks(
       break;
     }
     case "list": {
-      const paths = stringArray(details?.matches);
+      const paths = stringArray(details?.matches) ?? stringArray(details?.files);
       const block = paths ? filesBlock(paths) : null;
       if (block) blocks.push(block);
       break;
     }
     case "search": {
       const hits = details?.matches;
+      // `outputMode` decides the shape: content → path/line hits,
+      // filesWithMatches → a path list, count → hits per file.
       const block = Array.isArray(hits) ? matchesBlock(hits) : null;
-      if (block) blocks.push(block);
+      const paths = block ? null : stringArray(details?.files);
+      const grouped = block ?? (paths ? filesBlock(paths) : null);
+      const resolved = grouped ?? countsBlock(details?.counts);
+      if (resolved) blocks.push(resolved);
       break;
     }
     default:
       break;
+  }
+
+  // Host-side scoping notes ("results are truncated…", "N long lines were cut")
+  // explain a short result, so they ride along with the blocks they qualify.
+  const notice = stringAt(details, "notice");
+  if (notice && blocks.length > 0) {
+    blocks.push({ kind: "note", role: "notice", text: notice });
   }
 
   if (blocks.length > 0) return blocks;
@@ -502,7 +533,9 @@ export function buildToolPresentation(
   // the interesting part.
   const wantArgs =
     blocks.length === 0 ||
-    blocks.every((block) => block.role === "error") ||
+    blocks.every(
+      (block) => block.role === "error" || block.role === "notice",
+    ) ||
     action === "use" ||
     action === "fork" ||
     action === "fetch";

@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { HighlightedCode, useCopy } from "./Markdown";
-import { IconCheck, IconCircleAlert, IconCopy } from "./icons";
+import { IconCheck, IconCircleAlert, IconCopy, IconInfo } from "./icons";
 import { cx } from "./ui";
 import { toWorkspaceRel } from "../lib/chat-links";
 import { useOpenPreviewTarget } from "../lib/use-preview-target";
@@ -8,7 +8,7 @@ import { useAppStore } from "../stores/app-store";
 import type { ToolBlock, ToolChip } from "../lib/tool-presentation";
 
 /*
- * Renderer for the structured tool presentation (D188). Blocks arrive with a
+ * Renderer for the structured tool presentation (D189). Blocks arrive with a
  * semantic role; this layer owns the translated headings, the copy affordance
  * and the click-to-preview wiring. Shared by the transcript tool row and the
  * inline permission card so both read the same way.
@@ -24,6 +24,7 @@ const BLOCK_LABEL_KEYS: Record<ToolBlock["role"], string> = {
   files: "chat.toolBlockFiles",
   matches: "chat.toolBlockMatches",
   details: "chat.toolBlockDetails",
+  notice: "chat.toolBlockNotice",
   error: "chat.toolBlockError",
   output: "chat.toolOutput",
   input: "chat.toolInput",
@@ -201,8 +202,12 @@ function BlockBody({ block }: { block: ToolBlock }) {
       );
     case "note":
       return (
-        <div className="tool-note is-error">
-          <IconCircleAlert size={13} />
+        <div className={cx("tool-note", block.role === "error" && "is-error")}>
+          {block.role === "error" ? (
+            <IconCircleAlert size={13} />
+          ) : (
+            <IconInfo size={13} />
+          )}
           <span className="tool-note-text">
             {block.code ? `${block.text} (${block.code})` : block.text}
           </span>
