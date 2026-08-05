@@ -410,43 +410,13 @@
   cursor: default;
 }
 
-.conversation-topbar .ct-mode {
-  display: inline-flex;
-  height: 28px;
-  padding: 2px;
-  gap: 2px;
-  border-radius: var(--radius-md);
-  background: var(--ds-bg-secondary);
-  border: 1px solid var(--ds-border-subtle);
-}
-
-.conversation-topbar .ct-mode-btn {
-  appearance: none;
-  border: none;
-  background: transparent;
-  color: var(--ds-text-secondary);
-  font-size: var(--text-sm);
-  height: 100%;
-  padding: 0 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.conversation-topbar .ct-mode-btn:hover:not(:disabled) {
-  color: var(--ds-text-primary);
-}
-
-.conversation-topbar .ct-mode-btn.active {
-  background: var(--ds-bg-primary);
-  color: var(--ds-text-primary);
-}
-
-.conversation-topbar .ct-mode-btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
+/*
+  The mode selector lives in the composer's left toolbar, not the top bar — see
+  the topbar source contracts in test/thinking-ui.test.mjs and
+  src/plan-mode-source-contract.test.mjs. The `.ct-mode` / `.ct-mode-btn` rules
+  that used to sit here styled the retired top-bar control and are intentionally
+  absent; do not reintroduce them.
+*/
 
 .conversation-topbar .ct-actions {
   display: inline-flex;
