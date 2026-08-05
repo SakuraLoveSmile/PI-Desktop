@@ -1176,3 +1176,20 @@
     width: min(304px, calc(100vw - 56px));
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .scope-popover {
+    animation: none;
+  }
+
+  .ext-row,
+  .ext-row-actions,
+  .scope-seg,
+  .scope-chip,
+  .ext-transport-card,
+  .scope-option,
+  .scope-option-check,
+  .kv-add {
+    transition: none;
+  }
+}
