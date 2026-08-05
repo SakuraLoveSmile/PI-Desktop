@@ -16,19 +16,23 @@ import { ConversationMinimap } from "./ConversationMinimap";
 import { TurnOutcomeCard } from "./TurnOutcomeCard";
 import { ReviewChangeCard } from "./ReviewChangeCard";
 import { Markdown, useCopy } from "./Markdown";
+import { ToolChips, ToolDetailBlocks } from "./ToolDetails";
 import {
   formatToolDuration,
   getToolAction,
   getToolDisplayName,
-  getToolSections,
   getToolSummary,
-  hasToolSections,
   type ToolAction,
 } from "../lib/tool-display";
 import {
+  buildToolPresentation,
+  hasToolDetails,
+  toolResultChips,
+} from "../lib/tool-presentation";
+import { useOpenPreviewTarget } from "../lib/use-preview-target";
+import {
   getToolPreviewTarget,
   splitChatText,
-  type ChatPreviewTarget,
 } from "../lib/chat-links";
 import { reduceTranscriptScroll } from "../lib/transcript-scroll";
 import {
@@ -706,47 +710,8 @@ function ToolActionIcon({ action }: { action: ToolAction }) {
   }
 }
 
-function ToolSection({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  const { copied, copy } = useCopy();
-  const { t } = useTranslation();
-  return (
-    <section className="tool-row-section">
-      <div className="tool-row-section-head">
-        <span>{label}</span>
-        <button
-          className={`tool-row-copy ${copied ? "copied" : ""}`}
-          aria-label={`${t("chat.copy")} ${label}`}
-          title={copied ? t("chat.copied") : t("chat.copy")}
-          onClick={() => copy(value)}
-        >
-          {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
-        </button>
-      </div>
-      <pre className="tool-row-content">{value}</pre>
-    </section>
-  );
-}
-
 /** Actions whose path/url argument makes sense to preview in the panel. */
 const PREVIEWABLE_ACTIONS = new Set<ToolAction>(["read", "write", "edit", "fetch"]);
-
-function useOpenPreviewTarget() {
-  const openFile = useAppStore((s) => s.openFileInWorkPanel);
-  const openUrl = useAppStore((s) => s.openUrlInWorkPanel);
-  return useCallback(
-    (target: ChatPreviewTarget) => {
-      if (target.kind === "file") openFile(target.path);
-      else openUrl(target.url);
-    },
-    [openFile, openUrl],
-  );
-}
 
 /** Plain user text with file paths and URLs linkified to the work panel. */
 function LinkifiedText({ text }: { text: string }) {
@@ -797,10 +762,14 @@ function ToolRow({ message }: { message: UiMessage }) {
     ? getToolPreviewTarget(message.toolArgs, root)
     : null;
   const terminalArtifact = action === "run" && status === "success";
-  const hasDetails = hasToolSections(message);
+  const hasDetails = hasToolDetails(message);
+  const chips = toolResultChips(message);
   // Streaming updates replace the message object each tick; only pay the
-  // full args/result stringify once the row is actually expanded.
-  const sections = open && hasDetails ? getToolSections(message) : null;
+  // full payload walk once the row is actually expanded.
+  const blocks =
+    open && hasDetails
+      ? buildToolPresentation(message, { hideSummaryArg: true })
+      : null;
   const statusLabel =
     status === "running"
       ? t("chat.running")
@@ -860,6 +829,7 @@ function ToolRow({ message }: { message: UiMessage }) {
             {summary}
           </span>
         ) : null}
+        <ToolChips chips={chips} />
         {status === "running" ? (
           <span className="tool-spinner" aria-label={t("chat.running")} />
         ) : status === "error" ? (
@@ -879,14 +849,9 @@ function ToolRow({ message }: { message: UiMessage }) {
           </span>
         ) : null}
       </button>
-      {sections ? (
+      {blocks && blocks.length > 0 ? (
         <div className="tool-row-body" id={detailsId}>
-          {sections.output ? (
-            <ToolSection label={t("chat.toolOutput")} value={sections.output} />
-          ) : null}
-          {sections.input ? (
-            <ToolSection label={t("chat.toolInput")} value={sections.input} />
-          ) : null}
+          <ToolDetailBlocks blocks={blocks} />
         </div>
       ) : null}
     </div>

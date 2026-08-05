@@ -35,6 +35,58 @@ test("fork tools use the branch icon", () => {
   assert.match(transcriptSource, /case "fork":\s*return <IconBranch/);
 });
 
+test("tool rows render structured blocks instead of dumping JSON", async () => {
+  const detailsSource = await readFile(
+    new URL("../src/components/ToolDetails.tsx", import.meta.url),
+    "utf8",
+  );
+  const permissionSource = await readFile(
+    new URL("../src/components/PermissionCard.tsx", import.meta.url),
+    "utf8",
+  );
+  // No JSON stringify path is left in either surface.
+  assert.doesNotMatch(transcriptSource, /getToolSections|hasToolSections/);
+  assert.doesNotMatch(permissionSource, /JSON\.stringify|formatToolValue/);
+  assert.match(transcriptSource, /buildToolPresentation\(message, \{ hideSummaryArg: true \}\)/);
+  // Blocks stay behind the open guard so streaming ticks stay cheap.
+  assert.match(transcriptSource, /open && hasDetails\s*\?\s*buildToolPresentation/);
+  assert.match(transcriptSource, /<ToolChips chips=\{chips\} \/>/);
+  assert.match(transcriptSource, /<ToolDetailBlocks blocks=\{blocks\} \/>/);
+  assert.match(permissionSource, /<ToolDetailBlocks blocks=\{argBlocks\} \/>/);
+  // Code bodies share the transcript highlighter rather than a second cache.
+  assert.match(detailsSource, /<HighlightedCode code=\{block\.text\} lang=\{block\.lang\} \/>/);
+  // Diffs reuse the review card rails; hits and paths open in the work panel.
+  assert.match(detailsSource, /className="diff-hunk"/);
+  assert.match(detailsSource, /openTarget\(\{ kind: "file", path: rel \}\)/);
+});
+
+test("tool block bodies stay bounded and role-coded", () => {
+  for (const selector of [
+    "\\.tool-row-chips",
+    "\\.tool-chip",
+    "\\.tool-block \\+ \\.tool-block",
+    "\\.tool-diff",
+    "\\.tool-fields",
+    "\\.tool-block-more",
+  ]) {
+    assert.match(stylesSource, new RegExp(`${selector}\\s*\\{`), selector);
+  }
+  // Long payloads scroll inside the row instead of stretching the transcript.
+  assert.match(stylesSource, /\.tool-row-content \{[\s\S]*?max-height:\s*260px;/);
+  assert.match(
+    stylesSource,
+    /\.tool-file-list,\s*\.tool-match-list \{[\s\S]*?max-height:\s*260px;[\s\S]*?overflow:\s*auto;/,
+  );
+  // stderr and error notes carry the error hue, stdout does not.
+  assert.match(stylesSource, /\.tool-row-content\.is-error \{[\s\S]*?var\(--ds-error\)/);
+  assert.match(stylesSource, /\.tool-chip\.is-error \{[\s\S]*?var\(--ds-error\)/);
+  assert.match(stylesSource, /\.tool-note \{[\s\S]*?var\(--ds-error\)/);
+  // The permission card is a block container now, not a <pre>.
+  const permissionArgs = stylesSource.match(/\.permission-card-args \{([^}]*)\}/)?.[1];
+  assert.ok(permissionArgs);
+  assert.doesNotMatch(permissionArgs, /white-space|font-family/);
+});
+
 test("assistant turns stay transparent full-width prose", () => {
   assert.match(
     stylesSource,

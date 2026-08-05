@@ -5,8 +5,8 @@ import {
   formatToolDuration,
   getToolAction,
   getToolDisplayName,
-  getToolSections,
   getToolSummary,
+  getToolSummaryKey,
 } from "../src/lib/tool-display.ts";
 
 test("maps built-in tools to concise Codex-style actions", () => {
@@ -35,18 +35,11 @@ test("builds a single-line bounded hint from the most useful argument", () => {
   );
 });
 
-test("keeps arguments and output as separate inspectable sections", () => {
-  assert.deepEqual(
-    getToolSections({
-      content: "fallback",
-      toolArgs: { path: "README.md" },
-      toolResult: { ok: true },
-    }),
-    {
-      input: '{\n  "path": "README.md"\n}',
-      output: '{\n  "ok": true\n}',
-    },
-  );
+test("reports which argument the row summary already shows", () => {
+  assert.equal(getToolSummaryKey("Bash", { command: "ls", timeout: 5 }), "command");
+  assert.equal(getToolSummaryKey("Read", { filePath: "/a/b.ts" }), "filePath");
+  assert.equal(getToolSummaryKey("Read", { limit: 20 }), null);
+  assert.equal(getToolSummaryKey("Read", "not-a-record"), null);
 });
 
 test("formats cyclic values without throwing and humanizes plugin names", () => {

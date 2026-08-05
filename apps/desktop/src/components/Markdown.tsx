@@ -156,10 +156,34 @@ function useHighlightedTokens(
   }, [code, resolved, mode, version]);
 }
 
+/**
+ * Tokenized code body (no chrome). Shared with the transcript's tool result
+ * blocks so both use the one incremental highlighter cache.
+ */
+export function HighlightedCode({
+  code,
+  lang,
+}: {
+  code: string;
+  lang: string;
+}) {
+  const tokens = useHighlightedTokens(code, lang);
+  if (!tokens) return <>{code}</>;
+  return (
+    <>
+      {tokens.map((line, i) => (
+        <Fragment key={i}>
+          {i > 0 ? "\n" : null}
+          <TokenLine line={line} />
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
 function CodeBlock({ code, lang }: { code: string; lang: string }) {
   const { t } = useTranslation();
   const { copied, copy } = useCopy();
-  const tokens = useHighlightedTokens(code, lang);
   return (
     <div className="code-block">
       <div className="code-block-head">
@@ -175,14 +199,7 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
       </div>
       <pre>
         <code>
-          {tokens
-            ? tokens.map((line, i) => (
-                <Fragment key={i}>
-                  {i > 0 ? "\n" : null}
-                  <TokenLine line={line} />
-                </Fragment>
-              ))
-            : code}
+          <HighlightedCode code={code} lang={lang} />
         </code>
       </pre>
     </div>

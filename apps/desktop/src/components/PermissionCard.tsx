@@ -5,6 +5,8 @@ import {
   type PendingPermission,
 } from "../lib/pending-permissions";
 import { useAppStore } from "../stores/app-store";
+import { buildToolPresentation } from "../lib/tool-presentation";
+import { ToolDetailBlocks } from "./ToolDetails";
 import { Button } from "./ui";
 
 export function PermissionCard({ permission }: { permission: PendingPermission }) {
@@ -57,9 +59,15 @@ export function PermissionCard({ permission }: { permission: PendingPermission }
     void resolve("deny");
   }, [resolving, secondsLeft]);
 
-  const argsText = useMemo(
-    () => JSON.stringify(permission.argsPreview ?? null, null, 2),
-    [permission.argsPreview],
+  // Same structured presentation as the transcript tool rows: a command reads
+  // as shell, file content as code, everything else as labeled fields.
+  const argBlocks = useMemo(
+    () =>
+      buildToolPresentation({
+        toolName: permission.toolName,
+        toolArgs: permission.argsPreview,
+      }),
+    [permission.argsPreview, permission.toolName],
   );
   const risk = (permission.risk || "high") as "low" | "medium" | "high";
 
@@ -87,7 +95,11 @@ export function PermissionCard({ permission }: { permission: PendingPermission }
       {permission.reason ? (
         <div className="permission-card-reason">{permission.reason}</div>
       ) : null}
-      <pre className="permission-card-args">{argsText}</pre>
+      {argBlocks.length > 0 ? (
+        <div className="permission-card-args">
+          <ToolDetailBlocks blocks={argBlocks} />
+        </div>
+      ) : null}
       <div className="permission-card-meta">
         <span title={workspace}>
           {t("permission.workspace", {

@@ -9,13 +9,6 @@ export type ToolAction =
   | "fork"
   | "use";
 
-type ToolMessageLike = {
-  content?: string;
-  toolName?: string;
-  toolArgs?: unknown;
-  toolResult?: unknown;
-};
-
 const SUMMARY_KEYS: Record<ToolAction, string[]> = {
   read: ["path", "file_path", "filePath"],
   list: ["path", "pattern", "glob"],
@@ -89,43 +82,34 @@ export function getToolDisplayName(toolName?: string) {
   return spaced.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+/**
+ * Which argument the collapsed row summary is showing, so expanded detail
+ * blocks can skip repeating it.
+ */
+export function getToolSummaryKey(
+  toolName: string | undefined,
+  args: unknown,
+): string | null {
+  if (!args || typeof args !== "object") return null;
+  const record = args as Record<string, unknown>;
+  for (const key of SUMMARY_KEYS[getToolAction(toolName)]) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return key;
+  }
+  return null;
+}
+
 export function getToolSummary(toolName: string | undefined, args: unknown) {
   const action = getToolAction(toolName);
   if (args && typeof args === "object") {
     const record = args as Record<string, unknown>;
-    for (const key of SUMMARY_KEYS[action]) {
-      const value = record[key];
-      if (typeof value === "string" && value.trim()) return compact(value);
-    }
+    const key = getToolSummaryKey(toolName, args);
+    if (key) return compact(record[key] as string);
     const fallback = formatToolValue(record);
     if (fallback && fallback !== "{}") return compact(fallback);
   }
   if (action === "use") return getToolDisplayName(toolName);
   return "";
-}
-
-/**
- * Cheap "has expandable details" check. getToolSections stringifies the full
- * args/result; collapsed rows (the default) only need to know whether the
- * caret should show.
- */
-export function hasToolSections(message: ToolMessageLike) {
-  if (message.toolArgs !== undefined) return true;
-  const outputValue =
-    message.toolResult !== undefined ? message.toolResult : message.content;
-  return outputValue !== undefined && outputValue !== "";
-}
-
-export function getToolSections(message: ToolMessageLike) {
-  const input =
-    message.toolArgs === undefined ? "" : formatToolValue(message.toolArgs);
-  const outputValue =
-    message.toolResult !== undefined ? message.toolResult : message.content;
-  const output =
-    outputValue === undefined || outputValue === ""
-      ? ""
-      : formatToolValue(outputValue);
-  return { input, output };
 }
 
 export function formatToolDuration(totalSeconds: number) {

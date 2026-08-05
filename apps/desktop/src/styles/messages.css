@@ -527,18 +527,9 @@
 }
 
 .permission-card-args {
-  max-height: 160px;
+  max-height: 240px;
   margin-top: 12px;
   overflow: auto;
-  padding: 10px 12px;
-  border: 1px solid var(--ds-border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--ds-bg-inset);
-  color: var(--ds-text-secondary);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 
 .permission-card-meta {
@@ -1598,7 +1589,33 @@
   color: var(--ds-text-secondary);
 }
 
-.tool-row-section + .tool-row-section {
+/* Collapsed-row outcome badges: exit code, hit counts, truncation. */
+.tool-row-chips {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-xs);
+  padding: 0 5px;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-row);
+  white-space: nowrap;
+}
+
+.tool-chip.is-error {
+  border-color: color-mix(in oklab, var(--ds-error) 38%, var(--ds-border-subtle));
+  color: var(--ds-error);
+}
+
+.tool-block + .tool-block {
   margin-top: 10px;
 }
 
@@ -1643,6 +1660,177 @@
   line-height: var(--leading-relaxed);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.tool-row-content.is-error {
+  border-color: color-mix(in oklab, var(--ds-error) 28%, var(--ds-border-subtle));
+  color: color-mix(in oklab, var(--ds-error) 72%, var(--ds-text-primary));
+}
+
+/* Edit diffs: same rails as the review card, inside the tool body. */
+.tool-diff {
+  overflow: hidden;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.tool-diff .diff-line {
+  border-inline-start: 2px solid transparent;
+  font-size: var(--text-sm);
+}
+
+.tool-diff .diff-line.add {
+  border-inline-start-color: var(--ds-success);
+}
+
+.tool-diff .diff-line.del {
+  border-inline-start-color: var(--ds-error);
+}
+
+.tool-diff .diff-line-text {
+  padding-block: 2px;
+}
+
+.tool-file-list,
+.tool-match-list {
+  display: flex;
+  max-height: 260px;
+  flex-direction: column;
+  overflow: auto;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-text-primary) 2.5%, transparent);
+  padding: 6px 4px;
+  gap: 1px;
+}
+
+.tool-file-item {
+  overflow: hidden;
+  border-radius: var(--radius-3xs);
+  padding: 2px 8px;
+  color: var(--ds-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-file-item.is-linked:hover,
+.tool-match-path.is-linked:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+  text-decoration: underline;
+}
+
+.tool-match-group + .tool-match-group {
+  margin-top: 6px;
+}
+
+.tool-match-path {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-3xs);
+  padding: 2px 8px;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-plus);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-match-line {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+  padding: 1px 8px;
+}
+
+.tool-match-line-no {
+  flex: none;
+  min-width: 28px;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-align: right;
+  user-select: none;
+}
+
+.tool-match-line-text {
+  min-width: 0;
+  color: var(--ds-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* Scalar payload entries (plugin tools, argument previews). */
+.tool-fields {
+  display: grid;
+  margin: 0;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-text-primary) 2.5%, transparent);
+  padding: 6px 10px;
+  gap: 2px;
+}
+
+.tool-field {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.tool-field-label {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-field-value {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.tool-note {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid color-mix(in oklab, var(--ds-error) 28%, var(--ds-border-subtle));
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-error) 7%, transparent);
+  padding: 8px 10px;
+  color: var(--ds-error);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.tool-note-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tool-block-more {
+  padding: 4px 2px 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
 }
 
 @keyframes spin {
