@@ -150,7 +150,7 @@ const PATH_SCOPED_INSTRUCTION_TOOLS = new Set([
   "Edit",
   "BrowserPreview",
 ]);
-const CHAT_CORE_TOOL_NAMES = new Set(["Read", "Glob", "Grep"]);
+const READ_ONLY_CORE_TOOL_NAMES = new Set(["Read", "Glob", "Grep"]);
 const AGENT_CORE_TOOL_NAMES = new Set([
   "Read",
   "Write",
@@ -1242,7 +1242,7 @@ export class DesktopAgentRuntime {
       name === CONTEXT_COMPACTION_TOOL_NAME ||
       (this.mode === "agent"
         ? AGENT_CORE_TOOL_NAMES.has(name)
-        : CHAT_CORE_TOOL_NAMES.has(name))
+        : READ_ONLY_CORE_TOOL_NAMES.has(name))
     );
   }
 

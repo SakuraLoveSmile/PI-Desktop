@@ -37,7 +37,7 @@ const provider: RuntimeProviderConfig = {
 function createRuntime(
   overrides: Partial<{
     provider: RuntimeProviderConfig;
-    mode: "chat" | "agent";
+    mode: "read-only" | "agent";
     thinkingLevel: ThinkingLevel;
     history: UiMessage[];
     compaction: ContextCompactionRecord;
@@ -72,7 +72,7 @@ describe("DesktopAgentRuntime configuration matching", () => {
     const runtime = createRuntime();
 
     expect(runtime.matches("agent", provider, "medium")).toBe(true);
-    expect(runtime.matches("chat", provider, "medium")).toBe(false);
+    expect(runtime.matches("read-only", provider, "medium")).toBe(false);
     expect(
       runtime.matches("agent", { ...provider, authKind: "api_key" }, "medium"),
     ).toBe(false);
@@ -471,8 +471,8 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     await runtime.dispose();
   });
 
-  it("keeps chat on the read-only core while sharing discovery", async () => {
-    const runtime = createRuntime({ mode: "chat" });
+  it("keeps read-only mode on the read-only core while sharing discovery", async () => {
+    const runtime = createRuntime({ mode: "read-only" });
     const names = (runtime as any).agent.state.tools.map(
       (tool: any) => tool.name,
     );

@@ -1,7 +1,12 @@
 import type { AppError } from "./errors.js";
 import type { KeybindingOverrides } from "./keyboard-shortcuts.js";
 
-export type Mode = "chat" | "agent";
+/**
+ * Session tool profile. `agent` is the only mode the UI offers (D188);
+ * `read-only` is the former chat profile, kept as the fail-safe value for
+ * rows the UI can no longer produce.
+ */
+export type Mode = "read-only" | "agent";
 export const THINKING_LEVELS = [
   "off",
   "minimal",
