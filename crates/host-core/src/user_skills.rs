@@ -753,4 +753,55 @@ mod tests {
         assert_eq!(slugify("发布说明"), "");
         assert_eq!(slugify("v1.2 notes"), "v1-2-notes");
     }
+
+    /// The cap is on the document, not the body the user typed, because the
+    /// document is what a `Skill` call has to carry back into the turn.
+    #[test]
+    fn an_oversized_document_is_refused_on_create_and_on_update() {
+        let (_dir, mut registry) = registry();
+        let huge = "x".repeat(MAX_SKILL_BYTES);
+
+        let err = registry
+            .create(UserSkillInput {
+                name: Some("Huge".into()),
+                body: Some(huge.clone()),
+                ..Default::default()
+            })
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("exceeds"), "{err}");
+        // A refused create leaves nothing half-written behind.
+        assert!(registry.list().is_empty());
+
+        let record = registry.create(named("Review")).unwrap();
+        let err = registry
+            .update(
+                &record.id,
+                UserSkillInput {
+                    body: Some(huge),
+                    ..Default::default()
+                },
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("exceeds"), "{err}");
+        // The document that was already there is still readable and intact.
+        let (_, body) = registry.read(&record.id).unwrap().unwrap();
+        assert!(body.len() < MAX_SKILL_BYTES);
+
+        // Just under the cap, front matter included, still goes through.
+        let front_matter = render_document("Review", None, "").len();
+        let fits = "y".repeat(MAX_SKILL_BYTES - front_matter);
+        assert!(
+            registry
+                .update(
+                    &record.id,
+                    UserSkillInput {
+                        body: Some(fits),
+                        ..Default::default()
+                    },
+                )
+                .is_ok()
+        );
+    }
 }

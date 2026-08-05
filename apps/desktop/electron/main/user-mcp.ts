@@ -56,7 +56,13 @@ type Entry = {
   status: McpServerStatus;
 };
 
-/** Servers whose processes may be alive at once, mirroring the plugin cap. */
+/**
+ * Servers whose processes may be alive at once.
+ *
+ * 16 is the width the app already uses for per-owner resource caps (watched
+ * plugins, bus subscriptions, in-flight tools); a session that wants more than
+ * sixteen MCP servers has a configuration problem, not a limit problem.
+ */
 const MAX_ACTIVE_SERVERS = 16;
 
 export class UserMcpRuntime {

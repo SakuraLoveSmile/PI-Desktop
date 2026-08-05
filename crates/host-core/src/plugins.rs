@@ -2096,6 +2096,7 @@ fn download_url(url: &str) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::activation::ActivationMode;
     use tempfile::tempdir;
 
     fn with_local_market<T>(f: impl FnOnce() -> T) -> T {
@@ -2480,5 +2481,86 @@ mod tests {
             &[],
         );
         assert!(read_manifest_err(&pattern).contains("not valid"));
+    }
+
+    /// A scope is a user decision about reach, so it has to survive the two
+    /// things that rewrite a plugin record: a restart and a reinstall.
+    #[test]
+    fn a_project_scope_survives_a_reload_and_a_reinstall() {
+        let dir = tempdir().unwrap();
+        unsafe {
+            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+        }
+
+        let source = dir.path().join("src");
+        write_plugin(
+            &source,
+            json!({
+                "schemaVersion": 1,
+                "id": "demo.scoped",
+                "name": "Scoped",
+                "version": "0.1.0",
+                "main": "main.js",
+            }),
+            &[],
+        );
+
+        let mut mgr = PluginManager::new(dir.path());
+        let installed = mgr
+            .install_from_path(
+                source.to_str().unwrap(),
+                InstallOptions {
+                    source: "installed".into(),
+                    enable: true,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        // Anything installed before scopes existed reads as global, so that is
+        // also what a fresh install has to be.
+        assert_eq!(installed.plugin.scope.mode, ActivationMode::Global);
+
+        let scoped = mgr
+            .set_scope(
+                "demo.scoped",
+                ActivationScope {
+                    mode: ActivationMode::Projects,
+                    projects: vec!["/work/api".into()],
+                },
+            )
+            .unwrap()
+            .expect("plugin missing");
+        assert_eq!(scoped.scope.projects, vec!["/work/api".to_string()]);
+
+        // Off is a separate switch: it must not consume the project list.
+        let disabled = mgr.set_enabled("demo.scoped", false).unwrap().unwrap();
+        assert!(!disabled.enabled);
+        assert_eq!(disabled.scope.projects, vec!["/work/api".to_string()]);
+
+        let reloaded = PluginManager::new(dir.path());
+        let after = reloaded.get("demo.scoped").expect("plugin missing");
+        assert_eq!(after.scope.mode, ActivationMode::Projects);
+        assert_eq!(after.scope.projects, vec!["/work/api".to_string()]);
+
+        // Reinstalling over the top is an update, not a reset: widening a
+        // project-scoped plugin back to everywhere would hand it reach the user
+        // never granted.
+        let mut mgr = PluginManager::new(dir.path());
+        let again = mgr
+            .install_from_path(
+                source.to_str().unwrap(),
+                InstallOptions {
+                    source: "installed".into(),
+                    enable: true,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(again.plugin.scope.mode, ActivationMode::Projects);
+        assert_eq!(again.plugin.scope.projects, vec!["/work/api".to_string()]);
+
+        unsafe {
+            std::env::remove_var("PI_DESKTOP_DATA_DIR");
+        }
     }
 }
