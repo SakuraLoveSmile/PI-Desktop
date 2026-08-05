@@ -41,9 +41,7 @@ test("General and AI tabs expose their respective app and AI controls", () => {
   assert.match(settingsPageSource, /settings\.language/);
   assert.match(settingsPageSource, /settings\.languageAuto/);
   assert.match(settingsPageSource, /"zh-CN"/);
-  // D188: Agent is the only mode, so General no longer offers a mode control.
-  assert.doesNotMatch(settingsPageSource, /defaultMode/);
-  assert.doesNotMatch(settingsSearchSource, /"settings\.mode"/);
+  assert.match(settingsPageSource, /defaultMode: value/);
   assert.match(settingsPageSource, /enterToSend: !settings\.enterToSend/);
   assert.match(
     settingsPageSource,

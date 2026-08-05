@@ -9,7 +9,7 @@
 ## 1. Goals
 
 - Document every user-visible and protocol-visible behavior that MVP must verify.
-- Provide a scenario catalog that maps to acceptance criteria (A–H) and milestones (M1–M5).
+- Provide a scenario catalog that maps to acceptance criteria (A–H) and milestones (M1–M6).
 - Serve as the traceability backbone: scenario ID ↔ acceptance criterion ↔ spec.
 - Prepare for future automation without requiring implementation now.
 
@@ -83,8 +83,8 @@ Each scenario is documented in this format:
 - **Expected**: observable outcome that proves correctness
 - **Specs linked**: relevant spec file(s)
 - **Acceptance criterion**: which A–H letter(s) this verifies
-- **Milestone**: M1–M5 target
-- **Status**: Draft | Documented | Automated | Passed
+- **Milestone**: M1–M6 target
+- **Status**: Draft | Documented | Partially automated | Automated | Passed
 ```
 
 ---
@@ -93,7 +93,7 @@ Each scenario is documented in this format:
 
 ### Runtime Resource Governance
 
-#### E2E-012: Tool burst is bounded and recovers after host restart
+#### E2E-097: Tool burst is bounded and recovers after host restart
 
 - **Preconditions**: Host-core is healthy; one session has a workspace; the
   supervision probe can terminate the host process.
@@ -149,13 +149,13 @@ Each scenario is documented in this format:
 #### E2E-003: Rust host healthcheck responds
 
 - **Preconditions**: App is running; Rust host-core sidecar started.
-- **Steps**: 1) Electron handshakes with protocol version 6. 2) Call the host
-  healthcheck RPC. 3) Repeat boot with version 5, version 4, and version 3 host
+- **Steps**: 1) Electron handshakes with protocol version 9. 2) Call the host
+  healthcheck RPC. 3) Repeat boot with mismatched older and newer protocol
   fixtures.
-- **Expected**: The version 6 host returns `ok` and the handshake is logged.
-  Stale version 5 and older hosts are rejected before chat becomes interactive,
-  so context checkpoints and earlier protocol-visible records cannot be
-  silently lost.
+- **Expected**: The protocol v9 host returns `ok` and the handshake is logged.
+  Every version other than v9, whether older or newer, is rejected before the
+  conversation surface becomes interactive, so Plan approval/state events and
+  context checkpoints cannot be silently lost.
 - **Specs linked**: `03-runtime/05-host-core-rust.md`, `03-runtime/06-host-rpc-protocol.md`
 - **Acceptance**: A (bridge normal)
 - **Milestone**: M1
@@ -205,7 +205,7 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
-### Chat Stream & Abort
+### Conversation Stream & Abort
 
 #### E2E-008: New session and send message
 
@@ -336,17 +336,19 @@ Each scenario is documented in this format:
 - **Preconditions**: Provider configured; at least one session exists.
 - **Steps**: 1) Open the chat route. 2) Inspect the 46px bar at the top of the
   conversation area. 3) Confirm it shows the active project name and
-  session/task title, the model picker, and the New task / Search action
-  buttons; confirm there is **no** mode toggle (D188); confirm the
+  session/task title, the model picker, and the New task / Search / Commands
+  action buttons; confirm the
   sidebar toggle appears **only when the sidebar is collapsed** (when expanded,
   the sidebar owns that control). 4) Switch to the Pull requests, Scheduled,
   Plugins, or Settings routes and inspect the same top region.
 - **Expected**: On the chat route the conversation top bar renders with its
-  controls; the long task title ellipsizes instead of squeezing the model picker
-  or action buttons. The sidebar toggle is present only in
-  the collapsed state (no duplicate of the sidebar's control). On every other
-  route the frameless drag band renders instead (no top-bar controls). The bar is
-  draggable to move the window; interactive controls do not start a window drag.
+  title, model picker, and actions; it has no Agent|Plan mode control. The
+  left-of-input Composer chip owns the active session's Agent/Plan switch. The
+  long task title ellipsizes instead of squeezing the model picker or action
+  buttons. The sidebar toggle is present only in the collapsed state (no
+  duplicate of the sidebar's control). On every other route the frameless drag
+  band renders instead (no top-bar controls). The bar is draggable to move the
+  window; interactive controls do not start a window drag.
   macOS leaves the left ~76px clear for traffic lights only while the sidebar is
   collapsed (8px in fullscreen); Windows/Linux leave the right 112px clear for
   native window controls.
@@ -355,27 +357,21 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
-#### E2E-088: Agent is the only reachable mode (D188)
+#### E2E-088: Composer Agent/Plan chip updates the session
 
-- **Preconditions**: A data directory whose `sessions` table still holds a row
-  with `mode = 'chat'` and whose stored settings still hold
-  `defaultMode: "chat"` (write them before first launch).
-- **Steps**: 1) Launch the app and inspect the conversation top bar, the
-  composer chip row, and Settings → Basics → Defaults. 2) Open the command
-  palette and search for "mode", "chat", and "read-only"; type `/chat-mode` and
-  `/agent-mode` in the composer. 3) Open the pre-seeded legacy session and ask
-  the agent to write a workspace file. 4) Create a new session and inspect its
-  stored `mode`.
-- **Expected**: No mode control renders anywhere — no top-bar segmented toggle,
-  no composer chip, no Settings row, no localized mode labels. The palette
-  returns no mode-switch command and neither slash alias resolves. The legacy
-  session was migrated to `agent` at open, so the Write goes through the normal
-  permission path instead of a hard deny; the stored `defaultMode` reads
-  `agent`. The new session is created with `mode = "agent"`. Restarting the app
-  does not reintroduce a `chat` value.
+- **Preconditions**: Chat route active; a session selected.
+- **Steps**: 1) Click the left-of-input Composer mode chip to enter Plan. 2)
+  Send a prompt that would normally require Write/Edit and observe behavior. 3)
+  Click the same Composer chip to return to Agent. 4) Begin a turn and try to
+  toggle mode mid-run or while a pending Plan approval is visible.
+- **Expected**: The Composer chip updates the active session `mode` (Plan
+  hard-denies Write/Edit and plugin tools while Bash follows the selected
+  permission mode; Agent allows its normal tools per permission settings). The
+  chip is disabled while a turn or active pending approval exists and re-enables
+  after the session returns idle/planning. No top-bar mode control is rendered.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2, §11),
   `03-runtime/03-tools-and-permissions.md` (§10),
-  `03-runtime/04-data-storage.md` (§8), `adr/0052-agent-only-mode.md`
+  `03-runtime/04-data-storage.md` (§8)
 - **Acceptance**: C, E
 - **Milestone**: M2
 - **Status**: Draft
@@ -435,8 +431,8 @@ Each scenario is documented in this format:
 - **Steps**: 1) Ask agent to read a file in the project. 2) Observe result.
 - **Expected**: `Read` returns immediately within project scope. In Agent mode,
   the agent activates `Glob` or `Grep` through `ToolSearch` before using it;
-  read-only mode keeps both tools active from the first request. All results remain
-  within project scope.
+  Plan keeps its read/search core available from the first request. All results
+  remain within project scope.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`
 - **Acceptance**: E (Read/Glob/Grep work), D (tools based on project)
 - **Milestone**: M3
@@ -486,20 +482,21 @@ Each scenario is documented in this format:
 - **Milestone**: M3
 - **Status**: Draft
 
-#### E2E-018: Read-only mode cannot run Write/Edit/Bash
+#### E2E-018: Plan denies workspace mutation and plugin tools
 
-- **Preconditions**: A session persisted with `mode = "read-only"` (the UI
-  cannot produce one since D188 — set it through the host RPC or a seeded row).
-- **Steps**: 1) Ask agent to write a file. 2) Observe behavior. 3) Repeat with a
-  `mode` value the host does not know (e.g. `"future"`).
-- **Expected**: Write/Edit/Bash not available in read-only mode; only
-  Read/Glob/Grep work, with all three active in the first read-only request. An
-  unknown mode value normalizes to `read-only` rather than widening the tool
-  surface.
+- **Preconditions**: Plan mode active with Auto selected and a plugin agent tool registered.
+- **Steps**: 1) Ask the Agent to call Write, Edit, and the plugin tool. 2) Ask it
+  to run a Bash command that creates a marker file. 3) Repeat the Bash call
+  with Ask selected and inspect the permission card.
+- **Expected**: Write, Edit, and the plugin tool are not visible and direct
+  attempts return `WRITE_DISABLED_IN_PLAN`, `EDIT_DISABLED_IN_PLAN`, or
+  `PLUGIN_DISABLED_IN_PLAN`; no file is changed by those tools. Bash runs
+  without a confirmation under Auto and may mutate; under Ask it waits for the
+  ordinary permission card. No Chat-mode error or command exists.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`
-- **Acceptance**: E (read-only profile)
+- **Acceptance**: E (Plan policy)
 - **Milestone**: M3
-- **Status**: Automated (protocol smoke: WRITE_DISABLED_IN_READ_ONLY)
+- **Status**: Documented (M6; no E2E execution requested)
 
 #### E2E-019: Workspace-outside paths are rejected
 
@@ -524,8 +521,9 @@ Each scenario is documented in this format:
 #### E2E-019b: Scratch containment matches workspace defenses (D114)
 
 - **Preconditions**: Agent mode; project open.
-- **Steps**: 1) Attempt Write with `..` traversal from the scratch root. 2) Attempt Write through a symlink planted inside scratch pointing outside. 3) Attempt scratch writes in a session persisted as read-only.
-- **Expected**: Both escapes return `PATH_OUTSIDE_WORKSPACE`; read-only mode still returns `WRITE_DISABLED_IN_READ_ONLY` even for scratch paths.
+- **Steps**: 1) Attempt Write with `..` traversal from the scratch root. 2) Attempt Write through a symlink planted inside scratch pointing outside. 3) Attempt the same Write calls in Plan.
+- **Expected**: Both escapes return `PATH_OUTSIDE_WORKSPACE`; Plan returns
+  `WRITE_DISABLED_IN_PLAN` before any scratch path can make Write available.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md §4b`
 - **Acceptance**: E (scratch root cannot be escaped)
 - **Milestone**: M5
@@ -534,12 +532,12 @@ Each scenario is documented in this format:
 #### E2E-019c: Permission modes govern high-risk approval (D115/D132)
 
 - **Preconditions**: Agent mode; project open; global default `ask`.
-- **Steps**: 1) With a newly inherited session and global default Ask every time, open the composer menu — expect Ask every time to be selected with no global-default/inherit label — then ask the agent to write a workspace file and expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Create another inherited session after setting the global default to Accept edits in Settings — expect the composer chip and menu selection to display Accept edits directly and Write/Edit to be auto-allowed. 5) With Auto set, point the session at the read-only profile through the host RPC — expect Write denied (`WRITE_DISABLED_IN_READ_ONLY`).
-- **Expected**: Effective mode = session override → global default → ask; the read-only hard deny outranks every mode; the composer chip and menu always display the effective mode without default/inherit provenance.
+- **Steps**: 1) With a newly inherited session and global default Ask every time, open the composer menu — expect Ask every time to be selected with no global-default/inherit label — then ask the Agent to write a workspace file and expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Create another inherited session after setting the global default to Accept edits in Settings — expect the composer chip and menu selection to display Accept edits directly and Write/Edit to be auto-allowed. 5) Switch the session to Plan with Auto set — expect Write/Edit/plugin denied but Bash allowed without confirmation.
+- **Expected**: Effective mode = session override → global default → ask; Plan's Write/Edit/plugin hard deny outranks every mode while Plan Bash follows the selected mode; the composer chip and menu always display the effective mode without default/inherit provenance.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md §6`, `03-runtime/04-data-storage.md`, `08-meta/decisions-log.md` (D115/D132)
 - **Acceptance**: E (permission modes resolve and enforce host-side)
 - **Milestone**: M5
-- **Status**: Partially automated (host-core unit tests: evaluate matrix, chat-deny precedence, session grants under ask; renderer source test: effective-only composer options and selection)
+- **Status**: Partially automated (host-core unit tests: evaluate matrix, Plan policy precedence, session grants under ask; renderer source test: effective-only composer options and selection)
 
 #### E2E-019d: Bash tool sees the user's login-shell toolchain (D181)
 
@@ -1016,18 +1014,18 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Fresh profile; provider configured; one chat turn completed.
 - **Steps**: 1) Run a prompt with a tool call. 2) Open `~/.pi-desktop/logs/`. 3) Inspect the categorized files under `app/`, `host/`, and `agent/`.
-- **Expected**: NDJSON records exist with `ts/level/channel/category/message`; tool start/end carry `sessionId`/`toolCallId`; no API key material appears; each category file rotates at 5 MB. Additionally (D137) `host/timing.log` has one `tool timing` record per tool call carrying `prompted`/`permission_wait_ms`/`execute_ms`/`overhead_ms`/`total_ms`, and `agent/timing.log` has matching `[timing] kind=tool` and `[timing] kind=model` lines, so an approval wait, a slow tool body, and a slow provider are distinguishable for the same `toolCallId`.
+- **Expected**: NDJSON records exist with `ts/level/channel/category/message`; tool start/end carry `sessionId`/`toolCallId`; no API key material appears; each category file rotates at 5 MB. Additionally (D183) `host/timing.log` has one `tool timing` record per tool call carrying `prompted`/`permission_wait_ms`/`execute_ms`/`overhead_ms`/`total_ms`, and `agent/timing.log` has matching `[timing] kind=tool` and `[timing] kind=model` lines, so an approval wait, a slow tool body, and a slow provider are distinguishable for the same `toolCallId`.
 - **Specs linked**: `03-runtime/09-logging-and-observability.md`
 - **Acceptance**: H (diagnostics)
 - **Milestone**: M5
 - **Status**: Documented
 
-#### E2E-035: Bash tool resolves a platform shell or fails with guidance
+#### E2E-035: Bash tool uses the effective catalog shell
 
 - **Preconditions**: Workspace open; agent mode.
-- **Steps**: 1) Run a Bash tool call (e.g. `echo ok`) and observe success on a machine with bash. 2) Set `PI_DESKTOP_BASH` to a non-executable path, restart host-core, run a Bash tool call.
-- **Expected**: With a resolvable bash the command runs (Unix `bash -lc`, Windows Git-for-Windows `bash -c`); with a broken override the tool fails fast with stable `SHELL_NOT_FOUND` and a message naming `PI_DESKTOP_BASH`/Git for Windows; no partial execution.
-- **Specs linked**: `03-runtime/03-tools-and-permissions.md`, `03-runtime/08-error-codes.md`
+- **Steps**: 1) Select an available catalog shell and run `Bash` (e.g. `echo ok`). 2) Make the persisted selection unavailable and inspect the effective catalog before running the next turn. 3) Run with the previous turn snapshot.
+- **Expected**: The unchanged `Bash` protocol call uses the selected catalog entry. A later unavailable persisted choice falls back to the first available platform shell and marks the catalog fallback; the previous turn snapshot is rejected as stale by `COMMAND_SHELL_CHANGED` rather than silently changing shell. No partial execution occurs; E2E-113 covers the stale identity path.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md`, `03-runtime/06-host-rpc-protocol.md`, `03-runtime/08-error-codes.md`, ADR 0054
 - **Acceptance**: H (errors expose stable codes)
 - **Milestone**: M5
 - **Status**: Unit-covered (`tools::shell::tests`); scenario Documented
@@ -1198,10 +1196,10 @@ Each scenario is documented in this format:
 - **Preconditions**: One catalogued reasoning model, one non-reasoning model,
   and one unknown free-form model id.
 - **Steps**: 1) Select each provider/model in turn. 2) Inspect the composer
-  chip row. 3) Open the Thinking trigger and choose multiple
+  controls beside Agent / Plan. 3) Open the Thinking trigger and choose multiple
   supported levels. 4) Inspect the unknown model's menu and Provider Settings.
-- **Expected**: Reasoning models show the current Thinking level leading the
-  composer chip row, expose only their sparse supported levels as a
+- **Expected**: Reasoning models show the current Thinking level immediately to
+  the right of Agent / Plan, expose only their sparse supported levels as a
   single-column list in canonical order, mark the selected row with a trailing
   check, expose no inherit/default row, size the menu to its content without
   exceeding 160px or the available viewport, truncate overlong labels, and close
@@ -1221,8 +1219,8 @@ Each scenario is documented in this format:
 #### E2E-051: Thinking level persists with the session
 
 - **Preconditions**: A reasoning-capable session is idle.
-- **Steps**: 1) Select `high`. 2) Change the permission mode without changing
-  the thinking level. 3) Restart the app and reopen the session. 4) Switch to
+- **Steps**: 1) Select `high`. 2) Change Plan/Agent mode without changing the
+  thinking level. 3) Restart the app and reopen the session. 4) Switch to
   another session and back.
 - **Expected**: Every configuration update sends the complete session config;
   `high` survives the permission-mode change, session switches, host reload, and
@@ -1520,7 +1518,7 @@ Each scenario is documented in this format:
 
 ---
 
-#### E2E-059: Transcript message plates follow WorkBuddy density
+#### E2E-059a: Transcript message plates follow WorkBuddy density
 
 - **Preconditions**: A session contains at least one short user prompt, one
   longer user prompt, and a completed assistant answer; light and dark themes
@@ -1562,7 +1560,7 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`neutral-accent.test.mjs`,
   `plugins-page-style.test.mjs`); visual scenario Draft
 
-#### E2E-060: Assistant markdown prose hierarchy and code chrome
+#### E2E-060c: Assistant markdown prose hierarchy and code chrome
 
 - **Preconditions**: A completed assistant answer containing headings, a
   blockquote, a GFM table, a fenced code block with a language tag, inline
@@ -1598,7 +1596,7 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`transcript-style.test.mjs`); full visual scenario Draft
 
-#### E2E-060: Assistant context inspector and retry action
+#### E2E-060d: Assistant meta chips, context inspector, and retry action
 
 - **Preconditions**: A completed assistant message includes modelId and token
   usage; another completed assistant message has content but no usage.
@@ -1637,7 +1635,7 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`transcript-style.test.mjs`,
   `context-usage.test.mjs`, runtime usage mapping); full scenario Draft
 
-#### E2E-061: Regenerate replaces the current turn in place
+#### E2E-061a: Regenerate replaces the current turn in place
 
 - **Preconditions**: A session has user A → assistant A → user B → assistant B.
 - **Steps**: 1) Hover assistant A and click Regenerate. 2) Wait for the new
@@ -2073,7 +2071,7 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`renderer-branding.test.mjs`,
   `sidebar-navigation.test.mjs`); rendered interaction scenario Draft
 
-#### E2E-086: Sidebar collapse and expand animate as a docked transition
+#### E2E-098: Sidebar collapse and expand animate as a docked transition
 
 - **Preconditions**: PI-Desktop is open with the expanded sidebar and an active
   chat session; `prefers-reduced-motion` is off.
@@ -2092,7 +2090,7 @@ Each scenario is documented in this format:
   during exit (`sidebar-out-windows`), matching the work-panel dock behavior. No
   layout jump precedes the animation, and focus returns to the sidebar/Expand
   control predictably.
-- **Specs linked**: `04-ux/08-component-spec.md`, `07-ui-design-system.md`
+- **Specs linked**: `04-ux/08-component-spec.md`, `04-ux/07-ui-design-system.md`
 - **Acceptance**: Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`sidebar-collapse-animation.test.mjs`); rendered
@@ -2145,7 +2143,7 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`keyboard-shortcuts.test.ts`,
   `settings-keyboard-shortcuts.test.mjs`); rendered scenario Draft
 
-#### E2E-073: Developer mode gates the developer-tools console
+#### E2E-073a: Developer mode gates the developer-tools console
 
 - **Preconditions**: App running on macOS and on one Windows/Linux target;
   developer mode is absent or false in persisted settings and Settings ->
@@ -2239,17 +2237,14 @@ Each scenario is documented in this format:
   3. Wait until sessions/settings bootstrap finishes.
   4. Repeat with OS `prefers-reduced-motion: reduce` when available.
 - **Expected**:
-  - Before ready: full-window splash with brand mark, shell name, tagline, and accessible starting status (`data-testid="startup-splash"`). The brand mark is theme-aware: `build/logo_dark.png` in dark mode, `build/icon_1024.png` in light mode.
+  - Before ready: full-window splash with brand mark, shell name, tagline, and accessible starting status (`data-testid="startup-splash"`).
   - After ready: splash exits with a short fade (or instantly under reduced motion) and the main shell (or settings page) is interactive underneath.
   - No plain unbranded “Starting…” centered text as the only boot UI.
   - Overlay/dialog enter motion uses shared tokens; reduced motion keeps state changes without decorative duration.
 - **Specs linked**: `04-ux/07-ui-design-system.md` §8, `04-ux/02-i18n-english-first.md`, decisions-log D146
 - **Acceptance**: A (app startup), Quality
 - **Milestone**: M5
-
-
-
-#### E2E-087: Brand logo follows the active theme
+#### E2E-099: Brand logo follows the active theme
 - **Status**: Draft
 - **Priority**: P3
 - **Covers**: Quality / US-UI shell polish
@@ -2268,8 +2263,6 @@ Each scenario is documented in this format:
 - **Specs linked**: `04-ux/08-component-spec.md` §3.7, `04-ux/07-ui-design-system.md`
 - **Acceptance**: Quality
 - **Milestone**: M5
-
-
 #### E2E-077: Theme-aware selection and CJK section labels
 
 - **Status**: Partially automated (`user-select.test.mjs`, `interaction-polish.test.mjs`)
@@ -2708,6 +2701,339 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`agent-errors.test.ts`, `runtime.test.ts`); full
   provider/UI journey Draft
+## 7A. M6 Plan and shell scenarios
+
+#### E2E-104: Legacy Plan values migrate to schema v10
+
+- **Preconditions**: Schema-v8 fixtures contain sessions, app defaults, and
+  scheduled records with legacy `chat` values plus transcripts and permissions;
+  schema-v7 and schema-v9 fixtures cover both guarded entry paths.
+- **Steps**: 1) Start host-core and allow the guarded migration (v7 first
+  reaches v8). 2) Inspect sessions, settings, scheduled modes,
+  `plan_approvals` fields/indexes, and the exact readable v8/v9 backup. 3)
+  Restart and inspect the same records. 4) Repeat with malformed app settings,
+  malformed scheduled config, invalid top-level operating modes, and an unknown
+  or wrong-platform default shell. 5) Repeat with a platform-valid persisted
+  shell marked temporarily unavailable and nested extension `mode` fields.
+- **Expected**: Every legacy mode is `plan`, Agent remains the new-session and
+  new-task default, transcripts/permissions survive, `plan_approvals` retains
+  approval data and has artifact/execution fields, v8→v10 is one atomic
+  transaction after its WAL checkpoint and v8 backup, v9 creates a v9 backup,
+  and migration failure leaves schema v8 authoritative. Every malformed or
+  invalid fixture fails closed before schema promotion. The temporarily
+  unavailable platform-valid shell remains persisted for runtime fallback, and
+  nested extension modes remain unchanged.
+- **Specs linked**: `00-baseline.md`, `03-runtime/04-data-storage.md`,
+  `03-runtime/01-ipc-protocol.md`, `04-ux/06-settings-ia.md`, ADR 0053
+- **Acceptance**: F (persistence), H (diagnostics)
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-05): host-core 139/139, including 15
+  focused DB tests, covers schema-v7→v8→v10, v8→v10, and v9→v10 guarded paths,
+  exact readable backups, fail-closed rollback, restart, transcript, settings,
+  scheduled-mode, approval-field, and index tests
+
+#### E2E-105: Plan policy remains host-authoritative
+
+- **Preconditions**: A project-bound session is idle in Plan with BrowserPreview,
+  CompactContext, a plugin tool, and a forged `requestedMode = "agent"` fixture.
+- **Steps**: 1) Inspect visible Plan tools. 2) Use Read/Glob/Grep,
+  BrowserPreview, and CompactContext. 3) Attempt Write, Edit, plugin, and
+  unknown tools through the host with every permission mode. 4) Run Bash under
+  Ask, Accept edits, and Auto.
+- **Expected**: Plan denies Write/Edit/plugin/unknown tools regardless of the
+  forged mode, grants, or Auto; Bash follows the selected permission mode. The
+  runtime remains one pi Agent and all denials are audited.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`,
+  `03-runtime/03-tools-and-permissions.md`, `03-runtime/05-host-core-rust.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `05-security/01-security.md`, ADR 0053
+- **Acceptance**: E (tools and permissions), Security
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` plus host-core
+  permission/policy and agent-runtime tool-composition tests
+
+#### E2E-106: SubmitPlan rejects into editable planning and resubmits a new artifact
+
+- **Preconditions**: A project-bound session is idle in Plan with a provider;
+  `.pi/plan/` is absent or empty and the workspace permits host artifact
+  creation.
+- **Steps**: 1) Let the Agent call `SubmitPlan` with fixed title, Markdown, and
+  question. 2) Inspect the new `.pi/plan/*.md` file byte-for-byte and the
+  `plan_approvals` row. 3) Inspect the card's title, question, artifact opener,
+  expiry, and status; confirm only Approve and Reject are offered. 4) Reject the
+  proposal. 5) Confirm durable mode is Plan, live state is editable `planning`,
+  the approval gate is cleared, and a later prompt is accepted. 6) Let the
+  Agent revise and call `SubmitPlan` once in that new turn with a complete
+  snapshot. 7) Approve the second proposal with Ask selected.
+- **Expected**: Host preserves the exact submitted Markdown bytes in a new
+  unique artifact, records its relative path/hash/size with structured
+  title/question, and never lets the renderer or sidecar write or replace it.
+  The card opens the artifact and does not require inline Markdown/hash/size.
+  Rejection is terminal for the first row, leaves durable mode Plan, and returns
+  live state to editable planning. The later prompt/resubmission creates a
+  second complete Markdown snapshot and a different `.pi/plan/*.md` artifact;
+  the first artifact bytes remain unchanged. Approving the second proposal with
+  Ask still changes the same Agent to Agent and queues execution.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/02-agent-runtime.md`, `03-runtime/04-data-storage.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `04-ux/03-permission-ux.md`,
+  `04-ux/08-component-spec.md`, `05-security/01-security.md`, ADR 0053
+- **Acceptance**: C (conversation/stream), E (permissions), F (persistence)
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-05): `test:e2e:plan` verifies the Host
+  artifact/approval lifecycle. The optional live `test:e2e:plan-ui` case
+  requires an env-provided OpenAI-compatible provider; the authorized run with
+  model `gpt-5.6-luna` passed 6/6 with zero console diagnostics. It used the
+  real controlled Composer and Send, the live Agent called `EnterPlanMode` then
+  `SubmitPlan`, normal rendered Ask approval resolved through preload/Main,
+  approved execution emitted the exact durable marker, and a private
+  env-gated WeakMap check proved the same `DesktopAgentRuntime` object before
+  and after approval. Main/Host/sidecar PIDs remained stable; credentials never
+  entered CDP or output. The default no-key run remains 5/5 with the live case
+  explicitly skipped.
+
+#### E2E-107: Plan approval uses one absolute 30-minute expiry
+
+- **Preconditions**: A pending Plan request exists with a controllable clock.
+- **Steps**: 1) Record `createdAt` and `expiresAt`. 2) Reload the renderer and
+  reopen the request. 3) Advance time to the deadline without resolving. 4)
+  Attempt approval after expiry.
+- **Expected**: Renderer reload rehydrates only the still-pending row while the
+  host remains alive, and the displayed countdown retains the original absolute
+  deadline; rejected, expired, approved/completed, and interrupted terminal
+  cards are not part of reload hydration. Expiry records `expired`, leaves the
+  session Plan, returns `PLAN_APPROVAL_TIMEOUT`, and rejects the late response
+  without changing mode or permission.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/08-error-codes.md`, `03-runtime/10-session-state-machine.md`,
+  `04-ux/03-permission-ux.md`, ADR 0053
+- **Acceptance**: E (permissions), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan-ui` covers pending
+  renderer reload; `test:e2e:plan` and the deterministic host-core late-expiry
+  test cover the absolute deadline, timeout persistence, and fail-closed
+  resolution. No terminal-card reload hydration is claimed.
+
+#### E2E-108: Startup fence interrupts pending Plan work
+
+- **Preconditions**: A Plan request is pending with a live approval waiter and
+  running planning turn; host and renderer can restart independently.
+- **Steps**: 1) Reload the renderer and list the live request. 2) Restart the
+  host/app before resolution. 3) Inspect the `plan_approvals` row, turn, and
+  session after startup. 4) Submit the pre-restart response.
+- **Expected**: Renderer reload while the host remains alive preserves the
+  still-pending row and original deadline. Full Host/app restart transactionally
+  marks the pending row and turn interrupted/aborted before RPC service, leaves
+  the session Plan, and returns `PLAN_APPROVAL_STALE` for the old response. No
+  actionable stale card or execution is restored, and the UI is not required to
+  present the interrupted terminal snapshot after restart. No process epoch
+  field is persisted or sent.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `03-runtime/07-process-model.md`,
+  `03-runtime/10-session-state-machine.md`, `04-ux/08-component-spec.md`, ADR 0053
+- **Acceptance**: F (persistence), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` performs a real
+  Host restart and host-core recovery tests verify interrupted durable state;
+  the pending renderer-reload assertion is covered by the E2E-107 UI lane.
+
+#### E2E-109: Approved Plan execution is not replayed after restart
+
+- **Preconditions**: A Plan request has been approved with Ask and is captured
+  once in `queued` and once in `running` state.
+- **Steps**: 1) Restart the host during each state. 2) Inspect the
+  `plan_approvals.execution_state` and turn records after startup. 3) Observe
+  provider/tool invocations and session mode. 4) Start a new user turn
+  explicitly.
+- **Expected**: Queued/running execution fields become `interrupted`,
+  associated turns abort, no provider/tool call is replayed, and the session
+  remains Agent because approval already committed. A new turn is accepted only
+  after the user starts it; no interrupted terminal card or stale action is
+  required after restart.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `03-runtime/07-process-model.md`,
+  `03-runtime/10-session-state-machine.md`, ADR 0053
+- **Acceptance**: C (conversation/stream), F (persistence), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` restarts real queued
+  and claimed executions and verifies no replay plus Agent retention
+
+#### E2E-110: Scheduled Plan is rejected before any work
+
+- **Preconditions**: A scheduled task is Plan and an unattended runner is
+  available; provider, artifact, and queue writes can be observed.
+- **Steps**: 1) Trigger the task through the unattended path. 2) Inspect the
+  provider trace, `.pi/plan/`, and `plan_approvals` table. 3) Switch the
+  task/session explicitly to Agent and run it again.
+- **Expected**: Plan is rejected before provider, artifact, approval, or queue
+  work with `PLAN_REQUIRES_INTERACTIVE_SESSION`; no background auto-approval
+  occurs. Explicit Agent selection permits normal unattended policy.
+- **Specs linked**: `03-runtime/04-data-storage.md`,
+  `03-runtime/08-error-codes.md`, `04-ux/01-ui-ia.md`, ADR 0053
+- **Acceptance**: F (persistence), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` verifies Plan
+  rejection before side effects and explicit Agent execution independent of the
+  global default
+
+#### E2E-111: Active-turn, pending-approval, and configuration boundaries are enforced
+
+- **Preconditions**: A session has one active Agent turn and another session is
+  idle; a Plan run can be made pending/queued/running.
+- **Steps**: 1) Attempt a second prompt, mode/provider/model/permission/shell
+  configuration change, and second Plan submission during the active turn. 2)
+  Let the turn become pending approval and repeat the prompt and configuration
+  attempts. 3) Reject the approval. 4) Submit a later prompt and let the Agent
+  create a revised Plan snapshot. 5) Repeat configuration after the session is
+  editable planning.
+- **Expected**: Active-turn/configuration changes, prompts, and a second Plan
+  submission fail with `AGENT_BUSY`/`CONFLICT` while the turn or active pending
+  approval exists; only the originating session is blocked. Reject returns the
+  durable session to Plan and the live state to planning, clears the gate, and
+  permits the later prompt/new artifact. Terminal proposal snapshots do not
+  disable input, the Composer mode chip, or model selection during the current
+  renderer lifetime. Idle/planning configuration succeeds and no cross-session
+  event or workspace root leaks.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/02-agent-runtime.md`, `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/10-session-state-machine.md`, `04-ux/08-component-spec.md`, ADR 0053
+- **Acceptance**: C (conversation/stream), E (permissions), Quality
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` verifies Host
+  boundaries and `test:e2e:plan-ui` verifies pending-only gating plus editable
+  rejected/terminal states during the current renderer lifetime
+
+#### E2E-112: Selectable shell catalog persists the default
+
+- **Preconditions**: Host has an available platform catalog entry, a fixture can
+  make a persisted choice unavailable, and a project-bound Agent session is
+  idle. The Windows lane exercises the multi-choice ordering.
+- **Steps**: 1) Inspect the catalog for the platform-valid IDs
+  `windows-powershell`, `cmd`, `git-bash`, and `bash`. 2) Verify settings
+  rejects an unavailable or wrong-platform ID. 3) Select an available shell
+  and persist `defaultCommandShell`. 4) Make that persisted choice unavailable,
+  restart, and verify the catalog selects the first available platform shell
+  with `fallback: true`. 5) Execute the unchanged `Bash` tool.
+- **Expected**: Settings persists only a valid stable shell ID; unavailable
+  entries remain unavailable with guidance and a later unavailable persisted
+  choice uses the intentional first-available fallback. The host invokes the
+  effective shell while the tool/protocol name stays `Bash`, and shell
+  selection follows the idle configuration boundary.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `03-runtime/03-tools-and-permissions.md`, `03-runtime/06-host-rpc-protocol.md`,
+  `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`, ADR 0054
+- **Acceptance**: B (model/config), E (tools/permissions), F (persistence)
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` verifies catalog,
+  validation, persistence, and restart; the deterministic host-core catalog
+  test verifies first-available fallback when a stored shell becomes unavailable
+
+#### E2E-113: Stale shell identity fails closed
+
+- **Preconditions**: A Bash turn has a pinned effective shell ID/dialect; the
+  fixture can change the effective catalog selection before spawn.
+- **Steps**: 1) Change the effective shell ID or dialect. 2) Execute Bash with
+  the old expected ID. 3) Inspect process creation, fallback attempts, audit,
+  and UI error. 4) launch a fresh turn and retry.
+- **Expected**: The first call returns `COMMAND_SHELL_CHANGED`, starts no
+  process, and does not change shell after the turn pin. The audit records the
+  selected ID and dialect. A fresh turn snapshot is required for a later run.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
+  `03-runtime/05-host-core-rust.md`, `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/08-error-codes.md`, `05-security/01-security.md`, ADR 0054
+- **Acceptance**: E (tools/permissions), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` verifies stale
+  dialect rejection before marker creation plus host-core stale ID/dialect tests
+
+#### E2E-114: Bash streams stdout and stderr independently
+
+- **Preconditions**: A selected shell is available and a deterministic command
+  writes interleaved stdout and stderr chunks.
+- **Steps**: 1) Execute the command through `Bash`. 2) Observe host/RPC/UI
+  output events. 3) Inspect the final bounded result and transcript row.
+- **Expected**: stdout and stderr remain separate, ordered per tool call, and
+  visible while the process runs. Final output preserves truncation metadata;
+  no chunks cross sessions or turns and the Bash protocol name is unchanged.
+- **Specs linked**: `03-runtime/06-host-rpc-protocol.md`,
+  `03-runtime/09-logging-and-observability.md`,
+  `03-runtime/16-tool-result-limits.md`, `04-ux/09-interaction-patterns.md`, ADR 0054
+- **Acceptance**: C (stream), E (tools), Quality
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` verifies distinct
+  stdout/stderr notifications and final tool identity; host/runtime stream tests
+  cover bounded accumulation and session isolation
+
+#### E2E-115: Bash timeout uses 60 seconds and a bounded override
+
+- **Preconditions**: A selected shell can run a command longer than 60 seconds;
+  host clock is observable.
+- **Steps**: 1) Run without a timeout override. 2) Observe the 60-second
+  deadline. 3) Run with an in-range override. 4) Submit zero, negative, and
+  over-300-second overrides.
+- **Expected**: Missing timeout uses exactly 60 seconds and returns
+  `TOOL_TIMEOUT` after process-tree shutdown. In-range values work within
+  1–300 seconds; out-of-range values fail validation and never spawn.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `03-runtime/08-error-codes.md`,
+  `03-runtime/16-tool-result-limits.md`, `05-security/01-security.md`, ADR 0054
+- **Acceptance**: E (tools), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): long-timeout `test:e2e:plan`
+  measured the no-override timeout at 60,024 ms and verified in-range plus
+  invalid bounds without delayed marker writes
+
+#### E2E-116: Bash abort shuts down the complete process tree
+
+- **Preconditions**: A Bash command starts a child and grandchild that emit
+  delayed output; the originating session is running.
+- **Steps**: 1) Start the command. 2) Abort the active turn. 3) Inspect process
+  descendants, output events, audit, and turn state after the shutdown grace.
+- **Expected**: The process group/job tree is terminated, no descendant remains,
+  no later output arrives, the turn returns `TURN_ABORTED`, and the workspace is
+  not rolled back automatically.
+- **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
+  `03-runtime/07-process-model.md`, `03-runtime/08-error-codes.md`,
+  `03-runtime/16-tool-result-limits.md`, `05-security/01-security.md`, ADR 0054
+- **Acceptance**: C (abort), E (tools), H (diagnostics), Security
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): `test:e2e:plan` aborts a real
+  descendant process tree and verifies no late marker/output; host-core tests
+  verify cancellation registry cleanup
+
+#### E2E-117: Agent/Plan UX and locales contain no Chat controls
+
+- **Preconditions**: App can run in English and zh-CN with an idle session,
+  Plan artifact fixture, shell settings, and command palette available.
+- **Steps**: 1) Inspect Agent/Plan, permission, artifact approval, and shell
+  controls in English. 2) Enter Plan and inspect planning/approval/queue/
+  terminal states while the renderer remains alive. 3) Reload after a terminal
+  proposal and inspect the session while asserting that Electron Main and Host
+  process identities did not change. 4) Repeat in zh-CN. 5) Search visible
+  commands for the removed Chat mode and request-changes controls. Host/app
+  restart recovery is exercised separately by E2E-108 and E2E-109.
+- **Expected**: Agent is the default; the left-of-input Composer chip is the
+  sole active-session Agent/Plan control; Plan shows Ask/Accept edits/Auto, the
+  submitted title/question, an artifact opener, expiry/status, approve/reject
+  only, shell catalog/fallback status, and localized failed-closed states. No
+  Chat mode, `/chat-mode`, request-changes action, inline Markdown/hash/size
+  requirement, or stale actionable queue is exposed; a terminal card may remain
+  visible and non-actionable only for the current renderer lifetime. Renderer
+  reload does not rehydrate rejected, expired, approved/completed, or
+  interrupted terminal cards. Host/app restart does not replay work or restore
+  stale actions, and the UI is not required to present the interrupted terminal
+  snapshot; `page = "chat"` remains an internal route.
+- **Specs linked**: `01-product/01-product-scope.md`, `04-ux/01-ui-ia.md`,
+  `04-ux/04-builtin-commands.md`, `04-ux/03-permission-ux.md`,
+  `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/02-i18n-english-first.md`, ADR 0053, ADR 0054
+- **Acceptance**: C (conversation), Quality
+- **Milestone**: M6
+- **Status**: Automated (passed 2026-08-04): raw-CDP
+  `test:e2e:plan-ui` uses an env-gated Electron Main probe against the existing
+  Host, asserts stable Electron/Host PIDs, covers pending restore, live terminal
+  controls, rejected and approved/completed terminal-card absence after
+  renderer reload, EN/zh-CN, and 1280×800 / 900×700 rendering. E2E-108/E2E-109
+  cover Host restart interruption, stale-action rejection, and no replay.
 
 #### E2E-097: Tool results read as structured blocks, never JSON
 
@@ -2741,7 +3067,7 @@ Each scenario is documented in this format:
     `notice` renders as a neutral note under the block it qualifies, capped
     lists report the hidden remainder, and copy yields the full payload.
 - **Specs linked**: `04-ux/08-component-spec.md` §9, §10.2,
-  `08-meta/decisions-log.md` (D189)
+  `08-meta/decisions-log.md` (D192)
 - **Acceptance**: C (chat & stream), E (tools & permissions), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`tool-presentation.test.mjs`,
@@ -2779,7 +3105,7 @@ Each scenario is documented in this format:
   - Only one re-run happens per prompt, including after context-overflow
     recovery within the same prompt.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5e, §7,
-  `03-runtime/08-error-codes.md` §3.2, `08-meta/decisions-log.md` (D190)
+  `03-runtime/08-error-codes.md` §3.2, `08-meta/decisions-log.md` (D193)
 - **Acceptance**: C (chat & stream), F (persistence), H (diagnostics), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`runtime.test.ts`); full provider/UI journey Draft
@@ -2825,7 +3151,7 @@ Each scenario is documented in this format:
     batch with a sentence about what it is doing, never leaves more than one
     batch without new visible text, and ends with a self-contained result.
 - **Specs linked**: `03-runtime/16-tool-result-limits.md`,
-  `03-runtime/02-agent-runtime.md` §7, `08-meta/decisions-log.md` (D191)
+  `03-runtime/02-agent-runtime.md` §7, `08-meta/decisions-log.md` (D194)
 - **Acceptance**: C (chat & stream), E (tools & permissions), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (host-core `tools` tests, `runtime.test.ts` prompt
@@ -2839,24 +3165,25 @@ Each scenario is documented in this format:
 
 | Acceptance | Scenarios |
 |---|---|
-| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092 |
+| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
-| C — Chat & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-060, E2E-061, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-AGENTS-001 |
+| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-AGENTS-001 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-AGENTS-001 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-025, E2E-026 |
-| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098 |
-| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-AGENTS-001 |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-073a, E2E-082, E2E-084, E2E-096, E2E-098, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-AGENTS-001 |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-025, E2E-026, E2E-105, E2E-117 |
+| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116 |
+| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-073a, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-111, E2E-114, E2E-117, E2E-AGENTS-001 |
 
 | Milestone | Scenarios |
 |---|---|
 | M1 | E2E-001, E2E-002, E2E-003, E2E-028, E2E-029 |
-| M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042 |
+| M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-089, E2E-090 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-AGENTS-001 (+ packaging scenarios in release runbook) |
+| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067 (macOS), E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-073a, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-AGENTS-001 (+ packaging scenarios in release runbook) |
+| M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117 |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
@@ -2870,7 +3197,7 @@ rather than the A–H criteria; their gold source is the capture suite.
 When adding or changing a feature that affects user-visible or protocol-visible behavior:
 
 1. **Add a new scenario** using the template in §6. Assign the next available ID (`E2E-<N>`).
-2. **Link it** to the relevant acceptance criterion (A–H) and milestone (M1–M5).
+2. **Link it** to the relevant acceptance criterion (A–H) and milestone (M1–M6).
 3. **Set status** to `Draft` unless an automated test already exists.
 4. **Update the traceability matrix** in §8.
 5. **Commit** the update as part of the change (per [ai-development-workflow](03-ai-development-workflow.md) R3).
@@ -2926,14 +3253,15 @@ This test plan spec is accepted when:
 ### US-UI-04 Composer without workspace context
 - With a git workspace open, composer does not show project, Local, or branch
   labels above the prompt surface.
-- Permission toggle switches between Agent and Request approval.
+- Operating-mode selector switches between Agent and Plan; Plan keeps the
+  permission-mode chip and explains its Bash tradeoff.
 
 ### US-UI-05 Locale chrome
 - On a zh-CN system locale, sidebar labels render in Chinese (新建任务 / 项目 /
   插件 / 临时会话), without 拉取请求 or 已安排 entries.
 - Empty-thread hero remains the English PI-Desktop shell copy: "What should we build?".
-- Composer omits the 本地 workspace label; the top bar shows the active model
-  ID and no mode control (D188).
+- Composer omits the 本地 workspace label and shows Plan/Agent plus the active
+  model ID; both locales expose the Plan approval copy.
 
 ### US-UI-06 Session auto-title
 - Create a new task and send a first prompt such as "同步代码".
@@ -3010,8 +3338,8 @@ This test plan spec is accepted when:
 - On chat home and a docked thread, inspect every composer control.
 - Expect no file, photo, or appshot controls while those payloads are
   unsupported by the pi runtime. Exact reasoning-capable models expose the
-  current Thinking level leading the composer chip row; unsupported models show
-  no trigger. Unknown compatible models can explicitly enable
+  current Thinking level immediately to the right of Agent / Plan; unsupported
+  models show no trigger. Unknown compatible models can explicitly enable
   thinking from the model menu, and changes update the durable session.
 - Expect no project, Local, or branch context labels in the composer.
 - Every visible composer control changes the active session, opens its menu, or
@@ -3030,8 +3358,8 @@ This test plan spec is accepted when:
 ### US-UI-21 Top-bar model menu configures pi
 - Create a session with provider A/model A, then open the top-bar model menu.
 - Expect enabled, runnable provider/default-model pairs and an Agent entry. The
-  model trigger shows only the model ID; a capability-gated Thinking trigger
-  lives in the composer chip row instead of being nested in the model menu.
+  model trigger shows only the model ID; a capability-gated Thinking trigger is
+  placed beside Agent / Plan instead of being nested in the model menu.
 - Select provider B/model B, send a prompt, and expect the main-to-sidecar
   `agent.prompt` payload and pi runtime to use B for that session.
 - Switch away and back; expect B to remain selected. While a turn runs, expect
@@ -3492,8 +3820,8 @@ This test plan spec is accepted when:
 ### US-UI-71 Composer runtime chip descenders (D150)
 - Open empty home and a docked thread with a model ID that contains descenders
   (for example `gpt`, `gemini`, or any id with `g`/`y`/`p`/`q`/`j`).
-- Inspect Thinking (when present), permission mode (Agent), and the model chip
-  in light and dark.
+- Inspect Agent/Plan, Thinking (when present), permission mode, and the
+  model chip in light and dark.
 - Expect every chip label to show full glyph ink — bottoms of `g`/`y`/`p` are not
   clipped by the 28px capsule — while long model IDs still ellipsize horizontally.
 - **Specs linked**: `04-ux/07-ui-design-system.md` §8.2, `04-ux/08-component-spec.md` §11.5, decisions-log D150

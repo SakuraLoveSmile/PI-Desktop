@@ -4,11 +4,16 @@ import {
   DesktopAgentRuntime,
   PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
   looksLikePseudoToolCall,
+  type PluginToolDef,
+  type RuntimeMatchConfig,
   type RuntimeProviderConfig,
 } from "./runtime.js";
+import type { ProjectInstructions } from "./project-instructions.js";
 import type {
   ContextCompactionRecord,
   ContextCompactionSettings,
+  CommandShellOption,
+  PlanExecution,
   ThinkingLevel,
   UiMessage,
 } from "@pi-desktop/shared";
@@ -35,34 +40,46 @@ const provider: RuntimeProviderConfig = {
   },
 };
 
+const commandShell: CommandShellOption = {
+  id: "bash",
+  label: "Bash",
+  dialect: "posix",
+  available: true,
+  isDefault: true,
+};
+
 function createRuntime(
   overrides: Partial<{
     provider: RuntimeProviderConfig;
-    mode: "read-only" | "agent";
+    mode: "chat" | "agent";
     thinkingLevel: ThinkingLevel;
     history: UiMessage[];
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
     projectPath: string;
     projectInstructions: import("./project-instructions.js").ProjectInstructions;
-    pluginTools: import("./runtime.js").PluginToolDef[];
+    pluginTools: PluginToolDef[];
     pluginSkills: import("./plugin-skills-prompt.js").PluginSkillDef[];
-    host: { call: ReturnType<typeof vi.fn> };
+    commandShell: CommandShellOption;
+    turnId: string;
+    host: { call: ReturnType<typeof vi.fn>; onNotification?: ReturnType<typeof vi.fn> };
     onEvent: (envelope: unknown) => void;
   }> = {},
 ) {
   return new DesktopAgentRuntime({
     host: (overrides.host ?? { call: vi.fn() }) as never,
     sessionId: "session-1",
-    mode: overrides.mode ?? "agent",
+    mode: overrides.mode === "chat" ? "plan" : overrides.mode ?? "agent",
+    turnId: overrides.turnId,
     provider: overrides.provider ?? provider,
+    commandShell: overrides.commandShell ?? commandShell,
     thinkingLevel: overrides.thinkingLevel ?? "medium",
     history: overrides.history,
     compaction: overrides.compaction,
     compactionSettings: overrides.compactionSettings,
     projectPath: overrides.projectPath,
-    projectInstructions: overrides.projectInstructions,
     pluginTools: overrides.pluginTools,
+    projectInstructions: overrides.projectInstructions,
     pluginSkills: overrides.pluginSkills,
     onEvent: overrides.onEvent ?? vi.fn(),
   });
@@ -92,23 +109,40 @@ function assistantMessage(overrides: {
   };
 }
 
+function runtimeMatches(
+  runtime: DesktopAgentRuntime,
+  overrides: Partial<RuntimeMatchConfig> = {},
+): boolean {
+  return runtime.matches({
+    mode: runtime.getMode(),
+    provider: (runtime as any).provider,
+    thinkingLevel: (runtime as any).thinkingLevel,
+    pluginTools: (runtime as any).pluginTools,
+    pluginSkills: (runtime as any).pluginSkills,
+    projectInstructions: (runtime as any).baseProjectInstructions,
+    projectPath: (runtime as any).projectPath,
+    commandShell: (runtime as any).commandShell,
+    ...overrides,
+  });
+}
+
 describe("DesktopAgentRuntime configuration matching", () => {
   it("accepts no-auth providers and reuses only an exact pi configuration", async () => {
     const runtime = createRuntime();
 
-    expect(runtime.matches("agent", provider, "medium")).toBe(true);
-    expect(runtime.matches("read-only", provider, "medium")).toBe(false);
+    expect(runtimeMatches(runtime)).toBe(true);
+    expect(runtimeMatches(runtime, { mode: "plan" })).toBe(false);
     expect(
-      runtime.matches("agent", { ...provider, authKind: "api_key" }, "medium"),
+      runtimeMatches(runtime, {
+        provider: { ...provider, authKind: "api_key" },
+      }),
     ).toBe(false);
     expect(
-      runtime.matches(
-        "agent",
-        { ...provider, modelId: "another-model" },
-        "medium",
-      ),
+      runtimeMatches(runtime, {
+        provider: { ...provider, modelId: "another-model" },
+      }),
     ).toBe(false);
-    expect(runtime.matches("agent", provider, "high")).toBe(false);
+    expect(runtimeMatches(runtime, { thinkingLevel: "high" })).toBe(false);
 
     await runtime.dispose();
   });
@@ -284,14 +318,14 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect((runtime as any).agent.state.systemPrompt).toContain(
       "Run unit tests.",
     );
-    expect(runtime.matches("agent", provider, "medium", [], projectInstructions)).toBe(
-      true,
-    );
-    expect(runtime.matches("agent", provider, "medium", [], {
-      entries: [{ source: "AGENTS.md", content: "Run lint." }],
-    })).toBe(
-      false,
-    );
+    expect(runtimeMatches(runtime)).toBe(true);
+    expect(
+      runtimeMatches(runtime, {
+        projectInstructions: {
+          entries: [{ source: "AGENTS.md", content: "Run lint." }],
+        },
+      }),
+    ).toBe(false);
 
     await runtime.dispose();
   });
@@ -497,6 +531,268 @@ describe("DesktopAgentRuntime configuration matching", () => {
     expect((runtime as any).agent.state.systemPrompt).toContain("Use root rules.");
     expect((runtime as any).agent.state.systemPrompt).not.toContain("Use A rules.");
 
+  });
+
+  it("uses the active shell dialect in prompts and runtime reuse", async () => {
+    const powershell: CommandShellOption = {
+      id: "windows-powershell",
+      label: "Windows PowerShell",
+      dialect: "powershell",
+      available: true,
+      isDefault: true,
+    };
+    const runtime = createRuntime({ commandShell: powershell });
+    const systemPrompt = (runtime as any).agent.state.systemPrompt as string;
+    const bash = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Bash",
+    );
+
+    expect(systemPrompt).toContain("Windows PowerShell");
+    expect(systemPrompt).toContain("$env:PI_SCRATCH_DIR");
+    expect(systemPrompt).not.toContain("Git Bash (POSIX bash on Windows)");
+    expect(bash.description).toContain("Windows PowerShell");
+    expect((bash.parameters as any).properties.timeout).toMatchObject({
+      type: "number",
+      minimum: 1,
+      maximum: 300,
+    });
+    expect(runtimeMatches(runtime, { commandShell: powershell })).toBe(true);
+    expect(runtimeMatches(runtime, { commandShell })).toBe(false);
+
+    await runtime.dispose();
+  });
+
+  it("sends the default Bash timeout and preserves explicit overrides", async () => {
+    const host = {
+      call: vi.fn().mockResolvedValue({ ok: true, content: "done" }),
+    };
+    const runtime = createRuntime({ host });
+    const bash = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Bash",
+    );
+    expect(bash.description).toContain("60-second timeout");
+    expect((bash.parameters as any).properties.timeout.description).toContain(
+      "defaults to 60 seconds",
+    );
+
+    await bash.execute("bash-default", { command: "printf default" });
+    const defaultCall = host.call.mock.calls.at(-1)!;
+    expect(defaultCall[0]).toBe("tools.execute");
+    expect(defaultCall[1]).toMatchObject({
+      toolName: "Bash",
+      expectedCommandShellId: "bash",
+      expectedCommandShellDialect: "posix",
+      timeoutMs: 60_000,
+    });
+
+    await bash.execute("bash-timeout", { command: "printf timed", timeout: 1.25 });
+    const timedCall = host.call.mock.calls.at(-1)!;
+    expect(timedCall[1]).toMatchObject({
+      expectedCommandShellId: "bash",
+      expectedCommandShellDialect: "posix",
+      timeoutMs: 1_250,
+    });
+
+    await runtime.dispose();
+  });
+
+  it("accepts Bash timeout bounds and rejects invalid values before host execution", async () => {
+    const host = {
+      call: vi.fn().mockResolvedValue({ ok: true, content: "done" }),
+    };
+    const runtime = createRuntime({ host });
+    const bash = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Bash",
+    );
+
+    await bash.execute("bash-min", { command: "printf min", timeout: 1 });
+    expect(host.call).toHaveBeenLastCalledWith(
+      "tools.execute",
+      expect.objectContaining({ timeoutMs: 1_000 }),
+    );
+    await bash.execute("bash-max", { command: "printf max", timeout: 300 });
+    expect(host.call).toHaveBeenLastCalledWith(
+      "tools.execute",
+      expect.objectContaining({ timeoutMs: 300_000 }),
+    );
+
+    for (const timeout of [Number.NaN, Number.POSITIVE_INFINITY, 0.999, 300.001]) {
+      await expect(
+        bash.execute(`bash-invalid-${String(timeout)}`, {
+          command: "printf invalid",
+          timeout,
+        }),
+      ).rejects.toMatchObject({ errorCode: "INVALID_ARGUMENT" });
+    }
+    expect(host.call).toHaveBeenCalledTimes(2);
+    await runtime.dispose();
+  });
+
+  it("routes matching Bash output through throttled progress and aborts", async () => {
+    vi.useFakeTimers();
+    try {
+      const listeners = new Set<(method: string, params: unknown) => void>();
+      let finishExecution!: (value: unknown) => void;
+      const execution = new Promise((resolve) => {
+        finishExecution = resolve;
+      });
+      const host = {
+        call: vi.fn((method: string) =>
+          method === "tools.execute"
+            ? execution
+            : Promise.resolve({ ok: true, content: "abort requested" }),
+        ),
+        onNotification: vi.fn((handler: (method: string, params: unknown) => void) => {
+          listeners.add(handler);
+          return () => listeners.delete(handler);
+        }),
+      };
+      const updates: unknown[] = [];
+      const runtime = createRuntime({ host });
+      const bash = (runtime as any).agent.state.tools.find(
+        (tool: any) => tool.name === "Bash",
+      );
+      const controller = new AbortController();
+      const pending = bash.execute(
+        "bash-progress",
+        { command: "printf progress" },
+        controller.signal,
+        (update: unknown) => updates.push(update),
+      );
+      await vi.advanceTimersByTimeAsync(0);
+
+      for (const listener of listeners) {
+        listener("tools.output", {
+          sessionId: "other-session",
+          toolCallId: "bash-progress",
+          commandShellId: "bash",
+          stream: "stdout",
+          chunk: "ignored",
+        });
+        listener("tools.output", {
+          sessionId: "session-1",
+          toolCallId: "bash-progress",
+          commandShellId: "bash",
+          stream: "stdout",
+          chunk: "progress ",
+        });
+        listener("tools.output", {
+          sessionId: "session-1",
+          toolCallId: "bash-progress",
+          commandShellId: "bash",
+          stream: "stderr",
+          chunk: "warning",
+        });
+      }
+      expect(updates).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(99);
+      expect(updates).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(updates).toHaveLength(1);
+      expect((updates[0] as any).content[0].text).toBe("progress warning");
+
+      controller.abort();
+      expect(host.call).toHaveBeenCalledWith("tools.abort", {
+        sessionId: "session-1",
+        toolCallId: "bash-progress",
+      });
+      expect(listeners.size).toBe(0);
+      finishExecution({
+        ok: false,
+        isError: true,
+        errorCode: "TOOL_ABORTED",
+        content: { code: "TOOL_ABORTED" },
+      });
+      await expect(pending).resolves.toMatchObject({
+        isError: true,
+        details: { code: "TOOL_ABORTED" },
+      });
+      expect(listeners.size).toBe(0);
+
+      await runtime.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("removes streamed-output resources when the host dies or runtime is disposed", async () => {
+    vi.useFakeTimers();
+    try {
+      const listeners = new Set<(method: string, params: unknown) => void>();
+      let closeHost!: () => void;
+      let finishExecution!: (value: unknown) => void;
+      const execution = new Promise((resolve) => {
+        finishExecution = resolve;
+      });
+      const host = {
+        call: vi.fn((method: string) =>
+          method === "tools.execute"
+            ? execution
+            : Promise.resolve({ ok: true, content: "done" }),
+        ),
+        onNotification: vi.fn((handler: (method: string, params: unknown) => void) => {
+          listeners.add(handler);
+          return () => listeners.delete(handler);
+        }),
+        onClose: vi.fn((handler: () => void) => {
+          closeHost = handler;
+          return () => undefined;
+        }),
+      };
+      const updates: unknown[] = [];
+      const runtime = createRuntime({ host });
+      const bash = (runtime as any).agent.state.tools.find(
+        (tool: any) => tool.name === "Bash",
+      );
+      const pending = bash.execute(
+        "bash-host-death",
+        { command: "printf progress" },
+        undefined,
+        (update: unknown) => updates.push(update),
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(listeners.size).toBe(1);
+      closeHost();
+      expect(listeners.size).toBe(0);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(updates).toHaveLength(0);
+      finishExecution({ ok: true, content: "done" });
+      await pending;
+
+      await runtime.dispose();
+      expect((runtime as any).activeToolProgressCleanups.size).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("propagates a tools.abort protocol error instead of hiding it", async () => {
+    let finishExecution!: (value: { ok: boolean; content: unknown }) => void;
+    const execution = new Promise<{ ok: boolean; content: unknown }>((resolve) => {
+      finishExecution = resolve;
+    });
+    const host = {
+      call: vi.fn((method: string) =>
+        method === "tools.execute"
+          ? execution
+          : Promise.reject(new Error("tools.abort protocol failure")),
+      ),
+      onNotification: vi.fn(() => () => undefined),
+    };
+    const runtime = createRuntime({ host });
+    const bash = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Bash",
+    );
+    const controller = new AbortController();
+    const pending = bash.execute(
+      "bash-abort-error",
+      { command: "printf progress" },
+      controller.signal,
+    );
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    controller.abort();
+    finishExecution({ ok: false, content: { code: "TOOL_ABORTED" } });
+      await expect(pending).rejects.toThrow("tools.abort protocol failure");
     await runtime.dispose();
   });
 });
@@ -528,6 +824,7 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
       "Edit",
       "Write",
       "CompactContext",
+      "EnterPlanMode",
       "ToolSearch",
     ]);
     expect(names).not.toContain("BrowserPreview");
@@ -543,18 +840,36 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     await runtime.dispose();
   });
 
-  it("keeps read-only mode on the read-only core while sharing discovery", async () => {
-    const runtime = createRuntime({ mode: "read-only" });
+  it("normalizes legacy chat onto the Plan core", async () => {
+    const runtime = createRuntime({
+      mode: "chat",
+      pluginTools: [
+        { name: "plugin_demo_run", description: "demo", parameters: {} },
+      ],
+      pluginSkills: [{ id: "demo.skill", name: "Demo skill" }],
+    });
     const names = (runtime as any).agent.state.tools.map(
       (tool: any) => tool.name,
     );
 
     expect(names).toEqual(
-      expect.arrayContaining(["Read", "Glob", "Grep", "CompactContext", "ToolSearch"]),
+      expect.arrayContaining([
+        "Read",
+        "Glob",
+        "Grep",
+        "BrowserPreview",
+        "Bash",
+        "CompactContext",
+        "SubmitPlan",
+      ]),
     );
     expect(names).not.toContain("Write");
     expect(names).not.toContain("Edit");
-    expect(names).not.toContain("Bash");
+    expect(names).not.toContain("Skill");
+    expect(names).not.toContain("PluginCheck");
+    expect(names).not.toContain("plugin_demo_run");
+    expect(names).not.toContain("PluginScaffold");
+    expect(names).not.toContain("PluginPack");
 
     await runtime.dispose();
   });
@@ -617,6 +932,189 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     expect(agent.state.tools.some((tool: any) => tool.name === "BrowserPreview")).toBe(
       false,
     );
+  });
+});
+
+describe("DesktopAgentRuntime mode and tool composition", () => {
+  it("switches one pi Agent between Agent and Plan tool sets", async () => {
+    const runtime = createRuntime({
+      pluginTools: [
+        {
+          name: "plugin_demo_run",
+          description: "demo",
+          parameters: { type: "object", properties: {} },
+        },
+      ],
+    });
+    const agent = (runtime as any).agent;
+    const initialAgent = agent;
+    const agentTools = agent.state.tools.map((tool: any) => tool.name);
+    expect(agentTools).toEqual(
+      expect.arrayContaining([
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "CompactContext",
+        "EnterPlanMode",
+        "ToolSearch",
+      ]),
+    );
+    expect(agentTools).not.toContain("SubmitPlan");
+
+    runtime.setMode("plan");
+    expect((runtime as any).agent).toBe(initialAgent);
+    expect(runtime.getMode()).toBe("plan");
+    const planTools = agent.state.tools.map((tool: any) => tool.name);
+    expect(planTools).toEqual(
+      expect.arrayContaining([
+        "Read",
+        "Glob",
+        "Grep",
+        "BrowserPreview",
+        "Bash",
+        "CompactContext",
+        "SubmitPlan",
+      ]),
+    );
+    expect(planTools).not.toEqual(
+      expect.arrayContaining(["Write", "Edit", "plugin_demo_run"]),
+    );
+    expect(planTools).not.toContain("EnterPlanMode");
+    expect(agent.state.systemPrompt).toContain("SubmitPlan");
+    expect(agent.state.systemPrompt).toContain("Do not use Write, Edit, plugin tools");
+    expect(agent.state.systemPrompt).not.toContain("plugin_demo_run");
+    expect(agent.state.systemPrompt).not.toContain("PluginCheck");
+
+    runtime.setMode("agent");
+    expect((runtime as any).agent).toBe(initialAgent);
+    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("EnterPlanMode");
+    await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime plan transitions", () => {
+  it("guards transition batches and terminates after durable plan submission", async () => {
+    const host = { call: vi.fn() };
+    const runtime = createRuntime({ host, turnId: "turn-1" });
+    const agent = (runtime as any).agent;
+    const beforeToolCall = agent.beforeToolCall as Function;
+
+    const mixedBatch = {
+      assistantMessage: {
+        content: [
+          { type: "toolCall", id: "enter-call", name: "EnterPlanMode", arguments: {} },
+          { type: "toolCall", id: "read-call", name: "Read", arguments: { path: "a.txt" } },
+        ],
+      },
+      toolCall: { id: "enter-call", name: "EnterPlanMode", arguments: {} },
+      args: {},
+      context: {},
+    };
+    await expect(beforeToolCall(mixedBatch)).resolves.toMatchObject({ block: true });
+
+    host.call.mockResolvedValueOnce({ ok: true, state: "planning" });
+    const enterTool = agent.state.tools.find((tool: any) => tool.name === "EnterPlanMode");
+    const enterResult = await enterTool.execute("enter-call", {});
+    expect(enterResult.terminate).toBeUndefined();
+    expect(runtime.getMode()).toBe("plan");
+    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("SubmitPlan");
+    expect(host.call).toHaveBeenNthCalledWith(1, "plans.enter", {
+      sessionId: "session-1",
+      turnId: "turn-1",
+      toolCallId: "enter-call",
+    });
+
+    const exactMarkdown = "  # Implement it\n\n1. Make the change.  \n";
+    const proposal = {
+      id: "proposal-1",
+      sessionId: "session-1",
+      turnId: "durable-turn-1",
+      toolCallId: "submit-call-1",
+      title: "Implement it",
+      markdown: exactMarkdown,
+      plan: exactMarkdown,
+      question: "Approve implementation?",
+      artifact: {
+        relativePath: ".pi/plan/proposal-1.md",
+        sha256: "abc123",
+        sizeBytes: 31,
+      },
+      version: 1,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    host.call.mockResolvedValueOnce({ status: "pending", proposal });
+    const submitTool = agent.state.tools.find((tool: any) => tool.name === "SubmitPlan");
+    expect(submitTool.description).toContain("immutable historical checkpoints");
+    expect(submitTool.description).toContain("new full snapshot in this turn");
+    const submitResult = await submitTool.execute("submit-call-1", {
+      title: proposal.title,
+      markdown: proposal.markdown,
+      question: proposal.question,
+    });
+    expect(submitResult.terminate).toBe(true);
+    expect(runtime.getMode()).toBe("plan");
+    expect(runtime.getStatus().planningState).toBe("awaiting_approval");
+    expect(agent.state.tools.map((tool: any) => tool.name)).toContain("SubmitPlan");
+    expect(host.call).toHaveBeenLastCalledWith(
+      "plans.submit",
+      expect.objectContaining({
+        sessionId: "session-1",
+        toolCallId: "submit-call-1",
+        title: proposal.title,
+        markdown: proposal.markdown,
+        question: proposal.question,
+      }),
+    );
+    expect(host.call).toHaveBeenCalledTimes(2);
+
+    await runtime.dispose();
+  });
+
+  it("executes an approved plan in the same runtime without a visible user event", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const originalAgent = agent;
+    agent.continue = vi.fn(async () => undefined);
+    agent.waitForIdle = vi.fn(async () => undefined);
+    runtime.setMode("plan");
+
+    const execution: PlanExecution = {
+      id: "execution-1",
+      proposalId: "proposal-1",
+      sessionId: "session-1",
+      plan: "# Approved\n\nUse the exact snapshot.",
+      title: "Approved plan",
+      question: "Proceed?",
+      artifact: {
+        relativePath: ".pi/plan/proposal-1.md",
+        sha256: "abc123",
+        sizeBytes: 31,
+      },
+      targetPermissionMode: "auto",
+      state: "running",
+    };
+
+    const result = await runtime.executeApprovedPlan(execution, "execution-turn-1");
+
+    expect(result).toEqual({ turnId: "execution-turn-1" });
+    expect((runtime as any).agent).toBe(originalAgent);
+    expect(runtime.getMode()).toBe("agent");
+    expect(runtime.getStatus().planningState).toBe("inactive");
+    expect(agent.continue).toHaveBeenCalledOnce();
+    const internal = (runtime as any).fullEntries.at(-1).message;
+    expect(internal.role).toBe("user");
+    expect(internal.content).toContain(execution.artifact.relativePath);
+    expect(internal.content).toContain(execution.plan);
+    expect(
+      onEvent.mock.calls.some(
+        ([envelope]) => (envelope as any).event?.message?.role === "user",
+      ),
+    ).toBe(false);
 
     await runtime.dispose();
   });
@@ -738,9 +1236,11 @@ describe("DesktopAgentRuntime thinking configuration", () => {
     };
     const runtime = createRuntime({ provider: mimo, thinkingLevel: "medium" });
 
-    expect(runtime.matches("agent", mimo, "medium")).toBe(true);
+    expect(runtimeMatches(runtime)).toBe(true);
     expect(
-      runtime.matches("agent", { ...mimo, modelConfig: undefined }, "medium"),
+      runtimeMatches(runtime, {
+        provider: { ...mimo, modelConfig: undefined },
+      }),
     ).toBe(false);
 
     await runtime.dispose();
@@ -2253,22 +2753,19 @@ describe("DesktopAgentRuntime plugin skills (D174)", () => {
   it("does not reuse a runtime whose skill catalog changed", async () => {
     const runtime = createRuntime({ pluginSkills });
 
-    expect(
-      runtime.matches("agent", provider, "medium", [], undefined, pluginSkills),
-    ).toBe(true);
+    expect(runtimeMatches(runtime, { pluginSkills })).toBe(true);
     // Revoking agent.prompt.inject empties the catalog.
-    expect(runtime.matches("agent", provider, "medium", [], undefined, [])).toBe(false);
+    expect(runtimeMatches(runtime, { pluginSkills: [] })).toBe(false);
     expect(
-      runtime.matches("agent", provider, "medium", [], undefined, [
-        ...pluginSkills,
-        { id: "demo.hello/other", name: "Other" },
-      ]),
+      runtimeMatches(runtime, {
+        pluginSkills: [...pluginSkills, { id: "demo.hello/other", name: "Other" }],
+      }),
     ).toBe(false);
     // A renamed skill rewrites the catalog line the model reads.
     expect(
-      runtime.matches("agent", provider, "medium", [], undefined, [
-        { ...pluginSkills[0], name: "Renamed" },
-      ]),
+      runtimeMatches(runtime, {
+        pluginSkills: [{ ...pluginSkills[0], name: "Renamed" }],
+      }),
     ).toBe(false);
 
     await runtime.dispose();

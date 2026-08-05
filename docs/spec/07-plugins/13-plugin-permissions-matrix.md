@@ -35,6 +35,14 @@ Provide a permission–capability–risk–default-policy reference table for re
   skipped at load time instead (see
   [02-plugin-manifest-schema.md](02-plugin-manifest-schema.md) §7)
 
+## 3A. Plan operating-state rule
+
+Every `agentTools` contribution is denied in Plan, regardless of this matrix's
+risk or default policy. `agent.tool.register` authorizes registration for
+Agent, not visibility in Plan. The host returns `PLUGIN_DISABLED_IN_PLAN` for a
+direct Plan call and records the denial. Plugin tools become eligible only
+after the same Agent is approved into Agent mode.
+
 ## 4. Permission display copy
 
 English is the primary copy. The zh-CN column holds the localized example strings.

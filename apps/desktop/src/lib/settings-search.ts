@@ -44,6 +44,8 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.theme",
       "settings.language",
       "settings.defaultsTitle",
+      "settings.mode",
+      "settings.commandShell",
       "settings.enterToSend",
     ],
   },

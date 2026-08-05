@@ -1,5 +1,5 @@
-import { readdir, readFile, stat } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { readdir, readFile, realpath, stat } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { FsEntry, FsReadResult } from "@pi-desktop/shared";
 
 /**
@@ -50,12 +50,35 @@ export function resolveWithinRoot(root: string, rel: string): string | null {
   return target;
 }
 
+function pathIsWithin(root: string, target: string): boolean {
+  const rel = relative(root, target);
+  return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
+}
+
+/** Resolve an existing path and its root through links before containment. */
+async function resolveRealPathWithinRoot(
+  root: string,
+  rel: string,
+): Promise<string | null> {
+  const lexical = resolveWithinRoot(root, rel);
+  if (!lexical) return null;
+  try {
+    const [rootReal, targetReal] = await Promise.all([
+      realpath(resolve(root)),
+      realpath(lexical),
+    ]);
+    return pathIsWithin(rootReal, targetReal) ? targetReal : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isIgnoredName(name: string): boolean {
   return IGNORED_NAMES.has(name);
 }
 
 export async function listDir(root: string, rel: string): Promise<FsEntry[]> {
-  const dir = resolveWithinRoot(root, rel);
+  const dir = await resolveRealPathWithinRoot(root, rel);
   if (!dir) throw new Error("path escapes workspace root");
   const dirents = await readdir(dir, { withFileTypes: true });
   const entries: FsEntry[] = [];
@@ -73,10 +96,15 @@ export async function listDir(root: string, rel: string): Promise<FsEntry[]> {
         size = 0;
       }
     } else if (dirent.isSymbolicLink()) {
-      // Stat through the link but never traverse outside classification;
-      // broken links are skipped.
+      // Broken links and links whose real target leaves the workspace are
+      // omitted. The same real-path check runs again when opening the entry.
       try {
-        const info = await stat(join(dir, dirent.name));
+        const target = await resolveRealPathWithinRoot(
+          root,
+          rel ? `${rel}/${dirent.name}` : dirent.name,
+        );
+        if (!target) continue;
+        const info = await stat(target);
         kind = info.isDirectory() ? "dir" : "file";
         size = info.isFile() ? info.size : 0;
       } catch {
@@ -106,7 +134,7 @@ export async function readWorkspaceFile(
   root: string,
   rel: string,
 ): Promise<FsReadResult> {
-  const target = resolveWithinRoot(root, rel);
+  const target = await resolveRealPathWithinRoot(root, rel);
   if (!target) throw new Error("path escapes workspace root");
   const info = await stat(target);
   if (!info.isFile()) throw new Error("not a file");

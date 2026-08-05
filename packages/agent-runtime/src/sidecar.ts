@@ -18,11 +18,14 @@ import {
   normalizeSupportedThinkingLevels,
   normalizeThinkingLevel,
 } from "./sidecar-config.js";
+import { isCommandShellOption, normalizeMode } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   ContextCompactionRecord,
   ContextCompactionSettings,
+  CommandShellOption,
   Mode,
+  PlanExecution,
   ThinkingLevel,
   UiMessage,
 } from "@pi-desktop/shared";
@@ -31,12 +34,50 @@ type RuntimeMap = Map<string, DesktopAgentRuntime>;
 
 const runtimes: RuntimeMap = new Map();
 const hostProxy = new ParentHostProxy();
+const testRuntimeIds = new WeakMap<DesktopAgentRuntime, string>();
+
+function testRuntimeIdentity(sessionId: string) {
+  if (process.env.PI_DESKTOP_PLAN_UI_PROBE !== "1") {
+    throw Object.assign(new Error("test runtime identity RPC is unavailable"), {
+      rpcCode: -32601,
+    });
+  }
+  const runtime = runtimes.get(sessionId);
+  if (!runtime) {
+    throw Object.assign(new Error("runtime not found for session"), {
+      rpcCode: -32000,
+      errorCode: "RUNTIME_NOT_FOUND",
+    });
+  }
+  let runtimeId = testRuntimeIds.get(runtime);
+  if (!runtimeId) {
+    runtimeId = randomUUID();
+    testRuntimeIds.set(runtime, runtimeId);
+  }
+  const status = runtime.getStatus();
+  return {
+    runtimeId,
+    sessionId: runtime.sessionId,
+    mode: runtime.getMode(),
+    modelId: status.modelId,
+    status: {
+      isRunning: status.isRunning,
+      currentTurnId: status.currentTurnId,
+      planningState: status.planningState,
+      pendingToolConfirmations: status.pendingToolConfirmations,
+      ...(status.pendingPlanId ? { pendingPlanId: status.pendingPlanId } : {}),
+    },
+  };
+}
 
 type RuntimeParams = {
   sessionId: string;
   mode?: Mode;
+  /** Durable host turn ID for the prompt currently being executed. */
+  turnId?: string;
   thinkingLevel?: ThinkingLevel;
   provider: RuntimeProviderConfig;
+  commandShell: CommandShellOption;
   pluginTools?: PluginToolDef[];
   pluginSkills?: PluginSkillDef[];
   scratchDir?: string;
@@ -64,7 +105,13 @@ async function runtimeFor(
   currentPrompt?: string,
 ): Promise<DesktopAgentRuntime> {
   const sessionId = String(params.sessionId);
-  const mode = params.mode || "agent";
+  const mode = normalizeMode(params.mode);
+  if (!isCommandShellOption(params.commandShell) || !params.commandShell.available) {
+    throw Object.assign(new Error("active command shell is invalid or unavailable"), {
+      rpcCode: -32000,
+      errorCode: "COMMAND_SHELL_INVALID",
+    });
+  }
   const providerInput = params.provider;
   const provider = {
     ...providerInput,
@@ -76,7 +123,6 @@ async function runtimeFor(
   };
   const thinkingLevel = normalizeThinkingLevel(params.thinkingLevel);
   const pluginTools = params.pluginTools ?? [];
-  const pluginToolNames = pluginTools.map((tool) => tool.name);
   const pluginSkills = params.pluginSkills ?? [];
   if (!provider?.modelId || (!provider.apiKey && provider.authKind !== "none")) {
     throw Object.assign(new Error("model/provider not configured"), {
@@ -92,15 +138,16 @@ async function runtimeFor(
       errorCode: "AGENT_BUSY",
     });
   }
-  const reusable = existing?.matches(
+  const reusable = existing?.matches({
     mode,
     provider,
     thinkingLevel,
-    pluginToolNames,
-    params.projectInstructions,
+    pluginTools,
     pluginSkills,
-    params.projectPath,
-  )
+    projectInstructions: params.projectInstructions,
+    projectPath: params.projectPath,
+    commandShell: params.commandShell,
+  })
     ? existing
     : undefined;
   if (existing && !reusable) {
@@ -109,6 +156,7 @@ async function runtimeFor(
   }
   if (reusable) {
     reusable.setCompactionSettings(params.compactionSettings);
+    reusable.setMode(mode);
     return reusable;
   }
 
@@ -136,7 +184,9 @@ async function runtimeFor(
     host: hostProxy as any,
     sessionId,
     mode,
+    turnId: params.turnId,
     provider,
+    commandShell: params.commandShell,
     thinkingLevel,
     history,
     compaction,
@@ -198,19 +248,53 @@ async function handle(method: string, params: any): Promise<unknown> {
     }
     case "sidecar.health":
       return { ok: true, runtimes: runtimes.size };
+    case "agent.testRuntimeIdentity": {
+      return testRuntimeIdentity(String(params.sessionId ?? ""));
+    }
     case "agent.prompt": {
       const sessionId = String(params.sessionId);
       const content = String(params.content ?? "");
-      const turnId = randomUUID();
+      const turnId =
+        typeof params.turnId === "string" && params.turnId.trim()
+          ? params.turnId
+          : randomUUID();
       const runtime = await runtimeFor(params, content);
       const userMessageId =
         typeof params.userMessageId === "string" && params.userMessageId
           ? params.userMessageId
           : undefined;
-      void runtime.prompt(content, userMessageId).catch((err) => {
+      void runtime.prompt(content, userMessageId, turnId).catch((err) => {
         // Rejected-prompt path (pre-flight/transport failures). Streamed
         // provider errors surface via stopReason "error" and are classified
         // and emitted by the runtime itself.
+        notify("agent.event", {
+          sessionId,
+          turnId,
+          ts: Date.now(),
+          event: {
+            type: "error",
+            error: classifiedRuntimeError(err),
+          },
+        });
+      });
+      return { accepted: true, turnId };
+    }
+    case "agent.executeApprovedPlan": {
+      const sessionId = String(params.sessionId ?? "");
+      const turnId = String(params.turnId ?? "").trim();
+      const execution = params.execution as PlanExecution | undefined;
+      if (!sessionId || !turnId || !execution) {
+        throw Object.assign(new Error("approved plan execution parameters required"), {
+          errorCode: "PLAN_EXECUTION_NOT_FOUND",
+        });
+      }
+      const runtime = await runtimeFor({
+        ...params,
+        sessionId,
+        mode: "agent",
+        turnId,
+      });
+      void runtime.executeApprovedPlan(execution, turnId).catch((err) => {
         notify("agent.event", {
           sessionId,
           turnId,
@@ -230,6 +314,7 @@ async function handle(method: string, params: any): Promise<unknown> {
     }
     case "agent.abort": {
       const sessionId = String(params.sessionId);
+      await hostProxy.call("plans.abort", { sessionId }).catch(() => undefined);
       const runtime = runtimes.get(sessionId);
       if (runtime) await runtime.abort();
       return { ok: true };

@@ -29,6 +29,7 @@ There is no account, no subscription, and no cloud in the middle: you connect th
 ## Highlights
 
 - **Any model, your keys.** Anthropic, OpenAI, or anything that speaks an OpenAI-compatible API — hosted relays as well as local gateways like Ollama or LM Studio. Model IDs are free-form (no hardcoded allowlist), with per-model context window, output limit, temperature, and thinking-mode controls.
+- **Agent and Plan modes.** Agent mode reads, edits, and runs commands to get things done. Plan keeps the same agent in a host-authoritative planning state, blocks file edits and plugin tools, and submits an immutable checkpoint for explicit approval before implementation.
 - **You approve every change.** File writes and shell commands ask first, with session-scoped grants and a configurable default policy. Unanswered prompts deny by default.
 - **A real workbench.** Review the agent's edits as diffs, open a terminal, preview in a browser, and browse project files — all in a side panel, without leaving the conversation.
 - **Projects and sessions.** Sessions are grouped by project in a multi-project sidebar, with pinning, archiving, sorting, and throwaway scratch sessions.
@@ -69,7 +70,7 @@ Packaged builds check GitHub Releases for new versions and show an in-app update
 
 1. **Add a model provider.** Open **Settings → Models → Add provider**: pick the API style, paste the base URL and your API key, then choose or type a model ID. The key is stored in your OS keychain and never shown again.
 2. **Open a project.** Add a project folder from the sidebar — sessions, tools, and permissions are scoped to it.
-3. **Describe the task.** Approve edits and commands as they come up, and check the result in the **Review** diff panel before you commit anything.
+3. **Describe the task.** Start in Agent mode to make changes, or switch to Plan when you want the same agent to inspect the project and submit an implementation checkpoint for approval first. Review approved work in the **Review** diff panel before you commit anything.
 
 ## How it works
 
@@ -83,7 +84,7 @@ The full picture lives in the [architecture spec](docs/spec/02-architecture/01-a
 
 ## Status & roadmap
 
-PI-Desktop is an early preview under active development. Shipped so far: the app shell, streaming chat runtime, workspace agent tools with the permission system, the plugin foundation, and macOS packaging with update checks.
+PI-Desktop is an early preview under active development. Shipped so far: the app shell, streaming agent runtime, the host-authoritative Agent/Plan workflow, workspace tools with the permission system, the plugin foundation, and cross-platform packaging with update checks.
 
 Up next: signed and notarized macOS builds, and the plugin marketplace protocol. See the [milestones](docs/spec/06-delivery/01-mvp-milestones.md) and the [project board](docs/project/BOARD.md).
 
@@ -104,6 +105,12 @@ pnpm dev
 
 # protocol e2e smoke test
 PI_DESKTOP_TEST_API_KEY=... pnpm test:e2e
+
+# Plan host acceptance (includes the real 60-second default timeout)
+PI_DESKTOP_E2E_LONG_TIMEOUT=1 pnpm test:e2e:plan
+
+# rendered English / Simplified Chinese Plan acceptance through Electron CDP
+pnpm test:e2e:plan-ui
 ```
 
 CI runs JS build / typecheck / lint / unit tests plus `cargo test` for

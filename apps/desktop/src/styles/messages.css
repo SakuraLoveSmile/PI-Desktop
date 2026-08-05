@@ -68,6 +68,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+.planning-state-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 0 4px;
+  color: var(--ds-info);
+  font-size: var(--text-sm-plus);
+}
+
+.planning-state-indicator svg {
+  flex: 0 0 auto;
+  color: var(--ds-purple);
+}
+
 .shimmer-text {
   background: linear-gradient(
     90deg,

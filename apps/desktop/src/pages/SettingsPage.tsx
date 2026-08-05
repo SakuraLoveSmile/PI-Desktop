@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import type {
   AppSettings,
   AgentInstructionFile,
+  CommandShellCatalog,
+  CommandShellId,
   GlobalPermissionMode,
   ShortcutPlatform,
 } from "@pi-desktop/shared";
@@ -95,6 +97,148 @@ function SettingsCard({
       {title ? <h3 className="settings-card-heading">{title}</h3> : null}
       <div className="settings-panel">{children}</div>
     </section>
+  );
+}
+
+function CommandShellRow({
+  settings,
+  saveSettings,
+}: {
+  settings: AppSettings;
+  saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [catalog, setCatalog] = useState<CommandShellCatalog | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [selectedOverride, setSelectedOverride] =
+    useState<CommandShellId | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .listCommandShells()
+      .then((next) => {
+        if (cancelled) return;
+        setCatalog(next);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedId =
+    selectedOverride ??
+    catalog?.configuredId ??
+    catalog?.effective?.id ??
+    settings.defaultCommandShell ??
+    "";
+  const configuredChoice = catalog?.choices.find(
+    (choice) => choice.id === catalog.configuredId,
+  );
+  const effectiveChoice = catalog?.effective;
+
+  let effectiveStatus: string | null = null;
+  if (catalog && !effectiveChoice && catalog.choices.length > 0) {
+    effectiveStatus = t("settings.commandShellNoEffective");
+  } else if (catalog && effectiveChoice) {
+    if (!catalog.configuredId) {
+      effectiveStatus = t("settings.commandShellDefault", {
+        shell: effectiveChoice.label,
+      });
+    } else if (
+      catalog.fallback ||
+      catalog.configuredId !== effectiveChoice.id ||
+      configuredChoice?.available === false
+    ) {
+      effectiveStatus = t("settings.commandShellFallback", {
+        shell: effectiveChoice.label,
+      });
+    } else {
+      effectiveStatus = t("settings.commandShellConfigured", {
+        shell: configuredChoice?.label ?? effectiveChoice.label,
+      });
+    }
+  }
+
+  const onChange = async (value: string) => {
+    if (!catalog || saving) return;
+    const choice = catalog.choices.find((candidate) => candidate.id === value);
+    if (!choice || !choice.available) return;
+    setSaving(true);
+    setSaveError(false);
+    setSelectedOverride(choice.id);
+    try {
+      await saveSettings({ defaultCommandShell: choice.id });
+      setCatalog((current) =>
+        current
+          ? {
+              ...current,
+              configuredId: choice.id,
+              effective: choice,
+              fallback: false,
+            }
+          : current,
+      );
+    } catch {
+      setSelectedOverride(null);
+      setSaveError(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <SettingsRow
+      title={t("settings.commandShell")}
+      description={t("settings.commandShellDesc")}
+    >
+      <div
+        className="settings-command-shell-control"
+        aria-busy={saving || (!catalog && !loadError)}
+      >
+        {!catalog ? (
+          <span className="settings-command-shell-state" role="status">
+            {loadError
+              ? t("settings.commandShellLoadError")
+              : t("settings.commandShellLoading")}
+          </span>
+        ) : catalog.choices.length === 0 ? (
+          <span className="settings-command-shell-state" role="status">
+            {t("settings.commandShellNoChoices")}
+          </span>
+        ) : (
+          <Select
+            className="settings-command-shell-select"
+            value={selectedId}
+            disabled={saving}
+            aria-label={t("settings.commandShell")}
+            onChange={(event) => void onChange(event.target.value)}
+          >
+            {catalog.choices.map((choice) => (
+              <option key={choice.id} value={choice.id} disabled={!choice.available}>
+                {choice.label}
+                {!choice.available
+                  ? ` - ${t("settings.commandShellUnavailable")}`
+                  : ""}
+              </option>
+            ))}
+          </Select>
+        )}
+        {effectiveStatus ? (
+          <span className="settings-command-shell-status">{effectiveStatus}</span>
+        ) : null}
+        {saveError ? (
+          <span className="settings-command-shell-state error" role="status">
+            {t("settings.commandShellSaveError")}
+          </span>
+        ) : null}
+      </div>
+    </SettingsRow>
   );
 }
 
@@ -619,7 +763,9 @@ export function SettingsPage() {
 
   const saveSettings = async (patch: Partial<AppSettings>) => {
     if (!settings) return;
-    await api.setSettings({ ...settings, ...patch });
+    const nextSettings = { ...settings, ...patch };
+    await api.setSettings(nextSettings);
+    useAppStore.setState({ settings: nextSettings });
     await refreshProviders();
   };
   const contextCompaction = {
@@ -928,6 +1074,32 @@ export function SettingsPage() {
               </SettingsCard>
 
               <SettingsCard title={t("settings.defaultsTitle")}>
+                <SettingsRow title={t("settings.mode")} description={t("settings.modeDesc")}>
+                  <div
+                    className="settings-segment"
+                    role="group"
+                    aria-label={t("settings.mode")}
+                  >
+                    {([
+                      ["agent", "settings.modeAgent"],
+                      ["plan", "settings.modePlan"],
+                    ] as const).map(([value, labelKey]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={cx(
+                          "settings-segment-item",
+                          settings.defaultMode === value && "active",
+                        )}
+                        aria-pressed={settings.defaultMode === value}
+                        onClick={() => void saveSettings({ defaultMode: value })}
+                      >
+                        {t(labelKey)}
+                      </button>
+                    ))}
+                  </div>
+                </SettingsRow>
+                <CommandShellRow settings={settings} saveSettings={saveSettings} />
                 <SettingsRow
                   title={t("settings.enterToSend")}
                   description={t("settings.enterToSendDesc")}

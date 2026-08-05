@@ -3,7 +3,10 @@ import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { PROTOCOL_VERSION } from "@pi-desktop/shared";
+import { PROTOCOL_VERSION, rpcTimeoutMs } from "@pi-desktop/shared";
+
+const HOST_DISPOSE_GRACE_MS = 3_000;
+const HOST_FORCE_KILL_GRACE_MS = 1_000;
 
 export type HostNotificationHandler = (method: string, params: unknown) => void;
 export type ProcessExitHandler = (info: {
@@ -37,16 +40,30 @@ export class HostProcess {
   private child: ChildProcessWithoutNullStreams;
   private pending = new Map<
     string,
-    { resolve: (v: any) => void; reject: (e: Error) => void }
+    {
+      resolve: (v: any) => void;
+      reject: (e: Error) => void;
+      timer?: ReturnType<typeof setTimeout>;
+    }
   >();
   private handlers = new Set<HostNotificationHandler>();
   private exitHandlers = new Set<ProcessExitHandler>();
   private disposed = false;
   private available = true;
+  private closed = false;
+  private exitNotified = false;
+  private exitObserved = false;
+  private exitPromise: Promise<void>;
+  private resolveExit!: () => void;
+  private disposePromise?: Promise<void>;
+  private readline?: ReturnType<typeof createInterface>;
   readonly binaryPath: string;
   readonly generation = randomUUID();
 
   constructor(dataDir: string, onStderr?: StderrHandler) {
+    this.exitPromise = new Promise<void>((resolve) => {
+      this.resolveExit = resolve;
+    });
     this.binaryPath = resolveHostBinary();
     this.child = spawn(this.binaryPath, [], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -65,23 +82,71 @@ export class HostProcess {
 
     this.child.on("exit", (code, signal) => {
       this.available = false;
-      this.rejectAllPending(this.unavailableError("host-core exited"));
-      for (const h of this.exitHandlers) {
-        h({ code, signal, intentional: this.disposed });
-      }
+      this.closeTransport(this.unavailableError("host-core exited"));
+      this.exitObserved = true;
+      this.resolveExit();
+      this.notifyExit({ code, signal, intentional: this.disposed });
+      this.cleanupProcessListeners();
     });
     this.child.on("error", (error) => {
       this.available = false;
-      this.rejectAllPending(this.unavailableError(`host-core process error: ${error.message}`));
+      const failure = this.unavailableError(
+        `host-core process error: ${error.message}`,
+      );
+      this.closeTransport(failure);
+      this.notifyExit({ code: null, signal: null, intentional: this.disposed });
     });
 
     const rl = createInterface({ input: this.child.stdout });
+    this.readline = rl;
     rl.on("line", (line) => this.onLine(line));
   }
 
-  private rejectAllPending(error: Error) {
-    for (const [, p] of this.pending) p.reject(error);
+  private closeTransport(error: Error) {
+    if (this.closed) return;
+    this.available = false;
+    this.closed = true;
+    for (const [, p] of this.pending) {
+      if (p.timer) clearTimeout(p.timer);
+      p.reject(error);
+    }
     this.pending.clear();
+    this.handlers.clear();
+    this.readline?.close();
+    this.readline = undefined;
+  }
+
+  private cleanupProcessListeners() {
+    this.child.removeAllListeners("exit");
+    this.child.removeAllListeners("error");
+    this.child.stderr.removeAllListeners("data");
+  }
+
+  private waitForExit(timeoutMs: number): Promise<boolean> {
+    if (this.exitObserved) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (observed: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        resolve(observed);
+      };
+      const timer = setTimeout(() => finish(false), timeoutMs);
+      timer.unref?.();
+      this.exitPromise.then(() => finish(true));
+    });
+  }
+
+  private notifyExit(info: {
+    code: number | null;
+    signal: NodeJS.Signals | null;
+    intentional: boolean;
+  }) {
+    if (this.exitNotified) return;
+    this.exitNotified = true;
+    for (const h of this.exitHandlers) h(info);
+    this.exitHandlers.clear();
   }
 
   private unavailableError(message: string): Error & { errorCode: string } {
@@ -89,10 +154,16 @@ export class HostProcess {
   }
 
   isAvailable(): boolean {
-    return this.available && this.child.exitCode === null && !this.child.killed;
+    return (
+      this.available &&
+      !this.closed &&
+      this.child.exitCode === null &&
+      !this.child.killed
+    );
   }
 
   onExit(handler: ProcessExitHandler): () => void {
+    if (this.closed) return () => undefined;
     this.exitHandlers.add(handler);
     return () => this.exitHandlers.delete(handler);
   }
@@ -109,6 +180,7 @@ export class HostProcess {
       const pending = this.pending.get(String(msg.id));
       if (pending) {
         this.pending.delete(String(msg.id));
+        if (pending.timer) clearTimeout(pending.timer);
         if (msg.error) {
           const err = new Error(msg.error.message) as Error & {
             code?: number;
@@ -129,6 +201,7 @@ export class HostProcess {
   }
 
   onNotification(handler: HostNotificationHandler): () => void {
+    if (this.closed) return () => undefined;
     this.handlers.add(handler);
     return () => this.handlers.delete(handler);
   }
@@ -136,50 +209,56 @@ export class HostProcess {
   async call<T = unknown>(
     method: string,
     params: unknown = {},
-    timeoutMs = 130_000,
+    timeoutOverrideMs?: number,
   ): Promise<T> {
+    if (this.closed) throw new Error("host-core is unavailable");
     if (!this.isAvailable()) {
       throw this.unavailableError(`host RPC unavailable: ${method}`);
     }
     const id = randomUUID();
+    const timeoutMs = timeoutOverrideMs ?? rpcTimeoutMs(method, params);
     const payload = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
     return new Promise<T>((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let settled = false;
+      const settle = (finish: () => void) => {
+        if (settled) return;
+        settled = true;
+        this.pending.delete(id);
+        if (timer) clearTimeout(timer);
+        finish();
+      };
+      this.pending.set(id, {
+        resolve: (value) => settle(() => resolve(value)),
+        reject: (error) => settle(() => reject(error)),
+      });
       if (!this.isAvailable()) {
-        reject(this.unavailableError(`host RPC unavailable: ${method}`));
+        settle(() => reject(this.unavailableError(`host RPC unavailable: ${method}`)));
         return;
       }
-      const timeout = setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
-          reject(new Error(`host RPC timeout: ${method}`));
-        }
-      }, timeoutMs);
-      this.pending.set(id, {
-        resolve: (value) => {
-          clearTimeout(timeout);
-          resolve(value);
-        },
-        reject: (error) => {
-          clearTimeout(timeout);
-          reject(error);
-        },
-      });
+      if (timeoutMs !== undefined) {
+        timer = setTimeout(
+          () => settle(() => reject(new Error(`host RPC timeout: ${method}`))),
+          timeoutMs,
+        );
+      }
       try {
-        this.child.stdin.write(payload, (err) => {
-          if (err) {
-            this.pending.delete(id);
-            clearTimeout(timeout);
-            reject(this.unavailableError(`host RPC write failed: ${err.message}`));
-          }
+        this.child.stdin.write(payload, (error) => {
+          if (!error) return;
+          const failure = this.unavailableError(
+            `host RPC write failed: ${error.message}`,
+          );
+          settle(() => reject(failure));
+          this.closeTransport(failure);
+          this.notifyExit({ code: null, signal: null, intentional: this.disposed });
         });
       } catch (error) {
-        this.pending.delete(id);
-        clearTimeout(timeout);
-        reject(
-          this.unavailableError(
-            `host RPC write failed: ${error instanceof Error ? error.message : String(error)}`,
-          ),
+        const failure = this.unavailableError(
+          `host RPC write failed: ${error instanceof Error ? error.message : String(error)}`,
         );
+        settle(() => reject(failure));
+        this.closeTransport(failure);
+        this.notifyExit({ code: null, signal: null, intentional: this.disposed });
       }
     });
   }
@@ -189,11 +268,30 @@ export class HostProcess {
   }
 
   async dispose(): Promise<void> {
+    if (this.disposePromise) return this.disposePromise;
+    this.disposePromise = this.disposeInternal();
+    return this.disposePromise;
+  }
+
+  private async disposeInternal(): Promise<void> {
     this.disposed = true;
     this.available = false;
-    this.rejectAllPending(this.unavailableError("host-core disposed"));
-    if (!this.child.killed && this.child.exitCode === null) {
-      this.child.kill();
+    // EOF is the graceful host-core shutdown signal. Send it before rejecting
+    // transport callers so the runner can clean up active tools first.
+    if (!this.child.stdin.destroyed && !this.child.stdin.writableEnded) {
+      this.child.stdin.end();
     }
+    this.closeTransport(new Error("host-core disposed"));
+    if (this.exitObserved) return;
+
+    const exited = await this.waitForExit(HOST_DISPOSE_GRACE_MS);
+    if (exited || this.exitObserved) return;
+
+    try {
+      this.child.kill("SIGKILL");
+    } catch {
+      // The child may have exited between the grace check and kill fallback.
+    }
+    await this.waitForExit(HOST_FORCE_KILL_GRACE_MS);
   }
 }

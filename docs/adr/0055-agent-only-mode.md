@@ -1,7 +1,15 @@
-# ADR 0052: Agent-only mode; Chat becomes an internal read-only profile
+# ADR 0055: Agent-only mode; Chat becomes an internal read-only profile
 
-- Status: Accepted
+- Status: Superseded by ADR 0052 / ADR 0053
 - Date: 2026-08-05
+
+> Superseded. The mode concept this ADR removed returned as the Plan
+> operating state (ADR 0052, superseded in turn by ADR 0053), so the product
+> again exposes an `Agent | Plan` selector and `chat` migrates to `plan`, not
+> `agent`. Retained because the reasoning about a negative permission gate and
+> about failing closed on an unknown `mode` value still holds, and because it
+> records why the toggle was removed before it was reintroduced with a
+> different contract.
 
 ## Context
 
@@ -114,4 +122,6 @@ discard the user's sessions to fix one column value in them.
 - `docs/spec/03-runtime/04-data-storage.md`
 - `docs/spec/03-runtime/08-error-codes.md`
 - `docs/spec/06-delivery/04-e2e-test-plan.md` (E2E-018, E2E-088)
-- Decision D188; amends D003, D004, D115
+- Decision D191; amended D003, D004, D115; superseded by D188 / D189
+- [ADR 0052](0052-plan-operating-state-and-approval-boundary.md),
+  [ADR 0053](0053-plan-checkpoint-artifact-and-execution-epoch.md)

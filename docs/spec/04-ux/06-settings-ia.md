@@ -38,14 +38,21 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     Auto card shows the detected language inline (e.g. "当前：简体中文")
   - native select triggers and their opened option lists use the active theme's
     readable foreground/background pairing on macOS, Windows, and Linux
-- **Defaults** card retains the host-backed Enter-to-send control. The default
-  mode control is gone: Agent is the only mode (D188).
+- **Defaults** card retains the host-backed default mode and Enter-to-send
+  controls.
 - File-open target, menu-bar behavior, and bottom-panel behavior are not
   rendered until their host-backed settings schemas and runtime effects exist.
 
 ### 全局 AI (`ai` tab)
 - **Permissions** card: the global permission-mode control
   (ask / accept-edits / auto) that governs how autonomously the agent acts.
+- **Command shell** card: the host-discovered catalog of native PowerShell,
+  cmd, Git Bash, and Bash with IDs `windows-powershell`, `cmd`, `git-bash`, and
+  `bash` where supported. The selected `defaultCommandShell` persists across
+  restart; writes reject unavailable or wrong-platform IDs. If a persisted
+  choice later becomes unavailable, the first available platform shell is used
+  and the fallback state is shown. A Bash turn verifies its pinned ID/dialect
+  before execution.
 - **Context management** card:
   - automatic compaction is enabled by default
   - the switch controls per-`turn_end` soft guidance, deterministic threshold
@@ -75,6 +82,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ### Model configuration (`agent` tab)
 - **Studio hero**: provider count, ready count, and current default provider/model summary
 - **Defaults** card:
+  - default operating mode via segmented control (Agent / Plan), with Agent
+    selected for new sessions and new scheduled tasks
+  - persisted legacy `Chat` default values are displayed and stored as Plan
   - default model id
   - Enter to send as a switch (local preference; not on Codex General gold)
 - **Providers** studio:
@@ -86,6 +96,12 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     not editable here
   - empty state with primary add action
   - API keys are never shown raw after save
+
+The permission-mode selector remains available in the composer while the
+session is in either Agent or Plan. In Plan it controls Bash confirmation only:
+Ask and Accept edits prompt, while Auto may run a mutating Bash command without
+confirmation. The Defaults card must describe that Plan is planning intent,
+not a strict read-only security profile.
 
 ### Import
 - Scan supported local agent stores and review candidates through
@@ -197,7 +213,11 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     across restart, and disabling it closes an open console
 18. Context management defaults to automatic protection, persists all three
     settings, and cannot configure a retained tail that prevents compaction on
-    a small-window model because runtime limits remain model-aware
+     a small-window model because runtime limits remain model-aware
+19. The default operating-mode selector contains only Agent and Plan; legacy
+    Chat values migrate to Plan and do not reappear as a selectable option
+20. Command shell selection persists a platform-valid catalog ID, exposes
+    unavailable/fallback status, and never authorizes a stale ID/dialect
 
 ## 5. Basics chrome metrics
 

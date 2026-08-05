@@ -18,7 +18,7 @@ PI-Desktop.app
 |---|---|
 | Electron Main | window lifecycle, IPC fan-in/out, child process supervision, fixed-feed app update lifecycle |
 | Renderer | UI only |
-| Rust host-core | DB, tools, permissions, plugin host services, secrets adapters |
+| Rust host-core | DB, tools, permissions, immutable Plan artifacts/`plan_approvals` execution fields, shell catalog, plugin host services, secrets adapters |
 | Node pi sidecar | pi agent loop, provider streaming, tool-call planning |
 
 ## 3. Boot order
@@ -32,15 +32,19 @@ PI-Desktop.app
 7. Create main window / renderer
 8. Renderer performs `app/getVersion` healthcheck through main
 
-If step 3–4 fails: block app with recovery message.
+If step 3–4 fails: block app with recovery message. Before a successful host
+boot serves RPC, host-core transactionally marks prior pending approvals and
+queued/running `plan_approvals` execution states interrupted and aborts their
+running turns. This internal process-epoch fence is not serialized or sent over
+the protocol.
 
 ## 4. Crash policy
 
 | Crash | Policy |
 |---|---|
-| Renderer crash | reload window, keep host/agent processes |
-| Rust host crash | mark app degraded, attempt restart host, fail open sessions gracefully |
-| Node agent crash | abort active turns, restart sidecar, preserve DB state in Rust |
+| Renderer crash | reload window, keep host/agent processes; same-host reload restores only live pending Plan approvals and their deadlines, not terminal Plan cards |
+| Rust host crash | mark app degraded, interrupt pending/queued/running Plan work, keep pending sessions in Plan and already-approved sessions in Agent, attempt restart host, and fail active sessions closed |
+| Node agent crash | abort active turns and live Plan waiters/queue entries, keep pending sessions in Plan, preserve already-approved Agent mode in Rust, restart sidecar, and never replay an execution |
 | Electron main crash | full app exit |
 
 Supervision parameters (implemented in Electron main):
@@ -68,12 +72,13 @@ Supervision parameters (implemented in Electron main):
 
 1. Reject new prompts
 2. Abort active turns
-3. Unload plugins
-4. Stop Node agent sidecar
-5. Flush/close Rust host DB
-6. Stop Rust host
-7. Dispose update polling
-8. Close windows / exit
+3. Interrupt pending/queued/running Plan work and reject late responses
+4. Unload plugins
+5. Stop Node agent sidecar
+6. Flush/close Rust host DB
+7. Stop Rust host
+8. Dispose update polling
+9. Close windows / exit
 
 `updates/install` invokes Electron's quit-and-install path only after an update
 reaches `downloaded`. Electron still emits `before-quit`, so the normal
@@ -113,3 +118,8 @@ sidecar/host shutdown sequence runs before the updater replaces the app.
 3. Agent crash does not corrupt SQLite
 4. A host crash does not create a persistence error storm or replay a completed
    message twice.
+5. Host/sidecar crash never turns pending Plan approval into Agent execution;
+   restart recovery leaves it interrupted and the durable session in Plan
+6. A queued/running execution that was already approved is interrupted without
+   replay and its durable session remains Agent
+7. Bash timeout/abort shuts down the complete child process tree

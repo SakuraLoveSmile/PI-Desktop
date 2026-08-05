@@ -1,9 +1,10 @@
 export * from "./protocol.js";
 export * from "./errors.js";
 export * from "./types.js";
+export * from "./keyboard-shortcuts.js";
 export * from "./changelog.js";
 export * from "./composer-trigger.js";
 export * from "./fuzzy.js";
-export * from "./keyboard-shortcuts.js";
 export * from "./thinking-levels.js";
-
+export * from "./command-shells.js";
+export * from "./rpc-timeouts.js";

@@ -8,7 +8,7 @@ import { useAppStore } from "../stores/app-store";
 import type { ToolBlock, ToolChip } from "../lib/tool-presentation";
 
 /*
- * Renderer for the structured tool presentation (D189). Blocks arrive with a
+ * Renderer for the structured tool presentation (D192). Blocks arrive with a
  * semantic role; this layer owns the translated headings, the copy affordance
  * and the click-to-preview wiring. Shared by the transcript tool row and the
  * inline permission card so both read the same way.

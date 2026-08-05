@@ -1,9 +1,10 @@
-# 04. Data Storage (Schema v7)
+# 04. Data Storage (Schema v10)
 
 ## 0. Ownership decision
 
 **Rust host-core owns SQLite exclusively (D002), and the transcript file
-store with it (D119).**
+store with it (D119). Plan artifacts and queue records are also host-owned
+(D189); shell defaults are host settings (D190).**
 
 - Node pi sidecar does not open the DB or transcript files directly
 - Electron main does not write DB or transcript files directly
@@ -14,7 +15,8 @@ store with it (D119).**
 
 ## 1. Goals
 
-Local-first, recoverable after restart, sensitive data isolated — plus, for v7:
+Local-first, recoverable after restart, sensitive data isolated — plus, for
+schema v7, v8, and v10:
 
 1. **Lossless transcripts** — store the runtime message shape (content blocks),
    not the UI projection; UI shapes are derived at the RPC boundary.
@@ -27,6 +29,9 @@ Local-first, recoverable after restart, sensitive data isolated — plus, for v7
 4. **Extensible without migrations** where cheap (block vocabulary, JSONL line
    types, kv namespaces, `config_json` columns), **with migrations** where
    structural (new entities), versioned by `PRAGMA user_version`.
+5. **Plan checkpoints are immutable host artifacts** with recorded path,
+   hash, and size; the existing approval row also carries execution fields.
+   Startup interruption is the process-epoch fence and no work is replayed.
 
 ## 2. File layout
 
@@ -34,6 +39,8 @@ Local-first, recoverable after restart, sensitive data isolated — plus, for v7
 ~/.pi-desktop/
  ├── pi.sqlite            # index database (WAL: + -wal/-shm) — host-core only
  ├── pi.sqlite.v6.bak     # archived pre-v7 database (D119 breaking reset)
+ ├── pi.sqlite.v8.bak     # exact readable backup before v8→v10 destructive work
+ ├── pi.sqlite.v9.bak     # exact readable backup before v9→v10 destructive work
  ├── sessions/            # transcript file store (D119) — host-core only
  │    ├── <sessionId>.jsonl           # live transcript (header + messages)
  │    └── <sessionId>.revisions.jsonl # regenerate branches, append-only
@@ -134,13 +141,17 @@ PRAGMA trusted_schema = ON;       -- required by the FTS triggers (§4.8); the D
 PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
 ```
 
-- Schema version lives in `PRAGMA user_version` (v7 = `7`). The v1 `meta`
+- Schema version lives in `PRAGMA user_version` (v10 = `10`). The v1 `meta`
   table is gone.
 - host-core is the **single writer**; statements use `prepare_cached`; every
   multi-row write runs in one transaction.
-- Boot sweep: `UPDATE turns SET status='aborted', ended_at=:now WHERE
-  status='running'` (crash recovery), then `PRAGMA incremental_vacuum` and
-  audit retention pruning (§9).
+- Boot maintenance runs before RPC service: one transaction marks every
+  `plan_approvals` row with `status='pending'` as `interrupted` and every row
+  with `execution_state IN ('queued', 'running')` as `interrupted`; it also
+  aborts running turns and appends the recovery audit records. No process epoch
+  is serialized. An already-approved queued/running Plan interruption leaves
+  `sessions.mode = 'agent'`. The transaction then proceeds to the normal
+  `PRAGMA incremental_vacuum` and audit retention pruning (§9).
 
 ## 4. Schema
 
@@ -298,7 +309,7 @@ CREATE TABLE sessions (
   project_id  INTEGER REFERENCES projects(id) ON DELETE SET NULL,
   provider_id TEXT,                            -- loose ref, see below
   model_id    TEXT,
-  mode        TEXT NOT NULL DEFAULT 'agent',   -- agent | read-only (D188)
+  mode        TEXT NOT NULL DEFAULT 'agent',   -- plan | agent
   thinking_level TEXT NOT NULL DEFAULT 'off'
                 CHECK (thinking_level IN ('off', 'minimal', 'low', 'medium',
                                           'high', 'xhigh', 'max')),
@@ -341,6 +352,18 @@ CREATE INDEX idx_sessions_project ON sessions(project_id) WHERE project_id IS NO
   row while retaining the exact `project_id`, provider/model, mode, thinking,
   and permission configuration. No parent/child column is stored: the result
   is an independent session, not a durable navigation tree.
+- `mode` is the authoritative operating mode. `plan` means the same pi Agent
+  is in planning state; it never selects another runtime. A live `pending` row
+  in `plan_approvals` projects `awaiting_approval`; `execution_state` values
+  `queued`/`running` project post-approval execution. Otherwise a Plan session is `planning` when its
+  Agent is active or ready for planning. Terminal approval rows are historical
+  durable records, not renderer gates; reject, expiry, or pending interruption
+  returns live planning to editable state. The renderer may retain the latest
+  proposal/execution snapshot per session only for its current lifetime from
+  live Host events; `plans.pending` rehydrates only pending rows.
+- New sessions default to `agent`. Imported legacy `chat` values are normalized
+  to `plan`; forked sessions copy the durable mode but never copy pending,
+  queued, or running Plan rows.
 - A message-scoped fork copies only the canonical prefix through the selected
   message. Assistant Edit uses that child and records the original/edited
   response tails in the child's existing `message_revisions` store; the source
@@ -367,6 +390,80 @@ CREATE TABLE turns (
 );
 CREATE INDEX idx_turns_session ON turns(session_id, started_at DESC);
 ```
+
+### 4.6a plan_approvals — immutable checkpoint and execution fields (schema v10)
+
+The host writes each submitted Markdown snapshot to a new unique file under
+`<workspaceRoot>/.pi/plan/`. The existing `plan_approvals` row stores the
+structured title/question, artifact metadata, and post-approval execution
+descriptor. The file path is relative to the session workspace and always has
+the form `.pi/plan/<unique-name>.md`.
+
+```sql
+CREATE TABLE plan_approvals (
+  request_id               TEXT PRIMARY KEY,
+  session_id               TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  turn_id                  TEXT NOT NULL,
+  tool_call_id             TEXT NOT NULL UNIQUE,
+  plan_json                TEXT NOT NULL, -- exact submitted Markdown snapshot
+  title                    TEXT NOT NULL DEFAULT '',
+  question                 TEXT NOT NULL DEFAULT '',
+  status                   TEXT NOT NULL CHECK (status IN (
+    'pending', 'approved', 'changes_requested', 'rejected',
+    'expired', 'interrupted'
+  )),
+  action                   TEXT CHECK (action IN ('approve', 'request_changes', 'reject')),
+  target_permission_mode  TEXT CHECK (target_permission_mode IN ('ask', 'accept-edits', 'auto')),
+  feedback                 TEXT,
+  created_at               INTEGER NOT NULL,
+  updated_at               INTEGER NOT NULL,
+  expires_at               INTEGER,
+  resolved_at              INTEGER,
+  error_code               TEXT,
+  artifact_relative_path   TEXT,
+  artifact_sha256          TEXT,
+  artifact_size_bytes      INTEGER,
+  version                  INTEGER NOT NULL DEFAULT 1,
+  execution_id             TEXT UNIQUE,
+  execution_state          TEXT CHECK (execution_state IN (
+    'queued', 'running', 'completed', 'interrupted'
+  ))
+);
+CREATE INDEX idx_plan_approvals_session
+  ON plan_approvals(session_id, created_at DESC);
+CREATE INDEX idx_plan_approvals_pending
+  ON plan_approvals(status, created_at DESC);
+CREATE UNIQUE INDEX idx_plan_approvals_one_pending_session
+  ON plan_approvals(session_id) WHERE status = 'pending';
+CREATE INDEX idx_plan_approvals_execution_queue
+  ON plan_approvals(execution_state, created_at DESC)
+  WHERE execution_state IN ('queued', 'running');
+CREATE INDEX idx_plan_approvals_execution_id
+  ON plan_approvals(execution_id) WHERE execution_id IS NOT NULL;
+```
+
+`plan_json` is the exact Markdown snapshot kept for the approval/execution
+record; it is not a canonical wrapper. `title` and `question` are separate
+structured fields. Each artifact file is immutable and unique, so a later
+Plan turn creates a new complete snapshot/approval row and never replaces an
+earlier file. Hash and byte size authenticate the file before approval, but the
+approval UI may simply open the relative path.
+
+Approval changes `status` to `approved`, sets `execution_id` and
+`execution_state = 'queued'`, updates `sessions.mode` to `agent`, and stores
+the explicit permission mode in one transaction. Reject/expiry leave the
+session in Plan and close the active gate; a later prompt can create a new
+pending row. The new protocol has no request-changes action; compatibility
+columns remain for older records.
+
+At startup, before serving RPC, one transaction changes every `pending` row to
+`interrupted` and every `queued` or `running` execution state to `interrupted`.
+The associated running turn is aborted. There is no serialized process-epoch
+column and no replay. A pending interruption leaves the session Plan, while an
+already-approved queued/running interruption leaves it Agent. Renderer reload
+within the same host can list the pending row and its original `expires_at`;
+`plans.pending` returns no terminal rows, so rejected, expired, approved,
+completed, and interrupted cards are not rehydrated.
 
 Serves: mid-session model switches ("next turn only", spec 13 §4), the
 per-message cost chip's session rollup (benchmark §3.2), failed/aborted badges
@@ -536,7 +633,7 @@ CREATE TABLE scheduled_tasks (
   cadence     TEXT NOT NULL DEFAULT 'manual',  -- manual | hourly | daily | weekly
   enabled     INTEGER NOT NULL DEFAULT 1,
   project_id  INTEGER REFERENCES projects(id) ON DELETE SET NULL,
-  config_json TEXT NOT NULL DEFAULT '{}',      -- future: cron expr, model override, notify policy
+  config_json TEXT NOT NULL DEFAULT '{}',      -- mode, cron expr, model override, notify policy
   last_run_at INTEGER,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
@@ -556,6 +653,18 @@ CREATE INDEX idx_task_runs ON task_runs(task_id, started_at DESC);
 
 A run that spawns a session gets its transcript for free via `session_id`.
 Finer schedules (cron) land in `config_json` without a migration.
+
+Scheduled task `config_json.mode` is a durable operating-mode value. There is
+intentionally no physical `scheduled_tasks.mode` column. The v7→v8
+and v9→v10 migration paths map legacy `chat` values to `plan`; new scheduled
+tasks default to `agent`, and create/update/import normalize the same values.
+The top-level wire `ScheduledTask.mode` is only a normalized projection of this
+JSON value.
+A scheduled or unattended run whose mode is Plan is explicitly rejected before
+provider work, `.pi/plan/*.md` creation, approval, or queue insertion with
+`PLAN_REQUIRES_INTERACTIVE_SESSION`. It cannot display an approval card or
+auto-approve a plan in the background. The user must explicitly switch the
+task/session to Agent before an unattended run can execute.
 
 ### 4.12 secrets_meta
 
@@ -663,6 +772,8 @@ is the source of truth, the index is derived and self-healing.
 | context checkpoint (`session.appendCompaction`) | append typed checkpoint line after its referenced message boundary | — (checkpoint is not searchable transcript content) |
 | tool succeeded (Write/Edit) | — | upsert `artifacts` + `audit_log` row, same tx as result persistence |
 | turn terminal via `session.endTurn` | — | update `turns`; for completed/error insert one notification and prune to 200 in the same tx; aborted inserts none |
+| plan submission | host writes the exact Markdown bytes to a new unique `<workspaceRoot>/.pi/plan/*.md` file | insert one `plan_approvals(pending)` row with structured title/question, artifact path/hash/size, and expiry before emitting the approval request |
+| plan approval | verify the immutable artifact path/hash/size | atomically resolve `plan_approvals`, update `sessions.mode` and explicit `permission_mode`, and set `execution_state = 'queued'`; reject/expiry stay in Plan |
 | transcript truncate / edit (`session.replaceMessages`) | atomic transcript rewrite (temp + rename); preserve only a checkpoint whose boundary remains | single tx: delete index rows, bulk reinsert, reset `last_seq` |
 | session fork (`session.fork`) | write a new transcript with remapped message/tool-call ids; copy/remap the checkpoint only when its boundary is included | single tx: clone session configuration, insert child index rows, set `last_seq`; remove child file on failure |
 | regenerate branch save | append revision line | index row with `message_count` (+ `is_active` flip) |
@@ -700,7 +811,7 @@ next rewrite; transcript reads dedupe repeated ids keep-last.
 - JSON columns are read blind on hot paths (shipped to the renderer as-is);
   anything filtered or summed is a promoted column by rule.
 
-## 7. Versioning & the v7 breaking reset
+## 7. Versioning, v7 reset, and v8-to-v10 Plan migration
 
 - `PRAGMA user_version` stays the schema authority; future structural changes
   add ordered Rust migration fns again, each in one transaction, with a
@@ -711,7 +822,42 @@ next rewrite; transcript reads dedupe repeated ids keep-last.
   Sessions, providers, and settings from the old file are not carried over;
   the archive remains for manual recovery. All pre-v7 migration code
   (v1 `settings.sqlite` import, v2→v6 chain) is deleted.
-- Fresh installs run the full v7 DDL directly.
+- Fresh installs run the full v10 DDL directly.
+- **Schema v7 first reaches v8, then uses the guarded path.** The v7→v8
+  migration is followed by the same guarded v8→v10 migration; a schema-v9
+  database takes the same guarded path and receives an exact readable
+  `pi.sqlite.v9.bak` before destructive work.
+- **v8-to-v10 is an in-place transactional migration.** Before migration,
+  host-core checkpoints the WAL, then creates the exact readable
+  `pi.sqlite.v8.bak`; both happen before destructive work. Within one atomic
+  transaction it:
+  1. validates every `sessions.mode` value and maps `chat` to `plan`;
+  2. parses the structured app settings value and maps its top-level
+     `defaultMode: "chat"` to `"plan"`;
+  3. parses each scheduled task's `config_json` and maps its top-level stored
+     `mode: "chat"` to `"plan"`, leaving nested extension modes untouched;
+  4. preserves/migrates the existing `plan_approvals` table and adds its
+     artifact and execution fields/indexes;
+  5. preserves transcripts, turns, revisions, projects, permissions, grants,
+     providers, and scheduled task history;
+  6. validates all new mode values as `plan | agent`; and
+  7. validates `defaultCommandShell` as a known current-platform catalog ID,
+     retaining a valid ID that is temporarily unavailable so normal runtime
+     fallback can select the first available shell; and
+  8. sets `PRAGMA user_version = 10` only after every change succeeds.
+  A malformed app-settings value, malformed scheduled-task `config_json`,
+  invalid session or top-level scheduled mode, unknown or wrong-platform
+  `defaultCommandShell`, parse, constraint, or write failure fails closed,
+  rolls back the transaction, and leaves schema v8 authoritative; the backup
+  remains available for recovery.
+  Legacy `planApprovalPermissionMode` is removed from the app settings JSON
+  during migration; all unrelated settings remain intact.
+- Plan artifacts are never reconstructed from transcript content. On startup,
+  one transaction marks every `pending` approval and every `queued` or
+  `running` execution state in `plan_approvals` as `interrupted`; associated
+  running turns are marked `aborted` before RPC service begins. Pending
+  sessions remain Plan and already-approved queued/running sessions remain
+  Agent. No approval response or execution from before the restart is accepted.
 - The transcript file format carries its own `schema` field in the session
   header line; unknown line types are skipped, so additive file-format growth
   needs no reset.
@@ -729,11 +875,6 @@ next rewrite; transcript reads dedupe repeated ids keep-last.
   gone, file present) are preserved, not garbage-collected: the file is the
   source of truth and a future re-index can recover it.
 - logs rotate at the file layer (D082); sessions are never auto-deleted.
-- **D188 value fix-up**: the boot pass rewrites `sessions.mode = 'chat'` to
-  `'agent'` and folds a stored `app.defaultMode` of `chat` into `agent`. This
-  is a data repair inside the existing schema, not a version bump: the UI no
-  longer offers a mode switch, so a session left on the old read-only profile
-  could never be moved back. Idempotent — after the first open nothing matches.
 - Attachment GC (later): sweep `attachments/` for hashes unreferenced by any
   transcript file.
 
@@ -796,3 +937,18 @@ columns for anything the host filters, joins, sums, or indexes.
 15. Notification list/unread, mark-read, mark-all-read, clear, and session
     cascade deletion use the documented indexes/transactions without changing
     turn or transcript data
+16. Schema v7 first reaches v8 and then uses the guarded v8→v10 path. The
+    v8→v10 migration is one atomic transaction with a WAL checkpoint and exact
+    readable `pi.sqlite.v8.bak` before destructive work; schema v9 receives
+    `pi.sqlite.v9.bak`. Persisted session, app-default, and scheduled `chat`
+    values map to `plan`, sessions/transcripts and `plan_approvals` artifact/
+    execution fields survive, and malformed app settings/scheduled config,
+    invalid modes, or invalid default shells fail closed with schema v8 intact
+17. SubmitPlan writes exact Markdown bytes to a unique `.pi/plan/*.md` file
+    with SHA-256 and size; title/question stay structured and renderer reload
+    retains only the pending row and original absolute deadline
+18. Full process restart marks pending/queued/running Plan rows interrupted,
+    aborts associated turns, performs no replay, keeps pending sessions Plan,
+    keeps already-approved interrupted sessions Agent, and rejects stale responses
+19. A scheduled or unattended Plan run fails before provider/artifact/queue work
+    with `PLAN_REQUIRES_INTERACTIVE_SESSION`; no background path auto-approves

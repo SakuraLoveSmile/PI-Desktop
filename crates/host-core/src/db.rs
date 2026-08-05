@@ -1,13 +1,16 @@
 use anyhow::{anyhow, Context, Result};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use serde_json::Value;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-/// Storage schema v7 (docs/spec/03-runtime/04-data-storage.md): SQLite holds
+/// Storage schema v10: SQLite holds
 /// index data only; transcript content lives in per-session JSONL files
 /// (D119, `transcripts.rs`).
-pub const SCHEMA_VERSION: i64 = 7;
+pub const SCHEMA_VERSION: i64 = 10;
+
+/// Absolute approval deadline for a newly submitted Plan proposal.
+pub const PLAN_APPROVAL_TIMEOUT_MS: i64 = 30 * 60 * 1000;
 
 /// Audit rows older than this are pruned at boot.
 const AUDIT_RETENTION_MS: i64 = 90 * 24 * 3600 * 1000;
@@ -15,6 +18,15 @@ const AUDIT_RETENTION_MS: i64 = 90 * 24 * 3600 * 1000;
 const TASK_RUNS_KEEP: i64 = 100;
 /// Durable notification rows kept globally.
 pub const NOTIFICATION_KEEP: i64 = 200;
+
+const OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE: &str = "planApprovalPermissionMode";
+
+fn strip_obsolete_plan_approval_permission_mode(value: &mut Value) -> bool {
+    value
+        .as_object_mut()
+        .and_then(|object| object.remove(OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE))
+        .is_some()
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -166,6 +178,8 @@ CREATE TABLE turns (
   ended_at      INTEGER
 );
 CREATE INDEX idx_turns_session ON turns(session_id, started_at DESC);
+CREATE UNIQUE INDEX idx_turns_one_running_session
+  ON turns(session_id) WHERE status = 'running';
 
 CREATE TABLE notifications (
   id         TEXT PRIMARY KEY,
@@ -278,6 +292,52 @@ CREATE TABLE audit_log (
 );
 CREATE INDEX idx_audit_ts ON audit_log(ts);
 CREATE INDEX idx_audit_session ON audit_log(session_id, ts) WHERE session_id IS NOT NULL;
+
+"#;
+
+/// Approval storage is kept in one batch so fresh databases and migrations
+/// cannot drift in table names, checks, or indexes.
+const PLAN_APPROVALS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS plan_approvals (
+  request_id             TEXT PRIMARY KEY,
+  session_id            TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  turn_id               TEXT NOT NULL,
+  tool_call_id          TEXT NOT NULL UNIQUE,
+  plan_json             TEXT NOT NULL,
+  title                 TEXT NOT NULL DEFAULT '',
+  question              TEXT NOT NULL DEFAULT '',
+  status                TEXT NOT NULL CHECK (status IN (
+    'pending', 'approved', 'changes_requested', 'rejected',
+    'expired', 'interrupted'
+  )),
+  action                TEXT CHECK (action IN ('approve', 'request_changes', 'reject')),
+  target_permission_mode TEXT CHECK (target_permission_mode IN ('ask', 'accept-edits', 'auto')),
+  feedback              TEXT,
+  created_at            INTEGER NOT NULL,
+  updated_at            INTEGER NOT NULL,
+  expires_at            INTEGER,
+  resolved_at           INTEGER,
+  error_code            TEXT,
+  artifact_relative_path TEXT,
+  artifact_sha256       TEXT,
+  artifact_size_bytes   INTEGER,
+  version               INTEGER NOT NULL DEFAULT 1,
+  execution_id          TEXT UNIQUE,
+  execution_state       TEXT CHECK (execution_state IN (
+    'queued', 'running', 'completed', 'interrupted'
+  ))
+);
+CREATE INDEX IF NOT EXISTS idx_plan_approvals_session
+  ON plan_approvals(session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_plan_approvals_pending
+  ON plan_approvals(status, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_plan_approvals_one_pending_session
+  ON plan_approvals(session_id) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_plan_approvals_execution_queue
+  ON plan_approvals(execution_state, created_at DESC)
+  WHERE execution_state IN ('queued', 'running');
+CREATE INDEX IF NOT EXISTS idx_plan_approvals_execution_id
+  ON plan_approvals(execution_id) WHERE execution_id IS NOT NULL;
 "#;
 
 pub struct Database {
@@ -285,6 +345,16 @@ pub struct Database {
     /// App data directory (the sqlite file's parent); transcript files live
     /// under `<data_dir>/sessions/` (D119).
     data_dir: std::path::PathBuf,
+}
+
+struct PlanWorkRow {
+    proposal_id: String,
+    session_id: String,
+    turn_id: String,
+    tool_call_id: String,
+    execution_id: Option<String>,
+    status: String,
+    execution_state: Option<String>,
 }
 
 pub fn now_ms() -> i64 {
@@ -353,8 +423,19 @@ impl Database {
                 conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL;")?;
                 let tx = conn.unchecked_transaction()?;
                 tx.execute_batch(SCHEMA_LATEST)?;
+                tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)?;
                 tx.commit()?;
+            }
+            7 => {
+                migrate_v7_to_v8(&conn)?;
+                migrate_v8_to_v10(&conn, path)?;
+            }
+            8 => {
+                migrate_v8_to_v10(&conn, path)?;
+            }
+            9 => {
+                migrate_v9_to_v10(&conn, path)?;
             }
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
@@ -382,14 +463,104 @@ impl Database {
     /// Crash recovery + retention, run once per process at open.
     fn boot_maintenance(&self) -> Result<()> {
         let now = now_ms();
-        self.conn.execute(
-            "UPDATE turns SET status = 'aborted', ended_at = ?1 WHERE status = 'running'",
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "UPDATE turns
+             SET status = 'aborted', error_code = COALESCE(error_code, 'TURN_ABORTED'),
+                 ended_at = ?1
+             WHERE status = 'running'",
             params![now],
         )?;
-        self.conn.execute(
+        tx.execute(
             "UPDATE task_runs SET status = 'aborted', ended_at = ?1 WHERE status = 'running'",
             params![now],
         )?;
+
+        // No durable Plan work is safe to replay after a host restart. Keep
+        // terminal approved session configuration intact, but interrupt every
+        // pending approval and execution descriptor that could otherwise be
+        // returned as queued to the desktop runner.
+        let plan_work: Vec<PlanWorkRow> = {
+            let mut stmt = tx.prepare_cached(
+                "SELECT request_id, session_id, turn_id, tool_call_id, execution_id,
+                        status, execution_state
+                 FROM plan_approvals
+                 WHERE status = 'pending' OR execution_state IN ('queued', 'running')",
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok(PlanWorkRow {
+                    proposal_id: row.get(0)?,
+                    session_id: row.get(1)?,
+                    turn_id: row.get(2)?,
+                    tool_call_id: row.get(3)?,
+                    execution_id: row.get(4)?,
+                    status: row.get(5)?,
+                    execution_state: row.get(6)?,
+                })
+            })?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        tx.execute(
+            "UPDATE plan_approvals
+             SET status = CASE WHEN status = 'pending' THEN 'interrupted' ELSE status END,
+                 resolved_at = CASE WHEN status = 'pending' THEN ?1 ELSE resolved_at END,
+                 execution_state = CASE
+                   WHEN execution_state IN ('queued', 'running') THEN 'interrupted'
+                   ELSE execution_state
+                 END,
+                 updated_at = ?1,
+                 version = version + 1,
+                 error_code = CASE
+                   WHEN status = 'pending' THEN 'PLAN_APPROVAL_INTERRUPTED'
+                   WHEN execution_state IN ('queued', 'running')
+                     THEN 'PLAN_EXECUTION_INTERRUPTED'
+                   ELSE error_code
+                 END
+             WHERE status = 'pending' OR execution_state IN ('queued', 'running')",
+            params![now],
+        )?;
+        for PlanWorkRow {
+            proposal_id,
+            session_id,
+            turn_id,
+            tool_call_id,
+            execution_id,
+            status,
+            execution_state,
+        } in plan_work
+        {
+            if status == "pending" {
+                crate::audit::append_tx(
+                    &tx,
+                    "plan_approval_interrupted",
+                    Some(&session_id),
+                    serde_json::json!({
+                        "proposalId": proposal_id,
+                        "sessionId": session_id,
+                        "turnId": turn_id,
+                        "toolCallId": tool_call_id,
+                        "status": "interrupted",
+                        "errorCode": "PLAN_APPROVAL_INTERRUPTED",
+                        "reason": "host_restart"
+                    }),
+                )?;
+            }
+            if matches!(execution_state.as_deref(), Some("queued") | Some("running")) {
+                crate::audit::append_tx(
+                    &tx,
+                    "plan_execution_interrupted",
+                    Some(&session_id),
+                    serde_json::json!({
+                        "proposalId": proposal_id,
+                        "sessionId": session_id,
+                        "executionId": execution_id,
+                        "errorCode": "PLAN_EXECUTION_INTERRUPTED",
+                        "reason": "host_restart"
+                    }),
+                )?;
+            }
+        }
+        tx.commit()?;
         self.conn.execute(
             "DELETE FROM audit_log WHERE ts < ?1",
             params![now - AUDIT_RETENTION_MS],
@@ -414,24 +585,6 @@ impl Database {
             params![NOTIFICATION_KEEP],
         )?;
         let _ = self.conn.execute_batch("PRAGMA incremental_vacuum;");
-        self.migrate_chat_sessions_to_agent()?;
-        Ok(())
-    }
-
-    /// D188 fix-up: the desktop UI no longer offers a mode switch, so a
-    /// session left on the old `chat` profile could never be switched back to
-    /// `agent`. Move those rows (and the stored `defaultMode`) to `agent`
-    /// once, at open. Idempotent: after the first run nothing matches.
-    fn migrate_chat_sessions_to_agent(&self) -> Result<()> {
-        self.conn
-            .execute("UPDATE sessions SET mode = 'agent' WHERE mode = 'chat'", [])?;
-        self.conn.execute(
-            "UPDATE kv SET value_json = json_set(value_json, '$.defaultMode', 'agent')
-             WHERE ns = 'app' AND key = 'app'
-               AND json_valid(value_json)
-               AND json_extract(value_json, '$.defaultMode') = 'chat'",
-            [],
-        )?;
         Ok(())
     }
 
@@ -475,11 +628,22 @@ impl Database {
     // ---- settings compatibility shims (kv ns='app') -----------------------
 
     pub fn get_setting(&self, key: &str) -> Result<Option<Value>> {
-        self.kv_get("app", key)
+        let mut value = self.kv_get("app", key)?;
+        if key == "app" {
+            if let Some(value) = value.as_mut() {
+                strip_obsolete_plan_approval_permission_mode(value);
+            }
+        }
+        Ok(value)
     }
 
     pub fn set_setting(&self, key: &str, value: &Value) -> Result<()> {
-        self.kv_set("app", key, value)
+        if key != "app" {
+            return self.kv_set("app", key, value);
+        }
+        let mut sanitized = value.clone();
+        strip_obsolete_plan_approval_permission_mode(&mut sanitized);
+        self.kv_set("app", key, &sanitized)
     }
 
     // ---- projects ----------------------------------------------------------
@@ -544,6 +708,342 @@ fn archive_legacy_db(path: &Path, version: i64) -> Result<()> {
     Ok(())
 }
 
+fn migrate_and_validate_top_level_mode(value: &mut Value, key: &str, context: &str) -> Result<()> {
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("{context} must be an object"))?;
+    let Some(item) = object.get_mut(key) else {
+        return Ok(());
+    };
+    let mode = item
+        .as_str()
+        .ok_or_else(|| anyhow!("{context}.{key} must be the string 'agent' or 'plan'"))?;
+    match mode {
+        "chat" => *item = Value::String("plan".into()),
+        "agent" | "plan" => {}
+        other => {
+            return Err(anyhow!(
+                "{context}.{key} has invalid mode '{other}'; expected 'agent' or 'plan'"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_session_modes(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    let invalid: Option<(String, String)> = tx
+        .query_row(
+            "SELECT id, mode FROM sessions
+             WHERE mode NOT IN ('agent', 'plan')
+             LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    if let Some((id, mode)) = invalid {
+        return Err(anyhow!(
+            "session '{id}' has invalid mode '{mode}'; expected 'agent' or 'plan'"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_default_command_shell(
+    settings: &Value,
+    catalog: &crate::tools::shell::ShellCatalog,
+) -> Result<()> {
+    let Some(object) = settings.as_object() else {
+        return Err(anyhow!("app settings JSON must be an object"));
+    };
+    let Some(value) = object.get("defaultCommandShell") else {
+        return Ok(());
+    };
+    let shell_id = value
+        .as_str()
+        .ok_or_else(|| anyhow!("app settings defaultCommandShell must be a string"))?;
+    if !crate::tools::shell::is_known_shell_id(shell_id) {
+        return Err(anyhow!(
+            "app settings defaultCommandShell has unknown shell ID '{shell_id}'"
+        ));
+    }
+    if !catalog.choices.iter().any(|choice| choice.id == shell_id) {
+        return Err(anyhow!(
+            "app settings defaultCommandShell '{shell_id}' is unavailable on this platform"
+        ));
+    }
+    Ok(())
+}
+
+fn migrate_app_settings(
+    tx: &rusqlite::Transaction<'_>,
+    catalog: &crate::tools::shell::ShellCatalog,
+) -> Result<()> {
+    let existing: Option<String> = tx
+        .query_row(
+            "SELECT value_json FROM kv WHERE ns = 'app' AND key = 'app'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(raw) = existing else {
+        return Ok(());
+    };
+    let mut settings = serde_json::from_str::<Value>(&raw)
+        .with_context(|| "app settings JSON is malformed during migration")?;
+    if !settings.is_object() {
+        return Err(anyhow!(
+            "app settings JSON must be an object during migration"
+        ));
+    }
+    let before = settings.clone();
+    strip_obsolete_plan_approval_permission_mode(&mut settings);
+    migrate_and_validate_top_level_mode(&mut settings, "defaultMode", "app settings")?;
+    validate_default_command_shell(&settings, catalog)?;
+    if settings != before {
+        tx.execute(
+            "UPDATE kv SET value_json = ?1, updated_at = ?2
+             WHERE ns = 'app' AND key = 'app'",
+            params![settings.to_string(), now_ms()],
+        )?;
+    }
+    Ok(())
+}
+
+fn normalize_scheduled_config_modes(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    let scheduled: Vec<(String, String)> = {
+        let mut stmt = tx.prepare("SELECT id, config_json FROM scheduled_tasks")?;
+        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    for (id, raw) in scheduled {
+        let mut value = serde_json::from_str::<Value>(&raw)
+            .with_context(|| format!("scheduled task '{id}' config_json is malformed"))?;
+        if !value.is_object() {
+            return Err(anyhow!(
+                "scheduled task '{id}' config_json must be an object"
+            ));
+        }
+        let before = value.clone();
+        migrate_and_validate_top_level_mode(
+            &mut value,
+            "mode",
+            &format!("scheduled task '{id}' config_json"),
+        )?;
+        if value != before {
+            tx.execute(
+                "UPDATE scheduled_tasks SET config_json = ?1, updated_at = ?2 WHERE id = ?3",
+                params![value.to_string(), now_ms(), id],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn migrate_v7_to_v8(conn: &Connection) -> Result<()> {
+    let tx = conn.unchecked_transaction()?;
+    let shell_catalog = crate::tools::shell::catalog(None);
+    tx.execute("UPDATE sessions SET mode = 'plan' WHERE mode = 'chat'", [])?;
+    validate_session_modes(&tx)?;
+    migrate_app_settings(&tx, &shell_catalog)?;
+
+    normalize_scheduled_config_modes(&tx)?;
+
+    tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
+    tx.pragma_update(None, "user_version", 8i64)?;
+    tx.commit()?;
+    Ok(())
+}
+
+fn migrate_v8_to_v9_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    let has_approvals: bool = tx.query_row(
+        "SELECT EXISTS(
+             SELECT 1 FROM sqlite_master
+             WHERE type = 'table' AND name = 'plan_approvals'
+         )",
+        [],
+        |row| row.get(0),
+    )?;
+
+    if has_approvals {
+        for index in [
+            "idx_plan_approvals_session",
+            "idx_plan_approvals_pending",
+            "idx_plan_approvals_one_pending_session",
+            "idx_plan_approvals_execution_queue",
+            "idx_plan_approvals_execution_id",
+        ] {
+            tx.execute_batch(&format!("DROP INDEX IF EXISTS {index};"))?;
+        }
+        tx.execute_batch("ALTER TABLE plan_approvals RENAME TO plan_approvals_v8;")?;
+    }
+    tx.execute_batch(PLAN_APPROVALS_SCHEMA)?;
+    if has_approvals {
+        let now = now_ms();
+        tx.execute(
+            "INSERT INTO plan_approvals (
+                 request_id, session_id, turn_id, tool_call_id, plan_json,
+                 title, question, status, action, target_permission_mode,
+                 feedback, created_at, updated_at, expires_at, resolved_at,
+                 error_code, version
+             )
+             SELECT request_id, session_id, turn_id, tool_call_id, plan_json,
+                    '', '',
+                    CASE WHEN status = 'pending' THEN 'interrupted' ELSE status END,
+                    action, target_permission_mode, feedback, created_at,
+                    CASE WHEN status = 'pending' THEN ?1
+                         ELSE COALESCE(resolved_at, created_at) END,
+                    expires_at,
+                    CASE WHEN status = 'pending' THEN ?1 ELSE resolved_at END,
+                    CASE WHEN status = 'pending' THEN 'PLAN_APPROVAL_INTERRUPTED'
+                         ELSE error_code END,
+                    CASE WHEN status = 'pending' THEN 2 ELSE 1 END
+             FROM plan_approvals_v8",
+            params![now],
+        )?;
+        tx.execute_batch("DROP TABLE plan_approvals_v8;")?;
+    }
+    Ok(())
+}
+
+fn migrate_v9_to_v10_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    let shell_catalog = crate::tools::shell::catalog(None);
+    migrate_app_settings(tx, &shell_catalog)?;
+    normalize_scheduled_config_modes(tx)?;
+    validate_session_modes(tx)?;
+    let now = now_ms();
+
+    // v9 did not enforce one live turn per session. Abort every old live row
+    // before creating the partial unique index, including duplicate rows from
+    // a damaged database.
+    tx.execute(
+        "UPDATE turns
+         SET status = 'aborted', error_code = COALESCE(error_code, 'TURN_ABORTED'),
+             ended_at = COALESCE(ended_at, ?1)
+         WHERE status = 'running'",
+        params![now],
+    )?;
+    tx.execute_batch(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_turns_one_running_session
+         ON turns(session_id) WHERE status = 'running';",
+    )?;
+    tx.execute(
+        "UPDATE plan_approvals
+         SET expires_at = created_at + ?1
+         WHERE status = 'pending' AND expires_at IS NULL",
+        params![PLAN_APPROVAL_TIMEOUT_MS],
+    )?;
+    tx.pragma_update(None, "user_version", 10i64)?;
+    Ok(())
+}
+
+fn migration_backup_path(path: &Path, version: i64) -> PathBuf {
+    path.with_extension(format!("sqlite.v{version}.bak"))
+}
+
+fn verify_migration_backup(path: &Path, expected_version: i64) -> Result<()> {
+    let backup = Connection::open(path)
+        .with_context(|| format!("open migration backup {}", path.display()))?;
+    let version: i64 = backup
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .with_context(|| format!("read migration backup version {}", path.display()))?;
+    if version != expected_version {
+        return Err(anyhow!(
+            "migration backup {} has schema version {version}, expected {expected_version}",
+            path.display()
+        ));
+    }
+    let integrity: String = backup
+        .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+        .with_context(|| format!("check migration backup integrity {}", path.display()))?;
+    if integrity != "ok" {
+        return Err(anyhow!(
+            "migration backup {} failed integrity check: {integrity}",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+fn create_migration_backup(conn: &Connection, path: &Path, version: i64) -> Result<PathBuf> {
+    let checkpoint: (i64, i64, i64) = conn
+        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })
+        .with_context(|| format!("checkpoint database before v{version} backup"))?;
+    if checkpoint.0 != 0 {
+        return Err(anyhow!(
+            "database WAL is busy; cannot create v{version} migration backup"
+        ));
+    }
+
+    let backup = migration_backup_path(path, version);
+    let backup_name = backup
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| anyhow!("migration backup path is not valid UTF-8"))?;
+    let temporary = backup.with_file_name(format!("{backup_name}.tmp"));
+    if temporary.exists() {
+        std::fs::remove_file(&temporary)
+            .with_context(|| format!("remove stale migration backup {}", temporary.display()))?;
+    }
+    if let Err(error) = std::fs::copy(path, &temporary) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(error).with_context(|| {
+            format!(
+                "copy schema v{version} database {} to temporary backup {}",
+                path.display(),
+                temporary.display()
+            )
+        });
+    }
+    if let Err(error) = verify_migration_backup(&temporary, version) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(error);
+    }
+    if backup.exists() {
+        std::fs::remove_file(&backup)
+            .with_context(|| format!("replace existing migration backup {}", backup.display()))?;
+    }
+    if let Err(error) = std::fs::rename(&temporary, &backup) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(error).with_context(|| {
+            format!(
+                "install migration backup {} from {}",
+                backup.display(),
+                temporary.display()
+            )
+        });
+    }
+    Ok(backup)
+}
+
+fn migrate_v8_to_v10(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 8)?;
+    let tx = conn.unchecked_transaction()?;
+    migrate_v8_to_v9_tx(&tx)?;
+    migrate_v9_to_v10_tx(&tx)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v8 to v10 migration; backup {} remains",
+            backup.display()
+        )
+    })?;
+    Ok(())
+}
+
+fn migrate_v9_to_v10(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 9)?;
+    let tx = conn.unchecked_transaction()?;
+    migrate_v9_to_v10_tx(&tx)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v9 to v10 migration; backup {} remains",
+            backup.display()
+        )
+    })?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -556,6 +1056,53 @@ mod tests {
         )
         .map(|n| n > 0)
         .unwrap_or(false)
+    }
+
+    fn schema_version(conn: &Connection) -> i64 {
+        conn.query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap()
+    }
+
+    fn insert_raw_app_settings(db: &Database, raw: &str) {
+        db.conn()
+            .execute(
+                "INSERT INTO kv (ns, key, value_json, updated_at)
+                 VALUES ('app', 'app', ?1, 1)
+                 ON CONFLICT(ns, key) DO UPDATE SET value_json = excluded.value_json",
+                params![raw],
+            )
+            .unwrap();
+    }
+
+    fn assert_readable_migration_backup(path: &Path, version: i64) {
+        let backup_path = migration_backup_path(path, version);
+        assert!(
+            backup_path.exists(),
+            "missing {} backup",
+            backup_path.display()
+        );
+        let backup = Connection::open(&backup_path).unwrap();
+        assert_eq!(schema_version(&backup), version);
+        let integrity: String = backup
+            .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(integrity, "ok");
+        drop(backup);
+    }
+
+    fn fail_v8_migration(path: &Path) -> String {
+        let error = match Database::open(path) {
+            Ok(db) => {
+                drop(db);
+                panic!("schema v8 migration unexpectedly succeeded")
+            }
+            Err(error) => error,
+        };
+        let source = Connection::open(path).unwrap();
+        assert_eq!(schema_version(&source), 8);
+        drop(source);
+        assert_readable_migration_backup(path, 8);
+        error.to_string()
     }
 
     #[test]
@@ -582,6 +1129,7 @@ mod tests {
             "task_runs",
             "secrets_meta",
             "audit_log",
+            "plan_approvals",
         ] {
             assert!(table_exists(db.conn(), table), "missing {table}");
         }
@@ -597,6 +1145,45 @@ mod tests {
             .unwrap();
         assert_eq!(thinking_column, ("thinking_level".into(), "'off'".into()));
 
+        let index_count: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master
+                 WHERE type = 'index' AND name IN (
+                   'idx_plan_approvals_session',
+                   'idx_plan_approvals_pending',
+                   'idx_plan_approvals_one_pending_session',
+                   'idx_plan_approvals_execution_queue',
+                   'idx_plan_approvals_execution_id'
+                 )",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(index_count, 5);
+        let running_turn_index: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master
+                 WHERE type = 'index' AND name = 'idx_turns_one_running_session'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(running_turn_index, 1);
+
+        let scheduled_mode_columns: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM pragma_table_info('scheduled_tasks')
+                 WHERE name = 'mode'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(scheduled_mode_columns, 0);
+
         // v7: transcript payloads live in per-session files, not columns.
         for (table, column) in [
             ("messages", "content_json"),
@@ -606,9 +1193,7 @@ mod tests {
             let n: i64 = db
                 .conn()
                 .query_row(
-                    &format!(
-                        "SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = ?1"
-                    ),
+                    &format!("SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = ?1"),
                     params![column],
                     |r| r.get(0),
                 )
@@ -663,42 +1248,6 @@ mod tests {
     }
 
     #[test]
-    fn boot_moves_legacy_chat_sessions_and_default_to_agent() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("pi.sqlite");
-        {
-            let db = Database::open(&path).unwrap();
-            db.conn()
-                .execute(
-                    "INSERT INTO sessions (id, title, mode, created_at, updated_at)
-                     VALUES ('s-chat', 'Legacy', 'chat', 1, 1),
-                            ('s-agent', 'Agent', 'agent', 1, 1)",
-                    [],
-                )
-                .unwrap();
-            db.set_setting(
-                "app",
-                &serde_json::json!({ "defaultMode": "chat", "theme": "dark" }),
-            )
-            .unwrap();
-        }
-
-        let db = Database::open(&path).unwrap();
-        let modes: Vec<String> = db
-            .conn()
-            .prepare("SELECT mode FROM sessions ORDER BY id")
-            .unwrap()
-            .query_map([], |r| r.get(0))
-            .unwrap()
-            .collect::<rusqlite::Result<_>>()
-            .unwrap();
-        assert_eq!(modes, vec!["agent".to_string(), "agent".to_string()]);
-        let settings = db.get_setting("app").unwrap().unwrap();
-        assert_eq!(settings["defaultMode"], "agent");
-        assert_eq!(settings["theme"], "dark", "unrelated keys survive");
-    }
-
-    #[test]
     fn kv_roundtrip_and_delete() {
         let dir = tempfile::tempdir().unwrap();
         let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
@@ -710,6 +1259,671 @@ mod tests {
         );
         db.kv_delete("plugin:demo", "cfg").unwrap();
         assert!(db.kv_get("plugin:demo", "cfg").unwrap().is_none());
+    }
+
+    #[test]
+    fn migrates_v7_chat_modes_settings_and_scheduled_values_to_plan() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, mode, created_at, updated_at)
+                     VALUES ('legacy-session', 'chat', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.kv_set(
+                "app",
+                "app",
+                &serde_json::json!({
+                    "defaultMode": "chat",
+                    "theme": "dark",
+                    "planApprovalPermissionMode": "auto",
+                    "notification": { "mode": "silent" },
+                    "plugin": { "mode": "plugin", "defaultMode": "extension" }
+                }),
+            )
+            .unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO scheduled_tasks
+                        (id, title, prompt, config_json, created_at, updated_at)
+                     VALUES (
+                         'task-1', 'legacy', 'run',
+                         '{\"mode\":\"chat\",\"notification\":{\"mode\":\"silent\"},\"plugin\":{\"defaultMode\":\"extension\",\"mode\":\"plugin\"}}',
+                         1, 1
+                     )",
+                    [],
+                )
+                .unwrap();
+            db.kv_set(
+                "plugin:test",
+                "config",
+                &serde_json::json!({
+                    "mode": "chat",
+                    "defaultMode": "chat",
+                    "nested": { "operatingMode": "chat" }
+                }),
+            )
+            .unwrap();
+            // Simulate a real v7 file: the approval table did not exist until
+            // the migration itself creates the canonical table and indexes.
+            db.conn()
+                .execute_batch("DROP TABLE plan_approvals;")
+                .unwrap();
+            db.conn().pragma_update(None, "user_version", 7).unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        let version: i64 = db
+            .conn()
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+        let mode: String = db
+            .conn()
+            .query_row(
+                "SELECT mode FROM sessions WHERE id = 'legacy-session'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(mode, "plan");
+        assert_eq!(
+            db.get_setting("app").unwrap().unwrap()["defaultMode"],
+            serde_json::json!("plan")
+        );
+        let settings = db.get_setting("app").unwrap().unwrap();
+        assert_eq!(settings["theme"], serde_json::json!("dark"));
+        assert_eq!(settings["notification"]["mode"], "silent");
+        assert_eq!(
+            settings["plugin"],
+            serde_json::json!({ "mode": "plugin", "defaultMode": "extension" })
+        );
+        assert!(settings
+            .get(OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE)
+            .is_none());
+        let raw_settings = db.kv_get("app", "app").unwrap().unwrap();
+        assert!(raw_settings
+            .get(OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE)
+            .is_none());
+        let config: String = db
+            .conn()
+            .query_row(
+                "SELECT config_json FROM scheduled_tasks WHERE id = 'task-1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&config).unwrap()["mode"],
+            "plan"
+        );
+        let config_value = serde_json::from_str::<Value>(&config).unwrap();
+        assert_eq!(config_value["notification"]["mode"], "silent");
+        assert_eq!(
+            config_value["plugin"],
+            serde_json::json!({ "defaultMode": "extension", "mode": "plugin" })
+        );
+        assert_eq!(
+            db.kv_get("plugin:test", "config").unwrap().unwrap(),
+            serde_json::json!({
+                "mode": "chat",
+                "defaultMode": "chat",
+                "nested": { "operatingMode": "chat" }
+            })
+        );
+        assert!(table_exists(db.conn(), "plan_approvals"));
+        let index_count: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master
+                 WHERE type = 'index' AND name IN (
+                   'idx_plan_approvals_session',
+                   'idx_plan_approvals_pending',
+                   'idx_plan_approvals_one_pending_session',
+                   'idx_plan_approvals_execution_queue',
+                   'idx_plan_approvals_execution_id'
+                 )",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(index_count, 5);
+        drop(db);
+        assert_readable_migration_backup(&path, 8);
+    }
+
+    #[test]
+    fn migrates_v8_approvals_without_expiring_new_work() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, mode, created_at, updated_at)
+                     VALUES ('v8-session', 'plan', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.conn()
+                .execute_batch("DROP TABLE plan_approvals;")
+                .unwrap();
+            db.kv_set(
+                "app",
+                "app",
+                &serde_json::json!({
+                    "theme": "light",
+                    "planApprovalPermissionMode": "accept-edits"
+                }),
+            )
+            .unwrap();
+            db.conn()
+                .execute_batch(
+                    "CREATE TABLE plan_approvals (
+                       request_id TEXT PRIMARY KEY,
+                       session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+                       turn_id TEXT NOT NULL,
+                       tool_call_id TEXT NOT NULL UNIQUE,
+                       plan_json TEXT NOT NULL,
+                       status TEXT NOT NULL CHECK (status IN (
+                         'pending', 'approved', 'changes_requested', 'rejected',
+                         'expired', 'interrupted'
+                       )),
+                       action TEXT CHECK (action IN ('approve', 'request_changes', 'reject')),
+                       target_permission_mode TEXT CHECK (
+                         target_permission_mode IN ('ask', 'accept-edits', 'auto')
+                       ),
+                       feedback TEXT,
+                       created_at INTEGER NOT NULL,
+                       expires_at INTEGER NOT NULL,
+                       resolved_at INTEGER,
+                       error_code TEXT
+                     );
+                     INSERT INTO plan_approvals (
+                       request_id, session_id, turn_id, tool_call_id, plan_json,
+                       status, created_at, expires_at
+                     ) VALUES
+                       ('terminal-v8', 'v8-session', 'turn-terminal', 'call-terminal',
+                        'terminal plan', 'approved', 10, 20),
+                       ('pending-v8', 'v8-session', 'turn-pending', 'call-pending',
+                        'pending plan', 'pending', 11, 21);",
+                )
+                .unwrap();
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        let version: i64 = db
+            .conn()
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+        let terminal: (String, Option<String>, i64) = db
+            .conn()
+            .query_row(
+                "SELECT status, error_code, version FROM plan_approvals
+                 WHERE request_id = 'terminal-v8'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(terminal, ("approved".into(), None, 1));
+        let pending: (String, Option<String>, Option<String>, i64) = db
+            .conn()
+            .query_row(
+                "SELECT status, error_code, artifact_relative_path, version
+                 FROM plan_approvals WHERE request_id = 'pending-v8'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            pending,
+            (
+                "interrupted".into(),
+                Some("PLAN_APPROVAL_INTERRUPTED".into()),
+                None,
+                2
+            )
+        );
+        let settings = db.get_setting("app").unwrap().unwrap();
+        assert_eq!(settings["theme"], serde_json::json!("light"));
+        assert!(settings
+            .get(OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE)
+            .is_none());
+        let raw_settings = db.kv_get("app", "app").unwrap().unwrap();
+        assert!(raw_settings
+            .get(OBSOLETE_PLAN_APPROVAL_PERMISSION_MODE)
+            .is_none());
+        drop(db);
+        assert_readable_migration_backup(&path, 8);
+    }
+
+    #[test]
+    fn v8_migration_rejects_malformed_app_settings_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, mode, created_at, updated_at)
+                     VALUES ('malformed-app-session', 'agent', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            insert_raw_app_settings(&db, "{not-json");
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let error = fail_v8_migration(&path);
+        assert!(error.contains("app settings JSON is malformed"), "{error}");
+        let source = Connection::open(&path).unwrap();
+        let mode: String = source
+            .query_row(
+                "SELECT mode FROM sessions WHERE id = 'malformed-app-session'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(mode, "agent");
+        drop(source);
+    }
+
+    #[test]
+    fn v8_migration_rejects_malformed_scheduled_config_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO scheduled_tasks
+                        (id, title, prompt, config_json, created_at, updated_at)
+                     VALUES ('malformed-config-task', 'broken', 'run', '{not-json', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let error = fail_v8_migration(&path);
+        assert!(
+            error.contains("scheduled task 'malformed-config-task' config_json is malformed"),
+            "{error}"
+        );
+        let source = Connection::open(&path).unwrap();
+        let config: String = source
+            .query_row(
+                "SELECT config_json FROM scheduled_tasks
+                 WHERE id = 'malformed-config-task'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(config, "{not-json");
+        drop(source);
+    }
+
+    #[test]
+    fn v8_migration_rejects_invalid_session_mode_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, mode, created_at, updated_at)
+                     VALUES ('invalid-mode-session', 'invalid', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let error = fail_v8_migration(&path);
+        assert!(
+            error.contains("session 'invalid-mode-session' has invalid mode 'invalid'"),
+            "{error}"
+        );
+        let source = Connection::open(&path).unwrap();
+        let mode: String = source
+            .query_row(
+                "SELECT mode FROM sessions WHERE id = 'invalid-mode-session'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(mode, "invalid");
+        drop(source);
+    }
+
+    #[test]
+    fn v8_migration_rejects_invalid_shell_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let invalid_shell = if cfg!(windows) {
+            crate::tools::shell::BASH_ID
+        } else {
+            crate::tools::shell::WINDOWS_POWERSHELL_ID
+        };
+        {
+            let db = Database::open(&path).unwrap();
+            insert_raw_app_settings(
+                &db,
+                &serde_json::json!({
+                    "defaultCommandShell": invalid_shell,
+                    "theme": "dark"
+                })
+                .to_string(),
+            );
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let error = fail_v8_migration(&path);
+        assert!(
+            error.contains("app settings defaultCommandShell")
+                && error.contains("unavailable on this platform"),
+            "{error}"
+        );
+        let source = Connection::open(&path).unwrap();
+        let raw: String = source
+            .query_row(
+                "SELECT value_json FROM kv WHERE ns = 'app' AND key = 'app'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&raw).unwrap()["defaultCommandShell"],
+            invalid_shell
+        );
+        drop(source);
+    }
+
+    #[test]
+    fn v8_migration_rejects_unknown_shell_and_preserves_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        let unknown_shell = "not-a-real-command-shell";
+        {
+            let db = Database::open(&path).unwrap();
+            insert_raw_app_settings(
+                &db,
+                &serde_json::json!({
+                    "defaultCommandShell": unknown_shell,
+                    "theme": "dark"
+                })
+                .to_string(),
+            );
+            db.conn().pragma_update(None, "user_version", 8).unwrap();
+        }
+
+        let error = fail_v8_migration(&path);
+        assert!(
+            error.contains("app settings defaultCommandShell has unknown shell ID")
+                && error.contains(unknown_shell),
+            "{error}"
+        );
+        let source = Connection::open(&path).unwrap();
+        let raw: String = source
+            .query_row(
+                "SELECT value_json FROM kv WHERE ns = 'app' AND key = 'app'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&raw).unwrap()["defaultCommandShell"],
+            unknown_shell
+        );
+        drop(source);
+    }
+
+    #[test]
+    fn migration_accepts_current_platform_shell_when_catalog_marks_it_unavailable() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE kv (
+                ns TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value_json TEXT NOT NULL,
+                updated_at INTEGER NOT NULL,
+                PRIMARY KEY (ns, key)
+            ) WITHOUT ROWID;",
+        )
+        .unwrap();
+        let shell_id = crate::tools::shell::default_shell_id();
+        conn.execute(
+            "INSERT INTO kv (ns, key, value_json, updated_at)
+             VALUES ('app', 'app', ?1, 1)",
+            params![serde_json::json!({
+                "defaultCommandShell": shell_id,
+                "defaultMode": "chat"
+            })
+            .to_string()],
+        )
+        .unwrap();
+        let catalog = crate::tools::shell::catalog_for_platform(
+            crate::tools::shell::current_platform(),
+            Some(shell_id),
+            |_| false,
+        );
+        assert!(catalog
+            .choices
+            .iter()
+            .any(|choice| { choice.id == shell_id && !choice.available }));
+
+        let tx = conn.unchecked_transaction().unwrap();
+        migrate_app_settings(&tx, &catalog).unwrap();
+        tx.commit().unwrap();
+
+        let raw: String = conn
+            .query_row(
+                "SELECT value_json FROM kv WHERE ns = 'app' AND key = 'app'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let settings = serde_json::from_str::<Value>(&raw).unwrap();
+        assert_eq!(settings["defaultCommandShell"], shell_id);
+        assert_eq!(settings["defaultMode"], "plan");
+    }
+
+    #[test]
+    fn boot_interrupts_pending_and_queued_plan_work_without_replaying_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, mode, permission_mode, created_at, updated_at)
+                     VALUES ('execution-session', 'agent', 'auto', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO plan_approvals (
+                       request_id, session_id, turn_id, tool_call_id, plan_json,
+                       title, question, status, created_at, updated_at,
+                       artifact_relative_path, artifact_sha256, artifact_size_bytes,
+                       version, execution_id, execution_state, target_permission_mode
+                     ) VALUES
+                       ('running-proposal', 'execution-session', 'turn-1', 'call-1',
+                        'running', 'Running', '?', 'approved', 1, 1,
+                        '.pi/plan/running.md', 'hash', 7, 1, 'running-execution', 'running', 'auto'),
+                       ('queued-proposal', 'execution-session', 'turn-2', 'call-2',
+                        'queued', 'Queued', '?', 'approved', 2, 2,
+                        '.pi/plan/queued.md', 'hash', 6, 1, 'queued-execution', 'queued', 'auto'),
+                       ('pending-proposal', 'execution-session', 'turn-3', 'call-3',
+                        'pending', 'Pending', '?', 'pending', 3, 3,
+                        '.pi/plan/pending.md', 'hash', 7, 1, NULL, NULL, 'auto')",
+                    [],
+                )
+                .unwrap();
+        }
+        let db = Database::open(&path).unwrap();
+        let running: (String, Option<String>) = db
+            .conn()
+            .query_row(
+                "SELECT execution_state, error_code FROM plan_approvals
+                 WHERE execution_id = 'running-execution'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            running,
+            (
+                "interrupted".into(),
+                Some("PLAN_EXECUTION_INTERRUPTED".into())
+            )
+        );
+        let queued: String = db
+            .conn()
+            .query_row(
+                "SELECT execution_state FROM plan_approvals
+                 WHERE execution_id = 'queued-execution'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(queued, "interrupted");
+        let pending: (String, Option<String>) = db
+            .conn()
+            .query_row(
+                "SELECT status, error_code FROM plan_approvals
+                 WHERE request_id = 'pending-proposal'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            pending,
+            (
+                "interrupted".into(),
+                Some("PLAN_APPROVAL_INTERRUPTED".into())
+            )
+        );
+        let execution_audits: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM audit_log
+                 WHERE kind = 'plan_execution_interrupted'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(execution_audits, 2);
+        let approval_audits: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM audit_log
+                 WHERE kind = 'plan_approval_interrupted'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(approval_audits, 1);
+        let session_config: (String, String) = db
+            .conn()
+            .query_row(
+                "SELECT mode, permission_mode FROM sessions
+                 WHERE id = 'execution-session'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(session_config, ("agent".into(), "auto".into()));
+    }
+
+    #[test]
+    fn migrates_v9_running_turns_before_creating_single_turn_index() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute_batch("DROP INDEX idx_turns_one_running_session;")
+                .unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO sessions (id, created_at, updated_at)
+                     VALUES ('migration-session', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO turns (id, session_id, started_at)
+                     VALUES ('old-turn-1', 'migration-session', 1),
+                            ('old-turn-2', 'migration-session', 2)",
+                    [],
+                )
+                .unwrap();
+            db.conn()
+                .execute(
+                    "INSERT INTO scheduled_tasks
+                        (id, title, prompt, config_json, created_at, updated_at)
+                     VALUES ('migration-task', 'legacy', 'run', '{\"mode\":\"chat\"}', 1, 1)",
+                    [],
+                )
+                .unwrap();
+            db.conn().pragma_update(None, "user_version", 9).unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        let states: Vec<(String, Option<String>, Option<i64>)> = {
+            let mut stmt = db
+                .conn()
+                .prepare(
+                    "SELECT status, error_code, ended_at FROM turns
+                     WHERE session_id = 'migration-session' ORDER BY id",
+                )
+                .unwrap();
+            stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+                .unwrap()
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .unwrap()
+        };
+        assert_eq!(states.len(), 2);
+        for (status, error_code, ended_at) in states {
+            assert_eq!(status, "aborted");
+            assert_eq!(error_code.as_deref(), Some("TURN_ABORTED"));
+            assert!(ended_at.is_some());
+        }
+        let index_exists: bool = db
+            .conn()
+            .query_row(
+                "SELECT EXISTS(
+                   SELECT 1 FROM sqlite_master
+                   WHERE type = 'index' AND name = 'idx_turns_one_running_session'
+                 )",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(index_exists);
+        let config: String = db
+            .conn()
+            .query_row(
+                "SELECT config_json FROM scheduled_tasks WHERE id = 'migration-task'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&config).unwrap()["mode"],
+            "plan"
+        );
+        drop(db);
+        assert_readable_migration_backup(&path, 9);
     }
 
     #[test]
@@ -762,5 +1976,4 @@ mod tests {
         assert_eq!(a, b, "symlinked path spellings must share one project row");
         assert_eq!(db.list_projects().unwrap().len(), 1);
     }
-
 }

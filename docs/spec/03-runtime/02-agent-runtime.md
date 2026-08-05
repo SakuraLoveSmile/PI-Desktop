@@ -2,7 +2,7 @@
 
 ## 1. Goal
 
-Applied decisions: **D002/D003/D008/D158**.
+Applied decisions: **D002/D003/D008/D158/D189/D190/D193/D194**.
 
 
 Wrap pi into a product runtime that desktop layers can consume safely.
@@ -64,20 +64,26 @@ interface AgentRuntime {
 4. validate model/secret availability
 5. reject if session busy
 6. persist user message
-7. start pi turn with the resolved session configuration and effective
+7. snapshot the effective shell ID and dialect for the turn
+8. start pi turn with the resolved session configuration and effective
    thinking level; request setup receives one bounded pi-ai retry for transient
    transport/provider failures, while a transient failure after streaming has
    started receives one same-turn runtime retry before the turn is failed
    (D127, D186)
-8. stream normalized answer and thinking events to UI
-9. on tool calls, delegate to Rust host bridge with the durable `sessionId`;
-   host resolves the session-bound workspace root
-10. if pi finishes a message with `stopReason: "error"`, finalize any partial
+9. stream normalized answer and thinking events to UI
+10. on tool calls, delegate to Rust host bridge with the durable `sessionId`;
+    host resolves the session-bound workspace root
+11. if pi finishes a message with `stopReason: "error"`, finalize any partial
     assistant bubble with a structured `UiMessage.error`, persist it in the
     transcript, and emit a normalized lifecycle `error` event carrying the
     same provider `AppError`; even a failure with no answer text remains a
     visible assistant error message
-11. finalize and persist successful answer/thinking blocks independently
+12. finalize and persist successful answer/thinking blocks independently
+
+The runtime constructs exactly one pi `Agent` per durable session. Plan does
+not select a second model, planner service, permission implementation, or
+runtime. The same Agent changes its planning state and tool registry after a
+host-confirmed transition.
 
 ### 5d. Bounded provider stream recovery and diagnostics (D186, ADR 0050)
 
@@ -133,7 +139,7 @@ If the re-run is silent too, the turn ends as a visible assistant error with
 retriable `EMPTY_MODEL_RESPONSE`, which gives the transcript its normal retry
 action. No empty assistant message is persisted in either case.
 
-Decision D190; see E2E-098.
+Decision D193; see E2E-098.
 
 ### 5.1 Context checkpoint protection (D158, ADR 0030)
 
@@ -215,16 +221,55 @@ Automatic protection is enabled by default. Disabling it removes
 checkpoint generation are abortable and count as running state until durable
 persistence completes.
 
-## 5b. Mode defaults
+## 5b. Operating mode and planning state
 
-- Only product mode: **Agent** (D188)
-- `read-only` (the former Chat profile) is still enforced host-side for legacy
-  and imported rows, but no UI surface can select it
+- Default product mode: **Agent**
+- The product selector is **Agent | Plan**; the internal conversation page may
+  still use `page = "chat"`
 - Mode is session-scoped and persisted with session metadata
 - Thinking level is session-scoped and persisted with session metadata
 - Composer configuration is mutable only while the session is idle
 - Changing mode/provider/model/thinking level applies to the next turn and
   recreates the pi runtime when any runtime-affecting configuration changes
+
+The live planning state is derived and projected as:
+
+```ts
+type OperatingMode = "agent" | "plan";
+type PlanningState =
+  | "inactive"
+  | "planning"
+  | "awaiting_approval";
+type PlanExecutionState = "queued" | "running" | "completed" | "interrupted";
+```
+
+`Agent / inactive` enters `Plan / planning` either when the user selects Plan
+while idle or when the Agent calls `EnterPlanMode`. In Plan, the Agent can
+inspect, use context controls, run Bash through the selected permission mode,
+and call `SubmitPlan(title, markdown, question)`. Host-core preserves the
+submitted Markdown bytes in a new immutable
+`.pi/plan/<unique-name>.md` artifact, records its relative path/hash/size and
+structured title/question in `plan_approvals`, and moves the live state to
+`awaiting_approval`.
+
+Approval has only `approve` and `reject`. Approval commits `mode = agent`, the
+explicit permission mode, an execution ID, and `execution_state = queued` on
+the same `plan_approvals` row in one host transaction. The
+same Agent then receives a fresh model turn with the Agent tool set. Reject,
+absolute expiry, a pending interruption, stale response, or persistence
+failure closes the approval row and returns the live state to editable
+`Plan / planning` without granting execution tools. A later accepted Plan prompt
+is a new turn: earlier `SubmitPlan` calls remain historical immutable
+checkpoints, and the Agent must call `SubmitPlan`
+once with a new complete Markdown snapshot to create a new artifact. If approval
+already committed and a queued/running execution is interrupted, durable mode
+remains Agent and the execution is not replayed.
+
+Manual mode and configuration selection is allowed only while idle. Selecting
+Agent is an intentional user override and does not synthesize a plan or
+approval. Each session has one active turn, one pending approval, and one
+queued/running execution; a second prompt, configuration change, or execution
+is rejected.
 
 ## 5c. Thinking capability and stream contract
 
@@ -305,7 +350,7 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 
 ```text
 [base product prompt in English]
-+ [mode prompt: agent]
++ [operating-state prompt: agent/plan]
 + [workspace info]
 + [tool instructions]
 + [project instruction chain, when present]
@@ -341,15 +386,16 @@ registered schema into every provider request. Each new user prompt starts with
 the mode's core set plus `CompactContext` when automatic compaction is enabled:
 
 - Agent: `Read`, `Bash`, `Edit`, and `Write` (matching pi's coding-agent core)
-- Read-only: `Read`, `Glob`, and `Grep`
+- Plan: `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`, and `CompactContext`
 - both modes: `ToolSearch` when at least one deferred capability exists
 
 In Agent mode, `Glob` and `Grep` join `BrowserPreview`, plugin tools, `Skill`,
-and plugin-development helpers in the deferred set. In read-only mode, `Glob`
-and `Grep` remain part of the read-only core. Deferred tools are registered but
-their names and compact one-line descriptions appear in an `# On-demand tools`
-catalog; parameter schemas do not. The catalog is bounded so a plugin with
-many tools cannot recreate the original prompt bloat.
+and plugin-development helpers in the deferred set. Plan keeps its
+read/inspection core available, while `SubmitPlan` is exposed only during the
+planning state. Deferred tools are registered but their names and compact
+one-line descriptions appear in an `# On-demand tools` catalog; parameter
+schemas do not. The catalog is bounded so a plugin with many tools cannot
+recreate the original prompt bloat.
 The model calls `ToolSearch` with an exact name or a short capability query.
 The sidecar activates up to four matches, returns their names through
 pi-agent-core's `addedToolNames`, and rebuilds the next-turn context with those
@@ -370,6 +416,24 @@ meaningful visual edit, using a workspace-relative path. The agent reuses the
 live-reloading preview while iterating instead of issuing repeated preview
 calls. Generated, test-only, and non-visual HTML files are excluded. When the
 tool is deferred, `ToolSearch` must activate it before the preview call.
+### 7.2 Plan prompt requirements
+
+The Plan prompt tells the same Agent to understand the request, inspect the
+relevant repository/specification/test context, identify impacted files and
+risks, include focused validation and migration/recovery implications, surface
+open questions. When any initial or revised plan is ready, it must call
+`SubmitPlan` immediately exactly once in the current turn with one complete
+Markdown snapshot. An accepted new Plan prompt has no prior pending approval;
+earlier submissions in the transcript are historical immutable checkpoints.
+After reject, expiry, or interruption, the Agent may revise in the new turn and
+must follow the same one-SubmitPlan rule. It must not claim that changes were
+made. The host writes the immutable `.pi/plan/*.md` artifact; the Agent does
+not write or edit it itself and does not receive a request-changes flow.
+
+The prompt may describe Bash as permission-gated and potentially mutating. It
+must not describe Plan as a strict read-only security boundary.
+
+### 7.3 Project instruction chain
 
 The Electron main process first resolves the global
 `~/.pi/agent/AGENTS.md`, then project instruction files inside the
