@@ -5,6 +5,7 @@ mod db;
 mod mcp_servers;
 mod notifications;
 mod permissions;
+mod plans;
 mod plugins;
 mod providers;
 mod review;
@@ -14,9 +15,9 @@ mod scratch;
 mod secrets;
 mod sessions;
 mod state;
+mod tool_budget;
 mod tools;
 mod transcripts;
-mod tool_budget;
 mod user_skills;
 mod workspace;
 
@@ -28,6 +29,17 @@ use crate::state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    if std::env::args().any(|arg| arg == tools::INTERNAL_TOOL_RUNNER_FLAG) {
+        let exit_code = match tools::run_internal_tool_runner().await {
+            Ok(exit_code) => exit_code,
+            Err(error) => {
+                eprintln!("internal tool runner failed: {error:#}");
+                1
+            }
+        };
+        std::process::exit(exit_code);
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
@@ -63,8 +75,7 @@ async fn main() -> anyhow::Result<()> {
         // Only sweep with a real session list: an empty fallback on a db
         // error would wipe scratch dirs of sessions that still exist.
         if let Ok(list) = sessions::list_sessions(&st.db) {
-            let live: std::collections::HashSet<String> =
-                list.into_iter().map(|s| s.id).collect();
+            let live: std::collections::HashSet<String> = list.into_iter().map(|s| s.id).collect();
             scratch::sweep(&data_dir, &live);
             review::sweep(&data_dir, &live);
         }

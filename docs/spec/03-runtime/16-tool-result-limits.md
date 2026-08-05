@@ -14,6 +14,12 @@ forced compaction and made the agent re-search what it had already found.
 Read/Glob/Grep get the tighter budget because their results are re-fetchable on
 demand (narrow the pattern, advance the offset); shell output is not.
 
+Bash output passes two independent ceilings. The **capture** layer bounds what
+the host retains in memory while the process streams, and is what the spill file
+is written from. The **result** budget bounds what reaches the model. Capture is
+deliberately the looser of the two: if it matched the result budget, a spilled
+copy could never be fuller than the excerpt it exists to back.
+
 | channel | limit | action when exceeded |
 |---|---|---|
 | Read / Glob / Grep result (`BUDGET_SEARCH`) | 48 KB, 2000 lines | bound the window + `notice` naming the next step |
@@ -23,8 +29,10 @@ demand (narrow the pattern, advance the offset); shell output is not.
 | Read window | 2000 lines default, `offset`/`limit` | paginate; never refuse on file size |
 | Grep matches (`headLimit`) | 200 default | stop with `truncated: true` |
 | Glob entries (`limit`) | 100 default, 1000 max | stop with `truncated: true` |
+| Bash capture retention (`CAPTURE_MAX_BYTES` / `CAPTURE_MAX_LINES`) | 512 KB, 200000 lines | stop retaining; report omitted bytes and lines |
 | spilled full output (`SPILL_MAX_BYTES`) | 512 KB | stop retaining; marker still names the file |
-| Bash timeout | 60s default | kill + error |
+| Bash output stream | per-stream sequence | preserve stdout/stderr separation |
+| Bash timeout | 60s default; 1–300s override | kill process tree + error |
 
 Limits are host-enforced. Tool descriptions in `builtin_tool_defs()` carry the
 numbers and the scoping parameters verbatim: a tool that looks incapable of the
@@ -77,6 +85,8 @@ ignore files from applying — the same rule that lets `path` reach into
 ## 4. Model-facing vs UI-facing
 
 - model receives truncated payload with marker
+- Renderer receives ordered `stdout` and `stderr` chunks while Bash runs; the
+  final model/UI result remains the bounded combined payload.
 - UI may offer “open full output in viewer” for Bash/Read later (post-MVP optional)
 - full raw output is not required to persist forever; session may store truncated form in MVP
 - the per-result host cap does not bound a parallel batch in aggregate. During
@@ -137,6 +147,8 @@ and the counts are the stable signals.
    tool-call/result pair and re-estimate the resulting tail before persistence
 6. relevance ordering for Glob and Grep is file modification time, newest first,
    so a capped result keeps the half more likely to be asked about
+7. Timeout and abort close both output streams only after the complete process
+   tree has been shut down; no orphan process may continue writing output
 
 ## 7. Acceptance criteria
 
@@ -150,5 +162,10 @@ and the counts are the stable signals.
 - [x] an explicit `path` reaches into an ignored tree (`node_modules`, spill dir)
 - [x] Glob and Grep order results by modification time, newest first
 - [x] truncated results still valid UTF-8 text
+- [x] the capture ceiling sits above the result budget, so a spilled copy can be
+  fuller than the excerpt it backs, and reports the bytes and lines it omitted
+- [ ] stdout and stderr stream separately with stable per-tool sequence values
+- [ ] Bash uses the 60s default and rejects an override outside 1–300s
+- [ ] timeout/abort stops the complete process tree and emits no later chunks
 - [ ] an oversized parallel result batch compacts to a bounded marked tail,
   survives restart, and leaves the original transcript results unchanged

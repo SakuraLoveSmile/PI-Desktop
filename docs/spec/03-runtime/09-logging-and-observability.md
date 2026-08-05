@@ -98,6 +98,10 @@ Format MVP: NDJSON files.
 - prompt accepted/aborted
 - tool start/end
 - permission request/decision/timeout
+- Plan artifact creation (unique path, SHA-256, byte size), approval/expiry/
+  reject, execution transition, and startup interruption
+- shell ID/effective dialect, availability/fallback or changed-selection failure, stream
+  byte counts, timeout, and process-tree shutdown
 - plugin enable/disable/load/error
 - tool admission rejection, queue depth, active class budgets, and shell spawn
   resource exhaustion
@@ -112,7 +116,8 @@ Format MVP: NDJSON files.
 1. Keys matching `/token|secret|password|api[_-]?key/i` redacted
 2. Authorization headers redacted
 3. Tool args preview truncated (e.g. 2KB)
-4. Long command output truncated in audit, full output optional in host debug only
+4. Long command output is counted/truncated in audit; stdout/stderr chunks are
+   never logged wholesale in normal channels
 
 ## 7. Trace correlation
 
@@ -124,7 +129,7 @@ Use one `traceId` per user-visible action when possible:
 
 Renderer, Electron, host, agent should propagate these IDs.
 
-## 7a. Latency segmentation (D137)
+## 7a. Latency segmentation (D183)
 
 A slow agent turn is almost never slow inside the tool. The wait belongs to
 one of three stages, and each stage is logged separately so they can be told
@@ -164,6 +169,11 @@ projection of the same `streamMs` interval, not a second timing source. Tool
 rows carry a separate estimated argument/result footprint for context
 inspection, while exact provider input/output usage remains authoritative.
 
+Plan and shell records use the same `sessionId`, `turnId`, and `toolCallId`
+correlation fields. Artifact logs include only the unique relative path under
+`.pi/plan/`, hash, and size; shell logs include the catalog ID and dialect,
+never an arbitrary executable command line or path hash from the renderer.
+
 ## 8. User-facing diagnostics
 
 MVP provides:
@@ -191,6 +201,9 @@ Not in MVP:
 2. secrets never appear in log files during normal flows
 3. logs folder openable from app/command palette
 4. a slow tool call can be attributed to approval, execution, or the provider
-   from the logs alone (D137)
+   from the logs alone (D183)
 5. a host resource incident exposes active/queued tool budgets and a single
    restart generation instead of repeated stale-pipe errors
+6. Plan startup interruption and shell changed-selection/timeout/process abort
+   can be diagnosed from session/turn/tool-call correlation and stable error
+   code

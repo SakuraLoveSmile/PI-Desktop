@@ -11,7 +11,11 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import type { MessageUsage, UiMessage } from "@pi-desktop/shared";
+import type {
+  MessageUsage,
+  PlanningState,
+  UiMessage,
+} from "@pi-desktop/shared";
 import { ConversationMinimap } from "./ConversationMinimap";
 import { TurnOutcomeCard } from "./TurnOutcomeCard";
 import { ReviewChangeCard } from "./ReviewChangeCard";
@@ -67,6 +71,7 @@ import {
   IconFileText,
   IconFolder,
   IconGlobe,
+  IconListChecks,
   IconPencil,
   IconSearch,
   IconReview,
@@ -1114,6 +1119,16 @@ function WorkingIndicator() {
   );
 }
 
+function PlanningIndicator() {
+  const { t } = useTranslation();
+  return (
+    <div className="planning-state-indicator" role="status" aria-live="polite">
+      <IconListChecks size={14} aria-hidden />
+      <span>{t("plan.planning")}</span>
+    </div>
+  );
+}
+
 const MessageRow = memo(function MessageRow({
   message,
   isRunning,
@@ -1461,15 +1476,22 @@ export const ChatTranscript = memo(function ChatTranscript({
   messages,
   isRunning,
   pendingPermission,
+  planningState,
 }: {
   sessionId: string | undefined;
   messages: UiMessage[];
   isRunning: boolean;
   pendingPermission?: PendingPermission;
+  planningState?: PlanningState;
 }) {
   const { t } = useTranslation();
   const latestTurnResult = useAppStore((state) =>
     sessionId ? state.latestTurnResults[sessionId] : undefined,
+  );
+  const approvalPending = useAppStore((state) =>
+    Boolean(
+      sessionId && state.pendingPlans[sessionId]?.status === "pending",
+    ),
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -1543,7 +1565,14 @@ export const ChatTranscript = memo(function ChatTranscript({
 
   useEffect(() => {
     scheduleFollowScroll();
-  }, [messages, isRunning, pendingPermission?.requestId, scheduleFollowScroll]);
+  }, [
+    messages,
+    isRunning,
+    pendingPermission?.requestId,
+    approvalPending,
+    planningState,
+    scheduleFollowScroll,
+  ]);
 
   // Streamed Markdown and expanded activity rows can change content height, so
   // keep pinned follow synchronized with the observed layout.
@@ -1570,7 +1599,14 @@ export const ChatTranscript = memo(function ChatTranscript({
   // Show immediate feedback after send, then let the concrete activity row
   // (thinking/tool/answer) take over so the transcript never duplicates state.
   const showWorking =
-    isRunning && !pendingPermission && !activeToolGroup && !assistantIsAnswering;
+    isRunning &&
+    !pendingPermission &&
+    !approvalPending &&
+    planningState !== "planning" &&
+    !activeToolGroup &&
+    !assistantIsAnswering;
+  const showPlanning =
+    isRunning && planningState === "planning" && !approvalPending && !pendingPermission;
 
   return (
     <div className="thread-wrap">
@@ -1608,6 +1644,7 @@ export const ChatTranscript = memo(function ChatTranscript({
               permission={pendingPermission}
             />
           ) : null}
+          {showPlanning ? <PlanningIndicator /> : null}
           {showWorking ? <WorkingIndicator /> : null}
         </div>
       </div>

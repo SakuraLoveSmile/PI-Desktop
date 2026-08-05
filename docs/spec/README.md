@@ -1,7 +1,7 @@
 # PI-Desktop Spec
 
-> Baseline: `0.4.12`
-> Updated: `2026-07-30`
+> Baseline: `0.4.14`
+> Updated: `2026-07-31`
 > Language: **English-first**
 > Stack: Electron + **Rust host core** + pi Agent Harness + user-installable plugins
 
@@ -17,6 +17,7 @@
 | [03-runtime/05-host-core-rust.md](03-runtime/05-host-core-rust.md) | Rust host core |
 | [04-ux/02-i18n-english-first.md](04-ux/02-i18n-english-first.md) | i18n policy |
 | [04-ux/07-ui-design-system.md](04-ux/07-ui-design-system.md) | Design system (tokens, motion, density) |
+| [../project/plan-mode-implementation-plan.md](../project/plan-mode-implementation-plan.md) | Plan operating-state implementation plan |
 | [07-plugins/01-plugin-system.md](07-plugins/01-plugin-system.md) | Plugin system |
 | [06-delivery/03-ai-development-workflow.md](06-delivery/03-ai-development-workflow.md) | AI dev workflow rules |
 | [06-delivery/04-e2e-test-plan.md](06-delivery/04-e2e-test-plan.md) | E2E test plan & scenarios |
@@ -69,8 +70,15 @@ docs/spec/
 4. pi agent engine in Node sidecar
 5. Host RPC = stdio JSON-RPC NDJSON
 6. SQLite owned by Rust only
-7. Only mode = Agent; read-only profile kept host-side (D188)
-8. Permission timeout 120s deny
-9. Local user-installable plugins (market later)
-10. Tag releases = macOS arm64, Windows x64, and Linux x64 (D126)
-11. Universal provider/model coverage (native + OpenAI-compatible + custom)
+7. Default mode = Agent; operating selector = Agent | Plan; Plan is the same
+   Agent in planning state and is not a strict read-only security profile
+8. SubmitPlan writes exact Markdown bytes to a new host-owned
+   `.pi/plan/*.md` artifact; title/question stay structured in
+   `plan_approvals`, approval opens the artifact, is approve/reject only, and
+   expires after 30 absolute minutes with `PLAN_APPROVAL_TIMEOUT`
+9. Protocol v9 and storage schema v10 are authoritative for Plan checkpoints,
+   `plan_approvals` execution fields, startup interruption, and shell identity
+10. Permission timeout 120s deny; Bash timeout 60s by default
+11. Local user-installable plugins (market later)
+12. Tag releases = macOS arm64, Windows x64, and Linux x64 (D126)
+13. Universal provider/model coverage (native + OpenAI-compatible + custom)

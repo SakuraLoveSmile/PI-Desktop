@@ -1,4 +1,4 @@
-# ADR 0053: User-owned MCP servers and skills, with a shared activation scope
+# ADR 0056: User-owned MCP servers and skills, with a shared activation scope
 
 - Status: Accepted
 - Date: 2026-08-05

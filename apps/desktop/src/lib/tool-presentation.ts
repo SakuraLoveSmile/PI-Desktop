@@ -3,7 +3,7 @@ import { getToolAction, getToolSummaryKey, type ToolAction } from "./tool-displa
 import { reviewChangeFromMessage } from "./workspace-review";
 
 /*
- * Structured presentation of one tool call (D189).
+ * Structured presentation of one tool call (D192).
  *
  * Tool payloads are well-shaped — Read returns file content, Bash returns
  * stdout/stderr/exitCode, Grep returns path/line hits — so the transcript

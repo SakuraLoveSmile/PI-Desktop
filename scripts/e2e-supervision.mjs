@@ -13,10 +13,17 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const appDir = join(root, "apps/desktop");
-const electronBin = join(appDir, "node_modules/.bin/electron");
+const electronBin =
+  process.platform === "win32"
+    ? join(appDir, "node_modules/electron/dist/electron.exe")
+    : join(appDir, "node_modules/.bin/electron");
 
 if (!existsSync(join(appDir, "out/main/index.js"))) {
   console.error("desktop app not built. Run: pnpm --filter @pi-desktop/desktop build");
+  process.exit(1);
+}
+if (!existsSync(electronBin)) {
+  console.error("Electron binary missing:", electronBin);
   process.exit(1);
 }
 

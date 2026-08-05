@@ -12,6 +12,12 @@
 - user MCP tools use the prefix `mcp_<serverId>_<toolName>`, disjoint from D015's
   plugin namespace (D193)
 
+Plan policy: plugin agent tools, plugin skills that register tools, and any
+unknown plugin contribution are not visible or executable in Plan. This deny
+is enforced by host-core before generic plugin permission evaluation and cannot
+be bypassed by a low-risk manifest, a session grant, or `auto`. Plugin tools
+remain available to the same Agent after an approved Plan → Agent transition.
+
 ## 1. Goals
 
 Give PI-Desktop extensibility similar to established desktop plugin ecosystems (e.g. VS Code extensions):

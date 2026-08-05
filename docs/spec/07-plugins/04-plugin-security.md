@@ -130,6 +130,17 @@ switch. They are always registered at `risk: "medium"`: their schema and
 description come from a third-party server, so the host cannot trust a
 self-declared risk level. At most 64 tools per server and 8 servers per plugin.
 
+Plan is an additional host policy boundary for agent tools:
+
+- no plugin tool is visible or executable in Plan;
+- the deny precedes manifest risk, declared/granted permissions, session
+  grants, and the `auto` permission mode;
+- a direct forged `tools.execute` call returns `PLUGIN_DISABLED_IN_PLAN` and is
+  audited; it is not forwarded to the plugin runtime;
+- plugin commands and panels may remain usable as explicit user UI actions,
+  but they cannot become model-callable Plan tools or silently mutate Plan
+  state.
+
 ## 8. Network and external links
 
 - `net.fetch` is not granted by default
@@ -182,6 +193,7 @@ The host should be able to:
    own message
 8. An MCP server declared with an absolute `command` or a plain-`http` remote
    `url` fails manifest validation
+9. A low-risk or granted plugin tool still fails closed in Plan
 
 
 ## 11. Implementation status

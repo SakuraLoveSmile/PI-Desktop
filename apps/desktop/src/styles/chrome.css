@@ -410,6 +410,14 @@
   cursor: default;
 }
 
+/*
+  The mode selector lives in the composer's left toolbar, not the top bar — see
+  the topbar source contracts in test/thinking-ui.test.mjs and
+  src/plan-mode-source-contract.test.mjs. The `.ct-mode` / `.ct-mode-btn` rules
+  that used to sit here styled the retired top-bar control and are intentionally
+  absent; do not reintroduce them.
+*/
+
 .conversation-topbar .ct-actions {
   display: inline-flex;
   align-items: center;

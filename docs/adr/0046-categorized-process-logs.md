@@ -3,7 +3,8 @@
 - Status: Accepted
 - Date: 2026-08-02
 - Related: [D082](../spec/08-meta/decisions-log.md) ·
-  [D137](../spec/08-meta/decisions-log.md) ·
+  [D182](../spec/08-meta/decisions-log.md) ·
+  [D183](../spec/08-meta/decisions-log.md) ·
   [Logging and observability](../spec/03-runtime/09-logging-and-observability.md)
 
 ## Context

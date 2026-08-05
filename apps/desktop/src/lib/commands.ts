@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { useAppStore } from "../stores/app-store";
+import type { Mode } from "@pi-desktop/shared";
 
 /**
  * First-party command execution shared by the command palette and the
@@ -28,6 +29,16 @@ export async function runPaletteCommand(commandId: string): Promise<void> {
     case "builtin.agent.compact":
       await store.compactContext();
       break;
+    case "builtin.mode.agent":
+    case "builtin.mode.plan": {
+      const mode: Mode = commandId.endsWith("plan") ? "plan" : "agent";
+      if (store.settings) {
+        const next = { ...store.settings, defaultMode: mode };
+        await api.setSettings(next);
+        useAppStore.setState({ settings: next });
+      }
+      break;
+    }
     case "builtin.openProject":
     case "builtin.project.open":
       await store.openProject();

@@ -41,6 +41,7 @@ export function ConversationTopbar({
   const workspace = useAppStore((s) => s.workspace);
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
+
   const taskTitle = isDefaultSessionTitle(activeSession?.title)
     ? t("chat.untitledTask")
     : activeSession?.title || t("chat.untitledTask");

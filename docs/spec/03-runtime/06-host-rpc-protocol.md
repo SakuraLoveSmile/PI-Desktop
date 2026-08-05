@@ -108,7 +108,7 @@ Params:
 
 ```ts
 type HandshakeParams = {
-  protocolVersion: 6
+  protocolVersion: 9
   client: "electron-main"
   clientVersion: string
   locale: string // default "en"
@@ -119,7 +119,7 @@ Result:
 
 ```ts
 type HandshakeResult = {
-  protocolVersion: 6
+  protocolVersion: 9
   host: "rust-host-core"
   hostVersion: string
   features: string[]
@@ -138,6 +138,15 @@ Rules:
 6. Version 6 adds durable model-context checkpoints through
    `session.appendCompaction`; a version 5 host must be rejected before the
    runtime claims automatic context protection (ADR 0030).
+7. Version 9 is the frozen ADR 0053/0054 contract: it covers the checkpoint
+   Plan artifact/queue, active-turn Plan identity/CAS, explicit approval
+   permission, shell catalog identity and dialect pin, streamed command output,
+   and scheduled-task mode projection from `config_json`. A v7 or incompatible
+   v8 host must be rejected before the UI becomes interactive.
+
+Protocol v9 remains paired with host-core storage schema v10. The schema version
+is an internal persistence invariant, not an additional JSON-RPC field; the
+checkpoint architecture remains host-owned.
 
 ## 4. Method catalog (MVP)
 
@@ -205,7 +214,9 @@ type ToolBudgetHealth = {
 - `session.configure` — atomically persists `mode`, `providerId`, `modelId`,
   and optional `thinkingLevel` for the next pi turn; omitting/null
   `thinkingLevel` preserves the current value; invalid modes or levels return
-  `INVALID_PARAMS`
+  `INVALID_PARAMS`; mode is `plan | agent` and changing any session
+  configuration is allowed only while idle and without a pending/queued/running
+  Plan record
 - `session.appendMessage`
 - `session.appendCompaction` — sidecar-only append of the newest typed
   model-context checkpoint. It requires non-empty checkpoint/summary/boundary
@@ -229,6 +240,37 @@ type ToolBudgetHealth = {
   project path is normalized and upserted into `projects` before the session
   references it; returns `{ imported, skipped }`
 
+### Plan state and approvals
+
+- `plans.enter` — accepts only the active Agent turn's `sessionId`, `turnId`,
+  and `toolCallId`; host-core performs the mode transition with a compare-and-
+  swap update and emits `plans.changed`
+- `plans.submit` — writes the host-owned artifact and creates a pending proposal
+- `plans.pending` — returns only pending approval rows and the session planning
+  state; renderer reload does not extend the absolute deadline while the host
+  remains alive and does not restore terminal cards
+- `plans.resolve` — validates one matching approve/reject response and, for
+  approval, commits the selected permission mode and `execution_state = queued`
+- `plans.queuedExecutions` / `plans.claimExecution` /
+  `plans.finishExecution` — consume and transition execution fields on the
+  same approval row
+- `plans.abort` — marks pending approval work interrupted; it never replays or
+  changes an already-approved session back to Plan
+
+### Scheduled tasks
+
+- `scheduled.list` / `scheduled.create` / `scheduled.update` /
+  `scheduled.delete`
+- `scheduled.import` — imports task records and normalizes their persisted mode
+- `scheduled.run` / `scheduled.finishRun` / `scheduled.listRuns`
+
+The wire `ScheduledTask.mode` is a normalized projection of the durable
+`config_json.mode`; create, update, and import map legacy `chat` to `plan` and
+default missing values to `agent`. `scheduled.run` reads the selected task's
+persisted mode; a `plan` task fails with `PLAN_REQUIRES_INTERACTIVE_SESSION`
+before creating a session or run. It never uses `settings.defaultMode` as the
+task mode.
+
 Canonical thinking levels at the host boundary are:
 
 ```text
@@ -243,6 +285,13 @@ than appending it to answer `content`.
 - `tools.list`
 - `tools.execute`
 - `tools.abort`
+- `tools.output` notifications for ordered `stdout`/`stderr` chunks
+
+### Shells
+- `commandShells.list`
+- `settings.set` with a partial settings object; omitted fields are preserved,
+  and a changed effective `defaultCommandShell` is accepted only when every
+  session has no active turn and no pending/queued/running Plan work
 
 Tool execution starts only after admission. Shell spawn retries transient
 resource exhaustion (`EAGAIN` / `WouldBlock`) with bounded backoff, never
@@ -343,27 +392,54 @@ type ToolsExecuteParams = {
   toolCallId: string
   toolName: string
   args: unknown
-  mode: "read-only" | "agent"   // D188: only `agent` is UI-reachable
+  /** Diagnostic/request context only; never used for authorization. */
+  requestedMode?: "plan" | "agent"
+  expectedCommandShellId?: CommandShellId
+  /** Bash only: dialect pinned by the same runtime turn. */
+  expectedCommandShellDialect?: "powershell" | "cmd" | "posix"
+  /** Bash only: host default 60000; accepted override 1000..300000. */
   timeoutMs?: number
 }
 ```
 
-Workspace resolution is session-scoped:
+Authoritative mode and workspace resolution are session-scoped:
 
 1. Host loads `sessionId` and resolves its persisted `project_id`/path.
-2. That path becomes the tool sandbox root for permission preview, execution,
+2. Host reads the persisted `sessions.mode` and validates it as `plan | agent`.
+   A conflicting `requestedMode` is ignored for authorization and recorded only
+   as diagnostic data.
+3. That path becomes the tool sandbox root for permission preview, execution,
    artifact paths, and audit context.
-3. The mutable `workspace.get` selection is not consulted for a valid durable
+4. The mutable `workspace.get` selection is not consulted for a valid durable
    session, so switching a retained project tab cannot redirect a background
    call.
-4. A durable path-less session resolves no root and receives
+5. A durable path-less session resolves no root and receives
    `WORKSPACE_REQUIRED` where the tool requires one. A selected project is not
    inherited.
-5. Legacy calls whose session does not exist may temporarily fall back to the
+6. Legacy calls whose session does not exist may temporarily fall back to the
    selected workspace; new renderer flows must always provide a valid
    `sessionId`.
-6. A database/session-resolution error returns `INTERNAL` and fails closed;
+7. A database/session-resolution error returns `INTERNAL` and fails closed;
    only a confirmed missing session may use the legacy fallback.
+
+Before generic permission evaluation, host-core applies the mode policy:
+
+- Plan allows `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`,
+  `CompactContext`, and `SubmitPlan` as applicable to the live planning state.
+- Plan denies `Write`, `Edit`, every plugin tool, and unknown tools under all
+  permission modes and grants.
+- Plan `Bash` follows the resolved permission mode: `ask` and `accept-edits`
+  emit `permissions.request`; `auto` executes without confirmation and may
+  mutate. The host re-resolves the effective shell ID/dialect and requires the
+  exact `expectedCommandShellId` and `expectedCommandShellDialect` before
+  permission evaluation and again before spawn; it streams stdout/stderr
+  separately. A configured shell may fall back to the first available platform
+  shell before the turn pin is created, but execution never changes shell
+  after the pin.
+- Agent applies the normal registered-tool and permission policy.
+
+The visible tool list is not the security boundary; a forged RPC call is
+authorized by this host-side matrix.
 
 ### result
 
@@ -384,6 +460,186 @@ type ToolsExecuteResult = {
   // dropping the structured content/details needed for recovery.
 }
 ```
+
+### 5.1 Plan submission and approval contracts
+
+`SubmitPlan` is handled as a host transition before generic tool execution. The
+host preserves the exact Markdown bytes in a new unique artifact before
+publishing the proposal.
+
+```ts
+type SubmitPlanParams = {
+  title: string;
+  markdown: string;
+  question: string;
+};
+
+type PlanningState = "inactive" | "planning" | "awaiting_approval";
+
+type GlobalPermissionMode = "ask" | "accept-edits" | "auto";
+
+type PlanApprovalAction = "approve" | "reject";
+
+type PlanProposalStatus =
+  | "pending" | "approved" | "rejected"
+  | "expired" | "interrupted";
+
+type PlanExecutionState =
+  | "queued" | "running" | "completed" | "interrupted";
+
+type PlanArtifact = {
+  relativePath: string; // `.pi/plan/<unique-name>.md`
+  sha256: string;
+  sizeBytes: number;
+};
+
+type PlanProposal = {
+  id: string;
+  sessionId: string;
+  turnId: string;
+  toolCallId: string;
+  plan: string;
+  markdown: string;
+  title: string;
+  question: string;
+  status: PlanProposalStatus;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt?: string;
+  resolvedAt?: string;
+  action?: PlanApprovalAction;
+  targetPermissionMode?: GlobalPermissionMode;
+  errorCode?: string;
+  artifact?: PlanArtifact;
+  version: number;
+  executionId?: string;
+  executionState?: PlanExecutionState;
+};
+
+type PlanExecution = {
+  id: string;
+  proposalId: string;
+  sessionId: string;
+  plan: string;
+  title: string;
+  question: string;
+  artifact: PlanArtifact;
+  targetPermissionMode: GlobalPermissionMode;
+  state: PlanExecutionState;
+};
+
+type PlansPendingResult = {
+  plans: PlanProposal[];
+  state?: PlanningState;
+};
+
+type PlanResolveIdentity = {
+  proposalId: string;
+  sessionId: string;
+  turnId: string;
+  toolCallId: string;
+  version?: number;
+};
+
+type PlanResolveRequest =
+  | (PlanResolveIdentity & {
+      action: "approve";
+      targetPermissionMode: GlobalPermissionMode;
+    })
+  | (PlanResolveIdentity & { action: "reject" });
+
+type PlanResolutionResult = {
+  ok: boolean;
+  proposal: PlanProposal;
+  state: PlanningState;
+  action?: PlanApprovalAction;
+  targetPermissionMode?: GlobalPermissionMode;
+  execution?: PlanExecution;
+};
+```
+
+Host notifications:
+
+```text
+method: "plans.changed"
+params: {
+  sessionId: string
+  state: PlanningState
+  proposalId?: string
+  proposal?: PlanProposal
+  action?: PlanApprovalAction
+  targetPermissionMode?: GlobalPermissionMode | null
+  execution?: PlanExecution | null
+}
+
+type ToolsOutputParams = {
+  sessionId: string
+  toolCallId: string
+  commandShellId: CommandShellId
+  stream: CommandShellOutputStream
+  chunk: string
+}
+
+method: "tools.output"
+params: ToolsOutputParams
+```
+
+`plans.changed` is emitted for Plan entry, submission, resolution, execution
+claim/finish, and abort. Its top-level params are exactly the fields shown;
+fields not applicable to a transition are omitted. For `plans.resolve`, the
+host emits `targetPermissionMode` and `execution` as JSON `null` when no value
+exists. Electron forwards this notification unchanged through
+the shared `IPC.event.plansChanged` renderer channel.
+
+`plans.resolve` accepts only an authenticated, still-pending request whose
+proposal, session, turn, tool-call, and version match. `approve` requires an
+explicit permission mode and atomically commits the `plan_approvals` row to
+`status = approved`, assigns `execution_id`, sets `execution_state = queued`,
+sets `sessions.mode = agent`, and stores the selected
+`sessions.permission_mode`; that selection is not written into app settings
+as the next approval default. Ask remains the product default. The same Agent then receives a new provider
+request with Agent tools.
+
+`reject` records `rejected` and leaves the session in Plan. The absolute
+30-minute deadline records `expired` with `PLAN_APPROVAL_TIMEOUT`. Abort, host
+restart, sidecar restart, or persistence failure records `interrupted`. Before
+serving RPC after startup, the host transactionally interrupts prior pending
+approvals and queued/running execution states. Pending, queued, and running
+work is never replayed; queued/running interruption after approval leaves the
+session in Agent. The process epoch is internal and is not a wire or database
+field.
+
+### 5.2 Shell catalog
+
+```ts
+type CommandShellId = "windows-powershell" | "cmd" | "git-bash" | "bash";
+
+type CommandShellOption = {
+  id: CommandShellId;
+  label: string;
+  dialect: "powershell" | "cmd" | "posix";
+  available: boolean;
+  isDefault: boolean;
+};
+
+type CommandShellCatalog = {
+  configuredId: CommandShellId | null;
+  effective: CommandShellOption | null;
+  fallback: boolean;
+  choices: CommandShellOption[];
+};
+
+type CommandShellOutputStream = "stdout" | "stderr";
+```
+
+`commandShells.list` returns the host discovery result. Settings writes store
+only a catalog ID and reject unknown, unavailable, or wrong-platform IDs with
+`COMMAND_SHELL_INVALID`. If a persisted ID later becomes unavailable, the
+catalog selects the first available platform shell and sets `fallback: true`.
+A Bash request includes the pinned effective ID and dialect from the same turn;
+host-core rejects a changed ID or dialect with `COMMAND_SHELL_CHANGED` before
+permission evaluation and before spawn. Identity is not an executable path
+hash.
 
 ## 6. Permission request notification
 
@@ -432,6 +688,18 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 | 1010 | PLUGIN_LOAD_FAILED | enable/load failure |
 | 1011 | PROTOCOL_MISMATCH | handshake version mismatch |
 | -32029 | HOST_OVERLOADED | RPC dispatcher capacity exhausted |
+| 1012 | WRITE_DISABLED_IN_PLAN | Write is unavailable in Plan |
+| 1013 | EDIT_DISABLED_IN_PLAN | Edit is unavailable in Plan |
+| 1014 | PLUGIN_DISABLED_IN_PLAN | plugin tools are unavailable in Plan |
+| 1015 | PLAN_APPROVAL_REQUIRED | SubmitPlan is waiting for approval |
+| 1016 | PLAN_APPROVAL_TIMEOUT | absolute approval deadline expired |
+| 1017 | PLAN_APPROVAL_STALE | response does not match the live proposal/session/turn/tool-call/version |
+| 1018 | PLAN_APPROVAL_INTERRUPTED | pending approval failed closed during abort/recovery |
+| 1019 | PLAN_REQUIRES_INTERACTIVE_SESSION | unattended Plan cannot run |
+| 1020 | PLAN_ARTIFACT_WRITE_FAILED | exact bytes could not be written to a new `.pi/plan/*.md` artifact |
+| 1021 | PLAN_EXECUTION_INTERRUPTED | approved queued/running Plan execution was interrupted |
+| 1022 | SHELL_NOT_FOUND | no effective platform shell is available |
+| 1023 | COMMAND_SHELL_CHANGED | pinned shell ID or dialect changed before execution |
 
 ## 8. Concurrency / ordering
 
@@ -441,12 +709,22 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 2. Different sessions may continue concurrently across retained project tabs;
    each resolves its own project root and grants
 3. Notifications may arrive anytime after handshake
-4. Abort should be best-effort and idempotent
-5. A session fork is one host-owned snapshot operation. The source transcript
+4. `tools.output` preserves stdout/stderr separation and notification order;
+   it is scoped to its session/tool call and has no turn or ordering fields;
+   final results remain bounded
+5. Abort is idempotent and shuts down the complete Bash process tree
+6. Plan approval requests are proposal/session/turn/tool-call/version scoped;
+   only one pending approval and one queued/running execution exists per
+   session, and resolution is serialized by host-core
+7. Startup transactionally interrupts pending approvals and queued/running
+   execution states before RPC service. Late renderer responses fail closed;
+   pending interruption keeps Plan and an already-approved queued/running
+   interruption keeps Agent.
+8. A session fork is one host-owned snapshot operation. The source transcript
    is never rewritten, and a handled child write/index failure leaves no
    visible session or orphan transcript file. A process crash follows D119's
    existing orphan-transcript recovery policy.
-6. A message-scoped fork is identical except that the canonical snapshot ends
+9. A message-scoped fork is identical except that the canonical snapshot ends
    inclusively at `throughMessageId`. It still remaps message/tool-call ids and
    creates no runtime or revision state, so later child reseed/cache state is
    isolated by the new session id.
@@ -475,3 +753,13 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
    the source and its regenerate revisions unchanged
 9. Forking through a message excludes every later source row and rejects an
    unknown message without creating a child
+10. A forged `requestedMode` cannot authorize a tool against the durable mode;
+    Plan denies Write/Edit/plugin/unknown tools and applies permission prompts
+    to Bash according to `ask`/`accept-edits`/`auto`
+11. SubmitPlan writes exact Markdown bytes to a unique `.pi/plan/*.md` file with
+    hash/size and structured title/question fields; only matching
+    approve/reject responses can resolve the live `plan_approvals` row
+12. Plan expiry, abort, crash, scheduled rejection, and stale responses
+    produce the documented durable statuses and events
+13. Bash validates the pinned shell ID/dialect, streams stdout/stderr, enforces
+    the 60s default/bounded override, and shuts down the complete process tree

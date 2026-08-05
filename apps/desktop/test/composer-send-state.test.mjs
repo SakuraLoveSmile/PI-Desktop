@@ -11,7 +11,13 @@ const [store, composer] = await Promise.all([
 
 test("composer send/stop button follows the visible session's run state", () => {
   const composerRight = composer.match(/<div className="composer-right">[\s\S]*?<\/div>\s*<\/div>/)?.[0] ?? "";
-  assert.match(composerRight, /\{isRunning \? \(/);
+  // Plan mode widened the stop condition: the button switches on `runActive`,
+  // which folds an in-flight plan execution into the session's own `isRunning`.
+  // Assert the derivation too, so the control keeps tracking the visible
+  // session's run state rather than some unrelated global flag.
+  assert.match(composerRight, /\{runActive \? \(/);
+  assert.match(composer, /const runActive = isRunning \|\| executionActive;/);
+  assert.match(composer, /const isRunning = useAppStore\(\(s\) => s\.isRunning\);/);
   assert.match(composerRight, /stop-btn/);
   assert.match(composerRight, /send-btn/);
   assert.match(composerRight, /onClick=\{\(\) => void abort\(\)\}/);
