@@ -23,6 +23,7 @@ import { Markdown } from "../components/Markdown";
 import { ScopeControl } from "../components/extensions/ScopeControl";
 import { McpSection } from "../components/extensions/McpSection";
 import { SkillsSection } from "../components/extensions/SkillsSection";
+import { SubagentsSection } from "../components/extensions/SubagentsSection";
 import type {
   ActivationScope,
   MarketPluginDetail,
@@ -35,12 +36,12 @@ import type {
 } from "@pi-desktop/shared";
 
 /**
- * The four things a user extends the app with. Plugins, MCP servers and skills
- * are separate tabs rather than one merged list because they are created in
- * completely different ways — installed, configured, written — and a single list
- * would have to hide that behind a lowest-common-denominator row.
+ * The things a user extends the app with. Plugins, MCP servers, skills and
+ * subagents are separate tabs rather than one merged list because they are
+ * created in completely different ways — installed, configured, written — and a
+ * single list would have to hide that behind a lowest-common-denominator row.
  */
-type TabId = "installed" | "mcp" | "skills" | "market";
+type TabId = "installed" | "mcp" | "skills" | "subagents" | "market";
 
 /**
  * Always-visible sections of the installed index. Broken plugins come first and
@@ -349,7 +350,7 @@ export function PluginsPage() {
 
   const [tab, setTab] = useState<TabId>("installed");
   const [installedQuery, setInstalledQuery] = useState("");
-  /** Shared by the MCP and Skills tabs; both lists are short enough to filter live. */
+  /** Shared by the MCP, Skills and Subagents tabs; each list is short enough to filter live. */
   const [extQuery, setExtQuery] = useState("");
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [query, setQuery] = useState("");
@@ -860,6 +861,17 @@ export function PluginsPage() {
             <button
               type="button"
               role="tab"
+              id="plugins-tab-subagents"
+              aria-selected={tab === "subagents"}
+              aria-controls="plugins-panel-subagents"
+              className={cx("plugins-segment-btn", tab === "subagents" && "active")}
+              onClick={() => setTab("subagents")}
+            >
+              {t("extensions.tabSubagents")}
+            </button>
+            <button
+              type="button"
+              role="tab"
               id="plugins-tab-market"
               aria-selected={tab === "market"}
               aria-controls="plugins-panel-market"
@@ -911,7 +923,9 @@ export function PluginsPage() {
                 placeholder={
                   tab === "mcp"
                     ? t("extensions.mcp.searchPlaceholder")
-                    : t("extensions.skills.searchPlaceholder")
+                    : tab === "subagents"
+                      ? t("extensions.subagents.searchPlaceholder")
+                      : t("extensions.skills.searchPlaceholder")
                 }
               />
             </div>
@@ -939,6 +953,19 @@ export function PluginsPage() {
             className="plugins-panel"
           >
             <SkillsSection
+              projects={projects}
+              currentProjectPath={currentProjectPath}
+              query={extQuery}
+            />
+          </div>
+        ) : tab === "subagents" ? (
+          <div
+            id="plugins-panel-subagents"
+            role="tabpanel"
+            aria-labelledby="plugins-tab-subagents"
+            className="plugins-panel"
+          >
+            <SubagentsSection
               projects={projects}
               currentProjectPath={currentProjectPath}
               query={extQuery}
