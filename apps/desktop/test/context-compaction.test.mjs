@@ -47,10 +47,12 @@ test("turn_end remains a per-tool-turn boundary rather than a terminal run state
   assert.match(store, /case "turn_end":\s*break/);
 });
 
-test("per-turn protection nudges softly and blocks unsafe provider requests", () => {
+test("host-driven protection blocks unsafe provider requests with no model-facing tool", () => {
   assert.match(runtime, /prepareNextTurnWithContext/);
-  assert.match(runtime, /<context_management>/);
-  assert.match(runtime, /CONTEXT_NUDGE_TURN_INTERVAL = 3/);
+  // Triggering is deterministic and host-owned: no compaction tool, no prompt
+  // nudge, so a long session never spends a turn asking the model to compact.
+  assert.doesNotMatch(runtime, /CompactContext/);
+  assert.doesNotMatch(runtime, /<context_management>/);
   assert.match(runtime, /budget\.tokens >= budget\.hardLimit/);
   assert.match(runtime, /CONTEXT_COMPACTION_FAILED: unable to create a checkpoint/);
   assert.match(runtime, /checkpoint truncated: tool result exceeded the retained context budget/);
@@ -59,19 +61,72 @@ test("per-turn protection nudges softly and blocks unsafe provider requests", ()
   assert.match(runtime, /fallback: "retained_tail"/);
 });
 
+test("checkpoints are pre-computed only in provider-idle windows", () => {
+  assert.match(runtime, /BACKGROUND_COMPACTION_LIMIT_RATIO = 0\.7/);
+  // Window A: while a tool runs. Window B: after a run ends.
+  assert.match(
+    runtime,
+    /case "tool_execution_start":[\s\S]*?this\.maybeStartBackgroundCompaction\(\);/,
+  );
+  assert.match(
+    runtime,
+    /\} finally \{[\s\S]*?this\.maybeStartBackgroundCompaction\(\);\s*\}\s*return \{ turnId: this\.turnId \};/,
+  );
+  // Never concurrent with a streaming turn.
+  assert.match(
+    runtime,
+    /if \(this\.backgroundCompaction\) await this\.backgroundCompaction;/,
+  );
+  // Generation is side-effect free; only the install touches the session.
+  assert.match(runtime, /private async buildCheckpoint\(signal: AbortSignal\)/);
+  assert.match(runtime, /phase: "background"/);
+});
+
 test("compaction lifecycle keeps the renderer busy until its actual terminal event", () => {
+  assert.match(types, /phase\?: ContextCompactionPhase/);
   assert.match(
     store,
-    /event\.type === "turn_start" \|\|\s*event\.type === "compaction_start"/,
+    /event\.type === "compaction_start" && event\.phase !== "background"/,
   );
   assert.match(
     store,
     /event\.type === "compaction_end" && event\.reason === "manual"/,
   );
-  assert.match(store, /case "compaction_start":\s*set\(\{ isRunning: true \}\)/);
+  assert.match(
+    store,
+    /case "compaction_start":\s*if \(event\.phase !== "background"\) set\(\{ isRunning: true \}\)/,
+  );
   assert.match(
     store,
     /case "compaction_end":[\s\S]*event\.reason === "manual"\) set\(\{ isRunning: false \}\)/,
   );
   assert.match(store, /contextCompaction\.recovered/);
 });
+
+test("a successful automatic compaction notifies nobody", () => {
+  const compactionEnd =
+    store.match(/case "compaction_end":[\s\S]*?\n      case "agent_end":/)?.[0] ??
+    "";
+  assert.ok(compactionEnd.length > 0, "compaction_end handler not found");
+  // Only three toasts survive, and each follows something the user already saw:
+  // a degraded checkpoint, the request that overflowed, and a manual command.
+  assert.match(
+    compactionEnd,
+    /if \(event\.fallback\) \{\s*get\(\)\.showToast\(i18n\.t\("contextCompaction\.recovered"\)/,
+  );
+  assert.match(
+    compactionEnd,
+    /else if \(event\.reason === "overflow"\) \{\s*get\(\)\.showToast\(\s*i18n\.t\("contextCompaction\.retrying"\)/,
+  );
+  assert.match(
+    compactionEnd,
+    /else if \(event\.reason === "manual"\) \{\s*get\(\)\.showToast\(i18n\.t\("contextCompaction\.completed"\)/,
+  );
+  // A threshold compaction reaches no showToast call of its own.
+  assert.equal(
+    compactionEnd.match(/showToast/g)?.length,
+    4,
+    "unexpected number of compaction toasts",
+  );
+});
+

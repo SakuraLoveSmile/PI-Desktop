@@ -2391,7 +2391,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (
       event.type === "agent_start" ||
       event.type === "turn_start" ||
-      event.type === "compaction_start"
+      // Background checkpoints are pre-computed off the critical path, so they
+      // must not make an idle session look busy.
+      (event.type === "compaction_start" && event.phase !== "background")
     ) {
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: true },
@@ -2537,26 +2539,28 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ isRunning: true });
         break;
       case "compaction_start":
-        set({ isRunning: true });
+        if (event.phase !== "background") set({ isRunning: true });
         break;
       case "compaction_end":
         if (event.reason === "manual") set({ isRunning: false });
         if (event.ok) {
-          get().showToast(
-            i18n.t(
-              event.fallback
-                ? "contextCompaction.recovered"
-                : event.reason === "overflow"
-                ? "contextCompaction.retrying"
-                : "contextCompaction.completed",
-            ),
-            {
-              variant:
-                event.fallback || event.reason === "overflow"
-                  ? "warning"
-                  : "info",
-            },
-          );
+          // Automatic compaction is silent: it happens on its own schedule and
+          // announcing it would interrupt a long session for nothing. What is
+          // left announces something the user already saw — a degraded
+          // checkpoint, a request that overflowed, or a command they ran.
+          if (event.fallback) {
+            get().showToast(i18n.t("contextCompaction.recovered"), {
+              variant: "warning",
+            });
+          } else if (event.reason === "overflow") {
+            get().showToast(i18n.t("contextCompaction.retrying"), {
+              variant: "warning",
+            });
+          } else if (event.reason === "manual") {
+            get().showToast(i18n.t("contextCompaction.completed"), {
+              variant: "info",
+            });
+          }
         } else if (event.reason === "manual") {
           get().showToast(
             event.error?.message || i18n.t("contextCompaction.failed"),
