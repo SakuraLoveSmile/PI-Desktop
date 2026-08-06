@@ -78,3 +78,4 @@ Each ADR includes:
 | 0060 | Archive the regenerate branch under the RPC lock | Accepted |
 | 0061 | Imperceptible background context compaction | Accepted (amends 0030 / 0049) |
 | 0062 | Bounded subagents behind a Task tool | Accepted for implementation |
+| 0063 | A managed surface for subagent definitions | Accepted for implementation |

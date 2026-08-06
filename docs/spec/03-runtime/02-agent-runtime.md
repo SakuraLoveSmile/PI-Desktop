@@ -386,10 +386,15 @@ criterion-by-criterion report of what was met and the evidence observed.
 The session Agent can hand one self-contained piece of work to a delegate and
 receive a single written report.
 
-**Catalog.** Definitions are Markdown documents: three builtins shipped inline
-in `agent-runtime` (`explorer`, `code-reviewer`, `test-runner`) plus
-`<workspace>/.pi/agents/*.md`, with project documents shadowing builtins by
-name. Electron main loads the catalog on every launch and passes
+**Catalog.** Definitions are Markdown documents from three sources: three
+builtins shipped inline in `agent-runtime` (`explorer`, `code-reviewer`,
+`test-runner`), the user registry host-core owns under `<data>/agents/` (D202),
+and `<workspace>/.pi/agents/*.md`. Precedence is **project > user registry >
+builtin**, so a committed project document retunes a registry definition or a
+builtin without renaming it. Registry documents are filtered by `enabled` and
+their activation scope before they reach the loader, so a definition scoped to
+another project is not in the catalog at all. Electron main loads the catalog on
+every launch and passes
 `subagents` / `subagentProviders` in the sidecar params, so editing a definition
 takes effect on the next prompt. The catalog is capped at
 `MAX_SUBAGENT_DEFINITIONS` (16); a malformed or unreadable document becomes a
