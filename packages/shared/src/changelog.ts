@@ -23,6 +23,18 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.5.3",
+    date: "2026-08-07",
+    highlights: [
+      "Run bounded subagents behind a Task tool, with user-defined agents, pinned models, attribution, and session persistence.",
+      "Manage subagents from Extensions with registry reloads and clearer read-only status.",
+      "Prepare and install context checkpoints during idle time while preserving transcript history and showing compaction rows and warnings.",
+      "Add Goal mode as a second contract mode and preserve pasted file references through mode commands.",
+      "Restore subagent and host-backed panels when the host reconnects, with quieter routine teardown diagnostics.",
+      "Polish work panel and extension surfaces with clearer metadata, controls, and dark-theme contrast.",
+    ],
+  },
+  {
     version: "0.4.3",
     date: "2026-08-05",
     highlights: [
@@ -200,6 +212,18 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.5.3",
+    date: "2026-08-07",
+    highlights: [
+      "通过 Task 工具运行有界子代理，支持用户自定义代理、固定模型、归属标记与会话持久化。",
+      "可在扩展页面管理子代理，支持注册表重载，并提供更清晰的只读状态。",
+      "在空闲期间准备并安装上下文检查点，同时保留完整对话历史，并显示压缩行和提醒。",
+      "新增作为第二种契约模式的 Goal 模式，并在模式命令后保留粘贴的文件引用。",
+      "宿主重新连接后自动恢复子代理及其他宿主面板，并降低例行拆除时的诊断噪声。",
+      "优化工作面板与扩展页面的元信息、控件和深色主题对比度。",
+    ],
+  },
   {
     version: "0.4.3",
     date: "2026-08-05",
