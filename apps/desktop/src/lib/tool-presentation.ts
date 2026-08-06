@@ -92,6 +92,12 @@ export type ToolBlock =
 export type ToolPresentationOptions = {
   /** Drop the argument the collapsed row already shows as its summary. */
   hideSummaryArg?: boolean;
+  /**
+   * Drop a delegate's report from a `Task` body. The transcript nests the
+   * delegate's own rows under the call, and its last answer row already is the
+   * report, so showing both would print it twice (ADR 0062).
+   */
+  hideDelegateReport?: boolean;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -149,6 +155,19 @@ export function toolResultPayload(message: ToolPresentationMessage): unknown {
     return envelope.details;
   }
   return envelopeText(envelope) ?? envelope;
+}
+
+/**
+ * A delegate's report. `toolResultPayload` prefers the `details` object, which
+ * for `Task` holds only counters, so the report has to be read from the text
+ * blocks of the raw envelope.
+ */
+function delegateReport(message: ToolPresentationMessage): string | null {
+  const raw = message.toolResult;
+  if (typeof raw === "string") return raw.trim() ? raw : null;
+  const envelope = asRecord(raw);
+  const text = envelope ? envelopeText(envelope) : null;
+  return text && text.trim() ? text : null;
 }
 
 function countLines(text: string): number {
@@ -419,6 +438,7 @@ function resultBlocks(
   message: ToolPresentationMessage,
   args: Record<string, unknown> | null,
   payload: unknown,
+  options: ToolPresentationOptions = {},
 ): ToolBlock[] {
   const details = asRecord(payload);
   const blocks: ToolBlock[] = [];
@@ -491,6 +511,30 @@ function resultBlocks(
       if (resolved) blocks.push(resolved);
       break;
     }
+    case "delegate": {
+      // A delegation reads as brief in, report out. The counters that pi hands
+      // back (`turns`, `toolCalls`, `usage`) are a footer, and `agent` already
+      // labels the row, so neither repeats here.
+      const brief = stringAt(args, "task");
+      if (brief !== null) {
+        blocks.push(codeBlock("input", brief, "markdown", { label: "task" }));
+      }
+      const report = options.hideDelegateReport
+        ? null
+        : delegateReport(message);
+      if (report !== null) blocks.push(codeBlock("output", report, "markdown"));
+      const counters = details
+        ? Object.fromEntries(
+            Object.entries(details).filter(
+              ([key]) => key !== "agent" && key !== "error",
+            ),
+          )
+        : {};
+      if (Object.keys(counters).length > 0) {
+        blocks.push(...recordBlocks(counters, "details"));
+      }
+      break;
+    }
     default:
       break;
   }
@@ -525,20 +569,21 @@ export function buildToolPresentation(
   const action = getToolAction(message.toolName);
   const args = asRecord(message.toolArgs);
   const payload = toolResultPayload(message);
-  const blocks = resultBlocks(action, message, args, payload);
+  const blocks = resultBlocks(action, message, args, payload, options);
   if (!args) return blocks;
 
   // Arguments are worth showing when the result blocks did not already carry
   // them (Read content, Bash command) and for opaque tools whose arguments are
-  // the interesting part.
+  // the interesting part. A delegation places its own brief, so it opts out.
   const wantArgs =
-    blocks.length === 0 ||
-    blocks.every(
-      (block) => block.role === "error" || block.role === "notice",
-    ) ||
-    action === "use" ||
-    action === "fork" ||
-    action === "fetch";
+    action !== "delegate" &&
+    (blocks.length === 0 ||
+      blocks.every(
+        (block) => block.role === "error" || block.role === "notice",
+      ) ||
+      action === "use" ||
+      action === "fork" ||
+      action === "fetch");
   if (!wantArgs) return blocks;
   const summaryKey = options.hideSummaryArg
     ? getToolSummaryKey(message.toolName, args)

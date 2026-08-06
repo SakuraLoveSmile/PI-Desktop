@@ -381,6 +381,60 @@ criterion-by-criterion report of what was met and the evidence observed.
   next prompt cannot reuse the source session's runtime/provider cache because
   the session id and remapped transcript identities are independent (D134).
 
+## 5f. Subagent delegation (D201, ADR 0062)
+
+The session Agent can hand one self-contained piece of work to a delegate and
+receive a single written report.
+
+**Catalog.** Definitions are Markdown documents: three builtins shipped inline
+in `agent-runtime` (`explorer`, `code-reviewer`, `test-runner`) plus
+`<workspace>/.pi/agents/*.md`, with project documents shadowing builtins by
+name. Electron main loads the catalog on every launch and passes
+`subagents` / `subagentProviders` in the sidecar params, so editing a definition
+takes effect on the next prompt. The catalog is capped at
+`MAX_SUBAGENT_DEFINITIONS` (16); a malformed or unreadable document becomes a
+launch diagnostic and never fails the launch.
+
+**Tool.** `Task(agent, task, description?)` is built only in Agent mode and only
+when the catalog is non-empty. Its description carries the delegate catalog, and
+its arguments are validated in the tool: an unknown `agent`, an empty `task`, an
+unresolvable model pin and a definition whose tools are all unavailable each
+return a tool error explaining the failure rather than throwing.
+
+**Delegate loop.** A `SubagentRun` is a second pi `Agent` in the same sidecar
+process with the definition's system prompt, its (possibly pinned)
+provider/model, its declared tools, and the same host connection. It runs under
+`maxTurns` (default 24, maximum 80) and the same bounded provider retry policy
+as the parent. Its statuses are `completed`, `truncated`, `failed` and
+`aborted`; all four collapse into the `Task` tool result, whose text is the
+report (bounded to `MAX_SUBAGENT_REPORT_CHARS`, 12k) and whose details carry
+`agent`, `status`, `turns`, `toolCalls`, `usage` and, on failure, `error`.
+
+**Model pins.** `model: <provider>/<model>` in the frontmatter is resolved once
+per launch in Electron main, where credentials and the pi catalog live, against
+provider id, vendor key or display name, and capped at
+`MAX_SUBAGENT_PROVIDERS` (8) distinct providers. An unresolvable pin is omitted
+from the binding map on purpose; the runtime turns the missing entry into a tool
+error naming the pin, and never falls back to the session model. A definition's
+`thinkingLevel` is clamped against the resolved model with the same
+nearest-supported rule as §5c.
+
+**Events and context.** Every event a delegate emits carries
+`parentToolCallId` and `agentName` on its envelope, and Electron main copies both
+onto the persisted row. When the runtime rebuilds model context it skips every
+row with `parentToolCallId`: the parent only ever saw the report, and replaying
+delegate rows would both contradict that and reintroduce the context cost
+delegation exists to avoid.
+
+**Turn ownership.** A delegate's lifecycle never reaches Electron main's turn
+handling. Termination is visible only as the `Task` tool result, so the parent
+turn remains the only thing that can end a turn.
+
+The surrounding contracts live in `03-tools-and-permissions.md` §10.2 (what a
+delegate may call), `04-data-storage.md` §4.7a (persisted attribution),
+`04-ux/03-permission-ux.md` §6a (more than one pending request) and
+`04-ux/08-component-spec.md` §9.9 (how a delegation reads).
+
 ## 6. Providers & models
 
 > Full policy: `11-provider-model-system.md`, `12-provider-config-schema.md`, `13-model-catalog-and-selection.md`.
@@ -525,6 +579,27 @@ the standard the Agent works against: it pursues the goal autonomously, chooses
 its own approach, and stops only when every acceptance criterion is verified or a
 boundary blocks it.
 
+### 7.2b Subagent prompt composition (D201, ADR 0062)
+
+A delegate's system prompt is composed in the sidecar from three parts, in this
+order: the delegation framing, the definition's Markdown body, and the tool
+guidance its declared tools earn. The body sits ahead of the workspace guidance
+so a project's own instructions still have the last word.
+
+The framing states the shape of the delegate's situation, which is not
+inferable from the body: it is one delegated task, the delegate cannot see the
+user, ask a question, or delegate further, it has exactly the listed tools, and
+its final message is the only thing the main agent receives. A read-only
+definition is additionally told never to report an edit it could not have made;
+a write-capable one is told to touch only the files the task is about.
+
+Guidance blocks are the same text the session prompt uses, included only when
+the definition declares the matching tool: search/read scoping for
+Read/Grep/Glob, edit discipline for Edit/Write, the command shell contract for
+Bash, and the scratch-directory rule when the session has a scratch directory
+and the delegate can write. The project instruction chain (§7.3) is appended
+last, so a delegate follows the same project rules as its session.
+
 ### 7.3 Project instruction chain
 
 The Electron main process first resolves the global
@@ -576,6 +651,18 @@ Saves affect the next prompt without restarting the application.
 | same session | single turn serial |
 | different sessions | limited parallel |
 | tools | sequential by default |
+| `Task` calls in one assistant message | parallel, 4 slots (D201) |
+
+Tool concurrency is expressed through pi execution modes: every catalog tool is
+`sequential` and `Task` alone is `parallel`, and pi runs a batch sequentially as
+soon as it contains one sequential tool. So an all-`Task` batch is the only batch
+that fans out, and every other ordering guarantee is unchanged. Delegates issue
+host calls independently, and host-core's one-mutation-per-session admission
+keeps writes from tearing but leaves two same-path mutations unordered, so the
+sidecar serializes `Write`/`Edit` calls that target the same normalized path
+before they reach the host; calls on different paths never wait on each other.
+This is what keeps the per-path edit-recovery rules of
+`03-tools-and-permissions.md` §4d meaningful under fan-out.
 
 Selecting another project tab affects only the visible shell workspace. It
 does not dispose, abort, or re-root a runtime belonging to another session.

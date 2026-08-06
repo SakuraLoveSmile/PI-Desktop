@@ -1251,3 +1251,43 @@ D193, and D194.
   `03-runtime/06-host-rpc-protocol.md`, `04-ux/06-settings-ia.md`,
   `04-ux/08-component-spec.md` §7.3/§8.3/§11.5,
   `04-ux/09-interaction-patterns.md` §3A, and E2E-084.
+
+## 2026-08-06 — Bounded subagents behind a `Task` tool
+
+- A session can delegate one self-contained piece of work to a subagent and get
+  back a single written report. Definitions are Markdown documents — three
+  inline builtins (`explorer`, `code-reviewer`, `test-runner`) plus
+  `<workspace>/.pi/agents/*.md`, project shadowing builtins by name, re-read on
+  every launch, capped at 16, with malformed documents degraded to launch
+  diagnostics.
+- A definition declares its own `tools` from Read/Glob/Grep/BrowserPreview/
+  Bash/Edit/Write and is read-only (`Read, Glob, Grep`) when it declares none. A
+  delegate never inherits mutation rights from its session, cannot reach plugin,
+  skill, mode or meta tools, and has no `Task` tool of its own. Its calls run
+  through the same `tools.execute` host path, so containment and permission
+  modes are unchanged.
+- A definition may pin `model: <provider>/<model>`, resolved once per launch in
+  Electron main against configured providers (by id, vendor key or display name,
+  8 distinct providers maximum). An unresolvable pin fails the `Task` call with a
+  tool error instead of falling back to the session model.
+- `Task` is offered in Agent mode only. Fan-out comes from execution modes: the
+  session Agent runs `toolExecution: "parallel"`, every other tool is
+  `sequential`, and only an all-`Task` batch runs concurrently, capped at 4
+  slots and each delegate at its own `maxTurns` (default 24, maximum 80). The
+  sidecar serializes same-path `Write`/`Edit` calls through a `PathMutex`.
+- The parent's model context gains the bounded report (12k chars) and nothing
+  else. Delegate messages and tool rows are emitted and persisted with
+  `parentToolCallId` / `agentName` in the message `meta`, but the runtime skips
+  them when rebuilding context, and a delegate's termination collapses into the
+  tool result rather than reaching Electron main's turn handling.
+- The transcript nests attributed rows one level inside their `Task` row and
+  keeps them out of the turn stream and the minimap. Pending permission requests
+  become a per-session queue: head-only answering, id-matched removal, whole
+  queue denied on abort, and a card that names the delegate that asked and how
+  many wait behind it.
+- Decision D201 and ADR 0062 define this. See
+  `03-runtime/02-agent-runtime.md` §5f/§7.2b/§8,
+  `03-runtime/03-tools-and-permissions.md` §10.2,
+  `03-runtime/04-data-storage.md` §4.7a,
+  `04-ux/03-permission-ux.md` §6a, `04-ux/08-component-spec.md` §9.9, and
+  E2E-119.

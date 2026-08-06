@@ -21,6 +21,29 @@ test("maps built-in tools to concise Codex-style actions", () => {
   assert.equal(getToolAction("functions.fork_agent"), "fork");
 });
 
+test("delegation is its own action, matched exactly", () => {
+  assert.equal(getToolAction("Task"), "delegate");
+  assert.equal(getToolAction("functions.subagent"), "delegate");
+  // A plugin tool that merely mentions tasks keeps its generic presentation.
+  assert.equal(getToolAction("CreateTask"), "use");
+  assert.equal(getToolAction("plugin_tasks_list"), "list");
+});
+
+test("a delegation row shows its label, and the agent beside it", () => {
+  assert.equal(
+    getToolSummary("Task", {
+      agent: "code-reviewer",
+      description: "Review the store",
+      task: "Read app-store.ts and report dead branches.",
+    }),
+    "Review the store",
+  );
+  assert.equal(
+    getToolSummaryKey("Task", { agent: "code-reviewer", task: "..." }),
+    "agent",
+  );
+});
+
 test("builds a single-line bounded hint from the most useful argument", () => {
   assert.equal(
     getToolSummary("Bash", { command: "pnpm test\n  --filter desktop" }),

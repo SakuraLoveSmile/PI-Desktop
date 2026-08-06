@@ -1,0 +1,136 @@
+/**
+ * Provider/model wiring shared by the session runtime and its subagents.
+ *
+ * A subagent definition may pin its own provider and model, so building a
+ * pi-ai `Models` registry is no longer something only the session runtime
+ * does. Electron main still resolves credentials and catalog metadata; this
+ * module only turns a resolved `RuntimeProviderConfig` into pi-ai objects.
+ */
+
+import {
+  createModels,
+  createProvider,
+  type Api,
+  type Model,
+  type Models,
+  type ProviderStreams,
+} from "@earendil-works/pi-ai";
+import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
+import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
+import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
+import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
+import type { ThinkingLevel } from "@pi-desktop/shared";
+import type { PiModelConfig } from "./thinking-level.js";
+
+export type RuntimeProviderConfig = {
+  id: string;
+  name: string;
+  baseUrl?: string;
+  modelId: string;
+  apiKey: string;
+  authKind?: string;
+  /** Wire protocol for the endpoint (provider config apiStyle). */
+  apiStyle?: string;
+  supportsReasoning: boolean;
+  supportedThinkingLevels: ThinkingLevel[];
+  /** Complete model metadata resolved from pi-ai by Electron main. */
+  modelConfig?: PiModelConfig;
+};
+
+export const DEFAULT_CONTEXT_WINDOW = 128_000;
+export const DEFAULT_MAX_TOKENS = 8_192;
+
+export type ApiBinding = {
+  api: Api;
+  adapter: () => ProviderStreams;
+  defaultBaseUrl: string;
+};
+
+/** Map a stored provider apiStyle onto a pi-ai wire API. Unknown styles fall
+ * back to OpenAI Chat Completions, the pre-apiStyle behavior. */
+export function apiBindingForStyle(apiStyle?: string): ApiBinding {
+  switch (apiStyle) {
+    case "responses":
+      return {
+        api: "openai-responses",
+        adapter: openAIResponsesApi,
+        defaultBaseUrl: "https://api.openai.com/v1",
+      };
+    case "anthropic_messages":
+      return {
+        api: "anthropic-messages",
+        adapter: anthropicMessagesApi,
+        defaultBaseUrl: "https://api.anthropic.com",
+      };
+    case "google_generative_ai":
+      return {
+        api: "google-generative-ai",
+        adapter: googleGenerativeAIApi,
+        defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      };
+    default:
+      return {
+        api: "openai-completions",
+        adapter: openAICompletionsApi,
+        defaultBaseUrl: "https://api.openai.com/v1",
+      };
+  }
+}
+
+/** The key pi-ai signs requests with; `none` auth still needs a placeholder. */
+export function providerRequestKey(provider: RuntimeProviderConfig): string {
+  return (
+    provider.apiKey || (provider.authKind === "none" ? "pi-desktop-no-auth" : "")
+  );
+}
+
+export function buildProviderModel(
+  provider: RuntimeProviderConfig,
+): Model<Api> {
+  const binding = apiBindingForStyle(provider.apiStyle);
+  const catalog = provider.modelConfig;
+  const catalogModel = catalog
+    ? (({ source: _source, ...model }) => model)(catalog)
+    : {
+        name: provider.modelId,
+        reasoning: false,
+        input: ["text" as const],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: DEFAULT_CONTEXT_WINDOW,
+        maxTokens: DEFAULT_MAX_TOKENS,
+      };
+  return {
+    ...catalogModel,
+    id: provider.modelId,
+    api: binding.api,
+    provider: provider.id,
+    baseUrl: provider.baseUrl ?? catalog?.baseUrl ?? binding.defaultBaseUrl,
+  } as Model<Api>;
+}
+
+/** A single-model registry for one resolved provider. */
+export function createProviderModels(
+  provider: RuntimeProviderConfig,
+  model: Model<Api>,
+): Models {
+  const requestKey = providerRequestKey(provider);
+  const models = createModels();
+  models.setProvider(
+    createProvider({
+      id: provider.id,
+      name: provider.name,
+      baseUrl: provider.baseUrl,
+      auth: {
+        apiKey: {
+          name: `${provider.name} API key`,
+          // Plain apiKey semantics let each adapter emit its own auth header
+          // (Bearer for OpenAI-style APIs, x-api-key for Anthropic, …).
+          resolve: async () => ({ auth: { apiKey: requestKey } }),
+        },
+      },
+      models: [model],
+      api: apiBindingForStyle(provider.apiStyle).adapter(),
+    }),
+  );
+  return models;
+}

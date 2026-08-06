@@ -452,3 +452,81 @@ test("diff trims shared context down to the replacement", () => {
     false,
   );
 });
+
+test("a delegation reads as brief in, report out, counters last", () => {
+  const blocks = buildToolPresentation(
+    {
+      toolName: "Task",
+      toolArgs: {
+        agent: "code-reviewer",
+        description: "Review the store",
+        task: "Read app-store.ts and report dead branches.",
+      },
+      toolResult: envelope({
+        agent: "code-reviewer",
+        status: "completed",
+        turns: 3,
+        toolCalls: 5,
+      }),
+    },
+    { hideSummaryArg: true },
+  );
+
+  assert.deepEqual(roles(blocks), ["input", "output", "details"]);
+  const brief = byRole(blocks, "input");
+  assert.equal(brief.label, "task");
+  assert.equal(brief.text, "Read app-store.ts and report dead branches.");
+  // The report is the envelope text, not the JSON mirror of the counters.
+  assert.equal(
+    byRole(blocks, "output").text,
+    JSON.stringify({
+      agent: "code-reviewer",
+      status: "completed",
+      turns: 3,
+      toolCalls: 5,
+    }),
+  );
+  // `agent` already labels the row, so the footer only carries the counters.
+  assert.deepEqual(byRole(blocks, "details").rows, [
+    { label: "status", value: "completed" },
+    { label: "turns", value: "3" },
+    { label: "toolCalls", value: "5" },
+  ]);
+});
+
+test("a delegation whose rows are nested does not print the report twice", () => {
+  const message = {
+    toolName: "Task",
+    toolArgs: { agent: "code-reviewer", task: "Review the store" },
+    toolResult: {
+      content: [{ type: "text", text: "Two dead branches." }],
+      details: { agent: "code-reviewer", status: "completed", turns: 2 },
+    },
+  };
+
+  assert.equal(
+    byRole(buildToolPresentation(message), "output").text,
+    "Two dead branches.",
+  );
+  // The delegate's own answer row already shows that text one level in.
+  assert.equal(
+    byRole(buildToolPresentation(message, { hideDelegateReport: true }), "output"),
+    undefined,
+  );
+});
+
+test("a failed delegation shows the error, not an empty report", () => {
+  const blocks = buildToolPresentation({
+    toolName: "Task",
+    toolArgs: { agent: "ghost", task: "Do the thing" },
+    toolStatus: "error",
+    toolResult: {
+      content: [{ type: "text", text: "unknown agent: ghost" }],
+      details: { error: "unknown agent: ghost" },
+    },
+  });
+
+  assert.equal(byRole(blocks, "output").text, "unknown agent: ghost");
+  // `error` is not a counter: the report above already says it.
+  assert.equal(byRole(blocks, "details"), undefined);
+});

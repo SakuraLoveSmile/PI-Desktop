@@ -8,6 +8,10 @@ import { IconX } from "./icons";
 import { HomeQuickActions } from "./HomeQuickActions";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { useAppStore } from "../stores/app-store";
+import {
+  headPermission,
+  queuedPermissionCount,
+} from "../lib/pending-permissions";
 
 const StableComposer = memo(Composer);
 
@@ -36,9 +40,10 @@ export const ChatSurface = memo(function ChatSurface() {
   const errorCode = useAppStore((state) => state.errorCode);
   const errorRetriable = useAppStore((state) => state.errorRetriable);
   const activePermission = useAppStore((state) =>
-    state.activeSessionId
-      ? state.pendingPermissions[state.activeSessionId]
-      : undefined,
+    headPermission(state.pendingPermissions, state.activeSessionId),
+  );
+  const queuedPermissions = useAppStore((state) =>
+    queuedPermissionCount(state.pendingPermissions, state.activeSessionId),
   );
   const planCheckpoint = useAppStore((state) =>
     state.activeSessionId
@@ -68,12 +73,14 @@ export const ChatSurface = memo(function ChatSurface() {
       messages,
       isRunning,
       pendingPermission: activePermission,
+      queuedPermissions,
       approvalPending: planCheckpoint?.status === "pending",
       planCheckpoint,
       planningState: activePlanningState,
     }),
     [
       activePermission,
+      queuedPermissions,
       planCheckpoint,
       activePlanningState,
       activeSessionId,
@@ -172,6 +179,7 @@ export const ChatSurface = memo(function ChatSurface() {
             messages={transcriptView.messages}
             isRunning={transcriptView.isRunning}
             pendingPermission={transcriptView.pendingPermission}
+            queuedPermissions={transcriptView.queuedPermissions}
             planningState={transcriptView.planningState}
           />
           <StableComposer variant="docked" />

@@ -3,9 +3,13 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
-  clearPendingPermission,
+  clearSessionPermissions,
+  enqueuePermission,
+  headPermission,
   permissionSecondsLeft,
-  setPendingPermission,
+  queuedPermissionCount,
+  removePermission,
+  removePermissionForToolCall,
 } from "../src/lib/pending-permissions.ts";
 import { createNavigationIntentController } from "../src/lib/navigation-intent.ts";
 
@@ -20,7 +24,7 @@ const [appSource, chatSurfaceSource, transcriptSource, cardSource, storeSource, 
     read("../src/components/workpanel/BrowserTab.tsx"),
   ]);
 
-function permission(sessionId, requestId, receivedAt = 1_000) {
+function permission(sessionId, requestId, extra = {}) {
   return {
     sessionId,
     requestId,
@@ -29,44 +33,82 @@ function permission(sessionId, requestId, receivedAt = 1_000) {
     argsPreview: { path: `${sessionId}.txt` },
     risk: "high",
     reason: "Modify a workspace file",
-    receivedAt,
+    receivedAt: 1_000,
+    ...extra,
   };
 }
 
 test("pending permissions stay isolated by session and request id", () => {
   const first = permission("session-a", "request-a");
   const second = permission("session-b", "request-b");
-  const pending = setPendingPermission(
-    setPendingPermission({}, first),
+  const pending = enqueuePermission(
+    enqueuePermission({}, first),
     second,
   );
 
   assert.deepEqual(Object.keys(pending).sort(), ["session-a", "session-b"]);
   assert.equal(
-    clearPendingPermission(pending, "session-a", "stale-request"),
+    removePermission(pending, "session-a", "stale-request"),
     pending,
   );
 
-  const cleared = clearPendingPermission(pending, "session-a", "request-a");
+  const cleared = removePermission(pending, "session-a", "request-a");
   assert.equal(cleared["session-a"], undefined);
-  assert.equal(cleared["session-b"], second);
+  assert.equal(headPermission(cleared, "session-b"), second);
 });
 
-test("a replacement request survives completion of the older request", () => {
-  const oldRequest = permission("session-a", "request-old");
-  const newRequest = permission("session-a", "request-new");
-  const pending = setPendingPermission(
-    setPendingPermission({}, oldRequest),
-    newRequest,
+test("parallel delegates queue behind the request on screen", () => {
+  const first = permission("session-a", "request-first", {
+    agentName: "explorer",
+  });
+  const second = permission("session-a", "request-second", {
+    agentName: "test-runner",
+  });
+  const queues = enqueuePermission(enqueuePermission({}, first), second);
+
+  assert.equal(headPermission(queues, "session-a"), first);
+  assert.equal(queuedPermissionCount(queues, "session-a"), 1);
+  // A duplicate delivery must not stack a second copy of the same request.
+  assert.equal(enqueuePermission(queues, second), queues);
+
+  const answered = removePermission(queues, "session-a", "request-first");
+  assert.equal(headPermission(answered, "session-a"), second);
+  assert.equal(queuedPermissionCount(answered, "session-a"), 0);
+});
+
+test("a finished tool call clears its request from anywhere in the queue", () => {
+  const first = permission("session-a", "request-first");
+  const second = permission("session-a", "request-second");
+  const queues = enqueuePermission(enqueuePermission({}, first), second);
+
+  // The host answers an expired request itself, so a queued card that was
+  // never shown still has to leave the queue on `tool_end`.
+  const afterExpiry = removePermissionForToolCall(
+    queues,
+    "session-a",
+    "tool-request-second",
+  );
+  assert.equal(headPermission(afterExpiry, "session-a"), first);
+  assert.equal(queuedPermissionCount(afterExpiry, "session-a"), 0);
+  assert.equal(
+    removePermissionForToolCall(queues, "session-a", "tool-unknown"),
+    queues,
   );
 
-  const afterOldCompletion = clearPendingPermission(
-    pending,
-    "session-a",
-    "request-old",
-  );
-  assert.equal(afterOldCompletion, pending);
-  assert.equal(afterOldCompletion["session-a"], newRequest);
+  // Stopping the turn drops the whole queue, not just the visible request.
+  const stopped = clearSessionPermissions(queues, "session-a");
+  assert.equal(headPermission(stopped, "session-a"), undefined);
+  assert.deepEqual(Object.keys(stopped), []);
+});
+
+test("a session with nothing pending keeps no empty queue", () => {
+  const only = permission("session-a", "request-a");
+  const queues = enqueuePermission({}, only);
+  const emptied = removePermission(queues, "session-a", "request-a");
+
+  assert.equal("session-a" in emptied, false);
+  assert.equal(queuedPermissionCount(emptied, "session-a"), 0);
+  assert.equal(headPermission(emptied, undefined), undefined);
 });
 
 test("permission countdown uses its absolute receipt time", () => {
@@ -102,17 +144,31 @@ test("permission approval is an inline transcript card, never a global dialog", 
   assert.doesNotMatch(browserSource, /permission dialog/);
 });
 
+test("the card names the delegate that asked and how many wait behind it", () => {
+  assert.match(chatSurfaceSource, /queuedPermissionCount\(/);
+  assert.match(
+    chatSurfaceSource,
+    /queuedPermissions=\{transcriptView\.queuedPermissions\}/,
+  );
+  assert.match(transcriptSource, /queued=\{queuedPermissions\}/);
+  assert.match(cardSource, /t\("permission\.queued", \{ count: queued \}\)/);
+  assert.match(
+    cardSource,
+    /t\("permission\.fromSubagent", \{ agent: permission\.agentName \}\)/,
+  );
+});
+
 test("background permission events update only session-scoped state", () => {
   assert.match(
     storeSource,
-    /pendingPermissions:\s*Record<string, PendingPermission>/,
+    /pendingPermissions:\s*PermissionQueues/,
   );
   assert.doesNotMatch(storeSource, /permission\?:\s*ToolPermissionRequest/);
   const backgroundBlock = storeSource.match(
     /if \(envelope\.sessionId !== get\(\)\.activeSessionId\)[\s\S]*?return;/,
   )?.[0];
   assert.ok(backgroundBlock);
-  assert.match(backgroundBlock, /setPendingPermission/);
+  assert.match(backgroundBlock, /enqueuePermission/);
   assert.doesNotMatch(
     backgroundBlock,
     /selectSession|activeSessionId:\s*|messages:\s*|page:\s*/,
@@ -121,14 +177,21 @@ test("background permission events update only session-scoped state", () => {
     storeSource,
     /resolvePermission: async \(sessionId, requestId, decision\)/,
   );
+  // Only the request on screen is answerable, and a late answer clears that
+  // request alone rather than whatever now sits at the head.
+  assert.match(storeSource, /headPermission\(get\(\)\.pendingPermissions, sessionId\)/);
   assert.match(
     storeSource,
-    /clearPendingPermission\([\s\S]*state\.pendingPermissions,[\s\S]*sessionId,[\s\S]*requestId/,
+    /removePermission\([\s\S]*state\.pendingPermissions,[\s\S]*sessionId,[\s\S]*requestId/,
   );
+  assert.match(storeSource, /removePermissionForToolCall\(/);
   const abortBlock = storeSource.match(/abort: async[\s\S]*?\n  openProject:/)?.[0] ?? "";
   assert.match(abortBlock, /Promise\.allSettled/);
   assert.match(abortBlock, /decision: "deny"/);
-  assert.match(abortBlock, /pendingPermission\?\.requestId/);
+  // Every open request is denied: a queued delegate would otherwise keep its
+  // tool call alive past the stop the user asked for.
+  assert.match(abortBlock, /sessionPermissions\(/);
+  assert.match(abortBlock, /clearSessionPermissions\(/);
 });
 
 test("new navigation intents invalidate older asynchronous commits", async () => {

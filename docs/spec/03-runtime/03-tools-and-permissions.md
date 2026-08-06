@@ -423,6 +423,33 @@ in its batch. The host validates the durable mode, the proposal kind, and the
 active-turn/configuration boundary before any transition; the visible tool list
 is guidance, not the security boundary.
 
+### 10.2 Delegation and subagent tool scope (D201, ADR 0062)
+
+`Task` is available in Agent mode only, and only when the session has at least
+one subagent definition. Plan and Goal are read-only contract negotiations, so a
+delegate with `Bash`, `Edit` or `Write` would drive straight through them.
+
+A definition declares the tools its delegate may call, drawn only from `Read`,
+`Glob`, `Grep`, `BrowserPreview`, `Bash`, `Edit` and `Write`. A definition that
+declares none gets `Read`, `Glob`, `Grep`. Plugin tools, `Skill`, `ToolSearch`,
+the mode tools and `Task` itself are never assignable: a delegate is a bounded
+file/search/shell worker, not a second session.
+
+A delegate's rights are its definition's, never its session's. It cannot gain a
+tool because the parent has it, and a session cannot lend mutation rights to a
+read-only delegate. Delegate calls are built by the session runtime and go
+through the same `tools.execute` path, so path rules (§4), Bash rules (§5),
+permission modes (§6), the operating-mode matrix (§10) and auditing (§9) apply
+unchanged — evaluated against the session, because the session is what owns the
+workspace and the permission mode.
+
+Permission requests from a delegate carry the asking delegate's name, so the
+card can say which delegate wants the call (see `04-ux/03-permission-ux.md`
+§6a).
+Session-scoped `allow-session` grants are still per `toolName` and per session:
+one delegate's approval of `Bash` applies to the whole session, including the
+parent and other delegates.
+
 ## 11. Plugin Tools
 
 Plugins can contribute tools via `agentTools` in Agent only:
