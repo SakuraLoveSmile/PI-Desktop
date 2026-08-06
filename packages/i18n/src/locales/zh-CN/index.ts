@@ -238,6 +238,9 @@ export const zhCN = {
     usageNoTools: "本轮没有调用工具",
     usageUnknownTool: "未知工具",
     usageCompaction: "已压缩 {{times}} 次 · 摘要",
+    compactionRow: "上下文已压缩 · 第 {{times}} 次",
+    compactionRowSummary: "摘要 ≈{{tokens}} tokens",
+    compactionRowNoSummary: "未生成摘要",
     scrollToBottom: "回到最新",
     minimap: "对话大纲",
     resultNeedsAttention: "这次任务需要处理一下",
@@ -1156,6 +1159,7 @@ export const zhCN = {
     retrying: "上下文已压缩，正在重试模型请求",
     recovered: "上下文摘要失败，已保留近期上下文并继续任务",
     failed: "上下文压缩失败",
+    longThreadWarning: "上下文已压缩。每压缩一次都会丢掉更早的细节，无关的新任务建议开新会话。",
   },
   notifications: {
     title: "通知",

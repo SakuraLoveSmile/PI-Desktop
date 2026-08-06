@@ -239,6 +239,9 @@ export const en = {
     usageNoTools: "No tool calls in this turn",
     usageUnknownTool: "Unknown tool",
     usageCompaction: "Compacted {{times}}× · summary",
+    compactionRow: "Context compacted · #{{times}}",
+    compactionRowSummary: "summary ≈{{tokens}} tokens",
+    compactionRowNoSummary: "no summary generated",
     scrollToBottom: "Jump to latest",
     minimap: "Conversation outline",
     resultNeedsAttention: "This task needs attention",
@@ -1163,6 +1166,8 @@ export const en = {
     recovered:
       "Context summary failed; recent context was retained and the task is continuing",
     failed: "Context compaction failed",
+    longThreadWarning:
+      "Context compacted. Long threads lose earlier detail with each compaction — start a new session for unrelated work.",
   },
   notifications: {
     title: "Notifications",
