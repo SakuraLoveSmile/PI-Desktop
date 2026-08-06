@@ -524,6 +524,31 @@ function delayWithAbort(ms: number, signal: AbortSignal): Promise<void> {
 
 type CheckpointPersistResult = "persisted" | "oversized" | "failed";
 
+type CheckpointBuildSuccess = {
+  ok: true;
+  checkpoint: ContextCompactionRecord;
+  entries: SessionTreeEntry[];
+  budget: ContextBudget;
+  preparation: CompactionPreparation;
+};
+
+type CheckpointBuildFailure = {
+  ok: false;
+  entries: SessionTreeEntry[];
+  budget: ContextBudget;
+  preparation?: CompactionPreparation;
+  message: string;
+  tokensBefore?: number;
+  /**
+   * False when the failure must be reported as-is instead of falling back to a
+   * retained-tail checkpoint: the build was cancelled, or the transcript has no
+   * durable boundary to anchor any checkpoint to.
+   */
+  recoverable: boolean;
+};
+
+type CheckpointBuild = CheckpointBuildSuccess | CheckpointBuildFailure;
+
 function retainedTailForContext(value: unknown): AgentMessage[] | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.filter(isRecord).map((message) => {
@@ -2749,132 +2774,121 @@ export class DesktopAgentRuntime {
 
   private async generateCompaction(
     preparation: CompactionPreparation,
+    signal: AbortSignal,
   ): Promise<Awaited<ReturnType<typeof compact>>> {
-    if (!this.compactionAbort) {
-      throw new Error("Compaction was not initialized");
-    }
     return compact(
       preparation,
       this.models,
       this.model,
       undefined,
-      this.compactionAbort.signal,
+      signal,
       this.thinkingLevel,
     );
   }
 
-  private async performCompaction(
-    reason: ContextCompactionReason,
-    willRetry: boolean,
-  ): Promise<boolean> {
-    this.emit({ type: "compaction_start", reason });
+  /**
+   * Produce a checkpoint without touching the session: no persistence, no
+   * `activeCompaction` mutation, no events. Keeping generation free of side
+   * effects is what lets a background pre-compaction run the same code path and
+   * discard its result silently.
+   */
+  private async buildCheckpoint(signal: AbortSignal): Promise<CheckpointBuild> {
     const entries = this.entriesWithCompaction();
     const context = buildSessionContext(entries);
     const budget = this.contextBudget(context.messages);
     const preparation = this.prepareCompactionInput(entries, budget);
     if (!preparation.ok || !preparation.value) {
-      const message = preparation.ok
-        ? "No new context is available to compact"
-        : preparation.error.message;
-      if (reason !== "manual") {
-        return await this.recoverCompactionFailure(
-          entries,
-          budget,
-          reason,
-          willRetry,
-          undefined,
-          message,
-        );
-      }
-      this.emitCompactionFailure(reason, undefined, message);
-      return false;
+      return {
+        ok: false,
+        entries,
+        budget,
+        message: preparation.ok
+          ? "No new context is available to compact"
+          : preparation.error.message,
+        recoverable: true,
+      };
     }
 
     if (this.compactionSummaryWouldExceedBudget(preparation.value, budget)) {
-      const message =
-        "Compaction summary input exceeds the safe model budget";
-      if (reason !== "manual") {
-        return await this.recoverCompactionFailure(
-          entries,
-          budget,
-          reason,
-          willRetry,
-          preparation.value,
-          message,
-        );
-      }
-      this.emitCompactionFailure(
-        reason,
-        preparation.value.tokensBefore,
-        message,
-      );
-      return false;
-    }
-
-    this.compactionAbort = new AbortController();
-    let result: Awaited<ReturnType<typeof compact>>;
-    try {
-      result = await this.generateCompaction(preparation.value);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (reason !== "manual" && !this.compactionAbort?.signal.aborted) {
-        return await this.recoverCompactionFailure(
-          entries,
-          budget,
-          reason,
-          willRetry,
-          preparation.value,
-          message,
-        );
-      }
-      this.emitCompactionFailure(
-        reason,
-        preparation.value.tokensBefore,
-        message,
-      );
-      return false;
-    } finally {
-      this.compactionAbort = undefined;
-    }
-    if (!result.ok) {
-      if (result.error.code === "aborted") {
-        this.emitCompactionFailure(
-          reason,
-          preparation.value.tokensBefore,
-          result.error.message,
-        );
-        return false;
-      }
-      return await this.recoverCompactionFailure(
+      return {
+        ok: false,
         entries,
         budget,
-        reason,
-        willRetry,
-        preparation.value,
-        result.error.message,
-      );
+        preparation: preparation.value,
+        tokensBefore: preparation.value.tokensBefore,
+        message: "Compaction summary input exceeds the safe model budget",
+        recoverable: true,
+      };
+    }
+
+    let result: Awaited<ReturnType<typeof compact>>;
+    try {
+      result = await this.generateCompaction(preparation.value, signal);
+    } catch (error) {
+      return {
+        ok: false,
+        entries,
+        budget,
+        preparation: preparation.value,
+        tokensBefore: preparation.value.tokensBefore,
+        message: error instanceof Error ? error.message : String(error),
+        recoverable: !signal.aborted,
+      };
+    }
+    if (!result.ok) {
+      return {
+        ok: false,
+        entries,
+        budget,
+        preparation: preparation.value,
+        tokensBefore: preparation.value.tokensBefore,
+        message: result.error.message,
+        recoverable: result.error.code !== "aborted",
+      };
     }
 
     const throughMessageId = this.fullEntries.at(-1)?.id;
     if (!throughMessageId) {
-      this.emitCompactionFailure(
-        reason,
-        result.value.tokensBefore,
-        "Compaction has no durable transcript boundary",
-      );
-      return false;
+      return {
+        ok: false,
+        entries,
+        budget,
+        preparation: preparation.value,
+        tokensBefore: result.value.tokensBefore,
+        message: "Compaction has no durable transcript boundary",
+        recoverable: false,
+      };
     }
-    const checkpoint = this.createCheckpoint(
-      preparation.value,
-      throughMessageId,
-      result.value.summary,
-      result.value.usage,
-      result.value.details,
-    );
+    return {
+      ok: true,
+      entries,
+      budget,
+      preparation: preparation.value,
+      checkpoint: this.createCheckpoint(
+        preparation.value,
+        throughMessageId,
+        result.value.summary,
+        result.value.usage,
+        result.value.details,
+      ),
+    };
+  }
+
+  /**
+   * Install an already-generated checkpoint on the blocking path. The budget
+   * recheck inside `persistCheckpoint` runs against the current transcript, so
+   * a checkpoint built earlier is still validated against what it would
+   * actually produce now.
+   */
+  private async installCheckpoint(
+    build: CheckpointBuildSuccess,
+    reason: ContextCompactionReason,
+    willRetry: boolean,
+  ): Promise<boolean> {
     const mustFitSafeBudget =
-      reason === "overflow" || budget.tokens >= budget.hardLimit;
+      reason === "overflow" || build.budget.tokens >= build.budget.hardLimit;
     const persisted = await this.persistCheckpoint(
-      checkpoint,
+      build.checkpoint,
       reason,
       willRetry,
       mustFitSafeBudget,
@@ -2883,13 +2897,42 @@ export class DesktopAgentRuntime {
       return persisted === "persisted";
     }
     return await this.recoverCompactionFailure(
-      entries,
-      budget,
+      build.entries,
+      build.budget,
       reason,
       willRetry,
-      preparation.value,
+      build.preparation,
       "The checkpoint did not reduce context below the safe request budget",
     );
+  }
+
+  private async performCompaction(
+    reason: ContextCompactionReason,
+    willRetry: boolean,
+  ): Promise<boolean> {
+    this.emit({ type: "compaction_start", reason });
+    this.compactionAbort = new AbortController();
+    let build: CheckpointBuild;
+    try {
+      build = await this.buildCheckpoint(this.compactionAbort.signal);
+    } finally {
+      this.compactionAbort = undefined;
+    }
+    if (!build.ok) {
+      if (!build.recoverable) {
+        this.emitCompactionFailure(reason, build.tokensBefore, build.message);
+        return false;
+      }
+      return await this.recoverCompactionFailure(
+        build.entries,
+        build.budget,
+        reason,
+        willRetry,
+        build.preparation,
+        build.message,
+      );
+    }
+    return await this.installCheckpoint(build, reason, willRetry);
   }
 
   async compactManually(): Promise<void> {
