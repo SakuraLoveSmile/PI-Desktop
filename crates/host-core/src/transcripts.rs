@@ -299,12 +299,66 @@ pub fn write_transcript_with_compaction(
         writer.flush()?;
         writer.get_ref().sync_data()?;
     }
-    // Windows cannot rename over an existing file (D010: Windows post-MVP);
-    // on POSIX the plain rename keeps the replacement atomic.
+    swap_into_place(&tmp, &path)
+}
+
+/// Swap a fully written temp file over its target. Windows cannot rename over
+/// an existing file (D010: Windows post-MVP); on POSIX the plain rename keeps
+/// the replacement atomic.
+fn swap_into_place(tmp: &Path, path: &Path) -> Result<()> {
     #[cfg(windows)]
-    let _ = fs::remove_file(&path);
-    fs::rename(&tmp, &path).with_context(|| format!("replace {}", path.display()))?;
+    let _ = fs::remove_file(path);
+    fs::rename(tmp, path).with_context(|| format!("replace {}", path.display()))?;
     Ok(())
+}
+
+/// Rewrite exactly one message line, copying every other line through
+/// verbatim. Returns false when the id is not in the file.
+///
+/// The file is re-read here instead of being handed in by the caller, so a line
+/// appended between the caller's own read and this write survives. That is the
+/// difference that matters: a metadata stamp must never cost the transcript its
+/// newest messages the way a full `write_transcript` from a stale snapshot does.
+pub fn update_message(data_dir: &Path, session_id: &str, record: &MessageRecord) -> Result<bool> {
+    let path = transcript_path(data_dir, session_id)?;
+    let raw = match fs::read_to_string(&path) {
+        Ok(raw) => raw,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e).with_context(|| format!("read {}", path.display())),
+    };
+    let replacement = tagged("message", record)?;
+    let mut body = String::with_capacity(raw.len() + replacement.len());
+    let mut replaced = false;
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        let is_target = !trimmed.is_empty()
+            && serde_json::from_str::<Value>(trimmed).is_ok_and(|value| {
+                value.get("type").and_then(Value::as_str) == Some("message")
+                    && value.get("id").and_then(Value::as_str) == Some(record.id.as_str())
+            });
+        // A retried append can leave the same id on two lines; keep-last dedupe
+        // means every copy has to carry the new metadata.
+        if is_target {
+            body.push_str(&replacement);
+            replaced = true;
+        } else {
+            body.push_str(line);
+        }
+        body.push('\n');
+    }
+    if !replaced {
+        return Ok(false);
+    }
+    let tmp = path.with_extension("jsonl.tmp");
+    {
+        let file = File::create(&tmp)?;
+        let mut writer = BufWriter::new(file);
+        writer.write_all(body.as_bytes())?;
+        writer.flush()?;
+        writer.get_ref().sync_data()?;
+    }
+    swap_into_place(&tmp, &path)?;
+    Ok(true)
 }
 
 /// Append one archived branch. The file is append-only: the active revision
