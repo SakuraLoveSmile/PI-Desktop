@@ -14,6 +14,10 @@ const hostSessionsSource = await readFile(
   new URL("../../../crates/host-core/src/sessions.rs", import.meta.url),
   "utf8",
 );
+const sectionSource = await readFile(
+  new URL("../src/components/extensions/SubagentsSection.tsx", import.meta.url),
+  "utf8",
+);
 const hostProcessSource = await readFile(
   new URL("../electron/main/host-process.ts", import.meta.url),
   "utf8",
@@ -101,4 +105,11 @@ test("a dead host transport degrades quietly instead of warning", () => {
     /this\.closeTransport\(this\.unavailableError\("host-core disposed"\)\);/,
   );
   assert.match(hostProcessSource, /errorCode: ErrorCodes\.HOST_UNAVAILABLE,/);
+});
+
+test("the subagents panel recovers when the host comes back", () => {
+  assert.match(sectionSource, /api\.onHostStatus\(\(status\) => \{\n\s+if \(status\.ok\) void load\(\);/);
+  // Both subscriptions have to be released, so the effect returns a composed
+  // cleanup rather than a single unsubscribe.
+  assert.match(sectionSource, /offPluginChanged\(\);\n\s+offHostStatus\(\);/);
 });

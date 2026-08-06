@@ -76,6 +76,10 @@ Supervision parameters (implemented in Electron main):
   dead transport during shutdown or between restarts is routine; logging it at
   `warn` files it under the same line as a registry that genuinely cannot be
   read.
+- A renderer panel backed by a host-owned registry reloads on
+  `hostStatus { ok: true }`, so a call that lost a race with teardown or a
+  restart does not leave the panel showing a transport error for a registry that
+  is fine.
 - Intentional shutdown (quit/dispose) never triggers restart.
 
 ## 5. Shutdown order

@@ -84,7 +84,18 @@ export function SubagentsSection({
 
   useEffect(() => {
     void load();
-    return api.onPluginChanged(() => void load());
+    const offPluginChanged = api.onPluginChanged(() => void load());
+    // The registry lives in host-core, so a call that races its teardown or a
+    // supervised restart leaves this panel holding a transport error for a
+    // registry that is fine. Reload when the host is back rather than waiting
+    // for a mutation to clear the banner.
+    const offHostStatus = api.onHostStatus((status) => {
+      if (status.ok) void load();
+    });
+    return () => {
+      offPluginChanged();
+      offHostStatus();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
