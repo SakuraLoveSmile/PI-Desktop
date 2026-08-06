@@ -3163,6 +3163,69 @@ Each scenario is documented in this format:
   `replace_messages_preserves_owning_turn_ids` covers the remaining rewrite
   callers. UI paging remains manual.
 
+#### E2E-119: Parallel subagents report back without entering the parent's context
+
+- **Preconditions**: A project-bound Agent session with a workspace containing
+  `.pi/agents/scout.md` (read-only, no `tools` key), `.pi/agents/fixer.md`
+  (`tools: Read, Edit`), `.pi/agents/pinned.md` (`model:` naming a second
+  configured provider) and `.pi/agents/broken.md` (missing `name`); a provider
+  whose stream can be driven to emit two `Task` calls in one assistant message;
+  permission mode `ask` so a delegate's `Edit` is gated; read access to
+  `<data_dir>/sessions/<id>.jsonl` and the `messages` index.
+- **Steps**:
+  1. Prompt a turn in which the assistant emits two `Task` calls — `scout` and
+     `pinned` — in one message.
+  2. Prompt a turn in which two `fixer` delegates each edit a different file, and
+     answer only the first permission card.
+  3. Answer the second card, then prompt a third turn where two `fixer`
+     delegates edit the **same** file.
+  4. Start a fan-out and press Stop while one card is on screen and another is
+     queued.
+  5. Prompt a `Task` call naming `broken`, then one naming an agent that does not
+     exist, then one whose definition pins an unconfigured provider.
+  6. Switch the session to Plan, then to Goal, and inspect the tool catalog.
+  7. Reload the session and re-expand every `Task` row.
+- **Expected**:
+  - Both delegates in step 1 run concurrently, and `pinned` streams on its own
+    provider/model while the parent keeps the session's.
+  - Each `Task` row collapses to one line with the `delegate` icon and the agent
+    chip; expanding shows the brief, the report exactly once, and
+    `status`/`turns`/`toolCalls`. Delegate rows appear only inside the nested
+    block, never in the turn stream or the minimap.
+  - The parent's next request contains the reports and **no** delegate message or
+    tool row; the rows are nonetheless present in the transcript file and the
+    index with `meta.parentToolCallId` and `meta.agentName`.
+  - Only the head permission card is rendered; it names the asking delegate and
+    the number waiting behind it. Answering it reveals the next card, and neither
+    answer resolves the other request.
+  - `scout` cannot call `Edit` or `Write` at all; `fixer` can. Same-file edits in
+    step 3 apply in a defined order and neither loses the other's write.
+  - Stop denies both the shown and the queued request, and both delegates end
+    `aborted` inside their own `Task` results — the parent turn ends once.
+  - `broken` is absent from the catalog with a launch diagnostic and the session
+    keeps its other three delegates; an unknown agent and an unresolvable model
+    pin each fail as a `Task` tool error naming the cause, with no fallback to
+    the session provider and no turn failure.
+  - `Task` is absent from the catalog in Plan and Goal.
+  - After reload every `Task` row nests exactly as it did live.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5f/§7.2b/§8,
+  `03-runtime/03-tools-and-permissions.md` §10.2,
+  `03-runtime/04-data-storage.md` §4.7a, `04-ux/03-permission-ux.md` §6a,
+  `04-ux/08-component-spec.md` §9.9, ADR 0062, decisions-log D201
+- **Acceptance**: C (conversation), E (tools & permissions), F (persistence),
+  Security, Quality
+- **Milestone**: M6
+- **Status**: Covered by unit tests (2026-08-06): `packages/shared`
+  `subagent-definition.test.ts` and `packages/agent-runtime`
+  `subagent-definitions.test.ts` (frontmatter, tool filtering, caps, malformed
+  documents, project-shadows-builtin); `subagent.test.ts` (report bounding, turn
+  cap, abort, event attribution, prompt framing) and `path-lock.test.ts`
+  (same-path ordering, concurrency cap); desktop `permission-inline.test.mjs`
+  (queue order, id-matched removal, tool-call removal, abort denying the queue,
+  card copy), `subagent-wiring.test.mjs` (main-process discovery and model pins)
+  and `subagent-transcript.test.mjs` + `assistant-turns.test.mjs` (nesting,
+  single report print, memoization). Full multi-provider fan-out remains manual.
+
 #### E2E-097: Tool results read as structured blocks, never JSON
 
 - **Preconditions**: A project-bound Agent session with permissions allowed for
@@ -3411,14 +3474,14 @@ Each scenario is documented in this format:
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
-| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-AGENTS-001 |
+| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-AGENTS-001 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118 |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119 |
 | G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-025, E2E-026, E2E-105, E2E-117 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118 |
-| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118 |
+| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -3427,7 +3490,7 @@ Each scenario is documented in this format:
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
 | M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095 |
-| M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118 |
+| M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119 |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the

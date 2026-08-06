@@ -1213,6 +1213,52 @@ twice.
 - No cross-row activity grouping until turn boundaries are available to the
   transcript component
 
+### 9.9 Delegation rows (D201, ADR 0062)
+
+A `Task` call is a ToolCallRow like any other, with the `delegate` action icon
+and one extra header element: a quiet chip naming the delegate it ran, taken
+from the rows it produced or, before any arrived, from the call's own `agent`
+argument. The row hint is the call's short `description`.
+
+```text
+└─ [bot] Delegated  code-reviewer  check the store diff   [›]
+   ├─ task                                        [copy]
+   │  Review the changes in src/stores for …
+   ├─ Details
+   │  status  completed   turns  4   toolCalls  9
+   └─ [bot] What code-reviewer did          3 steps
+      ├─ [thinking] Thought for 2s                [›]
+      ├─ [file] Read /src/stores/app-store.ts     [›]
+      └─ The queue drops a request by id, so …
+```
+
+- A delegation is **always** expandable, even with no result blocks: the brief,
+  the report and the delegate's own rows all live in the body.
+- Block order is brief in, report out, counters last: the `task` argument as an
+  `input` block, the report as the output block, then a `Details` block holding
+  the counters pi handed back — `status`, `turns`, `toolCalls`, and `usage` when
+  present. `agent` is omitted because the header chip already shows it, and an
+  `error` is rendered as the leading error block, not as a counter. The
+  delegate's own rows follow the whole body, so the summary reads before the
+  detail.
+- A failed delegation shows its error instead of an empty report.
+- The delegate's rows render inside a `.subagent-run` block, indented behind a
+  hairline rail, headed by the agent name and a step count. They collapse with
+  the `Task` row, so a transcript at rest reads as one line per delegation.
+- Nesting is one level deep by construction: a delegate has no `Task` tool.
+- Delegate rows are ordinary rows inside that block — tool rows with their own
+  disclosures, thinking rows, and answer rows — so no new presentation is needed
+  for what a delegate does.
+- **The report is printed exactly once.** When the delegate produced an answer
+  row, that row is the report and the body's output block is suppressed; when it
+  produced none (aborted, capped, failed), the body prints it.
+- Delegate rows never appear in the turn stream, the minimap, or a processing
+  group of their own; grouping is by the parent's rows only
+  (`03-runtime/04-data-storage.md` §4.7a).
+- Runs are rebuilt from the message list on every render, so group memoization
+  compares them by row identity and length rather than by object identity —
+  otherwise a streaming delegate would freeze at its first row.
+
 ---
 
 ## 10. PermissionCard

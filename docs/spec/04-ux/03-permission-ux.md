@@ -42,9 +42,9 @@ pending → timeout_denied
 ```
 
 - A request is keyed by both `sessionId` and `requestId`.
-- Each session has at most one pending request because its agent loop is
-  paused, while different sessions may wait for independent approvals at the
-  same time.
+- A session without subagents has at most one pending request, because its
+  agent loop is paused. Parallel delegates (§6a) can put more than one in
+  flight; different sessions still wait for independent approvals.
 - Replacing or resolving one request never removes another session's request
   or a newer request in the same session.
 
@@ -77,6 +77,39 @@ backgrounded before completion, the artifact must not open or resize the
 visible panel; explicitly returning to the session restores its retained panel
 open state, tabs, active tab, and Browser resource without a transient panel
 open/close cycle in the intervening conversation.
+
+## 6a. Queued requests from parallel delegates (D201, ADR 0062)
+
+Parallel subagents can each stop on a gated tool at the same moment, so a
+session holds a **queue** of pending requests, oldest first, not a single slot.
+The alternative — a stack of cards for calls the user cannot tell apart — is not
+answerable.
+
+- Only the head of the queue is rendered and answerable. The rest wait
+  invisibly; their delegates stay blocked, which is the intended back-pressure.
+- Answers are matched by `requestId`, never by position, so a late answer can
+  only clear the request it answered and can never resolve a successor.
+- A request the host closed itself (expiry, cancelled tool call) is removed by
+  `toolCallId` from anywhere in the queue, so a card that was never shown still
+  leaves. The 120s deadline (§5) runs from arrival for every request, queued or
+  not — a request can therefore expire while waiting, and the host's own denial
+  is what the delegate sees.
+- Abort denies the **whole** queue, not just the visible card: a queued delegate
+  would otherwise keep its tool call alive behind a stop the user already asked
+  for.
+- A session with nothing pending has no queue at all, so "does this session need
+  attention" stays a presence check and the sidebar indicator is unchanged.
+
+The card adds two lines of provenance when they apply, on top of §6:
+
+- who asked — "Asked by the `<agent>` subagent" — present only for a delegate's
+  request, so a parent's own request looks exactly as it does today;
+- how many wait behind it — "N more request(s) are waiting" — so answering does
+  not look like it finished the session's questions.
+
+Session grants are unchanged and still per `toolName` per session: a delegate's
+"Allow for session" also covers the parent and the other delegates
+(`03-runtime/03-tools-and-permissions.md` §10.2).
 
 ## 7. Composer interaction while pending
 

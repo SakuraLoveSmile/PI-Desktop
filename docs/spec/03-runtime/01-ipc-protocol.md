@@ -332,6 +332,10 @@ type AgentEventEnvelope = {
  turnId?: string;
  ts: number;
  event: AgentEvent;
+ /** Set on events emitted inside a subagent (D201, ADR 0062): the `Task` call
+  * that spawned it, and the definition name. */
+ parentToolCallId?: string;
+ agentName?: string;
 };
 
 type AgentEvent =
@@ -515,6 +519,9 @@ type UiMessage = {
  toolUsage?: ToolTokenUsage; // estimated tool call/result footprint
  error?: AppError;  // structured failure owned by this assistant turn
  createdAt: string;
+ // Rows produced inside a subagent (D201, ADR 0062); absent on the session's own
+ parentToolCallId?: string;   // `Task` call that spawned the delegate
+ agentName?: string;          // delegate definition name
  // status/tool fields omitted here
 };
 
@@ -708,6 +715,10 @@ type ToolPermissionRequest = {
  argsPreview: unknown;
  risk: "low" | "medium" | "high";
  reason: string;
+ /** Definition name when a subagent asked (D201, ADR 0062); absent for the
+  * session's own calls, together with the `Task` call that spawned it. */
+ agentName?: string;
+ parentToolCallId?: string;
 };
 
 type ToolPermissionResolution = {
@@ -715,6 +726,11 @@ type ToolPermissionResolution = {
  decision: "allow-once" | "allow-session" | "deny";
 };
 ```
+
+A session can hold more than one open request once it runs parallel subagents.
+The renderer queues them per session and answers the oldest first; the resolution
+contract is unchanged, because it was already keyed by `requestId`
+(`04-ux/03-permission-ux.md` §6a).
 
 Plan does not replace this generic permission contract. A Plan `Bash` call
 uses the normal session-scoped permission flow: `ask` and `accept-edits` emit a

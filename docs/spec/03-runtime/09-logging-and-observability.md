@@ -149,9 +149,9 @@ apart without guessing:
   `prompted`, `permission_wait_ms`, `execute_ms`, `overhead_ms`, `total_ms`,
   and `outcome` (`ok` / `error` / `denied`); the same fields are persisted on
   the `tool_execute` / `tool_denied` audit rows.
-- the sidecar writes greppable `[timing] kind=<tool|model> key=value` lines to
-  stderr, which the Electron `Logger` wraps into the `agent` channel. Set
-  `PI_DESKTOP_TIMING=0` (or `off`/`false`) to suppress them.
+- the sidecar writes greppable `[timing] kind=<tool|model|subagent> key=value`
+  lines to stderr, which the Electron `Logger` wraps into the `agent` channel.
+  Set `PI_DESKTOP_TIMING=0` (or `off`/`false`) to suppress them.
 - `hostRttMs` minus the host's `total_ms` for the same `toolCallId` is the
   stdio/IPC cost; `providerWaitMs` covers pi-ai's own retry backoff, so a
   provider that burns its retries shows up there rather than as a slow tool.
@@ -161,6 +161,12 @@ apart without guessing:
   timeout or resolver failure that continued with the runtime's base chain.
 - failed or aborted turns still emit a `kind=model` line with the outcome, so
   a turn that never produced tokens is still measurable.
+- one `kind=subagent` line closes every `Task` call (D201, ADR 0062) with
+  `agent`, `toolCallId`, `sessionId`, `turnId`, `provider`, `model`, `status`,
+  `turns`, `toolCalls`, `durationMs`, and `errorCode` on failure. Delegate rows
+  are attributed in the transcript but their tool and model lines are not, so
+  this is what tells a parallel fan-out apart: same `turnId`, one line per
+  delegate, each with its own provider and wall-clock cost.
 
 The assistant transcript also preserves the successful stream duration as
 `UiMessage.responseDurationMs`. The renderer combines it with provider-reported

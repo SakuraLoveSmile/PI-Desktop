@@ -539,6 +539,35 @@ type Block =
 - `mid` (explicit INTEGER PRIMARY KEY) pins rowids across `VACUUM`, which the
   FTS external-content mapping depends on; `id` stays the wire-format uuid.
 
+### 4.7a Subagent attribution (D201, ADR 0062)
+
+Rows a subagent produced are stored in the same transcript file and the same
+index as the parent's; what marks them is two fields in the file line's `meta`
+object, written by host-core when the sidecar sends them:
+
+```ts
+meta.parentToolCallId?: string  // the `Task` call that spawned the delegate
+meta.agentName?: string         // the definition name, e.g. "code-reviewer"
+```
+
+No column, no table, no migration: attribution is metadata about a message, and
+promoting it would buy a query nobody makes.
+
+Both fields survive reload, which is what makes a restored session nest exactly
+like a live one (`04-ux/08-component-spec.md` §9.9). Two consumers read them:
+
+- The renderer groups attributed rows under their `Task` row and renders them
+  one level in; the turn stream and the minimap never see them.
+- The session runtime **excludes** attributed rows when it rebuilds model
+  context on restore. The parent only ever saw the delegate's report, which is
+  the `Task` tool result and is stored as such; replaying the delegate's own
+  rows would both misrepresent the conversation and reintroduce the context cost
+  delegation exists to avoid.
+
+Retention and deletion treat them as ordinary rows: a deleted session takes its
+delegate rows with it, and regenerate archives them with the branch they belong
+to.
+
 ### 4.8 messages_fts — full-text search
 
 Global search across transcripts (WorkBuddy-benchmark search, command
