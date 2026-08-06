@@ -1345,6 +1345,16 @@ async fn handle_request(
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "revision": revision }))
         }
+        "session.saveActiveRevision" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let saved = sessions::save_active_branch_revision(&st.db, session_id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "saved": saved }))
+        }
         "session.listRevisions" => {
             let session_id = params
                 .get("sessionId")
