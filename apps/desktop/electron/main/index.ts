@@ -57,6 +57,7 @@ import {
   type Result,
   type Risk,
   type ThinkingLevel,
+  type UiMessage,
   type UserSkillRecord,
   type WindowControlAction,
 } from "@pi-desktop/shared";
@@ -68,6 +69,8 @@ import {
   loadComposerTemplates,
   globalInstructionPath,
   loadInstructionChain,
+  loadSubagentDefinitions,
+  resolveSubagentProviders,
   type ComposerTemplate,
   type ThinkingCapabilities,
 } from "@pi-desktop/agent-runtime";
@@ -615,6 +618,26 @@ async function resolveAgentRuntimeLaunch(
       description: skill.description,
     })),
   ];
+  // Subagents (ADR 0060): definitions are re-read per launch so editing
+  // `.pi/agents` takes effect on the next prompt, and every pinned model is
+  // resolved here because credentials and the pi catalog live on this side.
+  const subagentCatalog = await loadSubagentDefinitions(projectPath);
+  const subagentBindings = await resolveSubagentProviders({
+    definitions: subagentCatalog.definitions,
+    providers: providers.providers,
+    getSecret: async (id: string) =>
+      (await host!.call<{ value?: string }>("providers.getSecret", { id })).value,
+  });
+  const subagentDiagnostics = [
+    ...subagentCatalog.diagnostics,
+    ...subagentBindings.diagnostics,
+  ];
+  if (subagentDiagnostics.length > 0) {
+    logger.app("session", "warn", "subagent definitions have problems", {
+      sessionId,
+      data: { diagnostics: subagentDiagnostics },
+    });
+  }
   return {
     providerId: provider.id,
     modelId,
@@ -664,6 +687,8 @@ async function resolveAgentRuntimeLaunch(
       // Plugin skills (D174): only the catalog crosses to the sidecar; the
       // document body is fetched on demand through the local `Skill` tool.
       pluginSkills,
+      subagents: subagentCatalog.definitions,
+      subagentProviders: subagentBindings.providers,
     },
   };
 }
@@ -934,10 +959,18 @@ const turnFinalizations = new Map<string, Promise<void>>();
 const scheduledRunsBySession = new Map<string, string>();
 /** Session currently rendered on the chat page; focus remains Main-owned. */
 let notificationViewingSessionId: string | null = null;
-/** Preserve tool metadata until the result is persisted at tool_end. */
+/** Preserve tool metadata until the result is persisted at tool_end. Subagent
+ * calls also carry their attribution, which is what lets a permission request
+ * name the delegate that asked (ADR 0060). */
 const activeToolCalls = new Map<
   string,
-  { toolName: string; args: unknown; createdAt: string }
+  {
+    toolName: string;
+    args: unknown;
+    createdAt: string;
+    parentToolCallId?: string;
+    agentName?: string;
+  }
 >();
 
 function activeToolCallKey(sessionId: string, toolCallId: string) {
@@ -2117,6 +2150,16 @@ function wireHost(h: HostProcess) {
         toolCallId: (params as any).toolCallId,
         data: { toolName: (params as any).toolName, risk: (params as any).risk },
       });
+      // A delegate's call is already in `activeToolCalls` by the time the host
+      // asks: the sidecar forwards `tool_start` before it executes the tool.
+      // Without this the dialog would attribute a delegate's write to the main
+      // agent, which is the one thing the user must not be confused about.
+      const asking = activeToolCalls.get(
+        activeToolCallKey(
+          (params as any).sessionId,
+          (params as any).toolCallId,
+        ),
+      );
       const envelope: AgentEventEnvelope = {
         sessionId: (params as any).sessionId,
         ts: Date.now(),
@@ -2130,6 +2173,10 @@ function wireHost(h: HostProcess) {
             argsPreview: (params as any).argsPreview,
             risk: (params as any).risk,
             reason: (params as any).reason,
+            ...(asking?.agentName ? { agentName: asking.agentName } : {}),
+            ...(asking?.parentToolCallId
+              ? { parentToolCallId: asking.parentToolCallId }
+              : {}),
           },
         },
       };
@@ -3171,6 +3218,20 @@ async function dispatchExecutionForProposal(proposalId: string): Promise<void> {
   }
 }
 
+/**
+ * Carry subagent attribution from the event envelope onto the persisted row, so
+ * a reloaded session still nests the row under its `Task` call and still keeps
+ * it out of the parent's model context (ADR 0060).
+ */
+function subagentTagged(message: UiMessage, envelope: AgentEventEnvelope): UiMessage {
+  if (!envelope.parentToolCallId) return message;
+  return {
+    ...message,
+    parentToolCallId: envelope.parentToolCallId,
+    ...(envelope.agentName ? { agentName: envelope.agentName } : {}),
+  };
+}
+
 function persistAgentEvent(envelope: AgentEventEnvelope) {
   const event = envelope.event;
   const turnId = activeTurns.get(envelope.sessionId);
@@ -3199,6 +3260,10 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
       toolName: event.toolName,
       args: event.args,
       createdAt: new Date(envelope.ts).toISOString(),
+      ...(envelope.parentToolCallId
+        ? { parentToolCallId: envelope.parentToolCallId }
+        : {}),
+      ...(envelope.agentName ? { agentName: envelope.agentName } : {}),
     });
     if (
       (event.toolName === "SubmitPlan" || event.toolName === "SubmitGoal") &&
@@ -3302,7 +3367,7 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
         {
           key: `message:${envelope.sessionId}:${event.message.id}`,
           sessionId: envelope.sessionId,
-          message: event.message,
+          message: subagentTagged(event.message, envelope),
           turnId,
         },
         () => host,
@@ -3343,6 +3408,10 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
               : undefined,
             isError: event.isError,
             status: "complete",
+            ...(started?.parentToolCallId
+              ? { parentToolCallId: started.parentToolCallId }
+              : {}),
+            ...(started?.agentName ? { agentName: started.agentName } : {}),
           },
           turnId,
         },
