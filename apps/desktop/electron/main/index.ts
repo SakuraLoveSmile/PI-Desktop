@@ -1955,7 +1955,8 @@ async function createWindow() {
               `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
             );
             await new Promise((r) => setTimeout(r, 150));
-            // The extension tabs, in order: installed, MCP, skills, marketplace.
+            // The extension tabs, in order: installed, MCP, skills, subagents,
+            // marketplace (D202 inserted the fourth).
             const extTab = async (index: number, settle = 350) => {
               await mainWindow!.webContents.executeJavaScript(`
                 (() => {
@@ -2005,14 +2006,53 @@ async function createWindow() {
             // from the MCP rows, so it gets its own scene.
             await extTab(2);
             await shot("pi-extensions-skills");
+            // Subagents tab: the writable registry list, whose rows carry the
+            // Task handle, the tinted mutating grants and the shadow/inactive
+            // tags, above the read-only effective catalog.
+            await extTab(3);
+            await shot("pi-extensions-subagents");
+            // The read-only half sits below the fold: builtin and project rows,
+            // which carry a source tag and a copy action instead of a scope.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const rows = [...document.querySelectorAll('.ext-row')];
+                rows[rows.length - 1]?.scrollIntoView({ block: 'end' });
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 300));
+            await shot("pi-extensions-subagents-provided");
+            await mainWindow!.webContents.executeJavaScript(
+              `document.querySelector('.plugins-page')?.scrollTo(0, 0)`,
+            );
+            await new Promise((r) => setTimeout(r, 200));
+            // Editor sheet: the tool grant sits above the prompt, which is the
+            // whole point of the field order, so it needs to be on screen.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                document.querySelector('.ext-section-actions button:last-of-type')
+                  ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 350));
+            await shot("pi-extensions-subagent-editor");
+            await mainWindow!.webContents.executeJavaScript(
+              `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
+            );
+            await new Promise((r) => setTimeout(r, 200));
+            await setTheme("dark");
+            await new Promise((r) => setTimeout(r, 300));
+            await shot("pi-extensions-subagents-dark");
+            await setTheme("light");
+            await new Promise((r) => setTimeout(r, 250));
             await extTab(1, 250);
             await setTheme("dark");
             await new Promise((r) => setTimeout(r, 300));
             await shot("pi-extensions-mcp-dark");
             await setTheme("light");
             await new Promise((r) => setTimeout(r, 250));
-            // Marketplace tab of the same page (D169 segmented control).
-            await extTab(3, 900);
+            // Marketplace tab of the same page (D169 segmented control, fifth
+            // since D202).
+            await extTab(4, 900);
             await shot("pi-plugins-market");
             // Template picker behind the overflow menu (D171). Selecting a
             // template only sets state, so no folder dialog opens here.

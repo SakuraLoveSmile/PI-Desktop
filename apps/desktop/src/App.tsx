@@ -46,7 +46,9 @@ import type {
   PluginSummary,
   PluginTheme,
   ProjectRecord,
+  SubagentDefinition,
   UserSkillRecord,
+  UserSubagentRecord,
 } from "@pi-desktop/shared";
 
 const MODIFIER_ONLY_KEYS = new Set([
@@ -579,6 +581,8 @@ function AppShell() {
     const originalListPluginServices = api.listPluginServices;
     const originalListMcpServers = api.listMcpServers;
     const originalListUserSkills = api.listUserSkills;
+    const originalListUserSubagents = api.listUserSubagents;
+    const originalSubagentCatalog = api.subagentCatalog;
     const originalListProjects = api.listProjects;
     (window as any).__PI_DESKTOP__ = {
       setPage: (page: string) => useAppStore.getState().setPage(page as any),
@@ -749,7 +753,8 @@ function AppShell() {
         useAppStore.setState({ plugins: samples.slice(0, count) });
       },
       seedExtensions: (count = 3) => {
-        // Capture-only fixture for the MCP and Skills tabs. Those sections read
+        // Capture-only fixture for the MCP, Skills and Subagents tabs. Those
+        // sections read
         // straight from IPC into local state rather than the store, so the rig
         // has to stand in for the host rather than seed a slice; count 0 puts
         // the real calls back.
@@ -757,6 +762,8 @@ function AppShell() {
         if (count <= 0) {
           (api as any).listMcpServers = originalListMcpServers;
           (api as any).listUserSkills = originalListUserSkills;
+          (api as any).listUserSubagents = originalListUserSubagents;
+          (api as any).subagentCatalog = originalSubagentCatalog;
           (api as any).listProjects = originalListProjects;
           return;
         }
@@ -894,9 +901,113 @@ function AppShell() {
             updatedAt: "2026-06-02T10:00:00.000Z",
           },
         ];
+        // One registry definition per state the row can report: active, scoped
+        // elsewhere, shadowed by a project document, and turned off.
+        const subagents: UserSubagentRecord[] = [
+          {
+            id: "log-reader",
+            name: "log-reader",
+            description:
+              "Read a build log end to end and report the first real failure with its file and line.",
+            enabled: true,
+            scope: { mode: "global", projects: [] },
+            tools: ["Read", "Grep", "Bash"],
+            maxTurns: 12,
+            path: "/Users/pi/.pi-desktop/agents/log-reader.md",
+            sizeBytes: 1_840,
+            createdAt: "2026-08-05T09:00:00.000Z",
+            updatedAt: "2026-08-06T11:20:00.000Z",
+          },
+          {
+            id: "schema-diff",
+            name: "schema-diff",
+            description:
+              "Compare the migration files on a branch against the committed schema and list what drifted.",
+            enabled: true,
+            scope: { mode: "projects", projects: ["/Users/pi/work/api"] },
+            tools: ["Read", "Glob", "Grep"],
+            model: "anthropic/claude-haiku-4-5",
+            thinkingLevel: "low",
+            path: "/Users/pi/.pi-desktop/agents/schema-diff.md",
+            sizeBytes: 3_120,
+            createdAt: "2026-07-28T09:00:00.000Z",
+            updatedAt: "2026-08-02T14:05:00.000Z",
+          },
+          {
+            id: "explorer",
+            name: "explorer",
+            description: "My own explorer, with the repository's layout written into the prompt.",
+            enabled: true,
+            scope: { mode: "global", projects: [] },
+            tools: ["Read", "Glob", "Grep"],
+            maxTurns: 30,
+            path: "/Users/pi/.pi-desktop/agents/explorer.md",
+            sizeBytes: 2_260,
+            createdAt: "2026-08-01T09:00:00.000Z",
+            updatedAt: "2026-08-01T09:00:00.000Z",
+          },
+          {
+            id: "release-drafter",
+            name: "release-drafter",
+            description: "Draft the release notes for a tag range, grouped by user-visible change.",
+            enabled: false,
+            scope: { mode: "global", projects: [] },
+            tools: ["Read", "Grep"],
+            path: "/Users/pi/.pi-desktop/agents/release-drafter.md",
+            sizeBytes: 980,
+            createdAt: "2026-06-20T09:00:00.000Z",
+            updatedAt: "2026-06-20T09:00:00.000Z",
+          },
+        ];
+        // The effective catalog main would compute: the registry copy of
+        // `explorer` has replaced the builtin, `log-reader` is owned by a project
+        // document, and the other two builtins are untouched.
+        const catalog: SubagentDefinition[] = [
+          {
+            name: "log-reader",
+            description: "The project's own log reader, tuned for its CI output.",
+            prompt: "You are log-reader.\n",
+            tools: ["Read", "Grep"],
+            maxTurns: 12,
+            source: "project",
+            filePath: "/Users/pi/work/api/.pi/agents/log-reader.md",
+          },
+          {
+            name: "explorer",
+            description: "My own explorer, with the repository's layout written into the prompt.",
+            prompt: "You are explorer.\n",
+            tools: ["Read", "Glob", "Grep"],
+            maxTurns: 30,
+            source: "user",
+            filePath: "/Users/pi/.pi-desktop/agents/explorer.md",
+          },
+          {
+            name: "code-reviewer",
+            description:
+              "Review a change for correctness, then report findings ranked by severity.",
+            prompt: "You are code-reviewer.\n",
+            tools: ["Read", "Glob", "Grep"],
+            maxTurns: 24,
+            source: "builtin",
+          },
+          {
+            name: "test-runner",
+            description: "Run the test suite, then report the first failure that is not flaky.",
+            prompt: "You are test-runner.\n",
+            tools: ["Read", "Glob", "Grep", "Bash"],
+            maxTurns: 24,
+            source: "builtin",
+          },
+        ];
         (api as any).listProjects = async () => ({ projects });
         (api as any).listMcpServers = async () => ({ servers, statuses });
         (api as any).listUserSkills = async () => ({ skills: skills.slice(0, count) });
+        (api as any).listUserSubagents = async () => ({ subagents });
+        (api as any).subagentCatalog = async () => ({
+          subagents: catalog,
+          diagnostics: [],
+          projectPath: "/Users/pi/work/api",
+        });
       },
       seedPluginThemes: (count = 2) => {
         // Capture-only theme fixture: plugin themes share the built-in grid on
