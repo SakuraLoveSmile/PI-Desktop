@@ -49,9 +49,16 @@
   --ds-bg-composer: color-mix(in oklab, var(--gray-800) 96%, transparent);
   --ds-bg-chip: color-mix(in oklab, var(--gray-0) 6%, transparent);
   --ds-text-primary: var(--gray-0);
+  /*
+    One white-alpha ramp for the whole secondary/muted/faint tier. gray-500 and
+    gray-600 used to sit here, but those are ink values for a pale surface: on
+    the #181818 plate they land at 2.7:1 and 1.7:1, so mono ids, row meta, tool
+    chips, and inactive scope segments were effectively unreadable. Alpha rather
+    than a flat hex keeps each step consistent over hover and elevated fills too.
+  */
   --ds-text-secondary: color-mix(in oklab, var(--gray-0) 70%, transparent);
-  --ds-text-muted: var(--gray-500);
-  --ds-text-faint: var(--gray-600);
+  --ds-text-muted: color-mix(in oklab, var(--gray-0) 52%, transparent);
+  --ds-text-faint: color-mix(in oklab, var(--gray-0) 38%, transparent);
   --ds-border-default: color-mix(in oklab, var(--gray-0) 8%, transparent);
   --ds-border-subtle: color-mix(in oklab, var(--gray-0) 5%, transparent);
   --ds-border-strong: color-mix(in oklab, var(--gray-0) 14%, transparent);
