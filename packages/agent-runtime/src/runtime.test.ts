@@ -857,7 +857,6 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
       "Bash",
       "Edit",
       "Write",
-      "CompactContext",
       "EnterPlanMode",
       "EnterGoalMode",
       "ToolSearch",
@@ -894,7 +893,6 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
         "Grep",
         "BrowserPreview",
         "Bash",
-        "CompactContext",
         "SubmitPlan",
       ]),
     );
@@ -990,7 +988,6 @@ describe("DesktopAgentRuntime mode and tool composition", () => {
         "Write",
         "Edit",
         "Bash",
-        "CompactContext",
         "EnterPlanMode",
         "ToolSearch",
       ]),
@@ -1009,7 +1006,6 @@ describe("DesktopAgentRuntime mode and tool composition", () => {
         "Grep",
         "BrowserPreview",
         "Bash",
-        "CompactContext",
         "SubmitPlan",
       ]),
     );
@@ -1050,7 +1046,6 @@ describe("DesktopAgentRuntime mode and tool composition", () => {
         "Grep",
         "BrowserPreview",
         "Bash",
-        "CompactContext",
         "SubmitGoal",
       ]),
     );
@@ -2405,7 +2400,7 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     await runtime.dispose();
   });
 
-  it("nudges a long tool loop, deduplicates reminders, then compacts before agent_end", async () => {
+  it("compacts a long tool loop at the hard boundary without prompt injection", async () => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
     const prepareNextTurn = (runtime as any).prepareNextTurn.bind(runtime);
@@ -2413,19 +2408,16 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     vi.spyOn(runtime as any, "contextBudget")
       .mockReturnValueOnce({
         tokens: 205_000,
-        softLimit: 204_000,
         hardLimit: 224_000,
         requestHeadroom: 32_000,
       })
       .mockReturnValueOnce({
         tokens: 210_000,
-        softLimit: 204_000,
         hardLimit: 224_000,
         requestHeadroom: 32_000,
       })
-      .mockReturnValueOnce({
-        tokens: 225_000,
-        softLimit: 204_000,
+      .mockReturnValue({
+        tokens: 100_000,
         hardLimit: 224_000,
         requestHeadroom: 32_000,
       });
@@ -2434,20 +2426,34 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
       .mockResolvedValue(true);
 
     await handleAgentEvent({ type: "turn_end", message: assistant, toolResults: [toolResult] });
-    const soft = await prepareNextTurn(nextTurn);
+    const below = await prepareNextTurn(nextTurn);
     await handleAgentEvent({ type: "turn_end", message: assistant, toolResults: [toolResult] });
-    const deduplicated = await prepareNextTurn(nextTurn);
+    const stillBelow = await prepareNextTurn(nextTurn);
     await handleAgentEvent({ type: "turn_end", message: assistant, toolResults: [toolResult] });
-    const hard = await prepareNextTurn(nextTurn);
 
-    expect(soft.context.systemPrompt).toContain("<context_management>");
-    expect(deduplicated.context.systemPrompt).not.toContain("<context_management>");
-    expect(hard.context.systemPrompt).not.toContain("<context_management>");
+    expect(below.context.systemPrompt).toBe(stillBelow.context.systemPrompt);
+    expect(below.context.systemPrompt).not.toContain("<context_management>");
     expect((runtime as any).agent.state.systemPrompt).not.toContain(
       "<context_management>",
     );
+    expect(runCompaction).not.toHaveBeenCalled();
+
+    vi.spyOn(runtime as any, "contextBudget")
+      .mockReturnValueOnce({
+        tokens: 225_000,
+        hardLimit: 224_000,
+        requestHeadroom: 32_000,
+      })
+      .mockReturnValue({
+        tokens: 40_000,
+        hardLimit: 224_000,
+        requestHeadroom: 32_000,
+      });
+    const hard = await prepareNextTurn(nextTurn);
+
+    expect(hard.context.systemPrompt).not.toContain("<context_management>");
     expect(runCompaction).toHaveBeenCalledOnce();
-    expect(runCompaction).toHaveBeenCalledWith("threshold", false, undefined);
+    expect(runCompaction).toHaveBeenCalledWith("threshold", false);
     const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
     expect(events.filter((event) => event.type === "turn_end")).toHaveLength(3);
     expect(events.some((event) => event.type === "agent_end")).toBe(false);
@@ -2455,34 +2461,16 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     await runtime.dispose();
   });
 
-  it("lets the model request one checkpoint with an active-task focus", async () => {
+  it("offers no model-facing compaction tool", async () => {
     const runtime = createRuntime();
-    const agent = (runtime as any).agent;
-    const compactTool = agent.state.tools.find(
-      (tool: any) => tool.name === "CompactContext",
-    );
-    expect(compactTool).toBeDefined();
-    await compactTool.execute("compact-call", {
-      focus: "Keep the migration plan and files already changed.",
-    });
-    vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
-      tokens: 100_000,
-      softLimit: 204_000,
-      hardLimit: 224_000,
-      requestHeadroom: 32_000,
-    });
-    const runCompaction = vi
-      .spyOn(runtime as any, "runCompaction")
-      .mockResolvedValue(true);
 
-    await (runtime as any).prepareNextTurn(nextTurn);
+    expect(
+      (runtime as any).agent.state.tools.some(
+        (tool: any) => tool.name === "CompactContext",
+      ),
+    ).toBe(false);
+    expect((runtime as any).toolCatalog.has("CompactContext")).toBe(false);
 
-    expect(runCompaction).toHaveBeenCalledWith(
-      "threshold",
-      false,
-      "Preserve this active focus with high fidelity: Keep the migration plan and files already changed.",
-    );
-    expect((runtime as any).pendingModelCompaction).toBeUndefined();
     await runtime.dispose();
   });
 
@@ -2839,8 +2827,11 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     await runtime.dispose();
   });
 
-  it("removes the model compaction tool when automatic protection is disabled", async () => {
+  it("keeps the tool set unchanged when automatic protection is disabled", async () => {
     const runtime = createRuntime();
+    const before = (runtime as any).agent.state.tools.map(
+      (tool: any) => tool.name,
+    );
 
     runtime.setCompactionSettings({
       enabled: false,
@@ -2849,10 +2840,8 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     });
 
     expect(
-      (runtime as any).agent.state.tools.some(
-        (tool: any) => tool.name === "CompactContext",
-      ),
-    ).toBe(false);
+      (runtime as any).agent.state.tools.map((tool: any) => tool.name),
+    ).toEqual(before);
     await runtime.dispose();
   });
 

@@ -153,9 +153,7 @@ const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;
 const PROVIDER_STREAM_RETRY_BACKOFF_MS = 750;
 const MAX_MUTATION_RECOVERY_FAILURES = 2;
 const BASH_PATCH_FAILURE_KEY = "__bash_patch_command__";
-const CONTEXT_COMPACTION_TOOL_NAME = "CompactContext";
 export const TOOL_SEARCH_NAME = "ToolSearch";
-const CONTEXT_NUDGE_TURN_INTERVAL = 3;
 const CHECKPOINT_TAIL_SAFETY_TOKENS = 256;
 const COMPACTION_FALLBACK_KEEP_RECENT_RATIO = 0.25;
 const COMPACTION_FALLBACK_MAX_SUMMARY_CHARS = 12_000;
@@ -243,14 +241,6 @@ function pathInstructionScope(path: string): string {
 
 const CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER =
   "\n\n[checkpoint truncated: tool result exceeded the retained context budget]\n\n";
-const CONTEXT_COMPACTION_NUDGE = [
-  "<context_management>",
-  "The working context is approaching its safe limit.",
-  `Before starting more exploration, call ${CONTEXT_COMPACTION_TOOL_NAME} once with a short focus describing the active task and the facts that must survive.`,
-  "You may finish the current atomic tool batch first. Do not call the tool repeatedly after it confirms the request.",
-  "</context_management>",
-].join("\n");
-
 /**
  * Appended for one automatic re-run after a turn that produced nothing the
  * user can see. Two shapes were observed: a wholly empty response, and a
@@ -895,8 +885,6 @@ export class DesktopAgentRuntime {
   private turnHadError = false;
   private compactionAbort?: AbortController;
   private compactionInProgress = false;
-  private pendingModelCompaction?: { instructions?: string };
-  private nudgeCooldownTurns = 0;
   private activeToolProgressCleanups = new Set<(flush: boolean) => void>();
   private hostCloseUnsubscribe?: () => void;
 
@@ -1694,9 +1682,6 @@ export class DesktopAgentRuntime {
             execute: exec(def.name).execute,
           }))
         : [];
-    const contextTools = this.compactionSettings.enabled
-      ? [this.buildContextCompactionTool()]
-      : [];
     // Only offered when a plugin actually taught a skill; Electron main serves
     // it locally (host-core never sees the skill documents).
     const skillTools: AgentTool[] =
@@ -1720,7 +1705,7 @@ export class DesktopAgentRuntime {
       this.mode === "agent"
         ? [this.buildEnterModeTool("plan"), this.buildEnterModeTool("goal")]
         : [this.buildSubmitTool(this.mode)];
-    return [...builtins, ...pluginTools, ...skillTools, ...contextTools, ...modeTools];
+    return [...builtins, ...pluginTools, ...skillTools, ...modeTools];
   }
 
   /**
@@ -1760,14 +1745,12 @@ export class DesktopAgentRuntime {
       "Grep",
       "BrowserPreview",
       "Bash",
-      CONTEXT_COMPACTION_TOOL_NAME,
       SUBMIT_TOOL_NAMES[kind],
     ]).has(name);
   }
 
   private isCoreTool(name: string): boolean {
     return (
-      name === CONTEXT_COMPACTION_TOOL_NAME ||
       MODE_TRANSITION_TOOL_NAMES.has(name) ||
       (this.mode === "agent"
         ? AGENT_CORE_TOOL_NAMES.has(name)
@@ -2138,40 +2121,6 @@ export class DesktopAgentRuntime {
     this.agent.state.systemPrompt = this.composeSystemPrompt();
   }
 
-  private buildContextCompactionTool(): AgentTool {
-    return {
-      name: CONTEXT_COMPACTION_TOOL_NAME,
-      label: "Compact Context",
-      description:
-        "Request a checkpoint summary of older model context while preserving recent work. Use this once when a context-management instruction asks for it; compaction runs after the current tool turn.",
-      parameters: Type.Object({
-        focus: Type.Optional(
-          Type.String({
-            description:
-              "Short description of the active task and details that the checkpoint must preserve.",
-          }),
-        ),
-      }),
-      execute: async (_toolCallId, params) => {
-        const focus = isRecord(params) ? params.focus : undefined;
-        const instructions =
-          typeof focus === "string" && focus.trim()
-            ? `Preserve this active focus with high fidelity: ${focus.trim().slice(0, 1_000)}`
-            : undefined;
-        this.pendingModelCompaction = { instructions };
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Context compaction is queued for the end of this tool turn. Continue after the refreshed context; do not request it again now.",
-            },
-          ],
-          details: { queued: true },
-        };
-      },
-    };
-  }
-
   private emit(event: AgentEventEnvelope["event"], turnId?: string) {
     this.onEvent({
       sessionId: this.sessionId,
@@ -2296,8 +2245,6 @@ export class DesktopAgentRuntime {
 
   setCompactionSettings(settings?: ContextCompactionSettings): void {
     this.compactionSettings = normalizeCompactionSettings(settings);
-    this.pendingModelCompaction = undefined;
-    this.nudgeCooldownTurns = 0;
     this.rebuildToolCatalog();
     this.agent.state.tools = this.activeTools();
   }
@@ -2456,81 +2403,42 @@ export class DesktopAgentRuntime {
   }
 
   private async prepareNextTurn(
-    turn: PrepareNextTurnContext,
+    _turn: PrepareNextTurnContext,
     _signal?: AbortSignal,
   ): Promise<AgentLoopTurnUpdate> {
     let context = this.rebuiltAgentContext();
-    if (!this.compactionSettings.enabled) {
-      this.pendingModelCompaction = undefined;
-      this.nudgeCooldownTurns = 0;
-      return { context };
-    }
+    if (!this.compactionSettings.enabled) return { context };
 
     const budget = this.contextBudget(context.messages);
-    const hardLimitReached = budget.tokens >= budget.hardLimit;
-    const modelRequest = this.pendingModelCompaction;
-    this.pendingModelCompaction = undefined;
+    if (budget.tokens < budget.hardLimit) return { context };
 
-    if (hardLimitReached || modelRequest) {
-      const compacted = await this.runCompaction(
-        "threshold",
-        false,
-        modelRequest?.instructions,
+    const compacted = await this.runCompaction("threshold", false);
+    if (!compacted) {
+      // Continuing would immediately issue the provider request that this
+      // guard exists to prevent. The Agent wrapper converts this failure to
+      // the normal error/agent_end event sequence.
+      throw new Error(
+        "CONTEXT_COMPACTION_FAILED: unable to create a checkpoint before the next model request",
       );
-      if (compacted) {
-        this.nudgeCooldownTurns = 0;
-        context = this.rebuiltAgentContext();
-        const postCompactionBudget = this.contextBudget(context.messages);
-        if (
-          hardLimitReached &&
-          postCompactionBudget.tokens >= postCompactionBudget.hardLimit
-        ) {
-          throw new Error(
-            "CONTEXT_COMPACTION_FAILED: checkpoint remained above the safe model context budget",
-          );
-        }
-        return { context };
-      }
-      if (hardLimitReached) {
-        // Continuing would immediately issue the provider request that this
-        // guard exists to prevent. The Agent wrapper converts this failure to
-        // the normal error/agent_end event sequence.
-        throw new Error(
-          "CONTEXT_COMPACTION_FAILED: unable to create a checkpoint before the next model request",
-        );
-      }
     }
-
-    if (budget.tokens < budget.softLimit) {
-      this.nudgeCooldownTurns = 0;
-      return { context };
+    context = this.rebuiltAgentContext();
+    const postCompactionBudget = this.contextBudget(context.messages);
+    if (postCompactionBudget.tokens >= postCompactionBudget.hardLimit) {
+      throw new Error(
+        "CONTEXT_COMPACTION_FAILED: checkpoint remained above the safe model context budget",
+      );
     }
-    if (turn.toolResults.length === 0) {
-      return { context };
-    }
-    if (this.nudgeCooldownTurns > 0) {
-      this.nudgeCooldownTurns -= 1;
-      return { context };
-    }
-
-    this.nudgeCooldownTurns = CONTEXT_NUDGE_TURN_INTERVAL - 1;
-    return {
-      context: {
-        ...context,
-        systemPrompt: `${context.systemPrompt}\n\n${CONTEXT_COMPACTION_NUDGE}`,
-      },
-    };
+    return { context };
   }
 
   private async runCompaction(
     reason: ContextCompactionReason,
     willRetry: boolean,
-    customInstructions?: string,
   ): Promise<boolean> {
     if (this.compactionInProgress) return false;
     this.compactionInProgress = true;
     try {
-      return await this.performCompaction(reason, willRetry, customInstructions);
+      return await this.performCompaction(reason, willRetry);
     } finally {
       this.compactionAbort = undefined;
       this.compactionInProgress = false;
@@ -2813,7 +2721,6 @@ export class DesktopAgentRuntime {
 
   private async generateCompaction(
     preparation: CompactionPreparation,
-    customInstructions?: string,
   ): Promise<Awaited<ReturnType<typeof compact>>> {
     if (!this.compactionAbort) {
       throw new Error("Compaction was not initialized");
@@ -2822,7 +2729,7 @@ export class DesktopAgentRuntime {
       preparation,
       this.models,
       this.model,
-      customInstructions,
+      undefined,
       this.compactionAbort.signal,
       this.thinkingLevel,
     );
@@ -2831,7 +2738,6 @@ export class DesktopAgentRuntime {
   private async performCompaction(
     reason: ContextCompactionReason,
     willRetry: boolean,
-    customInstructions?: string,
   ): Promise<boolean> {
     this.emit({ type: "compaction_start", reason });
     const entries = this.entriesWithCompaction();
@@ -2880,10 +2786,7 @@ export class DesktopAgentRuntime {
     this.compactionAbort = new AbortController();
     let result: Awaited<ReturnType<typeof compact>>;
     try {
-      result = await this.generateCompaction(
-        preparation.value,
-        customInstructions,
-      );
+      result = await this.generateCompaction(preparation.value);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (reason !== "manual" && !this.compactionAbort?.signal.aborted) {

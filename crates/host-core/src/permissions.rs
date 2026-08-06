@@ -113,7 +113,7 @@ impl PermissionManager {
     pub fn plan_mode_allows(tool_name: &str) -> bool {
         matches!(
             tool_name,
-            "Read" | "Glob" | "Grep" | "Bash" | "BrowserPreview" | "CompactContext"
+            "Read" | "Glob" | "Grep" | "Bash" | "BrowserPreview"
         )
     }
 
