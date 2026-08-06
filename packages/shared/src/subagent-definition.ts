@@ -4,9 +4,10 @@
  *
  * The format deliberately mirrors `.pi/prompts/*.md` (D123): YAML-ish
  * frontmatter followed by a Markdown body that becomes the delegate's system
- * prompt. Discovery lives in Electron main (`.pi/agents/*.md` plus builtins);
- * this module owns only the shape, the parser and the safety defaults so the
- * renderer, main and the sidecar agree on what a definition means.
+ * prompt. Discovery and provider resolution live in `agent-runtime`
+ * (`subagent-definitions.ts`); this module owns only the shape, the parser and
+ * the safety defaults so the renderer, main and the sidecar agree on what a
+ * definition means.
  *
  * Two defaults matter for safety:
  * - a delegate that does not declare `tools` is read-only, and

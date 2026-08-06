@@ -21,6 +21,7 @@ import {
 import { isCommandShellOption, normalizeMode } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
+  SubagentDefinition,
   ContextCompactionRecord,
   ContextCompactionSettings,
   CommandShellOption,
@@ -80,6 +81,10 @@ type RuntimeParams = {
   commandShell: CommandShellOption;
   pluginTools?: PluginToolDef[];
   pluginSkills?: PluginSkillDef[];
+  /** Delegates this session may spawn through `Task` (ADR 0060). */
+  subagents?: SubagentDefinition[];
+  /** Provider bindings for pinned models, keyed by `subagentModelKey`. */
+  subagentProviders?: Record<string, RuntimeProviderConfig>;
   scratchDir?: string;
   /** Session-bound workspace root supplied by Electron main. */
   projectPath?: string;
@@ -124,6 +129,8 @@ async function runtimeFor(
   const thinkingLevel = normalizeThinkingLevel(params.thinkingLevel);
   const pluginTools = params.pluginTools ?? [];
   const pluginSkills = params.pluginSkills ?? [];
+  const subagents = params.subagents ?? [];
+  const subagentProviders = params.subagentProviders ?? {};
   if (!provider?.modelId || (!provider.apiKey && provider.authKind !== "none")) {
     throw Object.assign(new Error("model/provider not configured"), {
       rpcCode: -32000,
@@ -144,6 +151,8 @@ async function runtimeFor(
     thinkingLevel,
     pluginTools,
     pluginSkills,
+    subagents,
+    subagentProviders,
     projectInstructions: params.projectInstructions,
     projectPath: params.projectPath,
     commandShell: params.commandShell,
@@ -193,6 +202,8 @@ async function runtimeFor(
     compactionSettings: params.compactionSettings,
     pluginTools,
     pluginSkills,
+    subagents,
+    subagentProviders,
     projectPath: params.projectPath,
     projectInstructions: params.projectInstructions,
     scratchDir:
