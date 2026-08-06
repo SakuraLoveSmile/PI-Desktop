@@ -287,6 +287,12 @@
   opacity: 1;
 }
 
+/* A read-only row has no switch or scope control to anchor it, so hiding its
+   actions until hover would leave nothing to suggest the row can be copied. */
+.ext-row.is-provided .ext-row-actions {
+  opacity: 1;
+}
+
 .ext-tag {
   display: inline-flex;
   align-items: center;
