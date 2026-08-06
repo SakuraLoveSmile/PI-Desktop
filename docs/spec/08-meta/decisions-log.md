@@ -1198,3 +1198,24 @@ D193, and D194.
   `03-runtime/06-host-rpc-protocol.md` §5.1,
   `03-runtime/08-error-codes.md`, `03-runtime/10-session-state-machine.md`,
   `04-ux/04-builtin-commands.md`, and `04-ux/08-component-spec.md` §11.
+
+## 2026-08-06 — The regenerate branch is archived under the host RPC lock
+
+- Turn completion used to archive the finished regenerate branch with a
+  read-modify-write from Electron main: `session.get`, then
+  `session.replaceMessages` to stamp `revisionCount` / `activeRevision` on the
+  user root. Assistant and tool messages reach SQLite asynchronously through the
+  persistence outbox (ADR 0041), so the snapshot could predate the turn's final
+  message and the whole-transcript rewrite deleted it from the transcript file
+  and the index, along with every row's `turn_id`.
+- `session.saveActiveRevision` now performs the read, the archive, and the stamp
+  in one host call under the state lock. The stamp rewrites only the root user's
+  transcript line and re-reads the file at write time, so a line appended in the
+  meantime survives. Electron main drains the outbox first and skips the archive
+  with a warning rather than archiving an incomplete branch.
+- `session.replaceMessages` carries each surviving message's owning `turn_id`
+  across the rewrite, and is documented as safe only for a caller that owns the
+  whole transcript for the duration of the call.
+- Decision D199 and ADR 0060 define this. See
+  `03-runtime/04-data-storage.md` §4.9/§7,
+  `03-runtime/06-host-rpc-protocol.md` §4, and E2E-118.
