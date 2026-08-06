@@ -53,12 +53,14 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   choice later becomes unavailable, the first available platform shell is used
   and the fallback state is shown. A Bash turn verifies its pinned ID/dialect
   before execution.
-- Context management has **no card and no controls** (D200 / ADR 0061).
-  Automatic protection is always on, its budgets are derived from the active
-  model's window, and compaction is imperceptible, so there is nothing to
-  configure. Settings search indexes no compaction keys. Manual `/compact`
-  remains available from the command palette for an idle session, and the
-  context usage inspector shows whether a checkpoint is installed.
+- Context management has **no card and no controls** (D200 / ADR 0061, kept by
+  D202 / ADR 0063). Automatic protection is always on and its budgets and
+  retention limits are derived from the active model's window, so there is
+  nothing a user could tune from here — the reference implementation does not
+  expose these values either. Settings search indexes no compaction keys.
+  Manual `/compact` remains available from the command palette for an idle
+  session; the transcript shows where each compaction happened and the context
+  usage inspector shows whether a checkpoint is installed.
 
 ### Shortcuts (`shortcuts` tab)
 - **Keyboard shortcuts** card:

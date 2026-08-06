@@ -32,10 +32,13 @@
 > `0.4.11` adopts turn-boundary model-context checkpoint compaction through
 > D158 / ADR 0030 while preserving the complete visible transcript. The
 > context-recovery amendment in ADR 0049 adds a durable retained-tail
-> fallback for automatic compaction failures. D200 / ADR 0061 later makes
-> compaction imperceptible: checkpoints are pre-computed in provider-idle
-> windows, the `CompactContext` tool and soft-boundary nudge are removed, and
-> the budgets are derived from the model window instead of settings.
+> fallback for automatic compaction failures. D200 / ADR 0061 derives the
+> budgets from the model window instead of settings and removes the compaction
+> settings. D202 / ADR 0063 then rebuilds the mechanism to match Codex:
+> compaction is inline only, a checkpoint carries the summary plus recent user
+> messages, the model-facing `new_context` tool and two budget reminders are
+> back, each compaction adds a transcript row and one warning, and a
+> no-summary rollover family exists behind an internal switch.
 > `0.4.12` standardizes home and thread-docked composer prompt rows without a
 > leading brand mark through D160 / ADR 0031 while preserving shell branding
 > elsewhere.
@@ -113,11 +116,12 @@
     project/session pin, archive, collapse, and sort metadata**
 42. Project activation: **one visible host workspace via existing
     `project.set`; tool roots remain bound to the originating session project**
-43. Context management: **pi-native checkpoint summaries with PI-Desktop-owned
-     background pre-computation in provider-idle windows, deterministic
-     pre-request hard guards, durable host checkpoints, and one overflow retry.
-     No model-facing compaction tool and no user-facing settings; a successful
-     automatic compaction is silent**
+43. Context management: **pi-native checkpoint summaries in Codex's shape —
+     inline compaction at the deterministic pre-request hard guard, the summary
+     plus recent user messages carried forward, durable host checkpoints, and
+     one overflow retry. The model can request a new window through
+     `new_context`; every compaction adds a transcript row and one warning.
+     No user-facing settings**
 44. Plan tools and policy: **Read / Glob / Grep / BrowserPreview / Bash plus
     `EnterPlanMode` and `SubmitPlan`; Write/Edit/plugin and
     unknown tools are denied. Bash follows `ask`, `accept-edits`, or `auto`, so

@@ -461,18 +461,16 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 - `turn_end` marks one completed model/tool turn and may be followed by another
   provider request. It never re-enables the composer or session configuration.
-- Automatic context protection evaluates after every `turn_end`. It has no
-  model-facing tool and no prompt instruction, so it never adds a transcript
-  row. Checkpoints are usually pre-computed while a tool runs or while the
-  session is idle, so the boundary only installs a finished result.
-- A `blocking` `compaction_start` keeps the session running. Threshold and
-  overflow `compaction_end` events remain inside the active run; only
-  `agent_end` or `error` settles it. A manual-only checkpoint settles on
-  `compaction_end`. A `background` pair changes no run state at all.
-- A successful automatic compaction shows no toast and changes nothing the user
-  can see. Successful manual `/compact` shows one informational toast, because
-  the user asked for it. A successful overflow recovery shows one warning toast
-  before the single retry, because the user already saw the failed request.
+- Automatic context protection evaluates after every `turn_end` and runs
+  inline: the user waits for it. The model can also ask for it early through
+  `new_context`, which lands at the same boundary.
+- `compaction_start` keeps the session running. Threshold and overflow
+  `compaction_end` events remain inside the active run; only `agent_end` or
+  `error` settles it. A manual-only checkpoint settles on `compaction_end`.
+- Every successful compaction shows one warning toast: earlier detail is gone,
+  and starting a fresh session is a decision only the user can make. The three
+  more specific toasts stay on top of it — a successful manual `/compact`
+  result, a warning before an overflow retry, and the fallback warning below.
 - If automatic summary generation fails but a retained-tail checkpoint is
   persisted, `compaction_end.fallback = "retained_tail"` shows one warning
   toast and the active run continues with reduced historical context.
@@ -481,9 +479,13 @@ may be retained while exactly one workspace supplies the visible shell context.
   attached to the failed turn.
 - Compaction never removes visible transcript messages. The checkpoint affects
   only future model context and survives session switching/restart.
-- The context usage inspector is the only surface that shows a checkpoint
-  exists: one muted line with the compaction count and the summary's estimated
-  token cost, shown on hover or keyboard focus.
+- Each compaction adds one divider row to the transcript, immediately after the
+  last message it covers, reading how many times the session has compacted and
+  the summary's estimated token cost (or that no summary was generated). The row
+  has no actions and is not selectable.
+- The context usage inspector keeps one muted line for the newest checkpoint,
+  shown on hover or keyboard focus — the count and the summary cost, in the one
+  place that also shows what the context is spent on.
 
 ## 4. Long content collapse / expand
 

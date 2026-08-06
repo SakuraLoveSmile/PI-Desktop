@@ -141,7 +141,7 @@ action. No empty assistant message is persisted in either case.
 
 Decision D193; see E2E-098.
 
-### 5.1 Context checkpoint protection (D158/D200, ADR 0030/0049/0061)
+### 5.1 Context checkpoint protection (D158/D202, ADR 0030/0049/0061/0063)
 
 The complete visible transcript and the model context are separate views of
 the same session. A durable checkpoint summarizes older model context while
@@ -153,10 +153,10 @@ desktop runtime owns when they run and how the result crosses the Rust storage
 boundary; OpenCode DCP is an AGPL-3.0 behavioral reference only, not a linked or
 copied dependency.
 
-Compaction is host-driven and imperceptible. There is no model-facing
-compaction tool and no system-prompt instruction about context management: the
-runtime decides deterministically, and a successful automatic compaction
-produces no toast, no run-state change, and no transcript row.
+Compaction follows Codex's mechanism (ADR 0063): it always happens inline at a
+turn boundary, the model can request it through `new_context`, every compaction
+adds a transcript row and raises one warning toast, and there is no
+pre-computation anywhere.
 
 For every pi loop turn:
 
@@ -164,16 +164,16 @@ For every pi loop turn:
    results for that turn are complete
 2. PI-Desktop rebuilds the context from the full transcript plus the newest
    valid checkpoint and estimates the next request budget
-3. any in-flight background summary is awaited, and a pre-computed checkpoint
-   that is still valid is installed; the turn then usually proceeds without
-   reaching the hard boundary
-4. below the hard boundary, the next turn proceeds unchanged
-5. at or above the hard boundary, summary generation is mandatory; the runtime
-   preflights the summary input against the model window and skips a request
-   that cannot fit. An automatic summary failure first attempts a deterministic
-   retained-tail checkpoint, while manual compaction still reports
+3. below the hard boundary, and with no pending model request, the next turn
+   proceeds unchanged
+4. at or above the hard boundary, or when the model called `new_context`,
+   compaction runs synchronously before the next provider request. In the
+   summary family, generation is mandatory; the runtime preflights the summary
+   input against the model window and skips a request that cannot fit. An
+   automatic summary failure first attempts a deterministic retained-tail
+   checkpoint, while manual compaction still reports
    `CONTEXT_COMPACTION_FAILED`
-6. successful generation or deterministic recovery first appends the
+5. successful generation or deterministic recovery first appends the
    checkpoint through host-core, then installs its summary + retained tail as
    the runtime context for the next provider request; a hard-boundary
    checkpoint is re-estimated before it is persisted and again before
@@ -186,57 +186,54 @@ without persisting anything or changing the active checkpoint; installation
 re-estimates, appends through host-core, updates the active checkpoint, and
 emits `compaction_end`. The blocking path composes the two back to back.
 
-Background pre-computation runs only in **provider-idle windows**, so a summary
-request never shares the provider connection with a streaming turn:
-
-- when a tool starts executing, after the model stream for that turn ended and
-  before the next request is issued;
-- after a run finishes, while the user is reading the result.
-
-It starts only if compaction is enabled, no compaction is already running or
-pending, the session is not disposed, the context is at or above the background
-limit, and the context grew by at least the retained-tail target since the
-baseline recorded when the newest checkpoint was installed. That increment test
-is what stops a large retained tail from requesting a fresh summary every turn
-while reducing nothing. Background work never sets the running flag that feeds
-`AgentStatus.isRunning`.
-
-A pre-computed checkpoint is installed at the next turn boundary or before the
-next user prompt, and only if the checkpoint it was based on is still the
-active one, its `throughMessageId` anchor is still present in the transcript,
-and it is still below the hard budget of the **current** model. Any miss
-discards it and falls through to the blocking path. A background build that
-fails, aborts, or lands on a superseded base is discarded in silence: nothing
-is persisted, no event is emitted, and no retained-tail fallback is attempted —
-that fallback belongs to the blocking hard boundary, which still catches
-whatever background work missed. `abort()` cancels an in-flight background
-summary but keeps an already-built checkpoint, which remains installable.
-
-pi's cut point keeps provider-valid tool call/result pairs together. When the
-final tool-result batch alone exceeds the configured recent-tail target,
-PI-Desktop raises the effective target just enough for pi's reverse scan to
-reach the batch's assistant carrier. When the carrier plus results reaches half
-the hard budget, the runtime first builds a checkpoint-only copy of the batch.
-Every tool result keeps its call identity and error state; available text budget
-is distributed fairly across the parallel results, retained as head + tail,
-and marked with
-`[checkpoint truncated: tool result exceeded the retained context budget]`.
-Provider-irrelevant duplicate `details` are dropped from truncated checkpoint
-results. Original durable message rows and the visible transcript are not
-modified. The bounded tail is re-estimated with the summary before persistence
+**What survives a checkpoint.** The model context after a compaction is the
+summary plus recent **user** messages only; assistant and tool messages are
+dropped from model context and remain in the visible transcript. pi's
+`prepareCompaction` still chooses the cut point, so its turn-boundary and
+split-turn handling are preserved, but the runtime then folds the split-turn
+prefix and the recent tail back into the summary input, so the summary covers
+the whole compacted range and nothing crosses the boundary uncovered. The
+retained user messages are chosen newest-first from the compacted range plus the
+previous checkpoint's retained users, up to the retention limit below; the
+message that crosses that limit is truncated rather than dropped
+(`[checkpoint truncated: this message crossed the retained context budget]`),
+and the selection is restored to chronological order. Dropping an assistant
+message also drops its tool calls, so no orphaned tool call can reach the
+provider. The retained tail is re-estimated with the summary before persistence
 and before continuation, so an oversized request still cannot pass the guard.
+
+**Two compaction families.** Both run the same lifecycle — budget
+re-estimation, host-core append, `compaction_end`, transcript row, warning:
+
+- `summary` (the default) requests a summary from the model;
+- `fresh_window` requests nothing and installs a checkpoint with an empty
+  retained tail and a fixed marker text saying the history was reset without
+  being summarized.
+
+The family is resolved from a construction option, then
+`PI_DESKTOP_COMPACTION_STRATEGY`. It is not a setting, is absent from
+`AppSettings` and i18n, and exists so the no-summary mechanism is implemented
+and testable.
+
+**Model-facing surface.** `new_context` takes no parameters and starts a new
+context window at the next turn boundary; it never clears or resets environment
+state. Two budget reminders are appended to the current turn's system prompt,
+each at most once per checkpoint window and reset when a checkpoint is
+installed: one when the remaining budget falls to
+`clamp(hardLimit * 0.15, 8k, 32k)`, asking the model to start closing out, and
+one at 2,000 tokens remaining, telling it to write down whatever must survive.
+Neither reminder is persisted or shown in the transcript.
 
 The hard boundary is the model context window minus request headroom.
 Headroom is the maximum of a 16,384-token reserve floor, model maximum output
 capped at 25% of the context window, and a 5% safety margin. The reserve floor
-is itself capped at half the window. The retained-tail target is derived from
-the model window as 20% of the hard budget clamped to 8,000–64,000 tokens, and
-then capped at half the hard budget so small-context models can still shed
-meaningful history. None of these values are configurable.
-
-The background limit is 70% of the hard budget. It is the pre-computation
-trigger only; the hard boundary keeps measuring total context, because that is
-the provider's actual constraint.
+is itself capped at half the window. The cut-point target passed to pi is
+derived from the model window as 20% of the hard budget clamped to
+8,000–64,000 tokens, then capped at half the hard budget; it decides where the
+boundary falls, not what survives it. The user-message retention limit is
+20,000 tokens, capped at half the hard budget so retention alone cannot fill a
+small window and leave the summary no room. None of these values are
+configurable.
 
 The incoming user prompt participates in budgeting before the first provider
 request. If normal compaction fails during an automatic threshold or overflow
@@ -256,9 +253,8 @@ Automatic protection is always enabled and is not user-configurable. The
 runtime still accepts a construction-time override that disables it, used by
 tests; persisted `contextCompaction` settings are ignored so a session cannot
 be left with the guard off and no way to restore it. Manual `/compact` remains
-available while the session is idle. Manual and blocking checkpoint generation
-are abortable and count as running state until durable persistence completes;
-background generation never does.
+available while the session is idle. Checkpoint generation is abortable and
+counts as running state until durable persistence completes.
 
 ## 5b. Operating mode and planning state
 

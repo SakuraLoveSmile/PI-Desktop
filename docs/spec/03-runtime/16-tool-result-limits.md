@@ -89,14 +89,17 @@ ignore files from applying — the same rule that lets `path` reach into
   final model/UI result remains the bounded combined payload.
 - UI may offer “open full output in viewer” for Bash/Read later (post-MVP optional)
 - full raw output is not required to persist forever; session may store truncated form in MVP
-- the per-result host cap does not bound a parallel batch in aggregate. During
-  context compaction, if the final assistant carrier plus all of its tool
-  results reaches half the hard request budget, the checkpoint stores bounded
-  model-facing copies instead: every result retains its identity/error state
-  and a fair head/tail text share with this marker:
+- the per-result host cap does not bound a parallel batch in aggregate, and it
+  does not need to during context compaction: a checkpoint retains only user
+  messages, so no tool result crosses the boundary at all (D202). Tool output
+  reaches the next context solely through the checkpoint summary.
+- the one message a checkpoint may truncate is the oldest retained user message,
+  the one that crosses the 20,000-token retention limit. It keeps a 75/25
+  head/tail share of its text with this marker in between, rather than being
+  dropped:
 
 ```text
-[checkpoint truncated: tool result exceeded the retained context budget]
+[checkpoint truncated: this message crossed the retained context budget]
 ```
 
 - checkpoint-only truncation never rewrites the original transcript message

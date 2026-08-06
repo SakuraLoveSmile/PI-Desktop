@@ -76,5 +76,6 @@ Each ADR includes:
 | 0058 | Extensions page density and theme-readable button surfaces | Accepted |
 | 0059 | Persist composer clipboard files in session scratch | Accepted |
 | 0060 | Archive the regenerate branch under the RPC lock | Accepted |
-| 0061 | Imperceptible background context compaction | Accepted (amends 0030 / 0049) |
+| 0061 | Imperceptible background context compaction | Accepted (amends 0030 / 0049; clauses 2/4/6/7/8 amended by 0063) |
 | 0062 | Bounded subagents behind a Task tool | Accepted for implementation |
+| 0063 | Codex-parity context compaction | Accepted (amends 0061 / 0030) |

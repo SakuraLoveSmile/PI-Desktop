@@ -797,7 +797,7 @@ storage but compose into one assistant turn until the next user message.
 | Thinking-only streaming | Transcript opens; disclosure stays open; no empty answer bubble or duplicate Working row |
 | Idle | Scrollable; no auto-scroll |
 | Permission pending | PermissionCard inserted inline; transcript continues after resolution |
-| Context checkpoint | Existing transcript remains visible; compaction adds no row, toast, or run-state change of its own |
+| Context checkpoint | Existing transcript remains visible; compaction adds one divider row after the message it covers and one warning toast |
 | Error | Error MessageBubble with actionable retry link |
 
 ### 7.4 Interactions
@@ -838,9 +838,11 @@ storage but compose into one assistant turn until the next user message.
   reserved for scrolling, marker identity changes, and viewport resize, so a
   streamed content height update does not scan every message twice.
 - Context compaction never removes, collapses, or replaces visible message
-  rows, and never adds one. It has no model-facing tool, so nothing about it
-  reaches the processing group; the context usage inspector is its only visible
-  trace (§7.6).
+  rows. It adds one non-message divider row per compaction, anchored after the
+  last message that checkpoint covers; the row ends whatever assistant turn it
+  falls inside, and a row whose anchor no longer exists is not drawn. The
+  `new_context` tool is a normal tool call and reaches the processing group like
+  any other.
 
 ### 7.5 Accessibility
 
@@ -980,9 +982,10 @@ Single message render — either user (plaintext) or assistant (markdown streami
   transcript scrolling or window resize so no transcript clipping ancestor can
   hide it (D103, D184). When the active session has an installed context
   checkpoint, the panel adds one muted line between the provider and tool
-  sections — how many times the session has compacted and the summary's
-  estimated token cost — and renders nothing there otherwise. This is the only
-  place compaction is visible (D200).
+  sections — how many times the session has compacted and the newest summary's
+  estimated token cost — and renders nothing there otherwise. The transcript
+  shows one row per compaction; this line adds what those rows cannot, next to
+  what the context is currently spent on (D202).
 - Gap: 12px vertical padding between consecutive message rows (denser than
   consumer chat, closer to WorkBuddy task transcript); assistant turns add a
   little extra bottom air so a completed answer separates from the next prompt
@@ -999,6 +1002,20 @@ Single message render — either user (plaintext) or assistant (markdown streami
 | Thinking streaming | disclosure open; answer bubble omitted until answer text exists |
 | Complete | no streaming rule; full rendered markdown |
 | Error | assistant error card in transcript; localized summary + stable code; details disclosure opens to redacted provider response, provider/model IDs, and copy action; retriable failures show Retry and configuration failures show Open settings |
+
+### 8.4a Context compaction row
+
+Not a bubble: a full-width divider between transcript rows, drawn after the last
+message its checkpoint covers.
+
+- One centered label — how many times the session has compacted — with a hairline
+  rule filling the space on both sides, using `--ds-border-subtle`.
+- A second muted segment states the summary's estimated token cost, or that no
+  summary was generated (the no-summary family).
+- `--ds-text-muted` at `--text-2xs` with tabular numerals; the detail segment
+  steps up to `--ds-text-secondary`. Margins match the transcript's row rhythm.
+- `role="separator"`. No actions, no hover state, no selection, no disclosure.
+  Nothing about a checkpoint is editable, so the row is informational only.
 
 ### 8.5 Accessibility
 
@@ -1458,9 +1475,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - `turn_end` is not an idle signal. The composer, model/mode controls, and
   session actions remain blocked through subsequent tool turns and blocking
   automatic checkpoint generation until `agent_end` or `error`. A manual-only
-  checkpoint becomes idle on its matching `compaction_end`. A background
-  checkpoint (`phase: "background"`) never blocks the composer, in either
-  direction: it cannot start a busy state and cannot end one.
+  checkpoint becomes idle on its matching `compaction_end`.
 - Auto-grow: textarea measures wrapped visual lines, starts at one visible
   line, expands through seven lines, then scrolls internally; deleting content
   shrinks it back to one line

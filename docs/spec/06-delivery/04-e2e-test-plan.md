@@ -2489,47 +2489,45 @@ Each scenario is documented in this format:
   results without finishing the agent run. Automatic protection is always on
   and has no settings.
 - **Steps**:
-  1. Start one agent task whose tool loop grows past the background limit (70%
-     of the hard budget).
+  1. Start one agent task whose tool loop grows past the hard budget.
   2. Let at least three `turn_end` events occur before `agent_end`; observe the
-     composer/session controls, processing rows, and toasts.
+     composer/session controls, processing rows, transcript, and toasts.
   3. Continue until a checkpoint is installed, then allow the task to finish.
-  4. Repeat with the background window suppressed (a fixture whose tool turns
-     return instantly and whose growth all lands in one turn) so the hard
-     boundary must compact synchronously.
-  5. Repeat the hard-boundary turn with multiple parallel capped tool results
-     whose aggregate carrier/result batch exceeds half the hard budget.
+  4. Send further prompts until a second checkpoint is installed.
+  5. Repeat the hard-boundary turn with multiple parallel capped tool results in
+     the compacted range.
   6. Restart the app, reopen the session, and send a follow-up that depends on
-     both summarized old work and the retained recent tail.
+     both summarized old work and the retained recent user messages.
   7. Repeat with a provider fixture that returns Bedrock's
      `prompt is too long: N tokens > M maximum` once.
-  8. Invoke `/compact` manually while idle.
+  8. Run a turn where the model calls `new_context` well below the hard budget.
+  9. Invoke `/compact` manually while idle.
 - **Expected**:
   - Each `turn_end` is evaluated before another provider request and never
     marks the overall task idle; composer/config controls remain blocked until
     `agent_end`, `error`, or manual-only `compaction_end`.
-  - Compaction is imperceptible: across the whole run there is no compaction
-    toast, no spinner or run-state change attributable to compaction, and no
-    transcript row for it. No `CompactContext` tool exists in any request's
-    tool list, and no context-management instruction appears in the transcript
-    or the durable system prompt.
-  - The summary request is issued while a tool is running or while the session
-    is idle, never concurrently with a model stream, and the turn boundary that
-    consumes it makes no additional provider request.
+  - Every successful compaction adds exactly one divider row to the transcript,
+    positioned immediately after the last message that checkpoint covers, and
+    raises exactly one warning toast. Two checkpoints produce two rows, in
+    order, and neither row replaces or hides a message.
+  - The `new_context` call appears as a normal tool activity row, returns
+    immediately, and the checkpoint is created at the following turn boundary
+    rather than mid-turn.
   - Opening the context usage inspector after a checkpoint shows one line with
-    the compaction count and summary token estimate; before any checkpoint that
-    line is absent.
+    the compaction count and the newest summary's token estimate; before any
+    checkpoint that line is absent.
   - At the hard boundary a durable checkpoint is created before the next model
     request. The complete visible transcript is unchanged, and the continued
-    task stays below the model-aware safe budget, including when the last
-    retained tool result is larger than the configured recent-tail target.
-  - An aggregate oversized parallel result batch keeps every assistant
-    tool-call/result pair in the checkpoint, fairly bounds result text with the
-    checkpoint-truncation marker, and continues without
-    `CONTEXT_COMPACTION_FAILED`; expanding the original transcript rows still
-    shows their complete persisted results.
-  - Restart restores summary + retained tail. A regenerate/fork before the
-    checkpoint boundary drops it; a later boundary preserves/remaps it.
+    task stays below the model-aware safe budget.
+  - After a checkpoint the next provider request contains no assistant or tool
+    message from before the boundary — only the summary and recent user
+    messages, the oldest of which may carry the checkpoint-truncation marker —
+    and contains no tool call without its result. Expanding the original
+    transcript rows still shows their complete persisted results.
+  - Restart restores summary + retained user messages, and every earlier
+    compaction row is still drawn. A regenerate/fork before a checkpoint
+    boundary drops that record specifically; records anchored on surviving
+    messages are preserved/remapped.
   - The exact provider overflow removes only the failed assistant from model
     context, retries once after compaction, and does not loop on a second
     overflow.
@@ -2541,23 +2539,25 @@ Each scenario is documented in this format:
     prompt crosses the hard budget, the runtime rebuilds a smaller tail from
     the full transcript and carries the existing summary forward instead of
     reporting that there is no new context to compact.
-  - A background build that fails or goes stale is invisible: no event, no
-    toast, no persisted record, and the hard boundary still compacts
-    synchronously on the same run.
-  - Idle `/compact` succeeds and shows its own informational toast, because the
-    user asked for it. Compaction failures surface once through
-    `CONTEXT_COMPACTION_FAILED` without duplicate error toasts.
+  - The budget reminders appear at most once each per checkpoint window, never
+    in the transcript, and never in a persisted system prompt.
+  - Idle `/compact` succeeds and shows its own informational toast on top of the
+    compaction warning, because the user asked for it. Compaction failures
+    surface once through `CONTEXT_COMPACTION_FAILED` without duplicate error
+    toasts.
   - Settings contains no context-management card and Settings search returns no
     compaction rows.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
-  `03-runtime/02-agent-runtime.md`, `03-runtime/04-data-storage.md`,
-  `03-runtime/06-host-rpc-protocol.md`, `04-ux/06-settings-ia.md`,
-  `04-ux/09-interaction-patterns.md`, ADR 0030, ADR 0049, ADR 0061, D158, D200
+  `03-runtime/02-agent-runtime.md`, `03-runtime/03-tools-and-permissions.md`,
+  `03-runtime/04-data-storage.md`, `03-runtime/06-host-rpc-protocol.md`,
+  `04-ux/06-settings-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`, ADR 0030, ADR 0049, ADR 0061, ADR 0063,
+  D158, D202
 - **Acceptance**: C (chat/stream), F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Partially automated (`runtime.test.ts`,
-  `context-compaction.test.mjs`, host-core transcript/session unit tests); full
-  provider/UI journey Draft
+  `context-compaction.test.mjs`, `assistant-turns.test.mjs`, host-core
+  transcript/session unit tests); full provider/UI journey Draft
 
 #### E2E-AGENTS-001: Project instruction chain configures an agent session
 

@@ -106,22 +106,29 @@ Rules:
   keeps integer ms.
 - Readers skip unknown `type` lines and a torn trailing line: new line kinds
   need no migration, and a crash mid-append cannot poison the file.
-- `compaction` is a model-context checkpoint, not a visible message. Readers
-  return every message unchanged and separately select the newest valid
-  checkpoint. `throughMessageId` is its durable transcript boundary;
-  `firstKeptMessageId` and `retainedTail` reproduce pi's summary + recent-tail
-  context after restart. When one atomic parallel tool-result batch exceeds the
-  checkpoint tail budget, `retainedTail` stores a marked, budget-bounded copy
-  that preserves every call/result envelope but may shorten result text and
-  omit duplicate provider-irrelevant details; the original message lines stay
-  complete and authoritative for UI/diagnostics. An automatic compaction
-  failure may store `details.fallback = "retained_tail"` and a short recovery
-  summary instead of an LLM-generated summary; the complete transcript remains
-  authoritative and the fallback tail is only a model-context recovery view.
+- `compaction` is a model-context checkpoint, not a message — but it is
+  rendered, as a divider row rather than a chat bubble (D202). Readers return
+  every message unchanged and separately return **every** still-valid
+  checkpoint, oldest first; the newest is the active one and the whole chain is
+  what the transcript draws its rows from, so a checkpoint outlives the
+  compaction that produced it. A record whose `throughMessageId` anchor no
+  longer exists is dropped, per record, on read and on fork.
+  `throughMessageId` is the durable transcript boundary;
+  `firstKeptMessageId` and `retainedTail` reproduce the summary + retained-user
+  context after restart. `retainedTail` holds user messages only, and the one
+  that crossed the retention limit is stored in marked, truncated form; the
+  original message lines stay complete and authoritative for UI/diagnostics. An
+  automatic compaction failure may store `details.fallback = "retained_tail"`
+  and a short recovery summary instead of an LLM-generated summary; the complete
+  transcript remains authoritative and the fallback tail is only a model-context
+  recovery view. `details` also carries the checkpoint generation and the
+  compaction family, both opaque to the host.
 - Writers append with flush + fsync (message durability ≈ WAL
   `synchronous=NORMAL`); full transcript rewrites (regenerate/edit, revision
   switch, import) go through a sibling temp file + atomic rename. A normal
   context checkpoint is one appended line and never rewrites visible messages.
+  A rewrite carries forward every checkpoint that is still valid against the
+  rewritten messages, not just the newest one.
 - Ordering: the file is written **before** the DB index transaction. A crash
   between the two costs one derived index row — never content — and the next
   full rewrite self-heals; transcript reads dedupe repeated message ids

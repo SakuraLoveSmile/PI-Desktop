@@ -25,6 +25,7 @@ Let the agent get things done, but stay under control by default.
 | Tool | Risk | Description |
 |---|---|---|
 | `Read` | low | Read files within the workspace |
+| `new_context` | low | Start a new context window at the next turn boundary; takes no parameters and changes no environment state |
 | `Glob` | low | List files by pattern |
 | `Grep` | low | Content search |
 | `BrowserPreview` | low | Open a workspace-relative preview in the user-driven Browser panel |
@@ -412,8 +413,10 @@ matching log lines.
 
 ### 10.1 Plan and Goal control tools
 
-Context compaction has no model-facing tool in any mode: the host triggers it
-deterministically (see [02-agent-runtime](02-agent-runtime.md) §5.1). A submit
+`new_context` is available in every mode and needs no confirmation: it only asks
+the runtime to compact at the next turn boundary, which the host would do on its
+own once the hard budget is reached (see
+[02-agent-runtime](02-agent-runtime.md) §5.1). A submit
 tool is available only in its own contract mode and must be the only tool call in its assistant batch. It preserves
 the exact Markdown bytes in a new unique artifact under the kind's directory
 (`.pi/plan/*.md` for `SubmitPlan`, `.pi/goal/*.md` for `SubmitGoal`)
@@ -432,7 +435,7 @@ delegate with `Bash`, `Edit` or `Write` would drive straight through them.
 A definition declares the tools its delegate may call, drawn only from `Read`,
 `Glob`, `Grep`, `BrowserPreview`, `Bash`, `Edit` and `Write`. A definition that
 declares none gets `Read`, `Glob`, `Grep`. Plugin tools, `Skill`, `ToolSearch`,
-the mode tools and `Task` itself are never assignable: a delegate is a bounded
+`new_context`, the mode tools and `Task` itself are never assignable: a delegate is a bounded
 file/search/shell worker, not a second session.
 
 A delegate's rights are its definition's, never its session's. It cannot gain a
