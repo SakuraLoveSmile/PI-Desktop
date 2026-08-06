@@ -12,6 +12,9 @@ import {
   type AgentLoopTurnUpdate,
   type AgentMessage,
   type AgentTool,
+  type AgentToolResult,
+  type AfterToolCallContext,
+  type AfterToolCallResult,
   type CompactionPreparation,
   type CompactionEntry,
   type CompactionSettings,
@@ -22,15 +25,12 @@ import {
   type SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import {
-  createModels,
-  createProvider,
   isContextOverflow,
   Type,
   type Api,
   type AssistantMessage,
   type Model,
   type Models,
-  type ProviderStreams,
   type ToolResultMessage,
   type Usage,
 } from "@earendil-works/pi-ai";
@@ -54,6 +54,7 @@ import type {
   PlanProposal,
   PlanningState,
   Risk,
+  SubagentDefinition,
   ThinkingLevel,
   ToolTokenUsage,
   UiMessage,
@@ -63,11 +64,38 @@ import {
   contextCompactionStatus,
   isCommandShellOption,
   isToolsOutputParams,
+  MAX_SUBAGENT_CONCURRENCY,
+  normalizeSubagentName,
   proposalKindForMode,
+  subagentModelKey,
   type ProposalKind,
 } from "@pi-desktop/shared";
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
+import {
+  assistantContent,
+  isRecord,
+  nowIso,
+  timestampIso,
+  usageFromPi,
+  usageToPi,
+} from "./agent-messages.js";
+import {
+  apiBindingForStyle,
+  buildProviderModel,
+  createProviderModels,
+  DEFAULT_CONTEXT_WINDOW,
+  DEFAULT_MAX_TOKENS,
+  providerRequestKey,
+  type RuntimeProviderConfig,
+} from "./provider-binding.js";
+import { PathMutex, Semaphore } from "./path-lock.js";
+import {
+  composeSubagentSystemPrompt,
+  SubagentRun,
+  SUBAGENT_TOOL_NAME,
+  type SubagentRunResult,
+} from "./subagent.js";
 import {
   composeModeSystemPrompt,
   DEFAULT_RUNTIME_SYSTEM_PROMPT,
@@ -83,71 +111,8 @@ import {
 import { pluginSkillsDigest } from "./plugin-skills.js";
 import { logTiming } from "./timing.js";
 
+export type { RuntimeProviderConfig } from "./provider-binding.js";
 
-function usageFromPi(usage: Usage | undefined | null): MessageUsage | undefined {
-  if (!usage) return undefined;
-  const inputTokens = Math.max(0, Math.round(usage.input || 0));
-  const outputTokens = Math.max(0, Math.round(usage.output || 0));
-  const cacheReadTokens = Math.max(0, Math.round(usage.cacheRead || 0));
-  const cacheWriteTokens = Math.max(0, Math.round(usage.cacheWrite || 0));
-  const reasoningTokens =
-    typeof usage.reasoning === "number"
-      ? Math.max(0, Math.round(usage.reasoning))
-      : undefined;
-  const totalTokens = Math.max(
-    0,
-    Math.round(
-      usage.totalTokens ||
-        inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens,
-    ),
-  );
-  if (totalTokens <= 0 && inputTokens <= 0 && outputTokens <= 0) return undefined;
-  return {
-    inputTokens,
-    outputTokens,
-    ...(cacheReadTokens > 0 ? { cacheReadTokens } : {}),
-    ...(cacheWriteTokens > 0 ? { cacheWriteTokens } : {}),
-    ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
-    totalTokens,
-  };
-}
-
-function usageToPi(usage: MessageUsage | undefined): Usage {
-  const input = usage?.inputTokens ?? 0;
-  const output = usage?.outputTokens ?? 0;
-  const cacheRead = usage?.cacheReadTokens ?? 0;
-  const cacheWrite = usage?.cacheWriteTokens ?? 0;
-  return {
-    input,
-    output,
-    cacheRead,
-    cacheWrite,
-    ...(usage?.reasoningTokens !== undefined
-      ? { reasoning: usage.reasoningTokens }
-      : {}),
-    totalTokens:
-      usage?.totalTokens ?? input + output + cacheRead + cacheWrite,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-  };
-}
-
-export type RuntimeProviderConfig = {
-  id: string;
-  name: string;
-  baseUrl?: string;
-  modelId: string;
-  apiKey: string;
-  authKind?: string;
-  /** Wire protocol for the endpoint (provider config apiStyle). */
-  apiStyle?: string;
-  supportsReasoning: boolean;
-  supportedThinkingLevels: ThinkingLevel[];
-  /** Complete model metadata resolved from pi-ai by Electron main. */
-  modelConfig?: PiModelConfig;
-};
-
-const DEFAULT_CONTEXT_WINDOW = 128_000;
-const DEFAULT_MAX_TOKENS = 8_192;
 const PROVIDER_REQUEST_MAX_RETRIES = 1;
 const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;
 const PROVIDER_STREAM_RETRY_BACKOFF_MS = 750;
@@ -190,6 +155,9 @@ const PATH_SCOPED_INSTRUCTION_TOOLS = new Set([
   "Edit",
   "BrowserPreview",
 ]);
+/** Tools whose `path` argument is rewritten, and which therefore must not run
+ * concurrently against the same file (see `PathMutex`). */
+const PATH_MUTATING_TOOLS = new Set(["Write", "Edit"]);
 const CHAT_CORE_TOOL_NAMES = new Set(["Read", "Glob", "Grep"]);
 const AGENT_CORE_TOOL_NAMES = new Set([
   "Read",
@@ -399,6 +367,18 @@ export type AgentRuntimeOptions = {
    * a second containment root. */
   scratchDir?: string;
   onEvent: (envelope: AgentEventEnvelope) => void;
+  /**
+   * Subagent definitions this session may delegate to (ADR 0060), already
+   * merged and capped by Electron main. Empty means no `Task` tool at all.
+   */
+  subagents?: SubagentDefinition[];
+  /**
+   * Provider resolved for each definition that pins one, keyed by definition
+   * name. Main owns credential lookup, so a pinned provider that is missing
+   * here is unavailable and the delegate must fail loudly rather than
+   * silently run on the session's model.
+   */
+  subagentProviders?: Record<string, RuntimeProviderConfig>;
 };
 
 export type RuntimeMatchConfig = {
@@ -410,63 +390,9 @@ export type RuntimeMatchConfig = {
   projectInstructions?: ProjectInstructions;
   projectPath?: string;
   commandShell: CommandShellOption;
+  subagents?: SubagentDefinition[];
+  subagentProviders?: Record<string, RuntimeProviderConfig>;
 };
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function timestampIso(timestamp: unknown): string {
-  return typeof timestamp === "number" && Number.isFinite(timestamp)
-    ? new Date(timestamp).toISOString()
-    : nowIso();
-}
-
-type AssistantContent = {
-  text: string;
-  thinking: string;
-  hasText: boolean;
-  hasThinking: boolean;
-};
-
-function assistantContent(content: unknown): AssistantContent {
-  if (typeof content === "string") {
-    return { text: content, thinking: "", hasText: true, hasThinking: false };
-  }
-  if (!Array.isArray(content)) {
-    return { text: "", thinking: "", hasText: false, hasThinking: false };
-  }
-
-  let text = "";
-  let thinking = "";
-  let hasText = false;
-  let hasThinking = false;
-  for (const part of content) {
-    if (!part || typeof part !== "object") continue;
-    const block = part as {
-      type?: string;
-      text?: string;
-      thinking?: string;
-    };
-    if (block.type === "text" && typeof block.text === "string") {
-      hasText = true;
-      text += block.text;
-    } else if (block.type === "thinking") {
-      hasThinking = true;
-      if (typeof block.thinking === "string") {
-        thinking += block.thinking;
-      } else if (typeof block.text === "string") {
-        // Accept OpenAI-compatible adapters that expose thinking as `text`.
-        thinking += block.text;
-      }
-    }
-  }
-  return { text, thinking, hasText, hasThinking };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** Tool calls ride in the assistant content array as `type: "toolCall"`. A
  * message that requested any is never a silent turn: the loop keeps going and
@@ -885,6 +811,13 @@ export class DesktopAgentRuntime {
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
   private pluginSkills: PluginSkillDef[];
+  /** Subagent definitions offered through the `Task` tool (ADR 0060). */
+  private subagents: SubagentDefinition[];
+  private subagentProviders: Record<string, RuntimeProviderConfig>;
+  /** Caps concurrent delegates across every `Task` batch in this session. */
+  private subagentSlots = new Semaphore(MAX_SUBAGENT_CONCURRENCY);
+  /** Serializes same-path mutations across the parent and its delegates. */
+  private writeLocks = new PathMutex();
   /** Complete tool registry; only the active subset is sent to the provider. */
   private toolCatalog = new Map<string, AgentTool>();
   /** Tools intentionally omitted from the initial provider request. */
@@ -980,6 +913,8 @@ export class DesktopAgentRuntime {
     this.onEvent = opts.onEvent;
     this.pluginTools = opts.pluginTools ?? [];
     this.pluginSkills = opts.pluginSkills ?? [];
+    this.subagents = opts.subagents ?? [];
+    this.subagentProviders = opts.subagentProviders ?? {};
     if (!isCommandShellOption(opts.commandShell) || !opts.commandShell.available) {
       throw Object.assign(new Error("active command shell is invalid or unavailable"), {
         errorCode: "COMMAND_SHELL_INVALID",
@@ -993,30 +928,12 @@ export class DesktopAgentRuntime {
     this.compactionEnabled = compactionEnabled(opts.compactionSettings);
 
     this.rebuildToolCatalog();
-    const model = this.buildModel();
+    const model = buildProviderModel(this.provider);
     this.model = model;
     const tools = this.activeTools();
-    const models = createModels();
+    const models = createProviderModels(this.provider, model);
     this.models = models;
-    const runtimeApiKey =
-      this.provider.apiKey ||
-      (this.provider.authKind === "none" ? "pi-desktop-no-auth" : "");
-    const provider = createProvider({
-      id: this.provider.id,
-      name: this.provider.name,
-      baseUrl: this.provider.baseUrl,
-      auth: {
-        apiKey: {
-          name: `${this.provider.name} API key`,
-          // Plain apiKey semantics let each adapter emit its own auth header
-          // (Bearer for OpenAI-style APIs, x-api-key for Anthropic, …).
-          resolve: async () => ({ auth: { apiKey: runtimeApiKey } }),
-        },
-      },
-      models: [model],
-      api: apiBindingForStyle(this.provider.apiStyle).adapter(),
-    });
-    models.setProvider(provider);
+    const runtimeApiKey = providerRequestKey(this.provider);
 
     this.fullEntries = this.historyToEntries(opts.history ?? []);
     this.activeCompaction = opts.compaction;
@@ -1078,15 +995,7 @@ export class DesktopAgentRuntime {
       convertToLlm,
       prepareNextTurnWithContext: (context, signal) =>
         this.prepareNextTurn(context, signal),
-      afterToolCall: async ({ toolCall }) => {
-        const terminate = this.terminatingToolCalls.delete(toolCall.id);
-        const failed = this.failedHostToolCalls.delete(toolCall.id);
-        if (!failed) return terminate ? { terminate: true } : undefined;
-        return {
-          isError: true,
-          ...(terminate ? { terminate: true } : {}),
-        };
-      },
+      afterToolCall: async (context) => this.afterToolCall(context),
       initialState: {
         systemPrompt: this.composeSystemPrompt(),
         model,
@@ -1098,7 +1007,12 @@ export class DesktopAgentRuntime {
       // Sequential execution also makes the host-confirmed mode change visible
       // before the next model request in the same run.
       beforeToolCall: (context) => this.beforeToolCall(context),
-      toolExecution: "sequential",
+      // Every tool except `Task` carries `executionMode: "sequential"`, and pi
+      // runs a batch sequentially as soon as it contains one such tool. So the
+      // only batch that actually runs concurrently is a batch of nothing but
+      // `Task` calls — subagent fan-out (ADR 0060) — and every existing tool
+      // ordering guarantee is untouched.
+      toolExecution: "parallel",
     });
 
     this.agent.subscribe((event) => this.handleAgentEvent(event));
@@ -1139,6 +1053,23 @@ export class DesktopAgentRuntime {
         ...(projectPrompt ? [projectPrompt] : []),
       ].join("\n\n"),
     );
+  }
+
+  /**
+   * Host failures and mutation-failure termination are recorded per tool-call
+   * id while the call runs; this is where they reach pi's tool-error channel.
+   * Subagents reuse it so a delegate's host failure behaves like the parent's.
+   */
+  private afterToolCall({
+    toolCall,
+  }: AfterToolCallContext): AfterToolCallResult | undefined {
+    const terminate = this.terminatingToolCalls.delete(toolCall.id);
+    const failed = this.failedHostToolCalls.delete(toolCall.id);
+    if (!failed) return terminate ? { terminate: true } : undefined;
+    return {
+      isError: true,
+      ...(terminate ? { terminate: true } : {}),
+    };
   }
 
   private async beforeToolCall(
@@ -1237,7 +1168,12 @@ export class DesktopAgentRuntime {
       // Enabling a plugin, revoking agent.prompt.inject or renaming a skill
       // changes the catalog digest, which retires the runtime and its stale
       // prompt. Bodies are excluded: the Skill tool always reads them fresh.
-      pluginSkillsDigest(this.pluginSkills) === pluginSkillsDigest(requestedPluginSkills)
+      pluginSkillsDigest(this.pluginSkills) === pluginSkillsDigest(requestedPluginSkills) &&
+      // Editing `.pi/agents/*.md` must reach the next prompt. Definition
+      // bodies are part of the `Task` tool's behavior, so unlike skills they
+      // are compared in full.
+      safeJson(this.subagents) === safeJson(config.subagents ?? []) &&
+      safeJson(this.subagentProviders) === safeJson(config.subagentProviders ?? {})
     );
   }
 
@@ -1268,6 +1204,11 @@ export class DesktopAgentRuntime {
     // the provider APIs require.
     let toolCarrier: AssistantMessage | undefined;
     for (const m of history) {
+      // Subagent rows belong to the transcript and to review, never to the
+      // parent's model context (ADR 0060): the parent only ever saw the `Task`
+      // report, and replaying a delegate's messages would both contradict that
+      // and reintroduce the context cost delegation exists to avoid.
+      if (m.parentToolCallId) continue;
       const timestamp = Date.parse(m.createdAt) || Date.now();
       if (m.role === "user") {
         toolCarrier = undefined;
@@ -1369,29 +1310,6 @@ export class DesktopAgentRuntime {
       timestamp: timestampIso(message.timestamp),
       message,
     });
-  }
-
-  private buildModel(): Model<Api> {
-    const binding = apiBindingForStyle(this.provider.apiStyle);
-    const catalog = this.provider.modelConfig;
-    const catalogModel = catalog
-      ? (({ source: _source, ...model }) => model)(catalog)
-      : {
-          name: this.provider.modelId,
-          reasoning: false,
-          input: ["text" as const],
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-          contextWindow: DEFAULT_CONTEXT_WINDOW,
-          maxTokens: DEFAULT_MAX_TOKENS,
-        };
-    return {
-      ...catalogModel,
-      id: this.provider.modelId,
-      api: binding.api,
-      provider: this.provider.id,
-      baseUrl:
-        this.provider.baseUrl ?? catalog?.baseUrl ?? binding.defaultBaseUrl,
-    } as Model<Api>;
   }
 
   private buildToolDefinitions(): AgentTool[] {
@@ -1517,12 +1435,13 @@ export class DesktopAgentRuntime {
       PluginCheck: { directory: Type.String() },
       PluginPack: { directory: Type.String() },
     };
-    const exec = (toolName: string): AgentTool => ({
-      name: toolName,
-      label: toolName,
-      description: describe(toolName),
-      parameters: Type.Object(parameters[toolName] ?? { command: Type.String() }),
-      execute: async (toolCallId, params, signal, onUpdate) => {
+    const exec = (toolName: string): AgentTool => {
+      const run: AgentTool["execute"] = async (
+        toolCallId,
+        params,
+        signal,
+        onUpdate,
+      ) => {
         const instructionTiming = await this.loadPathInstructions(toolName, params);
         const startedAt = Date.now();
         const isBash = toolName === "Bash";
@@ -1720,8 +1639,23 @@ export class DesktopAgentRuntime {
           ...(terminateAfterMutationFailure ? { terminate: true } : {}),
           isError: result.isError === true || result.ok === false,
         };
-      },
-    });
+      };
+      return {
+        name: toolName,
+        label: toolName,
+        description: describe(toolName),
+        parameters: Type.Object(
+          parameters[toolName] ?? { command: Type.String() },
+        ),
+        execute: (toolCallId, params, signal, onUpdate) =>
+          PATH_MUTATING_TOOLS.has(toolName)
+            ? this.writeLocks.run(
+                isRecord(params) ? String(params.path ?? "") : "",
+                () => run(toolCallId, params, signal, onUpdate),
+              )
+            : run(toolCallId, params, signal, onUpdate),
+      };
+    };
 
     // BrowserPreview is non-mutating (renders an existing workspace file in
     // the work panel browser), so it ships in every mode. PluginCheck only
@@ -1780,7 +1714,20 @@ export class DesktopAgentRuntime {
       this.mode === "agent"
         ? [this.buildEnterModeTool("plan"), this.buildEnterModeTool("goal")]
         : [this.buildSubmitTool(this.mode)];
-    return [...builtins, ...pluginTools, ...skillTools, ...modeTools];
+    // Delegation is an Agent-mode capability: Plan and Goal are read-only
+    // contract negotiations, and a delegate with Bash or Edit would drive
+    // straight through that (ADR 0060).
+    const subagentTools =
+      this.mode === "agent" && this.subagents.length
+        ? [this.buildSubagentTool()]
+        : [];
+    return [
+      ...builtins,
+      ...pluginTools,
+      ...skillTools,
+      ...modeTools,
+      ...subagentTools,
+    ];
   }
 
   /**
@@ -1791,7 +1738,16 @@ export class DesktopAgentRuntime {
   private rebuildToolCatalog(): void {
     const catalog = new Map<string, AgentTool>();
     for (const tool of this.buildToolDefinitions()) {
-      if (this.isToolAllowedInMode(tool.name)) catalog.set(tool.name, tool);
+      if (!this.isToolAllowedInMode(tool.name)) continue;
+      // The execution mode is decided here, in one place, so no tool can grow
+      // an accidental parallel batch: everything is sequential except `Task`.
+      // pi runs a whole batch sequentially when it holds one sequential tool,
+      // so only an all-`Task` batch fans out.
+      catalog.set(tool.name, {
+        ...tool,
+        executionMode:
+          tool.name === SUBAGENT_TOOL_NAME ? "parallel" : "sequential",
+      });
     }
     this.toolCatalog = catalog;
     this.deferredToolNames = new Set(
@@ -1805,7 +1761,10 @@ export class DesktopAgentRuntime {
       }
     }
     if (this.deferredToolNames.size > 0) {
-      this.toolCatalog.set(TOOL_SEARCH_NAME, this.buildToolSearchTool());
+      this.toolCatalog.set(TOOL_SEARCH_NAME, {
+        ...this.buildToolSearchTool(),
+        executionMode: "sequential",
+      });
     }
   }
 
@@ -1827,6 +1786,10 @@ export class DesktopAgentRuntime {
   private isCoreTool(name: string): boolean {
     return (
       MODE_TRANSITION_TOOL_NAMES.has(name) ||
+      // `Task` stays in the core set rather than the on-demand catalog: a
+      // capability the model has to go looking for is one it will not use, and
+      // delegation is worth the one extra schema per request.
+      name === SUBAGENT_TOOL_NAME ||
       (this.mode === "agent"
         ? AGENT_CORE_TOOL_NAMES.has(name)
         : proposalKindForMode(this.mode)
@@ -1969,6 +1932,205 @@ export class DesktopAgentRuntime {
             },
           ],
           details: { mode: kind, kind, planningState: "planning" },
+        };
+      },
+    };
+  }
+
+  /** Provider a delegate runs on: the definition's pin resolved by Electron
+   * main, or the session's own provider when it pins nothing. */
+  private subagentProvider(
+    definition: SubagentDefinition,
+  ): RuntimeProviderConfig | undefined {
+    if (!definition.model) return this.provider;
+    return this.subagentProviders[subagentModelKey(definition.model)];
+  }
+
+  /**
+   * Session facts a delegate needs and cannot discover: the shell dialect, the
+   * scratch directory, and the project's own instruction chain. The parent's
+   * collaboration rules are deliberately left out — a delegate has no user to
+   * talk to, and its report format is set by `composeSubagentSystemPrompt`.
+   */
+  private subagentGuidance(definition: SubagentDefinition): string[] {
+    const tools = new Set(definition.tools);
+    const blocks: string[] = [];
+    if (tools.has("Read") || tools.has("Grep") || tools.has("Glob")) {
+      blocks.push(
+        "Searching and reading: prefer Read, Grep, and Glob over shell text utilities, and scope every call — Grep takes `path`, `include`, `outputMode`, and `headLimit`; Glob takes `path` and `limit`; Read takes `offset` and `limit`. Use `outputMode: \"filesWithMatches\"` or `\"count\"` when contents are not needed. Your context is finite too: an unscoped search over the whole workspace costs the tokens you need to finish.",
+      );
+    }
+    if (tools.has("Edit") || tools.has("Write")) {
+      blocks.push(
+        "Editing: use Edit for one small unique replacement and Write for a coherent whole-file rewrite. Treat a failed edit as stale content — Read the file once, regenerate the change, and if it fails again report the exact mismatch instead of looping. Never write a file the task did not ask you to change; another agent may be working in the same tree.",
+      );
+    }
+    if (tools.has("Bash")) {
+      blocks.push(commandShellGuidance(this.commandShell, this.scratchDir));
+    }
+    if (this.scratchDir && (tools.has("Bash") || tools.has("Write"))) {
+      blocks.push(
+        `Write temporary and intermediate files into the session scratch directory \`${this.scratchDir}\` (in Bash: $PI_SCRATCH_DIR) using absolute paths, never into the workspace.`,
+      );
+    }
+    const projectPrompt = projectInstructionsPrompt(this.projectInstructions);
+    if (projectPrompt) blocks.push(projectPrompt);
+    return blocks;
+  }
+
+  /**
+   * A `Task` call that never reached a delegate. pi ignores an `isError` field
+   * on a tool result — only a thrown error or `afterToolCall` marks one — so
+   * the failure is registered the same way host tool failures are, and throwing
+   * is avoided to keep the explanation in the result the model reads.
+   */
+  private subagentToolError(
+    toolCallId: string,
+    text: string,
+  ): AgentToolResult<unknown> {
+    this.failedHostToolCalls.add(toolCallId);
+    return {
+      content: [{ type: "text", text }],
+      details: { error: text },
+    };
+  }
+
+  /**
+   * `Task`: delegate one bounded piece of work to a subagent (ADR 0060).
+   *
+   * The catalog of definitions rides in this tool's description rather than in
+   * the system prompt, because the two change together: a project adding an
+   * agent file changes the tool, and nothing else about the prompt.
+   */
+  private buildSubagentTool(): AgentTool {
+    const names = this.subagents.map((definition) => definition.name);
+    const catalog = this.subagents
+      .map(
+        (definition) =>
+          `- ${definition.name} (tools: ${definition.tools.join(", ")}): ${definition.description}`,
+      )
+      .join("\n");
+    return {
+      name: SUBAGENT_TOOL_NAME,
+      label: "Task",
+      description: [
+        "Delegate one self-contained piece of work to a subagent with its own context window, and get back a single written report.",
+        "Delegate when the work is separable and its intermediate output would otherwise fill this context: a wide search, a long log, a survey of many files. Do not delegate what you can finish in a couple of tool calls, and do not delegate anything that needs the user — a subagent cannot ask a question or propose a plan on your behalf.",
+        "`task` is the delegate's only instruction. It cannot see this conversation, and you cannot correct it while it runs, so state the goal, the paths and facts it cannot infer, and exactly what to report back.",
+        "Its final message is all you receive; everything it read or ran stays out of your context. Check anything you are about to rely on for an irreversible change.",
+        "To run delegates concurrently, emit several Task calls in one assistant message. A message that mixes Task with any other tool runs one call at a time.",
+        `Available subagents:\n${catalog}`,
+      ].join("\n\n"),
+      parameters: Type.Object({
+        agent: Type.String({
+          description: `Name of the subagent to run: ${names.join(", ")}.`,
+        }),
+        task: Type.String({
+          description:
+            "The complete brief: goal, context the delegate cannot infer, and the exact report you want back.",
+        }),
+        description: Type.Optional(
+          Type.String({
+            description:
+              "Short label for this delegation (3-6 words), shown to the user.",
+          }),
+        ),
+      }),
+      // Set in `rebuildToolCatalog`, which owns every execution mode; repeated
+      // here so the intent survives a tool built outside that path.
+      executionMode: "parallel",
+      execute: async (toolCallId, params, signal) => {
+        const requested = isRecord(params) ? String(params.agent ?? "") : "";
+        const definition = this.subagents.find(
+          (candidate) => candidate.name === normalizeSubagentName(requested),
+        );
+        if (!definition) {
+          return this.subagentToolError(
+            toolCallId,
+            `Unknown subagent "${requested}". Available: ${names.join(", ")}.`,
+          );
+        }
+        const task =
+          isRecord(params) && typeof params.task === "string"
+            ? params.task.trim()
+            : "";
+        if (!task) {
+          return this.subagentToolError(
+            toolCallId,
+            `Delegating to ${definition.name} needs a non-empty \`task\` brief.`,
+          );
+        }
+        const provider = this.subagentProvider(definition);
+        if (!provider) {
+          // A pinned model that is not configured must not silently fall back
+          // to the session model: the definition asked for that model on
+          // purpose, and the parent can do the work itself instead.
+          return this.subagentToolError(
+            toolCallId,
+            `The ${definition.name} subagent pins ${definition.model?.providerId}/${definition.model?.modelId}, which is not configured in PI-Desktop. Do this work yourself or delegate to another subagent.`,
+          );
+        }
+        const tools = definition.tools
+          .map((name) => this.toolCatalog.get(name))
+          .filter((tool): tool is AgentTool => tool !== undefined);
+        if (tools.length === 0) {
+          return this.subagentToolError(
+            toolCallId,
+            `The ${definition.name} subagent declares no tool available in this session.`,
+          );
+        }
+        const startedAt = Date.now();
+        const result = await this.subagentSlots.run(() =>
+          new SubagentRun({
+            definition,
+            sessionId: this.sessionId,
+            turnId: this.turnId,
+            parentToolCallId: toolCallId,
+            task,
+            provider,
+            thinkingLevel: clampThinkingLevel(
+              provider,
+              definition.thinkingLevel ?? this.thinkingLevel,
+            ),
+            systemPrompt: composeSubagentSystemPrompt({
+              definition,
+              guidance: this.subagentGuidance(definition),
+            }),
+            tools,
+            onEvent: this.onEvent,
+            // A host failure inside a delegate reaches its tool-error channel
+            // through the same bookkeeping the parent uses.
+            resolveToolOutcome: (context) => this.afterToolCall(context),
+            signal,
+          }).run(),
+        );
+        logTiming("subagent", {
+          agent: result.agentName,
+          toolCallId,
+          sessionId: this.sessionId,
+          turnId: this.turnId,
+          provider: provider.id,
+          model: provider.modelId,
+          status: result.status,
+          turns: result.turns,
+          toolCalls: result.toolCalls,
+          durationMs: Date.now() - startedAt,
+          errorCode: result.error?.code,
+        });
+        // A failed delegate is a failed tool call. A truncated or aborted one
+        // still carries a partial report that says so in its own text, so the
+        // parent can work with what there is.
+        if (result.status === "failed") this.failedHostToolCalls.add(toolCallId);
+        return {
+          content: [{ type: "text", text: result.report }],
+          details: {
+            agent: result.agentName,
+            status: result.status,
+            turns: result.turns,
+            toolCalls: result.toolCalls,
+            ...(result.usage ? { usage: result.usage } : {}),
+            ...(result.error ? { error: result.error } : {}),
+          },
         };
       },
     };

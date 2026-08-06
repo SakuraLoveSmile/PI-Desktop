@@ -9,12 +9,44 @@ import {
   type RuntimeProviderConfig,
 } from "./runtime.js";
 import type { ProjectInstructions } from "./project-instructions.js";
+/**
+ * The delegate loop itself is covered in `subagent.test.ts`; here only the
+ * `Task` wiring around it is under test, so `SubagentRun` is replaced by a
+ * recorder. Every other export stays real.
+ */
+const subagentRuns = vi.hoisted(() => ({
+  calls: [] as any[],
+  result: undefined as any,
+}));
+vi.mock("./subagent.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./subagent.js")>();
+  return {
+    ...actual,
+    SubagentRun: class {
+      constructor(options: unknown) {
+        subagentRuns.calls.push(options);
+      }
+      async run() {
+        return (
+          subagentRuns.result ?? {
+            agentName: "explorer",
+            status: "completed",
+            report: "done",
+            turns: 1,
+            toolCalls: 0,
+          }
+        );
+      }
+    },
+  };
+});
 import type {
   ContextCompactionRecord,
   ContextCompactionSettings,
   CommandShellOption,
   Mode,
   PlanExecution,
+  SubagentDefinition,
   ThinkingLevel,
   UiMessage,
 } from "@pi-desktop/shared";
@@ -58,8 +90,11 @@ function createRuntime(
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
     projectPath: string;
+    scratchDir: string;
     projectInstructions: import("./project-instructions.js").ProjectInstructions;
     pluginTools: PluginToolDef[];
+    subagents: SubagentDefinition[];
+    subagentProviders: Record<string, RuntimeProviderConfig>;
     pluginSkills: import("./plugin-skills-prompt.js").PluginSkillDef[];
     commandShell: CommandShellOption;
     turnId: string;
@@ -79,7 +114,10 @@ function createRuntime(
     compaction: overrides.compaction,
     compactionSettings: overrides.compactionSettings,
     projectPath: overrides.projectPath,
+    scratchDir: overrides.scratchDir,
     pluginTools: overrides.pluginTools,
+    subagents: overrides.subagents,
+    subagentProviders: overrides.subagentProviders,
     projectInstructions: overrides.projectInstructions,
     pluginSkills: overrides.pluginSkills,
     onEvent: overrides.onEvent ?? vi.fn(),
@@ -123,6 +161,8 @@ function runtimeMatches(
     projectInstructions: (runtime as any).baseProjectInstructions,
     projectPath: (runtime as any).projectPath,
     commandShell: (runtime as any).commandShell,
+    subagents: (runtime as any).subagents,
+    subagentProviders: (runtime as any).subagentProviders,
     ...overrides,
   });
 }
@@ -3415,6 +3455,327 @@ describe("DesktopAgentRuntime plugin skills (D174)", () => {
     expect(result.content).toEqual([
       { type: "text", text: "# Skill: Release notes" },
     ]);
+
+    await runtime.dispose();
+  });
+});
+
+describe("DesktopAgentRuntime subagents", () => {
+  const explorer: SubagentDefinition = {
+    name: "explorer",
+    description: "Search the workspace and report findings.",
+    tools: ["Read", "Glob", "Grep"],
+    maxTurns: 6,
+    prompt: "Report file paths and line numbers.",
+    source: "builtin",
+  };
+  const pinned: SubagentDefinition = {
+    name: "reviewer",
+    description: "Review a diff.",
+    tools: ["Read", "Bash"],
+    model: { providerId: "remote", modelId: "remote-model" },
+    maxTurns: 4,
+    prompt: "Review the change.",
+    source: "project",
+    filePath: "/work/.pi/agents/reviewer.md",
+  };
+
+  function taskTool(runtime: DesktopAgentRuntime) {
+    return (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "Task",
+    );
+  }
+
+  it("offers Task as a core Agent-mode tool that advertises every definition", async () => {
+    const runtime = createRuntime({ subagents: [explorer, pinned] });
+    const tool = taskTool(runtime);
+
+    // Core, so delegation needs no ToolSearch round trip first.
+    expect(tool).toBeDefined();
+    expect((runtime as any).deferredToolNames.has("Task")).toBe(false);
+    expect(tool.description).toContain(
+      "- explorer (tools: Read, Glob, Grep): Search the workspace and report findings.",
+    );
+    expect(tool.description).toContain("- reviewer (tools: Read, Bash): Review a diff.");
+
+    await runtime.dispose();
+  });
+
+  it("is the only tool allowed to run in parallel", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    const catalog = (runtime as any).toolCatalog as Map<string, any>;
+
+    expect(catalog.get("Task").executionMode).toBe("parallel");
+    for (const [name, tool] of catalog) {
+      if (name === "Task") continue;
+      expect(tool.executionMode).toBe("sequential");
+    }
+
+    await runtime.dispose();
+  });
+
+  it("withholds Task without definitions and in contract modes", async () => {
+    const withoutDefinitions = createRuntime();
+    expect(taskTool(withoutDefinitions)).toBeUndefined();
+    await withoutDefinitions.dispose();
+
+    // Plan and Goal are read-only contract negotiations (D198): a delegate
+    // with Bash or Edit would drive straight through them.
+    for (const mode of ["plan", "goal"] as const) {
+      const runtime = createRuntime({ mode, subagents: [explorer] });
+      expect(taskTool(runtime)).toBeUndefined();
+      expect((runtime as any).toolCatalog.has("Task")).toBe(false);
+      await runtime.dispose();
+    }
+  });
+
+  it("rebuilds the Task catalog on a mode switch", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+
+    runtime.setMode("plan");
+    expect((runtime as any).toolCatalog.has("Task")).toBe(false);
+    runtime.setMode("agent");
+    expect(taskTool(runtime)).toBeDefined();
+
+    await runtime.dispose();
+  });
+
+  it("treats a differing definition set as a different configuration", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+
+    expect(runtimeMatches(runtime)).toBe(true);
+    expect(runtimeMatches(runtime, { subagents: [] })).toBe(false);
+    expect(
+      runtimeMatches(runtime, {
+        subagents: [{ ...explorer, maxTurns: 12 }],
+      }),
+    ).toBe(false);
+    expect(
+      runtimeMatches(runtime, {
+        subagentProviders: { "remote/remote-model": provider },
+      }),
+    ).toBe(false);
+
+    await runtime.dispose();
+  });
+
+  it("rejects an unknown agent and an empty brief as tool errors", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    const agent = (runtime as any).agent;
+    const tool = taskTool(runtime);
+
+    const unknown = await tool.execute("task-1", {
+      agent: "Researcher",
+      task: "Find it.",
+    });
+    expect(unknown.content[0].text).toContain('Unknown subagent "Researcher"');
+    expect(unknown.content[0].text).toContain("explorer");
+    await expect(
+      agent.afterToolCall({ toolCall: { id: "task-1" } }),
+    ).resolves.toEqual({ isError: true });
+
+    const empty = await tool.execute("task-2", { agent: "explorer", task: "  " });
+    expect(empty.content[0].text).toContain("needs a non-empty `task` brief");
+    await expect(
+      agent.afterToolCall({ toolCall: { id: "task-2" } }),
+    ).resolves.toEqual({ isError: true });
+
+    await runtime.dispose();
+  });
+
+  it("refuses to silently downgrade an unresolved pinned model", async () => {
+    const runtime = createRuntime({ subagents: [pinned] });
+    const tool = taskTool(runtime);
+
+    const result = await tool.execute("task-1", {
+      agent: "reviewer",
+      task: "Review src/app.ts.",
+    });
+
+    expect(result.content[0].text).toContain("pins remote/remote-model");
+    expect(result.content[0].text).toContain("not configured");
+    await expect(
+      (runtime as any).agent.afterToolCall({ toolCall: { id: "task-1" } }),
+    ).resolves.toEqual({ isError: true });
+
+    await runtime.dispose();
+  });
+
+  it("resolves the provider and guidance each definition asks for", async () => {
+    const remote: RuntimeProviderConfig = {
+      ...provider,
+      id: "remote",
+      name: "Remote",
+      modelId: "remote-model",
+      modelConfig: undefined,
+    };
+    const runtime = createRuntime({
+      subagents: [explorer, pinned],
+      subagentProviders: { "remote/remote-model": remote },
+      scratchDir: "/scratch/session-1",
+      projectInstructions: {
+        entries: [{ source: "AGENTS.md", content: "Use project rules." }],
+      } as ProjectInstructions,
+    });
+
+    // No pin means the session's own provider; a pin means exactly that model.
+    expect((runtime as any).subagentProvider(explorer).modelId).toBe("local-model");
+    expect((runtime as any).subagentProvider(pinned).modelId).toBe("remote-model");
+
+    const readOnly = ((runtime as any).subagentGuidance(explorer) as string[]).join(
+      "\n\n",
+    );
+    expect(readOnly).toContain("prefer Read, Grep, and Glob");
+    expect(readOnly).not.toContain("use Edit for one small unique replacement");
+    expect(readOnly).toContain("Use project rules.");
+
+    const withShell = ((runtime as any).subagentGuidance(pinned) as string[]).join(
+      "\n\n",
+    );
+    expect(withShell).toContain("bash");
+    expect(withShell).toContain("/scratch/session-1");
+
+    await runtime.dispose();
+  });
+
+  it("runs the delegate with only its declared tools and returns its report", async () => {
+    const remote: RuntimeProviderConfig = {
+      ...provider,
+      id: "remote",
+      name: "Remote",
+      modelId: "remote-model",
+      modelConfig: undefined,
+      supportsReasoning: false,
+      supportedThinkingLevels: ["off"],
+    };
+    const runtime = createRuntime({
+      subagents: [pinned],
+      subagentProviders: { "remote/remote-model": remote },
+      thinkingLevel: "high",
+    });
+    subagentRuns.calls.length = 0;
+    subagentRuns.result = {
+      agentName: "reviewer",
+      status: "completed",
+      report: "src/app.ts:12 misses the null check.",
+      turns: 2,
+      toolCalls: 3,
+      usage: {
+        inputTokens: 10,
+        outputTokens: 4,
+        totalTokens: 14,
+      },
+    };
+    const tool = taskTool(runtime);
+
+    const result = await tool.execute("task-1", {
+      agent: "reviewer",
+      task: "Review src/app.ts.",
+      description: "review app",
+    });
+
+    expect(subagentRuns.calls).toHaveLength(1);
+    const options = subagentRuns.calls[0];
+    expect(options.parentToolCallId).toBe("task-1");
+    expect(options.provider.modelId).toBe("remote-model");
+    expect(options.task).toBe("Review src/app.ts.");
+    expect(options.tools.map((entry: any) => entry.name)).toEqual([
+      "Read",
+      "Bash",
+    ]);
+    // The remote provider advertises no reasoning, so the session level is
+    // clamped rather than passed through.
+    expect(options.thinkingLevel).toBe("off");
+    expect(options.systemPrompt).toContain('You are the "reviewer" subagent');
+    expect(options.systemPrompt).toContain("Review the change.");
+    expect(result.content).toEqual([
+      { type: "text", text: "src/app.ts:12 misses the null check." },
+    ]);
+    expect(result.details).toMatchObject({
+      agent: "reviewer",
+      status: "completed",
+      turns: 2,
+      toolCalls: 3,
+    });
+    // A completed delegate is not a tool error.
+    await expect(
+      (runtime as any).agent.afterToolCall({ toolCall: { id: "task-1" } }),
+    ).resolves.toBeUndefined();
+
+    await runtime.dispose();
+  });
+
+  it("marks a failed delegate as a failed tool call and a truncated one as usable", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    const agent = (runtime as any).agent;
+    const tool = taskTool(runtime);
+
+    subagentRuns.result = {
+      agentName: "explorer",
+      status: "failed",
+      report: "The explorer subagent failed after 1 turn(s): no route.",
+      turns: 1,
+      toolCalls: 0,
+      error: { code: "NETWORK_ERROR", message: "no route" },
+    };
+    await tool.execute("task-1", { agent: "explorer", task: "Find it." });
+    await expect(
+      agent.afterToolCall({ toolCall: { id: "task-1" } }),
+    ).resolves.toEqual({ isError: true });
+
+    subagentRuns.result = {
+      agentName: "explorer",
+      status: "truncated",
+      report: "Hit the turn limit. Checked 4 of 9 files.",
+      turns: 6,
+      toolCalls: 6,
+    };
+    const truncated = await tool.execute("task-2", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    expect(truncated.details).toMatchObject({ status: "truncated" });
+    await expect(
+      agent.afterToolCall({ toolCall: { id: "task-2" } }),
+    ).resolves.toBeUndefined();
+
+    await runtime.dispose();
+  });
+
+  it("keeps subagent rows out of the parent model context", async () => {
+    const history: UiMessage[] = [
+      {
+        id: "user-1",
+        role: "user",
+        content: "Review the diff.",
+        createdAt: "2026-08-06T00:00:00.000Z",
+        status: "complete",
+      },
+      {
+        id: "assistant-child",
+        role: "assistant",
+        content: "Reading src/app.ts",
+        createdAt: "2026-08-06T00:00:01.000Z",
+        status: "complete",
+        parentToolCallId: "task-1",
+        agentName: "reviewer",
+      },
+      {
+        id: "assistant-parent",
+        role: "assistant",
+        content: "The reviewer found one issue.",
+        createdAt: "2026-08-06T00:00:02.000Z",
+        status: "complete",
+      },
+    ];
+    const runtime = createRuntime({ subagents: [explorer], history });
+
+    const ids = ((runtime as any).fullEntries as Array<any>).map(
+      (entry) => entry.id,
+    );
+    expect(ids).toContain("user-1");
+    expect(ids).toContain("assistant-parent");
+    expect(ids).not.toContain("assistant-child");
 
     await runtime.dispose();
   });

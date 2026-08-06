@@ -361,6 +361,16 @@ export function mergeSubagentDefinitions(
   return { definitions: [...byName.values()], dropped };
 }
 
+/**
+ * Key of one resolved pin. Electron main resolves each distinct pin once and
+ * hands the sidecar a map under these keys; the sidecar looks a delegate's
+ * provider up by the same key, so an unresolvable pin is a missing entry rather
+ * than a silent fallback to the session model.
+ */
+export function subagentModelKey(pin: SubagentModelPin): string {
+  return `${pin.providerId}/${pin.modelId}`;
+}
+
 /** Distinct providers pinned across a definition list, capped for the same
  * reason as the definition count: each one is a live client in the sidecar. */
 export function subagentPinnedProviders(
