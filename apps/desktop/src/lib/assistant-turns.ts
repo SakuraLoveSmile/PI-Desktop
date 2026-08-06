@@ -2,7 +2,32 @@ import type { MessageUsage, UiMessage } from "@pi-desktop/shared";
 
 export type AssistantActivityItem =
   | { kind: "thinking"; message: UiMessage }
-  | { kind: "tool"; message: UiMessage };
+  | {
+      kind: "tool";
+      message: UiMessage;
+      /** Present on a `Task` call: what the delegate it spawned did. */
+      delegate?: SubagentRun;
+    };
+
+/** One row a delegate produced, in the order the delegate produced it. */
+export type SubagentRunItem =
+  | { kind: "thinking"; message: UiMessage }
+  | { kind: "tool"; message: UiMessage }
+  | { kind: "answer"; message: UiMessage };
+
+/**
+ * Everything one delegate did inside a single `Task` call (ADR 0060).
+ *
+ * Delegate rows arrive on the session stream interleaved with the parent's —
+ * parallel delegates guarantee it — so they are collected by the `Task` call
+ * that spawned them and rendered under it. That mirrors the model's view: the
+ * parent only ever sees the report, never these rows.
+ */
+export type SubagentRun = {
+  /** Definition name, when the runtime attributed the rows to one. */
+  agentName?: string;
+  items: SubagentRunItem[];
+};
 
 export type AssistantTurnPart =
   | { kind: "message"; message: UiMessage }
@@ -37,6 +62,35 @@ function isVisibleMessage(message: UiMessage): boolean {
   );
 }
 
+/** Delegate rows grouped by the `Task` call that produced them. */
+function collectSubagentRuns(
+  messages: readonly UiMessage[],
+): Map<string, SubagentRun> {
+  const runs = new Map<string, SubagentRun>();
+  for (const message of messages) {
+    const parent = message.parentToolCallId;
+    if (!parent) continue;
+    let run = runs.get(parent);
+    if (!run) {
+      run = { items: [] };
+      runs.set(parent, run);
+    }
+    if (message.agentName && !run.agentName) run.agentName = message.agentName;
+    if (message.role === "tool") {
+      run.items.push({ kind: "tool", message });
+      continue;
+    }
+    // A delegate turn can carry reasoning and text at once, and both are worth
+    // showing: the text is the only place its narration and report exist.
+    const thinking = messageThinking(message);
+    if (thinking) run.items.push({ kind: "thinking", message });
+    if ((message.content || "").trim() || message.error) {
+      run.items.push({ kind: "answer", message });
+    }
+  }
+  return runs;
+}
+
 /**
  * Group provider-level assistant fragments and tool rows into user-level turns.
  * Providers end an assistant message before each tool call, but that transport
@@ -46,7 +100,12 @@ export function buildTranscriptEntries(messages: UiMessage[]): {
   entries: TranscriptEntry[];
   visible: UiMessage[];
 } {
-  const visible = messages.filter(isVisibleMessage);
+  const runs = collectSubagentRuns(messages);
+  // Delegate rows are not transcript rows of their own: they hang off their
+  // `Task` call, so they stay out of the turn stream and the minimap.
+  const visible = messages.filter(
+    (message) => !message.parentToolCallId && isVisibleMessage(message),
+  );
   const entries: TranscriptEntry[] = [];
   let turn: AssistantTurnEntry | undefined;
 
@@ -76,7 +135,14 @@ export function buildTranscriptEntries(messages: UiMessage[]): {
     }
 
     if (message.role === "tool") {
-      pushActivity({ kind: "tool", message });
+      const delegate = message.toolCallId
+        ? runs.get(message.toolCallId)
+        : undefined;
+      pushActivity({
+        kind: "tool",
+        message,
+        ...(delegate ? { delegate } : {}),
+      });
       continue;
     }
 
@@ -107,6 +173,32 @@ export function buildTranscriptEntries(messages: UiMessage[]): {
   }
 
   return { entries, visible };
+}
+
+/**
+ * Whether two delegate runs render the same rows.
+ *
+ * `buildTranscriptEntries` rebuilds run objects on every message change, so
+ * memoized activity groups cannot compare them by identity; without this a
+ * delegate's rows would either never update or re-render on every tick.
+ */
+export function subagentRunsEqual(
+  previous: SubagentRun | undefined,
+  next: SubagentRun | undefined,
+): boolean {
+  if (previous === next) return true;
+  if (!previous || !next) return false;
+  if (
+    previous.agentName !== next.agentName ||
+    previous.items.length !== next.items.length
+  ) {
+    return false;
+  }
+  return previous.items.every(
+    (item, index) =>
+      item.kind === next.items[index].kind &&
+      item.message === next.items[index].message,
+  );
 }
 
 export function assistantTurnMessages(

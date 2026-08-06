@@ -47,7 +47,7 @@ test("tool rows render structured blocks instead of dumping JSON", async () => {
   // No JSON stringify path is left in either surface.
   assert.doesNotMatch(transcriptSource, /getToolSections|hasToolSections/);
   assert.doesNotMatch(permissionSource, /JSON\.stringify|formatToolValue/);
-  assert.match(transcriptSource, /buildToolPresentation\(message, \{ hideSummaryArg: true \}\)/);
+  assert.match(transcriptSource, /buildToolPresentation\(message, \{\n\s+hideSummaryArg: true,/);
   // Blocks stay behind the open guard so streaming ticks stay cheap.
   assert.match(transcriptSource, /open && hasDetails\s*\?\s*buildToolPresentation/);
   assert.match(transcriptSource, /<ToolChips chips=\{chips\} \/>/);

@@ -4,6 +4,7 @@ import {
   assistantTurnContent,
   assistantTurnUsage,
   buildTranscriptEntries,
+  subagentRunsEqual,
 } from "../src/lib/assistant-turns.ts";
 
 function message(id, role, content, extra = {}) {
@@ -103,4 +104,108 @@ test("aggregates provider usage across response fragments", () => {
     cacheReadTokens: 4,
     totalTokens: 28,
   });
+});
+
+test("nests delegate rows under the Task call that spawned them", () => {
+  const { entries, visible } = buildTranscriptEntries([
+    message("user", "user", "Audit the store"),
+    message("task", "tool", "report", {
+      toolName: "Task",
+      toolCallId: "task-1",
+    }),
+    message("delegate-think", "assistant", "", {
+      thinking: "Looking for the reducer",
+      parentToolCallId: "task-1",
+      agentName: "code-reviewer",
+    }),
+    message("delegate-read", "tool", "file", {
+      toolName: "Read",
+      toolCallId: "read-1",
+      parentToolCallId: "task-1",
+      agentName: "code-reviewer",
+    }),
+    message("delegate-report", "assistant", "Two dead branches.", {
+      parentToolCallId: "task-1",
+      agentName: "code-reviewer",
+    }),
+    message("final", "assistant", "Removed both."),
+  ]);
+
+  // The delegate's rows are not transcript rows: the minimap and the turn
+  // stream only ever see the parent's `Task` call.
+  assert.deepEqual(
+    visible.map((entry) => entry.id),
+    ["user", "task", "final"],
+  );
+  const turn = entries[1];
+  assert.equal(turn.kind, "assistant-turn");
+  const activity = turn.parts[0];
+  assert.equal(activity.kind, "activity");
+  assert.equal(activity.items.length, 1);
+  assert.equal(activity.items[0].message.id, "task");
+  assert.equal(activity.items[0].delegate.agentName, "code-reviewer");
+  assert.deepEqual(
+    activity.items[0].delegate.items.map((item) => item.kind),
+    ["thinking", "tool", "answer"],
+  );
+});
+
+test("a delegate turn with both reasoning and text keeps both rows", () => {
+  const { entries } = buildTranscriptEntries([
+    message("user", "user", "Delegate"),
+    message("task", "tool", "report", { toolName: "Task", toolCallId: "t" }),
+    message("both", "assistant", "Here is the report.", {
+      thinking: "Summarizing",
+      parentToolCallId: "t",
+    }),
+  ]);
+
+  const delegate = entries[1].parts[0].items[0].delegate;
+  assert.equal(delegate.agentName, undefined);
+  assert.deepEqual(
+    delegate.items.map((item) => item.kind),
+    ["thinking", "answer"],
+  );
+});
+
+test("delegate runs compare by rows so memoized groups still update", () => {
+  const rowA = message("a", "tool", "one", { toolCallId: "a" });
+  const rowB = message("b", "tool", "two", { toolCallId: "b" });
+  const run = (items, agentName) => ({
+    ...(agentName ? { agentName } : {}),
+    items,
+  });
+
+  assert.equal(subagentRunsEqual(undefined, undefined), true);
+  assert.equal(subagentRunsEqual(run([]), undefined), false);
+  // Rebuilt on every render, so identity never matches: the rows must.
+  assert.equal(
+    subagentRunsEqual(
+      run([{ kind: "tool", message: rowA }], "reviewer"),
+      run([{ kind: "tool", message: rowA }], "reviewer"),
+    ),
+    true,
+  );
+  assert.equal(
+    subagentRunsEqual(
+      run([{ kind: "tool", message: rowA }]),
+      run([{ kind: "tool", message: rowB }]),
+    ),
+    false,
+  );
+  // A streamed row grew: same length, same message, different kind.
+  assert.equal(
+    subagentRunsEqual(
+      run([{ kind: "thinking", message: rowA }]),
+      run([{ kind: "answer", message: rowA }]),
+    ),
+    false,
+  );
+  assert.equal(
+    subagentRunsEqual(
+      run([{ kind: "tool", message: rowA }], "reviewer"),
+      run([{ kind: "tool", message: rowA }], "planner"),
+    ),
+    false,
+  );
 });

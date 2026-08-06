@@ -1597,6 +1597,18 @@
   color: var(--ds-text-primary);
 }
 
+/* Which delegate a `Task` row handed the work to (ADR 0060). */
+.tool-row-agent {
+  flex: none;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-xs);
+  padding: 0 5px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-row);
+  white-space: nowrap;
+}
+
 .tool-row-summary {
   flex: 1;
   min-width: 0;
@@ -1638,6 +1650,40 @@
   padding: 4px 0 8px 12px;
   border-left: 1px solid var(--ds-border-subtle);
   color: var(--ds-text-secondary);
+}
+
+/*
+ * What a delegate did, one level inside its `Task` row. The rail marks the
+ * boundary: everything past it happened in the delegate's own context.
+ */
+.subagent-run {
+  margin: 2px 0 8px 24px;
+  border-left: 1px solid var(--ds-border-default);
+  padding: 2px 0 4px 12px;
+}
+
+.subagent-run-heading {
+  display: flex;
+  min-height: 22px;
+  align-items: center;
+  gap: 5px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.subagent-run-count {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-normal);
+}
+
+/* The delegate's own prose, including the report it hands back. */
+.subagent-answer {
+  margin: 4px 0;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
 }
 
 /* Collapsed-row outcome badges: exit code, hit counts, truncation. */

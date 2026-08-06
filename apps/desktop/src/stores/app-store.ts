@@ -2685,6 +2685,12 @@ export const useAppStore = create<AppState>((set, get) => ({
               toolArgs: event.args,
               toolStatus: "running",
               status: "streaming",
+              // Delegate rows are nested under their `Task` call rather than
+              // added to the turn; the persisted row carries the same tags.
+              ...(envelope.parentToolCallId
+                ? { parentToolCallId: envelope.parentToolCallId }
+                : {}),
+              ...(envelope.agentName ? { agentName: envelope.agentName } : {}),
             },
           ],
         }));

@@ -49,8 +49,10 @@ import {
   assistantTurnUsage,
   buildTranscriptEntries,
   messageThinking as thinkingText,
+  subagentRunsEqual,
   type AssistantActivityItem,
   type AssistantTurnEntry,
+  type SubagentRun,
 } from "../lib/assistant-turns";
 import {
   aggregateToolTokenUsage,
@@ -64,6 +66,7 @@ import {
 } from "../lib/context-usage";
 import {
   IconArrowDown,
+  IconBot,
   IconBranch,
   IconCheck,
   IconCircleAlert,
@@ -696,6 +699,7 @@ const TOOL_ACTION_KEYS: Record<ToolAction, string> = {
   run: "chat.toolRan",
   fetch: "chat.toolFetched",
   fork: "chat.toolUsed",
+  delegate: "chat.toolDelegated",
   use: "chat.toolUsed",
 };
 
@@ -708,6 +712,7 @@ const TOOL_RUNNING_KEYS: Record<ToolAction, string> = {
   run: "chat.toolRunning",
   fetch: "chat.toolFetching",
   fork: "chat.toolUsing",
+  delegate: "chat.toolDelegating",
   use: "chat.toolUsing",
 };
 
@@ -729,6 +734,8 @@ function ToolActionIcon({ action }: { action: ToolAction }) {
       return <IconGlobe {...props} />;
     case "fork":
       return <IconBranch {...props} />;
+    case "delegate":
+      return <IconBot {...props} />;
     default:
       return <IconWrench {...props} />;
   }
@@ -768,7 +775,29 @@ function LinkifiedText({ text }: { text: string }) {
   );
 }
 
-function ToolRow({ message }: { message: UiMessage }) {
+/** Definition name a `Task` row delegated to, from the rows it produced or,
+ * before any arrived, from the call's own argument. */
+function delegateAgentName(
+  message: UiMessage,
+  delegate?: SubagentRun,
+): string {
+  if (delegate?.agentName) return delegate.agentName;
+  const args = message.toolArgs;
+  if (args && typeof args === "object" && !Array.isArray(args)) {
+    const requested = (args as { agent?: unknown }).agent;
+    if (typeof requested === "string") return requested;
+  }
+  return "";
+}
+
+function ToolRow({
+  message,
+  delegate,
+}: {
+  message: UiMessage;
+  /** Rows the delegate produced, when this row is a `Task` call (ADR 0060). */
+  delegate?: SubagentRun;
+}) {
   const { t } = useTranslation();
   const detailsId = useId();
   const root = useAppStore((s) => s.workspace?.path);
@@ -786,13 +815,23 @@ function ToolRow({ message }: { message: UiMessage }) {
     ? getToolPreviewTarget(message.toolArgs, root)
     : null;
   const terminalArtifact = action === "run" && status === "success";
-  const hasDetails = hasToolDetails(message);
+  // A delegation is always expandable: its brief, report and the delegate's
+  // own rows all live in the body.
+  const hasDetails = hasToolDetails(message) || Boolean(delegate);
   const chips = toolResultChips(message);
+  const agentName =
+    action === "delegate" ? delegateAgentName(message, delegate) : "";
+  // The delegate's last answer row is its report, so the body must not print
+  // the same text a second time.
+  const nestedReport = delegate?.items.some((item) => item.kind === "answer");
   // Streaming updates replace the message object each tick; only pay the
   // full payload walk once the row is actually expanded.
   const blocks =
     open && hasDetails
-      ? buildToolPresentation(message, { hideSummaryArg: true })
+      ? buildToolPresentation(message, {
+          hideSummaryArg: true,
+          ...(nestedReport ? { hideDelegateReport: true } : {}),
+        })
       : null;
   const statusLabel =
     status === "running"
@@ -827,6 +866,11 @@ function ToolRow({ message }: { message: UiMessage }) {
         <span className={`tool-row-name ${status === "running" ? "running" : ""}`}>
           {actionLabel}
         </span>
+        {agentName ? (
+          <span className="tool-row-agent" title={t("chat.subagentAgent")}>
+            {agentName}
+          </span>
+        ) : null}
         {summary ? (
           <span
             className={`tool-row-summary${previewTarget || terminalArtifact ? " linked" : ""}`}
@@ -878,6 +922,67 @@ function ToolRow({ message }: { message: UiMessage }) {
           <ToolDetailBlocks blocks={blocks} />
         </div>
       ) : null}
+      {open && delegate ? (
+        <SubagentRunRows run={delegate} agentName={agentName} />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * What a delegate did, nested under the `Task` call that spawned it.
+ *
+ * The rows are the delegate's context, not the parent's, so they are visibly
+ * one level in and stay collapsed with the call. Only one level is possible: a
+ * delegate has no `Task` tool of its own (ADR 0060).
+ */
+function SubagentRunRows({
+  run,
+  agentName,
+}: {
+  run: SubagentRun;
+  agentName: string;
+}) {
+  const { t } = useTranslation();
+  if (run.items.length === 0) return null;
+  return (
+    <div className="subagent-run">
+      <div className="subagent-run-heading">
+        <IconBot size={13} aria-hidden />
+        <span>
+          {agentName
+            ? t("chat.subagentWork", { agent: agentName })
+            : t("chat.subagentWorkUnnamed")}
+        </span>
+        <span className="subagent-run-count">
+          {t("chat.processingSteps", { count: run.items.length })}
+        </span>
+      </div>
+      {run.items.map((item) =>
+        item.kind === "tool" ? (
+          <Fragment key={item.message.id}>
+            <ToolRow message={item.message} />
+            <ReviewChangeCard message={item.message} />
+          </Fragment>
+        ) : item.kind === "thinking" ? (
+          <ThinkingRow
+            key={`thinking-${item.message.id}`}
+            message={item.message}
+            streaming={item.message.status === "streaming"}
+          />
+        ) : (
+          <div className="subagent-answer" key={`answer-${item.message.id}`}>
+            {item.message.content ? (
+              <div className="prose-chat">
+                <Markdown source={item.message.content} />
+              </div>
+            ) : null}
+            {item.message.error ? (
+              <AssistantErrorMessage message={item.message} />
+            ) : null}
+          </div>
+        ),
+      )}
     </div>
   );
 }
@@ -963,6 +1068,20 @@ type ActivityGroupProps = {
   endedAt?: string;
 };
 
+/** Whether two activity items render identically, delegate rows included. */
+function activityItemsEqual(
+  previous: ActivityItem,
+  next: ActivityItem,
+): boolean {
+  if (previous.kind !== next.kind || previous.message !== next.message) {
+    return false;
+  }
+  if (previous.kind === "tool" && next.kind === "tool") {
+    return subagentRunsEqual(previous.delegate, next.delegate);
+  }
+  return true;
+}
+
 function activityGroupPropsEqual(
   previous: ActivityGroupProps,
   next: ActivityGroupProps,
@@ -974,10 +1093,8 @@ function activityGroupPropsEqual(
   ) {
     return false;
   }
-  return previous.items.every(
-    (item, index) =>
-      item.kind === next.items[index].kind &&
-      item.message === next.items[index].message,
+  return previous.items.every((item, index) =>
+    activityItemsEqual(item, next.items[index]),
   );
 }
 
@@ -1089,7 +1206,10 @@ const ActivityGroup = memo(function ActivityGroup({
             {items.map((item) =>
               item.kind === "tool" ? (
                 <Fragment key={item.message.id}>
-                  <ToolRow message={item.message} />
+                  <ToolRow
+                    message={item.message}
+                    {...(item.delegate ? { delegate: item.delegate } : {})}
+                  />
                   <ReviewChangeCard message={item.message} />
                 </Fragment>
               ) : (
@@ -1372,10 +1492,8 @@ function assistantTurnPropsEqual(
       return (
         part.endedAt === nextPart.endedAt &&
         part.items.length === nextPart.items.length &&
-        part.items.every(
-          (item, itemIndex) =>
-            item.kind === nextPart.items[itemIndex].kind &&
-            item.message === nextPart.items[itemIndex].message,
+        part.items.every((item, itemIndex) =>
+          activityItemsEqual(item, nextPart.items[itemIndex]),
         )
       );
     }
