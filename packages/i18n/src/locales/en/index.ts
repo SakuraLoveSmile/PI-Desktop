@@ -238,6 +238,7 @@ export const en = {
     usageToolDuration: "{{time}}",
     usageNoTools: "No tool calls in this turn",
     usageUnknownTool: "Unknown tool",
+    usageCompaction: "Compacted {{times}}× · summary",
     scrollToBottom: "Jump to latest",
     minimap: "Conversation outline",
     resultNeedsAttention: "This task needs attention",

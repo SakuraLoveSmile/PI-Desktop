@@ -3023,8 +3023,40 @@ describe("DesktopAgentRuntime background context compaction", () => {
         reason: "threshold",
         ok: true,
         phase: "background",
+        // The inspector is the only surface a silent compaction reaches.
+        status: { generation: 1, summaryTokens: 7 },
       }),
     );
+    await runtime.dispose();
+  });
+
+  it("counts checkpoint generations so the inspector can show how often a session compacted", async () => {
+    const runtime = createRuntime({
+      host: { call: vi.fn().mockResolvedValue(undefined) },
+      history,
+    });
+    const preparation = {
+      firstKeptEntryId: "recent-user",
+      tokensBefore: 160_000,
+      retainedTail: [],
+    };
+
+    const first = (runtime as any).createCheckpoint(
+      preparation,
+      "recent-user",
+      "first summary",
+    );
+    expect((first.details as { generation: number }).generation).toBe(1);
+
+    (runtime as any).activeCompaction = first;
+    const second = (runtime as any).createCheckpoint(
+      preparation,
+      "recent-user",
+      "second summary",
+      undefined,
+      { readFiles: ["a.ts"] },
+    );
+    expect(second.details).toEqual({ readFiles: ["a.ts"], generation: 2 });
     await runtime.dispose();
   });
 

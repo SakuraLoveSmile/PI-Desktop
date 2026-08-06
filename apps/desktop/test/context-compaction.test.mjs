@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [protocol, types, main, api, store, runtime, commands, hostRpc] =
+const [protocol, types, main, api, store, runtime, commands, hostRpc, transcript, enLocale] =
   await Promise.all([
     read("../../../packages/shared/src/protocol.ts"),
     read("../../../packages/shared/src/types.ts"),
@@ -14,6 +14,8 @@ const [protocol, types, main, api, store, runtime, commands, hostRpc] =
     read("../../../packages/agent-runtime/src/runtime.ts"),
     read("../electron/main/builtin-commands.ts"),
     read("../../../crates/host-core/src/rpc/mod.rs"),
+    read("../src/components/ChatTranscript.tsx"),
+    read("../../../packages/i18n/src/locales/en/index.ts"),
   ]);
 
 test("context compaction is wired through protocol v9 and the manual IPC path", () => {
@@ -128,5 +130,28 @@ test("a successful automatic compaction notifies nobody", () => {
     4,
     "unexpected number of compaction toasts",
   );
+});
+
+test("the context inspector is the only place a checkpoint is visible", () => {
+  assert.match(types, /type ContextCompactionStatus/);
+  assert.match(types, /status\?: ContextCompactionStatus/);
+  // The generation counter rides inside the opaque details value, so the host
+  // persists it without a record schema change.
+  assert.match(runtime, /checkpointDetailsWithGeneration/);
+  assert.match(runtime, /status: contextCompactionStatus\(checkpoint\)/);
+  // Both the durable record and the live event feed the same store map.
+  assert.match(store, /sessionCompactions: Record<string, ContextCompactionStatus>/);
+  assert.match(
+    store,
+    /rememberSessionCompaction\(id, detail\.session\?\.compaction\)/,
+  );
+  assert.match(
+    store,
+    /event\.type === "compaction_end" && event\.ok && event\.status/,
+  );
+  assert.match(store, /withoutRecordKey\(state\.sessionCompactions, id\)/);
+  assert.match(transcript, /state\.sessionCompactions\[state\.activeSessionId\]/);
+  assert.match(transcript, /chat\.usageCompaction/);
+  assert.match(enLocale, /usageCompaction:/);
 });
 

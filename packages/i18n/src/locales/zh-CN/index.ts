@@ -237,6 +237,7 @@ export const zhCN = {
     usageToolDuration: "{{time}}",
     usageNoTools: "本轮没有调用工具",
     usageUnknownTool: "未知工具",
+    usageCompaction: "已压缩 {{times}} 次 · 摘要",
     scrollToBottom: "回到最新",
     minimap: "对话大纲",
     resultNeedsAttention: "这次任务需要处理一下",

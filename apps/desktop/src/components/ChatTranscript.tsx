@@ -151,6 +151,13 @@ function ContextUsageInspector({
 }) {
   const { t } = useTranslation();
   const tooltipId = useId();
+  // Compaction is silent everywhere else, so the inspector is where a user can
+  // find out that older turns are now represented by a summary.
+  const compaction = useAppStore((state) =>
+    state.activeSessionId
+      ? state.sessionCompactions[state.activeSessionId]
+      : undefined,
+  );
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | undefined>(undefined);
@@ -262,6 +269,7 @@ function ContextUsageInspector({
     const frame = window.requestAnimationFrame(updatePopoverPosition);
     return () => window.cancelAnimationFrame(frame);
   }, [
+    compaction,
     context.usedTokens,
     contextWindow,
     open,
@@ -411,6 +419,14 @@ function ContextUsageInspector({
           ) : null}
         </div>
       </div>
+      {compaction ? (
+        <div className="context-inspector-compaction">
+          <span>
+            {t("chat.usageCompaction", { times: compaction.generation })}
+          </span>
+          <strong>~{formatTokenCount(compaction.summaryTokens)}</strong>
+        </div>
+      ) : null}
       <div className="context-inspector-section context-inspector-tools">
         <div className="context-inspector-section-heading">
           <div className="context-inspector-section-title">

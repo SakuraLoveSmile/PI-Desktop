@@ -6,6 +6,8 @@ import type {
   AppNotification,
   AppSettings,
   AppVersionInfo,
+  ContextCompactionRecord,
+  ContextCompactionStatus,
   ModelInfo,
   OnboardingState,
   Mode,
@@ -26,6 +28,7 @@ import type {
   UiMessage,
 } from "@pi-desktop/shared";
 import {
+  contextCompactionStatus,
   ErrorCodes as SharedErrorCodes,
   highestSupportedThinkingLevel,
   modeForProposalKind,
@@ -325,6 +328,11 @@ export type AppState = {
   latestTurnResults: Record<string, AgentTurnResult>;
   /** Latest terminal outcome per session for compact sidebar feedback. */
   sessionOutcomes: Record<string, SidebarSessionOutcome>;
+  /**
+   * Installed context checkpoint per session. Compaction is otherwise silent,
+   * so this feeds the only place it is visible: the context inspector.
+   */
+  sessionCompactions: Record<string, ContextCompactionStatus>;
   providers: ProviderPublic[];
   /** Discovered model lists per provider id (composer model menu). */
   providerModels: Record<string, ModelInfo[]>;
@@ -602,6 +610,23 @@ function persistCurrentSidebar(getState: () => AppState): void {
   saveSidebarPreferences(preferencesFromState(getState()));
 }
 
+/**
+ * Record (or clear) what the context inspector shows for a session. A session
+ * loaded without a checkpoint drops its entry so a forked or rewritten
+ * transcript never keeps showing its ancestor's compaction count.
+ */
+function rememberSessionCompaction(
+  sessionId: string,
+  record: ContextCompactionRecord | undefined,
+): void {
+  const status = contextCompactionStatus(record);
+  useAppStore.setState((state) => ({
+    sessionCompactions: status
+      ? { ...state.sessionCompactions, [sessionId]: status }
+      : withoutRecordKey(state.sessionCompactions, sessionId),
+  }));
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
   healthOk: false,
@@ -633,6 +658,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   runningSessions: {},
   latestTurnResults: {},
   sessionOutcomes: {},
+  sessionCompactions: {},
   providers: [],
   providerModels: {},
   plugins: [],
@@ -1003,6 +1029,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       detail ??= await detailPromise;
       if (!navigationIntentIsCurrent(intent)) return;
       commitSelection(detail.session?.messages ?? [], false);
+      rememberSessionCompaction(id, detail.session?.compaction);
       void get().restorePendingPlan(id);
       void get().acknowledgeSessionOutcome(id);
     } finally {
@@ -1177,6 +1204,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         navIndex: nextStack.length - 1,
       };
     });
+    rememberSessionCompaction(summary.id, result.session.compaction);
     void get().restorePendingPlan(summary.id);
   },
 
@@ -1223,6 +1251,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           errorCode: null,
         };
       });
+      rememberSessionCompaction(summary.id, result.session.compaction);
       void get().restorePendingPlan(summary.id);
     } catch (error) {
       set({
@@ -1962,6 +1991,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const planningStates = withoutRecordKey(state.planningStates, id);
       const pendingPlans = withoutRecordKey(state.pendingPlans, id);
       const planCheckpoints = withoutRecordKey(state.planCheckpoints, id);
+      const sessionCompactions = withoutRecordKey(state.sessionCompactions, id);
       const retainedNav = state.navStack.filter(
         (entry) => entry.sessionId !== id,
       );
@@ -1984,6 +2014,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         planningStates,
         pendingPlans,
         planCheckpoints,
+        sessionCompactions,
         navStack,
         navIndex: Math.min(state.navIndex, navStack.length - 1),
       };
@@ -2515,6 +2546,17 @@ export const useAppStore = create<AppState>((set, get) => ({
           toolWorkPanelTab("review"),
         );
       }
+    }
+    // A checkpoint installs on whichever session produced it, active or not,
+    // and its inspector state must survive until that session is next opened.
+    if (event.type === "compaction_end" && event.ok && event.status) {
+      const status = event.status;
+      set((state) => ({
+        sessionCompactions: {
+          ...state.sessionCompactions,
+          [envelope.sessionId]: status,
+        },
+      }));
     }
     if (envelope.sessionId !== get().activeSessionId) {
       // Cross-session events update only their scoped state. They never

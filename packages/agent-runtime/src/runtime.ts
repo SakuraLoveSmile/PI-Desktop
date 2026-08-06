@@ -59,6 +59,8 @@ import type {
   UiMessage,
 } from "@pi-desktop/shared";
 import {
+  checkpointGeneration,
+  contextCompactionStatus,
   isCommandShellOption,
   isToolsOutputParams,
   proposalKindForMode,
@@ -2685,10 +2687,30 @@ export class DesktopAgentRuntime {
       tokensBefore: preparation.tokensBefore,
       ...(usage ? { usage } : {}),
       retainedTail: preparation.retainedTail,
-      ...(details !== undefined ? { details } : {}),
+      details: this.checkpointDetailsWithGeneration(details),
       providerId: this.provider.id,
       modelId: this.provider.modelId,
       createdAt: nowIso(),
+    };
+  }
+
+  /**
+   * Stamp the checkpoint with its generation so the context inspector can show
+   * how many times a session has been compacted. A non-object `details` value
+   * is nested rather than dropped: it belongs to whoever produced it.
+   */
+  private checkpointDetailsWithGeneration(details: unknown): unknown {
+    const base =
+      details && typeof details === "object" && !Array.isArray(details)
+        ? (details as Record<string, unknown>)
+        : details === undefined
+          ? {}
+          : { value: details };
+    return {
+      ...base,
+      generation: this.activeCompaction
+        ? checkpointGeneration(this.activeCompaction.details) + 1
+        : 1,
     };
   }
 
@@ -2818,6 +2840,7 @@ export class DesktopAgentRuntime {
       willRetry,
       ...(fallback ? { fallback } : {}),
       ...(phase ? { phase } : {}),
+      status: contextCompactionStatus(checkpoint),
     });
     return "persisted";
   }

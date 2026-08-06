@@ -315,6 +315,17 @@ export type ContextCompactionRecord = {
   createdAt: string;
 };
 
+/**
+ * What the context inspector shows about the installed checkpoint. Compaction
+ * is otherwise invisible, so this is the only trace a user can inspect.
+ */
+export type ContextCompactionStatus = {
+  /** How many checkpoints this session has installed, oldest counted as 1. */
+  generation: number;
+  /** Estimated tokens the summary itself occupies in the model context. */
+  summaryTokens: number;
+};
+
 export type ContextCompactionReason = "manual" | "threshold" | "overflow";
 export type ContextCompactionFallback = "retained_tail";
 /**
@@ -435,6 +446,8 @@ export type AgentEvent =
       willRetry: boolean;
       fallback?: ContextCompactionFallback;
       phase?: ContextCompactionPhase;
+      /** Present when a checkpoint was installed, for the context inspector. */
+      status?: ContextCompactionStatus;
       error?: { code: string; message: string };
     }
   | { type: "error"; error: AppError }
