@@ -346,7 +346,7 @@ export type AppState = {
   /** Themes contributed by loaded plugins, with their sanitized CSS. */
   pluginThemes: PluginTheme[];
   /** Per-session permission queue, oldest first; parallel delegates can each
-   * be waiting on one (ADR 0060). */
+   * be waiting on one (ADR 0062). */
   pendingPermissions: PermissionQueues;
   /** Planning state is durable per session, including sessions outside view. */
   planningStates: Record<string, PlanningState>;

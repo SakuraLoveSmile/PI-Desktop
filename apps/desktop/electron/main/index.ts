@@ -618,7 +618,7 @@ async function resolveAgentRuntimeLaunch(
       description: skill.description,
     })),
   ];
-  // Subagents (ADR 0060): definitions are re-read per launch so editing
+  // Subagents (ADR 0062): definitions are re-read per launch so editing
   // `.pi/agents` takes effect on the next prompt, and every pinned model is
   // resolved here because credentials and the pi catalog live on this side.
   const subagentCatalog = await loadSubagentDefinitions(projectPath);
@@ -961,7 +961,7 @@ const scheduledRunsBySession = new Map<string, string>();
 let notificationViewingSessionId: string | null = null;
 /** Preserve tool metadata until the result is persisted at tool_end. Subagent
  * calls also carry their attribution, which is what lets a permission request
- * name the delegate that asked (ADR 0060). */
+ * name the delegate that asked (ADR 0062). */
 const activeToolCalls = new Map<
   string,
   {
@@ -3221,7 +3221,7 @@ async function dispatchExecutionForProposal(proposalId: string): Promise<void> {
 /**
  * Carry subagent attribution from the event envelope onto the persisted row, so
  * a reloaded session still nests the row under its `Task` call and still keeps
- * it out of the parent's model context (ADR 0060).
+ * it out of the parent's model context (ADR 0062).
  */
 function subagentTagged(message: UiMessage, envelope: AgentEventEnvelope): UiMessage {
   if (!envelope.parentToolCallId) return message;

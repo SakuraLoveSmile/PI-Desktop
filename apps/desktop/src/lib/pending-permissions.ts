@@ -10,7 +10,7 @@ export type PendingPermission = ToolPermissionRequest & {
  * Per-session queue of permission requests, oldest first.
  *
  * One session used to have at most one open request, because one agent asked one
- * question at a time. Parallel subagents (ADR 0060) broke that: two delegates
+ * question at a time. Parallel subagents (ADR 0062) broke that: two delegates
  * can each hit a gated tool in the same instant. The renderer answers them one
  * at a time in arrival order — the alternative is a stack of dialogs for work
  * the user cannot tell apart.

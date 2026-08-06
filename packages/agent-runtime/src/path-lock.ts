@@ -2,14 +2,17 @@
  * Serialize mutating tool calls that target the same file.
  *
  * The parent agent and its subagents run in one sidecar process but issue
- * `tools.execute` calls independently, and host-core has no per-path lock: two
- * concurrent `Write`/`Edit` calls on one file are last-writer-wins, and the
- * loser's `Edit` fails on content it read before the other write landed. With
- * subagents able to fan out (ADR 0060) that stopped being hypothetical, so the
- * sidecar queues same-path mutations itself.
+ * `tools.execute` calls independently. host-core admits one mutation per
+ * session at a time, so the writes themselves cannot tear; what it does not
+ * give is a defined order for two same-path mutations, and the sidecar's own
+ * per-path bookkeeping needs one. The edit-recovery contract counts failures
+ * per path and terminates the second failed `Edit` for the same file, which
+ * only means "read fresh content and try again" if the two attempts were
+ * ordered. With subagents able to fan out (ADR 0062) they no longer are, so the
+ * sidecar queues same-path mutations before they reach the host.
  *
  * Different paths never wait on each other, which is the point: fan-out stays
- * parallel except where it would corrupt a file.
+ * parallel except where the order matters.
  */
 
 /** Compare-equal spelling of a path: forward slashes, no `./` prefix. */

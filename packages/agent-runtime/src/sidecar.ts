@@ -81,7 +81,7 @@ type RuntimeParams = {
   commandShell: CommandShellOption;
   pluginTools?: PluginToolDef[];
   pluginSkills?: PluginSkillDef[];
-  /** Delegates this session may spawn through `Task` (ADR 0060). */
+  /** Delegates this session may spawn through `Task` (ADR 0062). */
   subagents?: SubagentDefinition[];
   /** Provider bindings for pinned models, keyed by `subagentModelKey`. */
   subagentProviders?: Record<string, RuntimeProviderConfig>;

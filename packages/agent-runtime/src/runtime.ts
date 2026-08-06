@@ -368,7 +368,7 @@ export type AgentRuntimeOptions = {
   scratchDir?: string;
   onEvent: (envelope: AgentEventEnvelope) => void;
   /**
-   * Subagent definitions this session may delegate to (ADR 0060), already
+   * Subagent definitions this session may delegate to (ADR 0062), already
    * merged and capped by Electron main. Empty means no `Task` tool at all.
    */
   subagents?: SubagentDefinition[];
@@ -811,7 +811,7 @@ export class DesktopAgentRuntime {
   private currentAssistant?: UiMessage;
   private pluginTools: PluginToolDef[];
   private pluginSkills: PluginSkillDef[];
-  /** Subagent definitions offered through the `Task` tool (ADR 0060). */
+  /** Subagent definitions offered through the `Task` tool (ADR 0062). */
   private subagents: SubagentDefinition[];
   private subagentProviders: Record<string, RuntimeProviderConfig>;
   /** Caps concurrent delegates across every `Task` batch in this session. */
@@ -1010,7 +1010,7 @@ export class DesktopAgentRuntime {
       // Every tool except `Task` carries `executionMode: "sequential"`, and pi
       // runs a batch sequentially as soon as it contains one such tool. So the
       // only batch that actually runs concurrently is a batch of nothing but
-      // `Task` calls — subagent fan-out (ADR 0060) — and every existing tool
+      // `Task` calls — subagent fan-out (ADR 0062) — and every existing tool
       // ordering guarantee is untouched.
       toolExecution: "parallel",
     });
@@ -1205,7 +1205,7 @@ export class DesktopAgentRuntime {
     let toolCarrier: AssistantMessage | undefined;
     for (const m of history) {
       // Subagent rows belong to the transcript and to review, never to the
-      // parent's model context (ADR 0060): the parent only ever saw the `Task`
+      // parent's model context (ADR 0062): the parent only ever saw the `Task`
       // report, and replaying a delegate's messages would both contradict that
       // and reintroduce the context cost delegation exists to avoid.
       if (m.parentToolCallId) continue;
@@ -1716,7 +1716,7 @@ export class DesktopAgentRuntime {
         : [this.buildSubmitTool(this.mode)];
     // Delegation is an Agent-mode capability: Plan and Goal are read-only
     // contract negotiations, and a delegate with Bash or Edit would drive
-    // straight through that (ADR 0060).
+    // straight through that (ADR 0062).
     const subagentTools =
       this.mode === "agent" && this.subagents.length
         ? [this.buildSubagentTool()]
@@ -1996,7 +1996,7 @@ export class DesktopAgentRuntime {
   }
 
   /**
-   * `Task`: delegate one bounded piece of work to a subagent (ADR 0060).
+   * `Task`: delegate one bounded piece of work to a subagent (ADR 0062).
    *
    * The catalog of definitions rides in this tool's description rather than in
    * the system prompt, because the two change together: a project adding an

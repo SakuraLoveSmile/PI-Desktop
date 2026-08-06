@@ -1,5 +1,5 @@
 /**
- * Subagents: bounded delegate agent loops spawned by the `Task` tool (ADR 0060).
+ * Subagents: bounded delegate agent loops spawned by the `Task` tool (ADR 0062).
  *
  * A delegate is a second pi `Agent` inside the same sidecar process, with its
  * own system prompt, its own (possibly pinned) provider/model, and only the

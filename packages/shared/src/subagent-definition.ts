@@ -74,7 +74,7 @@ export const DEFAULT_SUBAGENT_TOOLS: readonly SubagentAssignableTool[] = [
 export const DEFAULT_SUBAGENT_MAX_TURNS = 24;
 export const MAX_SUBAGENT_MAX_TURNS = 80;
 
-/** Caps that keep delegation cheap and predictable (see ADR 0060). */
+/** Caps that keep delegation cheap and predictable (see ADR 0062). */
 export const MAX_SUBAGENT_DEFINITIONS = 16;
 export const MAX_SUBAGENT_PROVIDERS = 8;
 export const MAX_SUBAGENT_CONCURRENCY = 4;

@@ -266,7 +266,7 @@ export type UiMessage = {
   isError?: boolean;
   /**
    * Set on rows produced inside a subagent: the `Task` tool call that spawned
-   * the delegate. Two consequences (ADR 0060): the transcript nests these rows
+   * the delegate. Two consequences (ADR 0062): the transcript nests these rows
    * under that call, and the parent model never sees them — only the `Task`
    * report enters its context.
    */
@@ -409,7 +409,7 @@ export type ToolPermissionRequest = {
   argsPreview: unknown;
   risk: Risk;
   reason: string;
-  /** Subagent that asked, when the call came from a delegate (ADR 0060). */
+  /** Subagent that asked, when the call came from a delegate (ADR 0062). */
   agentName?: string;
   /** `Task` call that spawned the asking delegate. */
   parentToolCallId?: string;
@@ -471,7 +471,7 @@ export type AgentEventEnvelope = {
   ts: number;
   event: AgentEvent;
   /**
-   * Set on every event emitted from inside a subagent (ADR 0060): the `Task`
+   * Set on every event emitted from inside a subagent (ADR 0062): the `Task`
    * tool call that owns the delegate. Main tags persisted rows with it and
    * skips the turn-lifecycle handling that belongs to the parent alone.
    */

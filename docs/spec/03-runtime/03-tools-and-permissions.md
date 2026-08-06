@@ -432,8 +432,8 @@ delegate with `Bash`, `Edit` or `Write` would drive straight through them.
 A definition declares the tools its delegate may call, drawn only from `Read`,
 `Glob`, `Grep`, `BrowserPreview`, `Bash`, `Edit` and `Write`. A definition that
 declares none gets `Read`, `Glob`, `Grep`. Plugin tools, `Skill`, `ToolSearch`,
-`CompactContext`, the mode tools and `Task` itself are never assignable: a
-delegate is a bounded file/search/shell worker, not a second session.
+the mode tools and `Task` itself are never assignable: a delegate is a bounded
+file/search/shell worker, not a second session.
 
 A delegate's rights are its definition's, never its session's. It cannot gain a
 tool because the parent has it, and a session cannot lend mutation rights to a
@@ -444,7 +444,8 @@ unchanged — evaluated against the session, because the session is what owns th
 workspace and the permission mode.
 
 Permission requests from a delegate carry the asking delegate's name, so the
-card can say which delegate wants the call (see `04-ux/03-permission-ux.md` §7).
+card can say which delegate wants the call (see `04-ux/03-permission-ux.md`
+§6a).
 Session-scoped `allow-session` grants are still per `toolName` and per session:
 one delegate's approval of `Bash` applies to the whole session, including the
 parent and other delegates.

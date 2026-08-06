@@ -795,7 +795,7 @@ function ToolRow({
   delegate,
 }: {
   message: UiMessage;
-  /** Rows the delegate produced, when this row is a `Task` call (ADR 0060). */
+  /** Rows the delegate produced, when this row is a `Task` call (ADR 0062). */
   delegate?: SubagentRun;
 }) {
   const { t } = useTranslation();
@@ -934,7 +934,7 @@ function ToolRow({
  *
  * The rows are the delegate's context, not the parent's, so they are visibly
  * one level in and stay collapsed with the call. Only one level is possible: a
- * delegate has no `Task` tool of its own (ADR 0060).
+ * delegate has no `Task` tool of its own (ADR 0062).
  */
 function SubagentRunRows({
   run,
@@ -1629,7 +1629,7 @@ export const ChatTranscript = memo(function ChatTranscript({
   messages: UiMessage[];
   isRunning: boolean;
   pendingPermission?: PendingPermission;
-  /** Requests waiting behind this one, from other delegates (ADR 0060). */
+  /** Requests waiting behind this one, from other delegates (ADR 0062). */
   queuedPermissions?: number;
   planningState?: PlanningState;
 }) {

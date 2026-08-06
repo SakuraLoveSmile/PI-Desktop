@@ -160,7 +160,7 @@ pub struct UiMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_error: Option<bool>,
     /// Set on rows a subagent produced: the `Task` tool call that spawned it
-    /// (ADR 0060). The transcript nests these under that call, and the agent
+    /// (ADR 0062). The transcript nests these under that call, and the agent
     /// runtime excludes them from the parent's model context.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_tool_call_id: Option<String>,

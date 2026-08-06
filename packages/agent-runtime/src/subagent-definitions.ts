@@ -1,6 +1,6 @@
 /**
  * Where subagent definitions come from, and how a definition's model pin turns
- * into a usable provider binding (ADR 0060).
+ * into a usable provider binding (ADR 0062).
  *
  * Discovery mirrors prompt templates (D123): `<workspace>/.pi/agents/*.md`,
  * plus the definitions PI-Desktop ships. Project documents shadow builtins by

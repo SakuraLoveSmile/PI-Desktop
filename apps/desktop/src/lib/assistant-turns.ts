@@ -16,7 +16,7 @@ export type SubagentRunItem =
   | { kind: "answer"; message: UiMessage };
 
 /**
- * Everything one delegate did inside a single `Task` call (ADR 0060).
+ * Everything one delegate did inside a single `Task` call (ADR 0062).
  *
  * Delegate rows arrive on the session stream interleaved with the parent's —
  * parallel delegates guarantee it — so they are collected by the `Task` call

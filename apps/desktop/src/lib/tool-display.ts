@@ -57,7 +57,7 @@ export function getToolAction(toolName?: string): ToolAction {
     aliases.some(
       (alias) => normalized === alias || normalized.endsWith(alias),
     );
-  // Delegation (ADR 0060) is matched on the exact name, minus any provider
+  // Delegation (ADR 0062) is matched on the exact name, minus any provider
   // namespace: a plugin tool called "CreateTask" is not a subagent call and
   // keeps its generic presentation.
   const bare = (toolName || "")

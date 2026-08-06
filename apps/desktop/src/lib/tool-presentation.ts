@@ -95,7 +95,7 @@ export type ToolPresentationOptions = {
   /**
    * Drop a delegate's report from a `Task` body. The transcript nests the
    * delegate's own rows under the call, and its last answer row already is the
-   * report, so showing both would print it twice (ADR 0060).
+   * report, so showing both would print it twice (ADR 0062).
    */
   hideDelegateReport?: boolean;
 };
