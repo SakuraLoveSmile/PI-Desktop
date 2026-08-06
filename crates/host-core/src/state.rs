@@ -11,6 +11,7 @@ use crate::plugins::PluginManager;
 use crate::secrets::SecretStore;
 use crate::tool_budget::ToolBudget;
 use crate::user_skills::UserSkillRegistry;
+use crate::user_subagents::UserSubagentRegistry;
 use crate::workspace::WorkspaceState;
 
 pub const PROTOCOL_VERSION: u32 = 9;
@@ -30,6 +31,9 @@ pub struct AppState {
     pub mcp_servers: McpServerRegistry,
     /// Skill documents the user wrote or imported directly.
     pub user_skills: UserSkillRegistry,
+    /// Subagent definitions the user owns, alongside the builtin and per-project
+    /// ones the runtime discovers itself (D202).
+    pub user_subagents: UserSubagentRegistry,
     pub started_at: Instant,
     pub handshook: bool,
     pub shutting_down: bool,
@@ -60,6 +64,7 @@ impl AppState {
         let plugins = PluginManager::new(data_dir);
         let mcp_servers = McpServerRegistry::new(data_dir);
         let user_skills = UserSkillRegistry::new(data_dir);
+        let user_subagents = UserSubagentRegistry::new(data_dir);
         Ok(Self {
             data_dir: data_dir.to_path_buf(),
             db,
@@ -70,6 +75,7 @@ impl AppState {
             plugins,
             mcp_servers,
             user_skills,
+            user_subagents,
             started_at: Instant::now(),
             handshook: false,
             shutting_down: false,

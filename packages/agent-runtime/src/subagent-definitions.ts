@@ -2,9 +2,11 @@
  * Where subagent definitions come from, and how a definition's model pin turns
  * into a usable provider binding (ADR 0062).
  *
- * Discovery mirrors prompt templates (D123): `<workspace>/.pi/agents/*.md`,
- * plus the definitions PI-Desktop ships. Project documents shadow builtins by
- * name, so a workspace can retune a bundled delegate without renaming it.
+ * Discovery has three sources, in shadowing order: `<workspace>/.pi/agents/*.md`
+ * mirroring prompt templates (D123), the user's own registry documents handed
+ * in by Electron main (D202), and the definitions PI-Desktop ships. A project
+ * document therefore retunes a bundled or user-owned delegate without renaming
+ * it.
  *
  * Builtins are inline rather than packaged resource files. There are a handful
  * of them, they must exist in every install for the `Task` tool to be worth
@@ -145,25 +147,72 @@ async function loadProjectSubagents(
 }
 
 /**
- * Definitions offered to a session, builtins plus this workspace's own.
- * Load failures degrade to diagnostics: a malformed document must not cost the
- * session its other delegates, let alone its turn.
+ * One document from the user's registry (D202). Electron main reads the
+ * registry — host-core owns it — and hands the documents in, so this module
+ * keeps one parser and one merge for all three sources.
+ */
+export type UserSubagentDocument = {
+  /** Registry id, used as the fallback name when the frontmatter omits one. */
+  id: string;
+  /** Raw document text, frontmatter included. */
+  document: string;
+  /** Absolute path, so a diagnostic and the UI can point at the same file. */
+  filePath?: string;
+};
+
+export type LoadSubagentOptions = {
+  /** Directory to read project documents from instead of `<root>/.pi/agents`. */
+  overrideDir?: string;
+  userDocuments?: readonly UserSubagentDocument[];
+};
+
+function loadUserSubagents(documents: readonly UserSubagentDocument[]): {
+  definitions: SubagentDefinition[];
+  diagnostics: string[];
+} {
+  const definitions: SubagentDefinition[] = [];
+  const diagnostics: string[] = [];
+  for (const entry of documents) {
+    const label = entry.filePath ?? `user subagent "${entry.id}"`;
+    const parsed = parseSubagentDefinition(entry.document, {
+      source: "user",
+      fallbackName: entry.id,
+      ...(entry.filePath ? { filePath: entry.filePath } : {}),
+    });
+    for (const warning of parsed.warnings) diagnostics.push(`${label}: ${warning}`);
+    if (parsed.ok) definitions.push(parsed.definition);
+    else diagnostics.push(`${label}: ${parsed.errors.join("; ")}`);
+  }
+  return { definitions, diagnostics };
+}
+
+/**
+ * Definitions offered to a session: this workspace's own, the user's own, and
+ * the builtins. Load failures degrade to diagnostics: a malformed document must
+ * not cost the session its other delegates, let alone its turn.
  */
 export async function loadSubagentDefinitions(
   workspaceRoot: string | null | undefined,
-  overrideDir?: string,
+  options: LoadSubagentOptions = {},
 ): Promise<{ definitions: SubagentDefinition[]; diagnostics: string[] }> {
   const builtin = builtinSubagents();
   const dir =
-    overrideDir ?? (workspaceRoot ? subagentDefinitionDir(workspaceRoot) : undefined);
+    options.overrideDir ??
+    (workspaceRoot ? subagentDefinitionDir(workspaceRoot) : undefined);
   const project = dir
     ? await loadProjectSubagents(dir)
     : { definitions: [], diagnostics: [] };
+  const user = loadUserSubagents(options.userDocuments ?? []);
   const merged = mergeSubagentDefinitions([
     ...project.definitions,
+    ...user.definitions,
     ...builtin.definitions,
   ]);
-  const diagnostics = [...project.diagnostics, ...builtin.diagnostics];
+  const diagnostics = [
+    ...project.diagnostics,
+    ...user.diagnostics,
+    ...builtin.diagnostics,
+  ];
   if (merged.dropped.length > 0) {
     diagnostics.push(
       `dropped subagents past the catalog cap: ${merged.dropped.join(", ")}`,

@@ -841,10 +841,40 @@ One Markdown document each, under `<data>/skills/<id>/SKILL.md`.
 The body is not in `list`: only the description enters the prompt, and the
 document is fetched when the model invokes `Skill` (D174).
 
-## 12c. Activation scope (D192)
+## 12c. Subagent API (D202)
+
+One Markdown document each, under `<data>/agents/<id>.md`, where the id is the
+name the model passes to `Task`. Registry records mirror `UserSkillRecord` and
+add the frontmatter the editor owns: `tools`, `model`, `thinkingLevel`,
+`maxTurns`.
+
+- `subagent/list` → `{ subagents: UserSubagentRecord[] }`
+- `subagent/create(subagent)` — a duplicate name fails with `SUBAGENT_INVALID`
+- `subagent/update(id, subagent)` — `model: ""` clears a pin, `maxTurns: 0`
+  clears the override
+- `subagent/read(id)` → `{ subagent, body }` — the only call that returns the
+  document
+- `subagent/remove(id)`
+- `subagent/setEnabled(id, enabled)`
+- `subagent/setScope(id, scope)`
+- `subagent/reveal({ id })` / `subagent/reveal({ path })`
+- `subagent/catalog()` → `{ subagents: SubagentDefinition[], diagnostics,
+  projectPath }`
+
+`catalog` is the one channel that is not a registry call: Electron main runs the
+real loader for the active project, so the result is the merged effective
+catalog — project, then user registry, then builtin — and is what renders the
+read-only builtin/project rows and supplies the body for "copy as my
+definition". Merge and precedence are never re-implemented in the renderer.
+
+Every mutation emits `pluginChanged` with `reason: "subagent"`, which is the
+refresh signal the extensions page already listens to.
+
+## 12d. Activation scope (D192)
 
 Every `setScope` call above takes the same shape, and `PluginSummary`,
-`McpServerRecord` and `UserSkillRecord` all carry it beside `enabled`:
+`McpServerRecord`, `UserSkillRecord` and `UserSubagentRecord` all carry it
+beside `enabled`:
 
 ```ts
 type ActivationScope = {

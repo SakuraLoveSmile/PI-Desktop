@@ -73,20 +73,25 @@ test("count interpolations carry plural forms in both catalogs", () => {
   }
 });
 
-test("the extensions page separates the four things a user installs or writes", () => {
-  assert.match(pageSrc, /type TabId = "installed" \| "mcp" \| "skills" \| "market"/);
-  for (const id of ["plugins-tab-mcp", "plugins-tab-skills"]) {
+test("the extensions page separates the things a user installs or writes", () => {
+  assert.match(
+    pageSrc,
+    /type TabId = "installed" \| "mcp" \| "skills" \| "subagents" \| "market"/,
+  );
+  for (const id of ["plugins-tab-mcp", "plugins-tab-skills", "plugins-tab-subagents"]) {
     assert.ok(pageSrc.includes(id), `missing segment ${id}`);
   }
-  for (const id of ["plugins-panel-mcp", "plugins-panel-skills"]) {
+  for (const id of ["plugins-panel-mcp", "plugins-panel-skills", "plugins-panel-subagents"]) {
     assert.ok(pageSrc.includes(id), `missing panel ${id}`);
   }
   // Each panel is a real tabpanel, not a bare div, so the segments are navigable.
-  assert.match(pageSrc, /id="plugins-panel-mcp"[\s\S]{0,120}aria-labelledby="plugins-tab-mcp"/);
-  assert.match(
-    pageSrc,
-    /id="plugins-panel-skills"[\s\S]{0,120}aria-labelledby="plugins-tab-skills"/,
-  );
+  for (const id of ["mcp", "skills", "subagents"]) {
+    assert.match(
+      pageSrc,
+      new RegExp(`id="plugins-panel-${id}"[\\s\\S]{0,120}aria-labelledby="plugins-tab-${id}"`),
+      id,
+    );
+  }
 });
 
 test("the extensions page uses tabs instead of a four-number overview band", () => {
@@ -107,7 +112,7 @@ test("the client hides development-only demo plugins from marketplace results", 
 // Scoping something to "this project" only means anything relative to the folder
 // the window has open, and the picker cannot offer folders it was never given.
 test("both new sections receive the project list and the open project", () => {
-  for (const tag of ["<McpSection", "<SkillsSection"]) {
+  for (const tag of ["<McpSection", "<SkillsSection", "<SubagentsSection"]) {
     const start = pageSrc.indexOf(tag);
     assert.ok(start > 0, `${tag} is not rendered`);
     const element = pageSrc.slice(start, pageSrc.indexOf("/>", start));
@@ -118,8 +123,13 @@ test("both new sections receive the project list and the open project", () => {
   assert.match(pageSrc, /api\s*\.\s*listProjects\(\)/);
 });
 
-test("plugins, MCP servers and skills all use the one scope control", () => {
-  const users = ["PluginsPage.tsx", "McpSection.tsx", "SkillsSection.tsx"];
+test("plugins, MCP servers, skills and subagents all use the one scope control", () => {
+  const users = [
+    "PluginsPage.tsx",
+    "McpSection.tsx",
+    "SkillsSection.tsx",
+    "SubagentsSection.tsx",
+  ];
   for (const name of users) {
     const source = name === "PluginsPage.tsx" ? pageSrc : components.get(name);
     assert.match(source, /<ScopeControl/, `${name} does not render ScopeControl`);
@@ -152,6 +162,45 @@ test("the skill editor treats the description as the part the model reads", () =
   assert.match(sheet, /MAX_SKILL_BYTES = 128 \* 1024/);
 });
 
+test("the subagent editor puts the tool grant above the prompt", () => {
+  const sheet = components.get("SubagentEditorSheet.tsx");
+  const toolsAt = sheet.indexOf("extensions.subagents.toolsHint");
+  const bodyAt = sheet.indexOf("extensions.subagents.bodyHint");
+  assert.ok(toolsAt > 0 && bodyAt > 0);
+  // The grant is the only field with a safety consequence, so it cannot sit
+  // below a twelve-row textarea where nobody scrolls to it.
+  assert.ok(toolsAt < bodyAt, "the prompt field precedes the tool grant");
+  // Every assignable tool is a checkbox, so read-only reads as a choice.
+  assert.match(sheet, /SUBAGENT_ASSIGNABLE_TOOLS\.map\(\(tool\) =>/);
+  assert.match(sheet, /MAX_SUBAGENT_BYTES = 32 \* 1024/);
+  assert.match(sheet, /errorTools/);
+});
+
+// Three sources, one writer: the registry rows are editable, the effective
+// catalog is not, and a name a project document owns has to say so (D202).
+test("the subagents section shows the effective catalog beside the writable one", () => {
+  const section = components.get("SubagentsSection.tsx");
+  assert.match(section, /api\.listUserSubagents\(\)/);
+  assert.match(section, /api\.subagentCatalog\(\)/);
+  assert.match(section, /definition\.source !== "user"/);
+  assert.match(section, /extensions\.subagents\.shadowedByProject/);
+  assert.match(section, /draftFromDefinition\(definition\)/);
+  // A builtin has no path to reveal, and no switch: it cannot be turned off.
+  assert.match(section, /definition\.filePath \? \(/);
+  const readOnlyRows = section.slice(section.indexOf("readOnly.map"));
+  assert.doesNotMatch(readOnlyRows, /<ScopeControl/);
+});
+
+test("a subagent prompt is read only when it is opened for editing", () => {
+  const section = components.get("SubagentsSection.tsx");
+  const list = section.slice(
+    section.indexOf("api.listUserSubagents"),
+    section.indexOf("openEdit"),
+  );
+  assert.doesNotMatch(list, /readUserSubagent/);
+  assert.match(section, /api\.readUserSubagent\(/);
+});
+
 test("a skill body is read only when it is opened for editing", () => {
   const section = components.get("SkillsSection.tsx");
   assert.match(section, /api\.readUserSkill\(/);
@@ -160,7 +209,7 @@ test("a skill body is read only when it is opened for editing", () => {
 });
 
 test("both new sections follow the plugin change event", () => {
-  for (const name of ["McpSection.tsx", "SkillsSection.tsx"]) {
+  for (const name of ["McpSection.tsx", "SkillsSection.tsx", "SubagentsSection.tsx"]) {
     assert.match(components.get(name), /api\.onPluginChanged\(/, name);
   }
 });
@@ -217,7 +266,11 @@ test("the scope popover is not clipped by the surface it opens on", () => {
 
 // All three caught by looking at the rendered page rather than the stylesheet.
 test("a validation message sits above the buttons it blocks, once there is one", () => {
-  for (const name of ["McpEditorSheet.tsx", "SkillEditorSheet.tsx"]) {
+  for (const name of [
+    "McpEditorSheet.tsx",
+    "SkillEditorSheet.tsx",
+    "SubagentEditorSheet.tsx",
+  ]) {
     const sheet = components.get(name);
     const errorAt = sheet.indexOf('className="ext-sheet-error"');
     const actionsAt = sheet.indexOf('className="ext-sheet-actions"');

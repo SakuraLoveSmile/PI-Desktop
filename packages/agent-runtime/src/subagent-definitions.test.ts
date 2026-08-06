@@ -58,7 +58,7 @@ describe("loadSubagentDefinitions", () => {
       "utf8",
     );
 
-    const { definitions, diagnostics } = await loadSubagentDefinitions(null, dir);
+    const { definitions, diagnostics } = await loadSubagentDefinitions(null, { overrideDir: dir });
 
     expect(diagnostics).toEqual([]);
     expect(definitions.slice(0, 2).map((d) => d.name)).toEqual([
@@ -81,7 +81,7 @@ describe("loadSubagentDefinitions", () => {
       "utf8",
     );
 
-    const { definitions, diagnostics } = await loadSubagentDefinitions(null, dir);
+    const { definitions, diagnostics } = await loadSubagentDefinitions(null, { overrideDir: dir });
 
     expect(definitions.map((d) => d.name)).toContain("good");
     expect(definitions.map((d) => d.name)).not.toContain("broken");
@@ -95,6 +95,68 @@ describe("loadSubagentDefinitions", () => {
     expect(subagentDefinitionDir(dir)).toBe(join(dir, ".pi", "agents"));
     expect(definitions.every((d) => d.source === "builtin")).toBe(true);
     expect(diagnostics).toEqual([]);
+  });
+
+  it("orders the user's own definitions between project and builtin", async () => {
+    await writeFile(
+      join(dir, "explorer.md"),
+      "---\ndescription: Project explorer.\ntools: [Read]\n---\nSearch our way.\n",
+      "utf8",
+    );
+
+    const { definitions, diagnostics } = await loadSubagentDefinitions(null, {
+      overrideDir: dir,
+      userDocuments: [
+        {
+          // Shadowed by the project document of the same name.
+          id: "explorer",
+          document:
+            "---\nname: explorer\ndescription: My explorer.\ntools: [Read, Grep]\n---\nMine.\n",
+          filePath: "/data/agents/explorer.md",
+        },
+        {
+          // Shadows a builtin, because nothing in the project claims the name.
+          id: "test-runner",
+          document:
+            "---\nname: test-runner\ndescription: My runner.\ntools: [Bash]\n---\nRun it.\n",
+          filePath: "/data/agents/test-runner.md",
+        },
+        {
+          id: "note-taker",
+          document:
+            "---\nname: note-taker\ndescription: Take notes.\ntools: [Read, Write]\n---\nWrite notes.\n",
+          filePath: "/data/agents/note-taker.md",
+        },
+      ],
+    });
+
+    expect(diagnostics).toEqual([]);
+    const byName = new Map(definitions.map((d) => [d.name, d]));
+    expect(byName.get("explorer")!.source).toBe("project");
+    expect(byName.get("test-runner")!.source).toBe("user");
+    expect(byName.get("test-runner")!.filePath).toBe("/data/agents/test-runner.md");
+    expect(byName.get("note-taker")!.tools).toEqual(["Read", "Write"]);
+    expect(byName.get("code-reviewer")!.source).toBe("builtin");
+    expect(definitions.filter((d) => d.name === "explorer")).toHaveLength(1);
+  });
+
+  it("reports a malformed user document without losing the others", async () => {
+    const { definitions, diagnostics } = await loadSubagentDefinitions(null, {
+      userDocuments: [
+        { id: "broken", document: "---\ntools: [Read]\n---\n\n" },
+        {
+          id: "fine",
+          document: "---\ndescription: Fine.\ntools: [Read]\n---\nWork.\n",
+        },
+      ],
+    });
+
+    expect(definitions.map((d) => d.name)).toContain("fine");
+    expect(definitions.map((d) => d.name)).not.toContain("broken");
+    expect(diagnostics.join("\n")).toContain('user subagent "broken"');
+    expect(diagnostics.join("\n")).toContain("missing `description`");
+    // The builtins are untouched by one bad registry entry.
+    expect(definitions.map((d) => d.name)).toContain("explorer");
   });
 });
 
