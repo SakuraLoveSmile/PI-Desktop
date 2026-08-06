@@ -399,7 +399,9 @@ launch diagnostic and never fails the launch.
 when the catalog is non-empty. Its description carries the delegate catalog, and
 its arguments are validated in the tool: an unknown `agent`, an empty `task`, an
 unresolvable model pin and a definition whose tools are all unavailable each
-return a tool error explaining the failure rather than throwing.
+return a tool error explaining the failure rather than throwing. `Task` belongs
+to the Agent core set rather than the on-demand catalog of §7.1, so a session
+with definitions always sees it.
 
 **Delegate loop.** A `SubagentRun` is a second pi `Agent` in the same sidecar
 process with the definition's system prompt, its (possibly pinned)
@@ -511,6 +513,9 @@ registered schema into every provider request. Each new user prompt starts with
 the mode's core set:
 
 - Agent: `Read`, `Bash`, `Edit`, and `Write` (matching pi's coding-agent core)
+- Agent: `Task` as well, whenever the subagent catalog is non-empty (§5f) — a
+  capability the model has to go looking for is one it will not use, and
+  delegation is worth one extra schema per request
 - Plan: `Read`, `Glob`, `Grep`, `BrowserPreview`, and `Bash`
 - both modes: `ToolSearch` when at least one deferred capability exists
 

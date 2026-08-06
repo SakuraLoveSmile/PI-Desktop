@@ -34,10 +34,6 @@ import {
   type ToolResultMessage,
   type Usage,
 } from "@earendil-works/pi-ai";
-import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
-import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
-import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
-import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
 import { DEFAULT_COMMAND_TIMEOUT_MS } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
@@ -289,43 +285,6 @@ type ContextBudget = {
   /** Approximate recent-context tokens a checkpoint should retain. */
   keepRecentTokens: number;
 };
-
-type ApiBinding = {
-  api: Api;
-  adapter: () => ProviderStreams;
-  defaultBaseUrl: string;
-};
-
-/** Map a stored provider apiStyle onto a pi-ai wire API. Unknown styles fall
- * back to OpenAI Chat Completions, the pre-apiStyle behavior. */
-function apiBindingForStyle(apiStyle?: string): ApiBinding {
-  switch (apiStyle) {
-    case "responses":
-      return {
-        api: "openai-responses",
-        adapter: openAIResponsesApi,
-        defaultBaseUrl: "https://api.openai.com/v1",
-      };
-    case "anthropic_messages":
-      return {
-        api: "anthropic-messages",
-        adapter: anthropicMessagesApi,
-        defaultBaseUrl: "https://api.anthropic.com",
-      };
-    case "google_generative_ai":
-      return {
-        api: "google-generative-ai",
-        adapter: googleGenerativeAIApi,
-        defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-      };
-    default:
-      return {
-        api: "openai-completions",
-        adapter: openAICompletionsApi,
-        defaultBaseUrl: "https://api.openai.com/v1",
-      };
-  }
-}
 
 export type PluginToolDef = {
   /** Full exposed name (`plugin_<pluginIdSafe>_<toolName>`, D015). */

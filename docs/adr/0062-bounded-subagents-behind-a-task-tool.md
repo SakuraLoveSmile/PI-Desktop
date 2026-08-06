@@ -51,8 +51,9 @@ Frontmatter keys: `name`, `description`, `tools`, `model`, `thinkingLevel`,
 (`SUBAGENT_ASSIGNABLE_TOOLS`: Read, Glob, Grep, BrowserPreview, Bash, Edit,
 Write). Plugin, skill, mode and meta tools are out of reach: a delegate is a
 bounded worker, not a second full session. A definition that omits `tools` gets
-`Read, Glob, Grep`. A delegate never inherits mutation rights from the parent
-session — write capability comes only from its own declaration.
+`Read, Glob, Grep`, and `tools: "*"` expands to the assignable set rather than to
+everything the session has. A delegate never inherits mutation rights from the
+parent session — write capability comes only from its own declaration.
 
 Every delegate tool call goes through the same `tools.execute` host path as the
 parent's, so containment, permission modes and hard denies are unchanged. A

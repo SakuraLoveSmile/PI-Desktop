@@ -431,9 +431,11 @@ delegate with `Bash`, `Edit` or `Write` would drive straight through them.
 
 A definition declares the tools its delegate may call, drawn only from `Read`,
 `Glob`, `Grep`, `BrowserPreview`, `Bash`, `Edit` and `Write`. A definition that
-declares none gets `Read`, `Glob`, `Grep`. Plugin tools, `Skill`, `ToolSearch`,
-the mode tools and `Task` itself are never assignable: a delegate is a bounded
-file/search/shell worker, not a second session.
+declares none gets `Read`, `Glob`, `Grep`; `tools: "*"` means all seven, which is
+still only those seven. An unrecognized name is dropped with a parse warning.
+Plugin tools, `Skill`, `ToolSearch`, the mode tools and `Task` itself are never
+assignable: a delegate is a bounded file/search/shell worker, not a second
+session.
 
 A delegate's rights are its definition's, never its session's. It cannot gain a
 tool because the parent has it, and a session cannot lend mutation rights to a
