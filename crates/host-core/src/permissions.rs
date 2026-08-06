@@ -109,11 +109,12 @@ impl PermissionManager {
 
     /// The shared contract-mode allowlist. Plan and Goal expose the same
     /// read/inspect core plus Bash; only their submit tool differs, and that one
-    /// is a sidecar-side tool that never reaches this gate.
+    /// is a sidecar-side tool that never reaches this gate. `new_context` is
+    /// sidecar-side too, and listed so the two sides of the bridge agree.
     pub fn plan_mode_allows(tool_name: &str) -> bool {
         matches!(
             tool_name,
-            "Read" | "Glob" | "Grep" | "Bash" | "BrowserPreview"
+            "Read" | "Glob" | "Grep" | "Bash" | "BrowserPreview" | "new_context"
         )
     }
 

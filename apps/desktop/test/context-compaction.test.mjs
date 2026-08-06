@@ -4,19 +4,31 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [protocol, types, main, api, store, runtime, commands, hostRpc, transcript, enLocale] =
-  await Promise.all([
-    read("../../../packages/shared/src/protocol.ts"),
-    read("../../../packages/shared/src/types.ts"),
-    read("../electron/main/index.ts"),
-    read("../src/lib/api.ts"),
-    read("../src/stores/app-store.ts"),
-    read("../../../packages/agent-runtime/src/runtime.ts"),
-    read("../electron/main/builtin-commands.ts"),
-    read("../../../crates/host-core/src/rpc/mod.rs"),
-    read("../src/components/ChatTranscript.tsx"),
-    read("../../../packages/i18n/src/locales/en/index.ts"),
-  ]);
+const [
+  protocol,
+  types,
+  main,
+  api,
+  store,
+  runtime,
+  commands,
+  hostRpc,
+  hostPermissions,
+  transcript,
+  enLocale,
+] = await Promise.all([
+  read("../../../packages/shared/src/protocol.ts"),
+  read("../../../packages/shared/src/types.ts"),
+  read("../electron/main/index.ts"),
+  read("../src/lib/api.ts"),
+  read("../src/stores/app-store.ts"),
+  read("../../../packages/agent-runtime/src/runtime.ts"),
+  read("../electron/main/builtin-commands.ts"),
+  read("../../../crates/host-core/src/rpc/mod.rs"),
+  read("../../../crates/host-core/src/permissions.rs"),
+  read("../src/components/ChatTranscript.tsx"),
+  read("../../../packages/i18n/src/locales/en/index.ts"),
+]);
 
 test("context compaction is wired through protocol v9 and the manual IPC path", () => {
   assert.match(protocol, /PROTOCOL_VERSION = 9/);
@@ -49,18 +61,31 @@ test("turn_end remains a per-tool-turn boundary rather than a terminal run state
   assert.match(store, /case "turn_end":\s*break/);
 });
 
-test("host-driven protection blocks unsafe provider requests with no model-facing tool", () => {
+test("the hard boundary is enforced by the host, with a model-side escape hatch", () => {
   assert.match(runtime, /prepareNextTurnWithContext/);
-  // Triggering is deterministic and host-owned: no compaction tool, no prompt
-  // nudge, so a long session never spends a turn asking the model to compact.
-  assert.doesNotMatch(runtime, /CompactContext/);
-  assert.doesNotMatch(runtime, /<context_management>/);
   assert.match(runtime, /budget\.tokens >= budget\.hardLimit/);
   assert.match(runtime, /CONTEXT_COMPACTION_FAILED: unable to create a checkpoint/);
   assert.match(runtime, /checkpoint truncated: this message crossed the retained context budget/);
   assert.match(runtime, /pendingOverflow/);
   assert.match(runtime, /runCompaction\("overflow", true\)/);
   assert.match(runtime, /fallback: "retained_tail"/);
+  // Codex's tool, verbatim and parameterless, plus its two-tier reminder.
+  assert.match(runtime, /CONTEXT_COMPACTION_TOOL_NAME = "new_context"/);
+  assert.match(
+    runtime,
+    /"Start a new context window\. Does not clear, reset, or otherwise affect environment state\."/,
+  );
+  assert.match(runtime, /pendingModelCompaction = true/);
+  assert.match(runtime, /function contextBudgetReminder\(/);
+  assert.match(runtime, /function contextFallbackReminder\(/);
+  assert.match(runtime, /contextReminderClaimed/);
+  assert.match(runtime, /contextFallbackReminderClaimed/);
+  // The reminder is a per-turn append, so it never reaches the transcript.
+  assert.match(
+    runtime,
+    /systemPrompt: `\$\{context\.systemPrompt\}\\n\\n\$\{reminder\}`/,
+  );
+  assert.match(hostPermissions, /"new_context"/);
 });
 
 test("a checkpoint carries only recent user messages past the boundary", () => {
@@ -108,7 +133,7 @@ test("compaction runs inline at the hard boundary, never ahead of it", () => {
   assert.doesNotMatch(runtime, /phase: "background"/);
   assert.match(
     runtime,
-    /const budget = this\.contextBudget\(context\.messages\);\s*if \(budget\.tokens < budget\.hardLimit\) return \{ context \};/,
+    /const budget = this\.contextBudget\(context\.messages\);\s*const hardLimitReached = budget\.tokens >= budget\.hardLimit;/,
   );
   // Generation stays separate from installation so a failed build can still
   // fall through to the retained-tail recovery path.

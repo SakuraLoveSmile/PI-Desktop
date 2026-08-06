@@ -300,6 +300,54 @@ const CONTEXT_ROLLOVER_SUMMARY = [
 ].join("\n\n");
 
 /**
+ * Codex's model-facing compaction tool: no parameters, and the description is
+ * its wording verbatim. The model cannot know how much room is left, so the
+ * tool is only useful together with the budget reminders below.
+ */
+const CONTEXT_COMPACTION_TOOL_NAME = "new_context";
+const CONTEXT_COMPACTION_TOOL_DESCRIPTION =
+  "Start a new context window. Does not clear, reset, or otherwise affect environment state.";
+/** Codex's `NEW_CONTEXT_WINDOW_MESSAGE`, one per family. */
+const CONTEXT_COMPACTION_TOOL_REPLY: Record<CompactionStrategy, string> = {
+  fresh_window:
+    "A new context window will start without summarizing conversation history.",
+  summary:
+    "A new context window will start with a summary of the conversation history.",
+};
+
+/**
+ * Two-tier budget reminder, matching Codex's `TokenBudgetReminder` and
+ * `AutoCompactFallbackPrompt`. Codex reads both thresholds and both texts from
+ * per-model metadata; we have no such feed, so the thresholds are derived from
+ * the same hard limit the compaction guard uses and the texts are ours.
+ */
+const CONTEXT_REMINDER_MIN_TOKENS = 8_000;
+const CONTEXT_REMINDER_MAX_TOKENS = 32_000;
+const CONTEXT_REMINDER_RATIO = 0.15;
+/** Close enough to the boundary that the next turn is likely to cross it. */
+const CONTEXT_FALLBACK_REMINDER_TOKENS = 2_000;
+
+function contextBudgetReminder(remaining: number): string {
+  return [
+    "<context_budget>",
+    `About ${remaining.toLocaleString("en-US")} tokens of working context remain before this conversation is compacted.`,
+    "Start closing out: write anything durable to files, and prefer targeted reads over broad exploration.",
+    `You may call ${CONTEXT_COMPACTION_TOOL_NAME} to start the new window yourself once the current step is at a clean stopping point.`,
+    "</context_budget>",
+  ].join("\n");
+}
+
+function contextFallbackReminder(): string {
+  return [
+    "<context_budget>",
+    "The working context is at its limit: the next request compacts this conversation automatically.",
+    "Write down now, in this turn, whatever must survive — file paths, decisions, and the exact next step — because unsummarized detail will not be available afterwards.",
+    "</context_budget>",
+  ].join("\n");
+}
+
+
+/**
  * Context thresholds derived from the active model's window.
  *
  * `hardLimit` is the safety boundary: the next provider request must not be
@@ -866,6 +914,11 @@ export class DesktopAgentRuntime {
   private turnHadError = false;
   private compactionAbort?: AbortController;
   private compactionInProgress = false;
+  /** Set by the `new_context` tool, consumed at the next turn boundary. */
+  private pendingModelCompaction = false;
+  /** Codex's `claim_*` flags: one of each reminder per context window. */
+  private contextReminderClaimed = false;
+  private contextFallbackReminderClaimed = false;
   private activeToolProgressCleanups = new Set<(flush: boolean) => void>();
   private hostCloseUnsubscribe?: () => void;
 
@@ -1693,12 +1746,16 @@ export class DesktopAgentRuntime {
       this.mode === "agent" && this.subagents.length
         ? [this.buildSubagentTool()]
         : [];
+    const contextTools = this.compactionEnabled
+      ? [this.buildContextCompactionTool()]
+      : [];
     return [
       ...builtins,
       ...pluginTools,
       ...skillTools,
       ...modeTools,
       ...subagentTools,
+      ...contextTools,
     ];
   }
 
@@ -1751,12 +1808,14 @@ export class DesktopAgentRuntime {
       "Grep",
       "BrowserPreview",
       "Bash",
+      CONTEXT_COMPACTION_TOOL_NAME,
       SUBMIT_TOOL_NAMES[kind],
     ]).has(name);
   }
 
   private isCoreTool(name: string): boolean {
     return (
+      name === CONTEXT_COMPACTION_TOOL_NAME ||
       MODE_TRANSITION_TOOL_NAMES.has(name) ||
       // `Task` stays in the core set rather than the on-demand catalog: a
       // capability the model has to go looking for is one it will not use, and
@@ -2330,6 +2389,33 @@ export class DesktopAgentRuntime {
     this.agent.state.systemPrompt = this.composeSystemPrompt();
   }
 
+  /**
+   * The model side of compaction, copied from Codex: a parameterless request
+   * for a new context window. It only records the request — compaction happens
+   * at the next turn boundary, where the host already owns it, so a model that
+   * calls this mid-batch does not lose the results it is still holding.
+   */
+  private buildContextCompactionTool(): AgentTool {
+    return {
+      name: CONTEXT_COMPACTION_TOOL_NAME,
+      label: "New Context",
+      description: CONTEXT_COMPACTION_TOOL_DESCRIPTION,
+      parameters: Type.Object({}),
+      execute: async () => {
+        this.pendingModelCompaction = true;
+        return {
+          content: [
+            {
+              type: "text",
+              text: CONTEXT_COMPACTION_TOOL_REPLY[this.compactionStrategy],
+            },
+          ],
+          details: { queued: true },
+        };
+      },
+    };
+  }
+
   private emit(event: AgentEventEnvelope["event"], turnId?: string) {
     this.onEvent({
       sessionId: this.sessionId,
@@ -2454,6 +2540,7 @@ export class DesktopAgentRuntime {
 
   setCompactionSettings(settings?: ContextCompactionSettings): void {
     this.compactionEnabled = compactionEnabled(settings);
+    this.pendingModelCompaction = false;
     this.rebuildToolCatalog();
     this.agent.state.tools = this.activeTools();
   }
@@ -2619,13 +2706,25 @@ export class DesktopAgentRuntime {
     _signal?: AbortSignal,
   ): Promise<AgentLoopTurnUpdate> {
     let context = this.rebuiltAgentContext();
-    if (!this.compactionEnabled) return { context };
+    if (!this.compactionEnabled) {
+      this.pendingModelCompaction = false;
+      return { context };
+    }
 
     const budget = this.contextBudget(context.messages);
-    if (budget.tokens < budget.hardLimit) return { context };
+    const hardLimitReached = budget.tokens >= budget.hardLimit;
+    // Codex's `should_roll_over`: either the model asked for a new window or
+    // the limit forces one. A model request that fails to compact is not fatal
+    // — nothing is over the boundary yet — so only the limit throws.
+    const modelRequested = this.pendingModelCompaction;
+    this.pendingModelCompaction = false;
+    if (!hardLimitReached && !modelRequested) {
+      return { context: this.withContextBudgetReminder(context, budget) };
+    }
 
     const compacted = await this.runCompaction("threshold", false);
     if (!compacted) {
+      if (!hardLimitReached) return { context };
       // Continuing would immediately issue the provider request that this
       // guard exists to prevent. The Agent wrapper converts this failure to
       // the normal error/agent_end event sequence.
@@ -2641,6 +2740,50 @@ export class DesktopAgentRuntime {
       );
     }
     return { context };
+  }
+
+  /**
+   * Codex's two-tier `maybe_record`, as a system-prompt append for this turn
+   * only. Codex writes its reminders into conversation history; we have no
+   * channel for a synthetic message that stays out of the transcript, and the
+   * append is equivalent without persisting anything.
+   */
+  private withContextBudgetReminder(
+    context: AgentContext,
+    budget: ContextBudget,
+  ): AgentContext {
+    const remaining = Math.max(0, budget.hardLimit - budget.tokens);
+    const reminder = this.claimContextBudgetReminder(remaining, budget);
+    if (!reminder) return context;
+    return {
+      ...context,
+      systemPrompt: `${context.systemPrompt}\n\n${reminder}`,
+    };
+  }
+
+  private claimContextBudgetReminder(
+    remaining: number,
+    budget: ContextBudget,
+  ): string | undefined {
+    if (
+      remaining <= CONTEXT_FALLBACK_REMINDER_TOKENS &&
+      !this.contextFallbackReminderClaimed
+    ) {
+      this.contextFallbackReminderClaimed = true;
+      // The first tier is pointless once the second has fired.
+      this.contextReminderClaimed = true;
+      return contextFallbackReminder();
+    }
+    const threshold = Math.min(
+      CONTEXT_REMINDER_MAX_TOKENS,
+      Math.max(
+        CONTEXT_REMINDER_MIN_TOKENS,
+        Math.floor(budget.hardLimit * CONTEXT_REMINDER_RATIO),
+      ),
+    );
+    if (remaining > threshold || this.contextReminderClaimed) return undefined;
+    this.contextReminderClaimed = true;
+    return contextBudgetReminder(remaining);
   }
 
   private async runCompaction(
@@ -2835,6 +2978,10 @@ export class DesktopAgentRuntime {
     }
 
     this.activeCompaction = checkpoint;
+    // A new window means both reminders are available again, matching Codex
+    // resetting its `claim_*` flags when the context window turns over.
+    this.contextReminderClaimed = false;
+    this.contextFallbackReminderClaimed = false;
     this.agent.state.messages = buildSessionContext(
       this.entriesWithCompaction(),
     ).messages;
