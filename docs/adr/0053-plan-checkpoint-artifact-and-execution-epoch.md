@@ -23,7 +23,7 @@ host process.
 The product selector remains `Agent | Plan`, with Agent as the default and one
 pi Agent per session. Plan is the same Agent in planning state. Plan exposes
 `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`, `EnterPlanMode`, and
-`SubmitPlan` (it also exposed `CompactContext` until ADR 0060 removed that
+`SubmitPlan` (it also exposed `CompactContext` until ADR 0061 removed that
 tool); Write, Edit, plugin tools, and unknown tools
 remain host-denied. `SubmitPlan` is the only assistant tool call in its batch
 and is valid only for the active Plan turn.

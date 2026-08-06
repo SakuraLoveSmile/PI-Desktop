@@ -226,9 +226,19 @@ type ToolBudgetHealth = {
 - `session.replaceMessages` — atomic transcript rewrite (temp-file rename +
   one index transaction, D119) used by regenerate/edit flows; it preserves the
   newest checkpoint only while both its boundary and optional first-kept id
-  remain valid in the rewritten prefix
+  remain valid in the rewritten prefix, and it carries each surviving message's
+  owning `turn_id` across the rewrite. It is only safe from a caller that owns
+  the whole transcript for the duration of the call: any rewrite from a snapshot
+  taken outside the RPC lock can delete a message appended in between
 - `session.saveRevision` — archive a regenerate branch under
   `(sessionId, rootUserId)`
+- `session.saveActiveRevision` — archive the branch of the newest
+  revision-bearing user root as its active revision and stamp that root's pager
+  metadata, all under the RPC lock. The stamp rewrites one transcript line
+  instead of the file, so a concurrent `session.appendMessage` survives.
+  Returns `{ saved: null }` when the session owns no regenerate history.
+  Turn-completion callers use this instead of
+  `session.get` + `session.replaceMessages`
 - `session.listRevisions` — list linear variants for a root user family
 - `session.activateRevision` — replace live transcript with `prefix + branch`
   and stamp root pager metadata

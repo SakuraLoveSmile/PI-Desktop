@@ -26,7 +26,7 @@ subset to the provider:
   coding-agent core.
 - Chat starts with `Read`, `Glob`, and `Grep`.
 - A local `ToolSearch` tool remains active when deferred capabilities exist.
-  *(ADR 0060 removed the `CompactContext` tool that this list also kept
+  *(ADR 0061 removed the `CompactContext` tool that this list also kept
   always-active; compaction is host-driven and has no model-facing tool.)*
 - Agent-mode `Glob` and `Grep`, `BrowserPreview`, plugin tools, `Skill`, and
   plugin-development helpers are deferred until requested.

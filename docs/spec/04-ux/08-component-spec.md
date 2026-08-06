@@ -982,7 +982,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
   checkpoint, the panel adds one muted line between the provider and tool
   sections — how many times the session has compacted and the summary's
   estimated token cost — and renders nothing there otherwise. This is the only
-  place compaction is visible (D199).
+  place compaction is visible (D200).
 - Gap: 12px vertical padding between consecutive message rows (denser than
   consumer chat, closer to WorkBuddy task transcript); assistant turns add a
   little extra bottom air so a completed answer separates from the next prompt

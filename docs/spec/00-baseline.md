@@ -32,7 +32,7 @@
 > `0.4.11` adopts turn-boundary model-context checkpoint compaction through
 > D158 / ADR 0030 while preserving the complete visible transcript. The
 > context-recovery amendment in ADR 0049 adds a durable retained-tail
-> fallback for automatic compaction failures. D199 / ADR 0060 later makes
+> fallback for automatic compaction failures. D200 / ADR 0061 later makes
 > compaction imperceptible: checkpoints are pre-computed in provider-idle
 > windows, the `CompactContext` tool and soft-boundary nudge are removed, and
 > the budgets are derived from the model window instead of settings.

@@ -76,7 +76,7 @@ Plan exposes:
 - `Read`, `Glob`, `Grep`, and `BrowserPreview`;
 - `Bash`, governed by the durable permission mode;
 - `ExitPlanMode` (this list also carried `CompactContext`, removed by
-  ADR 0060).
+  ADR 0061).
 
 Plan denies `Write`, `Edit`, every plugin tool, and unknown tools, regardless of
 permission mode, session grant, manifest risk, or stale IPC state. Agent keeps

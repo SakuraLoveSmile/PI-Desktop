@@ -607,6 +607,13 @@ CREATE INDEX idx_message_revisions_root
 - Root user `meta` also stores `revisionCount` / `activeRevision` for the
   transcript pager; those fields are presentation metadata, not a second source
   of truth for branch payloads.
+- The branch that finished a turn is archived by `session.saveActiveRevision`,
+  which reads the transcript, appends the revision line, and stamps the root's
+  pager metadata inside one host call. The stamp rewrites only the root's own
+  transcript line, and the file is re-read at write time, so an assistant or
+  tool line appended by the persistence outbox in the meantime survives. A
+  whole-transcript rewrite from a snapshot taken outside the host lock would
+  delete it (ADR 0060).
 
 ### 4.10 artifacts — files a session produced
 
@@ -787,9 +794,10 @@ is the source of truth, the index is derived and self-healing.
 | turn terminal via `session.endTurn` | — | update `turns`; for completed/error insert one notification and prune to 200 in the same tx; aborted inserts none |
 | plan/goal submission | host writes the exact Markdown bytes to a new unique `<workspaceRoot>/.pi/<kind>/*.md` file | insert one `plan_approvals(pending)` row with the kind, structured title/question, artifact path/hash/size, and expiry before emitting the approval request |
 | plan/goal approval | verify the immutable artifact path/hash/size | atomically resolve `plan_approvals`, update `sessions.mode` and explicit `permission_mode`, and set `execution_state = 'queued'`; reject/expiry stay in the contract mode |
-| transcript truncate / edit (`session.replaceMessages`) | atomic transcript rewrite (temp + rename); preserve only a checkpoint whose boundary remains | single tx: delete index rows, bulk reinsert, reset `last_seq` |
+| transcript truncate / edit (`session.replaceMessages`) | atomic transcript rewrite (temp + rename); preserve only a checkpoint whose boundary remains | single tx: delete index rows, bulk reinsert carrying each surviving message's owning `turn_id`, reset `last_seq` |
 | session fork (`session.fork`) | write a new transcript with remapped message/tool-call ids; copy/remap the checkpoint only when its boundary is included | single tx: clone session configuration, insert child index rows, set `last_seq`; remove child file on failure |
 | regenerate branch save | append revision line | index row with `message_count` (+ `is_active` flip) |
+| turn-completion branch archive (`session.saveActiveRevision`) | append revision line, then rewrite only the root user's transcript line for the pager stamp | index row with `message_count` (+ `is_active` flip); index rows for other messages untouched |
 | revision switch | read branch, atomic transcript rewrite | flip `is_active`, rebuild index rows, reset `last_seq` |
 | import | write transcript file | one tx per session: session row + index rows; on failure the file is removed |
 | session delete | remove both session files after row delete | `DELETE FROM sessions` (cascades) |

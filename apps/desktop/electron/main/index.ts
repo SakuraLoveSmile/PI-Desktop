@@ -3249,70 +3249,34 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
     void (async () => {
       try {
         if (!host) return;
-        const detail = await host.call<{ session?: { messages?: any[] } }>(
-          "session.get",
-          { id: envelope.sessionId },
-        );
-        const messages = detail.session?.messages ?? [];
-        let rootIndex = -1;
-        for (let i = messages.length - 1; i >= 0; i -= 1) {
-          if (messages[i]?.role === "user" && messages[i]?.revisionCount) {
-            rootIndex = i;
-            break;
-          }
+        // The turn's final assistant message may still be in the outbox. Archive
+        // a branch that is missing it and the answer is missing from the restored
+        // branch forever, so drain first and skip the archive if the host cannot
+        // take the writes right now. The yield lets a message_end enqueued in
+        // this same event-loop turn reach the queue before it is measured.
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        for (let attempt = 0; attempt < 3 && persistenceOutbox.size() > 0; attempt += 1) {
+          await persistenceOutbox.flush(() => host);
         }
-        if (rootIndex < 0) return;
-        const root = messages[rootIndex];
-        const branch = messages.slice(rootIndex);
-        const stableRootUserId =
-          typeof root.revisionRootId === "string" && root.revisionRootId
-            ? root.revisionRootId
-            : root.id;
-        const listedBefore = await host.call<{
-          revisions?: Array<{ revisionIndex: number; isActive?: boolean }>
-        }>("session.listRevisions", {
-          sessionId: envelope.sessionId,
-          rootUserId: stableRootUserId,
-        });
-        const existing = listedBefore.revisions ?? [];
-        const desiredActive = Number(root.activeRevision ?? 0);
-        const alreadyPresent = existing.some((revision) => revision.revisionIndex === desiredActive);
-        let active = desiredActive || existing.length + 1;
-        if (!alreadyPresent) {
-          const saved = await host.call<{ revision?: { revisionIndex?: number } }>(
-            "session.saveRevision",
-            {
-              sessionId: envelope.sessionId,
-              rootUserId: stableRootUserId,
-              messages: branch,
-              makeActive: true,
-            },
-          );
-          active = Number(saved.revision?.revisionIndex ?? active) || active;
+        if (persistenceOutbox.size() > 0) {
+          logger.app("persistence", "warn", "skipped regenerate branch archive", {
+            sessionId: envelope.sessionId,
+            data: { pending: persistenceOutbox.size() },
+          });
+          return;
         }
-        const listed = await host.call<{ revisions?: Array<{ revisionIndex: number }> }>(
-          "session.listRevisions",
-          { sessionId: envelope.sessionId, rootUserId: stableRootUserId },
-        );
-        const total = listed.revisions?.length ?? Number(root.revisionCount ?? 1);
-        if (!active || active < 1) active = total;
-        const stamped = {
-          ...root,
-          revisionRootId: stableRootUserId,
-          revisionCount: total,
-          activeRevision: active,
-        };
-        const nextMessages = messages.map((message: any, index: number) =>
-          index === rootIndex ? stamped : message,
-        );
-        await host.call("session.replaceMessages", {
-          sessionId: envelope.sessionId,
-          messages: nextMessages,
-        });
+        // One host call does the read, the archive and the pager stamp under the
+        // RPC lock. The read-modify-write this replaced raced the append above
+        // and wrote a stale transcript back over the final message.
+        const saved = await host.call<{
+          saved?: { root?: any } | null
+        }>("session.saveActiveRevision", { sessionId: envelope.sessionId });
+        const root = saved.saved?.root;
+        if (!root) return;
         sendToRenderer(IPC.event.agentMessage, {
           sessionId: envelope.sessionId,
           ts: Date.now(),
-          event: { type: "message_end", message: stamped },
+          event: { type: "message_end", message: root },
         } satisfies AgentEventEnvelope);
       } catch (error) {
         logger.app("persistence", "warn", "save active regenerate branch failed", {

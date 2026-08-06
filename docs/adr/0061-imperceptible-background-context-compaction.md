@@ -1,4 +1,4 @@
-# ADR 0060: Imperceptible background context compaction
+# ADR 0061: Imperceptible background context compaction
 
 - Status: Accepted
 - Date: 2026-08-06
@@ -171,5 +171,5 @@ thinks to ask it.
 - `docs/spec/03-runtime/03-tools-and-permissions.md`
 - `docs/spec/04-ux/06-settings-ia.md`
 - `docs/spec/06-delivery/04-e2e-test-plan.md`
-- `docs/spec/08-meta/decisions-log.md` (D158, D199)
+- `docs/spec/08-meta/decisions-log.md` (D158, D200)
 - `codex-rs/core/src/session/context_window.rs` (behavioral reference)

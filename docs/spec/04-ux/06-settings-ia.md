@@ -53,7 +53,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   choice later becomes unavailable, the first available platform shell is used
   and the fallback state is shown. A Bash turn verifies its pinned ID/dialect
   before execution.
-- Context management has **no card and no controls** (D199 / ADR 0060).
+- Context management has **no card and no controls** (D200 / ADR 0061).
   Automatic protection is always on, its budgets are derived from the active
   model's window, and compaction is imperceptible, so there is nothing to
   configure. Settings search indexes no compaction keys. Manual `/compact`

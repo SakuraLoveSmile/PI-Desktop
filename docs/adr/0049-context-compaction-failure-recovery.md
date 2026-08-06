@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-04
 - Amends: ADR 0030 / D158
-- Amended by: ADR 0060 (the fallback stays reserved for the blocking hard
+- Amended by: ADR 0061 (the fallback stays reserved for the blocking hard
   boundary; a failed background build is discarded silently)
 
 ## Context

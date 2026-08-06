@@ -141,7 +141,7 @@ action. No empty assistant message is persisted in either case.
 
 Decision D193; see E2E-098.
 
-### 5.1 Context checkpoint protection (D158/D199, ADR 0030/0049/0060)
+### 5.1 Context checkpoint protection (D158/D200, ADR 0030/0049/0061)
 
 The complete visible transcript and the model context are separate views of
 the same session. A durable checkpoint summarizes older model context while
