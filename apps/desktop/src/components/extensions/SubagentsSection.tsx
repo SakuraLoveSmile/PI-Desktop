@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  DEFAULT_SUBAGENT_MAX_TURNS,
   activationState,
   isSubagentMutatingTool,
   subagentModelKey,
@@ -270,7 +271,8 @@ export function SubagentsSection({
                 const state = activationState(record);
                 const menuOpen = rowMenu === record.id;
                 const shadowed = claimedByProject.has(record.name);
-                const inactive = !effectiveNames.has(record.name);
+                const inactive =
+                  state !== "off" && !effectiveNames.has(record.name);
                 const oversized = record.sizeBytes > MAX_SUBAGENT_BYTES;
                 return (
                   <div
@@ -311,7 +313,7 @@ export function SubagentsSection({
                         {toolChips(record.tools)}
                         <span>
                           {t("extensions.subagents.turns", {
-                            turns: record.maxTurns ?? 0,
+                            turns: record.maxTurns ?? DEFAULT_SUBAGENT_MAX_TURNS,
                           })}
                         </span>
                         {record.model ? <span>{record.model}</span> : null}
@@ -431,7 +433,7 @@ export function SubagentsSection({
                     <div
                       key={key}
                       role="listitem"
-                      className={cx("ext-row", menuOpen && "menu-open")}
+                      className={cx("ext-row", "is-provided", menuOpen && "menu-open")}
                     >
                       <span className="ext-row-glyph" aria-hidden>
                         {definition.source === "builtin" ? (

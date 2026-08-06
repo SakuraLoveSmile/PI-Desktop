@@ -3503,11 +3503,14 @@ Each scenario is documented in this format:
   `08-meta/decisions-log.md` (D192, D201, D202), ADR 0062, ADR 0063
 - **Acceptance**: E (tools & permissions), F (persistence), Quality
 - **Milestone**: M6
-- **Status**: Unit-covered (host-core `user_subagents` tests,
-  `packages/agent-runtime` subagent definition tests,
+- **Status**: Partly automated (`scripts/e2e-subagents.mjs` — the registry over
+  real host-core RPC, then its documents through the real loader: scope
+  filtering both ways, the 16 cap, project > user > builtin precedence, and a
+  malformed document degrading to a diagnostic) plus unit coverage (host-core
+  `user_subagents` tests, `packages/agent-runtime` subagent definition tests,
   `apps/desktop/test/extensions-page.test.mjs`,
-  `apps/desktop/test/subagent-wiring.test.mjs`); full UI journey Draft
-  (do not run E2E locally unless explicitly requested)
+  `apps/desktop/test/subagent-wiring.test.mjs`); the UI journey through `Task`
+  stays Draft (do not run E2E locally unless explicitly requested)
 
 ## 8. Traceability Matrix
 

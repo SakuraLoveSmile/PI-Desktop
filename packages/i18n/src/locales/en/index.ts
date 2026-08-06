@@ -828,7 +828,7 @@ export const en = {
   },
   plugins: {
     title: "Extensions",
-    subtitle: "Plugins, MCP servers, and skills — everything you add to the app, on everywhere or only in the projects you pick.",
+    subtitle: "Plugins, MCP servers, skills, and subagents — everything you add to the app, on everywhere or only in the projects you pick.",
     loadDev: "Load local plugin",
     loadDevDone: "Local plugin loaded",
     installPackage: "Install package",
