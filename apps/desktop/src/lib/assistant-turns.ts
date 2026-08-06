@@ -1,4 +1,8 @@
-import type { MessageUsage, UiMessage } from "@pi-desktop/shared";
+import type {
+  ContextCompactionMark,
+  MessageUsage,
+  UiMessage,
+} from "@pi-desktop/shared";
 
 export type AssistantActivityItem =
   | { kind: "thinking"; message: UiMessage }
@@ -46,6 +50,7 @@ export type AssistantTurnEntry = {
 
 export type TranscriptEntry =
   | { kind: "message"; message: UiMessage }
+  | { kind: "compaction"; mark: ContextCompactionMark }
   | AssistantTurnEntry;
 
 export function messageThinking(message: UiMessage): string {
@@ -95,8 +100,16 @@ function collectSubagentRuns(
  * Group provider-level assistant fragments and tool rows into user-level turns.
  * Providers end an assistant message before each tool call, but that transport
  * boundary is not a separate conversational response.
+ *
+ * `compactions` (oldest first) each produce a divider row right after the
+ * message they cover, mirroring how the runtime splices its checkpoint entry
+ * after the same anchor. A mark whose anchor is no longer in the transcript —
+ * rewritten, forked away — has nowhere to sit and is dropped.
  */
-export function buildTranscriptEntries(messages: UiMessage[]): {
+export function buildTranscriptEntries(
+  messages: UiMessage[],
+  compactions: readonly ContextCompactionMark[] = [],
+): {
   entries: TranscriptEntry[];
   visible: UiMessage[];
 } {
@@ -106,6 +119,12 @@ export function buildTranscriptEntries(messages: UiMessage[]): {
   const visible = messages.filter(
     (message) => !message.parentToolCallId && isVisibleMessage(message),
   );
+  const anchored = new Map<string, ContextCompactionMark[]>();
+  for (const mark of compactions) {
+    const marks = anchored.get(mark.throughMessageId);
+    if (marks) marks.push(mark);
+    else anchored.set(mark.throughMessageId, [mark]);
+  }
   const entries: TranscriptEntry[] = [];
   let turn: AssistantTurnEntry | undefined;
 
@@ -127,11 +146,11 @@ export function buildTranscriptEntries(messages: UiMessage[]): {
     else current.parts.push({ kind: "activity", items: [item] });
   };
 
-  for (const message of visible) {
+  const appendMessage = (message: UiMessage) => {
     if (message.role === "user" || message.role === "system") {
       turn = undefined;
       entries.push({ kind: "message", message });
-      continue;
+      return;
     }
 
     if (message.role === "tool") {
@@ -143,7 +162,7 @@ export function buildTranscriptEntries(messages: UiMessage[]): {
         message,
         ...(delegate ? { delegate } : {}),
       });
-      continue;
+      return;
     }
 
     const current = ensureTurn(message);
@@ -155,6 +174,16 @@ export function buildTranscriptEntries(messages: UiMessage[]): {
         current.anchorId = message.id;
       }
     }
+  };
+
+  for (const message of visible) {
+    appendMessage(message);
+    const marks = anchored.get(message.id);
+    if (!marks) continue;
+    // The row is a divider, so whatever turn it lands inside ends there and the
+    // next assistant fragment opens a new one.
+    turn = undefined;
+    for (const mark of marks) entries.push({ kind: "compaction", mark });
   }
 
   for (const entry of entries) {

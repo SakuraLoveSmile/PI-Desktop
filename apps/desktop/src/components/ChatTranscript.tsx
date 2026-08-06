@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type {
+  ContextCompactionMark,
   MessageUsage,
   PlanningState,
   ProposalKind,
@@ -154,11 +155,11 @@ function ContextUsageInspector({
 }) {
   const { t } = useTranslation();
   const tooltipId = useId();
-  // Compaction is silent everywhere else, so the inspector is where a user can
-  // find out that older turns are now represented by a summary.
+  // The transcript shows one row per compaction; the inspector adds what those
+  // rows cannot — how much of the model context the newest summary occupies.
   const compaction = useAppStore((state) =>
     state.activeSessionId
-      ? state.sessionCompactions[state.activeSessionId]
+      ? state.sessionCompactions[state.activeSessionId]?.at(-1)
       : undefined,
   );
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -1616,6 +1617,29 @@ const AssistantTurn = memo(function AssistantTurn({
   );
 }, assistantTurnPropsEqual);
 
+/**
+ * The transcript trace of one compaction, matching Codex's `ContextCompaction`
+ * turn item: a divider that says the earlier turns above it are now a summary.
+ * It carries no actions — nothing about a persisted checkpoint is undoable.
+ */
+function CompactionRow({ mark }: { mark: ContextCompactionMark }) {
+  const { t } = useTranslation();
+  return (
+    <div className="transcript-compaction-row" role="separator">
+      <span className="transcript-compaction-label">
+        {t("chat.compactionRow", { times: mark.generation })}
+      </span>
+      <span className="transcript-compaction-detail">
+        {mark.summarized
+          ? t("chat.compactionRowSummary", {
+              tokens: formatTokenCount(mark.summaryTokens),
+            })
+          : t("chat.compactionRowNoSummary")}
+      </span>
+    </div>
+  );
+}
+
 
 export const ChatTranscript = memo(function ChatTranscript({
   sessionId,
@@ -1650,6 +1674,9 @@ export const ChatTranscript = memo(function ChatTranscript({
         state.sessions.find((session) => session.id === sessionId)?.mode ??
           "agent",
       ) ?? "plan",
+  );
+  const compactions = useAppStore((state) =>
+    sessionId ? state.sessionCompactions[sessionId] : undefined,
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -1743,8 +1770,8 @@ export const ChatTranscript = memo(function ChatTranscript({
   }, [scheduleFollowScroll]);
 
   const { entries, visible } = useMemo(
-    () => buildTranscriptEntries(messages),
-    [messages],
+    () => buildTranscriptEntries(messages, compactions),
+    [messages, compactions],
   );
   const lastEntry = entries[entries.length - 1];
   const lastTurnPart =
@@ -1777,21 +1804,27 @@ export const ChatTranscript = memo(function ChatTranscript({
         aria-live="polite"
       >
         <div className="thread-content" ref={contentRef}>
-          {entries.map((entry, index) =>
-            entry.kind === "assistant-turn" ? (
-              <AssistantTurn
-                key={entry.id}
-                entry={entry}
-                isActive={isRunning && index === entries.length - 1}
-              />
-            ) : (
+          {entries.map((entry, index) => {
+            if (entry.kind === "assistant-turn") {
+              return (
+                <AssistantTurn
+                  key={entry.id}
+                  entry={entry}
+                  isActive={isRunning && index === entries.length - 1}
+                />
+              );
+            }
+            if (entry.kind === "compaction") {
+              return <CompactionRow key={entry.mark.id} mark={entry.mark} />;
+            }
+            return (
               <MessageRow
                 key={entry.message.id}
                 message={entry.message}
                 isRunning={isRunning}
               />
-            ),
-          )}
+            );
+          })}
           <TurnOutcomeCard
             messages={messages}
             result={latestTurnResult}

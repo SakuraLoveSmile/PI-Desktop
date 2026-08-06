@@ -1112,6 +1112,29 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* One transcript row per compaction: a quiet rule the eye can skip, with the
+ * label riding on it. Same muted/subtle pairing as the inspector's row. */
+.transcript-compaction-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.transcript-compaction-row::before,
+.transcript-compaction-row::after {
+  flex: 1;
+  border-top: 1px solid var(--ds-border-subtle);
+  content: "";
+}
+
+.transcript-compaction-detail {
+  color: var(--ds-text-secondary);
+}
+
 .context-inspector-tool-list {
   display: grid;
   gap: 0;

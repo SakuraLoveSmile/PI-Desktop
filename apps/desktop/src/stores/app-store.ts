@@ -6,8 +6,8 @@ import type {
   AppNotification,
   AppSettings,
   AppVersionInfo,
+  ContextCompactionMark,
   ContextCompactionRecord,
-  ContextCompactionStatus,
   ModelInfo,
   OnboardingState,
   Mode,
@@ -28,7 +28,7 @@ import type {
   UiMessage,
 } from "@pi-desktop/shared";
 import {
-  contextCompactionStatus,
+  contextCompactionMark,
   ErrorCodes as SharedErrorCodes,
   highestSupportedThinkingLevel,
   modeForProposalKind,
@@ -333,10 +333,10 @@ export type AppState = {
   /** Latest terminal outcome per session for compact sidebar feedback. */
   sessionOutcomes: Record<string, SidebarSessionOutcome>;
   /**
-   * Installed context checkpoint per session. Compaction is otherwise silent,
-   * so this feeds the only place it is visible: the context inspector.
+   * Every checkpoint a session has installed, oldest first. The transcript
+   * renders one divider row each and the context inspector reads the last one.
    */
-  sessionCompactions: Record<string, ContextCompactionStatus>;
+  sessionCompactions: Record<string, ContextCompactionMark[]>;
   providers: ProviderPublic[];
   /** Discovered model lists per provider id (composer model menu). */
   providerModels: Record<string, ModelInfo[]>;
@@ -617,20 +617,38 @@ function persistCurrentSidebar(getState: () => AppState): void {
 }
 
 /**
- * Record (or clear) what the context inspector shows for a session. A session
- * loaded without a checkpoint drops its entry so a forked or rewritten
- * transcript never keeps showing its ancestor's compaction count.
+ * Record (or clear) the compaction rows a session shows. A session loaded
+ * without a checkpoint drops its entry so a forked or rewritten transcript
+ * never keeps showing its ancestor's compactions.
  */
-function rememberSessionCompaction(
+function rememberSessionCompactions(
   sessionId: string,
-  record: ContextCompactionRecord | undefined,
+  session:
+    | {
+        compaction?: ContextCompactionRecord;
+        compactions?: ContextCompactionRecord[];
+      }
+    | null
+    | undefined,
 ): void {
-  const status = contextCompactionStatus(record);
+  const records =
+    session?.compactions ??
+    (session?.compaction ? [session.compaction] : []);
+  const marks = records.map(contextCompactionMark);
   useAppStore.setState((state) => ({
-    sessionCompactions: status
-      ? { ...state.sessionCompactions, [sessionId]: status }
-      : withoutRecordKey(state.sessionCompactions, sessionId),
+    sessionCompactions:
+      marks.length > 0
+        ? { ...state.sessionCompactions, [sessionId]: marks }
+        : withoutRecordKey(state.sessionCompactions, sessionId),
   }));
+}
+
+/** Append a freshly installed checkpoint, or replace a retried one by id. */
+function withCompactionMark(
+  marks: ContextCompactionMark[] | undefined,
+  mark: ContextCompactionMark,
+): ContextCompactionMark[] {
+  return [...(marks ?? []).filter((existing) => existing.id !== mark.id), mark];
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -1035,7 +1053,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       detail ??= await detailPromise;
       if (!navigationIntentIsCurrent(intent)) return;
       commitSelection(detail.session?.messages ?? [], false);
-      rememberSessionCompaction(id, detail.session?.compaction);
+      rememberSessionCompactions(id, detail.session);
       void get().restorePendingPlan(id);
       void get().acknowledgeSessionOutcome(id);
     } finally {
@@ -1210,7 +1228,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         navIndex: nextStack.length - 1,
       };
     });
-    rememberSessionCompaction(summary.id, result.session.compaction);
+    rememberSessionCompactions(summary.id, result.session);
     void get().restorePendingPlan(summary.id);
   },
 
@@ -1257,7 +1275,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           errorCode: null,
         };
       });
-      rememberSessionCompaction(summary.id, result.session.compaction);
+      rememberSessionCompactions(summary.id, result.session);
       void get().restorePendingPlan(summary.id);
     } catch (error) {
       set({
@@ -2551,13 +2569,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
     // A checkpoint installs on whichever session produced it, active or not,
-    // and its inspector state must survive until that session is next opened.
-    if (event.type === "compaction_end" && event.ok && event.status) {
-      const status = event.status;
+    // and its rows must survive until that session is next opened.
+    if (event.type === "compaction_end" && event.ok && event.mark) {
+      const mark = event.mark;
       set((state) => ({
         sessionCompactions: {
           ...state.sessionCompactions,
-          [envelope.sessionId]: status,
+          [envelope.sessionId]: withCompactionMark(
+            state.sessionCompactions[envelope.sessionId],
+            mark,
+          ),
         },
       }));
     }
@@ -2589,10 +2610,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       case "compaction_end":
         if (event.reason === "manual") set({ isRunning: false });
         if (event.ok) {
-          // Automatic compaction is silent: it happens on its own schedule and
-          // announcing it would interrupt a long session for nothing. What is
-          // left announces something the user already saw — a degraded
-          // checkpoint, a request that overflowed, or a command they ran.
+          // Codex warns after every compaction, and so do we: each one drops
+          // earlier detail, and the user is the only one who can decide to
+          // start a fresh session instead. The other three toasts stay because
+          // each says something more specific — a degraded checkpoint, a
+          // request that overflowed, or a command they ran.
+          get().showToast(i18n.t("contextCompaction.longThreadWarning"), {
+            variant: "warning",
+          });
           if (event.fallback) {
             get().showToast(i18n.t("contextCompaction.recovered"), {
               variant: "warning",

@@ -61,7 +61,7 @@ import type {
 } from "@pi-desktop/shared";
 import {
   checkpointGeneration,
-  contextCompactionStatus,
+  contextCompactionMark,
   isCommandShellOption,
   isToolsOutputParams,
   MAX_SUBAGENT_CONCURRENCY,
@@ -2993,7 +2993,7 @@ export class DesktopAgentRuntime {
       firstKeptMessageId: checkpoint.firstKeptMessageId,
       willRetry,
       ...(fallback ? { fallback } : {}),
-      status: contextCompactionStatus(checkpoint),
+      mark: contextCompactionMark(checkpoint),
     });
     return "persisted";
   }

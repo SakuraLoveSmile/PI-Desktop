@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
@@ -17,6 +18,8 @@ const [
   hostSessions,
   hostTranscripts,
   transcript,
+  turns,
+  styles,
   enLocale,
 ] = await Promise.all([
   read("../../../packages/shared/src/protocol.ts"),
@@ -31,6 +34,8 @@ const [
   read("../../../crates/host-core/src/sessions.rs"),
   read("../../../crates/host-core/src/transcripts.rs"),
   read("../src/components/ChatTranscript.tsx"),
+  read("../src/lib/assistant-turns.ts"),
+  loadStyles(),
   read("../../../packages/i18n/src/locales/en/index.ts"),
 ]);
 
@@ -185,13 +190,17 @@ test("compaction lifecycle keeps the renderer busy until its actual terminal eve
   assert.match(store, /contextCompaction\.recovered/);
 });
 
-test("a successful automatic compaction notifies nobody", () => {
+test("every compaction announces itself once, on top of the specific toasts", () => {
   const compactionEnd =
     store.match(/case "compaction_end":[\s\S]*?\n      case "agent_end":/)?.[0] ??
     "";
   assert.ok(compactionEnd.length > 0, "compaction_end handler not found");
-  // Only three toasts survive, and each follows something the user already saw:
-  // a degraded checkpoint, the request that overflowed, and a manual command.
+  // Codex warns after every compaction; ours is unconditional and lands before
+  // the three that describe something more specific.
+  assert.match(
+    compactionEnd,
+    /if \(event\.ok\) \{[\s\S]*?get\(\)\.showToast\(i18n\.t\("contextCompaction\.longThreadWarning"\), \{\s*variant: "warning",\s*\}\);/,
+  );
   assert.match(
     compactionEnd,
     /if \(event\.fallback\) \{\s*get\(\)\.showToast\(i18n\.t\("contextCompaction\.recovered"\)/,
@@ -204,34 +213,42 @@ test("a successful automatic compaction notifies nobody", () => {
     compactionEnd,
     /else if \(event\.reason === "manual"\) \{\s*get\(\)\.showToast\(i18n\.t\("contextCompaction\.completed"\)/,
   );
-  // A threshold compaction reaches no showToast call of its own.
   assert.equal(
     compactionEnd.match(/showToast/g)?.length,
-    4,
+    5,
     "unexpected number of compaction toasts",
   );
+  assert.match(enLocale, /longThreadWarning:/);
 });
 
-test("the context inspector is the only place a checkpoint is visible", () => {
-  assert.match(types, /type ContextCompactionStatus/);
-  assert.match(types, /status\?: ContextCompactionStatus/);
-  // The generation counter rides inside the opaque details value, so the host
-  // persists it without a record schema change.
+test("the transcript shows one row per compaction, the inspector the newest", () => {
+  assert.match(types, /type ContextCompactionMark = ContextCompactionStatus & \{/);
+  assert.match(types, /mark\?: ContextCompactionMark/);
+  // The generation counter and the family both ride inside the opaque details
+  // value, so the host persists them without a record schema change.
   assert.match(runtime, /checkpointDetailsWithGeneration/);
-  assert.match(runtime, /status: contextCompactionStatus\(checkpoint\)/);
-  // Both the durable record and the live event feed the same store map.
-  assert.match(store, /sessionCompactions: Record<string, ContextCompactionStatus>/);
-  assert.match(
-    store,
-    /rememberSessionCompaction\(id, detail\.session\?\.compaction\)/,
-  );
-  assert.match(
-    store,
-    /event\.type === "compaction_end" && event\.ok && event\.status/,
-  );
+  assert.match(runtime, /mark: contextCompactionMark\(checkpoint\)/);
+  // Both the durable records and the live event feed the same per-session list.
+  assert.match(store, /sessionCompactions: Record<string, ContextCompactionMark\[\]>/);
+  assert.match(store, /rememberSessionCompactions\(id, detail\.session\)/);
+  assert.match(store, /event\.type === "compaction_end" && event\.ok && event\.mark/);
+  assert.match(store, /withCompactionMark\(/);
   assert.match(store, /withoutRecordKey\(state\.sessionCompactions, id\)/);
-  assert.match(transcript, /state\.sessionCompactions\[state\.activeSessionId\]/);
+  // One transcript row each, anchored on the message the checkpoint covers.
+  assert.match(turns, /\{ kind: "compaction"; mark: ContextCompactionMark \}/);
+  assert.match(turns, /anchored\.get\(message\.id\)/);
+  assert.match(transcript, /function CompactionRow\(\{ mark \}/);
+  assert.match(transcript, /chat\.compactionRow/);
+  assert.match(transcript, /mark\.summarized/);
+  assert.match(transcript, /chat\.compactionRowNoSummary/);
+  assert.match(styles, /\.transcript-compaction-row \{/);
+  // The inspector keeps its own line, now fed by the newest row.
+  assert.match(
+    transcript,
+    /state\.sessionCompactions\[state\.activeSessionId\]\?\.at\(-1\)/,
+  );
   assert.match(transcript, /chat\.usageCompaction/);
   assert.match(enLocale, /usageCompaction:/);
+  assert.match(enLocale, /compactionRow:/);
 });
 

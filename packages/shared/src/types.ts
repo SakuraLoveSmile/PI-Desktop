@@ -327,15 +327,28 @@ export type ContextCompactionRecord = {
   createdAt: string;
 };
 
-/**
- * What the context inspector shows about the installed checkpoint. Compaction
- * is otherwise invisible, so this is the only trace a user can inspect.
- */
+/** What the context inspector shows about the installed checkpoint. */
 export type ContextCompactionStatus = {
   /** How many checkpoints this session has installed, oldest counted as 1. */
   generation: number;
   /** Estimated tokens the summary itself occupies in the model context. */
   summaryTokens: number;
+};
+
+/**
+ * One compaction, as the transcript renders it — Codex emits a
+ * `ContextCompaction` turn item per compaction and this is its equivalent.
+ *
+ * Both the durable record and the live `compaction_end` event carry a mark
+ * rather than the record itself: a record holds the whole summary and retained
+ * tail, which is far too much payload for a stream event.
+ */
+export type ContextCompactionMark = ContextCompactionStatus & {
+  id: string;
+  /** Last message the checkpoint covers; the row renders right after it. */
+  throughMessageId: string;
+  /** False when the window rolled over without asking for a summary. */
+  summarized: boolean;
 };
 
 export type ContextCompactionReason = "manual" | "threshold" | "overflow";
@@ -453,8 +466,9 @@ export type AgentEvent =
       firstKeptMessageId?: string;
       willRetry: boolean;
       fallback?: ContextCompactionFallback;
-      /** Present when a checkpoint was installed, for the context inspector. */
-      status?: ContextCompactionStatus;
+      /** Present when a checkpoint was installed: it feeds the transcript row
+       * and the context inspector. */
+      mark?: ContextCompactionMark;
       error?: { code: string; message: string };
     }
   | { type: "error"; error: AppError }

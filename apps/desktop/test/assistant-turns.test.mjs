@@ -168,6 +168,81 @@ test("a delegate turn with both reasoning and text keeps both rows", () => {
   );
 });
 
+function mark(id, throughMessageId, overrides = {}) {
+  return {
+    id,
+    throughMessageId,
+    generation: 1,
+    summaryTokens: 900,
+    summarized: true,
+    ...overrides,
+  };
+}
+
+test("a compaction row divides the transcript right after the message it covers", () => {
+  const { entries } = buildTranscriptEntries(
+    [
+      message("user-1", "user", "First"),
+      message("assistant-1", "assistant", "First response"),
+      message("user-2", "user", "Second"),
+      message("assistant-2", "assistant", "Second response"),
+    ],
+    [mark("cp-1", "assistant-1")],
+  );
+
+  assert.deepEqual(
+    entries.map((entry) => entry.kind),
+    ["message", "assistant-turn", "compaction", "message", "assistant-turn"],
+  );
+  assert.equal(entries[2].mark.id, "cp-1");
+});
+
+test("a compaction row ends the assistant turn it lands inside", () => {
+  // The runtime splices its checkpoint after the anchor entry, so a later
+  // fragment of the same provider turn belongs to a new visual turn here too.
+  const { entries } = buildTranscriptEntries(
+    [
+      message("user", "user", "Work"),
+      message("before", "assistant", "Reading"),
+      message("tool", "tool", "result", { toolName: "Read", toolCallId: "t" }),
+      message("after", "assistant", "Done"),
+    ],
+    [mark("cp-1", "tool")],
+  );
+
+  assert.deepEqual(
+    entries.map((entry) => entry.kind),
+    ["message", "assistant-turn", "compaction", "assistant-turn"],
+  );
+  assert.equal(entries[3].id, "after");
+});
+
+test("every checkpoint gets its own row, and an orphaned one gets none", () => {
+  const { entries } = buildTranscriptEntries(
+    [
+      message("user-1", "user", "First"),
+      message("user-2", "user", "Second"),
+    ],
+    [
+      mark("cp-1", "user-1"),
+      mark("cp-2", "user-2", { generation: 2, summarized: false }),
+      // Its anchor was rewritten away, so this checkpoint has nowhere to sit.
+      mark("cp-3", "gone"),
+    ],
+  );
+
+  assert.deepEqual(
+    entries.map((entry) => entry.kind),
+    ["message", "compaction", "message", "compaction"],
+  );
+  assert.deepEqual(
+    entries
+      .filter((entry) => entry.kind === "compaction")
+      .map((entry) => entry.mark.id),
+    ["cp-1", "cp-2"],
+  );
+});
+
 test("delegate runs compare by rows so memoized groups still update", () => {
   const rowA = message("a", "tool", "one", { toolCallId: "a" });
   const rowB = message("b", "tool", "two", { toolCallId: "b" });
