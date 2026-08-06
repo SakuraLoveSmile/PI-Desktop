@@ -4,6 +4,7 @@ import {
   DesktopAgentRuntime,
   PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
   looksLikePseudoToolCall,
+  type CompactionStrategy,
   type PluginToolDef,
   type RuntimeMatchConfig,
   type RuntimeProviderConfig,
@@ -89,6 +90,7 @@ function createRuntime(
     history: UiMessage[];
     compaction: ContextCompactionRecord;
     compactionSettings: ContextCompactionSettings;
+    compactionStrategy: CompactionStrategy;
     projectPath: string;
     scratchDir: string;
     projectInstructions: import("./project-instructions.js").ProjectInstructions;
@@ -113,6 +115,7 @@ function createRuntime(
     history: overrides.history,
     compaction: overrides.compaction,
     compactionSettings: overrides.compactionSettings,
+    compactionStrategy: overrides.compactionStrategy,
     projectPath: overrides.projectPath,
     scratchDir: overrides.scratchDir,
     pluginTools: overrides.pluginTools,
@@ -3052,10 +3055,7 @@ describe("DesktopAgentRuntime inline context compaction", () => {
   };
   const SUMMARY = "Older work was summarized.";
 
-  /**
-   * Past the hard boundary. The tiny retained tail is what leaves history for
-   * the summary to consume.
-   */
+  /** Past the hard boundary, so the next turn cannot be issued as-is. */
   function overBudget(tokens = 240_000) {
     return {
       tokens,
@@ -3197,6 +3197,73 @@ describe("DesktopAgentRuntime inline context compaction", () => {
     await (runtime as any).prepareNextTurn(nextTurn);
 
     expect(generateCompaction).not.toHaveBeenCalled();
+    await runtime.dispose();
+  });
+
+  it("rolls the context over without a summary request in the fresh-window family", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const onEvent = vi.fn();
+    const runtime = createRuntime({
+      host,
+      onEvent,
+      history,
+      compactionStrategy: "fresh_window",
+    });
+    vi.spyOn(runtime as any, "contextBudget").mockImplementation(
+      ((messages: unknown) =>
+        JSON.stringify(messages).includes("context rollover")
+          ? { ...overBudget(), tokens: 40_000 }
+          : overBudget()) as never,
+    );
+    const generateCompaction = vi.spyOn(runtime as any, "generateCompaction");
+
+    await (runtime as any).prepareNextTurn(nextTurn);
+
+    // The point of this family: the window is bought back without paying for a
+    // summary, so no provider request is made at all.
+    expect(generateCompaction).not.toHaveBeenCalled();
+    const compaction = host.call.mock.calls.find(
+      ([method]) => method === "session.appendCompaction",
+    )?.[1].compaction;
+    expect(compaction.summary).toContain("[context rollover:");
+    expect(compaction.retainedTail).toEqual([]);
+    expect(compaction.usage).toBeUndefined();
+    expect(compaction.details).toMatchObject({
+      strategy: "fresh_window",
+      generation: 1,
+    });
+    // Nothing but the rollover notice survives, matching Codex clearing history.
+    expect(
+      buildSessionContext((runtime as any).entriesWithCompaction()).messages.map(
+        (message: any) => message.role,
+      ),
+    ).toEqual(["compactionSummary"]);
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "compaction_end",
+        reason: "threshold",
+        ok: true,
+      }),
+    );
+    await runtime.dispose();
+  });
+
+  it("stamps the summary family on its checkpoint too", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const runtime = createRuntime({ host, history });
+    budgetSpy(runtime);
+    vi.spyOn(runtime as any, "generateCompaction").mockResolvedValue(
+      summaryResult(),
+    );
+
+    await (runtime as any).prepareNextTurn(nextTurn);
+
+    expect(
+      host.call.mock.calls.find(
+        ([method]) => method === "session.appendCompaction",
+      )?.[1].compaction.details,
+    ).toMatchObject({ strategy: "summary" });
     await runtime.dispose();
   });
 });

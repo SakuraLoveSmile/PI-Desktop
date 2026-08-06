@@ -268,6 +268,38 @@ function compactionEnabled(value?: Partial<ContextCompactionSettings>): boolean 
 }
 
 /**
+ * The two compaction families Codex has. `summary` spends a model request on a
+ * structured summary of the boundary range; `fresh_window` rolls the context
+ * over without summarizing it, the way Codex's token-budget compaction calls
+ * `start_new_context_window()`.
+ *
+ * This is not a user-facing setting — Codex does not expose it either, and a
+ * user cannot judge the trade-off from the UI. It exists so the no-summary
+ * family is implemented and reachable, not configurable.
+ */
+export type CompactionStrategy = "summary" | "fresh_window";
+
+function resolveCompactionStrategy(
+  option?: CompactionStrategy,
+): CompactionStrategy {
+  if (option) return option;
+  return process.env.PI_DESKTOP_COMPACTION_STRATEGY === "fresh_window"
+    ? "fresh_window"
+    : "summary";
+}
+
+/**
+ * Stands in for the summary a rollover deliberately does not generate. The
+ * host rejects an empty checkpoint summary, and a silent placeholder would
+ * leave the model guessing why its context changed, so the rollover says so.
+ */
+const CONTEXT_ROLLOVER_SUMMARY = [
+  "[context rollover: a new context window was started without summarizing conversation history]",
+  "Earlier messages in this session are not part of this request. The complete transcript is still available to the user, and the environment is unchanged.",
+  "Ask before assuming anything about work that is not visible here.",
+].join("\n\n");
+
+/**
  * Context thresholds derived from the active model's window.
  *
  * `hardLimit` is the safety boundary: the next provider request must not be
@@ -314,6 +346,11 @@ export type AgentRuntimeOptions = {
   /** Latest host-owned checkpoint used only to rebuild model context. */
   compaction?: ContextCompactionRecord;
   compactionSettings?: ContextCompactionSettings;
+  /**
+   * Which compaction family to use. Tests set it explicitly; production reads
+   * `PI_DESKTOP_COMPACTION_STRATEGY` and otherwise summarizes.
+   */
+  compactionStrategy?: CompactionStrategy;
   /** Plugin agent tools to expose to the model this session. */
   pluginTools?: PluginToolDef[];
   /** Plugin skills advertised in the system prompt and loaded via `Skill`. */
@@ -821,6 +858,7 @@ export class DesktopAgentRuntime {
   private fullEntries: MessageEntry[];
   private activeCompaction?: ContextCompactionRecord;
   private compactionEnabled: boolean;
+  private readonly compactionStrategy: CompactionStrategy;
   private pendingUserMessageId?: string;
   private pendingOverflow = false;
   private overflowRecoveryAttempted = false;
@@ -859,6 +897,7 @@ export class DesktopAgentRuntime {
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
     this.compactionEnabled = compactionEnabled(opts.compactionSettings);
+    this.compactionStrategy = resolveCompactionStrategy(opts.compactionStrategy);
 
     this.rebuildToolCatalog();
     const model = buildProviderModel(this.provider);
@@ -2939,6 +2978,10 @@ export class DesktopAgentRuntime {
       };
     }
 
+    if (this.compactionStrategy === "fresh_window") {
+      return this.buildRolloverCheckpoint(entries, budget, preparation.value);
+    }
+
     if (this.compactionSummaryWouldExceedBudget(preparation.value, budget)) {
       return {
         ok: false,
@@ -2999,7 +3042,55 @@ export class DesktopAgentRuntime {
         throughMessageId,
         result.value.summary,
         result.value.usage,
-        result.value.details,
+        {
+          ...(isRecord(result.value.details) ? result.value.details : {}),
+          strategy: "summary" satisfies CompactionStrategy,
+        },
+      ),
+    };
+  }
+
+  /**
+   * Roll the context over without summarizing it, the way Codex's token-budget
+   * compaction does. No model request, so nothing here can fail on the provider
+   * and the ADR 0049 summary fallback has nothing to catch. The rest of the
+   * lifecycle is shared with the summary family: this still produces a durable
+   * checkpoint, a `compaction_end`, and everything the user sees.
+   */
+  private buildRolloverCheckpoint(
+    entries: SessionTreeEntry[],
+    budget: ContextBudget,
+    preparation: CompactionPreparation,
+  ): CheckpointBuild {
+    const throughMessageId = this.fullEntries.at(-1)?.id;
+    if (!throughMessageId) {
+      return {
+        ok: false,
+        entries,
+        budget,
+        preparation,
+        tokensBefore: preparation.tokensBefore,
+        message: "Compaction has no durable transcript boundary",
+        recoverable: false,
+      };
+    }
+    // Codex clears history outright. Retaining nothing is the point of this
+    // family: it buys the whole window back instead of a summary's worth.
+    const rollover: CompactionPreparation = { ...preparation, retainedTail: [] };
+    return {
+      ok: true,
+      entries,
+      budget,
+      preparation: rollover,
+      checkpoint: this.createCheckpoint(
+        rollover,
+        throughMessageId,
+        CONTEXT_ROLLOVER_SUMMARY,
+        undefined,
+        {
+          ...this.checkpointDetails(rollover),
+          strategy: "fresh_window" satisfies CompactionStrategy,
+        },
       ),
     };
   }
