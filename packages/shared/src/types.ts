@@ -317,6 +317,13 @@ export type ContextCompactionRecord = {
 
 export type ContextCompactionReason = "manual" | "threshold" | "overflow";
 export type ContextCompactionFallback = "retained_tail";
+/**
+ * Whether the compaction the event describes made the user wait. `background`
+ * checkpoints are pre-computed in a provider-idle window and installed at a
+ * turn boundary, so they must not surface as run state or notifications. An
+ * absent field means `blocking` (additive compatibility, ADR 0047).
+ */
+export type ContextCompactionPhase = "background" | "blocking";
 
 export type MessageRevisionSummary = {
   revisionIndex: number;
@@ -414,7 +421,11 @@ export type AgentEvent =
     }
   | ({ type: "planning_state" } & Omit<PlanningStateEvent, "sessionId">)
   | { type: "tool_permission_request"; request: ToolPermissionRequest }
-  | { type: "compaction_start"; reason: ContextCompactionReason }
+  | {
+      type: "compaction_start";
+      reason: ContextCompactionReason;
+      phase?: ContextCompactionPhase;
+    }
   | {
       type: "compaction_end";
       reason: ContextCompactionReason;
@@ -423,6 +434,7 @@ export type AgentEvent =
       firstKeptMessageId?: string;
       willRetry: boolean;
       fallback?: ContextCompactionFallback;
+      phase?: ContextCompactionPhase;
       error?: { code: string; message: string };
     }
   | { type: "error"; error: AppError }

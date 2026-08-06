@@ -44,6 +44,7 @@ import type {
   AgentStatus,
   ContextCompactionFallback,
   CommandShellOption,
+  ContextCompactionPhase,
   ContextCompactionReason,
   ContextCompactionRecord,
   ContextCompactionSettings,
@@ -946,6 +947,19 @@ export class DesktopAgentRuntime {
   private turnHadError = false;
   private compactionAbort?: AbortController;
   private compactionInProgress = false;
+  /**
+   * A checkpoint generated in a provider-idle window, waiting for the next turn
+   * boundary to install it. Holding it here — rather than persisting it right
+   * away — keeps the transcript untouched until a boundary where swapping the
+   * model context is safe.
+   */
+  private pendingBackgroundCheckpoint?: {
+    checkpoint: ContextCompactionRecord;
+    /** The checkpoint this one was built on top of, to detect a newer install. */
+    basedOnCheckpointId?: string;
+  };
+  private backgroundCompaction?: Promise<void>;
+  private backgroundAbort?: AbortController;
   private activeToolProgressCleanups = new Set<(flush: boolean) => void>();
   private hostCloseUnsubscribe?: () => void;
 
@@ -2304,6 +2318,7 @@ export class DesktopAgentRuntime {
 
   setCompactionSettings(settings?: ContextCompactionSettings): void {
     this.compactionEnabled = compactionEnabled(settings);
+    if (!this.compactionEnabled) this.cancelBackgroundCompaction(true);
     this.rebuildToolCatalog();
     this.agent.state.tools = this.activeTools();
   }
@@ -2474,7 +2489,16 @@ export class DesktopAgentRuntime {
     let context = this.rebuiltAgentContext();
     if (!this.compactionEnabled) return { context };
 
-    const budget = this.contextBudget(context.messages);
+    // This is the last point before the next provider request, so an in-flight
+    // background summary is awaited here unconditionally: overlapping it with a
+    // streaming turn is what the idle-window rule exists to prevent, and most of
+    // its latency was already absorbed by the tool execution that started it.
+    if (this.backgroundCompaction) await this.backgroundCompaction;
+    let budget = this.contextBudget(context.messages);
+    if (await this.installPendingBackgroundCheckpoint()) {
+      context = this.rebuiltAgentContext();
+      budget = this.contextBudget(context.messages);
+    }
     if (budget.tokens < budget.hardLimit) return { context };
 
     const compacted = await this.runCompaction("threshold", false);
@@ -2510,10 +2534,118 @@ export class DesktopAgentRuntime {
     }
   }
 
+  /**
+   * Start pre-computing a checkpoint if the session is past the background
+   * limit. Called only from provider-idle windows — while a tool runs, and
+   * after a run ends — so the summary request never shares the connection with
+   * a streaming turn. Deliberately does not set `compactionInProgress`: that
+   * flag drives `getStatus().isRunning`, and background work must not change
+   * the session's run state.
+   */
+  private maybeStartBackgroundCompaction(): void {
+    if (this.disposed || !this.compactionEnabled) return;
+    if (this.compactionInProgress) return;
+    if (this.backgroundCompaction || this.pendingBackgroundCheckpoint) return;
+    const budget = this.contextBudget(
+      buildSessionContext(this.entriesWithCompaction()).messages,
+    );
+    if (!this.backgroundCompactionReached(budget)) return;
+
+    const abort = new AbortController();
+    const basedOnCheckpointId = this.activeCompaction?.id;
+    this.backgroundAbort = abort;
+    this.backgroundCompaction = this.runBackgroundCompaction(
+      abort.signal,
+      basedOnCheckpointId,
+    ).finally(() => {
+      this.backgroundCompaction = undefined;
+      if (this.backgroundAbort === abort) this.backgroundAbort = undefined;
+    });
+  }
+
+  /**
+   * Generate a checkpoint without installing it. Every failure is discarded in
+   * silence: nothing is persisted, no event is emitted, and the retained-tail
+   * fallback stays reserved for the blocking hard boundary, which is still
+   * there to catch whatever this misses.
+   */
+  private async runBackgroundCompaction(
+    signal: AbortSignal,
+    basedOnCheckpointId: string | undefined,
+  ): Promise<void> {
+    let build: CheckpointBuild;
+    try {
+      build = await this.buildCheckpoint(signal);
+    } catch {
+      return;
+    }
+    if (!build.ok || signal.aborted || this.disposed) return;
+    if (this.activeCompaction?.id !== basedOnCheckpointId) return;
+    this.pendingBackgroundCheckpoint = {
+      checkpoint: build.checkpoint,
+      ...(basedOnCheckpointId ? { basedOnCheckpointId } : {}),
+    };
+  }
+
+  /**
+   * Install a pre-computed checkpoint at a turn boundary. Returns false when
+   * there is nothing to install or the checkpoint went stale, leaving the
+   * caller's existing blocking path in charge.
+   */
+  private async installPendingBackgroundCheckpoint(): Promise<boolean> {
+    const pending = this.pendingBackgroundCheckpoint;
+    if (!pending) return false;
+    // Consumed either way: a stale checkpoint must not be retried, and a fresh
+    // build is cheap to schedule again from the next idle window.
+    this.pendingBackgroundCheckpoint = undefined;
+    if (this.disposed || !this.compactionEnabled) return false;
+    if (this.activeCompaction?.id !== pending.basedOnCheckpointId) return false;
+    // A rewritten or forked transcript can drop the entry the checkpoint
+    // splices onto, which would leave it applying to nothing.
+    const anchorPresent = this.fullEntries.some(
+      (entry) => entry.id === pending.checkpoint.throughMessageId,
+    );
+    if (!anchorPresent) return false;
+
+    this.emit({
+      type: "compaction_start",
+      reason: "threshold",
+      phase: "background",
+    });
+    // The budget check is unconditional here even though the boundary may be
+    // well below the hard limit: the model can have changed to a smaller window
+    // since the checkpoint was built, and a checkpoint that no longer fits must
+    // fall through to the blocking path instead of being installed.
+    const persisted = await this.persistCheckpoint(
+      pending.checkpoint,
+      "threshold",
+      false,
+      true,
+      undefined,
+      "background",
+    );
+    if (persisted === "oversized") {
+      this.emitCompactionFailure(
+        "threshold",
+        pending.checkpoint.tokensBefore,
+        "The pre-computed checkpoint no longer fits the safe model context budget",
+        "background",
+      );
+    }
+    return persisted === "persisted";
+  }
+
+  private cancelBackgroundCompaction(discardPending: boolean): void {
+    this.backgroundAbort?.abort();
+    this.backgroundAbort = undefined;
+    if (discardPending) this.pendingBackgroundCheckpoint = undefined;
+  }
+
   private emitCompactionFailure(
     reason: ContextCompactionReason,
     tokensBefore: number | undefined,
     message: string,
+    phase?: ContextCompactionPhase,
   ): void {
     this.emit({
       type: "compaction_end",
@@ -2521,6 +2653,7 @@ export class DesktopAgentRuntime {
       ok: false,
       ...(tokensBefore !== undefined ? { tokensBefore } : {}),
       willRetry: false,
+      ...(phase ? { phase } : {}),
       error: { code: "CONTEXT_COMPACTION_FAILED", message },
     });
   }
@@ -2644,6 +2777,7 @@ export class DesktopAgentRuntime {
     willRetry: boolean,
     mustFitSafeBudget: boolean,
     fallback?: ContextCompactionFallback,
+    phase?: ContextCompactionPhase,
   ): Promise<CheckpointPersistResult> {
     const compactedBudget = this.contextBudget(
       buildSessionContext(this.entriesWithCompaction(checkpoint)).messages,
@@ -2661,7 +2795,12 @@ export class DesktopAgentRuntime {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.emitCompactionFailure(reason, checkpoint.tokensBefore, message);
+      this.emitCompactionFailure(
+        reason,
+        checkpoint.tokensBefore,
+        message,
+        phase,
+      );
       return "failed";
     }
 
@@ -2678,6 +2817,7 @@ export class DesktopAgentRuntime {
       firstKeptMessageId: checkpoint.firstKeptMessageId,
       willRetry,
       ...(fallback ? { fallback } : {}),
+      ...(phase ? { phase } : {}),
     });
     return "persisted";
   }
@@ -3291,6 +3431,9 @@ export class DesktopAgentRuntime {
           toolName: event.toolName,
           args: event.args,
         });
+        // The model stream has ended and the follow-up request waits on this
+        // tool, so the provider connection is idle for as long as it runs.
+        this.maybeStartBackgroundCompaction();
         break;
       case "tool_execution_update":
         this.emit({
@@ -3546,6 +3689,12 @@ export class DesktopAgentRuntime {
         content,
         timestamp: Date.now(),
       };
+      if (this.compactionEnabled) {
+        // A checkpoint pre-computed while the session sat idle installs here, so
+        // the prompt that follows usually never reaches the hard boundary below.
+        if (this.backgroundCompaction) await this.backgroundCompaction;
+        await this.installPendingBackgroundCheckpoint();
+      }
       if (this.automaticCompactionNeeded([incomingUserMessage])) {
         const compacted = await this.runCompaction("threshold", false);
         if (!compacted) {
@@ -3622,6 +3771,10 @@ export class DesktopAgentRuntime {
       );
       if (classifiedError.code === "TURN_ABORTED") throw err;
       throw Object.assign(new Error(diagnosticError.message), diagnosticError);
+    } finally {
+      // The run is over and the user is reading the result: a free window for
+      // the next summary request, whether or not this run succeeded.
+      this.maybeStartBackgroundCompaction();
     }
     return { turnId: this.turnId };
   }
@@ -3630,6 +3783,9 @@ export class DesktopAgentRuntime {
     this.agent.abort();
     this.providerRetryAbort?.abort();
     this.compactionAbort?.abort();
+    // Stop the in-flight summary request, but keep an already-built checkpoint:
+    // it stays installable, and the next turn boundary can still use it.
+    this.cancelBackgroundCompaction(false);
   }
 
   getStatus(): AgentStatus {
@@ -3656,5 +3812,6 @@ export class DesktopAgentRuntime {
     this.providerRetryAbort?.abort();
     this.cleanupActiveToolProgress();
     this.compactionAbort?.abort();
+    this.cancelBackgroundCompaction(true);
   }
 }
