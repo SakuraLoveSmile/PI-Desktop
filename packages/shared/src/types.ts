@@ -289,16 +289,15 @@ export type SessionDetail = SessionSummary & {
   compaction?: ContextCompactionRecord;
 };
 
+/**
+ * @deprecated Not surfaced in settings and not persisted through to the
+ * runtime. Retained as the runtime's construction-time override, which the
+ * tests use to build a compaction-disabled session.
+ */
 export type ContextCompactionSettings = {
   enabled: boolean;
   reserveTokens: number;
   keepRecentTokens: number;
-};
-
-export const DEFAULT_CONTEXT_COMPACTION_SETTINGS: ContextCompactionSettings = {
-  enabled: true,
-  reserveTokens: 16_384,
-  keepRecentTokens: 20_000,
 };
 
 export type ContextCompactionRecord = {
@@ -589,7 +588,11 @@ export type AppSettings = {
   /** UI language; `auto` (and absent) follows the OS locale. */
   language?: "auto" | "en" | "zh-CN";
   enterToSend: boolean;
-  /** Model-context checkpoint behavior; absent legacy values use defaults. */
+  /**
+   * @deprecated No longer read. Compaction derives its budgets from the model
+   * window instead of exposing knobs; persisted values are ignored so a
+   * session disabled long ago is not stuck without a switch to re-enable it.
+   */
   contextCompaction?: ContextCompactionSettings;
   /** User overrides for the shared application shortcut map. */
   keybindings?: KeybindingOverrides;

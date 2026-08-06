@@ -59,10 +59,6 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.permissionModeAsk",
       "settings.permissionModeAcceptEdits",
       "settings.permissionModeAuto",
-      "settings.contextCompaction",
-      "settings.contextCompactionEnabled",
-      "settings.contextCompactionReserve",
-      "settings.contextCompactionRecent",
     ],
   },
   {

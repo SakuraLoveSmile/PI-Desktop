@@ -630,7 +630,6 @@ async function resolveAgentRuntimeLaunch(
       scratchDir: join(dataDir, "scratch", sessionId),
       projectPath,
       projectInstructions,
-      compactionSettings: settings.contextCompaction,
       provider: {
         id: provider.id,
         name: provider.name,
