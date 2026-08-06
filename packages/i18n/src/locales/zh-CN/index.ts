@@ -824,7 +824,7 @@ export const zhCN = {
   },
   plugins: {
     title: "扩展",
-    subtitle: "插件、MCP 服务器与技能——你为应用添加的一切，可全局启用，也可只在指定项目里启用。",
+    subtitle: "插件、MCP 服务器、技能与子智能体——你为应用添加的一切，可全局启用，也可只在指定项目里启用。",
     loadDev: "加载本地插件",
     loadDevDone: "本地插件已加载",
     installPackage: "安装插件包",
