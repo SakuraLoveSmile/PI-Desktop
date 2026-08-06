@@ -159,6 +159,14 @@ pub struct UiMessage {
     pub tool_duration_ms: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_error: Option<bool>,
+    /// Set on rows a subagent produced: the `Task` tool call that spawned it
+    /// (ADR 0060). The transcript nests these under that call, and the agent
+    /// runtime excludes them from the parent's model context.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_tool_call_id: Option<String>,
+    /// Subagent definition name that produced the row.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -228,6 +236,12 @@ fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String>) {
     }
     if let Some(active) = message.active_revision {
         meta_obj.insert("activeRevision".into(), json!(active));
+    }
+    if let Some(parent) = &message.parent_tool_call_id {
+        meta_obj.insert("parentToolCallId".into(), json!(parent));
+    }
+    if let Some(agent) = &message.agent_name {
+        meta_obj.insert("agentName".into(), json!(agent));
     }
     let meta = if meta_obj.is_empty() {
         None
@@ -331,6 +345,14 @@ fn record_to_ui(record: MessageRecord) -> UiMessage {
         .map(|s| s.to_string());
     let revision_count = meta.get("revisionCount").and_then(|v| v.as_i64());
     let active_revision = meta.get("activeRevision").and_then(|v| v.as_i64());
+    let parent_tool_call_id = meta
+        .get("parentToolCallId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let agent_name = meta
+        .get("agentName")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     let thinking = blocks
         .iter()
         .filter_map(|b| {
@@ -384,6 +406,8 @@ fn record_to_ui(record: MessageRecord) -> UiMessage {
                 .map(|s| s.to_string()),
             tool_duration_ms: block.get("durationMs").and_then(|v| v.as_i64()),
             is_error,
+            parent_tool_call_id,
+            agent_name,
         }
     } else {
         let content = blocks
@@ -416,6 +440,8 @@ fn record_to_ui(record: MessageRecord) -> UiMessage {
             tool_completed_at: None,
             tool_duration_ms: None,
             is_error,
+            parent_tool_call_id,
+            agent_name,
         }
     }
 }
@@ -1723,6 +1749,8 @@ mod tests {
             tool_completed_at: None,
             tool_duration_ms: None,
             is_error: None,
+            parent_tool_call_id: None,
+            agent_name: None,
         }
     }
 
@@ -2003,6 +2031,43 @@ mod tests {
     }
 
     #[test]
+    fn subagent_attribution_roundtrips() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, Some("/tmp/x".into())).unwrap();
+        let mut assistant = user_msg("m1", "Found it.", "2025-05-01T00:00:00Z");
+        assistant.role = "assistant".into();
+        assistant.parent_tool_call_id = Some("task-1".into());
+        assistant.agent_name = Some("explorer".into());
+        append_message(&db, &session.id, &assistant, None).unwrap();
+
+        let mut tool = user_msg("m2", "ok", "2025-05-01T00:00:01Z");
+        tool.role = "tool".into();
+        tool.tool_name = Some("Read".into());
+        tool.tool_call_id = Some("child-read".into());
+        tool.tool_status = Some("success".into());
+        tool.parent_tool_call_id = Some("task-1".into());
+        tool.agent_name = Some("explorer".into());
+        append_message(&db, &session.id, &tool, None).unwrap();
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        for message in &detail.messages {
+            assert_eq!(message.parent_tool_call_id.as_deref(), Some("task-1"));
+            assert_eq!(message.agent_name.as_deref(), Some("explorer"));
+        }
+        // A row without attribution stays unattributed rather than inheriting one.
+        append_message(
+            &db,
+            &session.id,
+            &user_msg("m3", "next", "2025-05-01T00:00:02Z"),
+            None,
+        )
+        .unwrap();
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages[2].parent_tool_call_id, None);
+        assert_eq!(detail.messages[2].agent_name, None);
+    }
+
+    #[test]
     fn append_and_roundtrip_tool_message() {
         let db = test_db();
         let session = create_session(&db, None, None, None, None, Some("/tmp/x".into())).unwrap();
@@ -2035,6 +2100,8 @@ mod tests {
             tool_completed_at: Some("2025-05-01T00:00:03Z".into()),
             tool_duration_ms: Some(1_000),
             is_error: None,
+            parent_tool_call_id: None,
+            agent_name: None,
         };
         append_message(&db, &session.id, &tool, None).unwrap();
         // Host recovery may replay the Electron persistence outbox; a message
@@ -2141,6 +2208,8 @@ mod tests {
             tool_completed_at: None,
             tool_duration_ms: None,
             is_error: None,
+            parent_tool_call_id: None,
+            agent_name: None,
         };
         append_message(&db, &session.id, &assistant, None).unwrap();
 
