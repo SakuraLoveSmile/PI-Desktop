@@ -59,6 +59,7 @@ import {
   type ThinkingLevel,
   type UiMessage,
   type UserSkillRecord,
+  type UserSubagentRecord,
   type WindowControlAction,
 } from "@pi-desktop/shared";
 import {
@@ -73,6 +74,7 @@ import {
   resolveSubagentProviders,
   type ComposerTemplate,
   type ThinkingCapabilities,
+  type UserSubagentDocument,
 } from "@pi-desktop/agent-runtime";
 import { isTemplateName, scaffold } from "@pi-desktop/plugin-devkit";
 import { HostProcess } from "./host-process";
@@ -490,6 +492,49 @@ async function activeUserSkills(
 }
 
 /**
+ * The user's own subagent definitions, filtered to the ones a session on this
+ * project sees, as documents the runtime can parse (D202).
+ *
+ * host-core owns the registry and the activation scope; the document text is
+ * read here because this is where the other two definition sources are read
+ * too, so all three reach `loadSubagentDefinitions` in the same shape.
+ */
+async function activeUserSubagentDocuments(
+  projectPath: string | undefined,
+): Promise<UserSubagentDocument[]> {
+  if (!host) return [];
+  let records: UserSubagentRecord[] = [];
+  try {
+    const result = await host.call<{ subagents: UserSubagentRecord[] }>(
+      "agents.active",
+      { projectPath: projectPath ?? null },
+    );
+    records = result.subagents ?? [];
+  } catch (error) {
+    logger.app("plugin", "warn", "subagent list failed", { data: String(error) });
+    return [];
+  }
+  const documents: UserSubagentDocument[] = [];
+  const { readFile } = await import("node:fs/promises");
+  for (const record of records) {
+    try {
+      documents.push({
+        id: record.id,
+        document: await readFile(record.path, "utf8"),
+        filePath: record.path,
+      });
+    } catch (error) {
+      // A document deleted behind the registry's back is one lost delegate,
+      // never a lost turn.
+      logger.app("plugin", "warn", "subagent document unreadable", {
+        data: { id: record.id, error: String(error) },
+      });
+    }
+  }
+  return documents;
+}
+
+/**
  * Load one of the user's own skill documents by id, or `null` if there is no
  * such skill — so the caller can fall through to the plugin catalog.
  *
@@ -619,9 +664,13 @@ async function resolveAgentRuntimeLaunch(
     })),
   ];
   // Subagents (ADR 0062): definitions are re-read per launch so editing
-  // `.pi/agents` takes effect on the next prompt, and every pinned model is
-  // resolved here because credentials and the pi catalog live on this side.
-  const subagentCatalog = await loadSubagentDefinitions(projectPath);
+  // `.pi/agents` or the registry takes effect on the next prompt, and every
+  // pinned model is resolved here because credentials and the pi catalog live on
+  // this side. The user's own definitions (D202) are scope-filtered like the
+  // skills above; a delegate the model can see is one it will try to call.
+  const subagentCatalog = await loadSubagentDefinitions(projectPath, {
+    userDocuments: await activeUserSubagentDocuments(projectPath),
+  });
   const subagentBindings = await resolveSubagentProviders({
     definitions: subagentCatalog.definitions,
     providers: providers.providers,

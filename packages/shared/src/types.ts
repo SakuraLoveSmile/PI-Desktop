@@ -799,6 +799,49 @@ export type UserSkillInput = {
   scope?: ActivationScope;
 };
 
+/**
+ * A subagent definition the user owns, stored as `<data>/agents/<id>.md` with
+ * its metadata in `<data>/agents/registry.json` (D202, ADR 0063).
+ *
+ * The same filename shape a project uses, so a definition can be copied between
+ * the two unchanged. `id` and `name` are deliberately the same string: the name
+ * is the handle the model passes to `Task`, and keeping the document named after
+ * it is what lets the UI tell which source won a name.
+ */
+export type UserSubagentRecord = {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  scope?: ActivationScope;
+  /** Resolved tool grant, never empty — what the delegate may actually call. */
+  tools: string[];
+  /** `<provider>/<model>` pin, resolved against providers at launch. */
+  model?: string;
+  thinkingLevel?: ThinkingLevel;
+  maxTurns?: number;
+  /** Absolute path of the document, for revealing it. */
+  path: string;
+  sizeBytes: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UserSubagentInput = {
+  id?: string;
+  name?: string;
+  description?: string;
+  body?: string;
+  tools?: string[];
+  /** Empty string clears the pin; absent leaves it unchanged. */
+  model?: string;
+  thinkingLevel?: ThinkingLevel | "";
+  /** `0` clears the override; absent leaves it unchanged. */
+  maxTurns?: number;
+  enabled?: boolean;
+  scope?: ActivationScope;
+};
+
 export type MarketPluginSummary = {
   id: string;
   name: string;
