@@ -290,43 +290,6 @@ type ContextBudget = {
   keepRecentTokens: number;
 };
 
-type ApiBinding = {
-  api: Api;
-  adapter: () => ProviderStreams;
-  defaultBaseUrl: string;
-};
-
-/** Map a stored provider apiStyle onto a pi-ai wire API. Unknown styles fall
- * back to OpenAI Chat Completions, the pre-apiStyle behavior. */
-function apiBindingForStyle(apiStyle?: string): ApiBinding {
-  switch (apiStyle) {
-    case "responses":
-      return {
-        api: "openai-responses",
-        adapter: openAIResponsesApi,
-        defaultBaseUrl: "https://api.openai.com/v1",
-      };
-    case "anthropic_messages":
-      return {
-        api: "anthropic-messages",
-        adapter: anthropicMessagesApi,
-        defaultBaseUrl: "https://api.anthropic.com",
-      };
-    case "google_generative_ai":
-      return {
-        api: "google-generative-ai",
-        adapter: googleGenerativeAIApi,
-        defaultBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
-      };
-    default:
-      return {
-        api: "openai-completions",
-        adapter: openAICompletionsApi,
-        defaultBaseUrl: "https://api.openai.com/v1",
-      };
-  }
-}
-
 export type PluginToolDef = {
   /** Full exposed name (`plugin_<pluginIdSafe>_<toolName>`, D015). */
   name: string;
