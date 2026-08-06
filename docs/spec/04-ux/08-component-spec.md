@@ -1120,6 +1120,8 @@ activity rows and their nested result disclosures.
   edit, terminal, web, or generic tool.
 - The group header owns the elapsed timer and step count. It stays in the
   transcript after completion and remains collapsed unless explicitly opened.
+- The processing group spans the full available assistant column, so expanded
+  result details keep a usable width even when the header or payload is short.
 - The visible label is a natural-language action (`Read`, `Ran`, `Searched`),
   not the raw function name. Running actions use the progressive form.
 - The primary argument is a clamped single-line monospace hint.

@@ -1373,6 +1373,11 @@
 
 /* Codex-style tool activity: lightweight disclosure rows, not boxed cards */
 .tool-activity-group {
+  /* The assistant column aligns children to flex-start, so the group has to
+     claim the full width itself — otherwise expanded detail blocks shrink to
+     their content and short payloads render as tiny chips. */
+  width: 100%;
+  min-width: 0;
   margin: 7px 0;
 }
 

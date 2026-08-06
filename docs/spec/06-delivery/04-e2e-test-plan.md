@@ -695,7 +695,9 @@ Each scenario is documented in this format:
   processing header that updates and then freezes its elapsed time and shows a
   step count. Expanded calls use transparent semantic activity rows with an
   action icon, natural-language verb, monospace primary argument, and quiet
-  disclosure. Nested expansion shows output before raw input in clamped scroll
+  disclosure. The processing group uses the full assistant-column width, so a
+  short label or payload does not shrink expanded details into a content-sized
+  chip. Nested expansion shows output before raw input in clamped scroll
   regions. Live partial output updates in place. Reloaded rows preserve the tool
   name, arguments, result, and status.
 - **Specs linked**: `04-ux/01-ui-ia.md`,
