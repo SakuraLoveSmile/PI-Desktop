@@ -18,7 +18,7 @@ PI-Desktop.app
 |---|---|
 | Electron Main | window lifecycle, IPC fan-in/out, child process supervision, fixed-feed app update lifecycle |
 | Renderer | UI only |
-| Rust host-core | DB, tools, permissions, immutable Plan artifacts/`plan_approvals` execution fields, shell catalog, plugin host services, secrets adapters |
+| Rust host-core | DB, tools, permissions, immutable Plan/Goal artifacts/`plan_approvals` execution fields, shell catalog, plugin host services, secrets adapters |
 | Node pi sidecar | pi agent loop, provider streaming, tool-call planning |
 
 ## 3. Boot order
@@ -42,9 +42,9 @@ the protocol.
 
 | Crash | Policy |
 |---|---|
-| Renderer crash | reload window, keep host/agent processes; same-host reload restores only live pending Plan approvals and their deadlines, not terminal Plan cards |
-| Rust host crash | mark app degraded, interrupt pending/queued/running Plan work, keep pending sessions in Plan and already-approved sessions in Agent, attempt restart host, and fail active sessions closed |
-| Node agent crash | abort active turns and live Plan waiters/queue entries, keep pending sessions in Plan, preserve already-approved Agent mode in Rust, restart sidecar, and never replay an execution |
+| Renderer crash | reload window, keep host/agent processes; same-host reload restores only live pending Plan/Goal approvals and their deadlines, not terminal cards |
+| Rust host crash | mark app degraded, interrupt pending/queued/running approval work, keep pending sessions in their contract mode (Plan or Goal) and already-approved sessions in Agent, attempt restart host, and fail active sessions closed |
+| Node agent crash | abort active turns and live approval waiters/queue entries, keep pending sessions in their contract mode, preserve already-approved Agent mode in Rust, restart sidecar, and never replay an execution |
 | Electron main crash | full app exit |
 
 Supervision parameters (implemented in Electron main):
@@ -72,7 +72,7 @@ Supervision parameters (implemented in Electron main):
 
 1. Reject new prompts
 2. Abort active turns
-3. Interrupt pending/queued/running Plan work and reject late responses
+3. Interrupt pending/queued/running Plan and Goal work and reject late responses
 4. Unload plugins
 5. Stop Node agent sidecar
 6. Flush/close Rust host DB
@@ -118,8 +118,10 @@ sidecar/host shutdown sequence runs before the updater replaces the app.
 3. Agent crash does not corrupt SQLite
 4. A host crash does not create a persistence error storm or replay a completed
    message twice.
-5. Host/sidecar crash never turns pending Plan approval into Agent execution;
-   restart recovery leaves it interrupted and the durable session in Plan
+5. Host/sidecar crash never turns a pending Plan or Goal approval into Agent
+   execution;
+   restart recovery leaves it interrupted and the durable session in its
+   contract mode
 6. A queued/running execution that was already approved is interrupted without
    replay and its durable session remains Agent
 7. Bash timeout/abort shuts down the complete child process tree

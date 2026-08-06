@@ -1083,6 +1083,7 @@ export function SettingsPage() {
                     {([
                       ["agent", "settings.modeAgent"],
                       ["plan", "settings.modePlan"],
+                      ["goal", "settings.modeGoal"],
                     ] as const).map(([value, labelKey]) => (
                       <button
                         key={value}

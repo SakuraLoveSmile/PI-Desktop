@@ -4,12 +4,12 @@ use serde::Serialize;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-/// Storage schema v10: SQLite holds
+/// Storage schema v11: SQLite holds
 /// index data only; transcript content lives in per-session JSONL files
-/// (D119, `transcripts.rs`).
-pub const SCHEMA_VERSION: i64 = 10;
+/// (D119, `transcripts.rs`). v11 adds the Plan/Goal approval kind (D198).
+pub const SCHEMA_VERSION: i64 = 11;
 
-/// Absolute approval deadline for a newly submitted Plan proposal.
+/// Absolute approval deadline for a newly submitted Plan or Goal proposal.
 pub const PLAN_APPROVAL_TIMEOUT_MS: i64 = 30 * 60 * 1000;
 
 /// Audit rows older than this are pruned at boot.
@@ -303,6 +303,7 @@ CREATE TABLE IF NOT EXISTS plan_approvals (
   session_id            TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   turn_id               TEXT NOT NULL,
   tool_call_id          TEXT NOT NULL UNIQUE,
+  kind                  TEXT NOT NULL DEFAULT 'plan' CHECK (kind IN ('plan', 'goal')),
   plan_json             TEXT NOT NULL,
   title                 TEXT NOT NULL DEFAULT '',
   question              TEXT NOT NULL DEFAULT '',
@@ -429,13 +430,16 @@ impl Database {
             }
             7 => {
                 migrate_v7_to_v8(&conn)?;
-                migrate_v8_to_v10(&conn, path)?;
+                migrate_v8_to_v11(&conn, path)?;
             }
             8 => {
-                migrate_v8_to_v10(&conn, path)?;
+                migrate_v8_to_v11(&conn, path)?;
             }
             9 => {
-                migrate_v9_to_v10(&conn, path)?;
+                migrate_v9_to_v11(&conn, path)?;
+            }
+            10 => {
+                migrate_v10_to_v11(&conn, path)?;
             }
             legacy @ 1..=6 => {
                 let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
@@ -717,13 +721,13 @@ fn migrate_and_validate_top_level_mode(value: &mut Value, key: &str, context: &s
     };
     let mode = item
         .as_str()
-        .ok_or_else(|| anyhow!("{context}.{key} must be the string 'agent' or 'plan'"))?;
+        .ok_or_else(|| anyhow!("{context}.{key} must be the string 'agent', 'plan' or 'goal'"))?;
     match mode {
         "chat" => *item = Value::String("plan".into()),
-        "agent" | "plan" => {}
+        "agent" | "plan" | "goal" => {}
         other => {
             return Err(anyhow!(
-                "{context}.{key} has invalid mode '{other}'; expected 'agent' or 'plan'"
+                "{context}.{key} has invalid mode '{other}'; expected 'agent', 'plan' or 'goal'"
             ));
         }
     }
@@ -734,7 +738,7 @@ fn validate_session_modes(tx: &rusqlite::Transaction<'_>) -> Result<()> {
     let invalid: Option<(String, String)> = tx
         .query_row(
             "SELECT id, mode FROM sessions
-             WHERE mode NOT IN ('agent', 'plan')
+             WHERE mode NOT IN ('agent', 'plan', 'goal')
              LIMIT 1",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),
@@ -742,7 +746,7 @@ fn validate_session_modes(tx: &rusqlite::Transaction<'_>) -> Result<()> {
         .optional()?;
     if let Some((id, mode)) = invalid {
         return Err(anyhow!(
-            "session '{id}' has invalid mode '{mode}'; expected 'agent' or 'plan'"
+            "session '{id}' has invalid mode '{mode}'; expected 'agent', 'plan' or 'goal'"
         ));
     }
     Ok(())
@@ -936,6 +940,30 @@ fn migrate_v9_to_v10_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
     Ok(())
 }
 
+/// v11 adds the Plan/Goal approval discriminator (D198). Legacy rows are Plan
+/// contracts by definition, which is exactly the column default.
+fn migrate_v10_to_v11_tx(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    // A v8 database migrated in the same chain already created the table from
+    // PLAN_APPROVALS_SCHEMA, which carries `kind`; only true v10 files need it.
+    let has_kind: bool = tx.query_row(
+        "SELECT EXISTS(
+             SELECT 1 FROM pragma_table_info('plan_approvals') WHERE name = 'kind'
+         )",
+        [],
+        |row| row.get(0),
+    )?;
+    if !has_kind {
+        tx.execute_batch(
+            "ALTER TABLE plan_approvals
+             ADD COLUMN kind TEXT NOT NULL DEFAULT 'plan'
+             CHECK (kind IN ('plan', 'goal'));",
+        )?;
+    }
+    validate_session_modes(tx)?;
+    tx.pragma_update(None, "user_version", 11i64)?;
+    Ok(())
+}
+
 fn migration_backup_path(path: &Path, version: i64) -> PathBuf {
     path.with_extension(format!("sqlite.v{version}.bak"))
 }
@@ -1017,27 +1045,42 @@ fn create_migration_backup(conn: &Connection, path: &Path, version: i64) -> Resu
     Ok(backup)
 }
 
-fn migrate_v8_to_v10(conn: &Connection, path: &Path) -> Result<()> {
+fn migrate_v8_to_v11(conn: &Connection, path: &Path) -> Result<()> {
     let backup = create_migration_backup(conn, path, 8)?;
     let tx = conn.unchecked_transaction()?;
     migrate_v8_to_v9_tx(&tx)?;
     migrate_v9_to_v10_tx(&tx)?;
+    migrate_v10_to_v11_tx(&tx)?;
     tx.commit().with_context(|| {
         format!(
-            "commit schema v8 to v10 migration; backup {} remains",
+            "commit schema v8 to v11 migration; backup {} remains",
             backup.display()
         )
     })?;
     Ok(())
 }
 
-fn migrate_v9_to_v10(conn: &Connection, path: &Path) -> Result<()> {
+fn migrate_v9_to_v11(conn: &Connection, path: &Path) -> Result<()> {
     let backup = create_migration_backup(conn, path, 9)?;
     let tx = conn.unchecked_transaction()?;
     migrate_v9_to_v10_tx(&tx)?;
+    migrate_v10_to_v11_tx(&tx)?;
     tx.commit().with_context(|| {
         format!(
-            "commit schema v9 to v10 migration; backup {} remains",
+            "commit schema v9 to v11 migration; backup {} remains",
+            backup.display()
+        )
+    })?;
+    Ok(())
+}
+
+fn migrate_v10_to_v11(conn: &Connection, path: &Path) -> Result<()> {
+    let backup = create_migration_backup(conn, path, 10)?;
+    let tx = conn.unchecked_transaction()?;
+    migrate_v10_to_v11_tx(&tx)?;
+    tx.commit().with_context(|| {
+        format!(
+            "commit schema v10 to v11 migration; backup {} remains",
             backup.display()
         )
     })?;
@@ -1924,6 +1967,83 @@ mod tests {
         );
         drop(db);
         assert_readable_migration_backup(&path, 9);
+    }
+
+    #[test]
+    fn migrates_v10_approvals_by_labelling_them_plan_contracts() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pi.sqlite");
+        {
+            let db = Database::open(&path).unwrap();
+            db.conn()
+                .execute_batch(
+                    "ALTER TABLE plan_approvals DROP COLUMN kind;
+                     INSERT INTO sessions (id, mode, created_at, updated_at)
+                     VALUES ('legacy-session', 'plan', 1, 1);
+                     INSERT INTO plan_approvals
+                        (request_id, session_id, turn_id, tool_call_id, plan_json,
+                         status, created_at, updated_at)
+                     VALUES ('legacy-approval', 'legacy-session', 'legacy-turn',
+                             'legacy-call', '# Plan', 'approved', 1, 1);",
+                )
+                .unwrap();
+            db.conn().pragma_update(None, "user_version", 10).unwrap();
+        }
+
+        let db = Database::open(&path).unwrap();
+        let version: i64 = db
+            .conn()
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+        let kind: String = db
+            .conn()
+            .query_row(
+                "SELECT kind FROM plan_approvals WHERE request_id = 'legacy-approval'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(kind, "plan");
+        // The new column still refuses anything outside the two contracts.
+        assert!(db
+            .conn()
+            .execute(
+                "UPDATE plan_approvals SET kind = 'sprint' WHERE request_id = 'legacy-approval'",
+                [],
+            )
+            .is_err());
+        db.conn()
+            .execute(
+                "UPDATE plan_approvals SET kind = 'goal' WHERE request_id = 'legacy-approval'",
+                [],
+            )
+            .unwrap();
+        drop(db);
+        assert_readable_migration_backup(&path, 10);
+    }
+
+    #[test]
+    fn goal_is_a_valid_persisted_session_mode() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::open(&dir.path().join("pi.sqlite")).unwrap();
+        db.conn()
+            .execute(
+                "INSERT INTO sessions (id, mode, created_at, updated_at)
+                 VALUES ('goal-session', 'goal', 1, 1)",
+                [],
+            )
+            .unwrap();
+        let tx = db.conn().unchecked_transaction().unwrap();
+        validate_session_modes(&tx).unwrap();
+        let mut settings = serde_json::json!({ "defaultMode": "goal" });
+        migrate_and_validate_top_level_mode(&mut settings, "defaultMode", "app settings").unwrap();
+        assert_eq!(settings["defaultMode"], "goal");
+        let mut invalid = serde_json::json!({ "defaultMode": "sprint" });
+        assert!(
+            migrate_and_validate_top_level_mode(&mut invalid, "defaultMode", "app settings")
+                .is_err()
+        );
     }
 
     #[test]

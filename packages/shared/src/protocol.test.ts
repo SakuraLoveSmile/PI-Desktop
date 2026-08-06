@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   IPC,
   IPC_WHITELIST,
+  PROPOSAL_KINDS,
   PROTOCOL_VERSION,
   SCHEMA_VERSION,
+  modeForProposalKind,
   normalizeGlobalPermissionMode,
   normalizeMode,
+  normalizeProposalKind,
+  proposalKindForMode,
   isCommandShellCatalog,
   isCommandShellOption,
   isGlobalPermissionMode,
@@ -20,9 +24,9 @@ import {
 } from "./index.js";
 
 describe("Plan protocol contracts", () => {
-  it("uses protocol v9/schema v10 and exposes the plan, schedule, and shell channels", () => {
+  it("uses protocol v9/schema v11 and exposes the plan, schedule, and shell channels", () => {
     expect(PROTOCOL_VERSION).toBe(9);
-    expect(SCHEMA_VERSION).toBe(10);
+    expect(SCHEMA_VERSION).toBe(11);
     expect(IPC_WHITELIST.has(IPC.invoke.plansPending)).toBe(true);
     expect(IPC_WHITELIST.has(IPC.invoke.plansResolve)).toBe(true);
     expect(IPC_WHITELIST.has(IPC.event.plansChanged)).toBe(true);
@@ -38,8 +42,23 @@ describe("Plan protocol contracts", () => {
   it("maps legacy Chat values to Plan while keeping Agent as fallback", () => {
     expect(normalizeMode("chat")).toBe("plan");
     expect(normalizeMode("plan")).toBe("plan");
+    expect(normalizeMode("goal")).toBe("goal");
     expect(normalizeMode("agent")).toBe("agent");
     expect(normalizeMode(undefined)).toBe("agent");
+  });
+
+  it("pairs each contract mode with its proposal kind and back (D198)", () => {
+    expect(PROPOSAL_KINDS).toEqual(["plan", "goal"]);
+    expect(proposalKindForMode("plan")).toBe("plan");
+    expect(proposalKindForMode("goal")).toBe("goal");
+    // Agent negotiates no contract, so it has no kind.
+    expect(proposalKindForMode("agent")).toBeNull();
+    expect(modeForProposalKind("goal")).toBe("goal");
+    expect(modeForProposalKind("plan")).toBe("plan");
+    // Rows written before the discriminator existed are Plan by definition.
+    expect(normalizeProposalKind(undefined)).toBe("plan");
+    expect(normalizeProposalKind("nonsense")).toBe("plan");
+    expect(normalizeProposalKind("goal")).toBe("goal");
   });
 
   it("keeps scheduled mode as a normalized wire projection", () => {
@@ -104,6 +123,7 @@ describe("Plan protocol contracts", () => {
       id: "execution-1",
       proposalId: "proposal-1",
       sessionId: "session-1",
+      kind: "plan",
       plan: "# Plan",
       title: "Plan",
       question: "Approve?",

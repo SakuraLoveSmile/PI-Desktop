@@ -14,8 +14,10 @@ import { useTranslation } from "react-i18next";
 import type {
   MessageUsage,
   PlanningState,
+  ProposalKind,
   UiMessage,
 } from "@pi-desktop/shared";
+import { proposalKindForMode } from "@pi-desktop/shared";
 import { ConversationMinimap } from "./ConversationMinimap";
 import { TurnOutcomeCard } from "./TurnOutcomeCard";
 import { ReviewChangeCard } from "./ReviewChangeCard";
@@ -76,6 +78,7 @@ import {
   IconSearch,
   IconReview,
   IconSparkles,
+  IconTarget,
   IconTerminal,
   IconTrash,
   IconWrench,
@@ -1119,12 +1122,21 @@ function WorkingIndicator() {
   );
 }
 
-function PlanningIndicator() {
+function PlanningIndicator({ kind }: { kind: ProposalKind }) {
   const { t } = useTranslation();
   return (
-    <div className="planning-state-indicator" role="status" aria-live="polite">
-      <IconListChecks size={14} aria-hidden />
-      <span>{t("plan.planning")}</span>
+    <div
+      className="planning-state-indicator"
+      role="status"
+      aria-live="polite"
+      data-kind={kind}
+    >
+      {kind === "goal" ? (
+        <IconTarget size={14} aria-hidden />
+      ) : (
+        <IconListChecks size={14} aria-hidden />
+      )}
+      <span>{t(`${kind}.planning`)}</span>
     </div>
   );
 }
@@ -1493,6 +1505,15 @@ export const ChatTranscript = memo(function ChatTranscript({
       sessionId && state.pendingPlans[sessionId]?.status === "pending",
     ),
   );
+  // Plan and Goal both project `planning`; the durable mode names which
+  // contract is being written, so the indicator can use that kind's copy.
+  const planningKind = useAppStore(
+    (state) =>
+      proposalKindForMode(
+        state.sessions.find((session) => session.id === sessionId)?.mode ??
+          "agent",
+      ) ?? "plan",
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
@@ -1644,7 +1665,7 @@ export const ChatTranscript = memo(function ChatTranscript({
               permission={pendingPermission}
             />
           ) : null}
-          {showPlanning ? <PlanningIndicator /> : null}
+          {showPlanning ? <PlanningIndicator kind={planningKind} /> : null}
           {showWorking ? <WorkingIndicator /> : null}
         </div>
       </div>

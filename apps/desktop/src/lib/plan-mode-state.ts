@@ -87,6 +87,7 @@ export function mergePlanCheckpoint(
   if (event.proposalId && event.proposalId !== current.id) return current;
 
   const next: PlanProposal = { ...current };
+  if (event.kind !== undefined) next.kind = event.kind;
   if (event.title !== undefined) next.title = event.title;
   if (event.question !== undefined) next.question = event.question;
   if (event.artifact !== undefined) next.artifact = event.artifact;

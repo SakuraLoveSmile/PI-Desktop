@@ -90,16 +90,24 @@ does not turn temporary thread pressure into a host process exit.
 | `COMMAND_SHELL_INVALID` | no | settings supplied an unknown, unavailable, or wrong-platform shell ID |
 | `PERMISSION_TIMEOUT` | no | permission prompt timed out (mapped to deny) |
 | `PERMISSION_REQUIRED` | no | waiting for user decision |
-| `WRITE_DISABLED_IN_PLAN` | no | Plan hard-deny for Write |
-| `EDIT_DISABLED_IN_PLAN` | no | Plan hard-deny for Edit |
-| `PLUGIN_DISABLED_IN_PLAN` | no | Plan hard-deny for every plugin tool |
-| `PLAN_APPROVAL_REQUIRED` | no | SubmitPlan is waiting for a separate plan approval |
+| `WRITE_DISABLED_IN_PLAN` | no | contract-mode hard-deny for Write |
+| `EDIT_DISABLED_IN_PLAN` | no | contract-mode hard-deny for Edit |
+| `PLUGIN_DISABLED_IN_PLAN` | no | contract-mode hard-deny for every plugin tool |
+| `TOOL_DISABLED_IN_PLAN` | no | contract-mode hard-deny for an unknown/unlisted tool |
+| `PLAN_NOT_ACTIVE` | no | a submit tool ran while no contract was being negotiated |
+| `PLAN_KIND_MISMATCH` | no | `SubmitPlan` in Goal mode, or `SubmitGoal` in Plan mode |
+| `PLAN_APPROVAL_REQUIRED` | no | SubmitPlan/SubmitGoal is waiting for a separate approval |
 | `PLAN_APPROVAL_TIMEOUT` | no | absolute 30-minute plan approval deadline expired |
 | `PLAN_APPROVAL_STALE` | no | response does not match the live proposal/session/turn/tool-call/version |
 | `PLAN_APPROVAL_INTERRUPTED` | no | pending approval closed during abort, crash, or persistence failure |
-| `PLAN_ARTIFACT_WRITE_FAILED` | no | host could not write exact bytes to a new `.pi/plan/*.md` artifact |
-| `PLAN_EXECUTION_INTERRUPTED` | no | approved queued/running Plan execution stopped without replay |
-| `PLAN_REQUIRES_INTERACTIVE_SESSION` | no | unattended/scheduled Plan run cannot request approval |
+| `PLAN_ARTIFACT_WRITE_FAILED` | no | host could not write exact bytes to a new `.pi/<kind>/*.md` artifact |
+| `PLAN_EXECUTION_INTERRUPTED` | no | approved queued/running Plan or Goal execution stopped without replay |
+| `PLAN_REQUIRES_INTERACTIVE_SESSION` | no | unattended/scheduled Plan or Goal run cannot request approval |
+
+The `_IN_PLAN` suffix and the `PLAN_` prefix are historical: both contract modes
+(Plan and Goal) share these codes rather than duplicating a `_IN_GOAL` set
+(**D198**). The renderer picks its wording from the proposal's `kind`, so one
+code can surface as either "Plan" or "Goal" copy.
 
 ### 3.4 Secrets / settings
 
@@ -171,7 +179,7 @@ retried once by the runtime; the second failure remains terminal.
 ### Permission timeout
 UI/host timeout emits `PERMISSION_TIMEOUT` internally, tool result presented as denied (`TOOL_DENIED`) to agent.
 
-### Shell and Plan checkpoint failures
+### Shell and Plan/Goal checkpoint failures
 
 `SHELL_NOT_FOUND` is returned only when catalog fallback finds no available
 platform shell. `COMMAND_SHELL_CHANGED` never retries with a different shell;
@@ -179,7 +187,9 @@ the turn must obtain a fresh effective ID/dialect. `PLAN_ARTIFACT_WRITE_FAILED`
 never creates an approval row. `PLAN_APPROVAL_TIMEOUT` applies only to the
 absolute pending deadline;
 `PLAN_EXECUTION_INTERRUPTED` identifies an already-approved queued/running
-execution interrupted by abort or host recovery.
+execution interrupted by abort or host recovery. `PLAN_KIND_MISMATCH` is a
+terminating tool error like `PLAN_NOT_ACTIVE`: the submit tool ran against the
+wrong contract, so no artifact is written and no approval row is created.
 
 ## 5. UI handling guidelines
 

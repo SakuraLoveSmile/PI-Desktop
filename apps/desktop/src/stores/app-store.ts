@@ -18,6 +18,7 @@ import type {
   PluginTheme,
   PermissionMode,
   ProjectWorkspace,
+  ProposalKind,
   ProviderPublic,
   ReviewRollbackResult,
   SessionSummary,
@@ -27,7 +28,9 @@ import type {
 import {
   ErrorCodes as SharedErrorCodes,
   highestSupportedThinkingLevel,
+  modeForProposalKind,
   normalizeMode,
+  normalizeProposalKind,
   PROTOCOL_VERSION,
 } from "@pi-desktop/shared";
 import { api } from "../lib/api";
@@ -193,8 +196,16 @@ function planSyncGeneration(sessionId: string): number {
   return planSyncGenerations.get(sessionId) ?? 0;
 }
 
-function sessionModeForPlanningState(state: PlanningState): Mode {
-  return state === "inactive" ? "agent" : "plan";
+/**
+ * Projected planning state plus the contract kind decide the durable mode a
+ * session is shown in: Plan and Goal both project `planning` (D198).
+ */
+function sessionModeForPlanningState(
+  state: PlanningState,
+  kind: ProposalKind | undefined,
+): Mode {
+  if (state === "inactive") return "agent";
+  return modeForProposalKind(kind ?? "plan");
 }
 
 function messageErrorFromUnknown(error: unknown): AppError {
@@ -820,9 +831,17 @@ export const useAppStore = create<AppState>((set, get) => ({
         result.state ??
         (proposal?.status === "pending"
           ? "awaiting_approval"
-          : durableMode === "plan"
+          : durableMode === "plan" || durableMode === "goal"
             ? "planning"
             : "inactive");
+      // The host's live kind wins; a pending proposal or the durable mode is
+      // the fallback when the response predates the discriminator.
+      const nextKind: ProposalKind | undefined =
+        result.kind ??
+        proposal?.kind ??
+        (durableMode === "plan" || durableMode === "goal"
+          ? durableMode
+          : undefined);
       const checkpoint =
         proposal ??
         (existingCheckpoint?.status === "pending" &&
@@ -857,7 +876,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           session.id === sessionId
             ? {
                 ...session,
-                mode: sessionModeForPlanningState(nextState),
+                mode: sessionModeForPlanningState(nextState, nextKind),
               }
             : session,
         ),
@@ -2321,7 +2340,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       const pendingPlans = activeProposal
         ? { ...state.pendingPlans, [event.sessionId]: activeProposal }
         : withoutRecordKey(state.pendingPlans, event.sessionId);
-      const nextMode = sessionModeForPlanningState(event.state);
+      const nextMode = sessionModeForPlanningState(
+        event.state,
+        // `planning` without a kind can only come from a pre-D198 host; the
+        // checkpoint it just merged is the closest durable answer.
+        event.kind ?? checkpoint?.kind,
+      );
       const executionActive = isActivePlanExecution(checkpoint);
       const planExecutionWasActive = isActivePlanExecution(previousCheckpoint);
       const planExecutionRunChanged = executionActive || planExecutionWasActive;

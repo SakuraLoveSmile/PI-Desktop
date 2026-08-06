@@ -158,15 +158,20 @@ session. It is available even when automatic context protection is disabled.
 Missing provider/session configuration fails through the normal `AppError`
 envelope; an active turn or compaction returns `AGENT_BUSY`.
 
-### 5.4 Plan checkpoint approval
+### 5.4 Plan and Goal checkpoint approval
 
-Plan approval is separate from a tool permission. The renderer receives the
+Contract approval is separate from a tool permission. Plan and Goal share this
+whole surface; `kind` is the only discriminator (**D198**). The renderer receives
+the
 host-written artifact metadata from the same Agent and resolves it through
-typed preload IPC; it never changes the session mode optimistically. Plan entry
+typed preload IPC; it never changes the session mode optimistically. Contract
+entry
 and submission remain Agent/host operations, not renderer preload methods.
 
 ```ts
 type PlanningState = "inactive" | "planning" | "awaiting_approval";
+
+type ProposalKind = "plan" | "goal";
 
 type GlobalPermissionMode = "ask" | "accept-edits" | "auto";
 
@@ -179,6 +184,7 @@ type PlanProposalStatus =
 type PlanExecutionState =
   | "queued" | "running" | "completed" | "interrupted";
 
+// Same shape for SubmitPlan and SubmitGoal; the tool name selects the kind.
 type SubmitPlanInput = {
   title: string;
   markdown: string;
@@ -186,7 +192,7 @@ type SubmitPlanInput = {
 };
 
 type PlanArtifact = {
-  relativePath: string; // `.pi/plan/<unique-name>.md`
+  relativePath: string; // `.pi/plan/<unique-name>.md` or `.pi/goal/<unique-name>.md`
   sha256: string;
   sizeBytes: number;
 };
@@ -196,6 +202,8 @@ type PlanProposal = {
   sessionId: string;
   turnId: string;
   toolCallId: string;
+  // Legacy rows written before the discriminator existed read back as `plan`.
+  kind: ProposalKind;
   plan: string;
   markdown: string;
   title: string;
@@ -218,6 +226,7 @@ type PlanExecution = {
   id: string;
   proposalId: string;
   sessionId: string;
+  kind: ProposalKind;
   plan: string;
   title: string;
   question: string;
@@ -229,6 +238,8 @@ type PlanExecution = {
 type PlanningStateEvent = {
   sessionId: string;
   state: PlanningState;
+  // Absent only for `inactive` transitions that carry no proposal.
+  kind?: ProposalKind;
   proposalId?: string;
   title?: string;
   markdown?: string;
@@ -246,6 +257,8 @@ type PlanningStateEvent = {
 type PlansPendingResult = {
   plans: PlanProposal[];
   state?: PlanningState;
+  // The contract being negotiated, for mode chip and approval copy.
+  kind?: ProposalKind;
 };
 
 type PlanResolveIdentity = {
@@ -280,11 +293,12 @@ Preload methods:
 
 Electron forwards each host `plans.changed` notification unchanged to the
 renderer through the stable shared `IPC.event.plansChanged` channel
-(`pi-desktop/plans/event/changed`). This is the Plan change event surface; the
-renderer does not receive Plan approval transitions as AgentEvent variants.
+(`pi-desktop/plans/event/changed`). This is the Plan/Goal change event surface;
+the
+renderer does not receive contract approval transitions as AgentEvent variants.
 `plans.pending` returns only currently pending approval rows. Terminal
 `plan_approvals` rows remain durable Host records, but are not renderer
-hydration data; the renderer retains its latest Plan snapshot only for the
+hydration data; the renderer retains its latest contract snapshot only for the
 current renderer lifetime while live `plans.changed` events arrive.
 
 For `approve`, host-core and Electron require an explicit
@@ -545,7 +559,9 @@ streamed stdout/stderr events. A v7 or older host, and any incompatible v8
 peer, must fail the handshake so a desktop cannot display Plan while silently
 losing the artifact, queue, shell, or policy boundary.
 `pi-desktop/agent/compact` and `session.appendCompaction` remain part of the v9
-contract.
+contract. The Goal contract is additive inside v9 (**D198**): `kind` is optional
+on the wire and absent means `plan`, so a peer that predates Goal keeps working
+and simply never negotiates one.
 
 Protocol version 2 adds `thinkingLevel`, `UiMessage.thinking`, and
 `message_update.deltaThinking`. A v1 peer must fail the version check instead
@@ -714,7 +730,9 @@ above.
   absolute expiry, `plan_approvals` execution states, shell selection and
   pinned ID/dialect, and streamed command output. A v7/v8 peer is rejected
   before the UI becomes interactive because it cannot enforce or represent this
-  boundary (ADR 0053/0054).
+  boundary (ADR 0053/0054). `SubmitGoal` and the optional `kind` discriminator
+  ride along inside v9 and need no version bump, because an absent `kind` is
+  exactly the pre-Goal behavior.
 
 ## 12. Plugin API (host UI side)
 

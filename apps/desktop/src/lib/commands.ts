@@ -30,8 +30,13 @@ export async function runPaletteCommand(commandId: string): Promise<void> {
       await store.compactContext();
       break;
     case "builtin.mode.agent":
-    case "builtin.mode.plan": {
-      const mode: Mode = commandId.endsWith("plan") ? "plan" : "agent";
+    case "builtin.mode.plan":
+    case "builtin.mode.goal": {
+      const mode: Mode = commandId.endsWith("plan")
+        ? "plan"
+        : commandId.endsWith("goal")
+          ? "goal"
+          : "agent";
       const activeSession = store.activeSessionId
         ? store.sessions.find((session) => session.id === store.activeSessionId)
         : undefined;

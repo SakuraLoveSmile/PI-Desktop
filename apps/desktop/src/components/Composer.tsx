@@ -25,10 +25,34 @@ import {
   IconCheck,
   IconListChecks,
   IconSparkles,
+  IconTarget,
 } from "./icons";
 
 const COMPOSER_MIN_HEIGHT_PX = 28;
 const COMPOSER_MAX_VISIBLE_ROWS = 7;
+
+/**
+ * The composer-left chip is the only mode control, so one click steps through
+ * every mode in a fixed order: execute freely, plan first, then goal contract.
+ */
+const MODE_CYCLE: readonly Mode[] = ["agent", "plan", "goal"];
+
+function nextMode(mode: Mode): Mode {
+  const index = MODE_CYCLE.indexOf(mode);
+  return MODE_CYCLE[(index + 1) % MODE_CYCLE.length] ?? "agent";
+}
+
+const MODE_LABEL_KEYS: Record<Mode, string> = {
+  agent: "settings.modeAgent",
+  plan: "settings.modePlan",
+  goal: "settings.modeGoal",
+};
+
+function ModeIcon({ mode }: { mode: Mode }) {
+  if (mode === "plan") return <IconListChecks size={14} />;
+  if (mode === "goal") return <IconTarget size={14} />;
+  return <IconShield size={14} />;
+}
 
 function clipboardFiles(data: DataTransfer): File[] {
   const files = Array.from(data.files);
@@ -340,7 +364,8 @@ export function Composer({
           commandEnd === -1 ? "" : content.slice(commandEnd).trim();
         const isModeCommand =
           command.id === "builtin.mode.agent" ||
-          command.id === "builtin.mode.plan";
+          command.id === "builtin.mode.plan" ||
+          command.id === "builtin.mode.goal";
 
         // Mode aliases can prefix a real prompt, e.g. `/plan-mode inspect
         // this change`. Switch first, then send only the prompt body through
@@ -560,7 +585,7 @@ export function Composer({
                 onClick={async () => {
                   setThinkingOpen(false);
                   setPermissionOpen(false);
-                  const next: Mode = mode === "agent" ? "plan" : "agent";
+                  const next: Mode = nextMode(mode);
                   try {
                     await configureActiveSession({
                       mode: next,
@@ -575,16 +600,8 @@ export function Composer({
                   }
                 }}
               >
-                {mode === "plan" ? (
-                  <IconListChecks size={14} />
-                ) : (
-                  <IconShield size={14} />
-                )}
-                <span className="text-sm">
-                  {mode === "plan"
-                    ? t("settings.modePlan")
-                    : t("settings.modeAgent")}
-                </span>
+                <ModeIcon mode={mode} />
+                <span className="text-sm">{t(MODE_LABEL_KEYS[mode])}</span>
               </button>
               {thinkingProvider?.supportsReasoning &&
               availableThinkingLevels.length ? (

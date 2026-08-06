@@ -7,14 +7,16 @@ const readRoot = (relativePath) =>
 const readDesktop = (relativePath) =>
   readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
-test("Plan artifact runtime uses the terminating SubmitPlan contract", async () => {
+test("Plan and Goal artifact runtime uses the terminating submit contract", async () => {
   const [runtime, sidecar, main] = await Promise.all([
     readRoot("packages/agent-runtime/src/runtime.ts"),
     readRoot("packages/agent-runtime/src/sidecar.ts"),
     readDesktop("electron/main/index.ts"),
   ]);
 
-  assert.match(runtime, /name: "SubmitPlan"/);
+  // One kind-keyed table names both submit tools, so Plan and Goal cannot drift.
+  assert.match(runtime, /SUBMIT_TOOL_NAMES: Record<ProposalKind, string> = \{\s*plan: "SubmitPlan",\s*goal: "SubmitGoal",/);
+  assert.match(runtime, /const name = SUBMIT_TOOL_NAMES\[kind\]/);
   assert.match(runtime, /title: Type\.String/);
   assert.match(runtime, /markdown: Type\.String/);
   assert.match(runtime, /question: Type\.String/);
@@ -25,6 +27,7 @@ test("Plan artifact runtime uses the terminating SubmitPlan contract", async () 
   assert.match(main, /plans\.claimExecution/);
   assert.match(main, /plans\.finishExecution/);
   assert.match(main, /createNotification/);
+  assert.match(main, /event\.toolName === "SubmitGoal"/);
 
   const resolveStart = main.indexOf("handle(IPC.invoke.plansResolve");
   const resolveSource = main.slice(resolveStart, main.indexOf("handle(IPC.invoke.pluginList", resolveStart));
@@ -39,7 +42,7 @@ test("Electron retains the stable Plan IPC names and protocol version", async ()
   ]);
 
   assert.match(protocol, /PROTOCOL_VERSION = 9/);
-  assert.match(protocol, /SCHEMA_VERSION = 10/);
+  assert.match(protocol, /SCHEMA_VERSION = 11/);
   assert.match(protocol, /plansPending:/);
   assert.match(protocol, /plansResolve:/);
   assert.match(protocol, /plansChanged:/);

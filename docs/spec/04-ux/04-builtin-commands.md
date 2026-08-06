@@ -20,6 +20,7 @@ builtin.<domain>.<action>
 | `builtin.session.delete` | Delete Current Session | delete, session | Session | medium | confirm then delete active session |
 | `builtin.session.rename` | Rename Current Session | rename, session | Session | low | open rename UI |
 | `builtin.mode.plan` | Switch to Plan | mode, plan, planning | Mode | low | set idle session mode=plan |
+| `builtin.mode.goal` | Switch to Goal | mode, goal, objective, autonomous | Mode | low | set idle session mode=goal |
 | `builtin.mode.agent` | Switch to Agent | mode, agent, execute | Mode | low | set idle session mode=agent |
 | `builtin.agent.abort` | Abort Active Turn | abort, stop | Agent | low | abort current turn/permission wait |
 | `builtin.agent.compact` | Compact Conversation Context | compact, context, tokens | Agent | low | create a model-context checkpoint for the idle active session |
@@ -41,11 +42,13 @@ builtin.<domain>.<action>
 - Debug commands may be hidden in production release builds
 - Plugin management commands always available
 - Project commands available even without active session
-- `SubmitPlan` is a model tool, not a palette command. Mode commands are
+- `SubmitPlan` and `SubmitGoal` are model tools, not palette commands. Mode
+  commands are
   accepted only for an idle session; there is no Chat mode or request-changes
   alias.
 - Mode commands use the same active-session configuration path as the Composer
-  Agent/Plan chip. When no session is active, they update the persisted default
+  Agent/Plan/Goal chip. When no session is active, they update the persisted
+  default
   for the next session; a running session or pending approval is not changed.
 
 ## 5. Execution results
@@ -62,8 +65,8 @@ type CommandExecutionResult =
 
 1. All builtin IDs are unique and prefixed
 2. Palette search matches title/keywords
-3. Mode switch commands update the idle session mode immediately; Plan and
-   Agent refer to the same pi Agent
+3. Mode switch commands update the idle session mode immediately; Plan, Goal,
+   and Agent refer to the same pi Agent
 4. Abort command works during stream and permission pending
 5. Compact works while idle even when automatic context protection is disabled
    and returns `AGENT_BUSY` during an active turn/checkpoint
@@ -82,6 +85,7 @@ defined in the same registry that feeds palette search
 | `/compact` | `builtin.agent.compact` |
 | `/agent-mode` | `builtin.mode.agent` |
 | `/plan-mode` | `builtin.mode.plan` |
+| `/goal-mode` | `builtin.mode.goal` |
 | `/open-project` | `builtin.project.open` |
 | `/clear-project` | `builtin.project.clear` |
 | `/settings` | `builtin.settings.open` |
@@ -95,7 +99,8 @@ Aliases share one namespace with template and plugin command names; builtin
 aliases win collisions, then project templates, then user templates, then
 plugin commands. Selecting an alias inserts `/alias `; sending executes it
 locally without creating a session or a prompt when the alias is sent alone.
-The Agent/Plan aliases also support a prompt body: `/agent-mode <prompt>` or
-`/plan-mode <prompt>` switches the idle session (or the next-session default)
+The Agent/Plan/Goal aliases also support a prompt body: `/agent-mode <prompt>`,
+`/plan-mode <prompt>`, or `/goal-mode <prompt>` switches the idle session (or
+the next-session default)
 and sends `<prompt>` through the normal prompt path. The prompt body remains
 the visible user turn; a failed dispatch does not clear the composer draft.

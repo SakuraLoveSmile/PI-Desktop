@@ -71,6 +71,7 @@ import {
   Square,
   Star,
   Sun,
+  Target,
   Terminal,
   Trash2,
   TriangleAlert,
@@ -151,6 +152,8 @@ export const IconSlash = icon(Slash);
 export const IconUser = icon(UserRound);
 export const IconSparkles = icon(Sparkles);
 export const IconListChecks = icon(ListChecks);
+/** Goal mode: an outcome to reach, as opposed to Plan's list of steps. */
+export const IconTarget = icon(Target);
 export const IconBrowser = icon(AppWindow);
 export const IconHook = icon(Webhook);
 export const IconWorkflow = icon(Workflow);

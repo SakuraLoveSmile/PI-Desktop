@@ -10,7 +10,8 @@
 | Default mode | Agent |
 | Agent tools | Read / Glob / Grep / Write / Edit / Bash |
 | Plan tools | Read / Glob / Grep / BrowserPreview / Bash / CompactContext / SubmitPlan |
-| Plan hard deny | Write / Edit / all plugin tools / unknown tools |
+| Goal tools | Read / Glob / Grep / BrowserPreview / Bash / CompactContext / SubmitGoal |
+| Plan and Goal hard deny | Write / Edit / all plugin tools / unknown tools / the other kind's submit tool |
 | Permission timeout | 120s → deny |
 | allow-session scope | toolName |
 | Bash style | non-interactive; selected host catalog shell with streamed output |
@@ -30,6 +31,8 @@ Let the agent get things done, but stay under control by default.
 | `CompactContext` | low | Create a model-context checkpoint without workspace mutation |
 | `EnterPlanMode` | low | Move the same Agent from Agent to Plan after host validation |
 | `SubmitPlan` | low | Preserve exact Markdown bytes in a new `.pi/plan/*.md` artifact and request approval |
+| `EnterGoalMode` | low | Move the same Agent from Agent to Goal after host validation |
+| `SubmitGoal` | low | Preserve exact Markdown bytes in a new `.pi/goal/*.md` artifact and request approval |
 | `Write` | high | Create/overwrite files |
 | `Edit` | high | Modify files |
 | `Bash` | high | Execute commands |
@@ -132,10 +135,10 @@ the persisted prompt as binary content.
 - **Permissions.** `Write`/`Edit` whose `path` is lexically inside the
   session's scratch root auto-allow without a permission card — they cannot
   touch the project. The lexical check only skips the prompt; execution still
-  goes through the full resolver, so it is not an escape vector. Plan does not
-  expose Write/Edit, so the scratch auto-allow rule cannot make those tools
-  available in Plan. A Plan Bash call may still create or mutate scratch data
-  when its permission mode allows it.
+  goes through the full resolver, so it is not an escape vector. Plan and Goal do
+  not expose Write/Edit, so the scratch auto-allow rule cannot make those tools
+  available in either. A contract-mode Bash call may still create or mutate
+  scratch data when its permission mode allows it.
 - **Artifacts.** Successful scratch writes are not recorded in the
   `artifacts` table; artifact-driven file tabs represent workspace
   deliverables only, while the Files surface may still browse the active
@@ -408,16 +411,18 @@ matching log lines.
 - Session grants follow `sessionId` across project-tab switches and are never
   inherited by another session or Temporary conversation
 
-### 10.1 Plan control and context tools
+### 10.1 Plan and Goal control and context tools
 
 `CompactContext` is available when automatic context protection permits it and
-does not mutate the workspace. `SubmitPlan` is available only in Plan and must
-be the only tool call in its assistant batch. It preserves the exact Markdown
-bytes in a new unique `.pi/plan/*.md` artifact
-through host-core before creating one pending approval. `EnterPlanMode` is
-available only in Agent and must be the only tool call in its batch. The host
-validates the durable mode and active-turn/configuration boundary before either
-transition; the visible tool list is guidance, not the security boundary.
+does not mutate the workspace. A submit tool is available only in its own
+contract mode and must be the only tool call in its assistant batch. It preserves
+the exact Markdown bytes in a new unique artifact under the kind's directory
+(`.pi/plan/*.md` for `SubmitPlan`, `.pi/goal/*.md` for `SubmitGoal`)
+through host-core before creating one pending approval. `EnterPlanMode` and
+`EnterGoalMode` are available only in Agent, and each must be the only tool call
+in its batch. The host validates the durable mode, the proposal kind, and the
+active-turn/configuration boundary before any transition; the visible tool list
+is guidance, not the security boundary.
 
 ## 11. Plugin Tools
 
@@ -428,11 +433,12 @@ Plugins can contribute tools via `agentTools` in Agent only:
 3. PluginManager registers them into the ToolHost
 4. execution goes through the unified permission/audit/timeout wrapper
 
-No plugin tool is visible or executable in Plan, regardless of manifest risk,
-declared permission, session grant, or `auto`. A direct attempt returns
-`PLUGIN_DISABLED_IN_PLAN` and is audited as a Plan policy denial. Missing or
-invalid plugin risk defaults to `medium` for Agent and never grants Plan
-access.
+No plugin tool is visible or executable in Plan or Goal, regardless of manifest
+risk, declared permission, session grant, or `auto`. A direct attempt returns
+`PLUGIN_DISABLED_IN_PLAN` — the `_IN_PLAN` codes are shared by both contract
+modes rather than duplicated per kind — and is audited as a contract-mode policy
+denial. Missing or invalid plugin risk defaults to `medium` for Agent and never
+grants contract-mode access.
 
 Naming:
 - Internal full name: `plugin.<pluginId>.<toolName>`

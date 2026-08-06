@@ -1413,24 +1413,25 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   `autoCorrect="off"`, and `autoCapitalize="off"` so browser/OS spelling and
   autocorrect never rewrite coding prompts
 - Runtime chips keep descenders fully visible (D150): the Thinking, permission,
-  and Agent/Plan triggers in the Composer use compact line-height rather than
+  and mode triggers in the Composer use compact line-height rather than
   `leading-none` under overflow. The topbar model trigger still ellipsizes long
   IDs.
-- Agent / Plan, provider/model, permission, and shell-default changes update the
+- Mode, provider/model, permission, and shell-default changes update the
   active session/settings only while idle; they are disabled while a turn or
-  active pending Plan approval exists. Plan approval actions are the exception
-  while awaiting approval. The Composer-left Agent/Plan chip is the sole mode
-  control; the topbar model picker remains a model-only control. Palette and
-  Composer slash mode commands use the same active-session configuration path;
-  after host confirmation resolves a Plan approval, the approval surface is
-  removed rather than remaining as a terminal action card.
+  active pending Plan or Goal approval exists. Approval actions are the exception
+  while awaiting approval. The Composer-left Agent/Plan/Goal chip is the sole mode
+  control and cycles Agent → Plan → Goal → Agent on click; the topbar model picker
+  remains a model-only control. Palette and Composer slash mode commands use the
+  same active-session configuration path; after host confirmation resolves an
+  approval, the approval surface is removed rather than remaining as a terminal
+  action card.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing
   an existing session preserves its durable selection.
 - The model menu lists only enabled, runnable providers with a default model.
 - For a reasoning-capable active model, a separate Thinking trigger appears
-  immediately to the right of Agent / Plan and before the permission
+  immediately to the right of the mode chip and before the permission
   control. It shows the current level and opens only the exact model's supported
   levels in a compact single-column list and canonical order; the selected row
   carries a trailing check. The menu width fits its content up to 160px and is
@@ -1446,10 +1447,14 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   supported level (upward first, then downward); a non-reasoning provider
   persists `off`.
 - The Plan permission chip remains visible beside the mode selector. It shows
-  the effective Ask / Accept edits / Auto posture. In Plan, its help text says
-  that Bash is confirmed under Ask or Accept edits and may mutate without a
+  the effective Ask / Accept edits / Auto posture. In Plan and Goal, its help text
+  says that Bash is confirmed under Ask or Accept edits and may mutate without a
   confirmation under Auto; it does not imply that Write/Edit/plugin tools are
   available.
+- Goal shares the Plan approval surface (D198). The bar reads its copy from the
+  proposal's `kind`, so a goal contract shows "Goal approval", "Open goal", and
+  "Working toward goal" while the layout, permission split-button, expiry
+  reconciliation, and terminal-status behavior stay identical.
 
 ### 11.6 Accessibility
 

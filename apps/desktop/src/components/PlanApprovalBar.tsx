@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type {
   GlobalPermissionMode,
   PlanProposal,
+  ProposalKind,
 } from "@pi-desktop/shared";
 import { ErrorCodes as SharedErrorCodes } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
@@ -35,16 +36,20 @@ const APPROVAL_MODES: readonly GlobalPermissionMode[] = [
   "auto",
 ];
 
-const APPROVAL_MODE_LABEL_KEYS: Record<GlobalPermissionMode, string> = {
-  ask: "plan.ask",
-  "accept-edits": "plan.acceptEdits",
-  auto: "plan.auto",
+/**
+ * Plan and Goal share this one approval bar; only the copy differs, so every
+ * label is looked up under the proposal kind's i18n namespace (D198).
+ */
+const APPROVAL_MODE_LABELS: Record<GlobalPermissionMode, string> = {
+  ask: "ask",
+  "accept-edits": "acceptEdits",
+  auto: "auto",
 };
 
-const APPROVE_LABEL_KEYS: Record<GlobalPermissionMode, string> = {
-  ask: "plan.approveAsk",
-  "accept-edits": "plan.approveAcceptEdits",
-  auto: "plan.approveAuto",
+const APPROVE_LABELS: Record<GlobalPermissionMode, string> = {
+  ask: "approveAsk",
+  "accept-edits": "approveAcceptEdits",
+  auto: "approveAuto",
 };
 
 const PLAN_APPROVAL_RECONCILE_RETRY_MS = 5_000;
@@ -53,17 +58,22 @@ function isApprovalMode(value: string | undefined): value is GlobalPermissionMod
   return value === "ask" || value === "accept-edits" || value === "auto";
 }
 
-const PLAN_STATUS_LABEL_KEYS: Record<PlanCheckpointStatus, string> = {
-  pending: "plan.statusPending",
-  resolving: "plan.statusResolving",
-  approved: "plan.statusApproved",
-  queued: "plan.statusQueued",
-  running: "plan.statusRunning",
-  completed: "plan.statusCompleted",
-  rejected: "plan.statusRejected",
-  expired: "plan.statusExpired",
-  interrupted: "plan.statusInterrupted",
+const PLAN_STATUS_LABELS: Record<PlanCheckpointStatus, string> = {
+  pending: "statusPending",
+  resolving: "statusResolving",
+  approved: "statusApproved",
+  queued: "statusQueued",
+  running: "statusRunning",
+  completed: "statusCompleted",
+  rejected: "statusRejected",
+  expired: "statusExpired",
+  interrupted: "statusInterrupted",
 };
+
+/** `plan.reject` or `goal.reject`, chosen by the approved contract kind. */
+function copyKey(kind: ProposalKind, name: string): string {
+  return `${kind}.${name}`;
+}
 
 function formatPlanTimestamp(value: string | undefined, locale: string | undefined) {
   if (!value) return null;
@@ -95,6 +105,8 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   );
   const menuRef = useRef<HTMLDivElement>(null);
   const chevronRef = useRef<HTMLButtonElement>(null);
+  const kind: ProposalKind = proposal.kind === "goal" ? "goal" : "plan";
+  const copy = (name: string) => t(copyKey(kind, name));
   const artifactPath = proposal.artifact?.relativePath?.trim() || null;
   const isPending = proposal.status === "pending";
   const expiryTime = formatPlanTimestamp(
@@ -103,7 +115,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
   );
   const busy = resolving || reconciling;
   const status = planCheckpointStatus(proposal, resolving);
-  const statusText = t(PLAN_STATUS_LABEL_KEYS[status]);
+  const statusText = copy(PLAN_STATUS_LABELS[status]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -281,19 +293,20 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
     <section
       className="plan-approval-bar"
       role="region"
-      aria-label={t("plan.approvalRegion")}
+      aria-label={copy("approvalRegion")}
       aria-busy={busy}
+      data-kind={kind}
       data-status={proposal.status}
       data-execution-state={proposal.executionState || ""}
       data-testid="plan-approval-bar"
     >
       <span className="sr-only" role="status" aria-live="polite">
-        {isPending ? t("plan.readyAnnouncement") : statusText}
+        {isPending ? copy("readyAnnouncement") : statusText}
       </span>
       <div className="plan-approval-copy">
-        <div className="plan-approval-label">{t("plan.approvalRegion")}</div>
+        <div className="plan-approval-label">{copy("approvalRegion")}</div>
         <h2 className="plan-approval-title">
-          {proposal.title.trim() || t("plan.untitled")}
+          {proposal.title.trim() || copy("untitled")}
         </h2>
         <p className="plan-approval-question">{proposal.question}</p>
         <div className="plan-approval-details">
@@ -302,13 +315,15 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
               type="button"
               className="plan-approval-artifact"
               data-testid="plan-open-artifact"
-              aria-label={t("plan.openArtifactLabel", { path: artifactPath })}
+              aria-label={t(copyKey(kind, "openArtifactLabel"), {
+                path: artifactPath,
+              })}
               title={artifactPath}
               onClick={openArtifact}
             >
               <IconFileText size={14} aria-hidden />
               <span className="plan-approval-artifact-label">
-                {t("plan.openArtifact")}
+                {copy("openArtifact")}
               </span>
               <span className="plan-approval-artifact-path">
                 {artifactPath}
@@ -317,7 +332,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
           ) : null}
           {expiryTime ? (
             <span className="plan-approval-expiry">
-              {t("plan.expiresAt", { time: expiryTime })}
+              {t(copyKey(kind, "expiresAt"), { time: expiryTime })}
             </span>
           ) : null}
           <span
@@ -345,7 +360,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
             disabled={busy}
             onClick={() => void resolve("reject")}
           >
-            {t("plan.reject")}
+            {copy("reject")}
           </button>
           <div
             ref={menuRef}
@@ -356,20 +371,20 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
               type="button"
               className="plan-approval-approve-main"
               disabled={busy}
-              aria-label={t(APPROVE_LABEL_KEYS[approvalMode])}
+              aria-label={copy(APPROVE_LABELS[approvalMode])}
               onClick={() => void resolve("approve", approvalMode)}
             >
               {resolving
-                ? t("plan.approving")
-                : t(APPROVE_LABEL_KEYS[approvalMode])}
+                ? copy("approving")
+                : copy(APPROVE_LABELS[approvalMode])}
             </button>
             <button
               ref={chevronRef}
               type="button"
               className="plan-approval-approve-menu"
               disabled={busy}
-              aria-label={t("plan.chooseApprovalMode")}
-              title={t("plan.chooseApprovalMode")}
+              aria-label={copy("chooseApprovalMode")}
+              title={copy("chooseApprovalMode")}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((open) => !open)}
@@ -380,7 +395,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
               <div
                 className="plan-approval-menu"
                 role="menu"
-                aria-label={t("plan.chooseApprovalMode")}
+                aria-label={copy("chooseApprovalMode")}
               >
                 {APPROVAL_MODES.map((candidate) => (
                   <button
@@ -396,7 +411,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
                       void resolve("approve", candidate);
                     }}
                   >
-                    <span>{t(APPROVAL_MODE_LABEL_KEYS[candidate])}</span>
+                    <span>{copy(APPROVAL_MODE_LABELS[candidate])}</span>
                     {approvalMode === candidate ? (
                       <IconCheck size={13} aria-hidden />
                     ) : null}
@@ -410,7 +425,7 @@ export function PlanApprovalBar({ proposal }: { proposal: PlanProposal }) {
       {isPending && approvalMode === "auto" ? (
         <div className="plan-approval-warning" role="note">
           <IconTriangleAlert size={13} aria-hidden />
-          <span>{t("plan.autoWarning")}</span>
+          <span>{copy("autoWarning")}</span>
         </div>
       ) : null}
     </section>

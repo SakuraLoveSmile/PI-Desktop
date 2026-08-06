@@ -38,6 +38,7 @@ import {
   type ComposerPasteFile,
   normalizeMode,
   normalizeGlobalPermissionMode,
+  normalizeProposalKind,
   type AgentEventEnvelope,
   type AppMenuCommand,
   type AppNotification,
@@ -2933,6 +2934,8 @@ function planExecutionFromUnknown(value: unknown): PlanExecution | null {
     id: value.id,
     proposalId: value.proposalId,
     sessionId: value.sessionId,
+    // Legacy queued rows predate the discriminator and are Plan by definition.
+    kind: normalizeProposalKind(value.kind),
     plan: value.plan,
     title: value.title,
     question: value.question,
@@ -3198,7 +3201,10 @@ function persistAgentEvent(envelope: AgentEventEnvelope) {
       args: event.args,
       createdAt: new Date(envelope.ts).toISOString(),
     });
-    if (event.toolName === "SubmitPlan" && (envelope.turnId || turnId)) {
+    if (
+      (event.toolName === "SubmitPlan" || event.toolName === "SubmitGoal") &&
+      (envelope.turnId || turnId)
+    ) {
       planSubmissionTurnIds.add(
         planSubmissionTurnKey(envelope.sessionId, envelope.turnId || turnId!),
       );

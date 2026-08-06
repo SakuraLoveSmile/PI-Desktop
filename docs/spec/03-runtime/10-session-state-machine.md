@@ -1,29 +1,43 @@
-# 10. Session and Plan State Machine
+# 10. Session, Plan, and Goal State Machine
 
 ## 0. Durable operating mode versus live planning state
 
-Each session persists exactly one operating mode: `agent | plan`. There is one
-pi Agent. Live planning state and execution status are host/runtime projections:
+Each session persists exactly one operating mode: `agent | plan | goal`. There
+is one
+pi Agent. Live planning state and execution status are host/runtime projections.
+Plan and Goal are **contract modes**: both negotiate a proposal before executing
+and share one projection, one approval row, and one hard deny (**D198**). `kind`
+(`plan | goal`) is what distinguishes them, and the diagram below reads the same
+with Goal/`SubmitGoal` substituted for Plan/`SubmitPlan`:
 
 ```text
 Agent / inactive
   -- user selects Plan while idle OR Agent calls EnterPlanMode --> Plan / planning
-Plan / planning
-  -- SubmitPlan(title, markdown, question) --> Plan / awaiting_approval
-Plan / awaiting_approval
+  -- user selects Goal while idle OR Agent calls EnterGoalMode --> Goal / planning
+Plan | Goal / planning
+  -- SubmitPlan | SubmitGoal (title, markdown, question) --> awaiting_approval
+Plan | Goal / awaiting_approval
   -- approve(permission mode) --> Agent / queued, same Agent continues
   -- reject | expiry | abort | crash | persistence failure
-       --> Plan / planning
+       --> same contract mode / planning
 Agent / queued
   -- dispatcher starts --> Agent / running
 Agent / running
   -- complete | fail | abort --> Agent / inactive
 ```
 
-Plan retains the permission-mode selector. Its `Bash` policy is `ask` or
-`accept-edits` = confirmation and `auto` = no confirmation, so Plan expresses
-planning intent but is not a strict read-only security profile. Write/Edit and
-plugin tools remain denied by host policy in every Plan permission mode.
+Both contract modes retain the permission-mode selector. Their `Bash` policy is
+`ask` or
+`accept-edits` = confirmation and `auto` = no confirmation, so a contract mode
+expresses negotiating intent but is not a strict read-only security profile.
+Write/Edit and
+plugin tools remain denied by host policy in every Plan or Goal permission mode.
+
+The kinds differ only in what the contract says and what the queued execution
+instruction asks for: Plan proposes ordered steps to carry out, while Goal
+proposes a goal statement, acceptance criteria, and boundaries, and its
+execution keeps working — choosing its own approach — until every acceptance
+criterion is verified or a boundary blocks it.
 
 Mode and configuration changes through the UI/session API are allowed only
 while idle. Approval is not a generic tool permission: it is a separate
@@ -83,22 +97,28 @@ accept_prompt
 10. Supplying `throughMessageId` changes only the snapshot boundary. Assistant
     Fork/Edit still creates a new idle session id with no shared turn,
     permission wait, runtime, or provider-cache state (D134).
-11. `EnterPlanMode` and `SubmitPlan` must be the only tool call in their
-    assistant batch. `SubmitPlan` preserves exact Markdown bytes in a new
-    host-owned `.pi/plan/*.md` artifact and creates one pending
-    `plan_approvals` row with structured title/question and artifact fields.
+11. `EnterPlanMode`, `EnterGoalMode`, `SubmitPlan`, and `SubmitGoal` must be the
+    only tool call in their
+    assistant batch. A submit tool preserves exact Markdown bytes in a new
+    host-owned `.pi/<kind>/*.md` artifact and creates one pending
+    `plan_approvals` row with its `kind` plus structured title/question and
+    artifact fields. A submit tool called against the other kind's mode fails
+    with `PLAN_KIND_MISMATCH` and writes nothing.
 12. Only a matching `plans.resolve` can settle a pending proposal. Approval
     atomically changes the durable mode to Agent, stores the selected explicit
     permission mode, assigns an execution ID, and changes the row's
     `execution_state` to `queued`.
 13. Approve and reject are the only resolution actions. Rejection and expiry
-    close the pending row, then return the live state to editable Plan/planning
+    close the pending row, then return the live state to the editable
+    planning state of the same contract mode
     and grant no execution tools. A pending interruption does the same; a
     queued/running interruption after approval stays Agent.
-14. A second prompt, Plan submission, configuration change, or execution is
+14. A second prompt, Plan or Goal submission, configuration change, or execution
+    is
     rejected while the session has an active turn, pending approval, or
     queued/running execution. Configuration is accepted only while idle.
-15. A later Plan turn may revise a rejected/expired/interrupted checkpoint and
+15. A later turn in the same contract mode may revise a
+    rejected/expired/interrupted checkpoint and
     must create a new immutable artifact rather than overwrite the earlier
     snapshot.
 
@@ -113,12 +133,15 @@ transcript-file line first, index transaction second.
   update; never for a visible-current result or abort
 - assistant/tool messages: on message_end/tool_end
 - mode/project fields: on change
-- Plan submission: write exact Markdown bytes to a new unique `.pi/plan/*.md`,
-  record path/hash/size plus structured title/question, and insert a `pending`
+- Plan/Goal submission: write exact Markdown bytes to a new unique
+  `.pi/<kind>/*.md`,
+  record path/hash/size plus the kind and structured title/question, and insert
+  a `pending`
   `plan_approvals` row before the approval event
-- Plan approval: approval outcome, mode transition, permission mode, execution
+- Plan/Goal approval: approval outcome, mode transition, permission mode,
+  execution
   ID, and `queued` state in one transaction; reject/expiry/interruption retain
-  Plan and return live planning to editable state
+  the contract mode and return live planning to editable state
 - startup recovery: transactionally interrupt pending approvals and
   queued/running execution states before serving RPC; abort associated running
   turns and never replay work
@@ -139,14 +162,22 @@ transcript-file line first, index transaction second.
    produce a child
 7. a message-scoped fork excludes later rows and begins with no source runtime
    or provider-cache state
-8. Plan and Agent use one pi Agent; the Composer-left mode chip, UI entry, and
-   `EnterPlanMode` converge on the same planning state, and approval resumes
+8. Plan, Goal, and Agent use one pi Agent; the Composer-left mode chip, UI
+   entry, and
+   `EnterPlanMode`/`EnterGoalMode` converge on the same planning state, and
+   approval resumes
    that Agent in Agent mode
-9. Plan policy permits Bash only through the selected permission mode and
-   denies Write/Edit/plugins regardless of `auto` or session grants
-10. SubmitPlan writes an exact unique `.pi/plan/*.md` artifact with hash/size,
+9. Contract-mode policy permits Bash only through the selected permission mode
+   and
+   denies Write/Edit/plugins regardless of `auto` or session grants, in Goal
+   exactly as in Plan
+10. SubmitPlan/SubmitGoal writes an exact unique `.pi/<kind>/*.md` artifact with
+    hash/size,
     keeps title/question structured, and only approve/reject can resolve its
     `plan_approvals` row
 11. Expiry uses `PLAN_APPROVAL_TIMEOUT`; startup interruption, shell failure,
     and process recovery are fail closed, and restart does not replay pending,
     queued, or running work
+12. A Goal execution reports each acceptance criterion's outcome before ending
+    the turn, and a scheduled/unattended Goal run is rejected with
+    `PLAN_REQUIRES_INTERACTIVE_SESSION` exactly like Plan

@@ -144,7 +144,8 @@ Rules:
    and scheduled-task mode projection from `config_json`. A v7 or incompatible
    v8 host must be rejected before the UI becomes interactive.
 
-Protocol v9 remains paired with host-core storage schema v10. The schema version
+Protocol v9 remains paired with host-core storage schema v11 (v11 adds the
+`plan_approvals.kind` discriminator). The schema version
 is an internal persistence invariant, not an additional JSON-RPC field; the
 checkpoint architecture remains host-owned.
 
@@ -214,9 +215,9 @@ type ToolBudgetHealth = {
 - `session.configure` — atomically persists `mode`, `providerId`, `modelId`,
   and optional `thinkingLevel` for the next pi turn; omitting/null
   `thinkingLevel` preserves the current value; invalid modes or levels return
-  `INVALID_PARAMS`; mode is `plan | agent` and changing any session
+  `INVALID_PARAMS`; mode is `plan | goal | agent` and changing any session
   configuration is allowed only while idle and without a pending/queued/running
-  Plan record
+  Plan or Goal record
 - `session.appendMessage`
 - `session.appendCompaction` — sidecar-only append of the newest typed
   model-context checkpoint. It requires non-empty checkpoint/summary/boundary
@@ -240,22 +241,31 @@ type ToolBudgetHealth = {
   project path is normalized and upserted into `projects` before the session
   references it; returns `{ imported, skipped }`
 
-### Plan state and approvals
+### Plan and Goal state and approvals
+
+Both contract kinds share these methods; the optional `kind`
+(`plan | goal`, default `plan` so a pre-D198 sidecar still works) selects which
+contract is being negotiated.
 
 - `plans.enter` — accepts only the active Agent turn's `sessionId`, `turnId`,
-  and `toolCallId`; host-core performs the mode transition with a compare-and-
-  swap update and emits `plans.changed`
-- `plans.submit` — writes the host-owned artifact and creates a pending proposal
-- `plans.pending` — returns only pending approval rows and the session planning
-  state; renderer reload does not extend the absolute deadline while the host
-  remains alive and does not restore terminal cards
+  and `toolCallId` plus the `kind`; host-core performs the mode transition to
+  that kind's mode with a compare-and-swap update and emits `plans.changed`
+  carrying the `kind`. An unrecognized `kind` fails with `INVALID_PARAMS`
+- `plans.submit` — writes the host-owned artifact under the kind's directory and
+  creates a pending proposal whose `kind` is persisted on the row
+- `plans.pending` — returns only pending approval rows, the session planning
+  state, and the `kind` of the contract being negotiated (the pending row's kind,
+  falling back to the session's own contract mode); renderer reload does not
+  extend the absolute deadline while the host remains alive and does not restore
+  terminal cards
 - `plans.resolve` — validates one matching approve/reject response and, for
   approval, commits the selected permission mode and `execution_state = queued`
 - `plans.queuedExecutions` / `plans.claimExecution` /
   `plans.finishExecution` — consume and transition execution fields on the
-  same approval row
+  same approval row; the claimed execution reports its `kind` so the sidecar can
+  select the matching execution instruction
 - `plans.abort` — marks pending approval work interrupted; it never replays or
-  changes an already-approved session back to Plan
+  changes an already-approved session back to its contract mode
 
 ### Scheduled tasks
 
@@ -267,9 +277,9 @@ type ToolBudgetHealth = {
 The wire `ScheduledTask.mode` is a normalized projection of the durable
 `config_json.mode`; create, update, and import map legacy `chat` to `plan` and
 default missing values to `agent`. `scheduled.run` reads the selected task's
-persisted mode; a `plan` task fails with `PLAN_REQUIRES_INTERACTIVE_SESSION`
-before creating a session or run. It never uses `settings.defaultMode` as the
-task mode.
+persisted mode; a `plan` or `goal` task fails with
+`PLAN_REQUIRES_INTERACTIVE_SESSION` before creating a session or run. It never
+uses `settings.defaultMode` as the task mode.
 
 Canonical thinking levels at the host boundary are:
 
@@ -434,11 +444,15 @@ not inherit this exception.
 
 Before generic permission evaluation, host-core applies the mode policy:
 
-- Plan allows `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`,
-  `CompactContext`, and `SubmitPlan` as applicable to the live planning state.
-- Plan denies `Write`, `Edit`, every plugin tool, and unknown tools under all
-  permission modes and grants.
-- Plan `Bash` follows the resolved permission mode: `ask` and `accept-edits`
+- Plan and Goal allow `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`,
+  `CompactContext`, and the kind's submit tool (`SubmitPlan` / `SubmitGoal`) as
+  applicable to the live planning state.
+- Plan and Goal deny `Write`, `Edit`, every plugin tool, and unknown tools under
+  all permission modes and grants. The host reads the session's **durable** mode
+  for this check, so a sidecar claiming `agent` in `tools.execute` cannot widen
+  it, and the `*_IN_PLAN` error codes are shared by both kinds.
+- Plan and Goal `Bash` follows the resolved permission mode: `ask` and
+  `accept-edits`
   emit `permissions.request`; `auto` executes without confirmation and may
   mutate. The host re-resolves the effective shell ID/dialect and requires the
   exact `expectedCommandShellId` and `expectedCommandShellDialect` before
@@ -471,18 +485,21 @@ type ToolsExecuteResult = {
 }
 ```
 
-### 5.1 Plan submission and approval contracts
+### 5.1 Plan and Goal submission and approval contracts
 
-`SubmitPlan` is handled as a host transition before generic tool execution. The
-host preserves the exact Markdown bytes in a new unique artifact before
-publishing the proposal.
+`SubmitPlan` and `SubmitGoal` are handled as host transitions before generic
+tool execution. The host preserves the exact Markdown bytes in a new unique
+artifact under the kind's directory before publishing the proposal.
 
 ```ts
+// Identical shape for both kinds; the tool name selects the kind.
 type SubmitPlanParams = {
   title: string;
   markdown: string;
   question: string;
 };
+
+type ProposalKind = "plan" | "goal";
 
 type PlanningState = "inactive" | "planning" | "awaiting_approval";
 
@@ -498,7 +515,7 @@ type PlanExecutionState =
   | "queued" | "running" | "completed" | "interrupted";
 
 type PlanArtifact = {
-  relativePath: string; // `.pi/plan/<unique-name>.md`
+  relativePath: string; // `.pi/plan/<unique-name>.md` or `.pi/goal/<unique-name>.md`
   sha256: string;
   sizeBytes: number;
 };
@@ -508,6 +525,9 @@ type PlanProposal = {
   sessionId: string;
   turnId: string;
   toolCallId: string;
+  // Which contract this approval carries; rows written before the
+  // discriminator existed read back as `plan`.
+  kind: ProposalKind;
   plan: string;
   markdown: string;
   title: string;
@@ -530,6 +550,8 @@ type PlanExecution = {
   id: string;
   proposalId: string;
   sessionId: string;
+  // Which contract was approved; selects the sidecar's execution instruction.
+  kind: ProposalKind;
   plan: string;
   title: string;
   question: string;
@@ -541,6 +563,9 @@ type PlanExecution = {
 type PlansPendingResult = {
   plans: PlanProposal[];
   state?: PlanningState;
+  // The contract being negotiated: the pending row's kind, else the session's
+  // own contract mode. Absent when nothing is being negotiated.
+  kind?: ProposalKind;
 };
 
 type PlanResolveIdentity = {
@@ -575,6 +600,7 @@ method: "plans.changed"
 params: {
   sessionId: string
   state: PlanningState
+  kind?: ProposalKind
   proposalId?: string
   proposal?: PlanProposal
   action?: PlanApprovalAction
@@ -594,9 +620,11 @@ method: "tools.output"
 params: ToolsOutputParams
 ```
 
-`plans.changed` is emitted for Plan entry, submission, resolution, execution
-claim/finish, and abort. Its top-level params are exactly the fields shown;
-fields not applicable to a transition are omitted. For `plans.resolve`, the
+`plans.changed` is emitted for Plan or Goal entry, submission, resolution,
+execution claim/finish, and abort. Its top-level params are exactly the fields
+shown; fields not applicable to a transition are omitted, and `kind` names the
+contract so the renderer can pick the right mode chip and approval copy without
+inspecting the projected state. For `plans.resolve`, the
 host emits `targetPermissionMode` and `execution` as JSON `null` when no value
 exists. Electron forwards this notification unchanged through
 the shared `IPC.event.plansChanged` renderer channel.
@@ -610,7 +638,8 @@ sets `sessions.mode = agent`, and stores the selected
 as the next approval default. Ask remains the product default. The same Agent then receives a new provider
 request with Agent tools.
 
-`reject` records `rejected` and leaves the session in Plan. The absolute
+`reject` records `rejected` and leaves the session in its contract mode (Plan or
+Goal). The absolute
 30-minute deadline records `expired` with `PLAN_APPROVAL_TIMEOUT`. Abort, host
 restart, sidecar restart, or persistence failure records `interrupted`. Before
 serving RPC after startup, the host transactionally interrupts prior pending
@@ -698,16 +727,16 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 | 1010 | PLUGIN_LOAD_FAILED | enable/load failure |
 | 1011 | PROTOCOL_MISMATCH | handshake version mismatch |
 | -32029 | HOST_OVERLOADED | RPC dispatcher capacity exhausted |
-| 1012 | WRITE_DISABLED_IN_PLAN | Write is unavailable in Plan |
-| 1013 | EDIT_DISABLED_IN_PLAN | Edit is unavailable in Plan |
-| 1014 | PLUGIN_DISABLED_IN_PLAN | plugin tools are unavailable in Plan |
-| 1015 | PLAN_APPROVAL_REQUIRED | SubmitPlan is waiting for approval |
+| 1012 | WRITE_DISABLED_IN_PLAN | Write is unavailable in Plan and Goal |
+| 1013 | EDIT_DISABLED_IN_PLAN | Edit is unavailable in Plan and Goal |
+| 1014 | PLUGIN_DISABLED_IN_PLAN | plugin tools are unavailable in Plan and Goal |
+| 1015 | PLAN_APPROVAL_REQUIRED | SubmitPlan/SubmitGoal is waiting for approval |
 | 1016 | PLAN_APPROVAL_TIMEOUT | absolute approval deadline expired |
 | 1017 | PLAN_APPROVAL_STALE | response does not match the live proposal/session/turn/tool-call/version |
 | 1018 | PLAN_APPROVAL_INTERRUPTED | pending approval failed closed during abort/recovery |
-| 1019 | PLAN_REQUIRES_INTERACTIVE_SESSION | unattended Plan cannot run |
-| 1020 | PLAN_ARTIFACT_WRITE_FAILED | exact bytes could not be written to a new `.pi/plan/*.md` artifact |
-| 1021 | PLAN_EXECUTION_INTERRUPTED | approved queued/running Plan execution was interrupted |
+| 1019 | PLAN_REQUIRES_INTERACTIVE_SESSION | unattended Plan or Goal cannot run |
+| 1020 | PLAN_ARTIFACT_WRITE_FAILED | exact bytes could not be written to a new `.pi/<kind>/*.md` artifact |
+| 1021 | PLAN_EXECUTION_INTERRUPTED | approved queued/running Plan or Goal execution was interrupted |
 | 1022 | SHELL_NOT_FOUND | no effective platform shell is available |
 | 1023 | COMMAND_SHELL_CHANGED | pinned shell ID or dialect changed before execution |
 
@@ -723,13 +752,14 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
    it is scoped to its session/tool call and has no turn or ordering fields;
    final results remain bounded
 5. Abort is idempotent and shuts down the complete Bash process tree
-6. Plan approval requests are proposal/session/turn/tool-call/version scoped;
+6. Plan and Goal approval requests are proposal/session/turn/tool-call/version
+   scoped;
    only one pending approval and one queued/running execution exists per
    session, and resolution is serialized by host-core
 7. Startup transactionally interrupts pending approvals and queued/running
    execution states before RPC service. Late renderer responses fail closed;
-   pending interruption keeps Plan and an already-approved queued/running
-   interruption keeps Agent.
+   pending interruption keeps the session's contract mode and an
+   already-approved queued/running interruption keeps Agent.
 8. A session fork is one host-owned snapshot operation. The source transcript
    is never rewritten, and a handled child write/index failure leaves no
    visible session or orphan transcript file. A process crash follows D119's
@@ -764,12 +794,15 @@ Timeout behavior (**D005**): after 120s unresolved → deny.
 9. Forking through a message excludes every later source row and rejects an
    unknown message without creating a child
 10. A forged `requestedMode` cannot authorize a tool against the durable mode;
-    Plan denies Write/Edit/plugin/unknown tools and applies permission prompts
-    to Bash according to `ask`/`accept-edits`/`auto`
-11. SubmitPlan writes exact Markdown bytes to a unique `.pi/plan/*.md` file with
+    Plan and Goal deny Write/Edit/plugin/unknown tools and apply permission
+    prompts to Bash according to `ask`/`accept-edits`/`auto`
+11. SubmitPlan and SubmitGoal write exact Markdown bytes to a unique
+    `.pi/plan/*.md` or `.pi/goal/*.md` file with
     hash/size and structured title/question fields; only matching
-    approve/reject responses can resolve the live `plan_approvals` row
-12. Plan expiry, abort, crash, scheduled rejection, and stale responses
+    approve/reject responses can resolve the live `plan_approvals` row, and a
+    submit tool run against the other kind fails with `PLAN_KIND_MISMATCH`
+    without writing an artifact
+12. Plan and Goal expiry, abort, crash, scheduled rejection, and stale responses
     produce the documented durable statuses and events
 13. Bash validates the pinned shell ID/dialect, streams stdout/stderr, enforces
     the 60s default/bounded override, and shuts down the complete process tree

@@ -224,8 +224,8 @@ persistence completes.
 ## 5b. Operating mode and planning state
 
 - Default product mode: **Agent**
-- The product selector is **Agent | Plan**; the internal conversation page may
-  still use `page = "chat"`
+- The product selector is **Agent | Plan | Goal**; the internal conversation page
+  may still use `page = "chat"`
 - Mode is session-scoped and persisted with session metadata
 - Thinking level is session-scoped and persisted with session metadata
 - Composer configuration is mutable only while the session is idle
@@ -235,13 +235,22 @@ persistence completes.
 The live planning state is derived and projected as:
 
 ```ts
-type OperatingMode = "agent" | "plan";
+type OperatingMode = "agent" | "plan" | "goal";
+type ProposalKind = "plan" | "goal";
 type PlanningState =
   | "inactive"
   | "planning"
   | "awaiting_approval";
 type PlanExecutionState = "queued" | "running" | "completed" | "interrupted";
 ```
+
+Plan and Goal are the two **contract modes** (D198). They share one durable
+approval table, one projected `PlanningState`, one approval surface, and one
+execution queue; a `kind` discriminator (`plan` | `goal`) on the proposal selects
+the prompt, the artifact directory, and the user-facing copy. `Agent` is the only
+mode with no kind, and is the only mode that executes freely. Because the
+projection is shared, `planning` and `awaiting_approval` are always read together
+with the kind to know which durable mode a session is in.
 
 `Agent / inactive` enters `Plan / planning` either when the user selects Plan
 while idle or when the Agent calls `EnterPlanMode`. In Plan, the Agent can
@@ -270,6 +279,25 @@ Agent is an intentional user override and does not synthesize a plan or
 approval. Each session has one active turn, one pending approval, and one
 queued/running execution; a second prompt, configuration change, or execution
 is rejected.
+
+`Agent / inactive` enters `Goal / planning` the same two ways, by user selection
+while idle or by the Agent calling `EnterGoalMode`. Goal has the identical tool
+surface as Plan, except that its submit tool is
+`SubmitGoal(title, markdown, question)` and its artifact is written to
+`.pi/goal/<unique-name>.md`. The submitted Markdown is a **goal contract** — the
+outcome to reach, the acceptance criteria that prove it was reached, and the
+boundaries that must not be crossed — not a list of implementation steps. A
+submit tool is rejected with `PLAN_KIND_MISMATCH` when the session's active kind
+is the other one, and with `PLAN_NOT_ACTIVE` when no contract is active.
+
+Goal approval commits exactly what Plan approval commits: `mode = agent`, the
+explicit permission mode, an execution ID, and `execution_state = queued` on the
+same row. The queued execution instruction differs by kind. An approved plan is
+replayed as steps to follow; an approved goal instructs the Agent to choose its
+own approach, verify every acceptance criterion by running the checks the
+contract names, keep working while a criterion is unmet and an untried approach
+remains, stop early only when a boundary blocks it, and close with a
+criterion-by-criterion report of what was met and the evidence observed.
 
 ## 5c. Thinking capability and stream contract
 
@@ -350,7 +378,7 @@ Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studi
 
 ```text
 [base product prompt in English]
-+ [operating-state prompt: agent/plan]
++ [operating-state prompt: agent/plan/goal]
 + [workspace info]
 + [tool instructions]
 + [project instruction chain, when present]
@@ -394,9 +422,11 @@ the mode's core set plus `CompactContext` when automatic compaction is enabled:
 - both modes: `ToolSearch` when at least one deferred capability exists
 
 In Agent mode, `Glob` and `Grep` join `BrowserPreview`, plugin tools, `Skill`,
-and plugin-development helpers in the deferred set. Plan keeps its
-read/inspection core available, while `SubmitPlan` is exposed only during the
-planning state. Deferred tools are registered but their names and compact
+and plugin-development helpers in the deferred set. Both contract modes keep
+their read/inspection core available, while the kind's submit tool
+(`SubmitPlan` or `SubmitGoal`) is exposed only during the planning state, and
+only for the active kind. Deferred tools are registered but their names and
+compact
 one-line descriptions appear in an `# On-demand tools` catalog; parameter
 schemas do not. The catalog is bounded so a plugin with many tools cannot
 recreate the original prompt bloat.
@@ -436,6 +466,25 @@ not write or edit it itself and does not receive a request-changes flow.
 
 The prompt may describe Bash as permission-gated and potentially mutating. It
 must not describe Plan as a strict read-only security boundary.
+
+### 7.2a Goal prompt requirements
+
+The Goal prompt tells the same Agent to negotiate a goal contract before any
+autonomous work. It asks for what to achieve rather than how: the outcome, the
+acceptance criteria, and the boundaries. It must not enumerate implementation
+steps, because the Agent decides those itself after approval. Every acceptance
+criterion must be objectively checkable by the Agent after execution — a command
+that must pass, or an observable behavior. The Agent inspects the workspace and
+asks about anything ambiguous first, then calls `SubmitGoal` immediately exactly
+once in the current turn with one complete Markdown snapshot.
+
+The one-submit rule, the historical-checkpoint rule, the revise-after-close rule,
+the no-chat-confirmation rule, and the host-writes-the-artifact rule are the same
+as Plan's, with `SubmitGoal` and `.pi/goal/*.md` in place of their Plan
+equivalents. The prompt additionally states that once approved, the contract is
+the standard the Agent works against: it pursues the goal autonomously, chooses
+its own approach, and stops only when every acceptance criterion is verified or a
+boundary blocks it.
 
 ### 7.3 Project instruction chain
 

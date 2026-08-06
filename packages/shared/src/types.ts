@@ -3,14 +3,38 @@ import type { AppError } from "./errors.js";
 import type { KeybindingOverrides } from "./keyboard-shortcuts.js";
 import type { CommandShellId } from "./command-shells.js";
 
-export type Mode = "plan" | "agent";
+export type Mode = "plan" | "goal" | "agent";
 
 /** Normalize mode values at compatibility boundaries. Older persisted and
  * scheduled data used `chat`; it is now the Plan operating state. */
 export function normalizeMode(value: unknown, fallback: Mode = "agent"): Mode {
   if (value === "agent") return "agent";
+  if (value === "goal") return "goal";
   if (value === "plan" || value === "chat") return "plan";
   return fallback;
+}
+
+/** Approval-proposal discriminator (D198). Plan and Goal share one host
+ * approval pipeline; `kind` selects prompts, artifact directory and copy. */
+export type ProposalKind = "plan" | "goal";
+
+export const PROPOSAL_KINDS = ["plan", "goal"] as const;
+
+export function normalizeProposalKind(
+  value: unknown,
+  fallback: ProposalKind = "plan",
+): ProposalKind {
+  return value === "goal" || value === "plan" ? value : fallback;
+}
+
+/** The proposal kind a mode submits, or `null` for freely executing modes. */
+export function proposalKindForMode(mode: Mode): ProposalKind | null {
+  return mode === "plan" || mode === "goal" ? mode : null;
+}
+
+/** The operating mode that owns a proposal kind. */
+export function modeForProposalKind(kind: ProposalKind): Mode {
+  return kind;
 }
 
 export type PlanningState = "inactive" | "planning" | "awaiting_approval";
@@ -47,10 +71,12 @@ export type PlanProposal = {
   /** Durable approval/proposal identity. */
   id: string;
   sessionId: string;
-  /** Durable host turn ID owning the SubmitPlan call. */
+  /** Durable host turn ID owning the SubmitPlan/SubmitGoal call. */
   turnId: string;
-  /** Exact SubmitPlan tool-call ID used to create this approval. */
+  /** Exact SubmitPlan/SubmitGoal tool-call ID used to create this approval. */
   toolCallId: string;
+  /** Which contract this approval carries; legacy rows read back as `plan`. */
+  kind: ProposalKind;
   title: string;
   /** Exact Markdown snapshot submitted for approval. */
   markdown: string;
@@ -77,6 +103,8 @@ export type PlanExecution = {
   id: string;
   proposalId: string;
   sessionId: string;
+  /** Which contract was approved; drives the execution instruction. */
+  kind: ProposalKind;
   /** Exact approved Markdown snapshot. */
   plan: string;
   title: string;
@@ -92,6 +120,8 @@ export type ApprovedPlanExecution = PlanExecution;
 export type PlanningStateEvent = {
   sessionId: string;
   state: PlanningState;
+  /** Absent only for `inactive` transitions that carry no proposal. */
+  kind?: ProposalKind;
   proposalId?: string;
   title?: string;
   markdown?: string;
@@ -109,6 +139,8 @@ export type PlanningStateEvent = {
 export type PlansPendingResult = {
   plans: PlanProposal[];
   state?: PlanningState;
+  /** Contract kind the session is currently negotiating, when any (D198). */
+  kind?: ProposalKind;
 };
 
 export type PlansQueuedExecutionsResult = {

@@ -107,6 +107,9 @@ impl PermissionManager {
         }
     }
 
+    /// The shared contract-mode allowlist. Plan and Goal expose the same
+    /// read/inspect core plus Bash; only their submit tool differs, and that one
+    /// is a sidecar-side tool that never reaches this gate.
     pub fn plan_mode_allows(tool_name: &str) -> bool {
         matches!(
             tool_name,
@@ -118,8 +121,9 @@ impl PermissionManager {
     ///
     /// `permission_mode` is the already-resolved effective mode — the
     /// caller collapses `inherit` against the global default before calling.
-    /// Plan mode's hard deny for unavailable tools stays above every permission
-    /// mode: `auto` cannot re-enable Write/Edit/plugins in Plan.
+    /// The contract modes' hard deny for unavailable tools stays above every
+    /// permission mode: `auto` cannot re-enable Write/Edit/plugins in Plan or
+    /// Goal.
     #[cfg(test)]
     pub fn evaluate_auto_with_permission_mode(
         &self,
@@ -174,9 +178,10 @@ impl PermissionManager {
         declared_risk: Option<&str>,
         requires_external_path_permission: bool,
     ) -> Option<PermissionDecision> {
-        // Plan's tool allowlist is authoritative. This check intentionally
-        // precedes low-risk classification, auto, grants, and scratch paths.
-        if mode == "plan" && !Self::plan_mode_allows(tool_name) {
+        // The contract modes' tool allowlist is authoritative. This check
+        // intentionally precedes low-risk classification, auto, grants, and
+        // scratch paths, and covers Goal as well as Plan (D198).
+        if crate::sessions::is_contract_mode(mode) && !Self::plan_mode_allows(tool_name) {
             return Some(PermissionDecision::Deny);
         }
 
@@ -456,6 +461,33 @@ mod tests {
                 "{tool} must be denied in plan"
             );
         }
+    }
+
+    #[test]
+    fn goal_mode_shares_plans_hard_deny_and_bash_semantics() {
+        let pm = PermissionManager::default();
+        let mut grants = HashMap::new();
+        grants.insert(
+            "s".to_string(),
+            vec!["Write".to_string(), "plugin_x_run".to_string()],
+        );
+        for tool in ["Write", "Edit", "plugin_x_run", "unknown"] {
+            for mode in ["ask", "accept-edits", "auto"] {
+                assert_eq!(
+                    pm.evaluate_auto_with_permission_mode("s", tool, "goal", mode, &grants),
+                    Some(PermissionDecision::Deny),
+                    "{tool} must be denied in goal + {mode}"
+                );
+            }
+        }
+        assert_eq!(
+            pm.evaluate_auto_with_permission_mode("s", "Bash", "goal", "ask", &no_grants()),
+            None
+        );
+        assert_eq!(
+            pm.evaluate_auto_with_permission_mode("s", "Bash", "goal", "auto", &no_grants()),
+            Some(PermissionDecision::AllowOnce)
+        );
     }
 
     #[test]

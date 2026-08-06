@@ -13,6 +13,7 @@ import type {
   ContextCompactionRecord,
   ContextCompactionSettings,
   CommandShellOption,
+  Mode,
   PlanExecution,
   ThinkingLevel,
   UiMessage,
@@ -51,7 +52,7 @@ const commandShell: CommandShellOption = {
 function createRuntime(
   overrides: Partial<{
     provider: RuntimeProviderConfig;
-    mode: "chat" | "agent";
+    mode: Mode | "chat";
     thinkingLevel: ThinkingLevel;
     history: UiMessage[];
     compaction: ContextCompactionRecord;
@@ -858,6 +859,7 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
       "Write",
       "CompactContext",
       "EnterPlanMode",
+      "EnterGoalMode",
       "ToolSearch",
     ]);
     expect(names).not.toContain("BrowserPreview");
@@ -994,6 +996,7 @@ describe("DesktopAgentRuntime mode and tool composition", () => {
       ]),
     );
     expect(agentTools).not.toContain("SubmitPlan");
+    expect(agentTools).not.toContain("SubmitGoal");
 
     runtime.setMode("plan");
     expect((runtime as any).agent).toBe(initialAgent);
@@ -1014,6 +1017,7 @@ describe("DesktopAgentRuntime mode and tool composition", () => {
       expect.arrayContaining(["Write", "Edit", "plugin_demo_run"]),
     );
     expect(planTools).not.toContain("EnterPlanMode");
+    expect(planTools).not.toContain("SubmitGoal");
     expect(agent.state.systemPrompt).toContain("SubmitPlan");
     expect(agent.state.systemPrompt).toContain("Do not use Write, Edit, plugin tools");
     expect(agent.state.systemPrompt).not.toContain("plugin_demo_run");
@@ -1022,6 +1026,43 @@ describe("DesktopAgentRuntime mode and tool composition", () => {
     runtime.setMode("agent");
     expect((runtime as any).agent).toBe(initialAgent);
     expect(agent.state.tools.map((tool: any) => tool.name)).toContain("EnterPlanMode");
+    await runtime.dispose();
+  });
+
+  it("gives Goal mode the read-only core plus only SubmitGoal", async () => {
+    const runtime = createRuntime({
+      mode: "goal",
+      pluginTools: [
+        {
+          name: "plugin_demo_run",
+          description: "demo",
+          parameters: { type: "object", properties: {} },
+        },
+      ],
+    });
+    const agent = (runtime as any).agent;
+    const goalTools = agent.state.tools.map((tool: any) => tool.name);
+
+    expect(goalTools).toEqual(
+      expect.arrayContaining([
+        "Read",
+        "Glob",
+        "Grep",
+        "BrowserPreview",
+        "Bash",
+        "CompactContext",
+        "SubmitGoal",
+      ]),
+    );
+    expect(goalTools).not.toContain("Write");
+    expect(goalTools).not.toContain("Edit");
+    expect(goalTools).not.toContain("plugin_demo_run");
+    expect(goalTools).not.toContain("SubmitPlan");
+    expect(goalTools).not.toContain("EnterGoalMode");
+    expect(runtime.getStatus().planningState).toBe("planning");
+    expect(agent.state.systemPrompt).toContain("SubmitGoal");
+    expect(agent.state.systemPrompt).toContain("acceptance criteria");
+
     await runtime.dispose();
   });
 });
@@ -1056,6 +1097,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
       sessionId: "session-1",
       turnId: "turn-1",
       toolCallId: "enter-call",
+      kind: "plan",
     });
 
     const exactMarkdown = "  # Implement it\n\n1. Make the change.  \n";
@@ -1064,6 +1106,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
       sessionId: "session-1",
       turnId: "durable-turn-1",
       toolCallId: "submit-call-1",
+      kind: "plan",
       title: "Implement it",
       markdown: exactMarkdown,
       plan: exactMarkdown,
@@ -1097,12 +1140,115 @@ describe("DesktopAgentRuntime plan transitions", () => {
       expect.objectContaining({
         sessionId: "session-1",
         toolCallId: "submit-call-1",
+        kind: "plan",
         title: proposal.title,
         markdown: proposal.markdown,
         question: proposal.question,
       }),
     );
     expect(host.call).toHaveBeenCalledTimes(2);
+
+    await runtime.dispose();
+  });
+
+  it("routes the Goal contract through the same host approval with kind goal", async () => {
+    const host = { call: vi.fn() };
+    const runtime = createRuntime({ host, turnId: "turn-1" });
+    const agent = (runtime as any).agent;
+
+    host.call.mockResolvedValueOnce({ ok: true, state: "planning" });
+    const enterTool = agent.state.tools.find(
+      (tool: any) => tool.name === "EnterGoalMode",
+    );
+    await enterTool.execute("enter-goal-call", {});
+    expect(runtime.getMode()).toBe("goal");
+    expect(host.call).toHaveBeenNthCalledWith(1, "plans.enter", {
+      sessionId: "session-1",
+      turnId: "turn-1",
+      toolCallId: "enter-goal-call",
+      kind: "goal",
+    });
+
+    const markdown = "# Goal\n\nCheckout works.\n\n## Acceptance criteria\n- tests pass\n";
+    const proposal = {
+      id: "proposal-goal-1",
+      sessionId: "session-1",
+      turnId: "durable-turn-1",
+      toolCallId: "submit-goal-call",
+      kind: "goal",
+      title: "Checkout works",
+      markdown,
+      plan: markdown,
+      question: "Approve this goal?",
+      artifact: {
+        relativePath: ".pi/goal/proposal-goal-1.md",
+        sha256: "def456",
+        sizeBytes: 42,
+      },
+      version: 1,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    host.call.mockResolvedValueOnce({ status: "pending", proposal });
+    const submitTool = agent.state.tools.find(
+      (tool: any) => tool.name === "SubmitGoal",
+    );
+    expect(submitTool.description).toContain("acceptance criteria");
+    const submitResult = await submitTool.execute("submit-goal-call", {
+      title: proposal.title,
+      markdown: proposal.markdown,
+      question: proposal.question,
+    });
+
+    expect(submitResult.terminate).toBe(true);
+    expect(runtime.getMode()).toBe("goal");
+    expect(runtime.getStatus().planningState).toBe("awaiting_approval");
+    expect(host.call).toHaveBeenLastCalledWith(
+      "plans.submit",
+      expect.objectContaining({
+        sessionId: "session-1",
+        toolCallId: "submit-goal-call",
+        kind: "goal",
+        markdown: proposal.markdown,
+      }),
+    );
+
+    await runtime.dispose();
+  });
+
+  it("blocks a submit tool that does not belong to the active contract mode", async () => {
+    const runtime = createRuntime({ mode: "goal" });
+    const beforeToolCall = (runtime as any).agent.beforeToolCall as Function;
+
+    await expect(
+      beforeToolCall({
+        assistantMessage: {
+          content: [
+            { type: "toolCall", id: "s1", name: "SubmitPlan", arguments: {} },
+          ],
+        },
+        toolCall: { id: "s1", name: "SubmitPlan", arguments: {} },
+        args: {},
+        context: {},
+      }),
+    ).resolves.toMatchObject({
+      block: true,
+      reason: "SubmitPlan is available only in Plan mode.",
+    });
+
+    await expect(
+      beforeToolCall({
+        assistantMessage: {
+          content: [
+            { type: "toolCall", id: "e1", name: "EnterGoalMode", arguments: {} },
+          ],
+        },
+        toolCall: { id: "e1", name: "EnterGoalMode", arguments: {} },
+        args: {},
+        context: {},
+      }),
+    ).resolves.toMatchObject({ block: true });
 
     await runtime.dispose();
   });
@@ -1120,6 +1266,7 @@ describe("DesktopAgentRuntime plan transitions", () => {
       id: "execution-1",
       proposalId: "proposal-1",
       sessionId: "session-1",
+      kind: "plan",
       plan: "# Approved\n\nUse the exact snapshot.",
       title: "Approved plan",
       question: "Proceed?",
@@ -1148,6 +1295,41 @@ describe("DesktopAgentRuntime plan transitions", () => {
         ([envelope]) => (envelope as any).event?.message?.role === "user",
       ),
     ).toBe(false);
+
+    await runtime.dispose();
+  });
+
+  it("tells an approved goal execution to verify every acceptance criterion", async () => {
+    const runtime = createRuntime({ mode: "goal" });
+    const agent = (runtime as any).agent;
+    agent.continue = vi.fn(async () => undefined);
+    agent.waitForIdle = vi.fn(async () => undefined);
+
+    const execution: PlanExecution = {
+      id: "execution-goal-1",
+      proposalId: "proposal-goal-1",
+      sessionId: "session-1",
+      kind: "goal",
+      plan: "# Goal\n\nCheckout works.\n\n## Acceptance criteria\n- tests pass\n",
+      title: "Checkout works",
+      question: "Approve this goal?",
+      artifact: {
+        relativePath: ".pi/goal/proposal-goal-1.md",
+        sha256: "def456",
+        sizeBytes: 42,
+      },
+      targetPermissionMode: "auto",
+      state: "running",
+    };
+
+    await runtime.executeApprovedPlan(execution, "execution-turn-2");
+
+    expect(runtime.getMode()).toBe("agent");
+    const internal = (runtime as any).fullEntries.at(-1).message;
+    expect(internal.content).toContain("<approved-goal-markdown>");
+    expect(internal.content).toContain(execution.artifact.relativePath);
+    expect(internal.content).toContain("verify every acceptance criterion");
+    expect(internal.content).not.toContain("Execute the approved implementation plan");
 
     await runtime.dispose();
   });

@@ -63,6 +63,8 @@ import type {
 import {
   isCommandShellOption,
   isToolsOutputParams,
+  proposalKindForMode,
+  type ProposalKind,
 } from "@pi-desktop/shared";
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
@@ -177,6 +179,45 @@ const AGENT_CORE_TOOL_NAMES = new Set([
 ]);
 const MAX_ON_DEMAND_TOOL_PROMPT_ENTRIES = 64;
 const MAX_TOOL_SEARCH_RESULT_NAMES = 24;
+
+/** Tools that ask the host to switch this session into a contract mode (D198). */
+const ENTER_TOOL_NAMES: Record<ProposalKind, string> = {
+  plan: "EnterPlanMode",
+  goal: "EnterGoalMode",
+};
+/** Tools that submit a contract of one kind for approval (D198). */
+const SUBMIT_TOOL_NAMES: Record<ProposalKind, string> = {
+  plan: "SubmitPlan",
+  goal: "SubmitGoal",
+};
+/**
+ * Every mode transition must be the only call in its assistant message, so the
+ * host commits one durable mode change per tool-call batch.
+ */
+const MODE_TRANSITION_TOOL_NAMES = new Set([
+  ...Object.values(ENTER_TOOL_NAMES),
+  ...Object.values(SUBMIT_TOOL_NAMES),
+]);
+
+function enterToolKind(name: string): ProposalKind | undefined {
+  return name === ENTER_TOOL_NAMES.plan
+    ? "plan"
+    : name === ENTER_TOOL_NAMES.goal
+      ? "goal"
+      : undefined;
+}
+
+function submitToolKind(name: string): ProposalKind | undefined {
+  return name === SUBMIT_TOOL_NAMES.plan
+    ? "plan"
+    : name === SUBMIT_TOOL_NAMES.goal
+      ? "goal"
+      : undefined;
+}
+
+function modeLabel(mode: Mode): string {
+  return mode === "plan" ? "Plan" : mode === "goal" ? "Goal" : "Agent";
+}
 
 type ToolCatalogEntry = {
   name: string;
@@ -864,7 +905,7 @@ export class DesktopAgentRuntime {
     this.hostTurnId = opts.turnId;
     this.turnId = opts.turnId;
     this.mode = opts.mode;
-    this.planningState = this.mode === "plan" ? "planning" : "inactive";
+    this.planningState = proposalKindForMode(this.mode) ? "planning" : "inactive";
     this.provider = opts.provider;
     this.thinkingLevel = clampThinkingLevel(opts.provider, opts.thinkingLevel);
     this.host = opts.host;
@@ -1003,8 +1044,13 @@ export class DesktopAgentRuntime {
   /** Switch the planning state on this Agent without creating another Agent. */
   setMode(mode: Mode): void {
     if (this.disposed) throw new Error("runtime disposed");
+    // Plan and Goal are both contract-negotiating states (D198); only Agent
+    // executes freely.
+    const kind = proposalKindForMode(mode);
+    const planningState: PlanningState = kind ? "planning" : "inactive";
+    const details = kind ? { kind } : {};
     if (this.mode === mode) {
-      this.setPlanningState(mode === "plan" ? "planning" : "inactive");
+      this.setPlanningState(planningState, details);
       return;
     }
     this.mode = mode;
@@ -1012,7 +1058,7 @@ export class DesktopAgentRuntime {
     this.rebuildToolCatalog();
     this.agent.state.systemPrompt = this.composeSystemPrompt();
     this.agent.state.tools = this.activeTools();
-    this.setPlanningState(mode === "plan" ? "planning" : "inactive");
+    this.setPlanningState(planningState, details);
   }
 
   getMode(): Mode {
@@ -1038,27 +1084,30 @@ export class DesktopAgentRuntime {
     const toolCalls = (context.assistantMessage.content as Array<{ type?: string }>).filter(
       (block) => block.type === "toolCall",
     );
-    const transition =
-      context.toolCall.name === "EnterPlanMode" ||
-      context.toolCall.name === "SubmitPlan";
-    const transitionInBatch = toolCalls.some(
-      (block) =>
-        (block as { name?: string }).name === "EnterPlanMode" ||
-        (block as { name?: string }).name === "SubmitPlan",
+    const transition = MODE_TRANSITION_TOOL_NAMES.has(context.toolCall.name);
+    const transitionInBatch = toolCalls.some((block) =>
+      MODE_TRANSITION_TOOL_NAMES.has((block as { name?: string }).name ?? ""),
     );
     if (transitionInBatch && toolCalls.length !== 1) {
       return {
         block: true,
-        reason:
-          "EnterPlanMode and SubmitPlan must be the only tool call in the assistant message.",
+        reason: `${[...MODE_TRANSITION_TOOL_NAMES].join(", ")} must be the only tool call in the assistant message.`,
       };
     }
     if (!transition) return undefined;
-    if (context.toolCall.name === "EnterPlanMode" && this.mode !== "agent") {
-      return { block: true, reason: "EnterPlanMode is available only in Agent mode." };
+    const enterKind = enterToolKind(context.toolCall.name);
+    if (enterKind && this.mode !== "agent") {
+      return {
+        block: true,
+        reason: `${context.toolCall.name} is available only in Agent mode.`,
+      };
     }
-    if (context.toolCall.name === "SubmitPlan" && this.mode !== "plan") {
-      return { block: true, reason: "SubmitPlan is available only in Plan mode." };
+    const submitKind = submitToolKind(context.toolCall.name);
+    if (submitKind && this.mode !== submitKind) {
+      return {
+        block: true,
+        reason: `${context.toolCall.name} is available only in ${modeLabel(submitKind)} mode.`,
+      };
     }
     return undefined;
   }
@@ -1066,6 +1115,7 @@ export class DesktopAgentRuntime {
   private setPlanningState(
     state: PlanningState,
     details: {
+      kind?: ProposalKind;
       proposalId?: string;
       title?: string;
       markdown?: string;
@@ -1668,8 +1718,8 @@ export class DesktopAgentRuntime {
       : [];
     const modeTools =
       this.mode === "agent"
-        ? [this.buildEnterPlanModeTool()]
-        : [this.buildSubmitPlanTool()];
+        ? [this.buildEnterModeTool("plan"), this.buildEnterModeTool("goal")]
+        : [this.buildSubmitTool(this.mode)];
     return [...builtins, ...pluginTools, ...skillTools, ...contextTools, ...modeTools];
   }
 
@@ -1700,7 +1750,10 @@ export class DesktopAgentRuntime {
   }
 
   private isToolAllowedInMode(name: string): boolean {
-    if (this.mode !== "plan") return true;
+    const kind = proposalKindForMode(this.mode);
+    if (!kind) return true;
+    // Contract modes are read-only: inspection tools plus the one submit tool
+    // that belongs to this kind.
     return new Set([
       "Read",
       "Glob",
@@ -1708,18 +1761,17 @@ export class DesktopAgentRuntime {
       "BrowserPreview",
       "Bash",
       CONTEXT_COMPACTION_TOOL_NAME,
-      "SubmitPlan",
+      SUBMIT_TOOL_NAMES[kind],
     ]).has(name);
   }
 
   private isCoreTool(name: string): boolean {
     return (
       name === CONTEXT_COMPACTION_TOOL_NAME ||
-      name === "EnterPlanMode" ||
-      name === "SubmitPlan" ||
+      MODE_TRANSITION_TOOL_NAMES.has(name) ||
       (this.mode === "agent"
         ? AGENT_CORE_TOOL_NAMES.has(name)
-        : this.mode === "plan"
+        : proposalKindForMode(this.mode)
           ? new Set(["Read", "Glob", "Grep", "Bash", "BrowserPreview"]).has(name)
           : CHAT_CORE_TOOL_NAMES.has(name))
     );
@@ -1826,12 +1878,16 @@ export class DesktopAgentRuntime {
     };
   }
 
-  private buildEnterPlanModeTool(): AgentTool {
+  private buildEnterModeTool(kind: ProposalKind): AgentTool {
+    const name = ENTER_TOOL_NAMES[kind];
+    const label = modeLabel(kind);
     return {
-      name: "EnterPlanMode",
-      label: "Enter Plan Mode",
+      name,
+      label: `Enter ${label} Mode`,
       description:
-        "Switch this same agent into Plan mode after the host confirms the durable session transition.",
+        kind === "plan"
+          ? "Switch this same agent into Plan mode after the host confirms the durable session transition. Use when the user wants to agree on the implementation steps before any change is made."
+          : "Switch this same agent into Goal mode after the host confirms the durable session transition. Use when the user states an outcome and wants you to agree on the goal and its acceptance criteria, then reach it autonomously.",
       parameters: Type.Object({}),
       executionMode: "sequential",
       execute: async (toolCallId) => {
@@ -1839,18 +1895,22 @@ export class DesktopAgentRuntime {
           sessionId: this.sessionId,
           turnId: this.turnId,
           toolCallId,
+          kind,
         });
         // The host is authoritative. Rebuild the live prompt and tool set only
-        // after plans.enter has committed mode=plan.
-        this.setMode("plan");
+        // after plans.enter has committed the new mode.
+        this.setMode(kind);
         return {
           content: [
             {
               type: "text",
-              text: "Plan mode is active. Inspect the workspace, formulate the plan, then call SubmitPlan for approval.",
+              text:
+                kind === "plan"
+                  ? "Plan mode is active. Inspect the workspace, formulate the plan, then call SubmitPlan for approval."
+                  : "Goal mode is active. Clarify the outcome and how it will be verified, then call SubmitGoal for approval.",
             },
           ],
-          details: { mode: "plan", planningState: "planning" },
+          details: { mode: kind, kind, planningState: "planning" },
         };
       },
     };
@@ -1885,23 +1945,33 @@ export class DesktopAgentRuntime {
     this.agent.state.tools = this.activeTools();
   }
 
-  private buildSubmitPlanTool(): AgentTool {
+  private buildSubmitTool(kind: ProposalKind): AgentTool {
+    const name = SUBMIT_TOOL_NAMES[kind];
     return {
-      name: "SubmitPlan",
-      label: "Submit plan",
+      name,
+      label: kind === "plan" ? "Submit plan" : "Submit goal",
       description:
-        "Submit one new complete Markdown implementation plan for user approval. Prior submissions are immutable historical checkpoints; after a rejected, expired, or interrupted approval, revise the plan and submit a new full snapshot in this turn. Do not use this until the plan is concrete.",
+        kind === "plan"
+          ? "Submit one new complete Markdown implementation plan for user approval. Prior submissions are immutable historical checkpoints; after a rejected, expired, or interrupted approval, revise the plan and submit a new full snapshot in this turn. Do not use this until the plan is concrete."
+          : "Submit one new complete Markdown goal contract for user approval: the outcome to reach, the acceptance criteria that prove it, and the boundaries you must not cross. Prior submissions are immutable historical checkpoints; after a rejected, expired, or interrupted approval, revise the contract and submit a new full snapshot in this turn. Do not use this until the goal is unambiguous and every criterion is checkable.",
       parameters: Type.Object({
         title: Type.String({
-          description: "A concise title for the implementation plan.",
+          description:
+            kind === "plan"
+              ? "A concise title for the implementation plan."
+              : "A concise title naming the goal.",
         }),
         markdown: Type.String({
           description:
-            "The exact Markdown implementation plan, including files, behavior, and validation.",
+            kind === "plan"
+              ? "The exact Markdown implementation plan, including files, behavior, and validation."
+              : "The exact Markdown goal contract, with a Goal section, an Acceptance criteria section of objectively checkable items, and a Boundaries section. Describe outcomes, not implementation steps.",
         }),
         question: Type.String({
           description:
-            "The question or decision the user should answer when approving this plan.",
+            kind === "plan"
+              ? "The question or decision the user should answer when approving this plan."
+              : "The question or decision the user should answer when approving this goal contract.",
         }),
       }),
       executionMode: "sequential",
@@ -1923,7 +1993,7 @@ export class DesktopAgentRuntime {
             content: [
               {
                 type: "text",
-                text: "SubmitPlan requires non-empty title, markdown, and question.",
+                text: `${name} requires non-empty title, markdown, and question.`,
               },
             ],
             details: { errorCode: "PLAN_INVALID_ARGUMENT" },
@@ -1938,6 +2008,7 @@ export class DesktopAgentRuntime {
             // current prompt, not a newly generated provider-side identifier.
             turnId: this.turnId,
             toolCallId,
+            kind,
             title,
             markdown,
             question,
@@ -1947,7 +2018,12 @@ export class DesktopAgentRuntime {
             (error as { data?: { errorCode?: string } })?.data?.errorCode ??
             "PLAN_SUBMIT_FAILED";
           return {
-            content: [{ type: "text", text: `Plan submission failed: ${errorCode}` }],
+            content: [
+              {
+                type: "text",
+                text: `${modeLabel(kind)} submission failed: ${errorCode}`,
+              },
+            ],
             details: { errorCode },
             isError: true,
             terminate: true,
@@ -1966,7 +2042,10 @@ export class DesktopAgentRuntime {
         ) {
           return {
             content: [
-              { type: "text", text: "Plan submission returned an invalid proposal." },
+              {
+                type: "text",
+                text: `${modeLabel(kind)} submission returned an invalid proposal.`,
+              },
             ],
             details: { errorCode: "PLAN_SUBMIT_FAILED" },
             isError: true,
@@ -1975,6 +2054,7 @@ export class DesktopAgentRuntime {
         }
 
         this.setPlanningState("awaiting_approval", {
+          kind,
           proposalId: proposal.id,
           title: proposal.title || title,
           markdown: proposal.markdown || markdown,
@@ -1990,7 +2070,10 @@ export class DesktopAgentRuntime {
           content: [
             {
               type: "text",
-              text: "Plan submitted for approval. Execution will begin only after approval.",
+              text:
+                kind === "plan"
+                  ? "Plan submitted for approval. Execution will begin only after approval."
+                  : "Goal contract submitted for approval. Autonomous execution will begin only after approval.",
             },
           ],
           details: { proposal },
@@ -3406,18 +3489,34 @@ export class DesktopAgentRuntime {
     this.requestStartedAt = Date.now();
     this.setMode("agent");
 
-    const instruction = [
-      "Execute the approved implementation plan now.",
-      `Use the host-created plan artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
-      `Approved plan title: ${execution.title}`,
-      `Approval question: ${execution.question}`,
-      "Treat the following Markdown as the exact approved snapshot. Do not replace it with a new plan or ask for approval again.",
-      "<approved-plan-markdown>",
-      execution.plan,
-      "</approved-plan-markdown>",
-      "Implement the approved plan with the normal Agent tools, then report the result.",
-    ].join("\n");
-    const internalId = `approved-plan:${execution.id}`;
+    const kind = execution.kind === "goal" ? "goal" : "plan";
+    const instruction =
+      kind === "goal"
+        ? [
+            "The user approved the goal contract below. Reach that goal now, autonomously.",
+            `Use the host-created goal artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
+            `Approved goal title: ${execution.title}`,
+            `Approval question: ${execution.question}`,
+            "Treat the following Markdown as the exact approved contract. Do not renegotiate it, replace it with a new contract, or ask for approval again.",
+            "<approved-goal-markdown>",
+            execution.plan,
+            "</approved-goal-markdown>",
+            "Choose your own approach with the normal Agent tools. Then verify every acceptance criterion yourself, running the checks the contract names rather than assuming they pass.",
+            "Keep working while a criterion is still unmet and you have an untried approach. Stop early only if a boundary in the contract blocks you or a criterion cannot be verified; say which one and why.",
+            "Finish with a report that walks the acceptance criteria one by one, each marked met or unmet with the evidence you observed.",
+          ].join("\n")
+        : [
+            "Execute the approved implementation plan now.",
+            `Use the host-created plan artifact at the workspace-relative path: ${execution.artifact.relativePath}`,
+            `Approved plan title: ${execution.title}`,
+            `Approval question: ${execution.question}`,
+            "Treat the following Markdown as the exact approved snapshot. Do not replace it with a new plan or ask for approval again.",
+            "<approved-plan-markdown>",
+            execution.plan,
+            "</approved-plan-markdown>",
+            "Implement the approved plan with the normal Agent tools, then report the result.",
+          ].join("\n");
+    const internalId = `approved-${kind}:${execution.id}`;
     const internalMessage: AgentMessage = {
       role: "user",
       content: instruction,

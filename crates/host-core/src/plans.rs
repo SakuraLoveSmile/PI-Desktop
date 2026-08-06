@@ -27,11 +27,32 @@ pub const EXECUTION_RUNNING: &str = "running";
 pub const EXECUTION_COMPLETED: &str = "completed";
 pub const EXECUTION_INTERRUPTED: &str = "interrupted";
 
+/// Approval kinds (D198). Plan and Goal share this pipeline; the kind decides
+/// the operating mode that owns the approval and the artifact directory.
+pub const KIND_PLAN: &str = "plan";
+pub const KIND_GOAL: &str = "goal";
+
+/// Map a wire kind onto a `'static` literal so SQL and paths can never carry
+/// caller-controlled text.
+pub fn normalize_kind(value: &str) -> Option<&'static str> {
+    match value {
+        KIND_PLAN => Some(KIND_PLAN),
+        KIND_GOAL => Some(KIND_GOAL),
+        _ => None,
+    }
+}
+
+/// The approval kind a session's durable mode submits, if any.
+pub fn kind_for_mode(mode: &str) -> Option<&'static str> {
+    normalize_kind(mode)
+}
+
+// `kind` is appended last so the historical column indexes stay stable.
 const PROPOSAL_COLUMNS: &str = "request_id, session_id, turn_id, tool_call_id,
     plan_json, title, question, status, created_at, updated_at, expires_at,
     resolved_at, action, target_permission_mode, feedback, error_code,
     artifact_relative_path, artifact_sha256, artifact_size_bytes, version,
-    execution_id, execution_state";
+    execution_id, execution_state, kind";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -48,6 +69,8 @@ pub struct PlanProposal {
     pub session_id: String,
     pub turn_id: String,
     pub tool_call_id: String,
+    /// `plan` or `goal`; legacy rows read back as `plan`.
+    pub kind: String,
     pub plan: String,
     pub markdown: String,
     pub title: String,
@@ -80,6 +103,8 @@ pub struct PlanExecution {
     pub id: String,
     pub proposal_id: String,
     pub session_id: String,
+    /// `plan` or `goal`; selects the execution instruction in the sidecar.
+    pub kind: String,
     pub plan: String,
     pub title: String,
     pub question: String,
@@ -107,6 +132,8 @@ pub struct PlanSubmitParams<'a> {
     pub session_id: &'a str,
     pub turn_id: &'a str,
     pub tool_call_id: &'a str,
+    /// Contract kind being submitted; must match the session's durable mode.
+    pub kind: &'a str,
     pub title: &'a str,
     pub markdown: &'a str,
     pub question: &'a str,
@@ -198,6 +225,9 @@ fn proposal_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PlanProposal> 
         session_id: row.get(1)?,
         turn_id: row.get(2)?,
         tool_call_id: row.get(3)?,
+        kind: row
+            .get::<_, Option<String>>(22)?
+            .unwrap_or_else(|| KIND_PLAN.to_string()),
         plan: row.get(4)?,
         markdown: row.get(4)?,
         title: row.get(5)?,
@@ -226,8 +256,13 @@ fn get_proposal(db: &Database, id: &str) -> Result<Option<PlanProposal>> {
         .optional()?)
 }
 
-fn session_is_plan(db: &Database, session_id: &str) -> Result<bool> {
-    Ok(sessions::session_mode(db, session_id)?.as_deref() == Some("plan"))
+/// The approval kind this session may submit, or `None` while it is executing
+/// freely in Agent mode.
+fn session_submit_kind(db: &Database, session_id: &str) -> Result<Option<&'static str>> {
+    let Some(mode) = sessions::session_mode(db, session_id)? else {
+        return Err(plan_error("PLAN_SESSION_NOT_FOUND"));
+    };
+    Ok(kind_for_mode(&mode))
 }
 
 fn live_turn_belongs_to_session(db: &Database, session_id: &str, turn_id: &str) -> Result<bool> {
@@ -247,7 +282,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
-fn ascii_slug(value: &str) -> String {
+fn ascii_slug(value: &str, fallback: &str) -> String {
     let mut slug = String::new();
     for ch in value.trim().chars() {
         if ch.is_ascii_alphanumeric() {
@@ -263,14 +298,14 @@ fn ascii_slug(value: &str) -> String {
         slug.pop();
     }
     if slug.is_empty() {
-        "plan".into()
+        fallback.into()
     } else {
         slug
     }
 }
 
-fn plan_filename(title: &str, now: DateTime<Local>, suffix: u32) -> String {
-    let slug = ascii_slug(title);
+fn plan_filename(kind: &str, title: &str, now: DateTime<Local>, suffix: u32) -> String {
+    let slug = ascii_slug(title, kind);
     let stamp = now.format("%Y%m%d-%H%M");
     if suffix == 1 {
         format!("{slug}-{stamp}.md")
@@ -311,7 +346,13 @@ fn safe_directory(path: &Path, create: bool) -> Result<()> {
     Ok(())
 }
 
-fn plan_directory(workspace_root: &Path, create: bool) -> Result<(PathBuf, PathBuf)> {
+/// Resolve `<workspace>/.pi/<kind>` with every component checked for links.
+/// `kind` is always a `'static` literal, never caller text.
+fn plan_directory(
+    workspace_root: &Path,
+    kind: &'static str,
+    create: bool,
+) -> Result<(PathBuf, PathBuf)> {
     let root = workspace_root
         .canonicalize()
         .map_err(|_| plan_error("PLAN_WORKSPACE_REQUIRED"))?;
@@ -322,13 +363,14 @@ fn plan_directory(workspace_root: &Path, create: bool) -> Result<(PathBuf, PathB
     }
     let pi = root.join(".pi");
     safe_directory(&pi, create)?;
-    let plan = pi.join("plan");
-    safe_directory(&plan, create)?;
-    Ok((root, plan))
+    let directory = pi.join(kind);
+    safe_directory(&directory, create)?;
+    Ok((root, directory))
 }
 
 fn publish_artifact(
     workspace_root: &Path,
+    kind: &'static str,
     title: &str,
     markdown: &str,
 ) -> Result<(PlanArtifact, PathBuf)> {
@@ -339,10 +381,10 @@ fn publish_artifact(
     if bytes.len() > PLAN_MAX_MARKDOWN_BYTES {
         return Err(plan_error("PLAN_MARKDOWN_TOO_LARGE"));
     }
-    let (_root, directory) = plan_directory(workspace_root, true)?;
+    let (_root, directory) = plan_directory(workspace_root, kind, true)?;
     let now = Local::now();
     for suffix in 1..=10_000u32 {
-        let filename = plan_filename(title, now, suffix);
+        let filename = plan_filename(kind, title, now, suffix);
         let path = directory.join(&filename);
         let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => file,
@@ -361,7 +403,7 @@ fn publish_artifact(
             let _ = fs::remove_file(&path);
             return Err(error);
         }
-        let relative_path = format!(".pi/plan/{filename}");
+        let relative_path = format!(".pi/{kind}/{filename}");
         return Ok((
             PlanArtifact {
                 relative_path,
@@ -374,12 +416,16 @@ fn publish_artifact(
     Err(plan_error("PLAN_ARTIFACT_COLLISION_LIMIT"))
 }
 
-fn safe_artifact_path(workspace_root: &Path, relative_path: &str) -> Result<PathBuf> {
-    let (root, _directory) = plan_directory(workspace_root, false)?;
+fn safe_artifact_path(
+    workspace_root: &Path,
+    kind: &'static str,
+    relative_path: &str,
+) -> Result<PathBuf> {
+    let (root, _directory) = plan_directory(workspace_root, kind, false)?;
     let components = Path::new(relative_path).components().collect::<Vec<_>>();
     if components.len() != 3
         || components[0] != Component::Normal(".pi".as_ref())
-        || components[1] != Component::Normal("plan".as_ref())
+        || components[1] != Component::Normal(kind.as_ref())
     {
         return Err(plan_error("PLAN_ARTIFACT_PATH_UNSAFE"));
     }
@@ -397,7 +443,7 @@ fn safe_artifact_path(workspace_root: &Path, relative_path: &str) -> Result<Path
     {
         return Err(plan_error("PLAN_ARTIFACT_PATH_UNSAFE"));
     }
-    let path = root.join(".pi").join("plan").join(filename);
+    let path = root.join(".pi").join(kind).join(filename);
     let metadata =
         fs::symlink_metadata(&path).map_err(|_| plan_error("PLAN_ARTIFACT_NOT_READY"))?;
     if is_link_or_reparse(&metadata) || !metadata.is_file() || !path.starts_with(&root) {
@@ -406,8 +452,12 @@ fn safe_artifact_path(workspace_root: &Path, relative_path: &str) -> Result<Path
     Ok(path)
 }
 
-fn verify_artifact(workspace_root: &Path, artifact: &PlanArtifact) -> Result<()> {
-    let path = safe_artifact_path(workspace_root, &artifact.relative_path)?;
+fn verify_artifact(
+    workspace_root: &Path,
+    kind: &'static str,
+    artifact: &PlanArtifact,
+) -> Result<()> {
+    let path = safe_artifact_path(workspace_root, kind, &artifact.relative_path)?;
     let bytes = fs::read(path).map_err(|_| plan_error("PLAN_ARTIFACT_NOT_READY"))?;
     if bytes.len() as u64 != artifact.size_bytes {
         return Err(plan_error("PLAN_ARTIFACT_HASH_MISMATCH"));
@@ -431,6 +481,7 @@ fn execution_from_proposal(proposal: &PlanProposal) -> Result<Option<PlanExecuti
         id,
         proposal_id: proposal.id.clone(),
         session_id: proposal.session_id.clone(),
+        kind: proposal.kind.clone(),
         plan: proposal.plan.clone(),
         title: proposal.title.clone(),
         question: proposal.question.clone(),
@@ -535,6 +586,7 @@ impl PlanManager {
         session_id: &str,
         turn_id: &str,
         tool_call_id: &str,
+        kind: &str,
     ) -> Result<()> {
         if session_id.trim().is_empty()
             || turn_id.trim().is_empty()
@@ -542,6 +594,9 @@ impl PlanManager {
         {
             return Err(plan_error("PLAN_INVALID_ARGUMENT"));
         }
+        let Some(kind) = normalize_kind(kind) else {
+            return Err(plan_error("PLAN_INVALID_ARGUMENT"));
+        };
         let Some(mode) = sessions::session_mode(db, session_id)? else {
             return Err(plan_error("PLAN_SESSION_NOT_FOUND"));
         };
@@ -552,7 +607,7 @@ impl PlanManager {
         let tx = db.conn().unchecked_transaction()?;
         let changed = tx
             .prepare_cached(
-                "UPDATE sessions SET mode = 'plan', updated_at = ?1
+                "UPDATE sessions SET mode = ?4, updated_at = ?1
                  WHERE id = ?2 AND mode = 'agent'
                    AND EXISTS (
                      SELECT 1 FROM turns
@@ -563,7 +618,7 @@ impl PlanManager {
                      WHERE session_id = ?2 AND execution_state IN ('queued', 'running')
                    )",
             )?
-            .execute(params![now, session_id, turn_id])?;
+            .execute(params![now, session_id, turn_id, kind])?;
         if changed == 0 {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
         }
@@ -575,7 +630,8 @@ impl PlanManager {
                 "sessionId": session_id,
                 "turnId": turn_id,
                 "toolCallId": tool_call_id,
-                "mode": "plan"
+                "kind": kind,
+                "mode": kind
             }),
         )?;
         tx.commit()?;
@@ -588,6 +644,7 @@ impl PlanManager {
             session_id,
             turn_id,
             tool_call_id,
+            kind,
             title,
             markdown,
             question,
@@ -601,12 +658,19 @@ impl PlanManager {
         {
             return Err(plan_error("PLAN_INVALID_ARGUMENT"));
         }
+        let Some(kind) = normalize_kind(kind) else {
+            return Err(plan_error("PLAN_INVALID_ARGUMENT"));
+        };
         if markdown.len() > PLAN_MAX_MARKDOWN_BYTES {
             return Err(plan_error("PLAN_MARKDOWN_TOO_LARGE"));
         }
         expire_pending_approvals(db)?;
-        if !session_is_plan(db, session_id)? {
-            return Err(plan_error("PLAN_NOT_ACTIVE"));
+        // Agent mode has no contract to submit; the other contract mode does,
+        // but not this one — those are different failures for the model.
+        match session_submit_kind(db, session_id)? {
+            None => return Err(plan_error("PLAN_NOT_ACTIVE")),
+            Some(active) if active != kind => return Err(plan_error("PLAN_KIND_MISMATCH")),
+            Some(_) => {}
         }
         if !live_turn_belongs_to_session(db, session_id, turn_id)? {
             return Err(plan_error("PLAN_APPROVAL_STALE"));
@@ -623,18 +687,18 @@ impl PlanManager {
             return Err(plan_error("PLAN_ALREADY_PENDING"));
         }
 
-        let (artifact, path) = publish_artifact(workspace_root, title, markdown)?;
+        let (artifact, path) = publish_artifact(workspace_root, kind, title, markdown)?;
         let id = Uuid::new_v4().to_string();
         let now = now_ms();
         let insert_result = (|| -> Result<()> {
             let tx = db.conn().unchecked_transaction()?;
             tx.prepare_cached(
                 "INSERT INTO plan_approvals (
-                     request_id, session_id, turn_id, tool_call_id, plan_json,
+                     request_id, session_id, turn_id, tool_call_id, kind, plan_json,
                      title, question, status, created_at, updated_at, expires_at,
                      artifact_relative_path, artifact_sha256, artifact_size_bytes,
                      version
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?8,
+                 ) VALUES (?1, ?2, ?3, ?4, ?13, ?5, ?6, ?7, 'pending', ?8, ?8,
                            ?9, ?10, ?11, ?12, 1)",
             )?
             .execute(params![
@@ -650,6 +714,7 @@ impl PlanManager {
                 artifact.relative_path,
                 artifact.sha256,
                 artifact.size_bytes as i64,
+                kind,
             ])?;
             artifacts::record_tx(
                 &tx,
@@ -667,6 +732,7 @@ impl PlanManager {
                     "sessionId": session_id,
                     "turnId": turn_id,
                     "toolCallId": tool_call_id,
+                    "kind": kind,
                     "title": title.trim(),
                     "question": question.trim(),
                     "artifact": artifact,
@@ -714,6 +780,12 @@ impl PlanManager {
         Ok("planning".into())
     }
 
+    /// The contract kind the session is currently authoring (`plan`/`goal`), or
+    /// `None` in Agent mode. Renderers need this to label a planning state.
+    pub fn active_kind(&self, db: &Database, session_id: &str) -> Result<Option<&'static str>> {
+        session_submit_kind(db, session_id)
+    }
+
     #[cfg(test)]
     pub fn resolution_for(
         &self,
@@ -745,6 +817,9 @@ impl PlanManager {
         let Some(current) = get_proposal(db, proposal_id)? else {
             return Err(plan_error("PLAN_NOT_FOUND"));
         };
+        // The stored kind is authoritative: it decides both the artifact
+        // directory to verify and the mode the approval must leave behind.
+        let kind = normalize_kind(&current.kind).unwrap_or(KIND_PLAN);
         if current.session_id != session_id
             || current.turn_id != turn_id
             || current.tool_call_id != tool_call_id
@@ -787,7 +862,7 @@ impl PlanManager {
                 .artifact
                 .clone()
                 .ok_or_else(|| plan_error("PLAN_ARTIFACT_NOT_READY"))?;
-            verify_artifact(workspace_root, &artifact)?;
+            verify_artifact(workspace_root, kind, &artifact)?;
         }
         let now = now_ms();
         let status = match action {
@@ -812,9 +887,9 @@ impl PlanManager {
                 .prepare_cached(
                     "UPDATE sessions
                      SET mode = 'agent', permission_mode = ?1, updated_at = ?2
-                     WHERE id = ?3 AND mode = 'plan'",
+                     WHERE id = ?3 AND mode = ?4",
                 )?
-                .execute(params![selected, now, session_id])?;
+                .execute(params![selected, now, session_id, kind])?;
             if changed == 0 {
                 return Err(plan_error("PLAN_NOT_ACTIVE"));
             }
@@ -856,6 +931,7 @@ impl PlanManager {
                 "sessionId": session_id,
                 "turnId": turn_id,
                 "toolCallId": tool_call_id,
+                "kind": kind,
                 "action": action,
                 "status": status,
                 "targetPermissionMode": selected,
@@ -1096,6 +1172,7 @@ mod tests {
                     session_id: &session.id,
                     turn_id: &turn,
                     tool_call_id: call,
+                    kind: KIND_PLAN,
                     title: "Build API",
                     markdown: "# Plan\n- implement",
                     question: "Proceed?",
@@ -1107,12 +1184,13 @@ mod tests {
     #[test]
     fn slug_and_filename_are_ascii_and_local_minute_shaped() {
         let now = Local::now();
-        let filename = plan_filename("Build API / v2", now, 1);
+        let filename = plan_filename(KIND_PLAN, "Build API / v2", now, 1);
         assert!(filename.starts_with("build-api-v2-"));
         assert!(filename.ends_with(".md"));
         assert!(filename.is_ascii());
         assert_eq!(filename.len(), "build-api-v2-YYYYMMDD-HHmm.md".len());
-        assert_eq!(ascii_slug("中文 / ???"), "plan");
+        assert_eq!(ascii_slug("中文 / ???", KIND_PLAN), "plan");
+        assert_eq!(ascii_slug("中文 / ???", KIND_GOAL), "goal");
     }
 
     #[test]
@@ -1132,7 +1210,7 @@ mod tests {
         let turn = live_turn(&db, &session.id);
 
         PlanManager
-            .enter(&db, &session.id, &turn, "enter-plan-call")
+            .enter(&db, &session.id, &turn, "enter-plan-call", KIND_PLAN)
             .unwrap();
 
         assert_eq!(
@@ -1168,7 +1246,7 @@ mod tests {
         .unwrap();
 
         let error = PlanManager
-            .enter(&db, &session.id, "stale-turn", "enter-plan-call")
+            .enter(&db, &session.id, "stale-turn", "enter-plan-call", KIND_PLAN)
             .unwrap_err();
         assert_eq!(error.to_string(), "PLAN_APPROVAL_STALE");
         assert_eq!(
@@ -1194,6 +1272,7 @@ mod tests {
                     session_id: &second_session.id,
                     turn_id: &turn2,
                     tool_call_id: "call-2",
+                    kind: KIND_PLAN,
                     title: "Build API",
                     markdown: "second",
                     question: "Proceed?",
@@ -1225,6 +1304,7 @@ mod tests {
                     session_id: &session.id,
                     turn_id: &turn,
                     tool_call_id: "call-1",
+                    kind: KIND_PLAN,
                     title: "Too large",
                     markdown: &"x".repeat(PLAN_MAX_MARKDOWN_BYTES + 1),
                     question: "Proceed?",
@@ -1255,6 +1335,7 @@ mod tests {
                     session_id: &session.id,
                     turn_id: &turn,
                     tool_call_id: "call-1",
+                    kind: KIND_PLAN,
                     title: "Plan",
                     markdown: "body",
                     question: "?",
@@ -1284,6 +1365,7 @@ mod tests {
                         session_id: &session_id,
                         turn_id: &turn,
                         tool_call_id: "call-1",
+                        kind: KIND_PLAN,
                         title: "Plan",
                         markdown: "body",
                         question: "?",
@@ -1357,6 +1439,7 @@ mod tests {
                     session_id: &proposal.session_id,
                     turn_id: &next_turn,
                     tool_call_id: "call-2",
+                    kind: KIND_PLAN,
                     title: "Build API revised",
                     markdown: "# Plan\n- revise",
                     question: "Proceed with the revision?",
@@ -1722,5 +1805,216 @@ mod tests {
             None,
         )
         .is_ok());
+    }
+
+    fn goal_session(db: &Database, workspace: &Path) -> sessions::SessionSummary {
+        sessions::create_session(
+            db,
+            Some("Goal".into()),
+            Some("goal".into()),
+            None,
+            None,
+            Some(workspace.to_string_lossy().into_owned()),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn every_kind_publishes_into_its_own_artifact_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        for kind in [KIND_PLAN, KIND_GOAL] {
+            let kind = normalize_kind(kind).unwrap();
+            let (artifact, path) =
+                publish_artifact(&root, kind, "Ship checkout", "# Contract\n- done").unwrap();
+            assert!(
+                artifact.relative_path.starts_with(&format!(".pi/{kind}/")),
+                "{} should live under .pi/{kind}/",
+                artifact.relative_path
+            );
+            assert!(path.is_file());
+            // A path claiming the other kind's directory must not resolve.
+            let other = if kind == KIND_PLAN { KIND_GOAL } else { KIND_PLAN };
+            assert_eq!(
+                safe_artifact_path(&root, other, &artifact.relative_path)
+                    .unwrap_err()
+                    .to_string(),
+                "PLAN_ARTIFACT_PATH_UNSAFE"
+            );
+        }
+    }
+
+    #[test]
+    fn goal_contract_round_trips_through_its_own_kind() {
+        let (dir, db) = test_db();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        let manager = PlanManager;
+        let session = goal_session(&db, &root);
+        let turn = live_turn(&db, &session.id);
+        let proposal = manager
+            .submit(
+                &db,
+                PlanSubmitParams {
+                    workspace_root: &root,
+                    session_id: &session.id,
+                    turn_id: &turn,
+                    tool_call_id: "goal-call-1",
+                    kind: KIND_GOAL,
+                    title: "Ship checkout",
+                    markdown: "# Goal\n## Acceptance criteria\n- tests pass",
+                    question: "Approve this goal?",
+                },
+            )
+            .unwrap();
+        assert_eq!(proposal.kind, KIND_GOAL);
+        assert!(proposal
+            .artifact
+            .as_ref()
+            .unwrap()
+            .relative_path
+            .starts_with(".pi/goal/"));
+        assert_eq!(
+            manager.active_kind(&db, &session.id).unwrap(),
+            Some(KIND_GOAL)
+        );
+        assert_eq!(
+            manager.state_for_session(&db, &session.id).unwrap(),
+            "awaiting_approval"
+        );
+
+        let resolution = manager
+            .resolve(
+                &db,
+                PlanResolveParams {
+                    workspace_root: Some(&root),
+                    proposal_id: &proposal.id,
+                    session_id: &proposal.session_id,
+                    turn_id: &proposal.turn_id,
+                    tool_call_id: &proposal.tool_call_id,
+                    version: Some(proposal.version),
+                    action: "approve",
+                    target_permission_mode: Some("accept-edits"),
+                },
+            )
+            .unwrap();
+        let execution = resolution.execution.unwrap();
+        assert_eq!(execution.kind, KIND_GOAL);
+        assert_eq!(execution.state, EXECUTION_QUEUED);
+        // Approval hands the session back to Agent so execution can act.
+        let session = sessions::get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(session.summary.mode, "agent");
+        assert_eq!(manager.active_kind(&db, &proposal.session_id).unwrap(), None);
+        assert_eq!(
+            manager.queued_executions(&db, None).unwrap()[0].kind,
+            KIND_GOAL
+        );
+    }
+
+    #[test]
+    fn submitting_the_other_contract_kind_is_rejected() {
+        let (dir, db) = test_db();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        let manager = PlanManager;
+        let goal = goal_session(&db, &root);
+        let goal_turn = live_turn(&db, &goal.id);
+        assert_eq!(
+            manager
+                .submit(
+                    &db,
+                    PlanSubmitParams {
+                        workspace_root: &root,
+                        session_id: &goal.id,
+                        turn_id: &goal_turn,
+                        tool_call_id: "wrong-kind-1",
+                        kind: KIND_PLAN,
+                        title: "Plan in a goal session",
+                        markdown: "# Plan",
+                        question: "Proceed?",
+                    },
+                )
+                .unwrap_err()
+                .to_string(),
+            "PLAN_KIND_MISMATCH"
+        );
+
+        let plan = plan_session(&db, &root);
+        let plan_turn = live_turn(&db, &plan.id);
+        assert_eq!(
+            manager
+                .submit(
+                    &db,
+                    PlanSubmitParams {
+                        workspace_root: &root,
+                        session_id: &plan.id,
+                        turn_id: &plan_turn,
+                        tool_call_id: "wrong-kind-2",
+                        kind: KIND_GOAL,
+                        title: "Goal in a plan session",
+                        markdown: "# Goal",
+                        question: "Approve?",
+                    },
+                )
+                .unwrap_err()
+                .to_string(),
+            "PLAN_KIND_MISMATCH"
+        );
+        // Neither rejected submission may leave an artifact behind.
+        assert!(!root.join(".pi").join("goal").exists());
+        assert!(!root.join(".pi").join("plan").exists());
+    }
+
+    #[test]
+    fn entering_goal_mode_writes_the_goal_mode_and_kind() {
+        let (dir, db) = test_db();
+        let root = dir.path().join("workspace");
+        fs::create_dir_all(&root).unwrap();
+        let session = sessions::create_session(
+            &db,
+            Some("Agent".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(root.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let turn = live_turn(&db, &session.id);
+
+        PlanManager
+            .enter(&db, &session.id, &turn, "enter-goal-call", KIND_GOAL)
+            .unwrap();
+
+        assert_eq!(
+            sessions::session_mode(&db, &session.id).unwrap().as_deref(),
+            Some("goal")
+        );
+        let audit_payload: String = db
+            .conn()
+            .query_row(
+                "SELECT payload_json FROM audit_log WHERE kind = 'plan_entered' ORDER BY id DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let audit_payload: serde_json::Value = serde_json::from_str(&audit_payload).unwrap();
+        assert_eq!(audit_payload["kind"], "goal");
+
+        // A second entry is refused whatever kind it asks for.
+        assert_eq!(
+            PlanManager
+                .enter(&db, &session.id, &turn, "enter-plan-call", KIND_PLAN)
+                .unwrap_err()
+                .to_string(),
+            "PLAN_ALREADY_ACTIVE"
+        );
+        assert_eq!(
+            PlanManager
+                .enter(&db, &session.id, &turn, "enter-bogus-call", "sprint")
+                .unwrap_err()
+                .to_string(),
+            "PLAN_INVALID_ARGUMENT"
+        );
     }
 }

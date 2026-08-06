@@ -1524,7 +1524,7 @@ async fn handle_request(
         "plans.pending" => {
             let session_id = params.get("sessionId").and_then(|v| v.as_str());
             let st = state.lock().await;
-            let (pending, planning_state) = {
+            let (pending, planning_state, kind) = {
                 let crate::state::AppState { db, plans, .. } = &*st;
                 let pending = plans
                     .pending_for_session(db, session_id)
@@ -1533,9 +1533,16 @@ async fn handle_request(
                     .map(|id| plans.state_for_session(db, id))
                     .transpose()
                     .map_err(plan_rpc_err)?;
-                (pending, planning_state)
+                // The session's own mode names the contract being authored even
+                // when no proposal exists yet (Plan/Goal `planning`).
+                let kind = session_id
+                    .map(|id| plans.active_kind(db, id))
+                    .transpose()
+                    .map_err(plan_rpc_err)?
+                    .flatten();
+                (pending, planning_state, kind)
             };
-            Ok(json!({ "plans": pending, "state": planning_state }))
+            Ok(json!({ "plans": pending, "state": planning_state, "kind": kind }))
         }
         "plans.enter" => {
             let session_id = params
@@ -1553,11 +1560,18 @@ async fn handle_request(
                 .and_then(|id| id.as_str())
                 .filter(|id| !id.trim().is_empty())
                 .ok_or_else(|| rpc_err(1002, "toolCallId required", "INVALID_PARAMS"))?;
+            // Older sidecars only knew Plan; absent means Plan (D198).
+            let kind = params
+                .get("kind")
+                .and_then(|v| v.as_str())
+                .unwrap_or(plans::KIND_PLAN);
+            let kind = plans::normalize_kind(kind)
+                .ok_or_else(|| rpc_err(1002, "kind must be 'plan' or 'goal'", "INVALID_PARAMS"))?;
             let st = state.lock().await;
             let planning_state = {
                 let crate::state::AppState { db, plans, .. } = &*st;
                 plans
-                    .enter(db, session_id, turn_id, tool_call_id)
+                    .enter(db, session_id, turn_id, tool_call_id, kind)
                     .map_err(plan_rpc_err)?;
                 plans
                     .state_for_session(db, session_id)
@@ -1569,10 +1583,11 @@ async fn handle_request(
                 json!({
                     "sessionId": session_id,
                     "state": planning_state,
+                    "kind": kind,
                 }),
             )
             .await;
-            Ok(json!({ "ok": true, "state": planning_state }))
+            Ok(json!({ "ok": true, "state": planning_state, "kind": kind }))
         }
         "plans.submit" => {
             let session_id = params
@@ -1602,6 +1617,12 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .filter(|id| !id.trim().is_empty())
                 .ok_or_else(|| rpc_err(1002, "toolCallId required", "INVALID_PARAMS"))?;
+            let kind = params
+                .get("kind")
+                .and_then(|v| v.as_str())
+                .unwrap_or(plans::KIND_PLAN);
+            let kind = plans::normalize_kind(kind)
+                .ok_or_else(|| rpc_err(1002, "kind must be 'plan' or 'goal'", "INVALID_PARAMS"))?;
             let proposal = {
                 let guard = state.lock().await;
                 let st = &*guard;
@@ -1614,6 +1635,7 @@ async fn handle_request(
                             session_id,
                             turn_id,
                             tool_call_id,
+                            kind,
                             title,
                             markdown,
                             question,
@@ -1627,6 +1649,7 @@ async fn handle_request(
                 json!({
                     "sessionId": session_id,
                     "state": "awaiting_approval",
+                    "kind": proposal.kind,
                     "proposalId": proposal.id,
                     "proposal": proposal
                 }),
@@ -1693,6 +1716,7 @@ async fn handle_request(
                 json!({
                     "sessionId": resolution.proposal.session_id,
                     "state": state_name,
+                    "kind": resolution.proposal.kind,
                     "proposalId": resolution.proposal.id,
                     "proposal": resolution.proposal,
                     "action": resolution.action,
@@ -1738,6 +1762,7 @@ async fn handle_request(
                     "sessionId": execution.session_id,
                     "proposalId": execution.proposal_id,
                     "state": "inactive",
+                    "kind": execution.kind,
                     "execution": execution,
                 }),
             )
@@ -1772,6 +1797,7 @@ async fn handle_request(
                     "sessionId": execution.session_id,
                     "proposalId": execution.proposal_id,
                     "state": "inactive",
+                    "kind": execution.kind,
                     "execution": execution,
                 }),
             )
@@ -1784,17 +1810,28 @@ async fn handle_request(
                 .and_then(|v| v.as_str())
                 .filter(|id| !id.trim().is_empty())
                 .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
-            let changed = {
+            let (changed, kind) = {
                 let st = state.lock().await;
-                st.plans
+                let changed = st
+                    .plans
                     .abort_session(&st.db, session_id)
-                    .map_err(plan_rpc_err)?
+                    .map_err(plan_rpc_err)?;
+                // Only a session that still exists can name the contract it
+                // returns to, and only such a session can have changed here.
+                let kind = if changed {
+                    st.plans
+                        .active_kind(&st.db, session_id)
+                        .map_err(plan_rpc_err)?
+                } else {
+                    None
+                };
+                (changed, kind)
             };
             if changed {
                 emit_notification(
                     &tx,
                     "plans.changed",
-                    json!({ "sessionId": session_id, "state": "planning" }),
+                    json!({ "sessionId": session_id, "state": "planning", "kind": kind }),
                 )
                 .await;
             }
@@ -1850,7 +1887,9 @@ async fn handle_request(
             let task = scheduled::get_task(&st.db, id)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                 .ok_or_else(|| rpc_err(1007, "task not found", "NOT_FOUND"))?;
-            if task.mode == "plan" {
+            // Both contract modes need a human to approve their proposal (D198),
+            // so neither can run unattended.
+            if sessions::is_contract_mode(&task.mode) {
                 return Err(plan_rpc_err("PLAN_REQUIRES_INTERACTIVE_SESSION"));
             }
             let settings = st
@@ -2077,8 +2116,9 @@ async fn handle_request(
                     // the user's project — skip the prompt (D114). The lexical
                     // pre-check only decides prompting; execution still goes
                     // through the symlink-aware resolver, so it cannot be used
-                    // to escape containment. Plan's hard deny is never bypassed.
-                    if durable_mode != "plan"
+                    // to escape containment. A contract mode's hard deny is
+                    // never bypassed.
+                    if !sessions::is_contract_mode(&durable_mode)
                         && auto.is_none()
                         && matches!(p.tool_name.as_str(), "Write" | "Edit")
                     {
@@ -2254,7 +2294,7 @@ async fn handle_request(
                     );
                     let error_code = if cancelled {
                         "TOOL_ABORTED"
-                    } else if durable_mode == "plan"
+                    } else if sessions::is_contract_mode(&durable_mode)
                         && !PermissionManager::plan_mode_allows(&p.tool_name)
                     {
                         match p.tool_name.as_str() {
@@ -3613,6 +3653,7 @@ mod tests {
                         session_id: &plan_session.id,
                         turn_id: &turn,
                         tool_call_id: "submit-shell-gate",
+                        kind: crate::plans::KIND_PLAN,
                         title: "Plan",
                         markdown: "# Plan",
                         question: "Proceed?",
@@ -4457,47 +4498,53 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn scheduled_run_rejects_task_plan_mode_before_creating_session_or_run() {
-        let data_dir = tempfile::tempdir().unwrap();
-        let mut app_state = AppState::open(data_dir.path()).unwrap();
-        app_state.handshook = true;
-        let task = scheduled::create_task(
-            &app_state.db,
-            &json!({
-                "title": "Plan schedule",
-                "prompt": "run this",
-                "mode": "plan"
-            }),
-        )
-        .unwrap();
-        app_state
-            .db
-            .set_setting("app", &json!({ "defaultMode": "agent" }))
+    async fn scheduled_run_rejects_contract_modes_before_creating_session_or_run() {
+        // Plan and Goal both need a human to approve their proposal (D198), so
+        // neither can be launched by the scheduler.
+        for mode in ["plan", "goal"] {
+            let data_dir = tempfile::tempdir().unwrap();
+            let mut app_state = AppState::open(data_dir.path()).unwrap();
+            app_state.handshook = true;
+            let task = scheduled::create_task(
+                &app_state.db,
+                &json!({
+                    "title": format!("{mode} schedule"),
+                    "prompt": "run this",
+                    "mode": mode
+                }),
+            )
             .unwrap();
-        let state = Arc::new(Mutex::new(app_state));
-        let (tx, _rx) = mpsc::unbounded_channel();
+            assert_eq!(task.mode, mode);
+            app_state
+                .db
+                .set_setting("app", &json!({ "defaultMode": "agent" }))
+                .unwrap();
+            let state = Arc::new(Mutex::new(app_state));
+            let (tx, _rx) = mpsc::unbounded_channel();
 
-        let error = handle_request(state.clone(), "scheduled.run", json!({ "id": task.id }), tx)
-            .await
-            .unwrap_err();
-        assert_eq!(
-            error.data.unwrap()["errorCode"],
-            "PLAN_REQUIRES_INTERACTIVE_SESSION"
-        );
+            let error = handle_request(state.clone(), "scheduled.run", json!({ "id": task.id }), tx)
+                .await
+                .unwrap_err();
+            assert_eq!(
+                error.data.unwrap()["errorCode"],
+                "PLAN_REQUIRES_INTERACTIVE_SESSION",
+                "{mode}"
+            );
 
-        let st = state.lock().await;
-        let session_count: i64 = st
-            .db
-            .conn()
-            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
-            .unwrap();
-        let run_count: i64 = st
-            .db
-            .conn()
-            .query_row("SELECT COUNT(*) FROM task_runs", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(session_count, 0);
-        assert_eq!(run_count, 0);
+            let st = state.lock().await;
+            let session_count: i64 = st
+                .db
+                .conn()
+                .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+                .unwrap();
+            let run_count: i64 = st
+                .db
+                .conn()
+                .query_row("SELECT COUNT(*) FROM task_runs", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(session_count, 0, "{mode}");
+            assert_eq!(run_count, 0, "{mode}");
+        }
     }
 
     #[tokio::test]
@@ -4922,6 +4969,96 @@ mod tests {
         .unwrap();
         let pending_result = pending_task.await.unwrap().unwrap();
         assert_eq!(pending_result["ok"], true);
+    }
+
+    #[tokio::test]
+    async fn goal_authorization_reuses_the_durable_contract_mode_hard_deny() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project = data_dir.path().join("project");
+        fs::create_dir_all(&project).unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Goal".into()),
+            Some("goal".into()),
+            None,
+            None,
+            Some(project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let session_id = session.id.clone();
+        // `auto` is the strongest permission mode; the deny must still win.
+        sessions::configure_session_with_thinking(
+            &app_state.db,
+            &session_id,
+            "goal",
+            None,
+            None,
+            None,
+            Some("auto"),
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (tx, _rx) = mpsc::unbounded_channel();
+
+        for (tool_name, args, expected) in [
+            (
+                "Write",
+                json!({ "path": "ignored.txt", "content": "no" }),
+                "WRITE_DISABLED_IN_PLAN",
+            ),
+            (
+                "Edit",
+                json!({ "path": "ignored.txt", "old_string": "a", "new_string": "b" }),
+                "EDIT_DISABLED_IN_PLAN",
+            ),
+            ("plugin_demo_run", json!({}), "PLUGIN_DISABLED_IN_PLAN"),
+            ("UnknownTool", json!({}), "TOOL_DISABLED_IN_PLAN"),
+        ] {
+            let result = handle_request(
+                state.clone(),
+                "tools.execute",
+                json!({
+                    "sessionId": session_id,
+                    "toolCallId": format!("goal-{tool_name}-call"),
+                    "toolName": tool_name,
+                    "args": args,
+                    // A sidecar claiming Agent cannot widen the durable mode.
+                    "mode": "agent"
+                }),
+                tx.clone(),
+            )
+            .await
+            .unwrap();
+            assert_eq!(result["errorCode"], expected, "{tool_name}");
+            assert_eq!(result["ok"], false);
+        }
+
+        // Bash still follows the permission mode rather than the allowlist.
+        #[cfg(windows)]
+        let goal_bash_command = "[Console]::Out.Write('goal-bash')";
+        #[cfg(not(windows))]
+        let goal_bash_command = "printf goal-bash";
+        let command_shell_id = crate::tools::shell::default_shell_id();
+        let bash = handle_request(
+            state.clone(),
+            "tools.execute",
+            json!({
+                "sessionId": session_id,
+                "toolCallId": "goal-bash-auto",
+                "toolName": "Bash",
+                "args": { "command": goal_bash_command },
+                "expectedCommandShellId": command_shell_id,
+                "expectedCommandShellDialect": crate::tools::shell::dialect_for_id(command_shell_id),
+                "mode": "agent"
+            }),
+            tx.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(bash["ok"], true);
+        assert_eq!(bash["content"]["stdout"], "goal-bash");
     }
 
     #[tokio::test]

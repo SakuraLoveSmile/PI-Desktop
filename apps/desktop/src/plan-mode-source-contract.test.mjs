@@ -25,12 +25,16 @@ const legacyModeKey = ["mode", "Chat"].join("");
 const legacyModeCommand = ["builtin.mode", "chat"].join(".");
 const legacyModeLiteral = ["mode:", '"chat"'].join(" ");
 
-test("renderer exposes Agent and Plan as the only operating modes", () => {
-  assert.match(composerSource, /mode === "agent" \? "plan" : "agent"/);
+test("renderer exposes Agent, Plan, and Goal as the only operating modes", () => {
+  assert.match(composerSource, /MODE_CYCLE: readonly Mode\[\] = \["agent", "plan", "goal"\]/);
   assert.match(composerSource, /settings\.modePlan/);
+  assert.match(composerSource, /settings\.modeGoal/);
   assert.match(composerSource, /IconListChecks/);
+  assert.match(composerSource, /IconTarget/);
   assert.match(settingsSource, /\["plan", "settings\.modePlan"\]/);
+  assert.match(settingsSource, /\["goal", "settings\.modeGoal"\]/);
   assert.match(commandsSource, /case "builtin\.mode\.plan"/);
+  assert.match(commandsSource, /case "builtin\.mode\.goal"/);
   for (const source of [composerSource, settingsSource, commandsSource]) {
     assert.doesNotMatch(source, new RegExp(`${legacyModeKey}|${legacyModeCommand}|${legacyModeLiteral}`));
   }
@@ -80,7 +84,9 @@ test("reject or interruption returns editable planning without changing durable 
   assert.doesNotMatch(planEventBlock, /sessions:/);
   const hostPlanEventBlock =
     storeSource.match(/handlePlansChanged: \(event\) =>[\s\S]*?\n  handleAgentEvent:/)?.[0] ?? "";
-  assert.match(hostPlanEventBlock, /sessionModeForPlanningState\(event\.state\)/);
+  assert.match(hostPlanEventBlock, /sessionModeForPlanningState\(\s*event\.state,/);
+  // The contract kind, not the projected state, decides which mode is shown.
+  assert.match(hostPlanEventBlock, /event\.kind \?\? checkpoint\?\.kind/);
   assert.match(hostPlanEventBlock, /planExecutionWasActive/);
   assert.match(storeSource, /pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.match(storeSource, /pendingPlans\[sessionId\]\?\.status === "pending"\) return;/);
@@ -116,7 +122,7 @@ test("the component spec assigns mode ownership to Composer", () => {
   assert.match(topbarSpec, /project identity/);
   assert.match(topbarSpec, /model picker/);
   assert.doesNotMatch(topbarSpec, /Agent \| Plan|mode toggle|mode indicator/);
-  assert.match(composerSpec, /Composer-left Agent\/Plan chip is the sole mode/);
+  assert.match(composerSpec, /Composer-left Agent\/Plan\/Goal chip is the sole mode/);
 });
 
 test("plan approval sends exact identities and waits for host confirmation", () => {
@@ -184,10 +190,16 @@ test("pending approval keeps the draft while gating every composer control", () 
 test("Plan approval labels and Auto file-change warning are locale-backed", () => {
   assert.match(englishSource, /modePlan: "Plan"/);
   assert.match(chineseSource, /modePlan: "规划"/);
+  assert.match(englishSource, /modeGoal: "Goal"/);
+  assert.match(chineseSource, /modeGoal: "目标"/);
   assert.match(englishSource, /approvalRegion: "Plan approval"/);
   assert.match(chineseSource, /approvalRegion: "规划审批"/);
+  assert.match(englishSource, /approvalRegion: "Goal approval"/);
+  assert.match(chineseSource, /approvalRegion: "目标审批"/);
   assert.match(englishSource, /statusQueued: "Plan queued"/);
   assert.match(chineseSource, /statusQueued: "规划已排队"/);
+  assert.match(englishSource, /statusQueued: "Goal queued"/);
+  assert.match(chineseSource, /statusQueued: "目标已排队"/);
   assert.match(englishSource, /approveAuto: "Approve \(Auto\)"/);
   assert.match(chineseSource, /approveAuto: "批准（全自动）"/);
   assert.match(englishSource, /autoWarning: "Auto runs Bash without asking and may change files\."/);

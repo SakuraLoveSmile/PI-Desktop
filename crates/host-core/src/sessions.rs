@@ -8,13 +8,14 @@ use crate::db::{ms_to_ts, now_ms, ts_to_ms, Database};
 use crate::notifications::{self, Notification};
 use crate::transcripts::{self, CompactionRecord, MessageRecord, RevisionRecord};
 
-pub const MODES: [&str; 2] = ["plan", "agent"];
+pub const MODES: [&str; 3] = ["plan", "goal", "agent"];
 
 /// Compatibility normalization for v7 callers and imported records. The
-/// persisted operating profile is now always `plan` or `agent`.
+/// persisted operating profile is now always `plan`, `goal` or `agent`.
 pub fn normalize_mode(mode: Option<&str>) -> String {
     match mode {
         Some("plan") | Some("chat") => "plan".into(),
+        Some("goal") => "goal".into(),
         Some("agent") => "agent".into(),
         _ => "agent".into(),
     }
@@ -22,6 +23,12 @@ pub fn normalize_mode(mode: Option<&str>) -> String {
 
 pub fn is_valid_mode(mode: &str) -> bool {
     MODES.contains(&mode)
+}
+
+/// Plan and Goal negotiate a contract before executing (D198), so they share one
+/// tool allowlist and one hard deny. Agent is the only executing mode.
+pub fn is_contract_mode(mode: &str) -> bool {
+    matches!(mode, "plan" | "goal")
 }
 
 /// Values accepted by the persisted per-session thinking selector.  Keep this
