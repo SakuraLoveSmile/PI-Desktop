@@ -228,19 +228,18 @@ pub fn read_transcript(data_dir: &Path, session_id: &str) -> Result<Vec<MessageR
     Ok(out)
 }
 
-/// Return the newest valid compaction checkpoint. Unknown/torn records are
-/// ignored using the same forward-compatible policy as message reads.
-pub fn read_latest_compaction(
-    data_dir: &Path,
-    session_id: &str,
-) -> Result<Option<CompactionRecord>> {
+/// Return every valid compaction checkpoint in append order. The renderer
+/// shows one transcript row per checkpoint, so the whole chain is durable, not
+/// just the newest one. Unknown/torn records are ignored using the same
+/// forward-compatible policy as message reads.
+pub fn read_compactions(data_dir: &Path, session_id: &str) -> Result<Vec<CompactionRecord>> {
     let path = transcript_path(data_dir, session_id)?;
     let raw = match fs::read_to_string(&path) {
         Ok(raw) => raw,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(e) => return Err(e).with_context(|| format!("read {}", path.display())),
     };
-    let mut latest = None;
+    let mut out = Vec::new();
     for line in raw.lines() {
         let Ok(value) = serde_json::from_str::<Value>(line.trim()) else {
             continue;
@@ -249,13 +248,13 @@ pub fn read_latest_compaction(
             continue;
         }
         match serde_json::from_value::<CompactionRecord>(value) {
-            Ok(record) => latest = Some(record),
+            Ok(record) => out.push(record),
             Err(error) => {
                 tracing::warn!(path = %path.display(), %error, "skipping invalid compaction line");
             }
         }
     }
-    Ok(latest)
+    Ok(out)
 }
 
 /// Atomically replace the live transcript (compaction, revision switch,
@@ -266,17 +265,19 @@ pub fn write_transcript(
     session_created_at: &str,
     records: &[MessageRecord],
 ) -> Result<()> {
-    write_transcript_with_compaction(data_dir, session_id, session_created_at, records, None)
+    write_transcript_with_compactions(data_dir, session_id, session_created_at, records, &[])
 }
 
-/// Atomically replace visible messages and optionally retain one current
-/// context checkpoint. Rewrites intentionally collapse older checkpoints.
-pub fn write_transcript_with_compaction(
+/// Atomically replace visible messages and retain the checkpoint chain, in
+/// append order. A rewrite drops whichever records the caller filtered out,
+/// which is how a truncated anchor invalidates a single checkpoint without
+/// discarding the rest of the chain.
+pub fn write_transcript_with_compactions(
     data_dir: &Path,
     session_id: &str,
     session_created_at: &str,
     records: &[MessageRecord],
-    compaction: Option<&CompactionRecord>,
+    compactions: &[CompactionRecord],
 ) -> Result<()> {
     let path = transcript_path(data_dir, session_id)?;
     if let Some(parent) = path.parent() {
@@ -292,7 +293,7 @@ pub fn write_transcript_with_compaction(
             writer.write_all(tagged("message", record)?.as_bytes())?;
             writer.write_all(b"\n")?;
         }
-        if let Some(record) = compaction {
+        for record in compactions {
             writer.write_all(tagged("compaction", record)?.as_bytes())?;
             writer.write_all(b"\n")?;
         }
@@ -546,10 +547,33 @@ mod tests {
         append_compaction(dir.path(), "s1", "2026-07-26T00:00:00Z", &compaction()).unwrap();
 
         assert_eq!(read_transcript(dir.path(), "s1").unwrap().len(), 2);
-        let restored = read_latest_compaction(dir.path(), "s1").unwrap().unwrap();
-        assert_eq!(restored.id, "compact-1");
-        assert_eq!(restored.through_message_id, "m2");
-        assert_eq!(restored.tokens_before, 42_000);
+        let restored = read_compactions(dir.path(), "s1").unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].id, "compact-1");
+        assert_eq!(restored[0].through_message_id, "m2");
+        assert_eq!(restored[0].tokens_before, 42_000);
+    }
+
+    #[test]
+    fn every_appended_compaction_survives_a_reload() {
+        let dir = tempdir().unwrap();
+        append_message(dir.path(), "s1", "2026-07-26T00:00:00Z", &record("m1", "one")).unwrap();
+        append_compaction(dir.path(), "s1", "2026-07-26T00:00:00Z", &compaction()).unwrap();
+        append_message(dir.path(), "s1", "2026-07-26T00:00:00Z", &record("m2", "two")).unwrap();
+        let second = CompactionRecord {
+            id: "compact-2".into(),
+            summary: "later summary".into(),
+            first_kept_message_id: Some("m2".into()),
+            ..compaction()
+        };
+        append_compaction(dir.path(), "s1", "2026-07-26T00:00:00Z", &second).unwrap();
+
+        // One transcript row per compaction needs the whole chain, in order.
+        let restored = read_compactions(dir.path(), "s1").unwrap();
+        assert_eq!(
+            restored.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
+            vec!["compact-1", "compact-2"]
+        );
     }
 
     #[test]
@@ -594,24 +618,30 @@ mod tests {
     }
 
     #[test]
-    fn rewrite_can_preserve_only_the_latest_compaction() {
+    fn rewrite_preserves_the_whole_compaction_chain() {
         let dir = tempdir().unwrap();
-        write_transcript_with_compaction(
+        let second = CompactionRecord {
+            id: "compact-2".into(),
+            summary: "later summary".into(),
+            ..compaction()
+        };
+        write_transcript_with_compactions(
             dir.path(),
             "s1",
             "2026-07-26T00:00:00Z",
             &[record("m1", "one"), record("m2", "two")],
-            Some(&compaction()),
+            &[compaction(), second],
         )
         .unwrap();
 
         assert_eq!(read_transcript(dir.path(), "s1").unwrap().len(), 2);
         assert_eq!(
-            read_latest_compaction(dir.path(), "s1")
+            read_compactions(dir.path(), "s1")
                 .unwrap()
-                .unwrap()
-                .summary,
-            "summary"
+                .iter()
+                .map(|r| r.summary.as_str())
+                .collect::<Vec<_>>(),
+            vec!["summary", "later summary"]
         );
     }
 

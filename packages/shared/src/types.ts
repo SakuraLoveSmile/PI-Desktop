@@ -294,8 +294,12 @@ export type SessionSummary = {
 
 export type SessionDetail = SessionSummary & {
   messages: UiMessage[];
-  /** Latest durable model-context checkpoint; never rendered as a chat row. */
+  /** The checkpoint that governs the next model request, i.e. the last of
+   * `compactions`. Restored by the runtime on load. */
   compaction?: ContextCompactionRecord;
+  /** Every durable checkpoint, oldest first: the transcript shows one row per
+   * compaction, the way Codex emits one `ContextCompaction` turn item each. */
+  compactions?: ContextCompactionRecord[];
 };
 
 /**

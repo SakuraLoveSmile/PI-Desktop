@@ -175,8 +175,15 @@ pub struct SessionDetail {
     #[serde(flatten)]
     pub summary: SessionSummary,
     pub messages: Vec<UiMessage>,
+    /// The checkpoint that governs the next model request, i.e. the last of
+    /// `compactions`. Kept as its own field because that is what the runtime
+    /// restores on load.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub compaction: Option<CompactionRecord>,
+    /// The whole checkpoint chain, oldest first, so the transcript can show one
+    /// row per compaction.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub compactions: Vec<CompactionRecord>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -818,11 +825,12 @@ pub fn get_session(db: &Database, id: &str) -> Result<Option<SessionDetail>> {
     // file line lost its index transaction to a crash.
     let records = dedupe_records(transcripts::read_transcript(db.data_dir(), id)?);
     let messages = records.into_iter().map(record_to_ui).collect();
-    let compaction = transcripts::read_latest_compaction(db.data_dir(), id)?;
+    let compactions = transcripts::read_compactions(db.data_dir(), id)?;
     Ok(Some(SessionDetail {
         summary,
         messages,
-        compaction,
+        compaction: compactions.last().cloned(),
+        compactions,
     }))
 }
 
@@ -872,10 +880,14 @@ pub fn fork_session_through(
         };
         source_records.truncate(position + 1);
     }
-    let source_compaction = transcripts::read_latest_compaction(db.data_dir(), source_id)?;
+    let source_compactions = transcripts::read_compactions(db.data_dir(), source_id)?;
     let (records, message_ids, tool_call_ids) = clone_records_for_fork(source_records);
-    let compaction = source_compaction
-        .and_then(|record| clone_compaction_for_fork(record, &message_ids, &tool_call_ids));
+    // Each checkpoint is remapped on its own: a message-scoped fork can cut the
+    // anchor of a later checkpoint while the earlier ones stay intact.
+    let compactions: Vec<CompactionRecord> = source_compactions
+        .into_iter()
+        .filter_map(|record| clone_compaction_for_fork(record, &message_ids, &tool_call_ids))
+        .collect();
     let texts = records.iter().map(record_index_text).collect::<Vec<_>>();
     let id = Uuid::new_v4().to_string();
     let now = now_ms();
@@ -885,12 +897,12 @@ pub fn fork_session_through(
         .map(|value| value.chars().take(100).collect::<String>())
         .unwrap_or_else(|| format!("{} (branch)", source.summary.title));
 
-    transcripts::write_transcript_with_compaction(
+    transcripts::write_transcript_with_compactions(
         db.data_dir(),
         &id,
         &created_at,
         &records,
-        compaction.as_ref(),
+        &compactions,
     )?;
     let indexed = (|| -> Result<()> {
         let tx = db.conn().unchecked_transaction()?;
@@ -935,7 +947,8 @@ pub fn fork_session_through(
     Ok(ForkSessionResult::Created(Box::new(SessionDetail {
         summary,
         messages,
-        compaction,
+        compaction: compactions.last().cloned(),
+        compactions,
     })))
 }
 
@@ -1116,14 +1129,17 @@ fn compaction_valid_for_records(compaction: &CompactionRecord, records: &[Messag
 pub fn replace_messages(db: &Database, session_id: &str, messages: &[UiMessage]) -> Result<()> {
     let session_created = session_created_at(db, session_id)?;
     let (records, texts) = records_and_texts(messages);
-    let compaction = transcripts::read_latest_compaction(db.data_dir(), session_id)?
-        .filter(|record| compaction_valid_for_records(record, &records));
-    transcripts::write_transcript_with_compaction(
+    let compactions: Vec<CompactionRecord> =
+        transcripts::read_compactions(db.data_dir(), session_id)?
+            .into_iter()
+            .filter(|record| compaction_valid_for_records(record, &records))
+            .collect();
+    transcripts::write_transcript_with_compactions(
         db.data_dir(),
         session_id,
         &session_created,
         &records,
-        compaction.as_ref(),
+        &compactions,
     )?;
     let conn = db.conn();
     // A rewrite reseats every index row, so the turn each surviving message was
@@ -1808,6 +1824,82 @@ mod tests {
             .unwrap()
             .compaction
             .is_none());
+    }
+
+    #[test]
+    fn the_whole_checkpoint_chain_survives_restart_and_partial_truncation() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let messages = [
+            user_msg("u1", "old", "2026-07-28T00:00:00Z"),
+            user_msg("u2", "recent", "2026-07-28T00:00:01Z"),
+            user_msg("u3", "after", "2026-07-28T00:00:02Z"),
+        ];
+        for message in &messages {
+            append_message(&db, &session.id, message, None).unwrap();
+        }
+        append_compaction(&db, &session.id, &checkpoint("u1", "u1")).unwrap();
+        append_compaction(&db, &session.id, &checkpoint("u2", "u3")).unwrap();
+
+        let restored = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(restored.compactions.len(), 2);
+        // `compaction` stays the newest one: it is what the runtime reinstalls.
+        assert_eq!(
+            restored.compaction.as_ref().unwrap().id,
+            restored.compactions[1].id
+        );
+
+        // Truncating past the second anchor invalidates that record alone.
+        replace_messages(&db, &session.id, &messages[..2]).unwrap();
+        let after = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(
+            after
+                .compactions
+                .iter()
+                .map(|record| record.through_message_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["u1"]
+        );
+    }
+
+    #[test]
+    fn fork_remaps_each_checkpoint_in_the_chain_on_its_own() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let messages = [
+            user_msg("u1", "old", "2026-07-28T00:00:00Z"),
+            user_msg("u2", "recent", "2026-07-28T00:00:01Z"),
+        ];
+        for message in &messages {
+            append_message(&db, &session.id, message, None).unwrap();
+        }
+        append_compaction(&db, &session.id, &checkpoint("u1", "u1")).unwrap();
+        append_compaction(&db, &session.id, &checkpoint("u2", "u2")).unwrap();
+
+        let ForkSessionResult::Created(full) =
+            fork_session_through(&db, &session.id, None, None).unwrap()
+        else {
+            panic!("expected fork");
+        };
+        assert_eq!(
+            full.compactions
+                .iter()
+                .map(|record| record.through_message_id.as_str())
+                .collect::<Vec<_>>(),
+            vec![full.messages[0].id.as_str(), full.messages[1].id.as_str()]
+        );
+
+        // A fork that cuts the later anchor keeps the earlier checkpoint.
+        let ForkSessionResult::Created(partial) =
+            fork_session_through(&db, &session.id, None, Some("u1")).unwrap()
+        else {
+            panic!("expected fork");
+        };
+        assert_eq!(partial.compactions.len(), 1);
+        assert_eq!(
+            partial.compactions[0].through_message_id,
+            partial.messages[0].id
+        );
     }
 
     #[test]

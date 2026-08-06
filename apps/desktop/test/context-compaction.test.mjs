@@ -14,6 +14,8 @@ const [
   commands,
   hostRpc,
   hostPermissions,
+  hostSessions,
+  hostTranscripts,
   transcript,
   enLocale,
 ] = await Promise.all([
@@ -26,6 +28,8 @@ const [
   read("../electron/main/builtin-commands.ts"),
   read("../../../crates/host-core/src/rpc/mod.rs"),
   read("../../../crates/host-core/src/permissions.rs"),
+  read("../../../crates/host-core/src/sessions.rs"),
+  read("../../../crates/host-core/src/transcripts.rs"),
   read("../src/components/ChatTranscript.tsx"),
   read("../../../packages/i18n/src/locales/en/index.ts"),
 ]);
@@ -86,6 +90,25 @@ test("the hard boundary is enforced by the host, with a model-side escape hatch"
     /systemPrompt: `\$\{context\.systemPrompt\}\\n\\n\$\{reminder\}`/,
   );
   assert.match(hostPermissions, /"new_context"/);
+});
+
+test("every checkpoint is durable, not just the newest one", () => {
+  // One transcript row per compaction needs the whole chain to survive a
+  // restart, a rewrite, and a fork.
+  assert.match(types, /compactions\?: ContextCompactionRecord\[\]/);
+  assert.match(hostTranscripts, /pub fn read_compactions\(/);
+  assert.match(hostTranscripts, /pub fn write_transcript_with_compactions\(/);
+  assert.doesNotMatch(hostTranscripts, /pub fn read_latest_compaction\(/);
+  assert.match(hostSessions, /pub compactions: Vec<CompactionRecord>/);
+  assert.match(hostSessions, /compaction: compactions\.last\(\)\.cloned\(\)/);
+  assert.match(
+    hostSessions,
+    /\.filter\(\|record\| compaction_valid_for_records\(record, &records\)\)/,
+  );
+  assert.match(
+    hostSessions,
+    /\.filter_map\(\|record\| clone_compaction_for_fork\(record, &message_ids, &tool_call_ids\)\)/,
+  );
 });
 
 test("a checkpoint carries only recent user messages past the boundary", () => {
