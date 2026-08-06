@@ -38,10 +38,7 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
-import {
-  DEFAULT_COMMAND_TIMEOUT_MS,
-  DEFAULT_CONTEXT_COMPACTION_SETTINGS,
-} from "@pi-desktop/shared";
+import { DEFAULT_COMMAND_TIMEOUT_MS } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   AgentStatus,
@@ -155,6 +152,28 @@ const MAX_MUTATION_RECOVERY_FAILURES = 2;
 const BASH_PATCH_FAILURE_KEY = "__bash_patch_command__";
 export const TOOL_SEARCH_NAME = "ToolSearch";
 const CHECKPOINT_TAIL_SAFETY_TOKENS = 256;
+/**
+ * Tokens held back from the context window for the summary prompt and the
+ * model's own output. Compaction thresholds are derived from the active model's
+ * window rather than configured, and this floor reproduces the reserve that
+ * used to be the default setting, so the hard safety boundary is unchanged.
+ */
+const COMPACTION_RESERVE_FLOOR_TOKENS = 16_384;
+/**
+ * Retained-tail target as a share of the safe budget, bounded so a 32K window
+ * still keeps a usable tail and a 1M window does not carry the whole session
+ * forward. A single fixed token count cannot serve both.
+ */
+const COMPACTION_KEEP_RECENT_RATIO = 0.2;
+const COMPACTION_MIN_KEEP_RECENT_TOKENS = 8_000;
+const COMPACTION_MAX_KEEP_RECENT_TOKENS = 64_000;
+/**
+ * Where background pre-compaction becomes worthwhile. Past this share of the
+ * safe budget a session is very likely to reach the hard boundary, so the
+ * summary request is paid for work that would have been needed anyway; below
+ * it, short sessions would pay for summaries they never use.
+ */
+const BACKGROUND_COMPACTION_LIMIT_RATIO = 0.7;
 const COMPACTION_FALLBACK_KEEP_RECENT_RATIO = 0.25;
 const COMPACTION_FALLBACK_MAX_SUMMARY_CHARS = 12_000;
 const COMPACTION_SUMMARY_PROMPT_SAFETY_TOKENS = 2_048;
@@ -269,25 +288,36 @@ export function looksLikePseudoToolCall(text: string): boolean {
   );
 }
 
-function normalizeCompactionSettings(
-  value?: Partial<ContextCompactionSettings>,
-): CompactionSettings {
-  const positiveInt = (candidate: unknown, fallback: number) =>
-    typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0
-      ? Math.round(candidate)
-      : fallback;
-  return {
-    enabled: value?.enabled !== false,
-    reserveTokens: positiveInt(
-      value?.reserveTokens,
-      DEFAULT_CONTEXT_COMPACTION_SETTINGS.reserveTokens,
-    ),
-    keepRecentTokens: positiveInt(
-      value?.keepRecentTokens,
-      DEFAULT_CONTEXT_COMPACTION_SETTINGS.keepRecentTokens,
-    ),
-  };
+/**
+ * Automatic protection is on unless a caller explicitly disables it. The token
+ * thresholds carried by the legacy settings shape are ignored: they are derived
+ * from the active model's context window in `contextBudget`, because no single
+ * configured number fits both a 32K and a 1M window.
+ */
+function compactionEnabled(value?: Partial<ContextCompactionSettings>): boolean {
+  return value?.enabled !== false;
 }
+
+/**
+ * Graded context thresholds derived from the active model's window.
+ *
+ * `hardLimit` is the safety boundary: the next provider request must not be
+ * issued while the context is at or above it. `backgroundLimit` sits below it
+ * and only decides whether pre-computing a checkpoint off the critical path is
+ * worth a summary request.
+ */
+type ContextBudget = {
+  /** Estimated tokens in the reconstructed model context. */
+  tokens: number;
+  /** Point where background pre-compaction becomes worthwhile. */
+  backgroundLimit: number;
+  /** Point where an uncompacted provider request is no longer allowed. */
+  hardLimit: number;
+  /** Tokens reserved for the request's own prompt and output. */
+  requestHeadroom: number;
+  /** Approximate recent-context tokens a checkpoint should retain. */
+  keepRecentTokens: number;
+};
 
 type ApiBinding = {
   api: Api;
@@ -877,7 +907,13 @@ export class DesktopAgentRuntime {
   private terminatingToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
   private activeCompaction?: ContextCompactionRecord;
-  private compactionSettings: CompactionSettings;
+  private compactionEnabled: boolean;
+  /**
+   * Context size right after the newest checkpoint was installed. Background
+   * pre-compaction measures growth against this baseline so one install cannot
+   * immediately justify the next.
+   */
+  private checkpointBaselineTokens?: number;
   private pendingUserMessageId?: string;
   private pendingOverflow = false;
   private overflowRecoveryAttempted = false;
@@ -913,9 +949,7 @@ export class DesktopAgentRuntime {
     this.projectPath = opts.projectPath?.trim() || undefined;
     this.baseProjectInstructions = opts.projectInstructions;
     this.projectInstructions = opts.projectInstructions;
-    this.compactionSettings = normalizeCompactionSettings(
-      opts.compactionSettings,
-    );
+    this.compactionEnabled = compactionEnabled(opts.compactionSettings);
 
     this.rebuildToolCatalog();
     const model = this.buildModel();
@@ -2244,18 +2278,12 @@ export class DesktopAgentRuntime {
   }
 
   setCompactionSettings(settings?: ContextCompactionSettings): void {
-    this.compactionSettings = normalizeCompactionSettings(settings);
+    this.compactionEnabled = compactionEnabled(settings);
     this.rebuildToolCatalog();
     this.agent.state.tools = this.activeTools();
   }
 
-  private contextBudget(messages: AgentMessage[]): {
-    tokens: number;
-    softLimit: number;
-    hardLimit: number;
-    requestHeadroom: number;
-    keepRecentTokens: number;
-  } {
+  private contextBudget(messages: AgentMessage[]): ContextBudget {
     const contextWindow = Math.max(
       1,
       Math.round(this.model.contextWindow || DEFAULT_CONTEXT_WINDOW),
@@ -2264,33 +2292,35 @@ export class DesktopAgentRuntime {
       Math.max(1, Math.round(this.model.maxTokens || DEFAULT_MAX_TOKENS)),
       Math.max(1, Math.floor(contextWindow * 0.25)),
     );
-    const configuredReserve = Math.min(
-      this.compactionSettings.reserveTokens,
+    const reserveFloor = Math.min(
+      COMPACTION_RESERVE_FLOOR_TOKENS,
       Math.max(1, Math.floor(contextWindow * 0.5)),
     );
     const requestHeadroom = Math.min(
       contextWindow - 1,
       Math.max(
-        configuredReserve,
+        reserveFloor,
         modelOutputBudget,
         Math.ceil(contextWindow * 0.05),
       ),
     );
     const hardLimit = Math.max(1, contextWindow - requestHeadroom);
     const keepRecentTokens = Math.min(
-      this.compactionSettings.keepRecentTokens,
-      Math.max(1, Math.floor(hardLimit * 0.5)),
-    );
-    const softGap = Math.min(
       Math.max(
-        keepRecentTokens,
-        Math.ceil(requestHeadroom / 2),
+        COMPACTION_MIN_KEEP_RECENT_TOKENS,
+        Math.min(
+          COMPACTION_MAX_KEEP_RECENT_TOKENS,
+          Math.floor(hardLimit * COMPACTION_KEEP_RECENT_RATIO),
+        ),
       ),
-      Math.max(1, Math.floor(hardLimit * 0.25)),
+      Math.max(1, Math.floor(hardLimit * 0.5)),
     );
     return {
       tokens: estimateContextTokens(messages).tokens,
-      softLimit: Math.max(1, hardLimit - softGap),
+      backgroundLimit: Math.max(
+        1,
+        Math.floor(hardLimit * BACKGROUND_COMPACTION_LIMIT_RATIO),
+      ),
       hardLimit,
       requestHeadroom,
       keepRecentTokens,
@@ -2303,17 +2333,27 @@ export class DesktopAgentRuntime {
     const context = buildSessionContext(this.entriesWithCompaction());
     const messages = [...context.messages, ...additionalMessages];
     const budget = this.contextBudget(messages);
-    return this.compactionSettings.enabled && budget.tokens >= budget.hardLimit;
+    return this.compactionEnabled && budget.tokens >= budget.hardLimit;
   }
 
-  private prepareCompactionInput(
-    entries: SessionTreeEntry[],
-    budget: {
-      hardLimit: number;
-      requestHeadroom: number;
-      keepRecentTokens: number;
-    },
-  ) {
+  /**
+   * Whether pre-computing a checkpoint off the critical path is worthwhile now.
+   *
+   * The hard boundary deliberately measures the total context, because that is
+   * the provider's actual constraint. This decision measures growth since the
+   * newest checkpoint instead: a large retained tail can sit above the
+   * background limit on its own, and a total-only measure would then request a
+   * fresh summary after every turn without ever reducing anything.
+   */
+  private backgroundCompactionReached(budget: ContextBudget): boolean {
+    if (budget.tokens < budget.backgroundLimit) return false;
+    if (this.checkpointBaselineTokens === undefined) return true;
+    return (
+      budget.tokens - this.checkpointBaselineTokens >= budget.keepRecentTokens
+    );
+  }
+
+  private prepareCompactionInput(entries: SessionTreeEntry[], budget: ContextBudget) {
     const maxRetainedTailTokens = Math.max(1, Math.floor(budget.hardLimit * 0.5));
     let keepRecentTokens = budget.keepRecentTokens;
     let compactionEntries = entries;
@@ -2384,10 +2424,10 @@ export class DesktopAgentRuntime {
       );
     }
     return prepareCompaction(compactionEntries, {
-      ...this.compactionSettings,
+      enabled: this.compactionEnabled,
       reserveTokens: budget.requestHeadroom,
       keepRecentTokens,
-    });
+    } satisfies CompactionSettings);
   }
 
   private rebuiltAgentContext(): AgentContext {
@@ -2407,7 +2447,7 @@ export class DesktopAgentRuntime {
     _signal?: AbortSignal,
   ): Promise<AgentLoopTurnUpdate> {
     let context = this.rebuiltAgentContext();
-    if (!this.compactionSettings.enabled) return { context };
+    if (!this.compactionEnabled) return { context };
 
     const budget = this.contextBudget(context.messages);
     if (budget.tokens < budget.hardLimit) return { context };
@@ -2526,11 +2566,7 @@ export class DesktopAgentRuntime {
 
   private prepareFallbackCompactionInput(
     entries: SessionTreeEntry[],
-    budget: {
-      hardLimit: number;
-      requestHeadroom: number;
-      keepRecentTokens: number;
-    },
+    budget: ContextBudget,
   ) {
     const fallbackKeepRecentTokens = Math.max(
       1,
@@ -2605,6 +2641,7 @@ export class DesktopAgentRuntime {
     }
 
     this.activeCompaction = checkpoint;
+    this.checkpointBaselineTokens = compactedBudget.tokens;
     this.agent.state.messages = buildSessionContext(
       this.entriesWithCompaction(),
     ).messages;
@@ -2622,11 +2659,7 @@ export class DesktopAgentRuntime {
 
   private fallbackPreparation(
     entries: SessionTreeEntry[],
-    budget: {
-      hardLimit: number;
-      requestHeadroom: number;
-      keepRecentTokens: number;
-    },
+    budget: ContextBudget,
     preparation?: CompactionPreparation,
   ): CompactionPreparation | undefined {
     const fallbackInput = this.prepareFallbackCompactionInput(entries, budget);
@@ -2651,12 +2684,7 @@ export class DesktopAgentRuntime {
 
   private async recoverCompactionFailure(
     entries: SessionTreeEntry[],
-    budget: {
-      tokens: number;
-      hardLimit: number;
-      requestHeadroom: number;
-      keepRecentTokens: number;
-    },
+    budget: ContextBudget,
     reason: ContextCompactionReason,
     willRetry: boolean,
     preparation: CompactionPreparation | undefined,
@@ -3192,7 +3220,7 @@ export class DesktopAgentRuntime {
           this.streamStartedAt = undefined;
           this.currentAssistant = undefined;
           const canRecoverOverflow =
-            this.compactionSettings.enabled &&
+            this.compactionEnabled &&
             overflow &&
             !this.overflowRecoveryAttempted;
           if (!failed && !aborted && !emptyResponse) {

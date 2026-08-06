@@ -2365,14 +2365,15 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     newMessages: [assistant, toolResult],
   };
 
-  it("derives soft and hard limits with provider-request headroom", async () => {
+  it("derives graded limits with provider-request headroom", async () => {
     const runtime = createRuntime();
 
     expect((runtime as any).contextBudget([])).toMatchObject({
       tokens: 0,
-      softLimit: 204_000,
+      backgroundLimit: 156_800,
       hardLimit: 224_000,
       requestHeadroom: 32_000,
+      keepRecentTokens: 44_800,
     });
 
     await runtime.dispose();
@@ -2391,11 +2392,43 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     });
 
     expect((runtime as any).contextBudget([])).toMatchObject({
-      softLimit: 12_000,
+      backgroundLimit: 11_200,
       hardLimit: 16_000,
       requestHeadroom: 16_000,
       keepRecentTokens: 8_000,
     });
+
+    await runtime.dispose();
+  });
+
+  it("requires growth past the newest checkpoint before pre-compacting", async () => {
+    const runtime = createRuntime();
+    const budget = {
+      tokens: 160_000,
+      backgroundLimit: 156_800,
+      hardLimit: 224_000,
+      requestHeadroom: 32_000,
+      keepRecentTokens: 44_800,
+    };
+
+    expect((runtime as any).backgroundCompactionReached(budget)).toBe(true);
+    expect(
+      (runtime as any).backgroundCompactionReached({
+        ...budget,
+        tokens: 156_799,
+      }),
+    ).toBe(false);
+
+    // A retained tail can sit above the background limit on its own. Measuring
+    // the total only would then re-request a summary every turn.
+    (runtime as any).checkpointBaselineTokens = 158_000;
+    expect((runtime as any).backgroundCompactionReached(budget)).toBe(false);
+    expect(
+      (runtime as any).backgroundCompactionReached({
+        ...budget,
+        tokens: 158_000 + budget.keepRecentTokens,
+      }),
+    ).toBe(true);
 
     await runtime.dispose();
   });
@@ -2488,10 +2521,16 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
       ],
       stopReason: "toolUse" as const,
     };
+    // Sized from the derived retained-tail target so the batch is the reason
+    // the cut point cannot stay inside the tail, whatever the window is.
+    const retainedTailTarget = (runtime as any).contextBudget([])
+      .keepRecentTokens as number;
     const largeToolResult = {
       ...toolResult,
       toolCallId: "large-tool-call",
-      content: [{ type: "text" as const, text: "x".repeat(80_001) }],
+      content: [
+        { type: "text" as const, text: "x".repeat((retainedTailTarget + 1_000) * 4) },
+      ],
     };
     (runtime as any).fullEntries = [
       {
@@ -2652,10 +2691,10 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     const runtime = createRuntime();
     vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
       tokens: 225_000,
-      softLimit: 204_000,
+      backgroundLimit: 156_800,
       hardLimit: 224_000,
       requestHeadroom: 32_000,
-      keepRecentTokens: 20_000,
+      keepRecentTokens: 44_800,
     });
     vi.spyOn(runtime as any, "runCompaction").mockResolvedValue(true);
 
@@ -2815,7 +2854,7 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     const runtime = createRuntime();
     vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
       tokens: 225_000,
-      softLimit: 204_000,
+      backgroundLimit: 156_800,
       hardLimit: 224_000,
       requestHeadroom: 32_000,
     });
