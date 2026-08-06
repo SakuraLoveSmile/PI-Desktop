@@ -461,16 +461,36 @@ function describeError(error: unknown): string {
   return String(error).slice(0, 300);
 }
 
+/**
+ * True when a rejection only says the host transport is gone (D080): the call
+ * lost a race with shutdown, a crash, or a supervised restart. Every such
+ * rejection carries `HOST_UNAVAILABLE`, whether it was refused before it was
+ * sent or was in flight when the transport closed.
+ */
+function isHostUnavailable(error: unknown): boolean {
+  return (
+    (error as { errorCode?: string } | null | undefined)?.errorCode ===
+    ErrorCodes.HOST_UNAVAILABLE
+  );
+}
+
 /** Pull the user's MCP server records from host-core into the local runtime. */
 async function refreshUserMcp(): Promise<McpServerRecord[]> {
-  if (!host) return [];
+  // A dead transport is expected during shutdown and between supervised
+  // restarts, and it rejects every call — warning about it would file the
+  // routine case under the same log line as a registry that cannot be read.
+  // The guard skips the calls that have not started; the catch covers the ones
+  // already in flight when the transport closed.
+  if (!host?.isAvailable()) return [];
   try {
     const result = await host.call<{ servers: McpServerRecord[] }>("mcp.list");
     const servers = result.servers ?? [];
     userMcp.setRecords(servers);
     return servers;
   } catch (error) {
-    logger.app("plugin", "warn", "mcp list failed", { data: String(error) });
+    if (!isHostUnavailable(error)) {
+      logger.app("plugin", "warn", "mcp list failed", { data: String(error) });
+    }
     return [];
   }
 }
@@ -479,14 +499,16 @@ async function refreshUserMcp(): Promise<McpServerRecord[]> {
 async function activeUserSkills(
   projectPath: string | undefined,
 ): Promise<UserSkillRecord[]> {
-  if (!host) return [];
+  if (!host?.isAvailable()) return [];
   try {
     const result = await host.call<{ skills: UserSkillRecord[] }>("skills.active", {
       projectPath: projectPath ?? null,
     });
     return result.skills ?? [];
   } catch (error) {
-    logger.app("plugin", "warn", "skills list failed", { data: String(error) });
+    if (!isHostUnavailable(error)) {
+      logger.app("plugin", "warn", "skills list failed", { data: String(error) });
+    }
     return [];
   }
 }
@@ -502,7 +524,7 @@ async function activeUserSkills(
 async function activeUserSubagentDocuments(
   projectPath: string | undefined,
 ): Promise<UserSubagentDocument[]> {
-  if (!host) return [];
+  if (!host?.isAvailable()) return [];
   let records: UserSubagentRecord[] = [];
   try {
     const result = await host.call<{ subagents: UserSubagentRecord[] }>(
@@ -511,7 +533,9 @@ async function activeUserSubagentDocuments(
     );
     records = result.subagents ?? [];
   } catch (error) {
-    logger.app("plugin", "warn", "subagent list failed", { data: String(error) });
+    if (!isHostUnavailable(error)) {
+      logger.app("plugin", "warn", "subagent list failed", { data: String(error) });
+    }
     return [];
   }
   const documents: UserSubagentDocument[] = [];

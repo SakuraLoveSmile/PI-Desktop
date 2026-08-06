@@ -43,7 +43,13 @@ test("sidecar detaches host listeners and gates every child write", () => {
 test("host transport closes pending calls and listeners on process death", () => {
   assert.match(hostSource, /private closed = false/);
   assert.match(hostSource, /this\.handlers\.clear\(\)/);
-  assert.match(hostSource, /if \(this\.closed\) throw new Error\("host-core is unavailable"\)/);
+  // Tagged, not a bare Error: a caller has to be able to tell routine teardown
+  // from a registry that genuinely failed without matching message text.
+  assert.match(
+    hostSource,
+    /if \(this\.closed\) throw this\.unavailableError\("host-core is unavailable"\)/,
+  );
+  assert.match(hostSource, /errorCode: ErrorCodes\.HOST_UNAVAILABLE,/);
   assert.match(hostSource, /private notifyExit\(/);
 });
 

@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { PROTOCOL_VERSION, rpcTimeoutMs } from "@pi-desktop/shared";
+import { ErrorCodes, PROTOCOL_VERSION, rpcTimeoutMs } from "@pi-desktop/shared";
 
 const HOST_DISPOSE_GRACE_MS = 3_000;
 const HOST_FORCE_KILL_GRACE_MS = 1_000;
@@ -149,8 +149,15 @@ export class HostProcess {
     this.exitHandlers.clear();
   }
 
+  /**
+   * Every rejection that only means "the transport is gone" is built here, so a
+   * caller can tell routine teardown from a real failure by the error code
+   * rather than by matching message text.
+   */
   private unavailableError(message: string): Error & { errorCode: string } {
-    return Object.assign(new Error(message), { errorCode: "HOST_UNAVAILABLE" });
+    return Object.assign(new Error(message), {
+      errorCode: ErrorCodes.HOST_UNAVAILABLE,
+    });
   }
 
   isAvailable(): boolean {
@@ -211,7 +218,7 @@ export class HostProcess {
     params: unknown = {},
     timeoutOverrideMs?: number,
   ): Promise<T> {
-    if (this.closed) throw new Error("host-core is unavailable");
+    if (this.closed) throw this.unavailableError("host-core is unavailable");
     if (!this.isAvailable()) {
       throw this.unavailableError(`host RPC unavailable: ${method}`);
     }
@@ -281,7 +288,7 @@ export class HostProcess {
     if (!this.child.stdin.destroyed && !this.child.stdin.writableEnded) {
       this.child.stdin.end();
     }
-    this.closeTransport(new Error("host-core disposed"));
+    this.closeTransport(this.unavailableError("host-core disposed"));
     if (this.exitObserved) return;
 
     const exited = await this.waitForExit(HOST_DISPOSE_GRACE_MS);

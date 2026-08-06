@@ -14,6 +14,10 @@ const hostSessionsSource = await readFile(
   new URL("../../../crates/host-core/src/sessions.rs", import.meta.url),
   "utf8",
 );
+const hostProcessSource = await readFile(
+  new URL("../electron/main/host-process.ts", import.meta.url),
+  "utf8",
+);
 
 test("every launch resolves the subagent catalog and its pinned models", () => {
   assert.match(mainSource, /loadSubagentDefinitions,\n  resolveSubagentProviders,/);
@@ -61,4 +65,40 @@ test("a permission request names the delegate that asked", () => {
   assert.match(mainSource, /const asking = activeToolCalls\.get\(/);
   assert.match(mainSource, /asking\?\.agentName \? \{ agentName: asking\.agentName \}/);
   assert.match(mainSource, /asking\?\.parentToolCallId/);
+});
+
+test("a dead host transport degrades quietly instead of warning", () => {
+  // Shutdown and supervised restarts reject every call. These three reads only
+  // add optional context, so they check the transport first — otherwise every
+  // quit files routine teardown under the same warn line as a registry that
+  // genuinely cannot be read.
+  for (const fn of [
+    "refreshUserMcp",
+    "activeUserSkills",
+    "activeUserSubagentDocuments",
+  ]) {
+    const start = mainSource.indexOf(`async function ${fn}(`);
+    assert.notEqual(start, -1, fn);
+    const body = mainSource.slice(start, start + 700);
+    assert.match(body, /if \(!host\?\.isAvailable\(\)\) return \[\];/, fn);
+    // The guard only stops calls that have not started; one already in flight at
+    // dispose is rejected too, so the catch has to classify it as well.
+    assert.match(body, /if \(!isHostUnavailable\(error\)\) \{/, fn);
+  }
+  // The bare guard only covers a host that was never constructed.
+  assert.doesNotMatch(mainSource, /^\s+if \(!host\) return \[\];$/m);
+  assert.match(
+    mainSource,
+    /function isHostUnavailable\(error: unknown\): boolean \{[\s\S]*?ErrorCodes\.HOST_UNAVAILABLE/,
+  );
+  // Classification works only because both teardown rejections are tagged.
+  assert.match(
+    hostProcessSource,
+    /if \(this\.closed\) throw this\.unavailableError\("host-core is unavailable"\);/,
+  );
+  assert.match(
+    hostProcessSource,
+    /this\.closeTransport\(this\.unavailableError\("host-core disposed"\)\);/,
+  );
+  assert.match(hostProcessSource, /errorCode: ErrorCodes\.HOST_UNAVAILABLE,/);
 });

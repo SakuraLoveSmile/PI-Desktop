@@ -66,6 +66,16 @@ Supervision parameters (implemented in Electron main):
   its helper thread cannot be created.
 - Renderer is notified on every transition via the `hostStatus` event:
   `{ ok, component?: "host" | "sidecar", restarting?, restarted?, fatal?, message? }`.
+- Every rejection that only reports a gone transport — refused before it was
+  sent, or in flight when the transport closed — carries
+  `errorCode: HOST_UNAVAILABLE`, so a caller classifies routine teardown by code
+  rather than by matching message text.
+- Reads of host-owned registries that only add optional context to a launch or a
+  panel (MCP servers, user skills, user subagents) check transport availability
+  first and drop a `HOST_UNAVAILABLE` rejection quietly, degrading to empty. A
+  dead transport during shutdown or between restarts is routine; logging it at
+  `warn` files it under the same line as a registry that genuinely cannot be
+  read.
 - Intentional shutdown (quit/dispose) never triggers restart.
 
 ## 5. Shutdown order
