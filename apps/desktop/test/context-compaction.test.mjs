@@ -57,10 +57,33 @@ test("host-driven protection blocks unsafe provider requests with no model-facin
   assert.doesNotMatch(runtime, /<context_management>/);
   assert.match(runtime, /budget\.tokens >= budget\.hardLimit/);
   assert.match(runtime, /CONTEXT_COMPACTION_FAILED: unable to create a checkpoint/);
-  assert.match(runtime, /checkpoint truncated: tool result exceeded the retained context budget/);
+  assert.match(runtime, /checkpoint truncated: this message crossed the retained context budget/);
   assert.match(runtime, /pendingOverflow/);
   assert.match(runtime, /runCompaction\("overflow", true\)/);
   assert.match(runtime, /fallback: "retained_tail"/);
+});
+
+test("a checkpoint carries only recent user messages past the boundary", () => {
+  // Codex's shape: the summary covers the whole boundary range and the only
+  // messages that survive it are user messages, capped at 20k tokens.
+  assert.match(runtime, /COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS = 20_000/);
+  assert.match(runtime, /private codexShapedPreparation\(/);
+  assert.match(
+    runtime,
+    /const messagesToSummarize = \[\s*\.\.\.preparation\.messagesToSummarize,\s*\.\.\.preparation\.turnPrefixMessages,\s*\.\.\.preparation\.retainedTail,\s*\]/,
+  );
+  assert.match(runtime, /turnPrefixMessages: \[\],\s*isSplitTurn: false/);
+  assert.match(
+    runtime,
+    /\(message\): message is UserMessage => message\.role === "user"/,
+  );
+  // Newest-first selection with the boundary message truncated, not dropped.
+  assert.match(runtime, /function selectRetainedUserMessages\(/);
+  assert.match(runtime, /truncateUserMessageForCheckpoint\(message, remaining\)/);
+  assert.match(runtime, /return selected\.reverse\(\)/);
+  // Full tool-result batches are no longer retained, so nothing bounds them.
+  assert.doesNotMatch(runtime, /fairToolResultTokenBudgets/);
+  assert.doesNotMatch(runtime, /CHECKPOINT_TAIL_SAFETY_TOKENS/);
 });
 
 test("compaction runs inline at the hard boundary, never ahead of it", () => {

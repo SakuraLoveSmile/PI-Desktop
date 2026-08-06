@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { estimateTokens } from "@earendil-works/pi-agent-core";
+import { buildSessionContext, estimateTokens } from "@earendil-works/pi-agent-core";
 import {
   DesktopAgentRuntime,
   PATH_INSTRUCTION_RESOLUTION_TIMEOUT_MS,
@@ -2513,7 +2513,7 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     await runtime.dispose();
   });
 
-  it("keeps an oversized trailing tool result with its assistant carrier", async () => {
+  it("keeps only user messages in the model context past a boundary", async () => {
     const runtime = createRuntime();
     const toolAssistant = {
       ...assistant,
@@ -2527,16 +2527,10 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
       ],
       stopReason: "toolUse" as const,
     };
-    // Sized from the derived retained-tail target so the batch is the reason
-    // the cut point cannot stay inside the tail, whatever the window is.
-    const retainedTailTarget = (runtime as any).contextBudget([])
-      .keepRecentTokens as number;
     const largeToolResult = {
       ...toolResult,
       toolCallId: "large-tool-call",
-      content: [
-        { type: "text" as const, text: "x".repeat((retainedTailTarget + 1_000) * 4) },
-      ],
+      content: [{ type: "text" as const, text: "x".repeat(200_000) }],
     };
     (runtime as any).fullEntries = [
       {
@@ -2576,15 +2570,132 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     const preparation = (runtime as any).prepareCompactionInput(entries, budget);
 
     expect(preparation.ok).toBe(true);
-    expect(preparation.value.firstKeptEntryId).toBe("tool-assistant");
-    expect(preparation.value.retainedTail.map((message: any) => message.role)).toEqual([
-      "assistant",
-      "toolResult",
+    // Everything is summarized as one range, so nothing leaves the context
+    // without the summary covering it.
+    expect(preparation.value.isSplitTurn).toBe(false);
+    expect(preparation.value.turnPrefixMessages).toEqual([]);
+    expect(
+      preparation.value.messagesToSummarize.map((message: any) => message.role),
+    ).toEqual(["user", "user", "assistant", "toolResult"]);
+    // The anchor becomes the next boundary.
+    expect(preparation.value.firstKeptEntryId).toBe("large-tool-call");
+    expect(
+      preparation.value.retainedTail.map((message: any) => message.content),
+    ).toEqual(["old context", "inspect the log"]);
+
+    const checkpoint = (runtime as any).createCheckpoint(
+      preparation.value,
+      "large-tool-call",
+      "Older work was summarized.",
+    );
+    const compacted = buildSessionContext(
+      (runtime as any).entriesWithCompaction(checkpoint),
+    ).messages;
+    expect(compacted.map((message: any) => message.role)).toEqual([
+      "compactionSummary",
+      "user",
+      "user",
     ]);
+    // No assistant message means no toolCall block, so no orphaned tool call can
+    // reach a provider.
+    expect(
+      compacted.flatMap((message: any) =>
+        Array.isArray(message.content)
+          ? message.content.filter((block: any) => block.type === "toolCall")
+          : [],
+      ),
+    ).toEqual([]);
     await runtime.dispose();
   });
 
-  it("bounds an atomic parallel tool batch in the checkpoint copy", async () => {
+  it("truncates the oldest retained user message instead of dropping it", async () => {
+    const runtime = createRuntime();
+    // Four 8k-token user messages against the 20k retention cap: the two newest
+    // fit whole, the third crosses the budget, the oldest is out of reach.
+    const asks = ["oldest", "third", "second", "newest"].map(
+      (label, index) => ({
+        type: "message",
+        id: `ask-${index}`,
+        parentId: index === 0 ? null : `ask-${index - 1}`,
+        timestamp: `2026-07-30T00:00:0${index}Z`,
+        message: {
+          role: "user",
+          content: `${label}:${"x".repeat(32_000 - label.length - 1)}`,
+          timestamp: index + 1,
+        },
+      }),
+    );
+    (runtime as any).fullEntries = asks;
+
+    const entries = (runtime as any).entriesWithCompaction();
+    const budget = (runtime as any).contextBudget(
+      entries.map((entry: any) => entry.message),
+    );
+    const preparation = (runtime as any).prepareCompactionInput(entries, budget);
+    const retained = preparation.value.retainedTail;
+
+    expect(retained).toHaveLength(3);
+    expect(
+      retained.reduce(
+        (sum: number, message: any) => sum + estimateTokens(message),
+        0,
+      ),
+    ).toBeLessThanOrEqual(20_000);
+    // Chronological order, oldest first, with only the boundary message cut.
+    expect(
+      retained.map((message: any) => message.content.slice(0, 6)),
+    ).toEqual(["third:", "second", "newest"]);
+    expect(retained[0].content).toContain("[checkpoint truncated:");
+    expect(retained[1].content).not.toContain("[checkpoint truncated:");
+    await runtime.dispose();
+  });
+
+  it("still sees the user messages an earlier checkpoint retained", async () => {
+    const runtime = createRuntime();
+    (runtime as any).fullEntries = [
+      {
+        type: "message",
+        id: "anchor-user",
+        parentId: null,
+        timestamp: "2026-07-31T00:00:00Z",
+        message: { role: "user", content: "anchor ask", timestamp: 1 },
+      },
+      {
+        type: "message",
+        id: "later-user",
+        parentId: "anchor-user",
+        timestamp: "2026-07-31T00:00:01Z",
+        message: { role: "user", content: "later ask", timestamp: 2 },
+      },
+    ];
+    (runtime as any).activeCompaction = {
+      id: "checkpoint-1",
+      summary: "First summary.",
+      firstKeptMessageId: "anchor-user",
+      throughMessageId: "anchor-user",
+      tokensBefore: 240_000,
+      retainedTail: [
+        { role: "user", content: "remembered ask", timestamp: 0 },
+      ],
+      details: { generation: 1 },
+      providerId: "local",
+      modelId: "local-model",
+      createdAt: "2026-07-31T00:00:00Z",
+    };
+
+    const entries = (runtime as any).entriesWithCompaction();
+    const budget = (runtime as any).contextBudget(
+      buildSessionContext(entries).messages,
+    );
+    const preparation = (runtime as any).prepareCompactionInput(entries, budget);
+
+    expect(
+      preparation.value.retainedTail.map((message: any) => message.content),
+    ).toEqual(["remembered ask", "anchor ask", "later ask"]);
+    await runtime.dispose();
+  });
+
+  it("summarizes an atomic parallel tool batch rather than carrying it forward", async () => {
     const constrainedProvider: RuntimeProviderConfig = {
       ...provider,
       modelConfig: {
@@ -2655,35 +2766,21 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
 
     expect(budget.tokens).toBeGreaterThan(budget.hardLimit);
     expect(preparation.ok).toBe(true);
-    expect(preparation.value.firstKeptEntryId).toBe("parallel-carrier");
-    expect(retainedTail.map((message: any) => message.role)).toEqual([
+    expect(preparation.value.firstKeptEntryId).toBe("parallel-tool-3");
+    // The batch that used to force a full-tail retention is now summary input.
+    expect(
+      preparation.value.messagesToSummarize.map((message: any) => message.role),
+    ).toEqual([
+      "user",
       "assistant",
       "toolResult",
       "toolResult",
       "toolResult",
       "toolResult",
     ]);
-    expect(
-      retainedTail.reduce(
-        (sum: number, message: any) => sum + estimateTokens(message),
-        0,
-      ),
-    ).toBeLessThan(Math.floor(budget.hardLimit * 0.5));
-    expect(
-      retainedTail.filter((message: any) => message.role === "toolResult"),
-    ).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          toolCallId: "parallel-tool-3",
-          details: undefined,
-          content: [
-            expect.objectContaining({
-              text: expect.stringContaining("[checkpoint truncated:"),
-            }),
-          ],
-        }),
-      ]),
-    );
+    expect(retainedTail.map((message: any) => message.role)).toEqual(["user"]);
+    expect(retainedTail[0].content).toBe("inspect the repository");
+    // The visible transcript keeps the complete results either way.
     expect(
       (runtime as any).fullEntries.at(-1).message.content[0].text,
     ).toHaveLength(155_573);
@@ -2697,7 +2794,6 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     const runtime = createRuntime();
     vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
       tokens: 225_000,
-      backgroundLimit: 156_800,
       hardLimit: 224_000,
       requestHeadroom: 32_000,
       keepRecentTokens: 44_800,
@@ -2860,7 +2956,6 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     const runtime = createRuntime();
     vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
       tokens: 225_000,
-      backgroundLimit: 156_800,
       hardLimit: 224_000,
       requestHeadroom: 32_000,
     });

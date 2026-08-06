@@ -33,6 +33,7 @@ import {
   type Models,
   type ToolResultMessage,
   type Usage,
+  type UserMessage,
 } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
@@ -118,7 +119,6 @@ const PROVIDER_STREAM_RETRY_BACKOFF_MS = 750;
 const MAX_MUTATION_RECOVERY_FAILURES = 2;
 const BASH_PATCH_FAILURE_KEY = "__bash_patch_command__";
 export const TOOL_SEARCH_NAME = "ToolSearch";
-const CHECKPOINT_TAIL_SAFETY_TOKENS = 256;
 /**
  * Tokens held back from the context window for the summary prompt and the
  * model's own output. Compaction thresholds are derived from the active model's
@@ -134,6 +134,12 @@ const COMPACTION_RESERVE_FLOOR_TOKENS = 16_384;
 const COMPACTION_KEEP_RECENT_RATIO = 0.2;
 const COMPACTION_MIN_KEEP_RECENT_TOKENS = 8_000;
 const COMPACTION_MAX_KEEP_RECENT_TOKENS = 64_000;
+/**
+ * Cap on the user messages carried across a compaction boundary, matching
+ * Codex's `COMPACT_USER_MESSAGE_MAX_TOKENS`. Clamped against the safe budget so
+ * a small model window is not filled by retention alone.
+ */
+const COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS = 20_000;
 const COMPACTION_FALLBACK_KEEP_RECENT_RATIO = 0.25;
 const COMPACTION_FALLBACK_MAX_SUMMARY_CHARS = 12_000;
 const COMPACTION_SUMMARY_PROMPT_SAFETY_TOKENS = 2_048;
@@ -221,8 +227,8 @@ function pathInstructionScope(path: string): string {
   return slash >= 0 ? normalized.slice(0, slash) || "/" : ".";
 }
 
-const CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER =
-  "\n\n[checkpoint truncated: tool result exceeded the retained context budget]\n\n";
+const CHECKPOINT_TRUNCATION_MARKER =
+  "\n\n[checkpoint truncated: this message crossed the retained context budget]\n\n";
 /**
  * Appended for one automatic re-run after a turn that produced nothing the
  * user can see. Two shapes were observed: a wholly empty response, and a
@@ -550,78 +556,72 @@ function appendToolProgress(current: string, chunk: string): string {
   }`;
 }
 
-function fairToolResultTokenBudgets(
-  tokenCounts: number[],
-  totalBudget: number,
-): number[] {
-  if (tokenCounts.length === 0) return [];
-  if (tokenCounts.reduce((sum, value) => sum + value, 0) <= totalBudget) {
-    return tokenCounts;
-  }
-
-  const budgets = tokenCounts.map(() => 0);
-  let remainingBudget = Math.max(tokenCounts.length, totalBudget);
-  let pending = tokenCounts.map((_, index) => index);
-  while (pending.length > 0) {
-    const share = Math.floor(remainingBudget / pending.length);
-    const complete = pending.filter((index) => tokenCounts[index] <= share);
-    if (complete.length === 0) {
-      const remainder = remainingBudget - share * pending.length;
-      pending.forEach((index, position) => {
-        budgets[index] = share + (position < remainder ? 1 : 0);
-      });
-      break;
-    }
-    for (const index of complete) {
-      budgets[index] = tokenCounts[index];
-      remainingBudget -= tokenCounts[index];
-    }
-    const completed = new Set(complete);
-    pending = pending.filter((index) => !completed.has(index));
-  }
-  return budgets;
-}
-
-function toolResultTextForCheckpoint(message: ToolResultMessage): string {
-  return message.content
-    .map((block) =>
-      block.type === "text"
-        ? block.text
-        : `[${block.type} tool result block omitted from checkpoint]`,
-    )
-    .join("\n");
-}
-
 function truncateTextForCheckpoint(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
-  if (maxChars <= CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER.length) {
-    return CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER.trim().slice(0, maxChars);
+  if (maxChars <= CHECKPOINT_TRUNCATION_MARKER.length) {
+    return CHECKPOINT_TRUNCATION_MARKER.trim().slice(0, maxChars);
   }
-  const retainedChars = maxChars - CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER.length;
+  const retainedChars = maxChars - CHECKPOINT_TRUNCATION_MARKER.length;
   const headChars = Math.ceil(retainedChars * 0.75);
   const tailChars = retainedChars - headChars;
-  return `${text.slice(0, headChars)}${CHECKPOINT_TOOL_RESULT_TRUNCATION_MARKER}${
+  return `${text.slice(0, headChars)}${CHECKPOINT_TRUNCATION_MARKER}${
     tailChars > 0 ? text.slice(-tailChars) : ""
   }`;
 }
 
-function truncateToolResultForCheckpoint(
-  message: ToolResultMessage,
+/**
+ * Flatten a user message to plain text so it can be truncated at a token
+ * budget. Images and other non-text blocks are named rather than kept: a
+ * checkpoint that carried them would spend its whole budget on one of them.
+ */
+function userMessageTextForCheckpoint(message: UserMessage): string {
+  if (typeof message.content === "string") return message.content;
+  return message.content
+    .map((block) =>
+      block.type === "text"
+        ? block.text
+        : `[${block.type} content omitted from checkpoint]`,
+    )
+    .join("\n");
+}
+
+function truncateUserMessageForCheckpoint(
+  message: UserMessage,
   tokenBudget: number,
-): ToolResultMessage {
-  const text = toolResultTextForCheckpoint(message);
+): UserMessage {
   return {
     ...message,
-    content: [
-      {
-        type: "text",
-        text: truncateTextForCheckpoint(text, Math.max(1, tokenBudget) * 4),
-      },
-    ],
-    // Host details often duplicate the content and are not provider-facing.
-    // The original durable message still owns the complete diagnostic value.
-    details: undefined,
+    content: truncateTextForCheckpoint(
+      userMessageTextForCheckpoint(message),
+      Math.max(1, tokenBudget) * 4,
+    ),
   };
+}
+
+/**
+ * Choose the user messages that survive a compaction boundary: newest first up
+ * to `maxTokens`, truncating the one that crosses the budget instead of
+ * dropping it, then restored to chronological order. This is Codex's
+ * `build_compacted_history_with_limit` selection.
+ */
+function selectRetainedUserMessages(
+  candidates: UserMessage[],
+  maxTokens: number,
+): UserMessage[] {
+  const selected: UserMessage[] = [];
+  let remaining = Math.max(0, maxTokens);
+  for (let index = candidates.length - 1; index >= 0 && remaining > 0; index -= 1) {
+    const message = candidates[index];
+    const tokens = estimateTokens(message);
+    if (tokens <= remaining) {
+      selected.push(message);
+      remaining -= tokens;
+      continue;
+    }
+    selected.push(truncateUserMessageForCheckpoint(message, remaining));
+    break;
+  }
+  return selected.reverse();
 }
 
 /** Rebuild a pi-ai tool result from a persisted tool row. Rows that never
@@ -2468,81 +2468,99 @@ export class DesktopAgentRuntime {
     return this.compactionEnabled && budget.tokens >= budget.hardLimit;
   }
 
-  private prepareCompactionInput(entries: SessionTreeEntry[], budget: ContextBudget) {
-    const maxRetainedTailTokens = Math.max(1, Math.floor(budget.hardLimit * 0.5));
-    let keepRecentTokens = budget.keepRecentTokens;
-    let compactionEntries = entries;
-    const trailingToolResultIndexes: number[] = [];
-    let trailingToolResultTokens = 0;
-    for (let index = entries.length - 1; index >= 0; index -= 1) {
-      const entry = entries[index];
-      if (entry.type !== "message" || entry.message.role !== "toolResult") break;
-      trailingToolResultIndexes.unshift(index);
-      trailingToolResultTokens += estimateTokens(entry.message);
-    }
-    const carrierIndex =
-      trailingToolResultIndexes.length > 0 ? trailingToolResultIndexes[0] - 1 : -1;
-    const carrier = entries[carrierIndex];
-    const carrierTokens =
-      carrier?.type === "message" && carrier.message.role === "assistant"
-        ? estimateTokens(carrier.message)
-        : 0;
-    const trailingAtomicBatchTokens = trailingToolResultTokens + carrierTokens;
+  /**
+   * Cap on the user messages a checkpoint carries forward. Codex uses a flat
+   * 20k; the clamp keeps a small model window from being filled by retention
+   * alone, which would leave the summary no room.
+   */
+  private retainedUserMessageBudget(budget: ContextBudget): number {
+    return Math.max(
+      1,
+      Math.min(
+        COMPACTION_RETAINED_USER_MESSAGE_MAX_TOKENS,
+        Math.floor(budget.hardLimit * 0.5),
+      ),
+    );
+  }
 
-    if (
-      trailingToolResultIndexes.length > 0 &&
-      trailingAtomicBatchTokens >= maxRetainedTailTokens
-    ) {
-      const toolResultBudget = Math.max(
-        trailingToolResultIndexes.length,
-        maxRetainedTailTokens - carrierTokens - CHECKPOINT_TAIL_SAFETY_TOKENS,
-      );
-      const originalTokenCounts = trailingToolResultIndexes.map((index) => {
-        const entry = entries[index] as MessageEntry;
-        return estimateTokens(entry.message);
-      });
-      const resultBudgets = fairToolResultTokenBudgets(
-        originalTokenCounts,
-        toolResultBudget,
-      );
-      compactionEntries = [...entries];
-      trailingToolResultIndexes.forEach((index, resultIndex) => {
-        const entry = entries[index] as MessageEntry;
-        if (resultBudgets[resultIndex] >= originalTokenCounts[resultIndex]) {
-          return;
-        }
-        compactionEntries[index] = {
-          ...entry,
-          message: truncateToolResultForCheckpoint(
-            entry.message as ToolResultMessage,
-            resultBudgets[resultIndex],
-          ),
-        };
-      });
-      trailingToolResultTokens = trailingToolResultIndexes.reduce(
-        (sum, index) => {
-          const entry = compactionEntries[index] as MessageEntry;
-          return sum + estimateTokens(entry.message);
-        },
-        0,
-      );
-    }
-    // pi's cut-point search cannot split a tool call/result pair. If the final
-    // result batch crosses keepRecentTokens, let the scan reach its assistant
-    // carrier instead of falling back to the oldest entry. An oversized batch
-    // is truncated only in the checkpoint copy above; visible history remains
-    // complete and every provider-valid tool call/result pair is retained.
-    if (trailingToolResultTokens >= keepRecentTokens) {
-      keepRecentTokens = Math.min(
-        maxRetainedTailTokens,
-        trailingToolResultTokens + 1,
-      );
-    }
-    return prepareCompaction(compactionEntries, {
+  /**
+   * Prepare a checkpoint in Codex's shape: the summary covers every message
+   * since the previous boundary, and the only messages carried past the
+   * boundary are recent user messages.
+   *
+   * pi's cut point is still what marks the boundary, but the split it produces
+   * is folded back together (see `codexShapedPreparation`), so
+   * `budget.keepRecentTokens` no longer decides what survives — it only decides
+   * which messages pi attributes file operations to.
+   */
+  private prepareCompactionInput(
+    entries: SessionTreeEntry[],
+    budget: ContextBudget,
+    retainedUserTokens = this.retainedUserMessageBudget(budget),
+  ) {
+    const prepared = prepareCompaction(entries, {
       enabled: this.compactionEnabled,
       reserveTokens: budget.requestHeadroom,
-      keepRecentTokens,
+      keepRecentTokens: budget.keepRecentTokens,
     } satisfies CompactionSettings);
+    if (!prepared.ok || !prepared.value) return prepared;
+    return {
+      ok: true as const,
+      value: this.codexShapedPreparation(
+        prepared.value,
+        entries,
+        retainedUserTokens,
+      ),
+    };
+  }
+
+  /**
+   * Reshape a pi preparation the way Codex compacts:
+   *
+   * - Everything pi would have split across `messagesToSummarize`,
+   *   `turnPrefixMessages` and `retainedTail` is summarized as one range. The
+   *   three are contiguous and ordered, so concatenating them loses nothing —
+   *   and it is what makes dropping the tail safe: no message leaves the model
+   *   context without the summary covering it.
+   * - The retained tail is rebuilt from user messages alone. Dropping assistant
+   *   messages also drops their `toolCall` blocks, and their results go with
+   *   them in the same pass, so no orphaned tool call can reach a provider.
+   * - `firstKeptEntryId` points at the anchor the checkpoint is filed against,
+   *   so the next boundary starts there. The anchor itself is summarized twice
+   *   as a result; a one-entry overlap is the safe direction to err in.
+   */
+  private codexShapedPreparation(
+    preparation: CompactionPreparation,
+    entries: SessionTreeEntry[],
+    retainedUserTokens: number,
+  ): CompactionPreparation {
+    const messagesToSummarize = [
+      ...preparation.messagesToSummarize,
+      ...preparation.turnPrefixMessages,
+      ...preparation.retainedTail,
+    ];
+    // User messages the previous checkpoint retained are older than this
+    // boundary but still in the model context, which is where Codex reads its
+    // own candidates from.
+    const previousCompaction = [...entries]
+      .reverse()
+      .find((entry) => entry.type === "compaction");
+    const carriedForward =
+      previousCompaction?.type === "compaction"
+        ? (previousCompaction.retainedTail ?? [])
+        : [];
+    const candidates = [...carriedForward, ...messagesToSummarize].filter(
+      (message): message is UserMessage => message.role === "user",
+    );
+    return {
+      ...preparation,
+      firstKeptEntryId:
+        this.fullEntries.at(-1)?.id ?? preparation.firstKeptEntryId,
+      messagesToSummarize,
+      turnPrefixMessages: [],
+      isSplitTurn: false,
+      retainedTail: selectRetainedUserMessages(candidates, retainedUserTokens),
+    };
   }
 
   private rebuiltAgentContext(): AgentContext {
@@ -2699,21 +2717,26 @@ export class DesktopAgentRuntime {
     );
   }
 
+  /**
+   * The recovery path retains less than a normal checkpoint: its summary is a
+   * carried-forward one rather than a fresh one, so the retained messages are
+   * the only thing that has to fit.
+   */
   private prepareFallbackCompactionInput(
     entries: SessionTreeEntry[],
     budget: ContextBudget,
   ) {
-    const fallbackKeepRecentTokens = Math.max(
-      1,
-      Math.min(
-        budget.keepRecentTokens,
-        Math.floor(budget.hardLimit * COMPACTION_FALLBACK_KEEP_RECENT_RATIO),
+    return this.prepareCompactionInput(
+      entries,
+      budget,
+      Math.max(
+        1,
+        Math.min(
+          this.retainedUserMessageBudget(budget),
+          Math.floor(budget.hardLimit * COMPACTION_FALLBACK_KEEP_RECENT_RATIO),
+        ),
       ),
     );
-    return this.prepareCompactionInput(entries, {
-      ...budget,
-      keepRecentTokens: fallbackKeepRecentTokens,
-    });
   }
 
   private compactionSummaryWouldExceedBudget(
@@ -2731,21 +2754,18 @@ export class DesktopAgentRuntime {
         modelOutputBudget -
         COMPACTION_SUMMARY_PROMPT_SAFETY_TOKENS,
     );
+    // The summary now covers the whole boundary range, so its input is the
+    // context that tripped the hard limit. On a window whose headroom leaves
+    // less room for the summary request than the hard limit allows, this is the
+    // guard that routes the turn to retained-tail recovery instead.
     const historyTokens = preparation.messagesToSummarize.reduce(
-      (total, message) => total + estimateTokens(message),
-      0,
-    );
-    const turnPrefixTokens = preparation.turnPrefixMessages.reduce(
       (total, message) => total + estimateTokens(message),
       0,
     );
     const previousSummaryTokens = preparation.previousSummary
       ? Math.ceil(preparation.previousSummary.length / 4)
       : 0;
-    return Math.max(
-      historyTokens + previousSummaryTokens,
-      turnPrefixTokens,
-    ) >= summaryInputLimit;
+    return historyTokens + previousSummaryTokens >= summaryInputLimit;
   }
 
   private async persistCheckpoint(
