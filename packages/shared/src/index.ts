@@ -11,3 +11,4 @@ export * from "./thinking-levels.js";
 export * from "./command-shells.js";
 export * from "./context-compaction.js";
 export * from "./rpc-timeouts.js";
+export * from "./subagent-definition.js";

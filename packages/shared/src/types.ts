@@ -264,6 +264,15 @@ export type UiMessage = {
   toolCompletedAt?: string;
   toolDurationMs?: number;
   isError?: boolean;
+  /**
+   * Set on rows produced inside a subagent: the `Task` tool call that spawned
+   * the delegate. Two consequences (ADR 0060): the transcript nests these rows
+   * under that call, and the parent model never sees them — only the `Task`
+   * report enters its context.
+   */
+  parentToolCallId?: string;
+  /** Definition name of the subagent that produced this row. */
+  agentName?: string;
 };
 
 export type SessionSummary = {
@@ -400,6 +409,10 @@ export type ToolPermissionRequest = {
   argsPreview: unknown;
   risk: Risk;
   reason: string;
+  /** Subagent that asked, when the call came from a delegate (ADR 0060). */
+  agentName?: string;
+  /** `Task` call that spawned the asking delegate. */
+  parentToolCallId?: string;
 };
 
 export type ToolPermissionResolution = {
@@ -457,6 +470,14 @@ export type AgentEventEnvelope = {
   turnId?: string;
   ts: number;
   event: AgentEvent;
+  /**
+   * Set on every event emitted from inside a subagent (ADR 0060): the `Task`
+   * tool call that owns the delegate. Main tags persisted rows with it and
+   * skips the turn-lifecycle handling that belongs to the parent alone.
+   */
+  parentToolCallId?: string;
+  /** Definition name of the emitting subagent. */
+  agentName?: string;
 };
 
 export type AppNotificationKind = "task.completed" | "task.failed";
