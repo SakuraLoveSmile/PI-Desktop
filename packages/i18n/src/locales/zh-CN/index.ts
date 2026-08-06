@@ -729,6 +729,9 @@ export const zhCN = {
     workspace: "项目：{{workspace}}",
     temporarySession: "临时对话",
     countdown: "若 {{seconds}} 秒内未响应将自动拒绝",
+    fromSubagent: "由 {{agent}} 子智能体发起",
+    queued_one: "还有 {{count}} 个请求在排队",
+    queued_other: "还有 {{count}} 个请求在排队",
   },
   panel: {
     title: "工作面板",

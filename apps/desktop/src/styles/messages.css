@@ -503,9 +503,23 @@
 }
 
 .permission-card-title {
+  /* Keeps the risk pill hard right once the queue count joins the header. */
+  margin-inline-end: auto;
   color: var(--ds-text-primary);
   font-size: var(--text-md);
   font-weight: var(--font-weight-semibold);
+}
+
+.permission-card-queued {
+  flex: none;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+}
+
+.permission-card-agent {
+  margin-top: 4px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
 }
 
 .permission-risk {

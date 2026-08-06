@@ -1504,12 +1504,15 @@ export const ChatTranscript = memo(function ChatTranscript({
   messages,
   isRunning,
   pendingPermission,
+  queuedPermissions = 0,
   planningState,
 }: {
   sessionId: string | undefined;
   messages: UiMessage[];
   isRunning: boolean;
   pendingPermission?: PendingPermission;
+  /** Requests waiting behind this one, from other delegates (ADR 0060). */
+  queuedPermissions?: number;
   planningState?: PlanningState;
 }) {
   const { t } = useTranslation();
@@ -1679,6 +1682,7 @@ export const ChatTranscript = memo(function ChatTranscript({
             <PermissionCard
               key={pendingPermission.requestId}
               permission={pendingPermission}
+              queued={queuedPermissions}
             />
           ) : null}
           {showPlanning ? <PlanningIndicator kind={planningKind} /> : null}

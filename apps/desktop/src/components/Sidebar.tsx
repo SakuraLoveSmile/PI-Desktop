@@ -918,7 +918,7 @@ export function Sidebar({
     const active = page === "chat" && selectedSessionId === session.id;
     const archived = sessionArchived(session, meta);
     const running = Boolean(runningSessions[session.id]);
-    const hasPendingPermission = Boolean(pendingPermissions[session.id]);
+    const hasPendingPermission = (pendingPermissions[session.id]?.length ?? 0) > 0;
     const status = sidebarSessionStatus({
       running,
       selected: active,

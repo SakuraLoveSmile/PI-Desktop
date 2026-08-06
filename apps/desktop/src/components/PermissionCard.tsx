@@ -9,7 +9,14 @@ import { buildToolPresentation } from "../lib/tool-presentation";
 import { ToolDetailBlocks } from "./ToolDetails";
 import { Button } from "./ui";
 
-export function PermissionCard({ permission }: { permission: PendingPermission }) {
+export function PermissionCard({
+  permission,
+  queued = 0,
+}: {
+  permission: PendingPermission;
+  /** Requests waiting behind this one; the user answers them in order. */
+  queued?: number;
+}) {
   const { t } = useTranslation();
   const resolvePermission = useAppStore((state) => state.resolvePermission);
   const showToast = useAppStore((state) => state.showToast);
@@ -81,10 +88,20 @@ export function PermissionCard({ permission }: { permission: PendingPermission }
         <span className="permission-card-title" role="status" aria-live="polite">
           {t("permission.title")}
         </span>
+        {queued > 0 ? (
+          <span className="permission-card-queued">
+            {t("permission.queued", { count: queued })}
+          </span>
+        ) : null}
         <span className={`permission-risk risk-${risk}`}>
           {t(`permission.risk.${risk}`)}
         </span>
       </div>
+      {permission.agentName ? (
+        <div className="permission-card-agent">
+          {t("permission.fromSubagent", { agent: permission.agentName })}
+        </div>
+      ) : null}
       <div className="permission-card-prompt">
         <Trans
           i18nKey="permission.allowPrompt"

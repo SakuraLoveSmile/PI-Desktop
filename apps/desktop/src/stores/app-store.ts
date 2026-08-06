@@ -75,9 +75,13 @@ import {
   type WorkPanelTab,
 } from "../lib/work-panel-tabs";
 import {
-  clearPendingPermission,
-  setPendingPermission,
-  type PendingPermission,
+  clearSessionPermissions,
+  enqueuePermission,
+  headPermission,
+  removePermission,
+  removePermissionForToolCall,
+  sessionPermissions,
+  type PermissionQueues,
 } from "../lib/pending-permissions";
 import {
   WORK_PANEL_DEFAULT_WIDTH,
@@ -341,7 +345,9 @@ export type AppState = {
   plugins: PluginSummary[];
   /** Themes contributed by loaded plugins, with their sanitized CSS. */
   pluginThemes: PluginTheme[];
-  pendingPermissions: Record<string, PendingPermission>;
+  /** Per-session permission queue, oldest first; parallel delegates can each
+   * be waiting on one (ADR 0060). */
+  pendingPermissions: PermissionQueues;
   /** Planning state is durable per session, including sessions outside view. */
   planningStates: Record<string, PlanningState>;
   /** Live host approval rows keyed by session; only pending rows form the gate. */
@@ -1663,23 +1669,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     const stateBeforeAbort = get();
     const sessionId = stateBeforeAbort.activeSessionId;
     if (!sessionId) return;
-    const pendingPermission = stateBeforeAbort.pendingPermissions[sessionId];
+    // Stopping the turn denies every request the session had open, not just
+    // the one on screen: a queued delegate would otherwise keep its tool call
+    // alive behind an abort the user already asked for.
+    const pendingForSession = sessionPermissions(
+      stateBeforeAbort.pendingPermissions,
+      sessionId,
+    );
     await Promise.allSettled([
       api.abort(sessionId),
-      ...(pendingPermission
-        ? [
-            api.resolvePermission({
-              requestId: pendingPermission.requestId,
-              decision: "deny",
-            }),
-          ]
-        : []),
+      ...pendingForSession.map((permission) =>
+        api.resolvePermission({
+          requestId: permission.requestId,
+          decision: "deny",
+        }),
+      ),
     ]);
     set((state) => ({
-      pendingPermissions: clearPendingPermission(
+      pendingPermissions: clearSessionPermissions(
         state.pendingPermissions,
         sessionId,
-        pendingPermission?.requestId,
       ),
     }));
     const state = get();
@@ -1983,7 +1992,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const sessionOutcomes = { ...state.sessionOutcomes };
       delete sessionOutcomes[id];
       const workPanelContexts = withoutRecordKey(state.workPanelContexts, id);
-      const pendingPermissions = clearPendingPermission(
+      const pendingPermissions = clearSessionPermissions(
         state.pendingPermissions,
         id,
       );
@@ -2444,7 +2453,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     ) {
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: false },
-        pendingPermissions: clearPendingPermission(
+        pendingPermissions: clearSessionPermissions(
           s.pendingPermissions,
           envelope.sessionId,
         ),
@@ -2522,18 +2531,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       const toolName = toolNamesByCallId.get(event.toolCallId);
       toolNamesByCallId.delete(event.toolCallId);
       set((state) => {
-        const pending = state.pendingPermissions[envelope.sessionId];
-        return {
-          ...(pending?.toolCallId === event.toolCallId
-            ? {
-                pendingPermissions: clearPendingPermission(
-                  state.pendingPermissions,
-                  envelope.sessionId,
-                  pending.requestId,
-                ),
-              }
-            : {}),
-        };
+        const pendingPermissions = removePermissionForToolCall(
+          state.pendingPermissions,
+          envelope.sessionId,
+          event.toolCallId,
+        );
+        return pendingPermissions === state.pendingPermissions
+          ? {}
+          : { pendingPermissions };
       });
       const reviewArtifact = shouldOpenReviewArtifact({
         toolName,
@@ -2563,7 +2568,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // replace the visible transcript, page, project, or focus.
       if (event.type === "tool_permission_request") {
         set((state) => ({
-          pendingPermissions: setPendingPermission(state.pendingPermissions, {
+          pendingPermissions: enqueuePermission(state.pendingPermissions, {
             ...event.request,
             receivedAt: envelope.ts,
           }),
@@ -2729,7 +2734,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         break;
       case "tool_permission_request":
         set((state) => ({
-          pendingPermissions: setPendingPermission(state.pendingPermissions, {
+          pendingPermissions: enqueuePermission(state.pendingPermissions, {
             ...event.request,
             receivedAt: envelope.ts,
           }),
@@ -2848,7 +2853,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   resolvePermission: async (sessionId, requestId, decision) => {
-    const permission = get().pendingPermissions[sessionId];
+    // Only the head request is on screen, so only the head request is
+    // answerable; the rest keep waiting their turn.
+    const permission = headPermission(get().pendingPermissions, sessionId);
     if (!permission || permission.requestId !== requestId) return;
     try {
       await api.resolvePermission({
@@ -2856,9 +2863,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         decision,
       });
     } finally {
-      // A late response for an expired request must not clear its replacement.
+      // A late response for an expired request must not clear its successor.
       set((state) => ({
-        pendingPermissions: clearPendingPermission(
+        pendingPermissions: removePermission(
           state.pendingPermissions,
           sessionId,
           requestId,
