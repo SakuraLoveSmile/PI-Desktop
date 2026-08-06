@@ -5574,6 +5574,97 @@ function registerIpc() {
     return { ok: true };
   });
 
+  // --- Subagents the user owns ----------------------------------------------
+
+  handle(IPC.invoke.subagentList, async () => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("agents.list");
+  });
+
+  /**
+   * The effective catalog: what `Task` would actually offer right now, merged
+   * across builtin, registry and project documents. The renderer needs this to
+   * show read-only rows and to name the definition that wins each handle.
+   */
+  handle(IPC.invoke.subagentCatalog, async () => {
+    const projectPath = (await optionalWorkspaceRoot()) ?? undefined;
+    const { definitions, diagnostics } = await loadSubagentDefinitions(
+      projectPath,
+      { userDocuments: await activeUserSubagentDocuments(projectPath) },
+    );
+    return { subagents: definitions, diagnostics, projectPath: projectPath ?? null };
+  });
+
+  handle(IPC.invoke.subagentCreate, async (subagent: Record<string, unknown>) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call("agents.create", { subagent });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "subagent" });
+    return res;
+  });
+
+  handle(
+    IPC.invoke.subagentUpdate,
+    async (payload: { id: string } & Record<string, unknown>) => {
+      if (!host) throw new Error("host unavailable");
+      const { id, ...subagent } = payload;
+      const res = await host.call("agents.update", { id, subagent });
+      sendToRenderer(IPC.event.pluginChanged, { reason: "subagent" });
+      return res;
+    },
+  );
+
+  handle(IPC.invoke.subagentRead, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("agents.read", { id });
+  });
+
+  handle(IPC.invoke.subagentRemove, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call("agents.remove", { id });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "subagent" });
+    return res;
+  });
+
+  handle(
+    IPC.invoke.subagentSetEnabled,
+    async (payload: { id: string; enabled: boolean }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call("agents.setEnabled", payload);
+      sendToRenderer(IPC.event.pluginChanged, { reason: "subagent" });
+      return res;
+    },
+  );
+
+  handle(
+    IPC.invoke.subagentSetScope,
+    async (payload: { id: string; scope: ActivationScope }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call("agents.setScope", payload);
+      sendToRenderer(IPC.event.pluginChanged, { reason: "subagent" });
+      return res;
+    },
+  );
+
+  /**
+   * Show a definition document in the OS file manager. Registry entries resolve
+   * through the registry; project documents pass their own path, since main
+   * never records them.
+   */
+  handle(IPC.invoke.subagentReveal, async (payload: { id?: string; path?: string }) => {
+    let path = payload.path;
+    if (!path) {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call<{ subagent: UserSubagentRecord | null }>(
+        "agents.read",
+        { id: payload.id },
+      );
+      path = res.subagent?.path;
+    }
+    if (!path) throw new Error("subagent not found");
+    shell.showItemInFolder(path);
+    return { ok: true };
+  });
+
   handle(IPC.invoke.pluginOpenPanel, async (id: string) => {
     const loaded = plugins.getLoaded(id);
     if (!loaded) throw new Error("plugin not loaded");
