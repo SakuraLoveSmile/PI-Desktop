@@ -50,6 +50,9 @@ import type {
   ToolPermissionResolution,
   UserSkillInput,
   UserSkillRecord,
+  UserSubagentInput,
+  UserSubagentRecord,
+  SubagentDefinition,
   WorkspaceDiff,
   AppMenuCommand,
   AppNotification,
@@ -458,6 +461,38 @@ export const api = {
   setUserSkillScope: (id: string, scope: ActivationScope) =>
     invoke(IPC.invoke.skillSetScope, { id, scope }),
   revealUserSkill: (id: string) => invoke(IPC.invoke.skillReveal, id),
+
+  // --- Subagents the user owns ----------------------------------------------
+  listUserSubagents: () =>
+    invoke<{ subagents: UserSubagentRecord[] }>(IPC.invoke.subagentList),
+  /** What `Task` would offer right now, merged across all three sources. */
+  subagentCatalog: () =>
+    invoke<{
+      subagents: SubagentDefinition[];
+      diagnostics: string[];
+      projectPath: string | null;
+    }>(IPC.invoke.subagentCatalog),
+  createUserSubagent: (subagent: UserSubagentInput) =>
+    invoke<{ subagent: UserSubagentRecord }>(IPC.invoke.subagentCreate, subagent),
+  updateUserSubagent: (id: string, subagent: Omit<UserSubagentInput, "id">) =>
+    invoke<{ subagent: UserSubagentRecord }>(IPC.invoke.subagentUpdate, {
+      id,
+      ...subagent,
+    }),
+  /** The record plus the document body, for the editor. */
+  readUserSubagent: (id: string) =>
+    invoke<{ subagent: UserSubagentRecord | null; body?: string }>(
+      IPC.invoke.subagentRead,
+      id,
+    ),
+  removeUserSubagent: (id: string) => invoke(IPC.invoke.subagentRemove, id),
+  setUserSubagentEnabled: (id: string, enabled: boolean) =>
+    invoke(IPC.invoke.subagentSetEnabled, { id, enabled }),
+  setUserSubagentScope: (id: string, scope: ActivationScope) =>
+    invoke(IPC.invoke.subagentSetScope, { id, scope }),
+  /** Registry entries reveal by id; project documents pass their own path. */
+  revealSubagent: (target: { id?: string; path?: string }) =>
+    invoke(IPC.invoke.subagentReveal, target),
   openPluginPanel: (id: string) => invoke(IPC.invoke.pluginOpenPanel, id),
   listPluginThemes: () => invoke<PluginTheme[]>(IPC.invoke.pluginThemes),
   listPluginServices: () => invoke<PluginServiceStatus[]>(IPC.invoke.pluginServices),

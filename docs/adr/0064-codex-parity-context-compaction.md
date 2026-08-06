@@ -1,4 +1,4 @@
-# ADR 0063: Codex-parity context compaction
+# ADR 0064: Codex-parity context compaction
 
 - Status: Accepted
 - Date: 2026-08-06
@@ -205,7 +205,7 @@ against "one summary request" from a settings row.
 - `docs/spec/04-ux/08-component-spec.md`
 - `docs/spec/04-ux/09-interaction-patterns.md`
 - `docs/spec/06-delivery/04-e2e-test-plan.md`
-- `docs/spec/08-meta/decisions-log.md` (D158, D200, D202)
+- `docs/spec/08-meta/decisions-log.md` (D158, D200, D203)
 - `codex-rs/core/src/compact.rs`, `compact_token_budget.rs`,
   `session/token_budget.rs`, `tools/handlers/new_context_window_spec.rs`
   (behavioral reference)

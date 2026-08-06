@@ -192,15 +192,20 @@ The user must explicitly switch it to Agent before enabling unattended
 execution.
 
 ### 3.5 Extensions
-The Extensions destination uses a compact header and a four-part segmented
-control — Installed / MCP / Skills / Marketplace — with relevant tab counts;
-it does not render a separate numeric overview band (D196 amends D169).
+The Extensions destination uses a compact header and a five-part segmented
+control — Installed / MCP / Skills / Subagents / Marketplace — with relevant tab
+counts; it does not render a separate numeric overview band (D202 amends D196,
+which amends D169).
 Installed groups rows by state — Needs attention / Updates available / Active /
 Turned off — inside one hairline-separated panel; each row shows the plugin
 glyph, name, version, state tags, author meta, risk-tinted permission chips,
 and reveals quiet icon actions on hover (open panel, overflow menu with
-auto-update and Uninstall) beside an always-visible enable switch. MCP and
-Skills provide their own scoped configuration and authoring surfaces.
+auto-update and Uninstall) beside an always-visible enable switch. MCP,
+Skills and Subagents provide their own scoped configuration and authoring
+surfaces. Subagents lists the registry definitions the user owns — each with an
+activation scope, an editor sheet, reveal and delete — above a read-only list of
+the effective delegate catalog (builtins and project `.pi/agents` documents),
+whose only actions are reveal and "copy as my definition" (D202).
 Marketplace is a card grid with category chips and skeleton placeholders.
 Development-only marketplace fixtures whose IDs begin with `demo.` are
 filtered from the client cards and search results; installed copies remain

@@ -19,6 +19,7 @@ mod tool_budget;
 mod tools;
 mod transcripts;
 mod user_skills;
+mod user_subagents;
 mod workspace;
 
 use std::sync::Arc;

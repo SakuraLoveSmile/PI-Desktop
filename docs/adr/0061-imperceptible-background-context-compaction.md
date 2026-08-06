@@ -1,6 +1,6 @@
 # ADR 0061: Imperceptible background context compaction
 
-- Status: Accepted (clauses 2, 4, 6, 7, 8 amended by ADR 0063)
+- Status: Accepted (clauses 2, 4, 6, 7, 8 amended by ADR 0064)
 - Date: 2026-08-06
 - Deciders: PI-Desktop core
 - Amends: ADR 0030 / ADR 0049 / D158
@@ -30,7 +30,7 @@ trigger instead of using one hard edge, and measure the trigger over the
 *increment* since the current context prefix rather than the total
 (`AutoCompactTokenLimitScope::BodyAfterPrefix`).
 
-> Corrected by ADR 0063: this section originally added "Codex also has no
+> Corrected by ADR 0064: this section originally added "Codex also has no
 > model-side compaction tool at all — the host decides and executes." That is
 > wrong. Codex has `new_context`
 > (`tools/handlers/new_context_window_spec.rs`), gated by

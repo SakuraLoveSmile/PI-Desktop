@@ -34,7 +34,7 @@
 > context-recovery amendment in ADR 0049 adds a durable retained-tail
 > fallback for automatic compaction failures. D200 / ADR 0061 derives the
 > budgets from the model window instead of settings and removes the compaction
-> settings. D202 / ADR 0063 then rebuilds the mechanism to match Codex:
+> settings. D203 / ADR 0064 then rebuilds the mechanism to match Codex:
 > compaction is inline only, a checkpoint carries the summary plus recent user
 > messages, the model-facing `new_context` tool and two budget reminders are
 > back, each compaction adds a transcript row and one warning, and a

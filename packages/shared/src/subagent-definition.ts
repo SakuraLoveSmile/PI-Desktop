@@ -16,8 +16,11 @@
 
 import { THINKING_LEVELS, type ThinkingLevel } from "./types.js";
 
-/** Where a definition came from; project documents shadow builtins by name. */
-export type SubagentSource = "builtin" | "project";
+/**
+ * Where a definition came from. Later sources shadow earlier ones by name:
+ * a project document beats the user's own, which beats a builtin (D202).
+ */
+export type SubagentSource = "builtin" | "user" | "project";
 
 /** Provider/model pin declared by a definition (resolved in Electron main). */
 export type SubagentModelPin = {
@@ -336,19 +339,21 @@ function parseMaxTurns(
 /**
  * Merge discovered definitions into the list the runtime offers.
  *
- * Project documents shadow builtins of the same name, so a workspace can
- * retune a builtin delegate without renaming it. The result is capped: past
- * `MAX_SUBAGENT_DEFINITIONS` the catalog stops being a menu the model can
- * reason about, and every extra entry costs prompt tokens on every turn.
+ * Precedence is project > user registry > builtin, so a committed document wins
+ * over a definition the user keeps for themselves, and both retune a builtin
+ * without renaming it. The result is capped: past `MAX_SUBAGENT_DEFINITIONS` the
+ * catalog stops being a menu the model can reason about, and every extra entry
+ * costs prompt tokens on every turn.
  */
 export function mergeSubagentDefinitions(
   definitions: readonly SubagentDefinition[],
 ): { definitions: SubagentDefinition[]; dropped: string[] } {
   const byName = new Map<string, SubagentDefinition>();
-  // Project first so it wins the name; builtins fill the rest.
+  // Highest-precedence source first, so the first entry for a name wins it.
   const ordered = [
     ...definitions.filter((d) => d.source === "project"),
-    ...definitions.filter((d) => d.source !== "project"),
+    ...definitions.filter((d) => d.source === "user"),
+    ...definitions.filter((d) => d.source === "builtin"),
   ];
   const dropped: string[] = [];
   for (const definition of ordered) {

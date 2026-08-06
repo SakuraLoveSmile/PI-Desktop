@@ -781,6 +781,27 @@ fn parse_skill_input(params: &Value) -> Result<crate::user_skills::UserSkillInpu
     serde_json::from_value(raw).map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))
 }
 
+fn subagent_err(err: impl ToString) -> JsonRpcError {
+    let msg = err.to_string();
+    if msg.contains("SUBAGENT_INVALID") {
+        rpc_err(1017, msg, "SUBAGENT_INVALID")
+    } else {
+        rpc_err(1000, msg, "INTERNAL")
+    }
+}
+
+/// Read the create/update payload for a user subagent. Absent fields stay absent
+/// so `update` can distinguish "unchanged" from "cleared".
+fn parse_subagent_input(
+    params: &Value,
+) -> Result<crate::user_subagents::UserSubagentInput, JsonRpcError> {
+    let raw = params
+        .get("subagent")
+        .cloned()
+        .unwrap_or_else(|| params.clone());
+    serde_json::from_value(raw).map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))
+}
+
 fn require_id(params: &Value) -> Result<String, JsonRpcError> {
     params
         .get("id")
@@ -3029,6 +3050,72 @@ async fn handle_request(
                 .set_scope(&id, scope)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "skill": skill }))
+        }
+
+        "agents.list" => {
+            let st = state.lock().await;
+            Ok(json!({ "subagents": st.user_subagents.list() }))
+        }
+        "agents.active" => {
+            let project_path = params.get("projectPath").and_then(|v| v.as_str());
+            let st = state.lock().await;
+            Ok(json!({ "subagents": st.user_subagents.active_for(project_path) }))
+        }
+        "agents.create" => {
+            let input = parse_subagent_input(&params)?;
+            let mut st = state.lock().await;
+            let subagent = st.user_subagents.create(input).map_err(subagent_err)?;
+            Ok(json!({ "subagent": subagent }))
+        }
+        "agents.update" => {
+            let id = require_id(&params)?;
+            let input = parse_subagent_input(&params)?;
+            let mut st = state.lock().await;
+            let subagent = st
+                .user_subagents
+                .update(&id, input)
+                .map_err(subagent_err)?;
+            Ok(json!({ "subagent": subagent }))
+        }
+        "agents.read" => {
+            let id = require_id(&params)?;
+            let st = state.lock().await;
+            match st.user_subagents.read(&id).map_err(subagent_err)? {
+                Some((subagent, body)) => Ok(json!({ "subagent": subagent, "body": body })),
+                None => Ok(json!({ "subagent": null, "body": null })),
+            }
+        }
+        "agents.remove" => {
+            let id = require_id(&params)?;
+            let mut st = state.lock().await;
+            let ok = st
+                .user_subagents
+                .remove(&id)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "ok": ok }))
+        }
+        "agents.setEnabled" => {
+            let id = require_id(&params)?;
+            let enabled = params
+                .get("enabled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let mut st = state.lock().await;
+            let subagent = st
+                .user_subagents
+                .set_enabled(&id, enabled)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "subagent": subagent }))
+        }
+        "agents.setScope" => {
+            let id = require_id(&params)?;
+            let scope = parse_scope(&params)?;
+            let mut st = state.lock().await;
+            let subagent = st
+                .user_subagents
+                .set_scope(&id, scope)
+                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            Ok(json!({ "subagent": subagent }))
         }
 
         "market.refresh" => {

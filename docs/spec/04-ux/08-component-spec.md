@@ -985,7 +985,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
   sections — how many times the session has compacted and the newest summary's
   estimated token cost — and renders nothing there otherwise. The transcript
   shows one row per compaction; this line adds what those rows cannot, next to
-  what the context is currently spent on (D202).
+  what the context is currently spent on (D203).
 - Gap: 12px vertical padding between consecutive message rows (denser than
   consumer chat, closer to WorkBuddy task transcript); assistant turns add a
   little extra bottom air so a completed answer separates from the next prompt

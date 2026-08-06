@@ -17,7 +17,13 @@ const hostSessionsSource = await readFile(
 
 test("every launch resolves the subagent catalog and its pinned models", () => {
   assert.match(mainSource, /loadSubagentDefinitions,\n  resolveSubagentProviders,/);
-  assert.match(mainSource, /await loadSubagentDefinitions\(projectPath\)/);
+  // The catalog is re-read per prompt, registry documents included, so an edit
+  // in the UI takes effect on the next turn with no restart (D202).
+  assert.match(mainSource, /await loadSubagentDefinitions\(projectPath, \{/);
+  assert.match(
+    mainSource,
+    /userDocuments: await activeUserSubagentDocuments\(projectPath\),/,
+  );
   assert.match(mainSource, /await resolveSubagentProviders\(\{/);
   assert.match(mainSource, /subagents: subagentCatalog\.definitions,/);
   assert.match(mainSource, /subagentProviders: subagentBindings\.providers,/);

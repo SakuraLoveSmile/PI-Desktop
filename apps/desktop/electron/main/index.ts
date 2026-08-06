@@ -59,6 +59,7 @@ import {
   type ThinkingLevel,
   type UiMessage,
   type UserSkillRecord,
+  type UserSubagentRecord,
   type WindowControlAction,
 } from "@pi-desktop/shared";
 import {
@@ -73,6 +74,7 @@ import {
   resolveSubagentProviders,
   type ComposerTemplate,
   type ThinkingCapabilities,
+  type UserSubagentDocument,
 } from "@pi-desktop/agent-runtime";
 import { isTemplateName, scaffold } from "@pi-desktop/plugin-devkit";
 import { HostProcess } from "./host-process";
@@ -490,6 +492,49 @@ async function activeUserSkills(
 }
 
 /**
+ * The user's own subagent definitions, filtered to the ones a session on this
+ * project sees, as documents the runtime can parse (D202).
+ *
+ * host-core owns the registry and the activation scope; the document text is
+ * read here because this is where the other two definition sources are read
+ * too, so all three reach `loadSubagentDefinitions` in the same shape.
+ */
+async function activeUserSubagentDocuments(
+  projectPath: string | undefined,
+): Promise<UserSubagentDocument[]> {
+  if (!host) return [];
+  let records: UserSubagentRecord[] = [];
+  try {
+    const result = await host.call<{ subagents: UserSubagentRecord[] }>(
+      "agents.active",
+      { projectPath: projectPath ?? null },
+    );
+    records = result.subagents ?? [];
+  } catch (error) {
+    logger.app("plugin", "warn", "subagent list failed", { data: String(error) });
+    return [];
+  }
+  const documents: UserSubagentDocument[] = [];
+  const { readFile } = await import("node:fs/promises");
+  for (const record of records) {
+    try {
+      documents.push({
+        id: record.id,
+        document: await readFile(record.path, "utf8"),
+        filePath: record.path,
+      });
+    } catch (error) {
+      // A document deleted behind the registry's back is one lost delegate,
+      // never a lost turn.
+      logger.app("plugin", "warn", "subagent document unreadable", {
+        data: { id: record.id, error: String(error) },
+      });
+    }
+  }
+  return documents;
+}
+
+/**
  * Load one of the user's own skill documents by id, or `null` if there is no
  * such skill — so the caller can fall through to the plugin catalog.
  *
@@ -619,9 +664,13 @@ async function resolveAgentRuntimeLaunch(
     })),
   ];
   // Subagents (ADR 0062): definitions are re-read per launch so editing
-  // `.pi/agents` takes effect on the next prompt, and every pinned model is
-  // resolved here because credentials and the pi catalog live on this side.
-  const subagentCatalog = await loadSubagentDefinitions(projectPath);
+  // `.pi/agents` or the registry takes effect on the next prompt, and every
+  // pinned model is resolved here because credentials and the pi catalog live on
+  // this side. The user's own definitions (D202) are scope-filtered like the
+  // skills above; a delegate the model can see is one it will try to call.
+  const subagentCatalog = await loadSubagentDefinitions(projectPath, {
+    userDocuments: await activeUserSubagentDocuments(projectPath),
+  });
   const subagentBindings = await resolveSubagentProviders({
     definitions: subagentCatalog.definitions,
     providers: providers.providers,
@@ -5521,6 +5570,97 @@ function registerIpc() {
     const res = await host.call<{ skill: UserSkillRecord | null }>("skills.read", { id });
     const path = res.skill?.path;
     if (!path) throw new Error("skill not found");
+    shell.showItemInFolder(path);
+    return { ok: true };
+  });
+
+  // --- Subagents the user owns ----------------------------------------------
+
+  handle(IPC.invoke.subagentList, async () => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("agents.list");
+  });
+
+  /**
+   * The effective catalog: what `Task` would actually offer right now, merged
+   * across builtin, registry and project documents. The renderer needs this to
+   * show read-only rows and to name the definition that wins each handle.
+   */
+  handle(IPC.invoke.subagentCatalog, async () => {
+    const projectPath = (await optionalWorkspaceRoot()) ?? undefined;
+    const { definitions, diagnostics } = await loadSubagentDefinitions(
+      projectPath,
+      { userDocuments: await activeUserSubagentDocuments(projectPath) },
+    );
+    return { subagents: definitions, diagnostics, projectPath: projectPath ?? null };
+  });
+
+  handle(IPC.invoke.subagentCreate, async (subagent: Record<string, unknown>) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call("agents.create", { subagent });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "subagent" });
+    return res;
+  });
+
+  handle(
+    IPC.invoke.subagentUpdate,
+    async (payload: { id: string } & Record<string, unknown>) => {
+      if (!host) throw new Error("host unavailable");
+      const { id, ...subagent } = payload;
+      const res = await host.call("agents.update", { id, subagent });
+      sendToRenderer(IPC.event.pluginChanged, { reason: "subagent" });
+      return res;
+    },
+  );
+
+  handle(IPC.invoke.subagentRead, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call("agents.read", { id });
+  });
+
+  handle(IPC.invoke.subagentRemove, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    const res = await host.call("agents.remove", { id });
+    sendToRenderer(IPC.event.pluginChanged, { reason: "subagent" });
+    return res;
+  });
+
+  handle(
+    IPC.invoke.subagentSetEnabled,
+    async (payload: { id: string; enabled: boolean }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call("agents.setEnabled", payload);
+      sendToRenderer(IPC.event.pluginChanged, { reason: "subagent" });
+      return res;
+    },
+  );
+
+  handle(
+    IPC.invoke.subagentSetScope,
+    async (payload: { id: string; scope: ActivationScope }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call("agents.setScope", payload);
+      sendToRenderer(IPC.event.pluginChanged, { reason: "subagent" });
+      return res;
+    },
+  );
+
+  /**
+   * Show a definition document in the OS file manager. Registry entries resolve
+   * through the registry; project documents pass their own path, since main
+   * never records them.
+   */
+  handle(IPC.invoke.subagentReveal, async (payload: { id?: string; path?: string }) => {
+    let path = payload.path;
+    if (!path) {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call<{ subagent: UserSubagentRecord | null }>(
+        "agents.read",
+        { id: payload.id },
+      );
+      path = res.subagent?.path;
+    }
+    if (!path) throw new Error("subagent not found");
     shell.showItemInFolder(path);
     return { ok: true };
   });

@@ -36,7 +36,10 @@ delegate's system prompt, mirroring prompt templates (D123):
 
 PI-Desktop ships three builtins inline in `agent-runtime` (`explorer`,
 `code-reviewer`, `test-runner`). Project documents shadow builtins by name, so a
-workspace retunes a bundled delegate without renaming it. The catalog is re-read
+workspace retunes a bundled delegate without renaming it. ADR 0063 adds a
+user-level registry under `<data>/agents/` as a third source, making the order
+**project > user registry > builtin**; the project source keeps its precedence
+and stays the place a team's delegates live. The catalog is re-read
 on every session launch, capped at `MAX_SUBAGENT_DEFINITIONS` (16), and a
 malformed document degrades to a launch diagnostic — it never costs the session
 its other delegates or its turn.
@@ -51,8 +54,9 @@ Frontmatter keys: `name`, `description`, `tools`, `model`, `thinkingLevel`,
 (`SUBAGENT_ASSIGNABLE_TOOLS`: Read, Glob, Grep, BrowserPreview, Bash, Edit,
 Write). Plugin, skill, mode and meta tools are out of reach: a delegate is a
 bounded worker, not a second full session. A definition that omits `tools` gets
-`Read, Glob, Grep`. A delegate never inherits mutation rights from the parent
-session — write capability comes only from its own declaration.
+`Read, Glob, Grep`, and `tools: "*"` expands to the assignable set rather than to
+everything the session has. A delegate never inherits mutation rights from the
+parent session — write capability comes only from its own declaration.
 
 Every delegate tool call goes through the same `tools.execute` host path as the
 parent's, so containment, permission modes and hard denies are unchanged. A
@@ -159,7 +163,9 @@ many requests wait behind it.
 - **Feed delegate messages back into the parent's context.** Rejected: it is
   precisely the cost delegation removes.
 - **Definitions in settings/SQLite.** Rejected: definitions are prompts and
-  belong in the project, reviewable in git next to the code they describe.
+  belong in the project, reviewable in git next to the code they describe. ADR
+  0063 adds a user-level source for delegates that follow the user across
+  repositories, but they stay Markdown documents on disk for the same reason.
 
 ## Consequences
 

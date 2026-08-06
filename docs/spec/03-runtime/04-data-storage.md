@@ -107,7 +107,7 @@ Rules:
 - Readers skip unknown `type` lines and a torn trailing line: new line kinds
   need no migration, and a crash mid-append cannot poison the file.
 - `compaction` is a model-context checkpoint, not a message — but it is
-  rendered, as a divider row rather than a chat bubble (D202). Readers return
+  rendered, as a divider row rather than a chat bubble (D203). Readers return
   every message unchanged and separately return **every** still-valid
   checkpoint, oldest first; the newest is the active one and the whole chain is
   what the transcript draws its rows from, so a checkpoint outlives the

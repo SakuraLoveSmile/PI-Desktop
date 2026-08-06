@@ -27,7 +27,7 @@ subset to the provider:
 - Chat starts with `Read`, `Glob`, and `Grep`.
 - A local `ToolSearch` tool remains active when deferred capabilities exist.
   *(ADR 0061 removed the `CompactContext` tool that this list also kept
-  always-active; ADR 0063 restores it as `new_context`, again always-active in
+  always-active; ADR 0064 restores it as `new_context`, again always-active in
   every mode.)*
 - Agent-mode `Glob` and `Grep`, `BrowserPreview`, plugin tools, `Skill`, and
   plugin-development helpers are deferred until requested.

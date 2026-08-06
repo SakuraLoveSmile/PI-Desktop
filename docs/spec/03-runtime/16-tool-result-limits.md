@@ -91,7 +91,7 @@ ignore files from applying — the same rule that lets `path` reach into
 - full raw output is not required to persist forever; session may store truncated form in MVP
 - the per-result host cap does not bound a parallel batch in aggregate, and it
   does not need to during context compaction: a checkpoint retains only user
-  messages, so no tool result crosses the boundary at all (D202). Tool output
+  messages, so no tool result crosses the boundary at all (D203). Tool output
   reaches the next context solely through the checkpoint summary.
 - the one message a checkpoint may truncate is the oldest retained user message,
   the one that crosses the 20,000-token retention limit. It keeps a 75/25

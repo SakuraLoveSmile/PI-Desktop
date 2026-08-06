@@ -54,7 +54,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   and the fallback state is shown. A Bash turn verifies its pinned ID/dialect
   before execution.
 - Context management has **no card and no controls** (D200 / ADR 0061, kept by
-  D202 / ADR 0063). Automatic protection is always on and its budgets and
+  D203 / ADR 0064). Automatic protection is always on and its budgets and
   retention limits are derived from the active model's window, so there is
   nothing a user could tune from here — the reference implementation does not
   expose these values either. Settings search indexes no compaction keys.

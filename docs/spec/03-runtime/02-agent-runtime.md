@@ -141,7 +141,7 @@ action. No empty assistant message is persisted in either case.
 
 Decision D193; see E2E-098.
 
-### 5.1 Context checkpoint protection (D158/D202, ADR 0030/0049/0061/0063)
+### 5.1 Context checkpoint protection (D158/D203, ADR 0030/0049/0061/0064)
 
 The complete visible transcript and the model context are separate views of
 the same session. A durable checkpoint summarizes older model context while
@@ -153,7 +153,7 @@ desktop runtime owns when they run and how the result crosses the Rust storage
 boundary; OpenCode DCP is an AGPL-3.0 behavioral reference only, not a linked or
 copied dependency.
 
-Compaction follows Codex's mechanism (ADR 0063): it always happens inline at a
+Compaction follows Codex's mechanism (ADR 0064): it always happens inline at a
 turn boundary, the model can request it through `new_context`, every compaction
 adds a transcript row and raises one warning toast, and there is no
 pre-computation anywhere.
@@ -382,10 +382,15 @@ criterion-by-criterion report of what was met and the evidence observed.
 The session Agent can hand one self-contained piece of work to a delegate and
 receive a single written report.
 
-**Catalog.** Definitions are Markdown documents: three builtins shipped inline
-in `agent-runtime` (`explorer`, `code-reviewer`, `test-runner`) plus
-`<workspace>/.pi/agents/*.md`, with project documents shadowing builtins by
-name. Electron main loads the catalog on every launch and passes
+**Catalog.** Definitions are Markdown documents from three sources: three
+builtins shipped inline in `agent-runtime` (`explorer`, `code-reviewer`,
+`test-runner`), the user registry host-core owns under `<data>/agents/` (D202),
+and `<workspace>/.pi/agents/*.md`. Precedence is **project > user registry >
+builtin**, so a committed project document retunes a registry definition or a
+builtin without renaming it. Registry documents are filtered by `enabled` and
+their activation scope before they reach the loader, so a definition scoped to
+another project is not in the catalog at all. Electron main loads the catalog on
+every launch and passes
 `subagents` / `subagentProviders` in the sidecar params, so editing a definition
 takes effect on the next prompt. The catalog is capped at
 `MAX_SUBAGENT_DEFINITIONS` (16); a malformed or unreadable document becomes a
@@ -395,7 +400,9 @@ launch diagnostic and never fails the launch.
 when the catalog is non-empty. Its description carries the delegate catalog, and
 its arguments are validated in the tool: an unknown `agent`, an empty `task`, an
 unresolvable model pin and a definition whose tools are all unavailable each
-return a tool error explaining the failure rather than throwing.
+return a tool error explaining the failure rather than throwing. `Task` belongs
+to the Agent core set rather than the on-demand catalog of §7.1, so a session
+with definitions always sees it.
 
 **Delegate loop.** A `SubagentRun` is a second pi `Agent` in the same sidecar
 process with the definition's system prompt, its (possibly pinned)
@@ -507,6 +514,9 @@ registered schema into every provider request. Each new user prompt starts with
 the mode's core set:
 
 - Agent: `Read`, `Bash`, `Edit`, and `Write` (matching pi's coding-agent core)
+- Agent: `Task` as well, whenever the subagent catalog is non-empty (§5f) — a
+  capability the model has to go looking for is one it will not use, and
+  delegation is worth one extra schema per request
 - Plan: `Read`, `Glob`, `Grep`, `BrowserPreview`, and `Bash`
 - both modes: `ToolSearch` when at least one deferred capability exists
 

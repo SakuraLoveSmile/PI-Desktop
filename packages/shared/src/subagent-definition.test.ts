@@ -273,6 +273,24 @@ describe("mergeSubagentDefinitions", () => {
     expect(merged.dropped).toEqual([]);
   });
 
+  it("ranks project over the user's own registry over builtin", () => {
+    const merged = mergeSubagentDefinitions([
+      definition({ name: "reviewer", source: "builtin", prompt: "builtin" }),
+      definition({ name: "reviewer", source: "user", prompt: "user" }),
+      definition({ name: "reviewer", source: "project", prompt: "project" }),
+      definition({ name: "explorer", source: "builtin", prompt: "builtin" }),
+      definition({ name: "explorer", source: "user", prompt: "user" }),
+    ]);
+
+    expect(merged.definitions).toHaveLength(2);
+    expect(merged.definitions.find((d) => d.name === "reviewer")?.prompt).toBe(
+      "project",
+    );
+    // With no project document, the user's own definition retunes the builtin.
+    expect(merged.definitions.find((d) => d.name === "explorer")?.prompt).toBe("user");
+    expect(merged.dropped).toEqual([]);
+  });
+
   it("caps the catalog and reports what it dropped", () => {
     const many = Array.from({ length: MAX_SUBAGENT_DEFINITIONS + 2 }, (_, i) =>
       definition({ name: `agent-${i}`, source: "builtin" }),

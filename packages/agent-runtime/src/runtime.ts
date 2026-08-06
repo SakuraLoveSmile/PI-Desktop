@@ -35,10 +35,6 @@ import {
   type Usage,
   type UserMessage,
 } from "@earendil-works/pi-ai";
-import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
-import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
-import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
-import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
 import { DEFAULT_COMMAND_TIMEOUT_MS } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,

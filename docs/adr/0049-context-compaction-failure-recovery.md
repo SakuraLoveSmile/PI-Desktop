@@ -4,7 +4,7 @@
 - Date: 2026-08-04
 - Amends: ADR 0030 / D158
 - Amended by: ADR 0061 (the fallback stays reserved for the blocking hard
-  boundary; a failed background build is discarded silently) / ADR 0063 (there
+  boundary; a failed background build is discarded silently) / ADR 0064 (there
   is no background build left to discard, and the `fresh_window` family issues
   no summary request, so this path cannot trigger there)
 
