@@ -75,3 +75,4 @@ Each ADR includes:
 | 0057 | Permission-gated external paths and portable native search | Accepted for implementation |
 | 0058 | Extensions page density and theme-readable button surfaces | Accepted |
 | 0059 | Persist composer clipboard files in session scratch | Accepted |
+| 0060 | Imperceptible background context compaction | Accepted (amends 0030 / 0049) |

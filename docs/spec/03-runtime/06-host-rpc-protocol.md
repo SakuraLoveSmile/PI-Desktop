@@ -444,9 +444,9 @@ not inherit this exception.
 
 Before generic permission evaluation, host-core applies the mode policy:
 
-- Plan and Goal allow `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`,
-  `CompactContext`, and the kind's submit tool (`SubmitPlan` / `SubmitGoal`) as
-  applicable to the live planning state.
+- Plan and Goal allow `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`, and the
+  kind's submit tool (`SubmitPlan` / `SubmitGoal`) as applicable to the live
+  planning state.
 - Plan and Goal deny `Write`, `Edit`, every plugin tool, and unknown tools under
   all permission modes and grants. The host reads the session's **durable** mode
   for this check, so a sidecar claiming `agent` in `tools.execute` cannot widen

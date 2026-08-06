@@ -53,17 +53,12 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   choice later becomes unavailable, the first available platform shell is used
   and the fallback state is shown. A Bash turn verifies its pinned ID/dialect
   before execution.
-- **Context management** card:
-  - automatic compaction is enabled by default
-  - the switch controls per-`turn_end` soft guidance, deterministic threshold
-    checkpoints, the internal `CompactContext` model tool, and one overflow
-    recovery attempt
-  - disabling automatic compaction leaves manual `/compact` available for an
-    idle session
-  - Reserved tokens and Recent tokens to keep are numeric token controls with
-    a 1024 minimum; the runtime further clamps unsafe values to the active
-    model's context window as specified by D158
-  - the card and all three controls are indexed by Settings search
+- Context management has **no card and no controls** (D199 / ADR 0060).
+  Automatic protection is always on, its budgets are derived from the active
+  model's window, and compaction is imperceptible, so there is nothing to
+  configure. Settings search indexes no compaction keys. Manual `/compact`
+  remains available from the command palette for an idle session, and the
+  context usage inspector shows whether a checkpoint is installed.
 
 ### Shortcuts (`shortcuts` tab)
 - **Keyboard shortcuts** card:
@@ -183,7 +178,7 @@ not a strict read-only security profile.
 5. Plugins has no Settings destination; the app-shell Plugins page supports
    load, enable, disable, and uninstall
 6. Basics shows host-backed Appearance and Defaults cards only; the AI
-   destination shows Permissions and Context management; the Shortcuts
+   destination shows Permissions and Command shell; the Shortcuts
    destination shows the Keyboard shortcuts card; Info shows the Developer card.
    No additional settings destinations are rendered
 7. Provider secrets never display raw key values
@@ -211,9 +206,9 @@ not a strict read-only security profile.
 17. Developer tools remain unavailable by default; enabling developer mode
     unlocks the localized Settings action and platform shortcuts, persists
     across restart, and disabling it closes an open console
-18. Context management defaults to automatic protection, persists all three
-    settings, and cannot configure a retained tail that prevents compaction on
-     a small-window model because runtime limits remain model-aware
+18. Context management exposes no settings at all; protection is always on and
+    its budgets scale with the active model's context window, so no persisted
+    value can leave a small-window model uncompactable or the guard disabled
 19. The default operating-mode selector contains only Agent and Plan; legacy
     Chat values migrate to Plan and do not reappear as a selectable option
 20. Command shell selection persists a platform-valid catalog ID, exposes

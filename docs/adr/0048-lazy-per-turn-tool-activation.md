@@ -25,8 +25,9 @@ subset to the provider:
 - Agent starts with `Read`, `Bash`, `Edit`, and `Write`, matching pi's
   coding-agent core.
 - Chat starts with `Read`, `Glob`, and `Grep`.
-- `CompactContext` remains active whenever automatic compaction is enabled.
 - A local `ToolSearch` tool remains active when deferred capabilities exist.
+  *(ADR 0060 removed the `CompactContext` tool that this list also kept
+  always-active; compaction is host-driven and has no model-facing tool.)*
 - Agent-mode `Glob` and `Grep`, `BrowserPreview`, plugin tools, `Skill`, and
   plugin-development helpers are deferred until requested.
 

@@ -30,6 +30,7 @@ const enEntries: ChangelogEntry[] = [
       "Add project-scoped MCP servers and Skills with one Extensions scope control.",
       "Harden external path permissions and native search scoping across workspaces.",
       "Make Plan approval surfaces close after resolution and mode commands switch the active session.",
+      "Context compaction is now invisible: summaries are prepared while tools run or the session is idle, so long conversations keep going without a pause, a notification, or any setting to tune.",
     ],
   },
   {
@@ -207,6 +208,7 @@ const zhCNEntries: ChangelogEntry[] = [
       "新增项目级 MCP 服务器和 Skill，并用一个扩展作用域控件统一管理。",
       "强化跨工作区的外部路径权限与原生搜索范围控制。",
       "规划审批完成后自动收起审批界面，命令切换可直接更新当前会话模式。",
+      "上下文压缩变为无感：摘要在工具执行或会话空闲时提前准备，长对话不再因此停顿、提示或需要手动调参。",
     ],
   },
   {

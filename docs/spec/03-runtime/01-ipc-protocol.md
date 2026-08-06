@@ -350,11 +350,14 @@ type AgentEvent =
   | ({ type: "planning_state" } & Omit<PlanningStateEvent, "sessionId">)
   | { type: "tool_permission_request"; request: ToolPermissionRequest }
   | { type: "compaction_start";
-     reason: "manual" | "threshold" | "overflow" }
+     reason: "manual" | "threshold" | "overflow";
+     phase?: "background" | "blocking" }
  | { type: "compaction_end";
      reason: "manual" | "threshold" | "overflow";
+     phase?: "background" | "blocking";
      ok: boolean; tokensBefore?: number; firstKeptMessageId?: string;
      willRetry: boolean; fallback?: "retained_tail";
+     status?: { generation: number; summaryTokens: number };
      error?: { code: string; message: string } }
  | { type: "error"; error: AppError }
  | { type: "status"; status: AgentStatus };
@@ -375,15 +378,26 @@ while a Bash tool runs; it is not an AgentEvent.
 `turn_end` closes one model/tool turn but is not a terminal desktop run event:
 another provider request may follow immediately. Renderer busy state and
 durable turn completion therefore settle only on `agent_end` or `error`.
-`compaction_start` keeps the run busy; a manual-only operation settles on its
+`phase` distinguishes a checkpoint pre-computed in a provider-idle window
+(`"background"`) from one created on the critical path (`"blocking"`). It is
+additive and optional; an absent value means `"blocking"`, so the protocol
+version is unchanged (ADR 0047 compatibility rule). A `"blocking"`
+`compaction_start` keeps the run busy and a manual-only operation settles on its
 matching `compaction_end`, while threshold/overflow compaction remains inside
-the active agent run. The soft context-management instruction is transient and
-has no protocol event or transcript row of its own. A model-issued
-`CompactContext` call uses the normal tool lifecycle and is visible/durable.
+the active agent run. A `"background"` pair never changes renderer busy state
+and never raises a notification. Compaction has no model-facing tool, so it
+never appears as a tool lifecycle or transcript row.
+
+`compaction_end.status` is present whenever a checkpoint was installed and
+carries `generation` (how many checkpoints this session has installed) and
+`summaryTokens` (the summary's estimated context cost). It exists for the
+context usage inspector, which is the only surface where compaction is visible.
+
 Automatic summary failures may still produce a successful lifecycle event with
 `fallback: "retained_tail"`; this means a durable, aggressively bounded tail
 checkpoint was installed and the run may continue with reduced historical
-context. Manual compaction never silently falls back.
+context. Manual compaction never silently falls back. A failed background build
+emits no event at all.
 
 Provider `error` events may include bounded diagnostic fields in
 `AppError.details`: `phase` (`request` or `stream`), `providerStatus`,

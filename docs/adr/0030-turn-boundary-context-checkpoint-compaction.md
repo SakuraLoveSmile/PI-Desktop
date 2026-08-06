@@ -1,8 +1,12 @@
 # ADR 0030: Turn-boundary context checkpoint compaction
 
-- Status: Accepted
+- Status: Accepted; soft-boundary, model-tool, and visibility clauses
+  superseded in part by ADR 0060
 - Date: 2026-07-28
-- Last amended: 2026-07-29
+- Last amended: 2026-08-06
+- Amended by: ADR 0049 (failure recovery), ADR 0060 (background compaction;
+  removes the soft-boundary nudge, the `CompactContext` tool, and the
+  visibility of compaction activity)
 
 ## Context
 
@@ -36,23 +40,30 @@ implements the desktop-specific controller.
   least the configured reserve, the model output allowance capped at 25% of
   context, or 5% of context. A configured reserve cannot consume more than
   half the window. The retained-tail target cannot exceed half the remaining
-  hard budget, so small-window models remain compactable.
+  hard budget, so small-window models remain compactable. *(ADR 0060 keeps
+  this headroom rule and derives the reserve and retained-tail targets from
+  the model window instead of settings, and adds a background limit below the
+  hard boundary.)*
 - At the soft boundary, a transient system instruction asks the model to call
   `CompactContext` with the active-task focus. It is eligible only after tool
   turns and repeats at most once every three qualifying turns. The instruction
-  is not persisted and does not mutate the durable system prompt.
+  is not persisted and does not mutate the durable system prompt. *(Superseded
+  by ADR 0060: the soft boundary and this instruction are removed.)*
 - `CompactContext` bypasses the Rust tool/permission bridge because it changes
   model context, not the workspace. Its call and result use normal tool events
   and remain visible/durable as a tool activity row. The requested checkpoint
   is generated only after that tool turn finishes, preserving provider-valid
-  call/result pairing.
+  call/result pairing. *(Superseded by ADR 0060: the tool is removed and
+  compaction leaves no transcript row.)*
 - At the hard boundary, the runtime generates a checkpoint deterministically.
   The candidate context is re-estimated before persistence and again before
   continuation. Automatic summary failure or an ineffective checkpoint first
   attempts the retained-tail recovery defined by ADR 0049; if that recovery
   cannot be prepared, durably appended, or brought below the safe budget, the
   loop stops before another provider request with
-  `CONTEXT_COMPACTION_FAILED`.
+  `CONTEXT_COMPACTION_FAILED`. *(ADR 0060 keeps this path unchanged as the
+  safety net, and usually reaches it with a checkpoint already pre-computed in
+  a provider-idle window.)*
 - A final tool-result batch is kept with its assistant tool-call carrier. If
   that atomic batch exceeds the normal retained-tail target, the runtime lets
   pi move the cut point to the carrier. If the batch itself reaches half the
@@ -68,7 +79,8 @@ implements the desktop-specific controller.
   terminal.
 - Automatic protection is enabled by default. Disabling it removes the model
   tool and disables threshold and overflow recovery. Manual `/compact` remains
-  available for an idle session.
+  available for an idle session. *(ADR 0060 removes the user-facing switch:
+  protection is always on and persisted `enabled: false` values are ignored.)*
 - Protocol v6 adds a host-owned `session.appendCompaction` operation and
   compaction lifecycle events. The host appends a typed checkpoint line to the
   session JSONL file. Visible messages are never deleted, rewritten, or hidden
@@ -116,6 +128,8 @@ next provider request can already be oversized.
 
 Rejected because the model may ignore, postpone, or repeat the request. Soft
 guidance is useful for summary focus but cannot enforce the provider limit.
+*(ADR 0060 goes further and removes the reminder entirely: with pre-computed
+checkpoints its only remaining effect was a spent turn and a transcript row.)*
 
 ### Delete older visible transcript messages
 

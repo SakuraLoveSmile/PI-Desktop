@@ -229,8 +229,8 @@ Each scenario is documented in this format:
   HTML page and observe the tool activity. 4) Start a second user prompt after
   the preview task completes.
 - **Expected**: The first request contains only the mode core tools (Agent:
-  `Read`/`Bash`/`Edit`/`Write`; Chat: `Read`/`Glob`/`Grep`),
-  `CompactContext` when enabled, and local `ToolSearch`; deferred schemas are
+  `Read`/`Bash`/`Edit`/`Write`; Chat: `Read`/`Glob`/`Grep`)
+  and local `ToolSearch`; deferred schemas are
   represented only by a bounded `# On-demand tools` catalog. The agent calls
   `ToolSearch` before `BrowserPreview` (or the selected plugin/`Skill` tool)
   when the capability is needed, and the matching schema is available on the
@@ -2485,28 +2485,40 @@ Each scenario is documented in this format:
 #### E2E-084: Long tool loop compacts before the provider context limit
 
 - **Preconditions**: Provider configured with known pi-ai context/output
-  limits; automatic context compaction enabled; a fixture can produce repeated
-  tool turns and large capped tool results without finishing the agent run.
+  limits; a fixture can produce repeated tool turns and large capped tool
+  results without finishing the agent run. Automatic protection is always on
+  and has no settings.
 - **Steps**:
-  1. Start one agent task whose tool loop grows past the soft context boundary.
+  1. Start one agent task whose tool loop grows past the background limit (70%
+     of the hard budget).
   2. Let at least three `turn_end` events occur before `agent_end`; observe the
-     composer/session controls and processing rows.
-  3. Continue until the hard boundary forces a checkpoint, then allow the task
-     to finish.
-  4. Repeat the hard-boundary turn with multiple parallel capped tool results
+     composer/session controls, processing rows, and toasts.
+  3. Continue until a checkpoint is installed, then allow the task to finish.
+  4. Repeat with the background window suppressed (a fixture whose tool turns
+     return instantly and whose growth all lands in one turn) so the hard
+     boundary must compact synchronously.
+  5. Repeat the hard-boundary turn with multiple parallel capped tool results
      whose aggregate carrier/result batch exceeds half the hard budget.
-  5. Restart the app, reopen the session, and send a follow-up that depends on
+  6. Restart the app, reopen the session, and send a follow-up that depends on
      both summarized old work and the retained recent tail.
-  6. Repeat with a provider fixture that returns Bedrock's
+  7. Repeat with a provider fixture that returns Bedrock's
      `prompt is too long: N tokens > M maximum` once.
-  7. Disable automatic compaction and invoke `/compact` manually while idle.
+  8. Invoke `/compact` manually while idle.
 - **Expected**:
   - Each `turn_end` is evaluated before another provider request and never
     marks the overall task idle; composer/config controls remain blocked until
     `agent_end`, `error`, or manual-only `compaction_end`.
-  - Soft guidance is transient and deduplicated. A model-issued
-    `CompactContext` call appears once as normal tool activity; the hidden
-    instruction never appears in the transcript or durable system prompt.
+  - Compaction is imperceptible: across the whole run there is no compaction
+    toast, no spinner or run-state change attributable to compaction, and no
+    transcript row for it. No `CompactContext` tool exists in any request's
+    tool list, and no context-management instruction appears in the transcript
+    or the durable system prompt.
+  - The summary request is issued while a tool is running or while the session
+    is idle, never concurrently with a model stream, and the turn boundary that
+    consumes it makes no additional provider request.
+  - Opening the context usage inspector after a checkpoint shows one line with
+    the compaction count and summary token estimate; before any checkpoint that
+    line is absent.
   - At the hard boundary a durable checkpoint is created before the next model
     request. The complete visible transcript is unchanged, and the continued
     task stays below the model-aware safe budget, including when the last
@@ -2529,13 +2541,18 @@ Each scenario is documented in this format:
     prompt crosses the hard budget, the runtime rebuilds a smaller tail from
     the full transcript and carries the existing summary forward instead of
     reporting that there is no new context to compact.
-  - Disabling automatic protection removes soft/hard/overflow recovery and the
-    model tool, but idle `/compact` still succeeds. Compaction failures surface
-    once through `CONTEXT_COMPACTION_FAILED` without duplicate error toasts.
+  - A background build that fails or goes stale is invisible: no event, no
+    toast, no persisted record, and the hard boundary still compacts
+    synchronously on the same run.
+  - Idle `/compact` succeeds and shows its own informational toast, because the
+    user asked for it. Compaction failures surface once through
+    `CONTEXT_COMPACTION_FAILED` without duplicate error toasts.
+  - Settings contains no context-management card and Settings search returns no
+    compaction rows.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/04-data-storage.md`,
-  `03-runtime/06-host-rpc-protocol.md`, `04-ux/09-interaction-patterns.md`,
-  ADR 0030, D158
+  `03-runtime/06-host-rpc-protocol.md`, `04-ux/06-settings-ia.md`,
+  `04-ux/09-interaction-patterns.md`, ADR 0030, ADR 0049, ADR 0060, D158, D199
 - **Acceptance**: C (chat/stream), F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Partially automated (`runtime.test.ts`,
@@ -2806,9 +2823,9 @@ Each scenario is documented in this format:
 #### E2E-105: Plan policy remains host-authoritative
 
 - **Preconditions**: A project-bound session is idle in Plan with BrowserPreview,
-  CompactContext, a plugin tool, and a forged `requestedMode = "agent"` fixture.
-- **Steps**: 1) Inspect visible Plan tools. 2) Use Read/Glob/Grep,
-  BrowserPreview, and CompactContext. 3) Attempt Write, Edit, plugin, and
+  a plugin tool, and a forged `requestedMode = "agent"` fixture.
+- **Steps**: 1) Inspect visible Plan tools. 2) Use Read/Glob/Grep and
+  BrowserPreview. 3) Attempt Write, Edit, plugin, and
   unknown tools through the host with every permission mode. 4) Run Bash under
   Ask, Accept edits, and Auto.
 - **Expected**: Plan denies Write/Edit/plugin/unknown tools regardless of the

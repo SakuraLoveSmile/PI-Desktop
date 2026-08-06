@@ -9,8 +9,8 @@
 |---|---|
 | Default mode | Agent |
 | Agent tools | Read / Glob / Grep / Write / Edit / Bash |
-| Plan tools | Read / Glob / Grep / BrowserPreview / Bash / CompactContext / SubmitPlan |
-| Goal tools | Read / Glob / Grep / BrowserPreview / Bash / CompactContext / SubmitGoal |
+| Plan tools | Read / Glob / Grep / BrowserPreview / Bash / SubmitPlan |
+| Goal tools | Read / Glob / Grep / BrowserPreview / Bash / SubmitGoal |
 | Plan and Goal hard deny | Write / Edit / all plugin tools / unknown tools / the other kind's submit tool |
 | Permission timeout | 120s → deny |
 | allow-session scope | toolName |
@@ -28,7 +28,6 @@ Let the agent get things done, but stay under control by default.
 | `Glob` | low | List files by pattern |
 | `Grep` | low | Content search |
 | `BrowserPreview` | low | Open a workspace-relative preview in the user-driven Browser panel |
-| `CompactContext` | low | Create a model-context checkpoint without workspace mutation |
 | `EnterPlanMode` | low | Move the same Agent from Agent to Plan after host validation |
 | `SubmitPlan` | low | Preserve exact Markdown bytes in a new `.pi/plan/*.md` artifact and request approval |
 | `EnterGoalMode` | low | Move the same Agent from Agent to Goal after host validation |
@@ -411,11 +410,11 @@ matching log lines.
 - Session grants follow `sessionId` across project-tab switches and are never
   inherited by another session or Temporary conversation
 
-### 10.1 Plan and Goal control and context tools
+### 10.1 Plan and Goal control tools
 
-`CompactContext` is available when automatic context protection permits it and
-does not mutate the workspace. A submit tool is available only in its own
-contract mode and must be the only tool call in its assistant batch. It preserves
+Context compaction has no model-facing tool in any mode: the host triggers it
+deterministically (see [02-agent-runtime](02-agent-runtime.md) §5.1). A submit
+tool is available only in its own contract mode and must be the only tool call in its assistant batch. It preserves
 the exact Markdown bytes in a new unique artifact under the kind's directory
 (`.pi/plan/*.md` for `SubmitPlan`, `.pi/goal/*.md` for `SubmitGoal`)
 through host-core before creating one pending approval. `EnterPlanMode` and

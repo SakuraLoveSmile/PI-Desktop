@@ -141,7 +141,7 @@ action. No empty assistant message is persisted in either case.
 
 Decision D193; see E2E-098.
 
-### 5.1 Context checkpoint protection (D158, ADR 0030)
+### 5.1 Context checkpoint protection (D158/D199, ADR 0030/0049/0060)
 
 The complete visible transcript and the model context are separate views of
 the same session. A durable checkpoint summarizes older model context while
@@ -153,32 +153,64 @@ desktop runtime owns when they run and how the result crosses the Rust storage
 boundary; OpenCode DCP is an AGPL-3.0 behavioral reference only, not a linked or
 copied dependency.
 
+Compaction is host-driven and imperceptible. There is no model-facing
+compaction tool and no system-prompt instruction about context management: the
+runtime decides deterministically, and a successful automatic compaction
+produces no toast, no run-state change, and no transcript row.
+
 For every pi loop turn:
 
 1. pi emits and awaits `turn_end` after the assistant message and all tool
    results for that turn are complete
 2. PI-Desktop rebuilds the context from the full transcript plus the newest
    valid checkpoint and estimates the next request budget
-3. below the soft boundary, the next turn proceeds unchanged
-4. at the soft boundary after a tool turn, the next request receives one
-   transient `<context_management>` instruction; it is not persisted or added
-   to the runtime's base system prompt, and repeats no more than once every
-   three qualifying turns
-5. the instruction asks the model to call `CompactContext` with a short active
-   focus; the internal tool queues summary generation for the end of its
-   current tool turn, bypasses workspace permissions, and otherwise emits and
-   persists a normal visible tool call/result row
-6. at or above the hard boundary, summary generation is mandatory; the runtime
+3. any in-flight background summary is awaited, and a pre-computed checkpoint
+   that is still valid is installed; the turn then usually proceeds without
+   reaching the hard boundary
+4. below the hard boundary, the next turn proceeds unchanged
+5. at or above the hard boundary, summary generation is mandatory; the runtime
    preflights the summary input against the model window and skips a request
    that cannot fit. An automatic summary failure first attempts a deterministic
    retained-tail checkpoint, while manual compaction still reports
    `CONTEXT_COMPACTION_FAILED`
-7. successful generation or deterministic recovery first appends the
+6. successful generation or deterministic recovery first appends the
    checkpoint through host-core, then installs its summary + retained tail as
    the runtime context for the next provider request; a hard-boundary
    checkpoint is re-estimated before it is persisted and again before
    continuation, and cannot authorize the next request unless it is below the
    hard budget
+
+Checkpoint generation and installation are separate operations.
+`buildCheckpoint` runs the preparation, budget preflight, and summary request
+without persisting anything or changing the active checkpoint; installation
+re-estimates, appends through host-core, updates the active checkpoint, and
+emits `compaction_end`. The blocking path composes the two back to back.
+
+Background pre-computation runs only in **provider-idle windows**, so a summary
+request never shares the provider connection with a streaming turn:
+
+- when a tool starts executing, after the model stream for that turn ended and
+  before the next request is issued;
+- after a run finishes, while the user is reading the result.
+
+It starts only if compaction is enabled, no compaction is already running or
+pending, the session is not disposed, the context is at or above the background
+limit, and the context grew by at least the retained-tail target since the
+baseline recorded when the newest checkpoint was installed. That increment test
+is what stops a large retained tail from requesting a fresh summary every turn
+while reducing nothing. Background work never sets the running flag that feeds
+`AgentStatus.isRunning`.
+
+A pre-computed checkpoint is installed at the next turn boundary or before the
+next user prompt, and only if the checkpoint it was based on is still the
+active one, its `throughMessageId` anchor is still present in the transcript,
+and it is still below the hard budget of the **current** model. Any miss
+discards it and falls through to the blocking path. A background build that
+fails, aborts, or lands on a superseded base is discarded in silence: nothing
+is persisted, no event is emitted, and no retained-tail fallback is attempted —
+that fallback belongs to the blocking hard boundary, which still catches
+whatever background work missed. `abort()` cancels an in-flight background
+summary but keeps an already-built checkpoint, which remains installable.
 
 pi's cut point keeps provider-valid tool call/result pairs together. When the
 final tool-result batch alone exceeds the configured recent-tail target,
@@ -195,11 +227,16 @@ modified. The bounded tail is re-estimated with the summary before persistence
 and before continuation, so an oversized request still cannot pass the guard.
 
 The hard boundary is the model context window minus request headroom.
-Headroom is the maximum of the configured reserve, model maximum output capped
-at 25% of the context window, and a 5% safety margin. A configured reserve is
-capped at half the window. The effective retained-tail target is capped at half
-the hard budget so small-context models can still shed meaningful history. The
-soft boundary precedes the hard boundary by a model-aware recent-context gap.
+Headroom is the maximum of a 16,384-token reserve floor, model maximum output
+capped at 25% of the context window, and a 5% safety margin. The reserve floor
+is itself capped at half the window. The retained-tail target is derived from
+the model window as 20% of the hard budget clamped to 8,000–64,000 tokens, and
+then capped at half the hard budget so small-context models can still shed
+meaningful history. None of these values are configurable.
+
+The background limit is 70% of the hard budget. It is the pre-computation
+trigger only; the hard boundary keeps measuring total context, because that is
+the provider's actual constraint.
 
 The incoming user prompt participates in budgeting before the first provider
 request. If normal compaction fails during an automatic threshold or overflow
@@ -215,11 +252,13 @@ recovery layer: omit the failed assistant from model context, compact once,
 and retry once. A second overflow remains terminal. Bedrock's
 `prompt is too long: N tokens > M maximum` form maps to this path.
 
-Automatic protection is enabled by default. Disabling it removes
-`CompactContext` and bypasses soft, hard, and overflow recovery; manual
-`/compact` remains available while the session is idle. Manual and automatic
-checkpoint generation are abortable and count as running state until durable
-persistence completes.
+Automatic protection is always enabled and is not user-configurable. The
+runtime still accepts a construction-time override that disables it, used by
+tests; persisted `contextCompaction` settings are ignored so a session cannot
+be left with the guard off and no way to restore it. Manual `/compact` remains
+available while the session is idle. Manual and blocking checkpoint generation
+are abortable and count as running state until durable persistence completes;
+background generation never does.
 
 ## 5b. Operating mode and planning state
 
@@ -415,10 +454,10 @@ repeat a search whose answer is already in context.
 
 The sidecar builds one complete tool registry, but it does not serialize every
 registered schema into every provider request. Each new user prompt starts with
-the mode's core set plus `CompactContext` when automatic compaction is enabled:
+the mode's core set:
 
 - Agent: `Read`, `Bash`, `Edit`, and `Write` (matching pi's coding-agent core)
-- Plan: `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`, and `CompactContext`
+- Plan: `Read`, `Glob`, `Grep`, `BrowserPreview`, and `Bash`
 - both modes: `ToolSearch` when at least one deferred capability exists
 
 In Agent mode, `Glob` and `Grep` join `BrowserPreview`, plugin tools, `Skill`,

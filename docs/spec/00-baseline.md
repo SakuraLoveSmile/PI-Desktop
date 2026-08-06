@@ -32,7 +32,10 @@
 > `0.4.11` adopts turn-boundary model-context checkpoint compaction through
 > D158 / ADR 0030 while preserving the complete visible transcript. The
 > context-recovery amendment in ADR 0049 adds a durable retained-tail
-> fallback for automatic compaction failures.
+> fallback for automatic compaction failures. D199 / ADR 0060 later makes
+> compaction imperceptible: checkpoints are pre-computed in provider-idle
+> windows, the `CompactContext` tool and soft-boundary nudge are removed, and
+> the budgets are derived from the model window instead of settings.
 > `0.4.12` standardizes home and thread-docked composer prompt rows without a
 > leading brand mark through D160 / ADR 0031 while preserving shell branding
 > elsewhere.
@@ -111,10 +114,12 @@
 42. Project activation: **one visible host workspace via existing
     `project.set`; tool roots remain bound to the originating session project**
 43. Context management: **pi-native checkpoint summaries with PI-Desktop-owned
-     per-`turn_end` soft guidance, deterministic pre-request hard guards,
-     durable host checkpoints, and one overflow retry**
+     background pre-computation in provider-idle windows, deterministic
+     pre-request hard guards, durable host checkpoints, and one overflow retry.
+     No model-facing compaction tool and no user-facing settings; a successful
+     automatic compaction is silent**
 44. Plan tools and policy: **Read / Glob / Grep / BrowserPreview / Bash plus
-    `CompactContext`, `EnterPlanMode`, and `SubmitPlan`; Write/Edit/plugin and
+    `EnterPlanMode` and `SubmitPlan`; Write/Edit/plugin and
     unknown tools are denied. Bash follows `ask`, `accept-edits`, or `auto`, so
     Plan is planning intent, not a strict read-only security profile.**
 45. Plan checkpoint: **`SubmitPlan(title, markdown, question)` causes host-core
