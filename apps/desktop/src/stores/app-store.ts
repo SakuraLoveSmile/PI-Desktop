@@ -2431,9 +2431,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (
       event.type === "agent_start" ||
       event.type === "turn_start" ||
-      // Background checkpoints are pre-computed off the critical path, so they
-      // must not make an idle session look busy.
-      (event.type === "compaction_start" && event.phase !== "background")
+      event.type === "compaction_start"
     ) {
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: true },
@@ -2586,7 +2584,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         set({ isRunning: true });
         break;
       case "compaction_start":
-        if (event.phase !== "background") set({ isRunning: true });
+        set({ isRunning: true });
         break;
       case "compaction_end":
         if (event.reason === "manual") set({ isRunning: false });

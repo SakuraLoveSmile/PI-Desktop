@@ -2405,12 +2405,11 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     newMessages: [assistant, toolResult],
   };
 
-  it("derives graded limits with provider-request headroom", async () => {
+  it("derives the hard limit from provider-request headroom", async () => {
     const runtime = createRuntime();
 
     expect((runtime as any).contextBudget([])).toMatchObject({
       tokens: 0,
-      backgroundLimit: 156_800,
       hardLimit: 224_000,
       requestHeadroom: 32_000,
       keepRecentTokens: 44_800,
@@ -2432,43 +2431,10 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     });
 
     expect((runtime as any).contextBudget([])).toMatchObject({
-      backgroundLimit: 11_200,
       hardLimit: 16_000,
       requestHeadroom: 16_000,
       keepRecentTokens: 8_000,
     });
-
-    await runtime.dispose();
-  });
-
-  it("requires growth past the newest checkpoint before pre-compacting", async () => {
-    const runtime = createRuntime();
-    const budget = {
-      tokens: 160_000,
-      backgroundLimit: 156_800,
-      hardLimit: 224_000,
-      requestHeadroom: 32_000,
-      keepRecentTokens: 44_800,
-    };
-
-    expect((runtime as any).backgroundCompactionReached(budget)).toBe(true);
-    expect(
-      (runtime as any).backgroundCompactionReached({
-        ...budget,
-        tokens: 156_799,
-      }),
-    ).toBe(false);
-
-    // A retained tail can sit above the background limit on its own. Measuring
-    // the total only would then re-request a summary every turn.
-    (runtime as any).checkpointBaselineTokens = 158_000;
-    expect((runtime as any).backgroundCompactionReached(budget)).toBe(false);
-    expect(
-      (runtime as any).backgroundCompactionReached({
-        ...budget,
-        tokens: 158_000 + budget.keepRecentTokens,
-      }),
-    ).toBe(true);
 
     await runtime.dispose();
   });
@@ -2968,7 +2934,7 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
   });
 });
 
-describe("DesktopAgentRuntime background context compaction", () => {
+describe("DesktopAgentRuntime inline context compaction", () => {
   const history: UiMessage[] = [
     {
       id: "old-user",
@@ -2989,53 +2955,57 @@ describe("DesktopAgentRuntime background context compaction", () => {
     context: { systemPrompt: "base", messages: [], tools: [] },
     newMessages: [],
   };
+  const SUMMARY = "Older work was summarized.";
 
   /**
-   * A budget past the background limit but still under the hard one. The tiny
-   * retained tail is what leaves history for the summary to consume.
+   * Past the hard boundary. The tiny retained tail is what leaves history for
+   * the summary to consume.
    */
-  function idleBudget(tokens = 160_000) {
+  function overBudget(tokens = 240_000) {
     return {
       tokens,
-      backgroundLimit: 156_800,
       hardLimit: 224_000,
       requestHeadroom: 32_000,
       keepRecentTokens: 1,
     };
   }
 
-  function summaryResult(summary = "Older work was summarized.") {
+  function summaryResult(summary = SUMMARY) {
     return {
       ok: true,
-      value: { summary, tokensBefore: 160_000 },
+      value: { summary, tokensBefore: 240_000 },
     };
   }
 
-  async function startToolWindow(runtime: DesktopAgentRuntime) {
+  /** Over the boundary until the checkpoint's summary is part of the context. */
+  function budgetSpy(runtime: DesktopAgentRuntime) {
+    return vi.spyOn(runtime as any, "contextBudget").mockImplementation(
+      ((messages: unknown) =>
+        JSON.stringify(messages).includes(SUMMARY)
+          ? { ...overBudget(), tokens: 40_000 }
+          : overBudget()) as never,
+    );
+  }
+
+  it("compacts at the turn boundary rather than ahead of it", async () => {
+    const host = { call: vi.fn().mockResolvedValue(undefined) };
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ host, onEvent, history });
+    budgetSpy(runtime);
+    const generateCompaction = vi
+      .spyOn(runtime as any, "generateCompaction")
+      .mockResolvedValue(summaryResult());
+
+    // A running tool is an idle provider connection, but compaction has no
+    // off-critical-path variant: nothing may happen here.
     await (runtime as any).handleAgentEvent({
       type: "tool_execution_start",
       toolCallId: "call-1",
       toolName: "Read",
       args: {},
     });
-    await (runtime as any).backgroundCompaction;
-  }
-
-  it("pre-computes a checkpoint while a tool runs and installs it without a second summary request", async () => {
-    const host = { call: vi.fn().mockResolvedValue(undefined) };
-    const onEvent = vi.fn();
-    const runtime = createRuntime({ host, onEvent, history });
-    vi.spyOn(runtime as any, "contextBudget").mockReturnValue(idleBudget());
-    const generateCompaction = vi
-      .spyOn(runtime as any, "generateCompaction")
-      .mockResolvedValue(summaryResult());
-
-    await startToolWindow(runtime);
-
-    expect(generateCompaction).toHaveBeenCalledOnce();
-    // Generation alone must leave the transcript untouched.
+    expect(generateCompaction).not.toHaveBeenCalled();
     expect(host.call).not.toHaveBeenCalled();
-    expect((runtime as any).activeCompaction).toBeUndefined();
 
     await (runtime as any).prepareNextTurn(nextTurn);
 
@@ -3044,26 +3014,18 @@ describe("DesktopAgentRuntime background context compaction", () => {
       "session.appendCompaction",
       expect.objectContaining({
         compaction: expect.objectContaining({
-          summary: "Older work was summarized.",
+          summary: SUMMARY,
           throughMessageId: "recent-user",
         }),
       }),
     );
     const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
-    expect(events).toContainEqual(
-      expect.objectContaining({
-        type: "compaction_start",
-        reason: "threshold",
-        phase: "background",
-      }),
-    );
+    expect(events).toContainEqual({ type: "compaction_start", reason: "threshold" });
     expect(events).toContainEqual(
       expect.objectContaining({
         type: "compaction_end",
         reason: "threshold",
         ok: true,
-        phase: "background",
-        // The inspector is the only surface a silent compaction reaches.
         status: { generation: 1, summaryTokens: 7 },
       }),
     );
@@ -3100,12 +3062,12 @@ describe("DesktopAgentRuntime background context compaction", () => {
     await runtime.dispose();
   });
 
-  it("keeps the session idle while a background checkpoint is generated", async () => {
+  it("reports the session as running while it compacts", async () => {
     const runtime = createRuntime({
       host: { call: vi.fn().mockResolvedValue(undefined) },
       history,
     });
-    vi.spyOn(runtime as any, "contextBudget").mockReturnValue(idleBudget());
+    budgetSpy(runtime);
     let release: (value: unknown) => void = () => {};
     vi.spyOn(runtime as any, "generateCompaction").mockReturnValue(
       new Promise((resolve) => {
@@ -3113,217 +3075,18 @@ describe("DesktopAgentRuntime background context compaction", () => {
       }),
     );
 
-    await (runtime as any).handleAgentEvent({
-      type: "tool_execution_start",
-      toolCallId: "call-1",
-      toolName: "Read",
-      args: {},
-    });
+    const pending = (runtime as any).prepareNextTurn(nextTurn);
+    await Promise.resolve();
 
-    expect((runtime as any).backgroundCompaction).toBeDefined();
-    expect(runtime.getStatus().isRunning).toBe(false);
-    expect((runtime as any).compactionInProgress).toBe(false);
+    expect(runtime.getStatus().isRunning).toBe(true);
 
     release(summaryResult());
-    await (runtime as any).backgroundCompaction;
+    await pending;
+    expect(runtime.getStatus().isRunning).toBe(false);
     await runtime.dispose();
   });
 
-  it("starts a background checkpoint once the run goes idle", async () => {
-    const runtime = createRuntime({
-      host: { call: vi.fn().mockResolvedValue(undefined) },
-      history,
-    });
-    const agent = (runtime as any).agent;
-    agent.prompt = vi.fn();
-    vi.spyOn(runtime as any, "contextBudget").mockReturnValue(idleBudget());
-    const generateCompaction = vi
-      .spyOn(runtime as any, "generateCompaction")
-      .mockResolvedValue(summaryResult());
-
-    await runtime.prompt("keep going", "user-idle");
-    await (runtime as any).backgroundCompaction;
-
-    expect(generateCompaction).toHaveBeenCalledOnce();
-    expect((runtime as any).pendingBackgroundCheckpoint).toBeDefined();
-    await runtime.dispose();
-  });
-
-  it("only pays for one background checkpoint per idle window", async () => {
-    const runtime = createRuntime({
-      host: { call: vi.fn().mockResolvedValue(undefined) },
-      history,
-    });
-    vi.spyOn(runtime as any, "contextBudget").mockReturnValue(idleBudget());
-    const generateCompaction = vi
-      .spyOn(runtime as any, "generateCompaction")
-      .mockResolvedValue(summaryResult());
-
-    await startToolWindow(runtime);
-    await startToolWindow(runtime);
-    (runtime as any).maybeStartBackgroundCompaction();
-
-    expect(generateCompaction).toHaveBeenCalledOnce();
-    await runtime.dispose();
-  });
-
-  it("discards a pre-computed checkpoint whose anchor left the transcript", async () => {
-    const host = { call: vi.fn().mockResolvedValue(undefined) };
-    const onEvent = vi.fn();
-    const runtime = createRuntime({ host, onEvent, history });
-    (runtime as any).pendingBackgroundCheckpoint = {
-      checkpoint: {
-        id: "checkpoint-1",
-        summary: "Older work was summarized.",
-        throughMessageId: "forked-away-user",
-        tokensBefore: 160_000,
-        retainedTail: [],
-        createdAt: "2026-07-28T00:00:03Z",
-      },
-    };
-
-    await expect(
-      (runtime as any).installPendingBackgroundCheckpoint(),
-    ).resolves.toBe(false);
-
-    expect(host.call).not.toHaveBeenCalled();
-    expect(onEvent).not.toHaveBeenCalled();
-    expect((runtime as any).pendingBackgroundCheckpoint).toBeUndefined();
-    await runtime.dispose();
-  });
-
-  it("discards a pre-computed checkpoint superseded by a newer one", async () => {
-    const host = { call: vi.fn().mockResolvedValue(undefined) };
-    const runtime = createRuntime({ host, history });
-    (runtime as any).activeCompaction = {
-      id: "checkpoint-newer",
-      summary: "A newer checkpoint won the race.",
-      throughMessageId: "recent-user",
-      tokensBefore: 160_000,
-      retainedTail: [],
-      createdAt: "2026-07-28T00:00:04Z",
-    };
-    (runtime as any).pendingBackgroundCheckpoint = {
-      checkpoint: {
-        id: "checkpoint-stale",
-        summary: "Built before the newer checkpoint landed.",
-        throughMessageId: "recent-user",
-        tokensBefore: 160_000,
-        retainedTail: [],
-        createdAt: "2026-07-28T00:00:03Z",
-      },
-    };
-
-    await expect(
-      (runtime as any).installPendingBackgroundCheckpoint(),
-    ).resolves.toBe(false);
-
-    expect(host.call).not.toHaveBeenCalled();
-    await runtime.dispose();
-  });
-
-  it("discards a pre-computed checkpoint that no longer fits the model window", async () => {
-    const host = { call: vi.fn().mockResolvedValue(undefined) };
-    const onEvent = vi.fn();
-    const runtime = createRuntime({ host, onEvent, history });
-    // A smaller model window since the checkpoint was built.
-    vi.spyOn(runtime as any, "contextBudget").mockReturnValue({
-      tokens: 20_000,
-      backgroundLimit: 11_200,
-      hardLimit: 16_000,
-      requestHeadroom: 16_000,
-      keepRecentTokens: 8_000,
-    });
-    (runtime as any).pendingBackgroundCheckpoint = {
-      checkpoint: {
-        id: "checkpoint-1",
-        summary: "Older work was summarized.",
-        throughMessageId: "recent-user",
-        tokensBefore: 160_000,
-        retainedTail: [],
-        createdAt: "2026-07-28T00:00:03Z",
-      },
-    };
-
-    await expect(
-      (runtime as any).installPendingBackgroundCheckpoint(),
-    ).resolves.toBe(false);
-
-    expect(host.call).not.toHaveBeenCalled();
-    expect((runtime as any).activeCompaction).toBeUndefined();
-    await runtime.dispose();
-  });
-
-  it("fails silently in the background and leaves the blocking guard in charge", async () => {
-    const host = { call: vi.fn().mockResolvedValue(undefined) };
-    const onEvent = vi.fn();
-    const runtime = createRuntime({ host, onEvent, history });
-    vi.spyOn(runtime as any, "contextBudget").mockReturnValue(idleBudget());
-    const generateCompaction = vi
-      .spyOn(runtime as any, "generateCompaction")
-      .mockResolvedValue({
-        ok: false,
-        error: {
-          code: "summarization_failed",
-          message: "provider terminated the summary request",
-        },
-      });
-
-    await startToolWindow(runtime);
-
-    expect(generateCompaction).toHaveBeenCalledOnce();
-    expect(host.call).not.toHaveBeenCalled();
-    expect(
-      onEvent.mock.calls.filter(([envelope]) =>
-        (envelope as any).event.type.startsWith("compaction_"),
-      ),
-    ).toEqual([]);
-    expect((runtime as any).pendingBackgroundCheckpoint).toBeUndefined();
-
-    // The hard-boundary path still compacts, fallback chain included.
-    await expect(
-      (runtime as any).runCompaction("threshold", false),
-    ).resolves.toBe(true);
-    expect(host.call).toHaveBeenCalledWith(
-      "session.appendCompaction",
-      expect.objectContaining({
-        compaction: expect.objectContaining({
-          details: expect.objectContaining({ fallback: "retained_tail" }),
-        }),
-      }),
-    );
-    await runtime.dispose();
-  });
-
-  it("cancels an in-flight background checkpoint on abort", async () => {
-    const host = { call: vi.fn().mockResolvedValue(undefined) };
-    const runtime = createRuntime({ host, history });
-    vi.spyOn(runtime as any, "contextBudget").mockReturnValue(idleBudget());
-    let observedSignal: AbortSignal | undefined;
-    vi.spyOn(runtime as any, "generateCompaction").mockImplementation(
-      (async (_preparation: unknown, signal: AbortSignal) => {
-        observedSignal = signal;
-        return summaryResult();
-      }) as never,
-    );
-
-    await (runtime as any).handleAgentEvent({
-      type: "tool_execution_start",
-      toolCallId: "call-1",
-      toolName: "Read",
-      args: {},
-    });
-    await runtime.abort();
-    await (runtime as any).backgroundCompaction;
-
-    expect(observedSignal?.aborted).toBe(true);
-    // An aborted build is dropped rather than installed.
-    expect((runtime as any).pendingBackgroundCheckpoint).toBeUndefined();
-    expect(host.call).not.toHaveBeenCalled();
-    await runtime.dispose();
-  });
-
-  it("does not pre-compact when automatic protection is disabled", async () => {
+  it("does not compact when automatic protection is disabled", async () => {
     const runtime = createRuntime({
       host: { call: vi.fn().mockResolvedValue(undefined) },
       history,
@@ -3333,10 +3096,10 @@ describe("DesktopAgentRuntime background context compaction", () => {
         keepRecentTokens: 20_000,
       },
     });
-    vi.spyOn(runtime as any, "contextBudget").mockReturnValue(idleBudget());
+    budgetSpy(runtime);
     const generateCompaction = vi.spyOn(runtime as any, "generateCompaction");
 
-    await startToolWindow(runtime);
+    await (runtime as any).prepareNextTurn(nextTurn);
 
     expect(generateCompaction).not.toHaveBeenCalled();
     await runtime.dispose();

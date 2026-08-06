@@ -63,32 +63,28 @@ test("host-driven protection blocks unsafe provider requests with no model-facin
   assert.match(runtime, /fallback: "retained_tail"/);
 });
 
-test("checkpoints are pre-computed only in provider-idle windows", () => {
-  assert.match(runtime, /BACKGROUND_COMPACTION_LIMIT_RATIO = 0\.7/);
-  // Window A: while a tool runs. Window B: after a run ends.
+test("compaction runs inline at the hard boundary, never ahead of it", () => {
+  // Codex has no off-critical-path compaction: the summary is paid for at the
+  // turn boundary the user is already waiting on.
+  assert.doesNotMatch(runtime, /maybeStartBackgroundCompaction/);
+  assert.doesNotMatch(runtime, /pendingBackgroundCheckpoint/);
+  assert.doesNotMatch(runtime, /BACKGROUND_COMPACTION_LIMIT_RATIO/);
+  assert.doesNotMatch(runtime, /phase: "background"/);
   assert.match(
     runtime,
-    /case "tool_execution_start":[\s\S]*?this\.maybeStartBackgroundCompaction\(\);/,
+    /const budget = this\.contextBudget\(context\.messages\);\s*if \(budget\.tokens < budget\.hardLimit\) return \{ context \};/,
   );
-  assert.match(
-    runtime,
-    /\} finally \{[\s\S]*?this\.maybeStartBackgroundCompaction\(\);\s*\}\s*return \{ turnId: this\.turnId \};/,
-  );
-  // Never concurrent with a streaming turn.
-  assert.match(
-    runtime,
-    /if \(this\.backgroundCompaction\) await this\.backgroundCompaction;/,
-  );
-  // Generation is side-effect free; only the install touches the session.
+  // Generation stays separate from installation so a failed build can still
+  // fall through to the retained-tail recovery path.
   assert.match(runtime, /private async buildCheckpoint\(signal: AbortSignal\)/);
-  assert.match(runtime, /phase: "background"/);
+  assert.match(runtime, /private async installCheckpoint\(/);
 });
 
 test("compaction lifecycle keeps the renderer busy until its actual terminal event", () => {
-  assert.match(types, /phase\?: ContextCompactionPhase/);
+  assert.doesNotMatch(types, /ContextCompactionPhase/);
   assert.match(
     store,
-    /event\.type === "compaction_start" && event\.phase !== "background"/,
+    /event\.type === "compaction_start"\s*\)/,
   );
   assert.match(
     store,
@@ -96,7 +92,7 @@ test("compaction lifecycle keeps the renderer busy until its actual terminal eve
   );
   assert.match(
     store,
-    /case "compaction_start":\s*if \(event\.phase !== "background"\) set\(\{ isRunning: true \}\)/,
+    /case "compaction_start":\s*set\(\{ isRunning: true \}\)/,
   );
   assert.match(
     store,
