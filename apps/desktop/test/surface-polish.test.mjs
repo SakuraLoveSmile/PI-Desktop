@@ -38,6 +38,27 @@ test("work panel interactive rows ease hover fills with motion tokens", () => {
   }
 });
 
+test("button press feedback eases transform instead of snapping", () => {
+  for (const selector of [
+    ".btn",
+    ".icon-btn",
+    ".title-nav-btn",
+    ".nav-item",
+    ".copy-btn",
+    ".sidebar-toolbar-button",
+    ".sidebar-session-group-add",
+  ]) {
+    const escaped = selector.replace(".", "\\.");
+    const re = new RegExp(
+      `${escaped}\\s*\\{[\\s\\S]*?transform var\\(--motion-duration-fast\\)`,
+    );
+    assert.match(styles, re, `${selector} should ease pressed feedback`);
+  }
+  assert.match(styles, /\.btn:active:not\(:disabled\)\s*\{[\s\S]*?scale\(0\.98\)/);
+  assert.match(styles, /\.send-btn:active:not\(:disabled\)[\s\S]*?scale\(0\.94\)/);
+  assert.match(styles, /\.stop-btn:active:not\(:disabled\)[\s\S]*?scale\(0\.94\)/);
+});
+
 test("settings and form controls gain light-theme surfaces", () => {
   assert.match(
     styles,

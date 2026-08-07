@@ -93,7 +93,7 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: shimmer 2s linear infinite;
+  animation: shimmer 0.9s linear infinite;
 }
 
 .review-change-card {
@@ -641,7 +641,8 @@
   font-size: var(--text-xs-plus);
   line-height: var(--leading-compact);
   transition: background var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .copy-btn:hover {
@@ -1481,7 +1482,7 @@
   background-size: 200% 100%;
   background-clip: text;
   color: transparent;
-  animation: shimmer 1.7s linear infinite;
+  animation: shimmer 0.9s linear infinite;
 }
 
 .tool-activity-count {
@@ -1613,7 +1614,7 @@
   background-size: 200% 100%;
   background-clip: text;
   color: transparent;
-  animation: shimmer 1.7s linear infinite;
+  animation: shimmer 0.9s linear infinite;
 }
 
 .tool-row-header:hover .tool-row-name {

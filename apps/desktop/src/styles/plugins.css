@@ -889,7 +889,7 @@
   width: 70%;
   border-radius: var(--radius-full);
   background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
-  animation: plugins-skeleton-pulse 1.4s var(--motion-ease-out) infinite;
+  animation: plugins-skeleton-pulse 0.9s var(--motion-ease-out) infinite;
 }
 
 .plugins-skeleton-line.is-short {

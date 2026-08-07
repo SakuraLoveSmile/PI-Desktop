@@ -732,7 +732,7 @@
   height: 7px;
   border-radius: var(--radius-full);
   background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
-  animation: mermaid-loading-pulse 1.2s var(--motion-ease-standard) infinite;
+  animation: mermaid-loading-pulse 0.9s var(--motion-ease-standard) infinite;
 }
 
 .mermaid-loading > span:nth-child(2) {

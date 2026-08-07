@@ -26,6 +26,9 @@ test("active turns show immediate feedback without a progress card", () => {
   assert.match(messagesStyles, /\.working-indicator\s*\{/);
   assert.match(messagesStyles, /\.shimmer-text\s*\{/);
   assert.doesNotMatch(proseStyles, /\.working-indicator\s*\{|\.shimmer-text\s*\{/);
+  assert.match(messagesStyles, /\.shimmer-text\s*\{[\s\S]*?animation:\s*shimmer\s+0\.9s/);
+  assert.match(messagesStyles, /\.tool-activity-label\.running\s*\{[\s\S]*?animation:\s*shimmer\s+0\.9s/);
+  assert.match(messagesStyles, /\.tool-row-name\.running\s*\{[\s\S]*?animation:\s*shimmer\s+0\.9s/);
   assert.doesNotMatch(
     en,
     /progressUnderstanding|progressWorking|progressChecking|progressFinalizing|progressWaiting/,

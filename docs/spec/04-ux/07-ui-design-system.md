@@ -560,9 +560,10 @@ High-frequency workstation feedback must remain compositor-friendly and bounded:
   error notices enter once with `opacity` plus a maximum 8px
   `transform`/`scale` offset using `--motion-duration-normal` and
   `--motion-ease-out`.
-- Icon, navigation, message-action, tab, and sidebar tool controls provide a
-  subtle pressed scale while active. Hover styling never changes element
-  dimensions or surrounding layout.
+- Icon, navigation, message-action, tab, sidebar tool, and standard button
+  controls provide a subtle pressed scale while active. The base transition
+  includes `transform`, so press and release never snap; hover styling never
+  changes element dimensions or surrounding layout.
 - Composer focus lifts by 1px with a restrained token-based shadow. Its
   near-opaque surface must not use backdrop blur: transcript updates beneath a
   blur layer would force avoidable repaint/compositing work while streaming.

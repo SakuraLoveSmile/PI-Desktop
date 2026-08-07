@@ -2494,6 +2494,10 @@ Each scenario is documented in this format:
   - Sidebar, composer, completed message/activity rows, work panel, titlebar,
     and global overlays do not visibly repaint or lose pointer/keyboard
     responsiveness for each token update.
+  - Pressing and releasing standard, icon, sidebar, send, stop, and message
+    action controls uses one eased transform rather than a snapped scale;
+    active streaming labels and loading skeletons keep their shimmer/pulse
+    loop at or below 1 second.
   - Minimap overflow and active-marker state remain correct without marker
     jitter while streamed content changes height.
   - Destination, panel, focus, pressed, jump, and error feedback use one short
