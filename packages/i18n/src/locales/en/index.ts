@@ -441,6 +441,7 @@ export const en = {
       openSearch: "Search",
       openCommandPalette: "Command palette",
       toggleSidebar: "Toggle sidebar",
+      openWorkPanel: "Open work panel",
       abort: "Stop active task",
       closeWindow: "Close window",
       resetZoom: "Reset zoom",

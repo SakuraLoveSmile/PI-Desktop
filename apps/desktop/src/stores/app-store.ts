@@ -482,6 +482,8 @@ export type AppState = {
   workPanelWidth: number;
   /** Chat-initiated "preview this file" request consumed by the files tab. */
   workPanelFileRequest: { path: string; seq: number } | null;
+  /** Reveal the active session's retained work panel without creating a tab. */
+  openWorkPanel: () => void;
   openWorkPanelTab: (tab: WorkPanelTab) => void;
   openWorkPanelTabForSession: (sessionId: string, tab: WorkPanelTab) => void;
   activateWorkPanelTab: (tabId: string) => void;
@@ -2993,6 +2995,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   dismissToast: (id) =>
     set((state) => ({ toasts: state.toasts.filter((item) => item.id !== id) })),
+
+  openWorkPanel: () => {
+    const state = get();
+    const sessionId = state.activeSessionId;
+    if (!sessionId) return;
+    const context = currentWorkPanelContext(state);
+    set({
+      workPanelOpen: true,
+      workPanelContexts: {
+        ...state.workPanelContexts,
+        [sessionId]: { ...context, open: true },
+      },
+    });
+  },
 
   openWorkPanelTabForSession: (sessionId, tab) => {
     if (!sessionId) return;

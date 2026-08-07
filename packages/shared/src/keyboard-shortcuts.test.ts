@@ -33,6 +33,21 @@ describe("keyboard shortcut mapping", () => {
     );
   });
 
+  it("assigns Cmd/Ctrl+J to opening the work panel", () => {
+    const workPanel = KEYBOARD_SHORTCUTS.find(
+      (shortcut) => shortcut.id === "openWorkPanel",
+    )!;
+    expect(workPanel.defaultBinding).toBe("Mod+J");
+    expect(resolveKeybinding(workPanel, undefined, "darwin")).toBe("Mod+J");
+    expect(
+      keybindingMatchesEvent(
+        "Mod+J",
+        { key: "j", code: "KeyJ", ctrlKey: true },
+        "win32",
+      ),
+    ).toBe(true);
+  });
+
   it("converts DOM keyboard events into portable bindings", () => {
     expect(
       keybindingFromEvent(

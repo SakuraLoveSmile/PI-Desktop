@@ -45,6 +45,9 @@ test("work panel replaces the context panel overlay", async () => {
   );
   assert.doesNotMatch(appSource, /ContextPanel/);
   assert.doesNotMatch(appSource, /contextOpen/);
+  assert.match(appSource, /case "openWorkPanel"/);
+  assert.match(appSource, /useAppStore\.getState\(\)\.openWorkPanel\(\)/);
+  assert.match(storeSource, /openWorkPanel:\s*\(\) => \{/);
   assert.doesNotMatch(appSource, /toggleWorkPanel|nav\.toggleWorkPanel/);
   assert.doesNotMatch(appSource, /key\.toLowerCase\(\) === "j"/);
 });

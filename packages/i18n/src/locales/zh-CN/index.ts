@@ -442,6 +442,7 @@ export const zhCN = {
       openSearch: "搜索",
       openCommandPalette: "命令面板",
       toggleSidebar: "切换侧边栏",
+      openWorkPanel: "打开工具面板",
       abort: "停止当前任务",
       closeWindow: "关闭窗口",
       resetZoom: "重置缩放",

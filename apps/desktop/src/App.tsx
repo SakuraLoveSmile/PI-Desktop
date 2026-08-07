@@ -535,6 +535,11 @@ function AppShell() {
           case "toggleSidebar":
             toggleSidebar();
             break;
+          case "openWorkPanel":
+            if (useAppStore.getState().page !== "settings") {
+              useAppStore.getState().openWorkPanel();
+            }
+            break;
           case "abort":
             void abort();
             break;

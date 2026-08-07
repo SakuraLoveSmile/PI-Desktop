@@ -1412,8 +1412,10 @@ Each scenario is documented in this format:
 #### E2E-056: Work panel shell docking and persistence
 
 - **Preconditions**: App running with any workspace state.
-- **Steps**: 1) Relaunch and inspect the titlebar, application menu, and
-  Cmd/Ctrl+J. 2) Open two distinct file artifacts, the same first file again,
+- **Steps**: 1) Relaunch and inspect the titlebar and application menu; confirm
+  the panel starts closed. Press Cmd/Ctrl+J and inspect the empty panel title
+  and context menu, then press it again to confirm the open state is idempotent
+  and no tab is created. 2) Open two distinct file artifacts, the same first file again,
   a URL preview, and a completed command artifact. 3) Open the header's unified
   context menu: verify the four tools appear once, in a fixed order, with active,
   open-inactive, and closed states, and that transcript-opened resources appear
@@ -1447,10 +1449,13 @@ Each scenario is documented in this format:
   display-change callback. 13) Inject one rejected reservation while opening
   and one while collapsing, then retry each action. 14) Send string, boolean,
   null, fractional, and out-of-range reservation payloads. 15) Relaunch.
-- **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons,
-  titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
-  the docked third column and creates or activates one resource; file resources
-  are path-keyed and repeated resources deduplicate. Opening, collapse, and
+- **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons, or
+  titlebar/menu launcher. Cmd/Ctrl+J opens the active session's panel at its
+  committed width without creating a resource tab; repeating it is idempotent,
+  and the shortcut does nothing without an active session or while Settings is
+  open. Each artifact atomically opens the docked third column and creates or
+  activates one resource; file resources are path-keyed and repeated resources
+  deduplicate. Opening, collapse, and
   closing animate the panel's width/flex allocation with its bounded
   opacity/slide, so MainChat reflows continuously without a pre-animation jump.
   Opening the panel, collapsing it, or committing a divider resize never
@@ -1517,7 +1522,7 @@ Each scenario is documented in this format:
   The former context-panel overlay no longer exists.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`, `04-ux/01-ui-ia.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
-  `04-ux/09-interaction-patterns.md`, ADR 0032, D163
+  `04-ux/09-interaction-patterns.md`, ADR 0032, ADR 0068, D163, D207
 - **Acceptance**: F (persistence), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`work-panel-resize.test.mjs`,

@@ -66,17 +66,18 @@ destination, chat as the home surface, tools and permissions inline.
   `Cmd/Ctrl+]`); no back/forward buttons are rendered. The main titlebar has no
   notification action; the durable local inbox opens from the sidebar footer
   bell instead (D130/D117).
-- **Work panel**: docked right column (not an overlay) created only by file,
-  URL, browser-preview, successful-command, or successful workspace-edit
-  artifacts. A combined create trigger keeps Review, Terminal, Browser, and
+- **Work panel**: docked right column (not an overlay) opened by an artifact
+  or `Cmd/Ctrl + J`. File, URL, browser-preview, successful-command, and
+  successful workspace-edit artifacts create their resources atomically. A
+  combined create trigger keeps Review, Terminal, Browser, and
   Files one click away while the panel is visible; opened-but-inactive tools show a quiet
   dot and the active tool has a restrained edge marker. The 46px content header
   names the
   current resource, closes it directly, and opens a compact switcher for all
   current session resources. File paths stay distinct in that switcher while
-  Review, Terminal, and Browser deduplicate by kind. The create trigger is not
-  rendered while the panel is closed and does not create a global or empty
-  manual panel entry point. A
+  Review, Terminal, and Browser deduplicate by kind. `Cmd/Ctrl + J` reveals the
+  active session's retained panel context without creating a resource tab; the
+  create trigger remains unavailable while the panel is closed. A
   successful active-session workspace Write/Edit artifact opens Review;
   scratch, failed, and background-session writes never steal focus. Width is
   drag-resizable from 244px to 720px and remains at

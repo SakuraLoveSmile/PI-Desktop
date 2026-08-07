@@ -41,8 +41,9 @@ state, ordered tabs, active tab, file request, and Browser resource.
 
 This adopts D142 and supersedes only D128's requirement to close and clear tabs
 on visible session/workspace changes. D128's artifact triggers, deduplication,
-close/collapse rules, and no-launcher rule remain unchanged. Electron Main,
-preload IPC, and renderer ownership boundaries remain unchanged.
+and close/collapse rules remain unchanged; its no-launcher rule is amended by
+ADR 0068. Electron Main, preload IPC, and renderer ownership boundaries remain
+unchanged.
 
 ## Consequences
 

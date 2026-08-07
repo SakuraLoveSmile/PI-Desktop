@@ -17,6 +17,7 @@
 | `Cmd/Ctrl + W` | Close window | Global |
 | `Cmd/Ctrl + ,` | Open settings | Global |
 | `Cmd/Ctrl + B` | Toggle sidebar | Global |
+| `Cmd/Ctrl + J` | Open work panel | Global; active session |
 | `Cmd/Ctrl + [` | Previous destination | Global |
 | `Cmd/Ctrl + ]` | Next destination | Global |
 | `Cmd/Ctrl + .` | Abort active turn | Global (same as abort button) |
@@ -72,9 +73,9 @@
   band, so page header actions and the sheet close control never stack under
   those targets. F10 and Shift+F10 are not consumed by shell chrome.
 - Windows/Linux keep New Task, Open Project, Settings, close-window,
-  zoom, fullscreen, search, command-palette, and sidebar shortcuts through
-  renderer key handling. Standard editing shortcuts remain native web-content
-  behavior.
+  zoom, fullscreen, search, command-palette, sidebar, and work-panel shortcuts
+  through renderer key handling. Standard editing shortcuts remain native
+  web-content behavior.
 - Developer tools are opt-in. With developer mode enabled, Main handles F12 on
   every platform and Ctrl+Shift+I on Windows/Linux; macOS exposes its native
   developer-tools role in View. With the mode disabled these product entry
@@ -257,11 +258,15 @@ may be retained while exactly one workspace supplies the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
-### 1.8 Artifact-driven work panel resources (D128, D142, D154, D173, D179)
+### 1.8 Work panel entry and resources (D128, D142, D154, D173, D179, D207)
 
-- The shell exposes no empty or unconditional work-panel launcher,
-  application-menu command, or global shortcut. An artifact trigger atomically
-  creates or reuses its resource, activates it, and opens the panel.
+- The shell starts without a visible work panel. `Cmd/Ctrl + J` opens the
+  active session's retained panel context without creating a resource tab; it
+  is idempotent while the panel is already open and is a no-op without an
+  active session or while Settings is the active page. The panel's context
+  trigger can then create one of the four tool resources.
+- An artifact trigger atomically creates or reuses its resource, activates it,
+  and opens the panel. Background artifacts never open the visible panel.
 - File resources use normalized paths as identity. Review, Terminal, and
   Browser are singletons; repeated triggers preserve resource order and
   activate the existing resource.

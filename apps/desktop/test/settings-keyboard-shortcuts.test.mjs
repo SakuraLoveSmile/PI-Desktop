@@ -44,6 +44,7 @@ test("shared shortcut map drives renderer dispatch and native menu accelerators"
     "openSearch",
     "openCommandPalette",
     "toggleSidebar",
+    "openWorkPanel",
     "abort",
     "closeWindow",
     "resetZoom",
@@ -57,6 +58,8 @@ test("shared shortcut map drives renderer dispatch and native menu accelerators"
   assert.match(appSource, /settings\?\.keybindings/);
   assert.match(appSource, /keybindingMatchesEvent/);
   assert.match(appSource, /keybindingDisplayParts/);
+  assert.match(appSource, /case "openWorkPanel"/);
+  assert.match(appSource, /useAppStore\.getState\(\)\.openWorkPanel\(\)/);
   assert.match(menuSource, /resolveKeybinding\(shortcut, keybindings/);
   assert.match(menuSource, /keybindingToElectronAccelerator/);
   assert.match(mainSource, /applyApplicationMenuSettings/);
