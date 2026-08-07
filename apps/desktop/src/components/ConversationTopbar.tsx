@@ -2,6 +2,8 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../stores/app-store";
 import { ModelSelect } from "./ModelSelect";
 import {
+  IconChevronRight,
+  IconFolder,
   IconSidebar,
   IconNewSession,
   IconSearch,
@@ -69,8 +71,23 @@ export function ConversationTopbar({
             <IconSidebar size={15} />
           </button>
         ) : null}
-        <div className="ct-title-wrap" title={project ? `${project} · ${taskTitle}` : taskTitle}>
-          {project ? <span className="ct-project">{project}</span> : null}
+        <div
+          className="ct-title-wrap"
+          title={project ? `${project} · ${taskTitle}` : taskTitle}
+        >
+          {project ? (
+            <>
+              <span className="ct-project">
+                <IconFolder size={13} aria-hidden />
+                <span>{project}</span>
+              </span>
+              <IconChevronRight
+                className="ct-title-chevron"
+                size={13}
+                aria-hidden
+              />
+            </>
+          ) : null}
           <span className="ct-title">{taskTitle}</span>
         </div>
         {busy ? (

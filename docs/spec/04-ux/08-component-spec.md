@@ -167,6 +167,8 @@ Thinking and permission triggers remain in the Composer (§11).
   cluster (model picker, action icons) is `flex: 0 0 auto`
   and is never squeezed by a long title. The conversation surface keeps a
   `min-width` so its content is not crushed on narrow windows.
+- Project context is a compact muted folder label followed by a chevron; the
+  task title is the primary readable label with the stronger visual hierarchy.
 - macOS fullscreen resets the left reserve to 8px (mirrors the sidebar header).
 - Sticky: `z-sticky`
 - Items: left-aligned controls, right-aligned actions

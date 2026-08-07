@@ -354,8 +354,8 @@
 
 .conversation-topbar .ct-title-wrap {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -365,18 +365,45 @@
 }
 
 .conversation-topbar .ct-project {
-  flex: 0 0 auto;
+  display: inline-flex;
+  min-width: 0;
+  max-width: min(240px, 28vw);
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 5px;
   color: var(--ds-text-muted);
   font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-compact);
+}
+
+.conversation-topbar .ct-project > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-topbar .ct-project svg,
+.conversation-topbar .ct-title-chevron {
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+}
+
+.conversation-topbar .ct-title-chevron {
+  opacity: 0.7;
 }
 
 .conversation-topbar .ct-title {
+  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ds-text-primary);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-strong);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-compact);
 }
 
 .conversation-topbar .ct-running {

@@ -88,6 +88,23 @@ test("Composer owns the mode chip and the top bar keeps only model selection", (
   assert.match(leftToolbar, /composer-thinking-menu/);
 });
 
+test("conversation topbar presents project context as a compact title hierarchy", () => {
+  assert.match(topbarSource, /IconFolder/);
+  assert.match(topbarSource, /IconChevronRight/);
+  assert.match(topbarSource, /className="ct-project"/);
+  assert.match(topbarSource, /className="ct-title-chevron"/);
+  assert.match(stylesSource, /\.conversation-topbar \.ct-title-wrap[\s\S]*?align-items: center/);
+  assert.match(
+    stylesSource,
+    /\.conversation-topbar \.ct-project[\s\S]*?font-size: var\(--text-sm\)/,
+  );
+  assert.match(
+    stylesSource,
+    /\.conversation-topbar \.ct-title[\s\S]*?font-size: var\(--text-base\)/,
+  );
+  assert.match(stylesSource, /\.conversation-topbar \.ct-title-chevron/);
+});
+
 test("model menus do not expose desktop-owned reasoning overrides", () => {
   assert.doesNotMatch(composerSource, /canEnableThinkingOverride/);
   assert.doesNotMatch(composerSource, /chat\.thinkingEnable/);

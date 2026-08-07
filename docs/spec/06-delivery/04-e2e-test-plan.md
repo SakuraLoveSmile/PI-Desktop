@@ -363,7 +363,9 @@ Each scenario is documented in this format:
 - **Expected**: On the chat route the conversation top bar renders with its
   title, model picker, and actions; it has no Agent|Plan mode control. The
   left-of-input Composer chip owns the active session's Agent/Plan switch. The
-  long task title ellipsizes instead of squeezing the model picker or action
+  project context reads as a compact folder label and chevron, while the task
+  title is the primary readable label rather than two equally weighted text
+  fragments. A long task title ellipsizes instead of squeezing the model picker or action
   buttons. The sidebar toggle is present only in the collapsed state (no
   duplicate of the sidebar's control). On every other route the frameless drag
   band renders instead (no top-bar controls). The bar is draggable to move the
