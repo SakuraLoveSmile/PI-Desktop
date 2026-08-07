@@ -160,8 +160,9 @@ may be retained while exactly one workspace supplies the visible shell context.
   its final record without a top-of-history or empty-home flash.
 - Selecting a project-scoped conversation activates its project as part of the
   store-owned selection transaction. Selecting a Temporary conversation clears
-  the visible workspace. Sidebar handlers do not perform a second project
-  navigation before session selection.
+  the visible workspace. Project-scoped new-session actions pass their target
+  path to that same store transaction; sidebar and project-index handlers do
+  not perform a second project navigation before session creation or selection.
 - Run state, permission grants, and streamed events are keyed by session id.
   A project/tab switch does not abort a background turn or copy its events into
   the visible transcript. Background message, tool, completion, and permission

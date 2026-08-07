@@ -314,8 +314,10 @@ export function ProjectsPage() {
 
   const startTask = async (path: string) => {
     try {
-      if (!(await activate(path))) return;
+      const key = normalizeProjectPath(path);
+      if (key && projectMeta[key]?.archived) restoreProject(path);
       await newSession({ projectPath: path });
+      setRecents(loadRecentProjects());
       setPage("chat");
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e), { variant: "error" });

@@ -31,12 +31,15 @@ test("closed projects are not recreated from historical sidebar sessions", () =>
   assert.match(sidebarSource, /if \(entry\) entry\.sessions\.push\(session\)/);
 });
 
-test("project session creation stops when project activation fails", () => {
+test("project new-session creation uses one store-owned navigation transaction", () => {
   assert.match(
     sidebarSource,
-    /const createProjectSession[\s\S]*if \(!\(await selectProject\(path\)\)\) return;[\s\S]*createSession/,
+    /const createProjectSession[\s\S]*createSession\(\{ projectPath: path \}\)/,
   );
-  assert.match(sidebarSource, /return Boolean\(await activateProject\(path\)\)/);
+  assert.doesNotMatch(
+    sidebarSource,
+    /const createProjectSession[\s\S]*selectProject\(path\)/,
+  );
 });
 
 test("project title toggles its conversation group without forcing it open", () => {

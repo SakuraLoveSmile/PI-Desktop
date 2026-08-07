@@ -898,7 +898,6 @@ export function Sidebar({
   };
 
   const createProjectSession = async (path: string) => {
-    if (!(await selectProject(path))) return;
     await createSession({ projectPath: path });
   };
 
