@@ -5,23 +5,22 @@ import { loadStyles } from "./helpers/styles.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [chatSurface, styles, checklist, starterPrompts] = await Promise.all([
+const [chatSurface, styles, checklist] = await Promise.all([
   read("../src/components/ChatSurface.tsx"),
   loadStyles(),
   read("../src/components/OnboardingChecklist.tsx"),
-  read("../src/components/HomeStarterPrompts.tsx"),
 ]);
 
 test("empty home uses a single scrollable stack instead of dual-grow portals", () => {
   assert.match(chatSurface, /className="home-main-content" data-testid="home-empty"/);
   assert.match(chatSurface, /className="home-scroll"/);
   assert.match(chatSurface, /className="home-stack-inner"/);
-  assert.match(chatSurface, /<HomeStarterPrompts onPrefill=/);
+  assert.match(chatSurface, /className="empty-hero-subtitle"/);
   assert.match(chatSurface, /<OnboardingChecklist \/>/);
   assert.match(chatSurface, /<div className="home-composer-wrap">/);
   assert.doesNotMatch(
     chatSurface,
-    /HomeQuickActions|HomeSuggestions|home-quick-actions|home-suggestion-card|home-suggestions-block|home-upper|home-lower|home-suggestions-portal/,
+    /HomeQuickActions|HomeSuggestions|HomeStarterPrompts|home-quick-actions|home-suggestion-card|home-starter-card|home-suggestions-block|home-upper|home-lower|home-suggestions-portal/,
   );
 
   assert.match(styles, /\.home-main-content \{[\s\S]*?overflow:\s*hidden;/);
@@ -51,28 +50,16 @@ test("empty home keeps the primary task surface focused", () => {
   const composerAt = emptyBlock.indexOf("home-composer-wrap");
   assert.notEqual(onboardingAt, -1);
   assert.notEqual(composerAt, -1);
-  const startersAt = emptyBlock.indexOf("<HomeStarterPrompts");
-  assert.notEqual(startersAt, -1);
-  assert.ok(startersAt < onboardingAt, "starter prompts must precede onboarding");
   assert.ok(onboardingAt < composerAt, "onboarding must precede composer in markup");
   assert.match(
     emptyBlock,
     /<div className="home-scroll">[\s\S]*?<\/div>\s*<div className="home-composer-wrap">/,
   );
   assert.doesNotMatch(emptyBlock, /empty-hero-copy/);
-  assert.doesNotMatch(emptyBlock, /HomeQuickActions|HomeSuggestions|home-quick-actions|home-suggestion-card/);
-});
-
-test("empty home starter prompts are localized and prefill the composer", () => {
-  assert.match(starterPrompts, /data-testid="home-starters"/);
-  assert.match(starterPrompts, /aria-labelledby="home-starters-title"/);
-  assert.match(starterPrompts, /starterExploreTitle/);
-  assert.match(starterPrompts, /starterBuildTitle/);
-  assert.match(starterPrompts, /starterFixTitle/);
-  assert.match(starterPrompts, /starterReviewTitle/);
-  assert.match(starterPrompts, /onClick=\{\(\) => onPrefill\(t\(starter\.promptKey\)\)\}/);
-  assert.match(styles, /\.home-starters-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2/);
-  assert.match(styles, /\.home-starter-card\s*\{[\s\S]*?border-radius:\s*var\(--radius-lg\)/);
+  assert.doesNotMatch(
+    emptyBlock,
+    /HomeQuickActions|HomeSuggestions|HomeStarterPrompts|home-quick-actions|home-suggestion-card|home-starter-card/,
+  );
 });
 
 test("short windows keep the empty stack scrollable rather than overlapping", () => {
@@ -88,5 +75,8 @@ test("empty home keeps the composer in a bottom region", () => {
     /\.home-composer-wrap\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?padding:\s*0 12px 16px;/,
   );
   assert.match(styles, /\.composer-dock-home\s*\{[\s\S]*?position:\s*relative;/);
-  assert.doesNotMatch(styles, /\.home-quick-actions|\.home-quick-action|\.home-suggestion-card/);
+  assert.doesNotMatch(
+    styles,
+    /\.home-quick-actions|\.home-quick-action|\.home-suggestion-card|\.home-starters|\.home-starter-card/,
+  );
 });

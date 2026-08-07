@@ -1,9 +1,13 @@
 # ADR 0067: ChatGPT-inspired empty-home starter guidance
 
-- Status: Accepted for implementation
+- Status: Superseded by D206
 - Date: 2026-08-07
 - Deciders: PI-Desktop core
 - Amends: D204 and the card-specific clause of ADR 0066
+
+> This historical decision is retained for traceability. The starter grid was
+> removed after review; D206 restores the empty home to the hero, optional
+> onboarding checklist, and direct bottom composer.
 
 ## Context
 
@@ -65,4 +69,4 @@ keeps the composer as the only send surface.
 - `docs/spec/04-ux/08-component-spec.md`
 - `docs/spec/04-ux/10-workbuddy-benchmark-ux.md`
 - `docs/spec/06-delivery/04-e2e-test-plan.md` (E2E-063, US-UI-31, US-UI-34, US-UI-48, US-UI-64)
-- `docs/spec/08-meta/decisions-log.md` (D204, D205)
+- `docs/spec/08-meta/decisions-log.md` (D204, D205, D206)

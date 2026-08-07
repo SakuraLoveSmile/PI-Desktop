@@ -127,10 +127,10 @@ its table but gains a "Start from template" row when empty.
 
 ### 3.4 Teaching placeholder in the composer
 Replace the static placeholder with a syntax-teaching one:
-"Describe a task — @ to reference files, / for commands". The empty home pairs
-this direct-entry surface with four compact developer starter cards, following
-ChatGPT's approachable empty-state hierarchy without adding marketing content.
-Cards only prefill the composer and never submit a prompt (D205).
+"Describe a task — @ to reference files, / for commands". The empty home keeps
+this direct-entry surface focused on the hero, optional onboarding, and bottom
+composer, without adding developer starter cards or a contextual quick-action
+layer (D204/D206).
 
 ### 3.5 Overflow "More" flyout for secondary destinations
 Keep the sidebar rail at ≤6 primary items. As destinations grow (Logs,

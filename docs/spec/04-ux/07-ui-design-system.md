@@ -582,25 +582,23 @@ High-frequency workstation feedback must remain compositor-friendly and bounded:
   near-zero animation durations and instant rather than smooth programmatic
   scrolling.
 
-## 8.0 Home empty stack and bottom composer (D111/D204/D205)
+## 8.0 Home empty stack and bottom composer (D111/D204/D206)
 
 Empty composer placeholder: EN `Ask PI-Desktop to do anything` / zh-CN `向 PI-Desktop 下达任意指令`.
 
 Empty chat home keeps the content and composer in separate vertical regions
-inside `home-main-content` (D111/D204/D205; supersedes the D047 dual-grow portal
+inside `home-main-content` (D111/D204/D206; supersedes the D047 dual-grow portal
 model):
 
 - Column `flex: 1; min-height: 0; overflow: hidden`
 - Inner scroller (`.home-scroll`) is the only vertical overflow surface for
   the hero and optional checklist
 - Stack (`.home-stack-inner`) uses content width **`min(100%, 768px)`**,
-  **`gap: 24px`** (workstation ceiling), and auto margins to center the column
+  **`gap: 16px`** (workstation ceiling), and auto margins to center the column
   when the viewport is tall
-- The content order is **hero → starter prompt grid → optional onboarding
-  checklist**. The grid contains four compact developer starters (Explore a
-  codebase, Build a feature, Fix a bug, Review a change) that prefill the
-  composer without sending or creating a turn. Task entry remains directly
-  available in the composer (D205).
+- The content order is **hero → optional onboarding checklist**. Task entry
+  starts directly in the bottom composer; no starter prompt grid or contextual
+  quick-action row is rendered (D204/D206).
 - Short windows (`max-height ≤ 760px`) top-align the stack and keep every
   content block reachable by scrolling; the bottom composer remains visible
   and never covers the checklist
