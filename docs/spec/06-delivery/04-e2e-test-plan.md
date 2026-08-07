@@ -1163,13 +1163,17 @@ Each scenario is documented in this format:
 - **Preconditions**: App running in both English and zh-CN locales, with an
   empty home and a docked transcript available.
 - **Steps**: 1) Inspect the expanded and collapsed sidebar. 2) Inspect the
-  empty-home hero and docked composer. 3) Focus the footer Settings and
-  Plugins icons, then each project/Temporary session create control. 4) Open
-  Settings and the composer input.
+  empty-home hero and docked composer. 3) Hover the mascot and confirm it
+  continues playing without the idle pause, then move the pointer away and
+  confirm the idle pause returns. 4) Focus the footer Settings and Plugins
+  icons, then each project/Temporary session create control. 5) Open Settings
+  and the composer input.
 - **Expected**: Visible shell identity reads `PI-Desktop`; the empty-home hero
   renders the 100px `HomeMascotLogo` sprite, randomly selecting a pose group
   and selecting a different group after playback inside a fixed viewport
-  without translating the mascot horizontally, while the expanded/collapsed
+  without translating the mascot horizontally; pointer hover continuously
+  advances the groups while leaving the mascot resumes the slower idle cadence.
+  The expanded/collapsed
   sidebar renders the canonical `build/icon_1024.png` asset through `BrandLogo`
   and the docked composer prompt row has no leading
   brand icon or reserved icon slot and its text aligns directly with the input
@@ -2371,7 +2375,8 @@ Each scenario is documented in this format:
   1. In light mode, open the app shell, an empty chat home, and the expanded sidebar (Windows/Linux) or startup splash.
   2. Inspect the rendered `BrandLogo` source in the sidebar and startup splash,
      and inspect the randomly selected `HomeMascotLogo` pose-group animation in
-     the empty-home hero.
+     the empty-home hero. Hover the mascot and verify that it advances
+     continuously while hovered.
   3. Switch the theme to dark (Settings → Basics → Appearance, or system appearance change).
   4. Re-inspect the same surfaces without reloading.
   5. Switch back to light and re-inspect.
@@ -2382,8 +2387,9 @@ Each scenario is documented in this format:
     remaining pose groups on mount, swaps discrete frames within the fixed
     viewport, and chooses a different group after each playback. Single-frame
     groups hold longer, and completed groups rest for several seconds before
-    the next selection; under reduced motion the current group's first frame
-    remains visible.
+    the next selection. Pointer hover bypasses those idle rests and continuously
+    advances the pose groups; under reduced motion the current group's first
+    frame remains visible.
   - Sizes stay stable across theme changes (sidebar 20px, hero 100px, splash
     64px), and the marks stay decorative with no click, keyboard, or focus
     behavior.
@@ -3760,8 +3766,9 @@ This test plan spec is accepted when:
 - Each empty-home mount randomly chooses one group and plays only its visible
   atlas cells. When the group finishes, another group is randomized without an
   immediate repeat after a several-second idle rest; single-frame groups rest
-  longer. The sprite keeps its native pixel-art colors and reduced motion holds
-  the current group's first frame.
+  longer. Hovering the mascot bypasses the idle rest and continuously advances
+  through the pose groups. The sprite keeps its native pixel-art colors and
+  reduced motion holds the current group's first frame.
 - Title is 28px / weight 400; active project name uses dotted underline (1px, offset 4px).
 - Composer does not render attachment or appshot controls before their payload
   reaches pi end to end.

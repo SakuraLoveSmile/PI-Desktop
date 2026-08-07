@@ -391,7 +391,8 @@ visually distinct from list content.
   chooses a different group after playback completes. It swaps discrete atlas
   frames inside the fixed 100px viewport, rests for several seconds between
   actions, holds single-frame poses longer, and holds the current group's first
-  frame under reduced motion. The
+  frame under reduced motion. Pointer hover over the mascot bypasses the idle
+  pause and continuously advances through the groups. The
   expanded/collapsed sidebar remains 20px/18px and the startup splash 64px.
   Home and thread-docked composer prompt rows do not render a leading brand
   icon.

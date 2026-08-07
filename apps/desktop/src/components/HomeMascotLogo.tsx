@@ -50,6 +50,7 @@ function usePrefersReducedMotion() {
 export function HomeMascotLogo() {
   const [groupIndex, setGroupIndex] = useState(() => chooseMascotGroupIndex());
   const [frameIndex, setFrameIndex] = useState(0);
+  const [isHovered, setIsHovered] = useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const group = MASCOT_GROUPS[groupIndex] ?? MASCOT_GROUPS[0];
 
@@ -60,7 +61,9 @@ export function HomeMascotLogo() {
     }
 
     const isLastFrame = frameIndex + 1 >= group.frameCount;
-    const duration = isLastFrame
+    const duration = isHovered
+      ? FRAME_DURATION_MS
+      : isLastFrame
       ? group.frameCount <= 1
         ? randomDuration(STATIC_GROUP_PAUSE_MIN_MS, STATIC_GROUP_PAUSE_MAX_MS)
         : randomDuration(GROUP_PAUSE_MIN_MS, GROUP_PAUSE_MAX_MS)
@@ -76,7 +79,7 @@ export function HomeMascotLogo() {
     }, duration);
 
     return () => window.clearTimeout(timer);
-  }, [frameIndex, group.frameCount, groupIndex, prefersReducedMotion]);
+  }, [frameIndex, group.frameCount, groupIndex, isHovered, prefersReducedMotion]);
 
   const frame = (group.startFrame + frameIndex) * FRAME_WIDTH;
   const style = {
@@ -89,6 +92,8 @@ export function HomeMascotLogo() {
       className="home-mascot-logo"
       data-testid="home-mascot-logo"
       aria-hidden="true"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={style}
     />
   );

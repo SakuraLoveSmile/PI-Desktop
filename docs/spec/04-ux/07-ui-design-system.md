@@ -624,7 +624,9 @@ model):
 - Empty-home branding stays quiet: the 100px mascot is the sole animated hero
   mark. A single randomly selected pose group plays at a time, and the
   supporting line stays short and muted so the composer remains the primary
-  task surface
+  task surface. Pointer hover over the mascot bypasses the idle pause and
+  continuously advances through pose groups; reduced motion still disables
+  the animation.
 - Night home composer plate styles are **dark-scoped only** (elevated-primary
   `#212121f5` + standard elevation-prominent)
 - Empty draft row keeps **one visible line / 28px optical minimum** so the
