@@ -47,6 +47,12 @@ test("stream rendering avoids duplicate frame state and coalesces following", ()
     transcript,
     /buildTranscriptEntries\(renderedMessages, renderedCompactions\)/,
   );
+  assert.match(transcript, /const TranscriptHistory = memo/);
+  assert.match(transcript, /const TranscriptTail = memo/);
+  assert.match(transcript, /function transcriptEntryEqual/);
+  assert.match(transcript, /const historyEntries = entries\.slice\(0, -1\)/);
+  assert.match(transcript, /<TranscriptHistory entries=\{historyEntries\}/);
+  assert.match(transcript, /<TranscriptTail[\s\S]*?entry=\{tailEntry\}/);
   assert.match(transcript, /activityGroupPropsEqual/);
   assert.match(transcript, /assistantTurnPropsEqual/);
 });

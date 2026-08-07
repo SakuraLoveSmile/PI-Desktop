@@ -55,6 +55,7 @@ import {
   type AssistantActivityItem,
   type AssistantTurnEntry,
   type SubagentRun,
+  type TranscriptEntry,
 } from "../lib/assistant-turns";
 import {
   aggregateToolTokenUsage,
@@ -1507,6 +1508,124 @@ function assistantTurnPropsEqual(
   });
 }
 
+function compactionMarksEqual(
+  previous: ContextCompactionMark,
+  next: ContextCompactionMark,
+): boolean {
+  return (
+    previous.id === next.id &&
+    previous.throughMessageId === next.throughMessageId &&
+    previous.generation === next.generation &&
+    previous.summaryTokens === next.summaryTokens &&
+    previous.summarized === next.summarized
+  );
+}
+
+/** Compare the data that can change a transcript row's rendered output. */
+function transcriptEntryEqual(
+  previous: TranscriptEntry,
+  next: TranscriptEntry,
+): boolean {
+  if (previous.kind !== next.kind) return false;
+  if (previous.kind === "message" && next.kind === "message") {
+    return previous.message === next.message;
+  }
+  if (previous.kind === "compaction" && next.kind === "compaction") {
+    return compactionMarksEqual(previous.mark, next.mark);
+  }
+  if (previous.kind === "assistant-turn" && next.kind === "assistant-turn") {
+    return assistantTurnPropsEqual(
+      { entry: previous, isActive: false },
+      { entry: next, isActive: false },
+    );
+  }
+  return false;
+}
+
+function TranscriptEntryView({
+  entry,
+  isRunning,
+  isActive,
+}: {
+  entry: TranscriptEntry;
+  isRunning: boolean;
+  isActive: boolean;
+}) {
+  if (entry.kind === "assistant-turn") {
+    return <AssistantTurn entry={entry} isActive={isActive} />;
+  }
+  if (entry.kind === "compaction") {
+    return <CompactionRow mark={entry.mark} />;
+  }
+  return <MessageRow message={entry.message} isRunning={isRunning} />;
+}
+
+function transcriptEntryKey(entry: TranscriptEntry): string {
+  if (entry.kind === "compaction") return entry.mark.id;
+  if (entry.kind === "assistant-turn") return entry.id;
+  return entry.message.id;
+}
+
+type TranscriptHistoryProps = {
+  entries: TranscriptEntry[];
+  isRunning: boolean;
+};
+
+/**
+ * Keep the completed transcript out of the streaming reconciliation path.
+ * The projection is still rebuilt for correctness, but React can now bail out
+ * before walking every historical row when only the active tail changed.
+ */
+const TranscriptHistory = memo(function TranscriptHistory({
+  entries,
+  isRunning,
+}: TranscriptHistoryProps) {
+  return (
+    <>
+      {entries.map((entry) => (
+        <TranscriptEntryView
+          key={transcriptEntryKey(entry)}
+          entry={entry}
+          isRunning={isRunning}
+          isActive={false}
+        />
+      ))}
+    </>
+  );
+}, (previous, next) => {
+  if (
+    previous.isRunning !== next.isRunning ||
+    previous.entries.length !== next.entries.length
+  ) {
+    return false;
+  }
+  return previous.entries.every((entry, index) =>
+    transcriptEntryEqual(entry, next.entries[index]),
+  );
+});
+
+const TranscriptTail = memo(function TranscriptTail({
+  entry,
+  isRunning,
+  isActive,
+}: {
+  entry: TranscriptEntry;
+  isRunning: boolean;
+  isActive: boolean;
+}) {
+  return (
+    <TranscriptEntryView
+      entry={entry}
+      isRunning={isRunning}
+      isActive={isActive}
+    />
+  );
+}, (previous, next) =>
+  previous.isRunning === next.isRunning &&
+  previous.isActive === next.isActive &&
+  transcriptEntryEqual(previous.entry, next.entry)
+);
+
 const AssistantTurn = memo(function AssistantTurn({
   entry,
   isActive,
@@ -1784,6 +1903,8 @@ export const ChatTranscript = memo(function ChatTranscript({
     () => buildTranscriptEntries(renderedMessages, renderedCompactions),
     [renderedMessages, renderedCompactions],
   );
+  const historyEntries = entries.slice(0, -1);
+  const tailEntry = entries.at(-1);
   const lastEntry = entries[entries.length - 1];
   const lastTurnPart =
     lastEntry?.kind === "assistant-turn" ? lastEntry.parts.at(-1) : undefined;
@@ -1815,27 +1936,14 @@ export const ChatTranscript = memo(function ChatTranscript({
         aria-live="polite"
       >
         <div className="thread-content" ref={contentRef}>
-          {entries.map((entry, index) => {
-            if (entry.kind === "assistant-turn") {
-              return (
-                <AssistantTurn
-                  key={entry.id}
-                  entry={entry}
-                  isActive={isRunning && index === entries.length - 1}
-                />
-              );
-            }
-            if (entry.kind === "compaction") {
-              return <CompactionRow key={entry.mark.id} mark={entry.mark} />;
-            }
-            return (
-              <MessageRow
-                key={entry.message.id}
-                message={entry.message}
-                isRunning={isRunning}
-              />
-            );
-          })}
+          <TranscriptHistory entries={historyEntries} isRunning={isRunning} />
+          {tailEntry ? (
+            <TranscriptTail
+              entry={tailEntry}
+              isRunning={isRunning}
+              isActive={isRunning && tailEntry.kind === "assistant-turn"}
+            />
+          ) : null}
           <TurnOutcomeCard
             messages={messages}
             result={latestTurnResult}

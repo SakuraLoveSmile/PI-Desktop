@@ -2494,6 +2494,9 @@ Each scenario is documented in this format:
   - Sidebar, composer, completed message/activity rows, work panel, titlebar,
     and global overlays do not visibly repaint or lose pointer/keyboard
     responsiveness for each token update.
+  - Completed history remains in its stable render boundary while the active
+    tail changes; history stays selectable, copyable, and anchored in the
+    minimap without being rebuilt as a React subtree for every token.
   - Pressing and releasing standard, icon, sidebar, send, stop, and message
     action controls uses one eased transform rather than a snapped scale;
     active streaming labels and loading skeletons keep their shimmer/pulse
