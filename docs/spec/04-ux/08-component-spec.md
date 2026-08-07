@@ -386,7 +386,7 @@ visually distinct from list content.
   `document.documentElement[data-theme]` via a `MutationObserver` and swaps the
   source at runtime, so the logo matches the active theme in the sidebar,
   empty-home hero, and startup splash without a reload. The empty-home hero
-  renders it at 40px, the expanded/collapsed sidebar at 20px/18px, the startup
+  renders it at 32px, the expanded/collapsed sidebar at 20px/18px, the startup
   splash at 64px. Home and thread-docked composer prompt rows do not render a
   leading brand icon.
 - Project and Temporary session creation controls render the dedicated

@@ -86,7 +86,7 @@ Codex as a visual reference. The identity contract is deliberately small:
   and NSIS shortcut identity stay aligned so native notifications,
   notification settings, and taskbar groups identify the app as `PI-Desktop`
   rather than Electron.
-- The home hero logo is 40px. Expanded/collapsed sidebar logos are 20px/18px.
+- The home hero logo is 32px. Expanded/collapsed sidebar logos are 20px/18px.
   Composer prompt rows do not render a leading brand icon in either home or
   thread-docked mode. The image keeps its native colors in both themes and is
   not replaced by a theme-tinted vector approximation.
@@ -613,7 +613,7 @@ model):
   controls remain icon-only and use the semantic hover wash
 - Empty hero title uses `var(--ds-text-primary)` (light override `#1a1c1f`);
   never hardcode light ink for shared hero styles
-- Empty-home branding stays quiet: the hero logo is 40px and the supporting
+- Empty-home branding stays quiet: the hero logo is 32px and the supporting
   line stays short and muted so the composer remains the primary task surface
 - Night home composer plate styles are **dark-scoped only** (elevated-primary
   `#212121f5` + standard elevation-prominent)

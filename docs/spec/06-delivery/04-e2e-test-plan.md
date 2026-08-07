@@ -2369,7 +2369,7 @@ Each scenario is documented in this format:
   - Light mode everywhere renders `build/icon_1024.png` (the canonical light logo).
   - Dark mode everywhere renders `build/logo_dark.png` (the dark logo variant).
   - The swap is live: changing `data-theme` updates the logo source in the sidebar, empty-home hero, and startup splash without a window reload.
-  - Sizes are unchanged (sidebar 20px, hero 40px, splash 64px) and the logo stays decorative with no change to click/keyboard/focus behavior.
+  - Sizes stay stable across theme changes (sidebar 20px, hero 32px, splash 64px), and the logo stays decorative with no change to click/keyboard/focus behavior.
 - **Specs linked**: `04-ux/08-component-spec.md` §3.7, `04-ux/07-ui-design-system.md`
 - **Acceptance**: Quality
 - **Milestone**: M5
@@ -3737,7 +3737,7 @@ This test plan spec is accepted when:
   row, with no Logo/Home brand or back/forward buttons.
 
 ### US-UI-17 PI-Desktop home hero logo
-- On empty chat home, the canonical PI-Desktop PNG renders at 40px above the
+- On empty chat home, the canonical PI-Desktop PNG renders at 32px above the
   title with its native colors and no decorative hover state.
 - The hero logo is theme-aware: light mode shows `build/icon_1024.png`, dark
   mode shows `build/logo_dark.png`, and the swap tracks `data-theme` live.

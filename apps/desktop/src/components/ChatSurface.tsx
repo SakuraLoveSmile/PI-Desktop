@@ -128,7 +128,7 @@ export const ChatSurface = memo(function ChatSurface() {
             <div className="home-stack-inner">
               <div className="empty-hero">
                 <div className="empty-hero-icon" data-testid="home-icon" aria-hidden>
-                  <BrandLogo size={40} />
+                  <BrandLogo size={32} />
                 </div>
                 <h1>
                   {heroProject ? (
