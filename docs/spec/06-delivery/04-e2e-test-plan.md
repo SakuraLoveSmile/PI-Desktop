@@ -1784,19 +1784,17 @@ Each scenario is documented in this format:
 - **Preconditions**: App running on empty chat home (no transcript) in light
   and dark themes; window can be resized to ~1200×690 and ~900×640.
 - **Steps**: 1) Open empty home. 2) Confirm the hero is limited to the quiet
-  logo and title, with no welcome paragraph. 3) Confirm the compact quick
-  actions are visible without a section heading, then activate a project
-  action to open the picker. 4) With a project open, activate an inspection
-  action and confirm it prefills, but does not submit, the composer. 5) Dismiss
-  onboarding and inspect again. 6) Repeat in the other theme. 7) Resize to a
-  short height and scroll if needed.
-- **Expected**: No Explore / Build / Review / Fix marketing cards render. The
-  default empty state keeps the quiet title and composer as the visual anchors;
-  contextual actions remain a compact, heading-free row. Dismissing the
-  checklist leaves no empty spacer. The composer never covers the checklist,
-  and short windows keep every remaining block reachable via scroll.
+  logo and title, with no welcome paragraph or contextual action row. 3) Verify
+  the composer is visible in the bottom region and accepts direct task entry.
+  4) Dismiss onboarding and inspect again. 5) Repeat in the other theme. 6)
+  Resize to a short height and scroll the content region if needed.
+- **Expected**: No Explore / Build / Review / Fix marketing cards or quick
+  action buttons render. The default empty state keeps the quiet title and
+  bottom composer as the visual anchors. Dismissing the checklist leaves no
+  empty spacer. The composer remains at the bottom without covering the
+  checklist, and short windows keep every content block reachable via scroll.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
-  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D111/D131)
+  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D111/D131/D204)
 - **Acceptance**: Quality (layout integrity)
 - **Milestone**: M5
 - **Status**: Unit-covered (`home-empty-layout.test.mjs`); full UI scenario Draft
@@ -3839,12 +3837,12 @@ This test plan spec is accepted when:
 - Empty composer shows PI-Desktop placeholder copy: EN `Ask PI-Desktop to do anything`, zh-CN `向 PI-Desktop 下达任意指令`.
 - Placeholder ink is legible on light and dark floating plates.
 
-### US-UI-31 Home empty vertical stack (D111)
+### US-UI-31 Home empty vertical stack (D111/D204)
 - Given empty chat home, when the window is ~1200×690, hero, optional
-  onboarding checklist, and the home composer render as one centered vertical
-  stack with clear gaps (not dual-grow absolute portal regions).
-- No suggestion cards render; no absolute overlay covers the onboarding
-  checklist.
+  onboarding checklist render in a centered scrollable content stack above a
+  bottom-reserved home composer (not dual-grow absolute portal regions).
+- No suggestion cards or contextual quick actions render; no absolute overlay
+  covers the onboarding checklist.
 
 ### US-UI-32 Dark floating box elevation
 - Given dark theme empty home, when the composer shell is painted, it uses elevated-primary `#212121` on `#181818` with elevation-prominent stroke+lift identical to light (no heavier custom dark shadow).
@@ -3863,8 +3861,8 @@ This test plan spec is accepted when:
   render between the hero and composer.
 - The removed card row leaves no blank layout block at ~1200×690 or shorter
   heights; the optional onboarding checklist remains actionable when present.
-- Task entry starts directly in the composer; no suggestion-card prompt-prefill
-  action remains.
+- Task entry starts directly in the bottom composer; no suggestion-card or
+  quick-action prompt-prefill action remains.
 
 ### US-UI-35 Empty composer plate density
 - Empty-home composer is compact and content-driven with an empty or one-line
@@ -4130,12 +4128,13 @@ This test plan spec is accepted when:
   toolbar to expose a `1/N` pager for restoring earlier variants.
 
 
-### US-UI-64 Empty home no composer overlap (D111)
+### US-UI-64 Empty home no composer overlap (D111/D204)
 - Open empty home at ~1200×690 and at a shorter height (~900×640).
-- Expect hero, optional onboarding checklist, and home composer as one
-  scrollable stack with positive vertical gaps and no suggestion cards.
-- Short windows scroll the remaining stack rather than stacking the composer
-  over the checklist; when the checklist is absent, no empty spacer remains.
+- Expect hero and optional onboarding checklist in a scrollable content region,
+  with the home composer visibly reserved at the bottom and no suggestion or
+  quick-action controls.
+- Short windows scroll the content region rather than stacking the composer over
+  the checklist; when the checklist is absent, no empty spacer remains.
 
 
 ### US-UI-65 Durable notification inbox (D117/D130)

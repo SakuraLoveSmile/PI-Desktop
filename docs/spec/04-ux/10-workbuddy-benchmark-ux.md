@@ -128,7 +128,8 @@ its table but gains a "Start from template" row when empty.
 ### 3.4 Teaching placeholder in the composer
 Replace the static placeholder with a syntax-teaching one:
 "Describe a task — @ to reference files, / for commands". The empty home does
-not pair this teaching copy with suggestion cards (D131).
+not pair this teaching copy with suggestion cards or contextual quick actions
+(D131/D204).
 
 ### 3.5 Overflow "More" flyout for secondary destinations
 Keep the sidebar rail at ≤6 primary items. As destinations grow (Logs,

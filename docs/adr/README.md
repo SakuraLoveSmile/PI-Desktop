@@ -80,3 +80,4 @@ Each ADR includes:
 | 0062 | Bounded subagents behind a Task tool | Accepted for implementation |
 | 0063 | A managed surface for subagent definitions | Accepted for implementation |
 | 0064 | Codex-parity context compaction | Accepted (amends 0061 / 0030) |
+| 0066 | Empty home direct bottom composer | Accepted for implementation (amends D111) |

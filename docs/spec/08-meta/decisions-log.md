@@ -231,6 +231,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D129 | Menu-free Windows/Linux window chrome | **The application menu is a macOS system-menu surface only. Windows/Linux retain the shared frameless 46px titlebar and renderer-drawn minimize/maximize-or-restore/close controls, but render no File/Edit/View/Window/Help menu inside the window and reserve no left-side titlebar space for one. Existing application, editing, zoom, fullscreen, and close shortcuts remain available through renderer/native web-content handling; update checks remain reachable from Settings -> Info. This supersedes only the Windows/Linux renderer-menubar portions of D118 and ADR 0021.** | An in-window desktop menu duplicates macOS-specific system-menu chrome, consumes navigation space, and does not belong in PI-Desktop's frameless Windows/Linux titlebar. |
 | D130 | Sidebar-footer notification entry | **The durable notification Bell moves from the main titlebar to the separate `32px` action at the right of the expanded sidebar footer, replacing D113's Help shortcut. Its unread badge and complete D117 inbox behavior remain unchanged; the popover opens above and to the right of the footer, and no duplicate Bell remains in the main titlebar. This supersedes only the entry-location clauses of D113 and D117.** | Notification history belongs with the persistent local profile controls and the footer position keeps the main titlebar quiet while preserving a compact, familiar status entry. |
 | D141 | Canonical Windows native application identity | **Electron Main sets the product name before readiness and registers `com.pi-desktop.app` as the Windows process AppUserModelID before creating any window. That ID is the existing electron-builder/NSIS application ID; Windows packaging explicitly retains `PI-Desktop` for the executable and Start menu shortcut. Native notification attribution, notification settings, taskbar grouping, installed shortcuts, and packaged executable identity must expose `PI-Desktop`, not the stock Electron host. D121 remains unchanged: Windows development may use the stock Electron executable while its OS-facing runtime identity uses the canonical AUMID.** | `app.setName` changes Electron's internal name but not the Windows identity used by notifications and shell integration. One stable ID across runtime and packaging prevents both the observed notification-source leak and adjacent shell-brand drift without changing the published NSIS upgrade identity. |
+| D204 | Empty home task-entry surface | *(supersedes D111's non-docked home-composer clause and its contextual quick-action clauses)* **The empty chat home renders only the restrained hero and optional first-run checklist in the scrollable content region. Contextual quick-action buttons and prompt-prefill entry points are removed. The home composer is a bottom-reserved sibling of the scroller, remains visible at the bottom of the chat surface, and never covers the checklist.** | The three middle prompt buttons split attention before the first task and made the home composer move with optional content. Direct entry keeps the primary action stable while preserving checklist reachability in short windows (ADR 0066). |
 
 ## P. Transcript storage decisions
 
@@ -1346,3 +1347,15 @@ D193, and D194.
   `03-runtime/04-data-storage.md` §4.7a,
   `04-ux/03-permission-ux.md` §6a, `04-ux/08-component-spec.md` §9.9, and
   E2E-119.
+
+## 2026-08-07 — Empty home uses direct bottom task entry
+
+- Empty chat home no longer renders the contextual quick-action buttons or
+  their prompt-prefill entry points. The hero and optional onboarding checklist
+  remain in the only scrollable content region.
+- The home composer is a bottom-reserved sibling of that region, so it remains
+  visible at the bottom while checklist content scrolls independently on short
+  windows.
+- Decision D204 and ADR 0066 define this. See
+  `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
+  `04-ux/08-component-spec.md`, and E2E-063 / US-UI-64.

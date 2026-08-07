@@ -1,11 +1,9 @@
-import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { BrandLogo } from "./BrandLogo";
 import { ChatTranscript } from "./ChatTranscript";
 import { Composer } from "./Composer";
-import type { ComposerPrefill } from "./Composer";
 import { IconX } from "./icons";
-import { HomeQuickActions } from "./HomeQuickActions";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { useAppStore } from "../stores/app-store";
 import {
@@ -35,7 +33,6 @@ export const ChatSurface = memo(function ChatSurface() {
   const isRunning = useAppStore((state) => state.isRunning);
   const workspace = useAppStore((state) => state.workspace);
   const openProject = useAppStore((state) => state.openProject);
-  const [homePrefill, setHomePrefill] = useState<ComposerPrefill | null>(null);
   const error = useAppStore((state) => state.error);
   const errorCode = useAppStore((state) => state.errorCode);
   const errorRetriable = useAppStore((state) => state.errorRetriable);
@@ -116,13 +113,6 @@ export const ChatSurface = memo(function ChatSurface() {
       return hasContent || message.role === "tool";
     });
 
-  const prefillHomeComposer = (text: string) => {
-    setHomePrefill((current) => ({
-      text,
-      token: (current?.token ?? 0) + 1,
-    }));
-  };
-
   return (
     <div
       className={`chat-surface route-surface${sessionSwitching ? " session-switching" : ""}`}
@@ -160,16 +150,11 @@ export const ChatSurface = memo(function ChatSurface() {
                   )}
                 </h1>
               </div>
-              <HomeQuickActions
-                hasWorkspace={Boolean(workspace?.path)}
-                onPrefill={prefillHomeComposer}
-                onOpenProject={() => void openProject()}
-              />
               <OnboardingChecklist />
-              <div className="home-composer-wrap">
-                <StableComposer variant="home" prefill={homePrefill} />
-              </div>
             </div>
+          </div>
+          <div className="home-composer-wrap">
+            <StableComposer variant="home" />
           </div>
         </div>
       ) : (

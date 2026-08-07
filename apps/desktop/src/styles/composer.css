@@ -24,7 +24,7 @@
   background: transparent;
 }
 
-/* Home mode: part of centered stack — no absolute dock, no bottom gradient veil */
+/* Home mode: the shell is owned by the bottom-reserved home composer region. */
 .composer-dock-home {
   position: relative;
   padding: 0;

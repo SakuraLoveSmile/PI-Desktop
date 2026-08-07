@@ -11,7 +11,8 @@
 > Codex parity decision in [decisions-log §D](../08-meta/decisions-log.md)
 > (D034+), the decision log wins — it tracks the live gold captures. Known
 > updated values: sidebar ~275px (not 240px), toolbar 46px (not 44px),
-> composer placeholder per D094/D066, home empty stack per D111,
+> composer placeholder per D094/D066, home empty stack and bottom composer per
+> D111/D204,
 > Projects index table per D066/D133, settings full-page shell per D063 with the
 > compact seven-destination directory from D090/D133/D166, and retained path-keyed
 > project groups per D093 (which preserves D088's Temporary/exact-path boundary
@@ -462,7 +463,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 |   ...                                |
 +--------------------------------------+
 | Composer (docked in thread view;     |
-| home uses scroll stack, D111)        |
+| bottom-reserved on empty home, D204) |
 +--------------------------------------+
 ```
 
@@ -487,7 +488,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 
 | State | Behavior |
 |---|---|
-| Empty | Restrained hero + compact contextual quick actions + optional onboarding checklist + home composer in one scrollable stack; no marketing suggestion cards (D111/D131) |
+| Empty | Restrained hero + optional onboarding checklist in a scrollable content region, with a bottom-reserved home composer; no contextual quick actions or marketing suggestion cards (D111/D131/D204) |
 | Streaming | Auto-scroll follows while pinned; new tokens append |
 | Active progress | Immediately after send, before the first assistant or tool event, a compact localized `Working…` status with elapsed time appears inline. It yields to concrete thinking, tool, and answer rows, while a permission card owns the approval state; no large generic progress card is rendered. |
 | Turn outcome | After a failed turn, a session-scoped recovery card summarizes the interruption and tool evidence. Completed turns use the existing transcript and message-scoped InlineReviewCard without an extra success card; failed turns can retry without losing the transcript. |
@@ -504,11 +505,9 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
   `aria-controls`. Its localized accessible name includes the path, status,
   addition count, and deletion count; the visible text and color are not the
   only status signal.
-- Empty-home quick actions are native buttons in one labelled group without a
-  separate visible heading. Each action has a concrete localized label, never
-  submits automatically, and returns focus to the home composer after
-  prefilling it. The no-workspace action opens the project picker instead of
-  creating an invalid prompt.
+- Empty-home task entry starts in the always-visible bottom composer; there is
+  no separate quick-action group or prompt-prefill control between the hero and
+  the composer.
 - The failed-turn recovery card is a labelled `role="status"` region with
   explicit text actions. It uses icon geometry plus text, never color alone;
   Retry preserves the existing prompt and Continue returns focus to the

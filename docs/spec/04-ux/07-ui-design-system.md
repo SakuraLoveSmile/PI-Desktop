@@ -582,28 +582,29 @@ High-frequency workstation feedback must remain compositor-friendly and bounded:
   near-zero animation durations and instant rather than smooth programmatic
   scrolling.
 
-## 8.0 Home empty stack (scrollable flow, D111)
+## 8.0 Home empty stack and bottom composer (D111/D204)
 
 Empty composer placeholder: EN `Ask PI-Desktop to do anything` / zh-CN `向 PI-Desktop 下达任意指令`.
 
-Empty chat home uses a **single scrollable vertical stack** inside
-`home-main-content` (D111; supersedes the D047 dual-grow portal model):
+Empty chat home keeps the content and composer in separate vertical regions
+inside `home-main-content` (D111/D204; supersedes the D047 dual-grow portal
+model):
 
 - Column `flex: 1; min-height: 0; overflow: hidden`
-- Inner scroller (`.home-scroll`) is the only vertical overflow surface
-- Stack (`.home-stack-inner`) is `min-height: 100%`, content width
-  **`min(100%, 768px)`**, **`gap: 16px`** (workstation ceiling), and centers
-  the column when the viewport is tall
-- Order is always: **hero → contextual quick actions → optional onboarding
-  checklist → home composer**. The quick actions render as a compact ghost
-  control row without a visible section heading; they prefill the home composer
-  or open the project picker and never auto-submit a prompt. The former four
-  marketing suggestion cards are not rendered (D131); the checklist remains in
-  normal document flow
+- Inner scroller (`.home-scroll`) is the only vertical overflow surface for
+  the hero and optional checklist
+- Stack (`.home-stack-inner`) uses content width **`min(100%, 768px)`**,
+  **`gap: 16px`** (workstation ceiling), and auto margins to center the column
+  when the viewport is tall
+- The content order is **hero → optional onboarding checklist**. No contextual
+  quick-action row or marketing suggestion cards is rendered (D131/D204).
+  Task entry starts directly in the composer with no prompt-prefill action.
 - Short windows (`max-height ≤ 760px`) top-align the stack and keep every
-  block reachable by scrolling; the composer must not cover the checklist
-- Composer is **not** absolute-docked on empty home; thread mode keeps the
-  bottom dock and reserves its measured height without a full-width fade veil
+  content block reachable by scrolling; the bottom composer remains visible
+  and never covers the checklist
+- The home composer is a bottom-reserved sibling of the scroller. Thread mode
+  keeps its absolute bottom dock and reserves its measured height without a
+  full-width fade veil
 - Composer radius uses Codex `radius-3xl-base` (**20px** / `1.25rem`)
 - Empty-home composer height is content-driven: a one-line draft renders the
   compact shell, grows with the draft through seven visible rows, and then

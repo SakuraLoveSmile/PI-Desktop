@@ -16,10 +16,10 @@ test("empty home uses a single scrollable stack instead of dual-grow portals", (
   assert.match(chatSurface, /className="home-scroll"/);
   assert.match(chatSurface, /className="home-stack-inner"/);
   assert.match(chatSurface, /<OnboardingChecklist \/>/);
-  assert.match(chatSurface, /home-composer-wrap/);
+  assert.match(chatSurface, /<div className="home-composer-wrap">/);
   assert.doesNotMatch(
     chatSurface,
-    /HomeSuggestions|home-suggestions-block|home-upper|home-lower|home-suggestions-portal/,
+    /HomeQuickActions|HomeSuggestions|home-quick-actions|home-suggestion-card|home-suggestions-block|home-upper|home-lower|home-suggestions-portal/,
   );
 
   assert.match(styles, /\.home-main-content \{[\s\S]*?overflow:\s*hidden;/);
@@ -50,9 +50,12 @@ test("empty home keeps the primary task surface focused", () => {
   assert.notEqual(onboardingAt, -1);
   assert.notEqual(composerAt, -1);
   assert.ok(onboardingAt < composerAt, "onboarding must precede composer in markup");
-  assert.match(emptyBlock, /<HomeQuickActions[\s\S]*?onPrefill=/);
+  assert.match(
+    emptyBlock,
+    /<div className="home-scroll">[\s\S]*?<\/div>\s*<div className="home-composer-wrap">/,
+  );
   assert.doesNotMatch(emptyBlock, /empty-hero-copy/);
-  assert.doesNotMatch(emptyBlock, /HomeSuggestions|home-suggestion-card/);
+  assert.doesNotMatch(emptyBlock, /HomeQuickActions|HomeSuggestions|home-quick-actions|home-suggestion-card/);
 });
 
 test("short windows keep the empty stack scrollable rather than overlapping", () => {
@@ -62,15 +65,11 @@ test("short windows keep the empty stack scrollable rather than overlapping", ()
   assert.doesNotMatch(checklist, /\bmt-6\b/);
 });
 
-test("empty home keeps contextual actions visible without a heading", async () => {
-  const quickActions = await read("../src/components/HomeQuickActions.tsx");
-  assert.doesNotMatch(quickActions, /<details/);
-  assert.doesNotMatch(quickActions, /home-quick-actions-trigger/);
-  assert.match(quickActions, /role="group"/);
-  assert.match(quickActions, /data-testid="home-quick-actions"/);
-  assert.match(quickActions, /quickActionInspectPrompt/);
-  assert.match(quickActions, /quickActionOpenProject/);
-  assert.match(styles, /\.home-quick-actions-list\s*\{/);
-  assert.match(styles, /\.home-quick-action\s*\{[\s\S]*?border-radius:\s*var\(--radius-full\)/);
-  assert.doesNotMatch(styles, /\.home-suggestion-card/);
+test("empty home keeps the composer in a bottom region", () => {
+  assert.match(
+    styles,
+    /\.home-composer-wrap\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?padding:\s*0 12px 16px;/,
+  );
+  assert.match(styles, /\.composer-dock-home\s*\{[\s\S]*?position:\s*relative;/);
+  assert.doesNotMatch(styles, /\.home-quick-actions|\.home-quick-action|\.home-suggestion-card/);
 });

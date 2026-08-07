@@ -303,7 +303,7 @@
   white-space: pre-wrap;
 }
 
-/* Empty chat home: one scrollable stack keeps optional onboarding above the composer. */
+/* Empty chat home: scroll the content while keeping the composer at the bottom. */
 .home-main-content {
   position: relative;
   display: flex;
@@ -344,10 +344,12 @@
 .home-composer-wrap {
   position: relative;
   z-index: 2;
-  width: 100%;
+  flex: 0 0 auto;
+  width: min(100%, 768px);
   max-width: 100%;
   margin-inline: auto;
-  padding: 0;
+  padding: 0 12px 16px;
+  box-sizing: border-box;
 }
 
 /* legacy alias kept for capture hooks */
@@ -411,68 +413,6 @@
 
 .empty-hero .project-underline:hover {
   color: var(--ds-text-secondary);
-}
-
-.home-quick-actions {
-  display: flex;
-  width: min(100%, 720px);
-  justify-content: center;
-  text-align: center;
-}
-
-.home-quick-actions-list {
-  width: min(100%, 720px);
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  max-width: 100%;
-  flex-wrap: wrap;
-}
-
-.home-quick-action {
-  display: inline-flex;
-  min-height: 32px;
-  max-width: 100%;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--ds-border-subtle);
-  border-radius: var(--radius-full);
-  background: transparent;
-  padding: 5px 10px 5px 7px;
-  color: var(--ds-text-secondary);
-  font-size: var(--text-sm-plus);
-  line-height: var(--leading-compact);
-  text-align: left;
-  transition: background var(--motion-duration-fast) var(--motion-ease-out),
-    border-color var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.home-quick-action:hover,
-.home-quick-action:focus-visible {
-  border-color: var(--ds-border-default);
-  background: var(--ds-bg-hover);
-  color: var(--ds-text-primary);
-}
-
-.home-quick-action-icon {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  color: var(--ds-text-muted);
-}
-
-.home-quick-action-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-quick-action-arrow {
-  flex: 0 0 auto;
-  color: var(--ds-text-faint);
 }
 
 .home-onboarding-checklist {
