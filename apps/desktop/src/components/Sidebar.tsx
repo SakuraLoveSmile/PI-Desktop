@@ -1414,11 +1414,6 @@ export function Sidebar({
 
       <div className="sidebar-body no-drag">
 
-        <button className="nav-item new-task-btn mb-1" data-nav="new-task" onClick={() => void createSession()}>
-          <IconNewSession size={15} />
-          <span>{t("nav.newTask")}</span>
-        </button>
-
         <nav className="mb-0.5 space-y-0 px-0.5">
           <button className={`nav-item ${page === "plugins" ? "active" : ""}`} data-nav="plugins" onClick={() => setPage("plugins")}>
             <IconAt size={15} />

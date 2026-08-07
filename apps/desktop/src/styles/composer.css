@@ -226,26 +226,6 @@
   color: var(--ds-text-primary);
 }
 
-.new-task-btn {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 8px;
-  border-radius: var(--radius-sm);
-  /* Codex gold: ghost New task in both themes */
-  background: transparent;
-  padding: 5px 8px;
-  min-height: 30px;
-  color: var(--ds-text-primary);
-  font-size: var(--text-base); /* match primary sidebar actions */
-  font-weight: var(--font-weight-normal);
-  transition: background var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.new-task-btn:hover {
-  background: var(--ds-bg-hover);
-}
-
 /* Plan approval surface. Keep the gate in the composer layer so it remains
    adjacent to the input and follows the same container width as the dock. */
 .plan-approval-bar {

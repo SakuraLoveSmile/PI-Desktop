@@ -318,8 +318,8 @@ Letter-spacing tokens: `--tracking-tighter` −0.03em, `--tracking-tight` −0.0
 
 > Note: 14px base is intentional for developer-density. Do not bump to 16px default.
 >
-> Sidebar primary chrome (nav items, New task, footer identity, profile menu
-> actions) uses `--text-base` so the left rail matches main body readability.
+> Sidebar primary chrome (nav items, footer identity, profile menu actions)
+> uses `--text-base` so the left rail matches main body readability.
 > Session titles, project/group titles, and empty-state copy use the compact
 > `--text-md` tier; only section labels and secondary metadata use `--text-sm`.
 > Never use the micro `--text-xs` band for primary list content.
@@ -608,8 +608,8 @@ Empty chat home uses a **single scrollable vertical stack** inside
 - Empty-home composer height is content-driven: a one-line draft renders the
   compact shell, grows with the draft through seven visible rows, and then
   keeps the shell stable while the textarea scrolls internally
-- Light **New task** control is a **ghost row** (transparent fill, hover wash
-  only), not a solid chip
+- The light sidebar has no standalone New task row; scoped session-creation
+  controls remain icon-only and use the semantic hover wash
 - Empty hero title uses `var(--ds-text-primary)` (light override `#1a1c1f`);
   never hardcode light ink for shared hero styles
 - Empty-home branding stays quiet: the hero logo is 40px and the supporting

@@ -17,8 +17,8 @@ destination, chat as the home surface, tools and permissions inline.
 | Platform titlebar: macOS traffic lights / Windows/Linux actions     |
 +------------------+--------------------------------+------------------+
 | Sidebar (~275px) | Main pane (active destination) | Work panel       |
-|  New task        |  chat home / transcript        |  (optional,      |
-|  Extensions      |  or Extensions page            |   resizable      |
+|  Extensions      |  chat home / transcript        |  (optional,      |
+|                  |  or Extensions page            |   resizable      |
 |                  |                                |   244–720px)     |
 |  Sessions     +↕ |                                | surface          |
 |   Recent rows ↕  |                                |                  |
@@ -29,8 +29,8 @@ destination, chat as the home surface, tools and permissions inline.
 +------------------+--------------------------------+------------------+
 ```
 
-- **Sidebar**: primary navigation — New task, the Extensions destination,
-  path-less conversations under a compact **Sessions** section with new-session
+- **Sidebar**: primary navigation — the Extensions destination, path-less
+  conversations under a compact **Sessions** section with new-session
   and sort actions, retained open-project groups under a following **Projects**
   section with a persistent new-project action, and the
   WorkBuddy-inspired local profile footer
@@ -45,7 +45,7 @@ destination, chat as the home surface, tools and permissions inline.
   Collapsible to an icon rail (Cmd/Ctrl+B).
 - **Product identity**: runtime shell copy uses `PI-Desktop`; the home hero and
   sidebar reuse the canonical `build/icon_1024.png` logo, while composer prompt
-  rows have no leading brand icon and New task/session controls use a dedicated
+  rows have no leading brand icon and session-creation controls use a dedicated
   message-plus icon. On
   Windows/Linux, the expanded sidebar begins with a keyboard-accessible Home
   brand and Search plus Collapse sidebar controls at the right; activating the

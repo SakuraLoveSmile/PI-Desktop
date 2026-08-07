@@ -133,8 +133,9 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 ### 2.1 Purpose
 
-Global controls bar: project identity, task title, model selection, and window
-actions. The active session's Agent/Plan control belongs solely to the
+Global controls bar: task title, model selection, and window actions. Project
+scope remains available in the title tooltip. The active session's Agent/Plan
+control belongs solely to the
 left-of-input Composer chip. (Settings is reached from the command palette /
 application menu, not the top bar.)
 
@@ -164,8 +165,9 @@ Thinking and permission triggers remain in the Composer (§11).
   `no-drag` on interactive controls; macOS reserves the left ~76px for traffic
   lights (only when the sidebar is collapsed), Windows/Linux reserve the right
   112px for native window controls
-- Title cluster (task title) flexes and **ellipsizes**; the right
-  cluster (model picker, action icons) is `flex: 0 0 auto`
+- Title cluster (task title) flexes and shows at most the first 10 Unicode
+  characters plus an ellipsis; the full title remains in the native tooltip.
+  The right cluster (model picker, action icons) is `flex: 0 0 auto`
   and is never squeezed by a long title. The conversation surface keeps a
   `min-width` so its content is not crushed on narrow windows.
 - Project scope is available from the title tooltip but is not rendered as a
@@ -178,7 +180,7 @@ Thinking and permission triggers remain in the Composer (§11).
 
 | Element | Default | Running | Error | No workspace |
 |---|---|---|---|---|
-| Task title | session title (or untitled) | same, plus a compact pulsing status dot | same | same |
+| Task title | session title (or untitled), capped at 10 characters with an ellipsis when needed | same, plus a compact pulsing status dot | same | same |
 | Model selector | clickable dropdown | disabled during stream | clickable | clickable (no provider warning) |
 | New task / Search | icon buttons | same | same | same |
 | Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
@@ -219,7 +221,6 @@ Expanded (~275px, D034/D070):
 +---------------------------+
 | [lights]          [⌕][◧] |  macOS
 | [π] PI-Desktop    [⌕][◧] |  Windows/Linux
-| [message+ New Task] button |
 | Plugins                   |
 | SESSIONS         [msg+][↕]|
 |   • Path-less session   ↕|
@@ -234,7 +235,6 @@ Expanded (~275px, D034/D070):
 
 Collapsed (48px):
 +----+
-| [+] |
 | ──  |
 | ses |
 | ses |
@@ -251,7 +251,7 @@ tier; weight, indentation, and disclosure icons preserve their hierarchy:
 
 | Surface | Token | Notes |
 |---|---|---|
-| New task / Plugins / nav items | `--text-base` (14px) | Primary actions and destinations |
+| Plugins / nav items | `--text-base` (14px) | Primary destinations |
 | Session / thread titles | `--text-md` (13px) | Compact list content |
 | Project / group titles, empty copy | `--text-md` (13px) | Hierarchy comes from weight and indentation |
 | Section labels (`SESSIONS`, `PROJECTS`) | `--text-sm` (12px) | Uppercase secondary labels |
@@ -297,7 +297,6 @@ visually distinct from list content.
   transcript prefetch. Selection reuses an in-flight or recent cached result,
   revalidates it in the background, and never waits for an older superseded
   session read before starting the latest read.
-- Click the message-plus New Task control: create/reuse a draft in the current workspace scope
 - On Windows/Linux, click the PI-Desktop brand to return the main pane to the
   chat home while preserving the active conversation and workspace; macOS
   intentionally omits this brand control from the sidebar header
@@ -376,8 +375,8 @@ visually distinct from list content.
   renders it at 40px, the expanded/collapsed sidebar at 20px/18px, the startup
   splash at 64px. Home and thread-docked composer prompt rows do not render a
   leading brand icon.
-- The expanded/collapsed New task control and project/Temporary session
-  creation controls render the dedicated message-plus session icon. Generic
+- Project and Temporary session creation controls render the dedicated
+  message-plus session icon. Generic
   `IconPlus` remains reserved for adding non-session entities.
 - Icons are decorative when a localized text label or accessible name is
   present; click, keyboard, and focus behavior remain unchanged.

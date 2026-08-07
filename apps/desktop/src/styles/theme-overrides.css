@@ -99,34 +99,8 @@
   opacity: 1;
 }
 
-:root[data-theme="light"] .new-task-btn,
-:root[data-theme="light"] .nav-item.new-task-btn {
-  /* Gold empty-home: ghost row, no solid chip fill */
-  background: transparent;
-  font-weight: var(--font-weight-normal);
-  box-shadow: none;
-}
-
-:root[data-theme="light"] .new-task-btn:hover,
-:root[data-theme="light"] .nav-item.new-task-btn:hover {
-  background: color-mix(in oklab, #1a1c1f 5%, transparent);
-}
-
-:root[data-theme="light"] button.nav-item.new-task-btn {
-  background: transparent;
-  font-weight: var(--font-weight-normal);
-}
-:root[data-theme="light"] button.nav-item.new-task-btn:hover {
-  background: color-mix(in oklab, #1a1c1f 5%, transparent);
-}
-
 :root[data-theme="light"] .tool-row-content {
   background: color-mix(in oklab, #1a1c1f 2%, transparent);
-}
-
-.nav-item.new-task-btn {
-  /* inherits nav density; dark keeps soft fill from .new-task-btn */
-  gap: 10px;
 }
 
 .footer-notification {

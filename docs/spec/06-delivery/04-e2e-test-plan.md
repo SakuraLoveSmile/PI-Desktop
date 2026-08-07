@@ -363,9 +363,9 @@ Each scenario is documented in this format:
 - **Expected**: On the chat route the conversation top bar renders with its
   title, model picker, and actions; it has no Agent|Plan mode control. The
   left-of-input Composer chip owns the active session's Agent/Plan switch. The
-  task title is the only visible title text; project scope is available through
-  its tooltip. A compact status dot appears while running. A long task title
-  ellipsizes instead of squeezing the model picker or action buttons. The sidebar
+  task title is the only visible title text and is capped at 10 characters
+  with an ellipsis; project scope is available through its tooltip. A compact
+  status dot appears while running. The sidebar
   toggle is present only in the collapsed state (no
   duplicate of the sidebar's control). On every other route the frameless drag
   band renders instead (no top-bar controls). The bar is draggable to move the
@@ -1161,13 +1161,14 @@ Each scenario is documented in this format:
 - **Preconditions**: App running in both English and zh-CN locales, with an
   empty home and a docked transcript available.
 - **Steps**: 1) Inspect the expanded and collapsed sidebar. 2) Inspect the
-  empty-home hero and docked composer. 3) Focus the New task control and each
-  project/Temporary create control. 4) Open Settings and the composer input.
+  empty-home hero and docked composer. 3) Focus each project/Temporary session
+  create control. 4) Open Settings and the composer input.
 - **Expected**: Visible shell identity reads `PI-Desktop`; the home hero and
   expanded/collapsed sidebar render the canonical `build/icon_1024.png` asset
   through `BrandLogo`, while the docked composer prompt row has no leading
   brand icon or reserved icon slot and its text aligns directly with the input
-  gutter. Every session-creation control uses the dedicated message-plus icon
+  gutter. Every scoped session-creation control uses the dedicated message-plus
+  icon
   with localized labels and accessible names. `Codex` remains visible only as
   the external import-source label or in non-runtime design-reference text.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
@@ -2664,15 +2665,15 @@ Each scenario is documented in this format:
   session, one retained project with a session, and one empty project group;
   light and dark themes are available.
 - **Steps**:
-  1. Open the app at the default window width and inspect New task, Plugins,
-     session titles, project/group titles, empty-state copy, section labels,
+  1. Open the app at the default window width and inspect Plugins, session
+     titles, project/group titles, empty-state copy, section labels,
      and the profile footer.
   2. Switch between light and dark themes, then narrow the window to the
      minimum supported expanded-sidebar width.
   3. Compare the sidebar hierarchy with 14px chat body text and inspect long
      session/project names.
 - **Expected**:
-  - New task, Plugins, and the footer identity use `--text-base` (14px).
+  - Plugins and the footer identity use `--text-base` (14px).
   - Session titles, project/group titles, and empty-state copy use `--text-md`
     (13px); section labels and secondary metadata remain at `--text-sm` (12px).
   - The hierarchy remains readable in both themes, row pitch stays compact at
@@ -3631,7 +3632,7 @@ This test plan spec is accepted when:
 
 ### US-UI-01 Codex-aligned shell chrome
 - Open the desktop app on macOS dark theme.
-- Expect charcoal main surface (`#181818`), left sidebar with New task +
+- Expect charcoal main surface (`#181818`), left sidebar with Plugins plus
   current-project and Temporary session groups, and a floating bottom composer
   with mode/model controls and no workspace rail.
 - Expect no blue-slate marketing chrome; primary send control is a circular inverted button.
@@ -3655,8 +3656,8 @@ This test plan spec is accepted when:
   permission-mode chip and explains its Bash tradeoff.
 
 ### US-UI-05 Locale chrome
-- On a zh-CN system locale, sidebar labels render in Chinese (新建任务 / 项目 /
-  插件 / 临时会话), without 拉取请求 or 已安排 entries.
+- On a zh-CN system locale, sidebar labels render in Chinese (项目 / 插件 /
+  临时会话), without 拉取请求 or 已安排 entries.
 - Empty-thread hero remains the English PI-Desktop shell copy: "What should we build?".
 - Composer omits the 本地 workspace label and shows Plan/Agent plus the active
   model ID; both locales expose the Plan approval copy.
@@ -3691,8 +3692,8 @@ This test plan spec is accepted when:
 ### US-UI-13 Light theme shell parity
 - Set theme to system/light on a light macOS appearance.
 - Expect sidebar `#f3f3f3`, main `#ffffff`, text `#1a1c1f`, white floating composer, and home hero with project underline.
-- Sidebar nav labels (New task / Plugins / Projects group / Sessions group),
-  current-project identity, thread titles, and composer controls must remain
+- Sidebar nav labels (Plugins / Projects group / Sessions group), current-
+  project identity, thread titles, and composer controls must remain
   readable dark-on-light (≥4.5:1). Never white/translucent text on the light
   sidebar.
 - The macOS traffic-light row keeps Search and Collapse sidebar readable at the
@@ -3879,8 +3880,9 @@ This test plan spec is accepted when:
 - Dark empty home hero title ink is light-on-dark (`--ds-text-primary` / near white), not hardcoded `#1a1c1f`.
 - Night composer plate is elevated-primary `#212121f5` on main `#181818` with elevation-prominent; light theme is not forced to the night plate fill.
 
-### US-UI-42 Light New task ghost chrome
-- Light empty-home **New task** row has no solid gray chip fill (transparent on `#f3f3f3` sidebar); icon+label only until hover.
+### US-UI-42 Light scoped session creation chrome
+- On the light sidebar, the Sessions and Projects scoped create controls remain
+  icon-only with semantic hover wash; no standalone New task row is rendered.
 
 
 
@@ -3966,7 +3968,8 @@ This test plan spec is accepted when:
 ### US-UI-50 Destination title scale
 - Open Settings → Project archive and Plugins.
 - Expect large section titles (~28px) consistent with Codex destination/index pages.
-- Dark home New task remains a ghost row (no solid selected chip) unless genuinely active.
+- Dark home scoped session-creation controls remain quiet icon actions without
+  a standalone New task row.
 
 ### US-UI-52 Settings gold chrome metrics (D070)
 - Open Settings light Basics at ~1200×690.
@@ -4198,8 +4201,8 @@ This test plan spec is accepted when:
 - Open the expanded sidebar in light and dark themes at default and minimum
   supported widths with at least one session, one project group, and the local
   profile footer visible.
-- Expect New task, Plugins, footer profile name, and profile menu actions to
-  render at the body chrome size (`--text-base` / 14px).
+- Expect Plugins, footer profile name, and profile menu actions to render at
+  the body chrome size (`--text-base` / 14px).
 - Expect session/thread titles, project/group titles, and empty-state copy at
   `--text-md` / 13px, with uppercase section labels (`SESSIONS` / `PROJECTS`)
   at `--text-sm` / 12px — never below `--text-md` for primary list content.
