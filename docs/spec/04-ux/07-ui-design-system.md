@@ -582,23 +582,25 @@ High-frequency workstation feedback must remain compositor-friendly and bounded:
   near-zero animation durations and instant rather than smooth programmatic
   scrolling.
 
-## 8.0 Home empty stack and bottom composer (D111/D204)
+## 8.0 Home empty stack and bottom composer (D111/D204/D205)
 
 Empty composer placeholder: EN `Ask PI-Desktop to do anything` / zh-CN `向 PI-Desktop 下达任意指令`.
 
 Empty chat home keeps the content and composer in separate vertical regions
-inside `home-main-content` (D111/D204; supersedes the D047 dual-grow portal
+inside `home-main-content` (D111/D204/D205; supersedes the D047 dual-grow portal
 model):
 
 - Column `flex: 1; min-height: 0; overflow: hidden`
 - Inner scroller (`.home-scroll`) is the only vertical overflow surface for
   the hero and optional checklist
 - Stack (`.home-stack-inner`) uses content width **`min(100%, 768px)`**,
-  **`gap: 16px`** (workstation ceiling), and auto margins to center the column
+  **`gap: 24px`** (workstation ceiling), and auto margins to center the column
   when the viewport is tall
-- The content order is **hero → optional onboarding checklist**. No contextual
-  quick-action row or marketing suggestion cards is rendered (D131/D204).
-  Task entry starts directly in the composer with no prompt-prefill action.
+- The content order is **hero → starter prompt grid → optional onboarding
+  checklist**. The grid contains four compact developer starters (Explore a
+  codebase, Build a feature, Fix a bug, Review a change) that prefill the
+  composer without sending or creating a turn. Task entry remains directly
+  available in the composer (D205).
 - Short windows (`max-height ≤ 760px`) top-align the stack and keep every
   content block reachable by scrolling; the bottom composer remains visible
   and never covers the checklist
@@ -614,7 +616,7 @@ model):
 - Empty hero title uses `var(--ds-text-primary)` (light override `#1a1c1f`);
   never hardcode light ink for shared hero styles
 - Empty-home branding stays quiet: the hero logo is 40px and the supporting
-  welcome paragraph is omitted so the composer remains the visual focus
+  line stays short and muted so the composer remains the primary task surface
 - Night home composer plate styles are **dark-scoped only** (elevated-primary
   `#212121f5` + standard elevation-prominent)
 - Empty draft row keeps **one visible line / 28px optical minimum** so the
@@ -631,6 +633,10 @@ model):
   painting a full-width gradient veil.
 - Dark elevated shell reads as elevated-primary (`#212121f5` / gray-800 96%)
   on `#181818` with standard elevation-prominent
+- Starter cards use a two-column grid at workstation widths and collapse to
+  one column below 620px. Each card uses a subtle border, a small icon plate,
+  a localized title/description, and a quiet arrow affordance; hover/focus
+  uses the shared hover fill, border, shadow, and motion tokens.
 
 ## 8.1 Composer workspace chips (Codex parity)
 

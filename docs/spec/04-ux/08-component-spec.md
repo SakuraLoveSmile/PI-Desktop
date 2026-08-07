@@ -12,7 +12,7 @@
 > (D034+), the decision log wins — it tracks the live gold captures. Known
 > updated values: sidebar ~275px (not 240px), toolbar 46px (not 44px),
 > composer placeholder per D094/D066, home empty stack and bottom composer per
-> D111/D204,
+> D111/D204/D205,
 > Projects index table per D066/D133, settings full-page shell per D063 with the
 > compact seven-destination directory from D090/D133/D166, and retained path-keyed
 > project groups per D093 (which preserves D088's Temporary/exact-path boundary
@@ -488,7 +488,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 
 | State | Behavior |
 |---|---|
-| Empty | Restrained hero + optional onboarding checklist in a scrollable content region, with a bottom-reserved home composer; no contextual quick actions or marketing suggestion cards (D111/D131/D204) |
+| Empty | Restrained hero + four localized developer starter cards + optional onboarding checklist in a scrollable content region, with a bottom-reserved home composer; starter cards prefill only and do not send (D111/D204/D205) |
 | Streaming | Auto-scroll follows while pinned; new tokens append |
 | Active progress | Immediately after send, before the first assistant or tool event, a compact localized `Working…` status with elapsed time appears inline. It yields to concrete thinking, tool, and answer rows, while a permission card owns the approval state; no large generic progress card is rendered. |
 | Turn outcome | After a failed turn, a session-scoped recovery card summarizes the interruption and tool evidence. Completed turns use the existing transcript and message-scoped InlineReviewCard without an extra success card; failed turns can retry without losing the transcript. |
@@ -505,9 +505,10 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
   `aria-controls`. Its localized accessible name includes the path, status,
   addition count, and deletion count; the visible text and color are not the
   only status signal.
-- Empty-home task entry starts in the always-visible bottom composer; there is
-  no separate quick-action group or prompt-prefill control between the hero and
-  the composer.
+- Empty-home task entry starts in the always-visible bottom composer. The
+  starter grid between the hero and composer is optional task guidance: each
+  card focuses the composer with a localized prompt, but never sends or
+  creates a session turn on its own.
 - The failed-turn recovery card is a labelled `role="status"` region with
   explicit text actions. It uses icon geometry plus text, never color alone;
   Retry preserves the existing prompt and Continue returns focus to the
@@ -1746,8 +1747,9 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 
 ### 15.3 Layout
 
-- Chat home empty: single scrollable stack (hero → optional checklist →
-  composer) centered in MainChat; the former suggestion-card row is omitted
+- Chat home empty: single scrollable stack (hero → starter grid → optional
+  checklist) centered in MainChat, with a bottom-reserved composer sibling;
+  starter cards only prefill that composer and never submit a turn
 - Other empty surfaces: text-xl heading + text-sm description + primary action
 - Icon (48px Lucide / brand mark) above heading where applicable
 - Background: bg-primary (transparent, not a card)

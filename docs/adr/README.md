@@ -81,3 +81,4 @@ Each ADR includes:
 | 0063 | A managed surface for subagent definitions | Accepted for implementation |
 | 0064 | Codex-parity context compaction | Accepted (amends 0061 / 0030) |
 | 0066 | Empty home direct bottom composer | Accepted for implementation (amends D111) |
+| 0067 | ChatGPT-inspired empty-home starter guidance | Accepted for implementation (amends D204 / 0066 card clause) |

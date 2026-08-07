@@ -1783,18 +1783,20 @@ Each scenario is documented in this format:
 
 - **Preconditions**: App running on empty chat home (no transcript) in light
   and dark themes; window can be resized to ~1200×690 and ~900×640.
-- **Steps**: 1) Open empty home. 2) Confirm the hero is limited to the quiet
-  logo and title, with no welcome paragraph or contextual action row. 3) Verify
-  the composer is visible in the bottom region and accepts direct task entry.
-  4) Dismiss onboarding and inspect again. 5) Repeat in the other theme. 6)
-  Resize to a short height and scroll the content region if needed.
-- **Expected**: No Explore / Build / Review / Fix marketing cards or quick
-  action buttons render. The default empty state keeps the quiet title and
-  bottom composer as the visual anchors. Dismissing the checklist leaves no
+- **Steps**: 1) Open empty home. 2) Confirm the hero contains the quiet logo,
+  localized title, and short supporting line. 3) Inspect the four developer
+  starter cards and activate each one in turn. 4) Verify each card only
+  prefills and focuses the bottom composer; it never sends a turn. 5) Dismiss
+  onboarding and inspect again. 6) Repeat in the other theme. 7) Resize to a
+  short height and scroll the content region if needed.
+- **Expected**: Explore / Build / Review / Fix are compact task starters rather
+  than marketing cards. The default empty state keeps the hero, starter grid,
+  and bottom composer as the visual anchors. Dismissing the checklist leaves no
   empty spacer. The composer remains at the bottom without covering the
-  checklist, and short windows keep every content block reachable via scroll.
+  starter grid or checklist, and short windows keep every content block
+  reachable via scroll.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
-  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D111/D131/D204)
+  `04-ux/08-component-spec.md`, `08-meta/decisions-log.md` (D111/D131/D204/D205)
 - **Acceptance**: Quality (layout integrity)
 - **Milestone**: M5
 - **Status**: Unit-covered (`home-empty-layout.test.mjs`); full UI scenario Draft
@@ -3647,7 +3649,9 @@ This test plan spec is accepted when:
 
 ### US-UI-02 Empty thread hero
 - Open or create a thread with zero messages.
-- Expect centered hero copy: "What should we build" with optional project name underline when a workspace is open.
+- Expect the centered hero copy "What can I help you build?", a short muted
+  supporting line, and the four compact developer starter cards. The optional
+  project name remains a dotted-underline action when a workspace is open.
 
 ### US-UI-03 Sidebar destinations
 - Expect the expanded home sidebar to show Sessions and Projects without
@@ -3667,7 +3671,8 @@ This test plan spec is accepted when:
 - On a zh-CN system locale, sidebar labels render in Chinese (项目 / 临时会话),
   without 拉取请求 or 已安排 entries. The footer Plugins icon exposes the
   localized accessible name 插件.
-- Empty-thread hero remains the English PI-Desktop shell copy: "What should we build?".
+- Empty-thread hero and starter cards are localized Chinese copy; project name
+  remains a dotted-underline action when a workspace is open.
 - Composer omits the 本地 workspace label and shows Plan/Agent plus the active
   model ID; both locales expose the Plan approval copy.
 
@@ -3820,9 +3825,9 @@ This test plan spec is accepted when:
 - Expect black sidebar, main `#181818`, and destination cards/rows readable on elevated dark plates (not flat same-gray).
 
 ### US-UI-28 Home empty composer association
-- On empty chat home (light + dark), expect the hero, optional onboarding
-  checklist, and home composer in one scrollable vertical stack (D111/D131),
-  with no suggestion-card row or large empty gap.
+- On empty chat home (light + dark), expect the hero, four starter cards,
+  optional onboarding checklist, and home composer in one scrollable vertical
+  flow (D111/D204/D205), without a large empty gap.
 - The composer remains a standalone plate without an attached workspace rail.
 - Starting a transcript restores the bottom-docked composer with fade veil.
 
@@ -3837,11 +3842,12 @@ This test plan spec is accepted when:
 - Empty composer shows PI-Desktop placeholder copy: EN `Ask PI-Desktop to do anything`, zh-CN `向 PI-Desktop 下达任意指令`.
 - Placeholder ink is legible on light and dark floating plates.
 
-### US-UI-31 Home empty vertical stack (D111/D204)
-- Given empty chat home, when the window is ~1200×690, hero, optional
-  onboarding checklist render in a centered scrollable content stack above a
-  bottom-reserved home composer (not dual-grow absolute portal regions).
-- No suggestion cards or contextual quick actions render; no absolute overlay
+### US-UI-31 Home empty vertical stack (D111/D204/D205)
+- Given empty chat home, when the window is ~1200×690, hero, four starter
+  cards, and optional onboarding checklist render in a centered scrollable
+  content stack above a bottom-reserved home composer (not dual-grow absolute
+  portal regions).
+- Starter cards prefill the composer without submitting; no absolute overlay
   covers the onboarding checklist.
 
 ### US-UI-32 Dark floating box elevation
@@ -3856,20 +3862,22 @@ This test plan spec is accepted when:
   project/session overflow menus expose pin/archive actions; nav row pitch
   remains ~32px and session row pitch ~28–31px.
 
-### US-UI-34 Home suggestion cards removed (D131)
-- On empty chat home (light + dark), no Explore / Build / Review / Fix cards
-  render between the hero and composer.
-- The removed card row leaves no blank layout block at ~1200×690 or shorter
-  heights; the optional onboarding checklist remains actionable when present.
-- Task entry starts directly in the bottom composer; no suggestion-card or
-  quick-action prompt-prefill action remains.
+### US-UI-34 Home starter cards prefill without submitting (D205)
+- On empty chat home (light + dark), four compact Explore / Build / Review /
+  Fix developer cards render between the hero and composer.
+- Activate each card at ~1200×690 and at a shorter height; the composer gains
+  the localized prompt and focus, while no user or assistant turn is created.
+- The bottom composer remains the primary task-entry surface and the optional
+  onboarding checklist remains actionable when present.
 
 ### US-UI-35 Empty composer plate density
 - Empty-home composer is compact and content-driven with an empty or one-line
   draft; it does not reserve the former fixed ~148px empty plate.
 
 ### US-UI-36 Hero Y + night box elevation
-- At ~1200×690 light home, hero first dark ink is near y≈300 (±12px) vs Codex gold.
+- At ~1200×690 light home, the hero and starter grid form one centered block;
+  the grid is fully reachable and the home scroller does not clip its top or
+  overlap the bottom composer.
 - Dark home composer plate reads as elevated-primary `#212121f5` with elevation-prominent against `#181818` (not flat same-surface).
 - Light composer renders as one uninterrupted solid surface with no context
   rail or independent top elevation.
@@ -3960,9 +3968,11 @@ This test plan spec is accepted when:
   the renderer and never hides or deletes a durable Project-archive row.
 
 
-### US-UI-48 Home suggestion glyphs removed (D131)
-- On empty home, no code / hammer / refresh / bug suggestion glyphs render.
-- No explore / create / review / fix suggestion labels remain in either locale.
+### US-UI-48 Home starter glyphs and labels (D205)
+- On empty home, the four starter cards render one localized icon plate and
+  title/description for Explore / Build / Fix / Review.
+- Light and dark themes keep the cards quiet at rest and visibly actionable on
+  hover/focus without introducing colored marketing accents.
 
 
 ### US-UI-49 Scoped sidebar row chrome
@@ -4128,11 +4138,11 @@ This test plan spec is accepted when:
   toolbar to expose a `1/N` pager for restoring earlier variants.
 
 
-### US-UI-64 Empty home no composer overlap (D111/D204)
+### US-UI-64 Empty home no composer overlap (D111/D204/D205)
 - Open empty home at ~1200×690 and at a shorter height (~900×640).
-- Expect hero and optional onboarding checklist in a scrollable content region,
-  with the home composer visibly reserved at the bottom and no suggestion or
-  quick-action controls.
+- Expect hero, four starter cards, and optional onboarding checklist in a
+  scrollable content region, with the home composer visibly reserved at the
+  bottom. Starter cards only prefill the composer.
 - Short windows scroll the content region rather than stacking the composer over
   the checklist; when the checklist is absent, no empty spacer remains.
 

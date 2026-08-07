@@ -4,6 +4,7 @@
 - Date: 2026-08-07
 - Deciders: PI-Desktop core
 - Amends: D111
+- Amended by: ADR 0067 (starter-grid presentation only)
 
 ## Context
 
@@ -15,9 +16,9 @@ bottom of the chat area.
 
 ## Decision
 
-1. Remove the empty-home contextual quick-action row and its prompt-prefill
-   entry points. The empty state does not render a separate row of task
-   templates or project-opening buttons.
+1. Remove the former empty-home contextual quick-action row and its
+   project-opening buttons. ADR 0067 later adds a separate four-card starter
+   grid whose only action is to prefill the existing composer.
 2. Keep the hero and optional onboarding checklist inside `.home-scroll`, the
    only vertical overflow surface for empty-home content.
 3. Render the home composer in a sibling `.home-composer-wrap` after the
@@ -29,13 +30,14 @@ bottom of the chat area.
 
 ## Consequences
 
-- Empty home has one direct task-entry path and less visual noise.
+- Empty home has one direct task-entry path and a quieter, purpose-built
+  guidance surface above it.
 - The composer remains stable at the bottom in both empty-home and transcript
   states.
 - Optional onboarding remains reachable without an overlay or a second scroll
   surface.
-- Prompt-template localization keys and the unused quick-action styling are no
-  longer part of the renderer bundle.
+- The former prompt-template row and quick-action styling are no longer part of
+  the renderer surface; starter-card copy is localized separately.
 
 ## Alternatives considered
 
@@ -60,4 +62,4 @@ reserves and tracks the composer's changing multi-line height.
 - `docs/spec/04-ux/07-ui-design-system.md`
 - `docs/spec/04-ux/08-component-spec.md`
 - `docs/spec/06-delivery/04-e2e-test-plan.md` (E2E-063, US-UI-31, US-UI-64)
-- `docs/spec/08-meta/decisions-log.md` (D111, D131, D204)
+- `docs/spec/08-meta/decisions-log.md` (D111, D131, D204, D205)

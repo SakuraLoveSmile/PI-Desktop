@@ -103,7 +103,7 @@ destination, chat as the home surface, tools and permissions inline.
   in the composer chips and Settings instead.
 - **Composer**: workspace-agnostic floating pill anchored to the conversation
   destination — centered empty-home content above a bottom-reserved composer
-  (D111/D204), bottom-docked in a transcript, with no project / Local / branch
+  (D111/D204/D205), bottom-docked in a transcript, with no project / Local / branch
   rail (D095).
   Its left-of-input operating-mode chip is the sole active-session control for
   exactly **Agent** and **Plan**. Plan shows the same Agent's planning state,
@@ -117,11 +117,12 @@ destination, chat as the home surface, tools and permissions inline.
 ## 3. Destinations
 
 ### 3.1 Chat home (default)
-- Empty state: a restrained hero title ("What should we build?" — project name
+- Empty state: a restrained hero title ("What can I help you build?" — project name
   becomes a dotted-underline button when a workspace is open), an optional
-  first-run checklist, and a bottom-reserved composer. The former contextual
-  quick-action row and four suggestion cards are not rendered; task entry
-  starts directly in the composer (D131/D204).
+  first-run checklist, four compact developer starter cards, and a
+  bottom-reserved composer. Starter cards prefill the composer without
+  sending or creating a turn; task entry remains directly available in the
+  composer (D205).
 - With transcript: message stream + tool disclosure rows (D071), a contextual
   message-scoped review card immediately after each successful workspace
   Write/Edit row, docked composer, and a session-scoped permission card inline.

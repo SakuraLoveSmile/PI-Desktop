@@ -1,8 +1,9 @@
-import { memo, useDeferredValue, useEffect, useMemo, useRef } from "react";
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BrandLogo } from "./BrandLogo";
 import { ChatTranscript } from "./ChatTranscript";
-import { Composer } from "./Composer";
+import { Composer, type ComposerPrefill } from "./Composer";
+import { HomeStarterPrompts } from "./HomeStarterPrompts";
 import { IconX } from "./icons";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { useAppStore } from "../stores/app-store";
@@ -52,6 +53,7 @@ export const ChatSurface = memo(function ChatSurface() {
       ? state.planningStates[state.activeSessionId]
       : undefined,
   );
+  const [homePrefill, setHomePrefill] = useState<ComposerPrefill | null>(null);
 
   const heroProject = useMemo(
     () => projectName(workspace?.path, workspace?.name),
@@ -93,6 +95,13 @@ export const ChatSurface = memo(function ChatSurface() {
       : previousTranscriptViewRef.current;
   const sessionSwitching =
     Boolean(selectingSessionId) || transcriptView.sessionId !== activeSessionId;
+
+  const prefillHomeComposer = (text: string) => {
+    setHomePrefill((current) => ({
+      text,
+      token: (current?.token ?? 0) + 1,
+    }));
+  };
 
   useEffect(() => {
     if (deferredSessionId === activeSessionId) {
@@ -149,12 +158,14 @@ export const ChatSurface = memo(function ChatSurface() {
                     t("chat.emptyTitle")
                   )}
                 </h1>
+                <p className="empty-hero-subtitle">{t("chat.emptySubtitle")}</p>
               </div>
+              <HomeStarterPrompts onPrefill={prefillHomeComposer} />
               <OnboardingChecklist />
             </div>
           </div>
           <div className="home-composer-wrap">
-            <StableComposer variant="home" />
+            <StableComposer variant="home" prefill={homePrefill} />
           </div>
         </div>
       ) : (

@@ -52,9 +52,10 @@ test("crash and empty-home copy is catalog-backed in English and Chinese", () =>
   assert.match(english, /uiCrashed:\s*"Something went wrong with the interface"/);
   assert.match(chinese, /uiCrashed:\s*"界面出现了问题"/);
   assert.match(app, /i18n\.t\("app\.uiCrashed"\)/);
-  assert.match(chinese, /emptyTitle:\s*"今天想做什么？"/);
+  assert.match(chinese, /emptyTitle:\s*"今天想做点什么？"/);
   assert.match(
     chinese,
-    /emptyTitleInProject:\s*"要在 \{\{project\}\} 里做什么？"/,
+    /emptyTitleInProject:\s*"今天想在 \{\{project\}\} 里做点什么？"/,
   );
+  assert.match(chinese, /emptySubtitle:\s*"从一个任务开始，或者选择一个方向。"/);
 });
