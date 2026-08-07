@@ -88,9 +88,11 @@ Codex as a visual reference. The identity contract is deliberately small:
   rather than Electron.
 - The empty-home hero uses a 100px `HomeMascotLogo` compiled from the remaining
   supplied `docs/ip` frame sheets into nine static-pose groups (50 transparent
-  frames total). Each mount selects one group at random and plays only that
-  group at a restrained pace by swapping discrete frames inside the fixed
-  100px viewport; reduced motion holds the selected group's first frame.
+  frames total). Each mount selects one group at random; after that group
+  finishes, the next group is randomized without immediately repeating the
+  previous one. Frames swap discretely inside the fixed 100px viewport, while
+  a single-frame pose holds briefly before the next selection. Reduced motion
+  holds the current group's first frame.
   `BrandLogo` remains 20px/18px in the expanded/collapsed sidebar and 64px in
   the startup splash. Composer prompt rows do not render a leading brand icon
   in either home or thread-docked mode.

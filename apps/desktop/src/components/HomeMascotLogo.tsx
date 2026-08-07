@@ -3,6 +3,7 @@ import mascotGroupsUrl from "../assets/home-mascot-groups.png";
 
 const FRAME_WIDTH = 100;
 const FRAME_DURATION_MS = 140;
+const STATIC_GROUP_DURATION_MS = 900;
 
 const MASCOT_GROUPS = [
   { startFrame: 0, frameCount: 1 },
@@ -16,9 +17,12 @@ const MASCOT_GROUPS = [
   { startFrame: 44, frameCount: 6 },
 ] as const;
 
-function chooseMascotGroup() {
-  const index = Math.floor(Math.random() * MASCOT_GROUPS.length);
-  return MASCOT_GROUPS[index] ?? MASCOT_GROUPS[0];
+function chooseMascotGroupIndex(previousIndex = -1) {
+  const candidates = MASCOT_GROUPS.map((_, index) => index).filter(
+    (index) => index !== previousIndex,
+  );
+  const index = Math.floor(Math.random() * candidates.length);
+  return candidates[index] ?? 0;
 }
 
 function usePrefersReducedMotion() {
@@ -37,22 +41,30 @@ function usePrefersReducedMotion() {
 }
 
 export function HomeMascotLogo() {
-  const [group] = useState(chooseMascotGroup);
+  const [groupIndex, setGroupIndex] = useState(() => chooseMascotGroupIndex());
   const [frameIndex, setFrameIndex] = useState(0);
   const prefersReducedMotion = usePrefersReducedMotion();
+  const group = MASCOT_GROUPS[groupIndex] ?? MASCOT_GROUPS[0];
 
   useEffect(() => {
-    if (prefersReducedMotion || group.frameCount <= 1) {
+    if (prefersReducedMotion) {
       setFrameIndex(0);
       return;
     }
 
-    const timer = window.setInterval(() => {
-      setFrameIndex((current) => (current + 1) % group.frameCount);
-    }, FRAME_DURATION_MS);
+    const duration = group.frameCount <= 1 ? STATIC_GROUP_DURATION_MS : FRAME_DURATION_MS;
+    const timer = window.setTimeout(() => {
+      if (frameIndex + 1 < group.frameCount) {
+        setFrameIndex((current) => current + 1);
+        return;
+      }
 
-    return () => window.clearInterval(timer);
-  }, [group.frameCount, prefersReducedMotion]);
+      setGroupIndex((current) => chooseMascotGroupIndex(current));
+      setFrameIndex(0);
+    }, duration);
+
+    return () => window.clearTimeout(timer);
+  }, [frameIndex, group.frameCount, groupIndex, prefersReducedMotion]);
 
   const frame = (group.startFrame + frameIndex) * FRAME_WIDTH;
   const style = {

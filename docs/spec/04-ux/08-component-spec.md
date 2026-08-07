@@ -387,9 +387,10 @@ visually distinct from list content.
   source at runtime for the sidebar and startup splash without a reload. The
   empty-home hero uses `HomeMascotLogo` at 100px: its transparent sprite is
   compiled from the remaining supplied `docs/ip` frame sheets into nine static-
-  pose groups (50 frames total). Each mount randomly selects one group and
-  swaps discrete atlas frames inside the fixed 100px viewport; reduced motion
-  holds its first frame. The
+  pose groups (50 frames total). Each mount randomly selects one group, then
+  chooses a different group after playback completes. It swaps discrete atlas
+  frames inside the fixed 100px viewport, holds single-frame poses briefly,
+  and holds the current group's first frame under reduced motion. The
   expanded/collapsed sidebar remains 20px/18px and the startup splash 64px.
   Home and thread-docked composer prompt rows do not render a leading brand
   icon.
