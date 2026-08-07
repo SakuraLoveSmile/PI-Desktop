@@ -199,14 +199,15 @@ Turned off — inside one hairline-separated panel. Each row stays to a two-line
 summary: plugin glyph, name, optional Local marker, id, and version. The group
 heading carries the state, while errors remain inline. Capabilities, resident
 service status, and risk-tinted permission chips are behind a native Details
-disclosure so the default list stays quiet without hiding them; the activation
-scope uses the compact icon-only track with accessible labels and tooltips.
-Quiet icon actions remain available on hover (open panel, overflow menu with
-auto-update and Uninstall) beside the scope control. MCP, Skills and Subagents
-provide their own scoped configuration and authoring surfaces. Subagents lists
-the registry definitions the user owns — each with an activation scope, an
-editor sheet, reveal and delete — above a read-only list of the effective
-delegate catalog (builtins and project `.pi/agents` documents),
+disclosure so the default list stays quiet without hiding them. The activation
+scope is one current-state trigger; its compact menu exposes Off / This project
+/ Everywhere and the selected-project picker without adding a second segmented
+toolbar. Quiet icon actions remain available on hover (open panel, overflow
+menu with auto-update and Uninstall), with visible hover/focus labels. MCP,
+Skills and Subagents provide their own scoped configuration and authoring
+surfaces. Subagents lists the registry definitions the user owns — each with an
+activation scope, an editor sheet, reveal and delete — above a read-only list of
+the effective delegate catalog (builtins and project `.pi/agents` documents),
 whose only actions are reveal and "copy as my definition" (D202).
 Marketplace is a card grid with category chips and skeleton placeholders.
 Development-only marketplace fixtures whose IDs begin with `demo.` are

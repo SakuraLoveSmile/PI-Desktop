@@ -185,9 +185,10 @@ heading carries Active / Turned off / Updates available / Needs attention, and
 load errors remain inline. Capabilities, resident service status, and
 risk-tinted permission chips are rendered inside a collapsed native Details
 disclosure; expanding it exposes the existing full readout without making every
-row tall. Installed rows use the compact icon-only scope track, while its
-accessible label and per-state tooltip preserve the meaning of Off / This
-project / Everywhere. This is a renderer-only presentation choice; plugin
+row tall. Installed rows use one current-state scope trigger; opening it shows
+the three scope choices with their explanations, and choosing This project
+opens the existing project picker. Row icon actions show their labels on hover
+and keyboard focus. This is a renderer-only presentation choice; plugin
 permissions and activation contracts are unchanged.
 
 The Detail sheet must show:

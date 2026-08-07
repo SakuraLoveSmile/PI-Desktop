@@ -80,6 +80,15 @@ test("installed rows default to a calm summary with accessible details", () => {
   assert.match(section, /\.plugins-row-details\[open\] \.plugins-row-details-toggle > svg/);
 });
 
+test("installed row controls share one aligned rail and explain icon actions", () => {
+  const section = pluginsSection(stylesSource);
+
+  assert.match(section, /\.plugins-row-controls\s*\{[\s\S]*?margin-left:\s*auto/);
+  assert.match(section, /\.plugins-icon-btn\s*\{[\s\S]*?position:\s*relative/);
+  assert.match(section, /\.plugins-icon-btn\[data-tip\]::after\s*\{[\s\S]*?content: attr\(data-tip\)/);
+  assert.match(section, /\.plugins-icon-btn\[data-tip\]:focus-visible::after/);
+});
+
 // The 46px titlebar band floats over the destination pages: it is a native drag
 // rectangle, and on Windows/Linux the renderer-drawn window controls own its
 // rightmost 112px. The plugins page is the one destination page with controls in

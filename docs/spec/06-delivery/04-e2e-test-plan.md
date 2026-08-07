@@ -886,7 +886,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: At least one enabled plugin, one disabled plugin, and one plugin whose load failed.
 - **Steps**: 1) Open Extensions → Installed. 2) Read the tab and group counts. 3) Confirm the failed plugin sits under Needs attention with its error message. 4) Search by author and by permission. 5) Clear the search.
-- **Expected**: Rows group as Needs attention / Updates available / Active / Turned off with counts; `status: "error" | "load_error"` renders the error message inline instead of being silent; each row defaults to a two-line name/id/version summary, while a Details disclosure reveals risk-tinted permission chips, capabilities, and resident service status; the compact scope track remains keyboard and tooltip accessible; the result count reflects the filtered subset and clearing restores every group.
+- **Expected**: Rows group as Needs attention / Updates available / Active / Turned off with counts; `status: "error" | "load_error"` renders the error message inline instead of being silent; each row defaults to a two-line name/id/version summary, while a Details disclosure reveals risk-tinted permission chips, capabilities, and resident service status; the single scope trigger opens explained Off / This project / Everywhere choices and the project picker; row icon actions expose hover/focus labels; the result count reflects the filtered subset and clearing restores every group.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `07-plugins/13-plugin-permissions-matrix.md`
 - **Acceptance**: G (installed plugin management)
 - **Status**: Documented
@@ -963,17 +963,18 @@ Each scenario is documented in this format:
   without a four-card numeric overview band. 3) Confirm installed rows begin
   as a quiet two-line summary, then expand Details on one row and inspect its
   capabilities, service status, and permissions. 4) Use the compact scope
-  control, contextual primary action, and a secondary update/action button. 5)
+  control and its explained scope menu, contextual primary action, and a
+  secondary update/action button. 5)
   Switch to light theme and repeat. 6) Keyboard-focus the Details disclosure,
   scope states, and each action.
 - **Expected**: The four numeric overview cards are absent; tab counts,
   installed group counts, and any update alert remain available in their
   relevant surfaces. Installed rows keep their default height low while the
-  disclosure exposes the complete secondary readout. Scope states remain
-  understandable through accessible labels/tooltips. Primary and secondary
-  buttons keep visible semantic surfaces, text, borders, hover states, and
-  focus rings in both themes, and keyboard focus does not depend on pointer
-  hover.
+  disclosure exposes the complete secondary readout. The scope trigger stays
+  aligned with the row action rail, its menu explains each state, and icon
+  actions show labels on hover and focus. Primary and secondary buttons keep
+  visible semantic surfaces, text, borders, hover states, and focus rings in
+  both themes, and keyboard focus does not depend on pointer hover.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `07-plugins/07-plugin-marketplace.md`, ADR 0058, D196
 - **Acceptance**: G (Extensions page) + Quality

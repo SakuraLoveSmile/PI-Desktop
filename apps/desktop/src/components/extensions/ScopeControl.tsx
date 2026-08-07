@@ -11,18 +11,24 @@ import {
   type ProjectRecord,
 } from "@pi-desktop/shared";
 import { cx } from "../ui";
-import { IconCheck, IconFolder, IconGlobe, IconPower, IconSearch, IconX } from "../icons";
+import {
+  IconCheck,
+  IconChevronDown,
+  IconFolder,
+  IconGlobe,
+  IconPower,
+  IconSearch,
+  IconX,
+} from "../icons";
 
 /**
  * The one control that answers both questions an extension raises: is it on, and
  * where does it apply. Plugins, MCP servers and user skills all render this, so a
  * user learns the affordance once.
  *
- * Three states in one track, left to right by increasing reach — Off, This
- * project, Everywhere — because a segmented control makes the alternatives
- * visible in a way a switch plus a hidden menu never does. Choosing the middle
- * segment opens the project list, so scoping is one gesture rather than a switch
- * followed by a hunt for the folder picker.
+ * The full form keeps all three states visible. Dense installed-plugin rows use
+ * one current-state trigger instead, with the same three choices in a small
+ * menu so the row does not become a second toolbar.
  */
 export type ScopeTarget = {
   enabled: boolean;
@@ -33,14 +39,14 @@ export type ScopeControlProps = {
   target: ScopeTarget;
   /** Accessible name of the thing being scoped, e.g. the plugin's name. */
   label: string;
-  /** The project open in this window, offered first and used by the middle segment. */
+  /** The project open in this window, offered first by the This project choice. */
   currentProjectPath?: string | null;
   /** Everything the picker can offer, newest-first as the sidebar orders them. */
   projects: readonly ProjectRecord[];
   onSetEnabled: (enabled: boolean) => void | Promise<void>;
   onSetScope: (scope: ActivationScope) => void | Promise<void>;
   disabled?: boolean;
-  /** Renders without the segment labels, for dense rows. */
+  /** Renders one current-state trigger with a menu, for dense rows. */
   compact?: boolean;
 };
 
@@ -83,11 +89,41 @@ export function ScopeControl({
 }: ScopeControlProps) {
   const { t } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [compactOpen, setCompactOpen] = useState(false);
+  const compactWrapRef = useRef<HTMLDivElement | null>(null);
+  const [compactFlipUp, setCompactFlipUp] = useState(false);
   const state = activationState(target);
   const scope = resolveScope(target.scope);
 
+  useEffect(() => {
+    if (!compact || !compactOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!compactWrapRef.current?.contains(event.target as Node)) {
+        setCompactOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setCompactOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [compact, compactOpen]);
+
+  useLayoutEffect(() => {
+    if (!compact || !compactOpen) return;
+    const rect = compactWrapRef.current?.getBoundingClientRect();
+    if (rect) setCompactFlipUp(window.innerHeight - rect.bottom < 220);
+  }, [compact, compactOpen]);
+
   const select = (next: ActivationState) => {
     if (disabled) return;
+    setCompactOpen(false);
     if (next === state && next !== "projects") return;
     if (next === "off") {
       void onSetEnabled(false);
@@ -117,50 +153,129 @@ export function ScopeControl({
     setPickerOpen((open) => !open);
   };
 
+  const currentStateLabel =
+    state === "projects" && scope.projects.length > 0
+      ? t("extensions.scope.projectCount", { count: scope.projects.length })
+      : t(STATE_LABEL_KEYS[state]);
+
   return (
     <div className={cx("scope-control", compact && "is-compact")}>
-      <div
-        className="scope-track"
-        role="radiogroup"
-        aria-label={t("extensions.scope.ariaLabel", { name: label })}
-      >
-        {STATE_ORDER.map((option) => (
+      {compact ? (
+        <div className="scope-compact-wrap" ref={compactWrapRef}>
           <button
-            key={option}
             type="button"
-            role="radio"
-            aria-checked={state === option}
-            className={cx("scope-seg", state === option && "is-active")}
-            title={t(STATE_HINT_KEYS[option])}
+            className={cx("scope-compact-trigger", `is-${state}`)}
+            aria-label={`${t("extensions.scope.ariaLabel", { name: label })}: ${currentStateLabel}`}
+            aria-haspopup={pickerOpen ? "dialog" : "menu"}
+            aria-expanded={compactOpen || pickerOpen}
+            title={t(STATE_HINT_KEYS[state])}
+            data-tip={t(STATE_HINT_KEYS[state])}
             disabled={disabled}
-            onClick={() => select(option)}
+            onClick={() => {
+              if (pickerOpen) {
+                setPickerOpen(false);
+                return;
+              }
+              setCompactOpen((open) => !open);
+            }}
           >
-            <StateIcon state={option} />
-            {compact ? null : <span>{t(STATE_LABEL_KEYS[option])}</span>}
+            <StateIcon state={state} />
+            <span className="scope-compact-label">{currentStateLabel}</span>
+            <IconChevronDown className="scope-compact-chevron" size={12} />
           </button>
-        ))}
-      </div>
-      {state === "projects" ? (
-        <ScopeProjectsSummary
-          scope={scope}
-          projects={projects}
-          currentProjectPath={currentProjectPath}
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-          onSetScope={onSetScope}
-          label={label}
-        />
-      ) : null}
+          {compactOpen ? (
+            <div
+              className={cx("scope-compact-menu", compactFlipUp && "is-up")}
+              role="menu"
+              aria-label={t("extensions.scope.ariaLabel", { name: label })}
+            >
+              {STATE_ORDER.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={state === option}
+                  className={cx("scope-compact-option", state === option && "is-active")}
+                  title={t(STATE_HINT_KEYS[option])}
+                  disabled={disabled}
+                  onClick={() => select(option)}
+                >
+                  <StateIcon state={option} />
+                  <span className="scope-compact-option-copy">
+                    <span className="scope-compact-option-label">
+                      {t(STATE_LABEL_KEYS[option])}
+                    </span>
+                    <span className="scope-compact-option-hint">
+                      {t(STATE_HINT_KEYS[option])}
+                    </span>
+                  </span>
+                  {state === option ? <IconCheck size={13} /> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {state === "projects" ? (
+            <ScopeProjectsSummary
+              compact
+              anchorRef={compactWrapRef}
+              scope={scope}
+              projects={projects}
+              currentProjectPath={currentProjectPath}
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              onSetScope={onSetScope}
+              label={label}
+            />
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <div
+            className="scope-track"
+            role="radiogroup"
+            aria-label={t("extensions.scope.ariaLabel", { name: label })}
+          >
+            {STATE_ORDER.map((option) => (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={state === option}
+                className={cx("scope-seg", state === option && "is-active")}
+                title={t(STATE_HINT_KEYS[option])}
+                disabled={disabled}
+                onClick={() => select(option)}
+              >
+                <StateIcon state={option} />
+                <span>{t(STATE_LABEL_KEYS[option])}</span>
+              </button>
+            ))}
+          </div>
+          {state === "projects" ? (
+            <ScopeProjectsSummary
+              scope={scope}
+              projects={projects}
+              currentProjectPath={currentProjectPath}
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              onSetScope={onSetScope}
+              label={label}
+            />
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
 
 /**
- * The chip under the track that reports how many projects are selected, and the
- * popover that edits them. Kept separate so the track never reflows when the
- * picker opens.
+ * The project summary for the full control, plus the popover that edits the
+ * selected folders. The compact row keeps only the popover and folds its count
+ * into the current-state trigger.
  */
 function ScopeProjectsSummary({
+  compact = false,
+  anchorRef,
   scope,
   projects,
   currentProjectPath,
@@ -169,6 +284,8 @@ function ScopeProjectsSummary({
   onSetScope,
   label,
 }: {
+  compact?: boolean;
+  anchorRef?: { current: HTMLElement | null };
   scope: ActivationScope;
   projects: readonly ProjectRecord[];
   currentProjectPath?: string | null;
@@ -204,9 +321,9 @@ function ScopeProjectsSummary({
   // reads as a glitch.
   useLayoutEffect(() => {
     if (!open) return;
-    const rect = wrapRef.current?.getBoundingClientRect();
+    const rect = (anchorRef ?? wrapRef).current?.getBoundingClientRect();
     if (rect) setFlipUp(window.innerHeight - rect.bottom < 320);
-  }, [open]);
+  }, [anchorRef, open]);
 
   useEffect(() => {
     if (!open) setQuery("");
@@ -254,25 +371,29 @@ function ScopeProjectsSummary({
   const count = scope.projects.length;
 
   return (
-    <div className="scope-projects" ref={wrapRef}>
-      <button
-        type="button"
-        className={cx("scope-chip", count === 0 && "is-empty", open && "is-open")}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => onOpenChange(!open)}
-      >
-        <IconFolder size={12} />
-        {count === 0
-          ? t("extensions.scope.pickProjects")
-          : count === 1
-            ? projectLabel(scope.projects[0])
-            : t("extensions.scope.projectCount", { count })}
-      </button>
-      {count === 0 ? (
-        <span className="scope-warn" role="status">
-          {t("extensions.scope.noProjectsWarning")}
-        </span>
+    <div className={cx("scope-projects", compact && "is-compact")} ref={wrapRef}>
+      {!compact ? (
+        <>
+          <button
+            type="button"
+            className={cx("scope-chip", count === 0 && "is-empty", open && "is-open")}
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            onClick={() => onOpenChange(!open)}
+          >
+            <IconFolder size={12} />
+            {count === 0
+              ? t("extensions.scope.pickProjects")
+              : count === 1
+                ? projectLabel(scope.projects[0])
+                : t("extensions.scope.projectCount", { count })}
+          </button>
+          {count === 0 ? (
+            <span className="scope-warn" role="status">
+              {t("extensions.scope.noProjectsWarning")}
+            </span>
+          ) : null}
+        </>
       ) : null}
       {open ? (
         <div

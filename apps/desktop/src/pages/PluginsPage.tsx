@@ -1170,6 +1170,7 @@ export function PluginsPage() {
                                   className="plugins-icon-btn"
                                   aria-label={t("plugins.openPanel")}
                                   title={t("plugins.openPanel")}
+                                  data-tip={t("plugins.openPanel")}
                                   onClick={() =>
                                     void run(() => api.openPluginPanel(plugin.id))
                                   }
@@ -1188,6 +1189,7 @@ export function PluginsPage() {
                                     name: plugin.name,
                                   })}
                                   title={t("plugins.rowActions", { name: plugin.name })}
+                                  data-tip={t("plugins.rowActions", { name: plugin.name })}
                                   aria-haspopup="menu"
                                   aria-expanded={menuOpen}
                                   onClick={(event) => {

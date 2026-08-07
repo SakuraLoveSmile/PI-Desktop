@@ -104,6 +104,8 @@ test("installed plugin rows keep secondary detail behind a disclosure", () => {
   assert.match(pageSrc, /function PluginRowDetails/);
   assert.match(pageSrc, /<details className="plugins-row-details">/);
   assert.match(pageSrc, /<ScopeControl[\s\S]*?compact/);
+  assert.match(components.get("ScopeControl.tsx"), /scope-compact-trigger/);
+  assert.match(components.get("ScopeControl.tsx"), /scope-compact-menu/);
 
   const rowStart = pageSrc.indexOf('role="listitem"\n                          className={cx(');
   const controlsStart = pageSrc.indexOf('className="plugins-row-controls"', rowStart);
@@ -113,6 +115,13 @@ test("installed plugin rows keep secondary detail behind a disclosure", () => {
   assert.match(row, /<PluginRowDetails/);
   assert.doesNotMatch(row, /<CapabilityChips|<ServiceChips|<PermissionChips/);
   assert.doesNotMatch(row, /tagError|tagOff|autoUpdateOn/);
+});
+
+test("installed row icon actions expose visible hover and focus labels", () => {
+  assert.match(pageSrc, /data-tip=\{t\("plugins\.openPanel"\)\}/);
+  assert.match(pageSrc, /data-tip=\{t\("plugins\.rowActions", \{ name: plugin\.name \}\)\}/);
+  assert.match(styles, /\.plugins-icon-btn\[data-tip\]::after[\s\S]*?content: attr\(data-tip\)/);
+  assert.match(styles, /\.plugins-icon-btn\[data-tip\]:focus-visible::after/);
 });
 
 test("the client hides development-only demo plugins from marketplace results", () => {
@@ -322,6 +331,8 @@ test("extensions styles use design tokens and respect reduced motion", () => {
   assert.match(section, /\.ext-row-glyph\.is-ready\s*\{[\s\S]*?--ds-success/);
   assert.match(section, /\.ext-row-glyph\.is-failed\s*\{[\s\S]*?--ds-error/);
   assert.match(section, /\.scope-seg\.is-active\s*\{[\s\S]*?--ds-text-primary/);
+  assert.match(section, /\.scope-compact-trigger\s*\{[\s\S]*?--ds-text-secondary/);
+  assert.match(section, /\.scope-compact-menu\s*\{[\s\S]*?--ds-bg-elevated-opaque/);
   assert.match(section, /\.scope-chip\.is-empty\s*\{[\s\S]*?--ds-warning/);
   assert.match(section, /\.ext-row\.is-off/);
   assert.match(section, /\.ext-row\.menu-open/);
