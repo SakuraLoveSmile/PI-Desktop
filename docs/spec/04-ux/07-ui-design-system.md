@@ -73,9 +73,9 @@ Codex as a visual reference. The identity contract is deliberately small:
 - The sidebar shell name, settings copy, and composer placeholder use
   `PI-Desktop`; `Codex` is reserved for the external session-import source or
   historical design-reference text.
-- `build/icon_1024.png` is the canonical logo. `BrandLogo` imports it through
-  Vite so the renderer bundle, development Dock, and packaged application all
-  use the same visual asset.
+- `build/icon_1024.png` is the canonical shell logo. `BrandLogo` imports it
+  through Vite so the renderer bundle, development Dock, and packaged
+  application all use the same visual asset.
 - On macOS, both development and packaged launches expose `PI-Desktop` as the
   native application-menu name. The native About panel uses the PI-Desktop
   name, version, and canonical icon; no stock Electron name or icon is visible.
@@ -86,10 +86,12 @@ Codex as a visual reference. The identity contract is deliberately small:
   and NSIS shortcut identity stay aligned so native notifications,
   notification settings, and taskbar groups identify the app as `PI-Desktop`
   rather than Electron.
-- The home hero logo is 32px. Expanded/collapsed sidebar logos are 20px/18px.
-  Composer prompt rows do not render a leading brand icon in either home or
-  thread-docked mode. The image keeps its native colors in both themes and is
-  not replaced by a theme-tinted vector approximation.
+- The empty-home hero uses a 100px `HomeMascotLogo` compiled from the supplied
+  `docs/ip` frame sheets into a 58-frame transparent sprite. It advances at a
+  restrained pace and freezes on the first frame under reduced motion.
+  `BrandLogo` remains 20px/18px in the expanded/collapsed sidebar and 64px in
+  the startup splash. Composer prompt rows do not render a leading brand icon
+  in either home or thread-docked mode.
 - New-session controls use the dedicated message-plus icon at 15–16px. The
   generic plus icon remains reserved for non-session additions such as adding
   a project.
@@ -547,7 +549,8 @@ also explicitly suppressed or collapsed to a static state.
 ### 8.6 Prohibited motion
 
 - No parallax
-- No continuous background animations (particles, waves)
+- No continuous background animations (particles, waves); the bounded
+  foreground mascot loop is the explicit empty-home exception
 - No shimmer/skeleton animations longer than 1s loop — use simple fade-in for loading states
 - No bounce effects
 - No multi-second boot theatrical sequences; splash exits as soon as ready (+ min dwell)
@@ -613,8 +616,9 @@ model):
   controls remain icon-only and use the semantic hover wash
 - Empty hero title uses `var(--ds-text-primary)` (light override `#1a1c1f`);
   never hardcode light ink for shared hero styles
-- Empty-home branding stays quiet: the hero logo is 32px and the supporting
-  line stays short and muted so the composer remains the primary task surface
+- Empty-home branding stays quiet: the 100px mascot is the sole animated hero
+  mark, and the supporting line stays short and muted so the composer remains
+  the primary task surface
 - Night home composer plate styles are **dark-scoped only** (elevated-primary
   `#212121f5` + standard elevation-prominent)
 - Empty draft row keeps **one visible line / 28px optical minimum** so the

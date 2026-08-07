@@ -5,8 +5,18 @@ import { loadStyles } from "./helpers/styles.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [english, chinese, brandLogo, icons, sidebar, app, chatSurface, composer, styles] =
-  await Promise.all([
+const [
+  english,
+  chinese,
+  brandLogo,
+  icons,
+  sidebar,
+  app,
+  chatSurface,
+  composer,
+  styles,
+  mascotLogo,
+] = await Promise.all([
     read("../../../packages/i18n/src/locales/en/index.ts"),
     read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
     read("../src/components/BrandLogo.tsx"),
@@ -16,6 +26,7 @@ const [english, chinese, brandLogo, icons, sidebar, app, chatSurface, composer, 
     read("../src/components/ChatSurface.tsx"),
     read("../src/components/Composer.tsx"),
     loadStyles(),
+    read("../src/components/HomeMascotLogo.tsx"),
   ]);
 
 test("renderer surfaces the PI-Desktop brand instead of the Codex shell brand", () => {
@@ -36,8 +47,19 @@ test("app chrome uses the shared brand asset without branding the composer input
   assert.match(brandLogo, /src=\{.*brandLogoUrl/);
   assert.match(icons, /export const IconNewSession/);
   assert.doesNotMatch(icons, /IconCodexHome|IconCompose|IconPiMark|IconPiHome/);
-  assert.match(chatSurface, /<BrandLogo\s+size=\{32\}/);
-  assert.match(styles, /\.empty-hero-icon\s*\{[\s\S]*?height:\s*32px;[\s\S]*?width:\s*32px;/);
+  assert.match(chatSurface, /<HomeMascotLogo \/>/);
+  assert.match(mascotLogo, /home-mascot-frames\.png/);
+  assert.doesNotMatch(chatSurface, /<BrandLogo/);
+  assert.match(styles, /\.empty-hero-icon\s*\{[\s\S]*?height:\s*100px;[\s\S]*?width:\s*100px;/);
+  assert.match(
+    styles,
+    /\.home-mascot-logo\s*\{[\s\S]*?background-size:\s*5800px 100px;[\s\S]*?animation:\s*home-mascot-frames 5\.8s steps\(58, end\) infinite;/,
+  );
+  assert.match(styles, /@keyframes home-mascot-frames/);
+  assert.match(
+    styles,
+    /prefers-reduced-motion:\s*reduce[\s\S]*?\.home-mascot-logo\s*\{[\s\S]*?animation:\s*none !important;/,
+  );
   assert.doesNotMatch(composer, /<BrandLogo/);
   assert.doesNotMatch(composer, /composer-thread-mark/);
   assert.doesNotMatch(styles, /\.composer-thread-mark/);

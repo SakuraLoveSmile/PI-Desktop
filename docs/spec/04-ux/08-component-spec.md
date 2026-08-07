@@ -384,11 +384,13 @@ visually distinct from list content.
 - `BrandLogo` imports canonical `build/icon_1024.png` through Vite for light
   mode, and `build/logo_dark.png` for dark mode. The component subscribes to
   `document.documentElement[data-theme]` via a `MutationObserver` and swaps the
-  source at runtime, so the logo matches the active theme in the sidebar,
-  empty-home hero, and startup splash without a reload. The empty-home hero
-  renders it at 32px, the expanded/collapsed sidebar at 20px/18px, the startup
-  splash at 64px. Home and thread-docked composer prompt rows do not render a
-  leading brand icon.
+  source at runtime for the sidebar and startup splash without a reload. The
+  empty-home hero uses `HomeMascotLogo` at 100px: its transparent 58-frame
+  sprite is compiled from the supplied `docs/ip` frame sheets, loops at a
+  restrained pace, and holds its first frame under reduced motion. The
+  expanded/collapsed sidebar remains 20px/18px and the startup splash 64px.
+  Home and thread-docked composer prompt rows do not render a leading brand
+  icon.
 - Project and Temporary session creation controls render the dedicated
   message-plus session icon. Generic
   `IconPlus` remains reserved for adding non-session entities.

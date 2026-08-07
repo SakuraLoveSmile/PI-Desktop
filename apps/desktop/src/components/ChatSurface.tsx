@@ -1,8 +1,8 @@
 import { memo, useDeferredValue, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { BrandLogo } from "./BrandLogo";
 import { ChatTranscript } from "./ChatTranscript";
 import { Composer } from "./Composer";
+import { HomeMascotLogo } from "./HomeMascotLogo";
 import { IconX } from "./icons";
 import { OnboardingChecklist } from "./OnboardingChecklist";
 import { useAppStore } from "../stores/app-store";
@@ -128,7 +128,7 @@ export const ChatSurface = memo(function ChatSurface() {
             <div className="home-stack-inner">
               <div className="empty-hero">
                 <div className="empty-hero-icon" data-testid="home-icon" aria-hidden>
-                  <BrandLogo size={32} />
+                  <HomeMascotLogo />
                 </div>
                 <h1>
                   {heroProject ? (

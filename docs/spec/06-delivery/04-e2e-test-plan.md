@@ -1166,9 +1166,10 @@ Each scenario is documented in this format:
   empty-home hero and docked composer. 3) Focus the footer Settings and
   Plugins icons, then each project/Temporary session create control. 4) Open
   Settings and the composer input.
-- **Expected**: Visible shell identity reads `PI-Desktop`; the home hero and
-  expanded/collapsed sidebar render the canonical `build/icon_1024.png` asset
-  through `BrandLogo`, while the docked composer prompt row has no leading
+- **Expected**: Visible shell identity reads `PI-Desktop`; the empty-home hero
+  renders the 100px `HomeMascotLogo` frame sprite, while the expanded/collapsed
+  sidebar renders the canonical `build/icon_1024.png` asset through `BrandLogo`
+  and the docked composer prompt row has no leading
   brand icon or reserved icon slot and its text aligns directly with the input
   gutter. The footer Settings and Plugins actions are compact icon buttons;
   Plugins sits immediately to the right of Settings and exposes a localized
@@ -2366,15 +2367,19 @@ Each scenario is documented in this format:
 - **Preconditions**: App running; theme can switch between light and dark (and system) without restart.
 - **Steps**:
   1. In light mode, open the app shell, an empty chat home, and the expanded sidebar (Windows/Linux) or startup splash.
-  2. Inspect the rendered `BrandLogo` source in each surface.
+  2. Inspect the rendered `BrandLogo` source in the sidebar and startup splash,
+     and inspect the `HomeMascotLogo` frame animation in the empty-home hero.
   3. Switch the theme to dark (Settings → Basics → Appearance, or system appearance change).
   4. Re-inspect the same surfaces without reloading.
   5. Switch back to light and re-inspect.
 - **Expected**:
-  - Light mode everywhere renders `build/icon_1024.png` (the canonical light logo).
-  - Dark mode everywhere renders `build/logo_dark.png` (the dark logo variant).
-  - The swap is live: changing `data-theme` updates the logo source in the sidebar, empty-home hero, and startup splash without a window reload.
-  - Sizes stay stable across theme changes (sidebar 20px, hero 32px, splash 64px), and the logo stays decorative with no change to click/keyboard/focus behavior.
+  - Light and dark mode render `build/icon_1024.png` / `build/logo_dark.png`
+    live in the sidebar and startup splash without a window reload.
+  - The empty-home hero renders the 100px, 58-frame mascot sprite; under
+    reduced motion it holds the first frame.
+  - Sizes stay stable across theme changes (sidebar 20px, hero 100px, splash
+    64px), and the marks stay decorative with no click, keyboard, or focus
+    behavior.
 - **Specs linked**: `04-ux/08-component-spec.md` §3.7, `04-ux/07-ui-design-system.md`
 - **Acceptance**: Quality
 - **Milestone**: M5
@@ -3742,10 +3747,10 @@ This test plan spec is accepted when:
   row, with no Logo/Home brand or back/forward buttons.
 
 ### US-UI-17 PI-Desktop home hero logo
-- On empty chat home, the canonical PI-Desktop PNG renders at 32px above the
-  title with its native colors and no decorative hover state.
-- The hero logo is theme-aware: light mode shows `build/icon_1024.png`, dark
-  mode shows `build/logo_dark.png`, and the swap tracks `data-theme` live.
+- On empty chat home, the 100px `HomeMascotLogo` renders above the title using
+  the 58 transparent mascot frames compiled from the supplied `docs/ip` sheets.
+- The animation loops without interaction, keeps the sprite's native pixel-art
+  colors, and holds the first frame under reduced motion.
 - Title is 28px / weight 400; active project name uses dotted underline (1px, offset 4px).
 - Composer does not render attachment or appshot controls before their payload
   reaches pi end to end.

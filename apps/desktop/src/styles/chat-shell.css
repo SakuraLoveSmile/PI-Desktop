@@ -371,15 +371,35 @@
 
 .empty-hero-icon {
   display: flex;
-  height: 32px;
-  width: 32px;
+  height: 100px;
+  width: 100px;
   align-items: center;
   justify-content: center;
-  color: var(--ds-text-primary);
   opacity: 1;
   cursor: default;
   -webkit-user-select: none;
   user-select: none;
+}
+
+.home-mascot-logo {
+  width: 100px;
+  height: 100px;
+  flex: 0 0 auto;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  background-size: 5800px 100px;
+  image-rendering: pixelated;
+  animation: home-mascot-frames 5.8s steps(58, end) infinite;
+}
+
+@keyframes home-mascot-frames {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: -5700px 0;
+  }
 }
 
 .empty-hero h1 {
