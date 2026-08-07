@@ -23,6 +23,13 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.5.4",
+    date: "2026-08-08",
+    highlights: [
+      "Refine the empty-home mascot with slower idle pose changes and continuous playback on hover.",
+    ],
+  },
+  {
     version: "0.5.0",
     date: "2026-08-07",
     highlights: [
@@ -212,6 +219,13 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.5.4",
+    date: "2026-08-08",
+    highlights: [
+      "优化空首页宠物的待机节奏，让动作切换更自然，并在鼠标悬停时连续播放。",
+    ],
+  },
   {
     version: "0.5.0",
     date: "2026-08-07",
