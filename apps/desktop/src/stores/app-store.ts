@@ -60,6 +60,7 @@ import {
   type SessionMeta,
   type SessionSort,
 } from "../lib/sidebar-preferences";
+import { createFrameBatcher } from "../lib/frame-batcher";
 import { formatToolValue } from "../lib/tool-display";
 import { withReviewChangeState } from "../lib/workspace-review";
 import {
@@ -650,6 +651,20 @@ function withCompactionMark(
 ): ContextCompactionMark[] {
   return [...(marks ?? []).filter((existing) => existing.id !== mark.id), mark];
 }
+
+let flushingStreamUpdates = false;
+const streamUpdates = createFrameBatcher<AgentEventEnvelope>((envelopes) => {
+  flushingStreamUpdates = true;
+  try {
+    for (const envelope of envelopes) {
+      // Re-enter the public action with batching disabled so all regular
+      // session/tool lifecycle ordering stays in one place.
+      useAppStore.getState().handleAgentEvent(envelope);
+    }
+  } finally {
+    flushingStreamUpdates = false;
+  }
+});
 
 export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
@@ -2444,6 +2459,25 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   handleAgentEvent: (envelope) => {
     const event = envelope.event;
+    if (!flushingStreamUpdates) {
+      if (event.type === "message_update") {
+        streamUpdates.enqueue(
+          `message:${envelope.sessionId}:${event.message.id}`,
+          envelope,
+        );
+        return;
+      }
+      if (event.type === "tool_update") {
+        streamUpdates.enqueue(
+          `tool:${envelope.sessionId}:${event.toolCallId}`,
+          envelope,
+        );
+        return;
+      }
+      // Terminal and control events must observe every pending partial update
+      // before they settle running/error state.
+      streamUpdates.flushNow();
+    }
     // Per-session run state: agents run independently per session, so track
     // running/finished for every envelope, visible session or not.
     if (

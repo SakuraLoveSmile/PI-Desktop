@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -360,6 +361,10 @@ export function WorkPanel({
   const activeLabel = activeTab ? tabLabel(activeTab, t) : t("panel.title");
   const ActiveIcon = activeTab ? TAB_ICONS[activeTab.kind] : IconDiff;
   const exitAnimationReady = exiting && nativeSurfaceReadyForExit;
+  const panelStyle = {
+    width: renderWidth,
+    "--work-panel-width": `${renderWidth}px`,
+  } as CSSProperties;
 
   return (
     <aside
@@ -368,7 +373,7 @@ export function WorkPanel({
         exiting && !exitAnimationReady && "is-exit-pending",
         exitAnimationReady && "is-exiting",
       )}
-      style={{ width: renderWidth }}
+      style={panelStyle}
       data-testid="work-panel"
       data-resizing={dragWidth === null ? undefined : "true"}
       data-exiting={exiting ? "true" : undefined}

@@ -9,13 +9,20 @@
   position: relative;
   display: flex;
   flex-direction: row;
-  flex: 0 0 auto;
-  min-width: 244px;
+  flex: 0 0 var(--work-panel-width);
+  width: var(--work-panel-width);
+  min-width: 0;
   height: 100%;
   min-height: 0;
+  z-index: 20;
   background: var(--ds-bg-primary);
   border-left: 1px solid var(--ds-border-subtle);
-  /* Compositor-friendly dock: opacity + ≤8px slide (design-system §8.7). */
+  /*
+   * Animate the allocated dock width as well as its small compositor slide.
+   * Transform-only feedback used to leave the flex item at full width before
+   * the animation painted, which made the chat column jump on every open or
+   * close.
+   */
   animation: work-panel-in var(--motion-duration-normal) var(--motion-ease-out)
     both;
 }
@@ -26,6 +33,7 @@
 }
 
 .work-panel.is-exiting {
+  overflow: hidden;
   animation: work-panel-out var(--motion-duration-fast) var(--motion-ease-in)
     both;
 }
@@ -33,10 +41,14 @@
 @keyframes work-panel-in {
   from {
     opacity: 0;
+    flex-basis: 0;
+    width: 0;
     transform: translateX(8px);
   }
   to {
     opacity: 1;
+    flex-basis: var(--work-panel-width);
+    width: var(--work-panel-width);
     transform: translateX(0);
   }
 }
@@ -44,10 +56,14 @@
 @keyframes work-panel-out {
   from {
     opacity: 1;
+    flex-basis: var(--work-panel-width);
+    width: var(--work-panel-width);
     transform: translateX(0);
   }
   to {
     opacity: 0;
+    flex-basis: 0;
+    width: 0;
     transform: translateX(8px);
   }
 }
@@ -57,9 +73,13 @@
    bounded slide still communicates the state change without a full-pane flash. */
 @keyframes work-panel-out-windows {
   from {
+    flex-basis: var(--work-panel-width);
+    width: var(--work-panel-width);
     transform: translateX(0);
   }
   to {
+    flex-basis: 0;
+    width: 0;
     transform: translateX(8px);
   }
 }

@@ -155,7 +155,7 @@
 
 .sidebar {
   width: var(--ds-sidebar-width);
-  min-width: 240px;
+  min-width: 0;
   max-width: 520px;
   height: 100%;
   min-height: 0;
@@ -166,7 +166,11 @@
   background: var(--ds-bg-sidebar, var(--ds-bg-primary));
   /* Codex expanded shell: continuous sidebar/main edge (hairline only) */
   border-right: 1px solid color-mix(in oklab, var(--ds-text-primary) 4%, transparent);
-  /* Mount/exit dock animation (design-system §8.7, mirrors work-panel). */
+  /*
+   * Animate the flex allocation with the dock motion. A transform-only
+   * animation leaves MainChat at its final width before the first frame,
+   * making sidebar collapse feel like a layout jump.
+   */
   animation: sidebar-in var(--motion-duration-normal) var(--motion-ease-out) both;
 }
 
@@ -178,10 +182,14 @@
 @keyframes sidebar-in {
   from {
     opacity: 0;
+    flex-basis: 0;
+    width: 0;
     transform: translateX(-8px);
   }
   to {
     opacity: 1;
+    flex-basis: var(--ds-sidebar-width);
+    width: var(--ds-sidebar-width);
     transform: translateX(0);
   }
 }
@@ -189,10 +197,14 @@
 @keyframes sidebar-out {
   from {
     opacity: 1;
+    flex-basis: var(--ds-sidebar-width);
+    width: var(--ds-sidebar-width);
     transform: translateX(0);
   }
   to {
     opacity: 0;
+    flex-basis: 0;
+    width: 0;
     transform: translateX(-8px);
   }
 }
@@ -201,9 +213,13 @@
    frameless window background (mirrors work-panel-out-windows). */
 @keyframes sidebar-out-windows {
   from {
+    flex-basis: var(--ds-sidebar-width);
+    width: var(--ds-sidebar-width);
     transform: translateX(0);
   }
   to {
+    flex-basis: 0;
+    width: 0;
     transform: translateX(-8px);
   }
 }

@@ -13,18 +13,15 @@
   container-name: composer-stack;
 }
 
-/* Thread mode: floating bottom dock with fade */
+/* Thread mode: floating bottom dock. The transcript already reserves the
+ * composer's measured height, so a full-width gradient veil is unnecessary
+ * and makes the lower half of the conversation look hazy. */
 .composer-dock-docked {
   position: absolute;
   inset-inline: 0;
   bottom: 0;
   padding: 0 24px 16px;
-  background: linear-gradient(
-    to top,
-    var(--ds-bg-primary) 52%,
-    color-mix(in oklab, var(--ds-bg-primary) 72%, transparent) 78%,
-    transparent
-  );
+  background: transparent;
 }
 
 /* Home mode: part of centered stack — no absolute dock, no bottom gradient veil */

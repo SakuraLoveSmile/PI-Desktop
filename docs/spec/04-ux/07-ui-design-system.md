@@ -570,6 +570,13 @@ High-frequency workstation feedback must remain compositor-friendly and bounded:
   reachable without introducing horizontal page overflow.
 - Stream-driven updates never restart route or shell animations. Every enter
   effect is mount/state-transition feedback, not a response to token arrival.
+- Sidebar and work-panel dock transitions animate their allocated `width` and
+  `flex-basis` together with the bounded opacity/transform offset. MainChat must
+  reflow continuously during the 150–200ms transition, never jump to the final
+  dock width before the first painted frame.
+- Replaceable streamed message/tool partials may be coalesced until the next
+  animation frame; terminal, permission, planning, and error states flush first
+  and remain synchronous.
 - Reduced-motion mode keeps every state change and scroll destination but uses
   near-zero animation durations and instant rather than smooth programmatic
   scrolling.
@@ -595,7 +602,7 @@ Empty chat home uses a **single scrollable vertical stack** inside
 - Short windows (`max-height ≤ 760px`) top-align the stack and keep every
   block reachable by scrolling; the composer must not cover the checklist
 - Composer is **not** absolute-docked on empty home; thread mode keeps the
-  bottom dock + fade veil
+  bottom dock and reserves its measured height without a full-width fade veil
 - Composer radius uses Codex `radius-3xl-base` (**20px** / `1.25rem`)
 - Empty-home composer height is content-driven: a one-line draft renders the
   compact shell, grows with the draft through seven visible rows, and then
@@ -618,7 +625,8 @@ Empty chat home uses a **single scrollable vertical stack** inside
 - Floating composer plates use one solid semantic surface with no internal
   gradient: `--ds-bg-composer` in light and elevated-primary in dark. A
   hairline stroke plus the restrained `--elevation-prominent` shadow provides
-  separation; the docked transcript fade remains outside the input surface.
+  separation; the transcript reserves the measured dock height instead of
+  painting a full-width gradient veil.
 - Dark elevated shell reads as elevated-primary (`#212121f5` / gray-800 96%)
   on `#181818` with standard elevation-prominent
 

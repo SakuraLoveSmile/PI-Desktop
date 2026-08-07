@@ -2,6 +2,7 @@ import {
   Fragment,
   memo,
   useCallback,
+  useDeferredValue,
   useEffect,
   useId,
   useLayoutEffect,
@@ -1131,11 +1132,15 @@ const ActivityGroup = memo(function ActivityGroup({
     Math.floor(((isActive ? now : completedAt) - startedAt) / 1000),
   );
   const elapsed = formatToolDuration(elapsedSeconds);
-  const failed = items.some((item) =>
+  const hasFailure = items.some((item) =>
     item.kind === "tool"
       ? item.message.toolStatus === "error"
       : item.message.status === "error",
   );
+  // A provider/tool retry can leave an intermediate error row while the
+  // active turn is still running. Do not paint the whole group as terminally
+  // failed until the run has actually settled.
+  const failed = !isActive && hasFailure;
   const lastItem = items[items.length - 1];
   const thinkingNow =
     isActive &&
@@ -1769,9 +1774,15 @@ export const ChatTranscript = memo(function ChatTranscript({
     return () => ro.disconnect();
   }, [scheduleFollowScroll]);
 
+  // Store updates are intentionally immediate for controls and status, but a
+  // streamed token should not force the full historical transcript tree to
+  // rebuild at the same priority. React keeps the latest tail responsive and
+  // schedules this heavier projection between paints.
+  const renderedMessages = useDeferredValue(messages);
+  const renderedCompactions = useDeferredValue(compactions);
   const { entries, visible } = useMemo(
-    () => buildTranscriptEntries(messages, compactions),
-    [messages, compactions],
+    () => buildTranscriptEntries(renderedMessages, renderedCompactions),
+    [renderedMessages, renderedCompactions],
   );
   const lastEntry = entries[entries.length - 1];
   const lastTurnPart =

@@ -84,8 +84,10 @@ test("work panel is an internal dock that never expands the OS window", () => {
   assert.match(panelSource, /exitAnimationReady && "is-exiting"/);
   assert.match(panelSource, /if \(!exitAnimationReady\) return/);
   assert.match(panelSource, /animationName\.startsWith\("work-panel-out"\)/);
-  // The panel remains a fixed-width in-flow shell sibling; the window never grows.
-  assert.match(globalStyles, /\.work-panel \{[^}]*flex: 0 0 auto/s);
+  // The panel remains a fixed-width in-flow shell sibling; its flex allocation
+  // is animated with the dock so the main pane does not jump before motion.
+  assert.match(globalStyles, /\.work-panel \{[^}]*flex: 0 0 var\(--work-panel-width\)/s);
+  assert.match(panelSource, /"--work-panel-width": `\$\{renderWidth\}px`/);
   assert.doesNotMatch(
     globalStyles.match(/\.work-panel \{[^}]*\}/s)?.[0] ?? "",
     /position:\s*absolute/,
@@ -98,7 +100,11 @@ test("work panel is an internal dock that never expands the OS window", () => {
   );
   assert.match(
     globalStyles,
-    /@keyframes work-panel-in \{[^}]*translateX\(8px\)/s,
+    /@keyframes work-panel-in \{[^}]*flex-basis:\s*0;[^}]*width:\s*0;[^}]*translateX\(8px\)/s,
+  );
+  assert.match(
+    globalStyles,
+    /@keyframes work-panel-out \{[\s\S]*?flex-basis:\s*0;[\s\S]*?width:\s*0;/,
   );
 });
 

@@ -507,6 +507,10 @@ may be retained while exactly one workspace supplies the visible shell context.
 - Consecutive tool activity is wrapped in one collapsed processing group. Its
   header updates elapsed time once per second while active, freezes after the
   next transcript message, and exposes the number of contained steps.
+- A failed row inside an active group is an intermediate result while the
+  bounded provider/tool retry or follow-up may still recover. The group uses
+  terminal failure styling only after the active run settles; the individual
+  failed row remains visible immediately.
 - Expanding the processing group reveals the ordered rows; each row retains its
   own nested disclosure for output and input.
 - Activating the row reveals clamped output first and raw input second.
@@ -694,12 +698,16 @@ Work-panel width resizing is implemented in MVP:
 - The committed width clamps to the fixed `244px–720px` range.
 - Pointer movement is frame-coalesced. Pointer release persists one committed
   preferred width; Escape, pointer cancellation, and lost capture roll back both.
+- Opening and closing animate the dock's `width` and `flex-basis` together with
+  the bounded opacity/transform feedback, so MainChat reflows continuously
+  instead of changing width before the first motion frame.
 - The renderer always requests a native reservation width of 0, so the OS window
   never expands (ADR 0033). Opening, collapse, and final close change only the
   committed preferred width. Repeating a target is idempotent.
-- MainChat keeps its width across open, commit, collapse, and close because the
-  window does not change; when the fixed window is too narrow for both panel and
-  a readable chat, chat reflows below its 360px target.
+- MainChat reflows continuously while the panel flex allocation opens or
+  closes, then remains at the settled client width; the window does not change.
+  When the fixed window is too narrow for both panel and a readable chat, chat
+  may reflow below its 360px target.
 - Native window and sidebar resize never clamp or rewrite the panel. Native
   edges resize MainChat by reflow only.
 - Maximized/fullscreen is unaffected; display/work-area changes reconcile the

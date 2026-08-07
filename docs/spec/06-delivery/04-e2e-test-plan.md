@@ -1433,7 +1433,10 @@ Each scenario is documented in this format:
   titlebar/menu launcher, or Cmd/Ctrl+J action. Each artifact atomically opens
   the docked third column and creates or activates one resource; file resources
   are path-keyed and repeated resources deduplicate. Opening, collapse, and
-  divider commit never change the OS window size — only MainChat reflows inside
+  closing animate the panel's width/flex allocation with its bounded
+  opacity/slide, so MainChat reflows continuously without a pre-animation jump.
+  Opening the panel, collapsing it, or committing a divider resize never
+  changes the OS window size — only MainChat reflows inside
   the fixed client area (ADR 0033). Once the panel is open, a single unified
   context trigger opens one dropdown that lists the four tools first, in a fixed
   order, with a fill plus 2px edge marker for the active row and a dot for open
@@ -2173,9 +2176,10 @@ Each scenario is documented in this format:
   re-expands the sidebar (regression: it must never re-collapse). 5) Collapse
   and re-expand once more via the shortcut, then repeat the full round trip
   with the pointer controls. 6) Repeat on Windows/Linux.
-- **Expected**: Collapse plays the `sidebar-out` keyframe (opacity + ≤8px slide)
-  while the aside stays in the tree, then unmounts once the animation ends; the
-  main pane fills the freed space. Expand plays the `sidebar-in` keyframe and
+- **Expected**: Collapse plays the `sidebar-out` keyframe (opacity + ≤8px slide
+  plus width/flex allocation) while the aside stays in the tree, then unmounts
+  once the animation ends; the main pane fills the freed space continuously.
+  Expand plays the `sidebar-in` keyframe and
   the controls return to the expanded header. On Windows the dock stays opaque
   during exit (`sidebar-out-windows`), matching the work-panel dock behavior. No
   layout jump precedes the animation, and focus returns to the sidebar/Expand
@@ -2482,6 +2486,11 @@ Each scenario is documented in this format:
 - **Expected**:
   - The current assistant row reveals content progressively and pinned follow
     stays at latest without visible oscillation.
+  - Replaceable message/tool partials are coalesced to the next paint, while
+    terminal, permission, planning, and error states remain immediate.
+  - An intermediate failed row during a still-running retry does not mark the
+    containing activity group as terminally failed; terminal styling appears
+    only after the run settles.
   - Sidebar, composer, completed message/activity rows, work panel, titlebar,
     and global overlays do not visibly repaint or lose pointer/keyboard
     responsiveness for each token update.

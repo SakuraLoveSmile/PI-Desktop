@@ -68,6 +68,14 @@ test("the sidebar entrance/exit keyframes and exit rule exist", () => {
   assert.match(globalStyles, /@keyframes sidebar-out-windows\s*\{/);
   assert.match(
     globalStyles,
+    /@keyframes sidebar-in\s*\{[\s\S]*?flex-basis:\s*0;[\s\S]*?width:\s*0;[\s\S]*?flex-basis:\s*var\(--ds-sidebar-width\);/,
+  );
+  assert.match(
+    globalStyles,
+    /@keyframes sidebar-out\s*\{[\s\S]*?flex-basis:\s*0;[\s\S]*?width:\s*0;/,
+  );
+  assert.match(
+    globalStyles,
     /:root\[data-platform="win32"\] \.sidebar\.is-exiting\s*\{[\s\S]*?animation-name:\s*sidebar-out-windows/,
   );
 });

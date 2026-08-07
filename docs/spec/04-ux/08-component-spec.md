@@ -76,6 +76,9 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   column and is resized only from its own divider
 - The main pane renders one active transcript and one selected workspace while
   the sidebar may retain several project tabs/groups
+- Sidebar and work-panel dock transitions animate their flex allocation as well
+  as opacity/transform feedback, so MainChat reflows over the motion duration
+  rather than jumping before the first painted frame.
 - `AppShell` owns low-frequency shell/navigation state only. Streamed
   `messages`, active-turn rendering, inline chat errors, and active permission
   projection are subscribed inside a memoized `ChatSurface`, so a token update
@@ -568,7 +571,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 | State | Behavior |
 |---|---|
 | Closed (default) | Not rendered; no unconditional launcher and no retained tabs after startup. Inline review cards remain available in the transcript because they are message-scoped and do not require the work panel. |
-| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 244–720px (default 280px). It occupies client-area space and never expands the OS window (ADR 0033). |
+| Open | Docked flex row right of the main pane; opened by an artifact at a fixed committed width of 244–720px (default 280px). Its flex allocation eases from zero to the committed width so MainChat reflows continuously. It occupies client-area space and never expands the OS window (ADR 0033). |
 | Multiple artifacts | The current-resource header keeps one readable label at the panel minimum; its bounded menu lists the tools first and then the transcript-opened resources in first-open order, with full-path tooltips and independent close controls |
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows anchored pointer delta or keyboard input. Pointer changes preview once per animation frame and commit width plus reservation only on release; Escape, pointer cancellation, or lost capture restores both. Native window-edge resize changes MainChat only. |

@@ -5,12 +5,13 @@ import { loadStyles } from "./helpers/styles.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [app, chatSurface, transcript, minimap, styles] = await Promise.all([
+const [app, chatSurface, transcript, minimap, styles, store] = await Promise.all([
   read("../src/App.tsx"),
   read("../src/components/ChatSurface.tsx"),
   read("../src/components/ChatTranscript.tsx"),
   read("../src/components/ConversationMinimap.tsx"),
   loadStyles(),
+  read("../src/stores/app-store.ts"),
 ]);
 
 test("streaming state stays inside the chat render boundary", () => {
@@ -40,10 +41,27 @@ test("stream rendering avoids duplicate frame state and coalesces following", ()
   assert.doesNotMatch(transcript, /setVisibleLen/);
   assert.match(transcript, /const scheduleFollowScroll = useCallback/);
   assert.match(transcript, /followFrameRef\.current !== 0/);
+  assert.match(transcript, /const renderedMessages = useDeferredValue\(messages\)/);
   assert.match(transcript, /const \{ entries, visible \} = useMemo/);
-  assert.match(transcript, /buildTranscriptEntries\(messages, compactions\)/);
+  assert.match(
+    transcript,
+    /buildTranscriptEntries\(renderedMessages, renderedCompactions\)/,
+  );
   assert.match(transcript, /activityGroupPropsEqual/);
   assert.match(transcript, /assistantTurnPropsEqual/);
+});
+
+test("stream event bursts are coalesced until a paint or terminal event", () => {
+  assert.match(store, /createFrameBatcher<AgentEventEnvelope>/);
+  assert.match(store, /streamUpdates\.enqueue\(/);
+  assert.match(store, /streamUpdates\.flushNow\(\)/);
+  assert.match(store, /event\.type === "message_update"/);
+  assert.match(store, /event\.type === "tool_update"/);
+});
+
+test("intermediate retry errors do not paint an active group as terminal", () => {
+  assert.match(transcript, /const hasFailure = items\.some/);
+  assert.match(transcript, /const failed = !isActive && hasFailure/);
 });
 
 test("manual upward scrolling cancels pending transcript follow work", () => {
