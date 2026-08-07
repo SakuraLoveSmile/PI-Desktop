@@ -31,9 +31,10 @@ test("the sidebar footer is an action bar, not a fabricated identity", () => {
   }
 });
 
-test("footer exposes settings, theme and notifications in one row", () => {
+test("footer exposes settings, plugins, theme and notifications in one row", () => {
   assert.match(sidebarSource, /className="footer-actions"/);
   assert.match(sidebarSource, /data-nav="settings"/);
+  assert.match(sidebarSource, /data-nav="plugins"/);
   assert.match(sidebarSource, /data-nav="theme"/);
   assert.match(
     sidebarSource,
@@ -45,7 +46,7 @@ test("footer exposes settings, theme and notifications in one row", () => {
   const actions = sidebarSource
     .split("<button")
     .filter((chunk) => /className=(?:"footer-action"|\{`footer-action )/.test(chunk));
-  assert.equal(actions.length, 2);
+  assert.equal(actions.length, 3);
   for (const action of actions) {
     const attrs = action.slice(0, action.indexOf(">"));
     assert.match(attrs, /title=/);

@@ -119,7 +119,7 @@ test("the component spec assigns mode ownership to Composer", () => {
     componentSpec.indexOf("## 11. Composer"),
     componentSpec.indexOf("## 12.", componentSpec.indexOf("## 11. Composer")),
   );
-  assert.match(topbarSpec, /project identity/);
+  assert.match(topbarSpec, /Project\s+scope/);
   assert.match(topbarSpec, /model picker/);
   assert.doesNotMatch(topbarSpec, /Agent \| Plan|mode toggle|mode indicator/);
   assert.match(composerSpec, /Composer-left Agent\/Plan\/Goal chip is the sole mode/);
