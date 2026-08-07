@@ -55,7 +55,10 @@ test("app chrome uses the shared brand asset without branding the composer input
   assert.match(mascotLogo, /setTimeout/);
   assert.match(mascotLogo, /chooseMascotGroupIndex\(current\)/);
   assert.match(mascotLogo, /index !== previousIndex/);
-  assert.match(mascotLogo, /STATIC_GROUP_DURATION_MS = 900/);
+  assert.match(mascotLogo, /FRAME_DURATION_MS = 160/);
+  assert.match(mascotLogo, /randomDuration\(GROUP_PAUSE_MIN_MS, GROUP_PAUSE_MAX_MS\)/);
+  assert.match(mascotLogo, /randomDuration\(STATIC_GROUP_PAUSE_MIN_MS, STATIC_GROUP_PAUSE_MAX_MS\)/);
+  assert.match(mascotLogo, /const isLastFrame/);
   assert.match(mascotLogo, /backgroundPosition: `-\$\{frame\}px 0`/);
   assert.match(mascotLogo, /matchMedia\("\(prefers-reduced-motion: reduce\)"\)/);
   assert.equal((mascotLogo.match(/startFrame:/g) ?? []).length, 9);

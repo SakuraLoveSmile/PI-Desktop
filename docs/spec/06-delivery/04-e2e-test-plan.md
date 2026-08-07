@@ -2381,7 +2381,8 @@ Each scenario is documented in this format:
   - The empty-home hero renders the 100px mascot sprite, chooses one of nine
     remaining pose groups on mount, swaps discrete frames within the fixed
     viewport, and chooses a different group after each playback. Single-frame
-    groups hold briefly; under reduced motion the current group's first frame
+    groups hold longer, and completed groups rest for several seconds before
+    the next selection; under reduced motion the current group's first frame
     remains visible.
   - Sizes stay stable across theme changes (sidebar 20px, hero 100px, splash
     64px), and the marks stay decorative with no click, keyboard, or focus
@@ -3758,9 +3759,9 @@ This test plan spec is accepted when:
   the supplied `docs/ip` sheets.
 - Each empty-home mount randomly chooses one group and plays only its visible
   atlas cells. When the group finishes, another group is randomized without an
-  immediate repeat; single-frame groups hold briefly. The sprite keeps its
-  native pixel-art colors and reduced motion holds the current group's first
-  frame.
+  immediate repeat after a several-second idle rest; single-frame groups rest
+  longer. The sprite keeps its native pixel-art colors and reduced motion holds
+  the current group's first frame.
 - Title is 28px / weight 400; active project name uses dotted underline (1px, offset 4px).
 - Composer does not render attachment or appshot controls before their payload
   reaches pi end to end.

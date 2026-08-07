@@ -91,8 +91,9 @@ Codex as a visual reference. The identity contract is deliberately small:
   frames total). Each mount selects one group at random; after that group
   finishes, the next group is randomized without immediately repeating the
   previous one. Frames swap discretely inside the fixed 100px viewport, while
-  a single-frame pose holds briefly before the next selection. Reduced motion
-  holds the current group's first frame.
+  the completed pose rests for several seconds before the next selection
+  (single-frame poses rest longer). Reduced motion holds the current group's
+  first frame.
   `BrandLogo` remains 20px/18px in the expanded/collapsed sidebar and 64px in
   the startup splash. Composer prompt rows do not render a leading brand icon
   in either home or thread-docked mode.

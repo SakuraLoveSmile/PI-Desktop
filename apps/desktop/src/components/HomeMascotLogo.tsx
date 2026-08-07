@@ -2,8 +2,11 @@ import { type CSSProperties, useEffect, useState } from "react";
 import mascotGroupsUrl from "../assets/home-mascot-groups.png";
 
 const FRAME_WIDTH = 100;
-const FRAME_DURATION_MS = 140;
-const STATIC_GROUP_DURATION_MS = 900;
+const FRAME_DURATION_MS = 160;
+const GROUP_PAUSE_MIN_MS = 3200;
+const GROUP_PAUSE_MAX_MS = 5600;
+const STATIC_GROUP_PAUSE_MIN_MS = 5200;
+const STATIC_GROUP_PAUSE_MAX_MS = 8000;
 
 const MASCOT_GROUPS = [
   { startFrame: 0, frameCount: 1 },
@@ -23,6 +26,10 @@ function chooseMascotGroupIndex(previousIndex = -1) {
   );
   const index = Math.floor(Math.random() * candidates.length);
   return candidates[index] ?? 0;
+}
+
+function randomDuration(minMs: number, maxMs: number) {
+  return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 }
 
 function usePrefersReducedMotion() {
@@ -52,9 +59,14 @@ export function HomeMascotLogo() {
       return;
     }
 
-    const duration = group.frameCount <= 1 ? STATIC_GROUP_DURATION_MS : FRAME_DURATION_MS;
+    const isLastFrame = frameIndex + 1 >= group.frameCount;
+    const duration = isLastFrame
+      ? group.frameCount <= 1
+        ? randomDuration(STATIC_GROUP_PAUSE_MIN_MS, STATIC_GROUP_PAUSE_MAX_MS)
+        : randomDuration(GROUP_PAUSE_MIN_MS, GROUP_PAUSE_MAX_MS)
+      : FRAME_DURATION_MS;
     const timer = window.setTimeout(() => {
-      if (frameIndex + 1 < group.frameCount) {
+      if (!isLastFrame) {
         setFrameIndex((current) => current + 1);
         return;
       }

@@ -389,8 +389,9 @@ visually distinct from list content.
   compiled from the remaining supplied `docs/ip` frame sheets into nine static-
   pose groups (50 frames total). Each mount randomly selects one group, then
   chooses a different group after playback completes. It swaps discrete atlas
-  frames inside the fixed 100px viewport, holds single-frame poses briefly,
-  and holds the current group's first frame under reduced motion. The
+  frames inside the fixed 100px viewport, rests for several seconds between
+  actions, holds single-frame poses longer, and holds the current group's first
+  frame under reduced motion. The
   expanded/collapsed sidebar remains 20px/18px and the startup splash 64px.
   Home and thread-docked composer prompt rows do not render a leading brand
   icon.
