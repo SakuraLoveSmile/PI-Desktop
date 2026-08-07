@@ -17,7 +17,7 @@ destination, chat as the home surface, tools and permissions inline.
 | Platform titlebar: macOS traffic lights / Windows/Linux actions     |
 +------------------+--------------------------------+------------------+
 | Sidebar (~275px) | Main pane (active destination) | Work panel       |
-|  Extensions      |  chat home / transcript        |  (optional,      |
+|                  |  chat home / transcript        |  (optional,      |
 |                  |  or Extensions page            |   resizable      |
 |                  |                                |   244–720px)     |
 |  Sessions     +↕ |                                | surface          |
@@ -25,17 +25,15 @@ destination, chat as the home surface, tools and permissions inline.
 |  Projects      + |                                | ◫ | App.tsx  ⌄ × |
 |   Project A      |                                | > |              |
 |   Project B      |                                | ◎ | Active       |
-| Footer + bell    |  Floating composer (chat)      |   | resource     |
+| Footer [⚙][@][☾][bell] |  Floating composer (chat) |   | resource     |
 +------------------+--------------------------------+------------------+
 ```
 
-- **Sidebar**: primary navigation — the Extensions destination, path-less
-  conversations under a compact **Sessions** section with new-session
-  and sort actions, retained open-project groups under a following **Projects**
-  section with a persistent new-project action, and the
-  WorkBuddy-inspired local profile footer
-  (Custom / Local profile → Settings / Logs / Theme, plus the durable
-  notification bell and unread badge, D130/D117). Pull requests and Scheduled
+- **Sidebar**: primary navigation — path-less conversations under a compact
+  **Sessions** section with new-session and sort actions, retained open-project
+  groups under a following **Projects** section with a persistent new-project
+  action, and the WorkBuddy-inspired footer. The footer keeps compact Settings,
+  Extensions, Theme, and notification icon actions; Pull requests and Scheduled
   are intentionally omitted from the home sidebar. Each retained project is a
   path-keyed tab/group that can be
   collapsed independently. Project and conversation rows expose

@@ -210,9 +210,10 @@ expanded sidebar shows path-less conversations first under a compact `Sessions`
 heading and retained project tabs under a following `Projects` heading; the
 collapsed state is an icon rail. Retained tabs are renderer presentation state,
 not additional host workspaces.
-The home destination controls expose Plugins only; Projects is managed through
-Settings → Project archive, while Pull requests and Scheduled are not rendered
-in the sidebar.
+The sidebar body is reserved for Sessions and Projects; the footer exposes the
+Plugins destination beside Settings. Projects is managed through Settings →
+Project archive, while Pull requests and Scheduled are not rendered in the
+sidebar.
 
 ### 3.2 Anatomy
 
@@ -221,7 +222,6 @@ Expanded (~275px, D034/D070):
 +---------------------------+
 | [lights]          [⌕][◧] |  macOS
 | [π] PI-Desktop    [⌕][◧] |  Windows/Linux
-| Plugins                   |
 | SESSIONS         [msg+][↕]|
 |   • Path-less session   ↕|
 | PROJECTS            [dir+]|
@@ -229,8 +229,7 @@ Expanded (~275px, D034/D070):
 |   • Project session      |
 | project-B      [>] [+] … |
 |                           |
-| [(user) Custom       v][?]|
-|        Local profile     |
+| [version]       [⚙][@][☾][bell]|
 +---------------------------+
 
 Collapsed (48px):
@@ -239,7 +238,7 @@ Collapsed (48px):
 | ses |
 | ses |
 | ──  |
-| [⚙] |
+| [⚙][@][☾][bell] |
 +----+
 ```
 
@@ -251,7 +250,7 @@ tier; weight, indentation, and disclosure icons preserve their hierarchy:
 
 | Surface | Token | Notes |
 |---|---|---|
-| Plugins / nav items | `--text-base` (14px) | Primary destinations |
+| Footer action icons | `--text-base` (14px) | Settings, Extensions, theme, notifications |
 | Session / thread titles | `--text-md` (13px) | Compact list content |
 | Project / group titles, empty copy | `--text-md` (13px) | Hierarchy comes from weight and indentation |
 | Section labels (`SESSIONS`, `PROJECTS`) | `--text-sm` (12px) | Uppercase secondary labels |
@@ -279,7 +278,7 @@ visually distinct from list content.
 | Archived row | Hidden by default; visible in the explicit archived view |
 | No retained project | Compact Open project entry; standalone Sessions rows remain available |
 | Empty group | Muted one-line empty state; group create action remains available |
-| Footer idle | Transparent 58px band; profile and Help controls remain visually quiet |
+| Footer idle | Transparent 58px band; build and action controls remain visually quiet |
 | Footer hover/focus | Only the targeted control receives the semantic hover/focus treatment |
 | Profile menu open | Profile trigger is active; 280px menu opens 8px above the footer |
 
@@ -300,6 +299,8 @@ visually distinct from list content.
 - On Windows/Linux, click the PI-Desktop brand to return the main pane to the
   chat home while preserving the active conversation and workspace; macOS
   intentionally omits this brand control from the sidebar header
+- Click the footer Plugins icon immediately right of Settings to open the
+  Extensions destination; the icon exposes the localized label on hover/focus
 - Click Search or Collapse sidebar at the right of the header row to
   open global search or collapse the sidebar respectively
 - While the work panel is open, click the session-pane top-right panel collapse
@@ -353,6 +354,8 @@ visually distinct from list content.
   check/radio items expose `aria-checked`
 - Collapsed state: each icon has `aria-label` with session title
 - Keyboard: arrow keys navigate session list
+- Footer Settings, Plugins, Theme, and notification controls expose localized
+  accessible names and visible focus treatment
 - The profile trigger exposes `aria-haspopup="menu"` and its expanded state;
   the menu has a stable accessible relationship to the trigger
 - The notification trigger has a localized accessible name containing the

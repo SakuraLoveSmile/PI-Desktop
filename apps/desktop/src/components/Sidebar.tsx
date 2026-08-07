@@ -1414,13 +1414,6 @@ export function Sidebar({
 
       <div className="sidebar-body no-drag">
 
-        <nav className="mb-0.5 space-y-0 px-0.5">
-          <button className={`nav-item ${page === "plugins" ? "active" : ""}`} data-nav="plugins" onClick={() => setPage("plugins")}>
-            <IconAt size={15} />
-            <span>{t("nav.plugins")}</span>
-          </button>
-        </nav>
-
         <section
           className="sidebar-standalone-sessions"
           aria-labelledby="sidebar-standalone-sessions-label"
@@ -1590,6 +1583,16 @@ export function Sidebar({
               onClick={() => setPage("settings")}
             >
               <IconSettings size={14} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className={`footer-action ${page === "plugins" ? "active" : ""}`}
+              data-nav="plugins"
+              title={t("nav.plugins")}
+              aria-label={t("nav.plugins")}
+              onClick={() => setPage("plugins")}
+            >
+              <IconAt size={14} aria-hidden />
             </button>
             <button
               type="button"

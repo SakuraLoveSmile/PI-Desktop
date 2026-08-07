@@ -789,7 +789,7 @@ Each scenario is documented in this format:
 #### E2E-022: Load local plugin
 
 - **Preconditions**: App running; sample plugin available at local path.
-- **Steps**: 1) Open Extensions from the app sidebar. 2) Choose Load local plugin from the header overflow menu. 3) Enable it with the row switch.
+- **Steps**: 1) Open Extensions from the sidebar footer Plugins icon. 2) Choose Load local plugin from the header overflow menu. 3) Enable it with the row switch.
 - **Expected**: Plugin loads; manifest validated; contributions registered; the row appears under Active with a Local tag.
 - **Specs linked**: `07-plugins/01-plugin-system.md`, `07-plugins/05-plugin-lifecycle.md`
 - **Acceptance**: G (load local plugin)
@@ -1161,15 +1161,17 @@ Each scenario is documented in this format:
 - **Preconditions**: App running in both English and zh-CN locales, with an
   empty home and a docked transcript available.
 - **Steps**: 1) Inspect the expanded and collapsed sidebar. 2) Inspect the
-  empty-home hero and docked composer. 3) Focus each project/Temporary session
-  create control. 4) Open Settings and the composer input.
+  empty-home hero and docked composer. 3) Focus the footer Settings and
+  Plugins icons, then each project/Temporary session create control. 4) Open
+  Settings and the composer input.
 - **Expected**: Visible shell identity reads `PI-Desktop`; the home hero and
   expanded/collapsed sidebar render the canonical `build/icon_1024.png` asset
   through `BrandLogo`, while the docked composer prompt row has no leading
   brand icon or reserved icon slot and its text aligns directly with the input
-  gutter. Every scoped session-creation control uses the dedicated message-plus
-  icon
-  with localized labels and accessible names. `Codex` remains visible only as
+  gutter. The footer Settings and Plugins actions are compact icon buttons;
+  Plugins sits immediately to the right of Settings and exposes a localized
+  accessible name. Every scoped session-creation control uses the dedicated
+  message-plus icon with localized labels and accessible names. `Codex` remains visible only as
   the external import-source label or in non-runtime design-reference text.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
@@ -2665,15 +2667,16 @@ Each scenario is documented in this format:
   session, one retained project with a session, and one empty project group;
   light and dark themes are available.
 - **Steps**:
-  1. Open the app at the default window width and inspect Plugins, session
-     titles, project/group titles, empty-state copy, section labels,
-     and the profile footer.
+  1. Open the app at the default window width and inspect session titles,
+     project/group titles, empty-state copy, section labels, and the footer's
+     Settings, Plugins, Theme, and notification icons.
   2. Switch between light and dark themes, then narrow the window to the
      minimum supported expanded-sidebar width.
   3. Compare the sidebar hierarchy with 14px chat body text and inspect long
      session/project names.
 - **Expected**:
-  - Plugins and the footer identity use `--text-base` (14px).
+  - Footer action icons use the shared 32px hit target and compact 14px icon
+    sizing; Plugins sits immediately to the right of Settings.
   - Session titles, project/group titles, and empty-state copy use `--text-md`
     (13px); section labels and secondary metadata remain at `--text-sm` (12px).
   - The hierarchy remains readable in both themes, row pitch stays compact at
@@ -3632,8 +3635,8 @@ This test plan spec is accepted when:
 
 ### US-UI-01 Codex-aligned shell chrome
 - Open the desktop app on macOS dark theme.
-- Expect charcoal main surface (`#181818`), left sidebar with Plugins plus
-  current-project and Temporary session groups, and a floating bottom composer
+- Expect charcoal main surface (`#181818`), left sidebar with current-project
+  and Temporary session groups, and a floating bottom composer
   with mode/model controls and no workspace rail.
 - Expect no blue-slate marketing chrome; primary send control is a circular inverted button.
 
@@ -3642,10 +3645,10 @@ This test plan spec is accepted when:
 - Expect centered hero copy: "What should we build" with optional project name underline when a workspace is open.
 
 ### US-UI-03 Sidebar destinations
-- Expect the expanded home sidebar to show Plugins without a standalone Projects,
-  Pull requests, or Scheduled entry.
-- Click Plugins in the left sidebar and expect it to replace the main pane with
-  a dedicated page.
+- Expect the expanded home sidebar to show Sessions and Projects without
+  standalone Plugins, Pull requests, or Scheduled rows.
+- Click the Plugins icon in the sidebar footer, immediately to the right of
+  Settings, and expect it to replace the main pane with a dedicated page.
 - Open Settings → Project archive and use it to open, switch, and close a local
   folder workspace.
 
@@ -3656,8 +3659,9 @@ This test plan spec is accepted when:
   permission-mode chip and explains its Bash tradeoff.
 
 ### US-UI-05 Locale chrome
-- On a zh-CN system locale, sidebar labels render in Chinese (项目 / 插件 /
-  临时会话), without 拉取请求 or 已安排 entries.
+- On a zh-CN system locale, sidebar labels render in Chinese (项目 / 临时会话),
+  without 拉取请求 or 已安排 entries. The footer Plugins icon exposes the
+  localized accessible name 插件.
 - Empty-thread hero remains the English PI-Desktop shell copy: "What should we build?".
 - Composer omits the 本地 workspace label and shows Plan/Agent plus the active
   model ID; both locales expose the Plan approval copy.
@@ -3692,8 +3696,8 @@ This test plan spec is accepted when:
 ### US-UI-13 Light theme shell parity
 - Set theme to system/light on a light macOS appearance.
 - Expect sidebar `#f3f3f3`, main `#ffffff`, text `#1a1c1f`, white floating composer, and home hero with project underline.
-- Sidebar nav labels (Plugins / Projects group / Sessions group), current-
-  project identity, thread titles, and composer controls must remain
+- Sidebar project/session labels, footer Settings/Plugins/Theme/notification
+  icons, current-project identity, thread titles, and composer controls must remain
   readable dark-on-light (≥4.5:1). Never white/translucent text on the light
   sidebar.
 - The macOS traffic-light row keeps Search and Collapse sidebar readable at the
@@ -3801,8 +3805,8 @@ This test plan spec is accepted when:
   to app, search, and exactly Basics / 全局 AI / Shortcuts / Model configuration /
   Import / Project archive / Info in that order; content pane shows section title and the
   destination's settings or archive content.
-- Return to the app shell and expect Plugins to remain an independent sidebar
-  destination.
+- Return to the app shell and expect Plugins to remain an independent
+  sidebar-footer destination.
 - Drag the empty 46px top band over either the rail or content pane; the native
   window moves while Back, search, and navigation remain clickable.
 
