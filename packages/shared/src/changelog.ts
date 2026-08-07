@@ -23,7 +23,7 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
-    version: "0.5.3",
+    version: "0.5.0",
     date: "2026-08-07",
     highlights: [
       "Run bounded subagents behind a Task tool, with user-defined agents, pinned models, attribution, and session persistence.",
@@ -213,7 +213,7 @@ const enEntries: ChangelogEntry[] = [
 
 const zhCNEntries: ChangelogEntry[] = [
   {
-    version: "0.5.3",
+    version: "0.5.0",
     date: "2026-08-07",
     highlights: [
       "通过 Task 工具运行有界子代理，支持用户自定义代理、固定模型、归属标记与会话持久化。",
