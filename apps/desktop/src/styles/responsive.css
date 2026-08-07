@@ -34,10 +34,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-mascot-logo {
-    animation: none !important;
-  }
-
   .route-surface,
   .settings-shell-full,
   .jump-latest-btn,

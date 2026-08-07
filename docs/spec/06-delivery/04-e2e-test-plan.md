@@ -1168,7 +1168,8 @@ Each scenario is documented in this format:
   Settings and the composer input.
 - **Expected**: Visible shell identity reads `PI-Desktop`; the empty-home hero
   renders the 100px `HomeMascotLogo` sprite, randomly selecting and playing one
-  of the nine remaining pose groups, while the expanded/collapsed
+  of the nine remaining pose groups inside a fixed viewport without translating
+  the mascot horizontally, while the expanded/collapsed
   sidebar renders the canonical `build/icon_1024.png` asset through `BrandLogo`
   and the docked composer prompt row has no leading
   brand icon or reserved icon slot and its text aligns directly with the input
@@ -2378,8 +2379,8 @@ Each scenario is documented in this format:
   - Light and dark mode render `build/icon_1024.png` / `build/logo_dark.png`
     live in the sidebar and startup splash without a window reload.
   - The empty-home hero renders the 100px mascot sprite, chooses one of nine
-    remaining pose groups on mount, and plays that group; under reduced motion
-    it holds the selected group's first frame.
+    remaining pose groups on mount, and swaps discrete frames within the fixed
+    viewport; under reduced motion it holds the selected group's first frame.
   - Sizes stay stable across theme changes (sidebar 20px, hero 100px, splash
     64px), and the marks stay decorative with no click, keyboard, or focus
     behavior.
@@ -3754,8 +3755,9 @@ This test plan spec is accepted when:
   the nine remaining pose groups (50 transparent mascot frames) compiled from
   the supplied `docs/ip` sheets.
 - Each empty-home mount randomly chooses one group and loops that group without
-  interaction, keeps the sprite's native pixel-art colors, and holds the
-  selected group's first frame under reduced motion.
+  interaction by changing only the visible atlas cell, keeps the sprite's
+  native pixel-art colors, and holds the selected group's first frame under
+  reduced motion.
 - Title is 28px / weight 400; active project name uses dotted underline (1px, offset 4px).
 - Composer does not render attachment or appshot controls before their payload
   reaches pi end to end.

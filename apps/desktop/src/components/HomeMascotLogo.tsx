@@ -1,7 +1,8 @@
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import mascotGroupsUrl from "../assets/home-mascot-groups.png";
 
 const FRAME_WIDTH = 100;
+const FRAME_DURATION_MS = 140;
 
 const MASCOT_GROUPS = [
   { startFrame: 0, frameCount: 1 },
@@ -20,16 +21,43 @@ function chooseMascotGroup() {
   return MASCOT_GROUPS[index] ?? MASCOT_GROUPS[0];
 }
 
+function usePrefersReducedMotion() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const updatePreference = () => setPrefersReducedMotion(mediaQuery.matches);
+
+    updatePreference();
+    mediaQuery.addEventListener("change", updatePreference);
+    return () => mediaQuery.removeEventListener("change", updatePreference);
+  }, []);
+
+  return prefersReducedMotion;
+}
+
 export function HomeMascotLogo() {
   const [group] = useState(chooseMascotGroup);
-  const firstFrame = group.startFrame * FRAME_WIDTH;
-  const lastFrame = (group.startFrame + group.frameCount - 1) * FRAME_WIDTH;
+  const [frameIndex, setFrameIndex] = useState(0);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (prefersReducedMotion || group.frameCount <= 1) {
+      setFrameIndex(0);
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setFrameIndex((current) => (current + 1) % group.frameCount);
+    }, FRAME_DURATION_MS);
+
+    return () => window.clearInterval(timer);
+  }, [group.frameCount, prefersReducedMotion]);
+
+  const frame = (group.startFrame + frameIndex) * FRAME_WIDTH;
   const style = {
     backgroundImage: `url(${mascotGroupsUrl})`,
-    "--home-mascot-start": `-${firstFrame}px`,
-    "--home-mascot-end": `-${lastFrame}px`,
-    "--home-mascot-frame-count": group.frameCount,
-    "--home-mascot-duration": `${group.frameCount * 100}ms`,
+    backgroundPosition: `-${frame}px 0`,
   } as CSSProperties;
 
   return (

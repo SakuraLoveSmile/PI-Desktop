@@ -385,24 +385,9 @@
   width: 100px;
   height: 100px;
   flex: 0 0 auto;
-  background-position: var(--home-mascot-start, 0) 0;
   background-repeat: no-repeat;
   background-size: 5000px 100px;
   image-rendering: pixelated;
-  animation-duration: var(--home-mascot-duration, 100ms);
-  animation-iteration-count: infinite;
-  animation-name: home-mascot-group;
-  animation-timing-function: steps(var(--home-mascot-frame-count, 1), end);
-}
-
-@keyframes home-mascot-group {
-  from {
-    background-position: var(--home-mascot-start, 0) 0;
-  }
-
-  to {
-    background-position: var(--home-mascot-end, 0) 0;
-  }
 }
 
 .empty-hero h1 {
