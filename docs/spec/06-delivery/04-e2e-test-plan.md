@@ -972,7 +972,8 @@ Each scenario is documented in this format:
   relevant surfaces. Installed rows keep their default height low while the
   disclosure exposes the complete secondary readout. The scope trigger stays
   aligned with the row action rail, its menu explains each state, and icon
-  actions show labels on hover and focus. Primary and secondary buttons keep
+  actions remain visible at rest while showing labels on hover and focus.
+  Primary and secondary buttons keep
   visible semantic surfaces, text, borders, hover states, and focus rings in
   both themes, and keyboard focus does not depend on pointer hover.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,

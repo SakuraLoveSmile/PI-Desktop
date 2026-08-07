@@ -124,6 +124,13 @@ test("installed row icon actions expose visible hover and focus labels", () => {
   assert.match(styles, /\.plugins-icon-btn\[data-tip\]:focus-visible::after/);
 });
 
+test("extension row actions stay visible without waiting for hover", () => {
+  const actionBlock = styles.match(/\.ext-row-actions\s*\{[^}]*\}/)?.[0] ?? "";
+  assert.match(actionBlock, /opacity:\s*1/);
+  assert.doesNotMatch(styles, /\.ext-row:hover \.ext-row-actions/);
+  assert.doesNotMatch(actionBlock, /opacity:\s*0/);
+});
+
 test("the client hides development-only demo plugins from marketplace results", () => {
   assert.match(pageSrc, /function isClientVisibleMarketPlugin/);
   assert.match(pageSrc, /!plugin\.id\.startsWith\("demo\."\)/);

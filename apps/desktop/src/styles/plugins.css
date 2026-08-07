@@ -588,19 +588,12 @@
   padding-top: 0;
 }
 
-/* Quiet actions surface on hover / focus / open menu; the scope trigger always shows. */
+/* Keep row actions visible so available operations are discoverable at rest. */
 .plugins-row-actions {
   display: flex;
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
-  opacity: 0;
-  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
-}
-
-.plugins-row:hover .plugins-row-actions,
-.plugins-row:focus-within .plugins-row-actions,
-.plugins-row.menu-open .plugins-row-actions {
   opacity: 1;
 }
 

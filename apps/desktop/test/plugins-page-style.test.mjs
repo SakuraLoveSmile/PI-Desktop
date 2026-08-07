@@ -84,6 +84,8 @@ test("installed row controls share one aligned rail and explain icon actions", (
   const section = pluginsSection(stylesSource);
 
   assert.match(section, /\.plugins-row-controls\s*\{[\s\S]*?margin-left:\s*auto/);
+  assert.match(section, /\.plugins-row-actions\s*\{[\s\S]*?opacity:\s*1/);
+  assert.doesNotMatch(section, /\.plugins-row:hover \.plugins-row-actions/);
   assert.match(section, /\.plugins-icon-btn\s*\{[\s\S]*?position:\s*relative/);
   assert.match(section, /\.plugins-icon-btn\[data-tip\]::after\s*\{[\s\S]*?content: attr\(data-tip\)/);
   assert.match(section, /\.plugins-icon-btn\[data-tip\]:focus-visible::after/);
