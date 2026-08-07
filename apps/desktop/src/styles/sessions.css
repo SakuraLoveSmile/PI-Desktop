@@ -275,6 +275,8 @@
 }
 
 .thread-item:hover .thread-item-more,
+.sidebar-session-group-header:hover .thread-item-more,
+.sidebar-session-group-header:focus-within .thread-item-more,
 .thread-item.active .thread-item-more:hover,
 .thread-item-more[aria-expanded="true"] {
   opacity: 1;
@@ -390,7 +392,7 @@
   justify-content: center;
   border-radius: var(--radius-2xs);
   color: var(--ds-text-muted);
-  opacity: 0.72;
+  opacity: 0;
   transition:
     opacity var(--motion-duration-fast) var(--motion-ease-out),
     background var(--motion-duration-fast) var(--motion-ease-out),
@@ -403,6 +405,11 @@
 .sidebar-toolbar-button:hover,
 .sidebar-toolbar-button:focus-visible,
 .sidebar-toolbar-button.active {
+  opacity: 1;
+}
+
+.sidebar-session-group-header:hover .sidebar-session-group-add,
+.sidebar-session-group-header:focus-within .sidebar-session-group-add {
   opacity: 1;
 }
 

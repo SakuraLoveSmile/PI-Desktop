@@ -202,6 +202,26 @@ test("sessions toolbar puts sorting before new-session creation", () => {
   assert.ok(sortIndex < newSessionIndex);
 });
 
+test("sidebar action icons stay quiet until their toolbar or row is hovered", () => {
+  const toolbarButton = globalStyles.match(
+    /\.sidebar-toolbar-button\s*\{[^}]+\}/s,
+  )?.[0] ?? "";
+  assert.match(toolbarButton, /opacity:\s*0/);
+  assert.match(
+    globalStyles,
+    /\.sidebar-list-toolbar:hover \.sidebar-toolbar-button,[\s\S]*?\.sidebar-list-toolbar:focus-within \.sidebar-toolbar-button,[\s\S]*?opacity:\s*1;/,
+  );
+  assert.match(globalStyles, /\.thread-item:hover \.thread-item-more,/);
+  assert.match(
+    globalStyles,
+    /\.sidebar-session-group-header:hover \.thread-item-more,[\s\S]*?\.sidebar-session-group-header:focus-within \.thread-item-more,/,
+  );
+  assert.match(
+    globalStyles,
+    /\.sidebar-session-group-header:hover \.sidebar-session-group-add,[\s\S]*?\.sidebar-session-group-header:focus-within \.sidebar-session-group-add,[\s\S]*?opacity:\s*1;/,
+  );
+});
+
 test("project rows expose folder actions and full-path hover", () => {
   assert.match(sidebarSource, /data-action="open-project-folder"/);
   assert.match(sidebarSource, /api\.openProjectFolder\(entry\.path\)/);

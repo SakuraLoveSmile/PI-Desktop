@@ -1219,14 +1219,19 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Two retained projects contain conversations with distinct
   titles and created/updated timestamps; archived view is initially disabled.
-- **Steps**: 1) Inspect the `Sessions` toolbar and verify that Sort appears
-  before New Chat. 2) Open Sort and inspect its placement, then select Recently
-  updated, Created date, Oldest first, and Name in turn. 3) Pin one project and
-  one conversation. 4) Archive another conversation and project. 5) Enable
-  Show archived and restore both. 6) Restart the app. 7) Delete a disposable
-  conversation through the distinct Delete action.
-- **Expected**: Sort precedes New Chat in the Sessions toolbar; the sort menu
-  remains content-sized, opens to the trigger's right without flipping left, and
+- **Steps**: 1) Inspect the Sessions and Projects heading actions at rest. 2)
+  Hover each heading and keyboard-focus each action to confirm the controls
+  reveal without moving the labels. 3) Inspect the `Sessions` toolbar and verify
+  that Sort appears before New Chat. 4) Open Sort and inspect its placement,
+  then select Recently updated, Created date, Oldest first, and Name in turn.
+  5) Pin one project and one conversation. 6) Archive another conversation
+  and project. 7) Enable Show archived and restore both. 8) Restart the app.
+  9) Delete a disposable conversation through the distinct Delete action.
+- **Expected**: Section create and sort controls are visually quiet at rest and
+  reveal on toolbar hover or keyboard focus; project `+` and overflow actions
+  follow the same rule without shifting labels. Sort precedes New Chat in the
+  Sessions toolbar; the sort menu remains content-sized, opens to the trigger's
+  right without flipping left, and
   session/project/section body-level menus use the same right-side rule with a
   narrow-viewport width cap. Pinned rows remain ahead
   of unpinned rows under every selected secondary order; each sort produces the

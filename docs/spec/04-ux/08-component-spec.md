@@ -215,6 +215,11 @@ Plugins destination beside Settings. Projects is managed through Settings →
 Project archive, while Pull requests and Scheduled are not rendered in the
 sidebar.
 
+Section-level create and sort controls stay visually quiet at rest and reveal
+when the owning Sessions or Projects toolbar is hovered or keyboard-focused.
+Project-group `+` and overflow controls follow the same hover/focus treatment;
+their hit areas remain in the layout so revealing them does not shift labels.
+
 ### 3.2 Anatomy
 
 ```text
@@ -314,6 +319,9 @@ visually distinct from list content.
   its exact path
 - Click the `Sessions` heading message-plus action: clear the workspace and create/reuse a
   path-less persistent session
+- Sessions and Projects heading actions reveal together when their toolbar is
+  hovered or keyboard-focused; the controls remain keyboard-reachable while
+  visually hidden at rest
 - Right-click the `Sessions` heading or empty standalone-list chrome: open a
   single-item create menu that creates/reuses a path-less temporary session
 - Project overflow: switch, open folder, pin/unpin, archive/restore, close
@@ -332,7 +340,7 @@ visually distinct from list content.
 - Project groups use compact vertical spacing so adjacent directories and
   conversation rows read as one dense navigation list rather than detached
   cards. Directory `+` and overflow actions remain hidden until hover or
-  keyboard focus.
+  keyboard focus, without changing the directory label's position.
 - Sidebar toggle: expanded-header icon beside Search + keyboard shortcut; the
   collapsed main titlebar retains an Expand sidebar icon; when the work panel is
   open, the session-pane top-right hosts the sole panel collapse control
@@ -352,6 +360,8 @@ visually distinct from list content.
   color is reinforced by ring, dot, check, or alert geometry
 - Project directory rows expose `aria-expanded` and `aria-controls`; menu
   check/radio items expose `aria-checked`
+- Hover-hidden section and project actions remain in the tab order and reveal
+  through `:focus-within`; keyboard focus never depends on pointer hover
 - Collapsed state: each icon has `aria-label` with session title
 - Keyboard: arrow keys navigate session list
 - Footer Settings, Plugins, Theme, and notification controls expose localized
