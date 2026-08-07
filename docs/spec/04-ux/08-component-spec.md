@@ -385,9 +385,10 @@ visually distinct from list content.
   mode, and `build/logo_dark.png` for dark mode. The component subscribes to
   `document.documentElement[data-theme]` via a `MutationObserver` and swaps the
   source at runtime for the sidebar and startup splash without a reload. The
-  empty-home hero uses `HomeMascotLogo` at 100px: its transparent 58-frame
-  sprite is compiled from the supplied `docs/ip` frame sheets, loops at a
-  restrained pace, and holds its first frame under reduced motion. The
+  empty-home hero uses `HomeMascotLogo` at 100px: its transparent sprite is
+  compiled from the remaining supplied `docs/ip` frame sheets into nine static-
+  pose groups (50 frames total). Each mount randomly selects one group and
+  plays only that group; reduced motion holds its first frame. The
   expanded/collapsed sidebar remains 20px/18px and the startup splash 64px.
   Home and thread-docked composer prompt rows do not render a leading brand
   icon.

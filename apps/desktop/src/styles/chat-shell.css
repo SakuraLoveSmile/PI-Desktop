@@ -385,20 +385,23 @@
   width: 100px;
   height: 100px;
   flex: 0 0 auto;
-  background-position: 0 0;
+  background-position: var(--home-mascot-start, 0) 0;
   background-repeat: no-repeat;
-  background-size: 5800px 100px;
+  background-size: 5000px 100px;
   image-rendering: pixelated;
-  animation: home-mascot-frames 5.8s steps(58, end) infinite;
+  animation-duration: var(--home-mascot-duration, 100ms);
+  animation-iteration-count: infinite;
+  animation-name: home-mascot-group;
+  animation-timing-function: steps(var(--home-mascot-frame-count, 1), end);
 }
 
-@keyframes home-mascot-frames {
+@keyframes home-mascot-group {
   from {
-    background-position: 0 0;
+    background-position: var(--home-mascot-start, 0) 0;
   }
 
   to {
-    background-position: -5700px 0;
+    background-position: var(--home-mascot-end, 0) 0;
   }
 }
 

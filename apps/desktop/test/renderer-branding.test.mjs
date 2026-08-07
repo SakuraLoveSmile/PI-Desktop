@@ -48,14 +48,19 @@ test("app chrome uses the shared brand asset without branding the composer input
   assert.match(icons, /export const IconNewSession/);
   assert.doesNotMatch(icons, /IconCodexHome|IconCompose|IconPiMark|IconPiHome/);
   assert.match(chatSurface, /<HomeMascotLogo \/>/);
-  assert.match(mascotLogo, /home-mascot-frames\.png/);
+  assert.match(mascotLogo, /home-mascot-groups\.png/);
+  assert.match(mascotLogo, /Math\.random\(\)/);
+  assert.match(mascotLogo, /useState\(chooseMascotGroup\)/);
+  assert.equal((mascotLogo.match(/startFrame:/g) ?? []).length, 9);
+  assert.equal((mascotLogo.match(/frameCount:/g) ?? []).length, 9);
+  assert.match(mascotLogo, /startFrame:\s*44,\s*frameCount:\s*6/);
   assert.doesNotMatch(chatSurface, /<BrandLogo/);
   assert.match(styles, /\.empty-hero-icon\s*\{[\s\S]*?height:\s*100px;[\s\S]*?width:\s*100px;/);
   assert.match(
     styles,
-    /\.home-mascot-logo\s*\{[\s\S]*?background-size:\s*5800px 100px;[\s\S]*?animation:\s*home-mascot-frames 5\.8s steps\(58, end\) infinite;/,
+    /\.home-mascot-logo\s*\{[\s\S]*?background-size:\s*5000px 100px;[\s\S]*?animation-duration:\s*var\(--home-mascot-duration, 100ms\);[\s\S]*?animation-iteration-count:\s*infinite;[\s\S]*?animation-name:\s*home-mascot-group;[\s\S]*?animation-timing-function:\s*steps\(var\(--home-mascot-frame-count, 1\), end\);/,
   );
-  assert.match(styles, /@keyframes home-mascot-frames/);
+  assert.match(styles, /@keyframes home-mascot-group/);
   assert.match(
     styles,
     /prefers-reduced-motion:\s*reduce[\s\S]*?\.home-mascot-logo\s*\{[\s\S]*?animation:\s*none !important;/,

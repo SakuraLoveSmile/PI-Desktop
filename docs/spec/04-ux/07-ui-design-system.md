@@ -86,9 +86,11 @@ Codex as a visual reference. The identity contract is deliberately small:
   and NSIS shortcut identity stay aligned so native notifications,
   notification settings, and taskbar groups identify the app as `PI-Desktop`
   rather than Electron.
-- The empty-home hero uses a 100px `HomeMascotLogo` compiled from the supplied
-  `docs/ip` frame sheets into a 58-frame transparent sprite. It advances at a
-  restrained pace and freezes on the first frame under reduced motion.
+- The empty-home hero uses a 100px `HomeMascotLogo` compiled from the remaining
+  supplied `docs/ip` frame sheets into nine static-pose groups (50 transparent
+  frames total). Each mount selects one group at random and plays only that
+  group at a restrained pace; reduced motion holds the selected group's first
+  frame.
   `BrandLogo` remains 20px/18px in the expanded/collapsed sidebar and 64px in
   the startup splash. Composer prompt rows do not render a leading brand icon
   in either home or thread-docked mode.
@@ -617,8 +619,9 @@ model):
 - Empty hero title uses `var(--ds-text-primary)` (light override `#1a1c1f`);
   never hardcode light ink for shared hero styles
 - Empty-home branding stays quiet: the 100px mascot is the sole animated hero
-  mark, and the supporting line stays short and muted so the composer remains
-  the primary task surface
+  mark. A single randomly selected pose group plays at a time, and the
+  supporting line stays short and muted so the composer remains the primary
+  task surface
 - Night home composer plate styles are **dark-scoped only** (elevated-primary
   `#212121f5` + standard elevation-prominent)
 - Empty draft row keeps **one visible line / 28px optical minimum** so the

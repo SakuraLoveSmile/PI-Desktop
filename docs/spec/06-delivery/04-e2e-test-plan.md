@@ -1167,7 +1167,8 @@ Each scenario is documented in this format:
   Plugins icons, then each project/Temporary session create control. 4) Open
   Settings and the composer input.
 - **Expected**: Visible shell identity reads `PI-Desktop`; the empty-home hero
-  renders the 100px `HomeMascotLogo` frame sprite, while the expanded/collapsed
+  renders the 100px `HomeMascotLogo` sprite, randomly selecting and playing one
+  of the nine remaining pose groups, while the expanded/collapsed
   sidebar renders the canonical `build/icon_1024.png` asset through `BrandLogo`
   and the docked composer prompt row has no leading
   brand icon or reserved icon slot and its text aligns directly with the input
@@ -2368,15 +2369,17 @@ Each scenario is documented in this format:
 - **Steps**:
   1. In light mode, open the app shell, an empty chat home, and the expanded sidebar (Windows/Linux) or startup splash.
   2. Inspect the rendered `BrandLogo` source in the sidebar and startup splash,
-     and inspect the `HomeMascotLogo` frame animation in the empty-home hero.
+     and inspect the randomly selected `HomeMascotLogo` pose-group animation in
+     the empty-home hero.
   3. Switch the theme to dark (Settings → Basics → Appearance, or system appearance change).
   4. Re-inspect the same surfaces without reloading.
   5. Switch back to light and re-inspect.
 - **Expected**:
   - Light and dark mode render `build/icon_1024.png` / `build/logo_dark.png`
     live in the sidebar and startup splash without a window reload.
-  - The empty-home hero renders the 100px, 58-frame mascot sprite; under
-    reduced motion it holds the first frame.
+  - The empty-home hero renders the 100px mascot sprite, chooses one of nine
+    remaining pose groups on mount, and plays that group; under reduced motion
+    it holds the selected group's first frame.
   - Sizes stay stable across theme changes (sidebar 20px, hero 100px, splash
     64px), and the marks stay decorative with no click, keyboard, or focus
     behavior.
@@ -3748,9 +3751,11 @@ This test plan spec is accepted when:
 
 ### US-UI-17 PI-Desktop home hero logo
 - On empty chat home, the 100px `HomeMascotLogo` renders above the title using
-  the 58 transparent mascot frames compiled from the supplied `docs/ip` sheets.
-- The animation loops without interaction, keeps the sprite's native pixel-art
-  colors, and holds the first frame under reduced motion.
+  the nine remaining pose groups (50 transparent mascot frames) compiled from
+  the supplied `docs/ip` sheets.
+- Each empty-home mount randomly chooses one group and loops that group without
+  interaction, keeps the sprite's native pixel-art colors, and holds the
+  selected group's first frame under reduced motion.
 - Title is 28px / weight 400; active project name uses dotted underline (1px, offset 4px).
 - Composer does not render attachment or appshot controls before their payload
   reaches pi end to end.
