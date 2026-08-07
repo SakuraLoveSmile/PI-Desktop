@@ -141,7 +141,7 @@ application menu, not the top bar.)
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [📁 Project ▸ Task title] [● Running]   [🤖 Model] [＋ New] [🔍 Search]
+[☰ Sidebar] [Task title] [●]   [🤖 Model] [＋ New] [🔍 Search]
 ```
 
 (Icons described functionally; actual render uses Lucide SVGs. The `[☰ Sidebar]`
@@ -149,8 +149,9 @@ toggle renders **only when the sidebar is collapsed**; when the sidebar is
 expanded it owns that control, so the top bar does not duplicate it.)
 
 The conversation top bar renders for the chat route only; Pull requests, Scheduled,
-Plugins, and Settings keep the frameless drag band. It owns project/title identity,
-the downward-opening model picker, and window actions only. The left-of-input
+Plugins, and Settings keep the frameless drag band. It owns the task title, the
+downward-opening model picker, and window actions only. Project scope remains in
+the title tooltip instead of adding another visible label. The left-of-input
 Composer chip is the sole Agent/Plan control and writes the session `mode`; the
 Thinking and permission triggers remain in the Composer (§11).
 
@@ -163,12 +164,12 @@ Thinking and permission triggers remain in the Composer (§11).
   `no-drag` on interactive controls; macOS reserves the left ~76px for traffic
   lights (only when the sidebar is collapsed), Windows/Linux reserve the right
   112px for native window controls
-- Title cluster (project ▸ task title) flexes and **ellipsizes**; the right
+- Title cluster (task title) flexes and **ellipsizes**; the right
   cluster (model picker, action icons) is `flex: 0 0 auto`
   and is never squeezed by a long title. The conversation surface keeps a
   `min-width` so its content is not crushed on narrow windows.
-- Project context is a compact muted folder label followed by a chevron; the
-  task title is the primary readable label with the stronger visual hierarchy.
+- Project scope is available from the title tooltip but is not rendered as a
+  second visible label.
 - macOS fullscreen resets the left reserve to 8px (mirrors the sidebar header).
 - Sticky: `z-sticky`
 - Items: left-aligned controls, right-aligned actions
@@ -177,11 +178,11 @@ Thinking and permission triggers remain in the Composer (§11).
 
 | Element | Default | Running | Error | No workspace |
 |---|---|---|---|---|
-| Task title | session title (or untitled) | same, plus a "Running" pill with a pulsing dot | same | same |
+| Task title | session title (or untitled) | same, plus a compact pulsing status dot | same | same |
 | Model selector | clickable dropdown | disabled during stream | clickable | clickable (no provider warning) |
 | New task / Search | icon buttons | same | same | same |
 | Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
-| Project name | workspace folder name | same | same | "No project" muted |
+| Project name | title tooltip only | same | same | omitted |
 
 ### 2.5 Accessibility
 

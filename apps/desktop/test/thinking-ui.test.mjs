@@ -88,21 +88,25 @@ test("Composer owns the mode chip and the top bar keeps only model selection", (
   assert.match(leftToolbar, /composer-thinking-menu/);
 });
 
-test("conversation topbar presents project context as a compact title hierarchy", () => {
-  assert.match(topbarSource, /IconFolder/);
-  assert.match(topbarSource, /IconChevronRight/);
-  assert.match(topbarSource, /className="ct-project"/);
-  assert.match(topbarSource, /className="ct-title-chevron"/);
+test("conversation topbar keeps only the concise task title visible", () => {
+  assert.doesNotMatch(topbarSource, /IconFolder|IconChevronRight/);
+  assert.doesNotMatch(topbarSource, /className="ct-project"/);
+  assert.doesNotMatch(topbarSource, /className="ct-title-chevron"/);
+  assert.match(topbarSource, /className="ct-title"/);
+  assert.match(topbarSource, /role="status"/);
   assert.match(stylesSource, /\.conversation-topbar \.ct-title-wrap[\s\S]*?align-items: center/);
-  assert.match(
-    stylesSource,
-    /\.conversation-topbar \.ct-project[\s\S]*?font-size: var\(--text-sm\)/,
-  );
   assert.match(
     stylesSource,
     /\.conversation-topbar \.ct-title[\s\S]*?font-size: var\(--text-base\)/,
   );
-  assert.match(stylesSource, /\.conversation-topbar \.ct-title-chevron/);
+  assert.match(
+    stylesSource,
+    /\.conversation-topbar \.ct-running\s*\{[\s\S]*?width: 18px[\s\S]*?height: 18px/,
+  );
+  assert.match(
+    stylesSource,
+    /\.conversation-topbar \.ct-running-dot[\s\S]*?background: var\(--ds-warning\)/,
+  );
 });
 
 test("model menus do not expose desktop-owned reasoning overrides", () => {

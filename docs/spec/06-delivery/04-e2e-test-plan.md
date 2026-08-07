@@ -354,8 +354,8 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Provider configured; at least one session exists.
 - **Steps**: 1) Open the chat route. 2) Inspect the 46px bar at the top of the
-  conversation area. 3) Confirm it shows the active project name and
-  session/task title, the model picker, and the New task / Search / Commands
+  conversation area. 3) Confirm it shows the concise session/task title, the
+  model picker, and the New task / Search / Commands
   action buttons; confirm the
   sidebar toggle appears **only when the sidebar is collapsed** (when expanded,
   the sidebar owns that control). 4) Switch to the Pull requests, Scheduled,
@@ -363,10 +363,10 @@ Each scenario is documented in this format:
 - **Expected**: On the chat route the conversation top bar renders with its
   title, model picker, and actions; it has no Agent|Plan mode control. The
   left-of-input Composer chip owns the active session's Agent/Plan switch. The
-  project context reads as a compact folder label and chevron, while the task
-  title is the primary readable label rather than two equally weighted text
-  fragments. A long task title ellipsizes instead of squeezing the model picker or action
-  buttons. The sidebar toggle is present only in the collapsed state (no
+  task title is the only visible title text; project scope is available through
+  its tooltip. A compact status dot appears while running. A long task title
+  ellipsizes instead of squeezing the model picker or action buttons. The sidebar
+  toggle is present only in the collapsed state (no
   duplicate of the sidebar's control). On every other route the frameless drag
   band renders instead (no top-bar controls). The bar is draggable to move the
   window; interactive controls do not start a window drag.
