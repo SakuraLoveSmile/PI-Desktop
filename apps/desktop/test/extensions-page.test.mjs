@@ -100,6 +100,21 @@ test("the extensions page uses tabs instead of a four-number overview band", () 
   assert.match(pageSrc, /className="plugins-segment"/);
 });
 
+test("installed plugin rows keep secondary detail behind a disclosure", () => {
+  assert.match(pageSrc, /function PluginRowDetails/);
+  assert.match(pageSrc, /<details className="plugins-row-details">/);
+  assert.match(pageSrc, /<ScopeControl[\s\S]*?compact/);
+
+  const rowStart = pageSrc.indexOf('role="listitem"\n                          className={cx(');
+  const controlsStart = pageSrc.indexOf('className="plugins-row-controls"', rowStart);
+  assert.ok(rowStart > 0 && controlsStart > rowStart, "installed row markup is missing");
+  const row = pageSrc.slice(rowStart, controlsStart);
+
+  assert.match(row, /<PluginRowDetails/);
+  assert.doesNotMatch(row, /<CapabilityChips|<ServiceChips|<PermissionChips/);
+  assert.doesNotMatch(row, /tagError|tagOff|autoUpdateOn/);
+});
+
 test("the client hides development-only demo plugins from marketplace results", () => {
   assert.match(pageSrc, /function isClientVisibleMarketPlugin/);
   assert.match(pageSrc, /!plugin\.id\.startsWith\("demo\."\)/);

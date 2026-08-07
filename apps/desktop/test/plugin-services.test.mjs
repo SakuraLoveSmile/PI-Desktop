@@ -327,9 +327,14 @@ test("service status reaches the renderer over its own channel", () => {
   assert.match(apiSrc, /listPluginServices/);
 });
 
-test("the plugins page shows capability and service chips", () => {
+test("the plugins page keeps capability and service chips in row details", () => {
   assert.match(pluginsPageSrc, /<CapabilityChips capabilities=\{plugin\.capabilities\} \/>/);
-  assert.match(pluginsPageSrc, /<ServiceChips statuses=\{servicesByPlugin\.get\(plugin\.id\)\} \/>/);
+  assert.match(pluginsPageSrc, /<ServiceChips statuses=\{services\} \/>/);
+  assert.match(pluginsPageSrc, /<details className="plugins-row-details">/);
+  assert.match(
+    pluginsPageSrc,
+    /<PluginRowDetails[\s\S]*?services=\{servicesByPlugin\.get\(plugin\.id\)\}/,
+  );
   assert.match(pluginsPageSrc, /\.listPluginServices\(\)/);
   assert.match(pluginsPageSrc, /api\.onPluginChanged\(refresh\)/);
   for (const key of ["serviceState", "serviceRestarts", "capabilities"]) {

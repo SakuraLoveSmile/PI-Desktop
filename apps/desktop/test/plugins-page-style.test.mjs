@@ -70,6 +70,16 @@ test("plugins installed list lets row menus escape the panel", () => {
   assert.match(section, /\.plugins-menu\.is-up\s*\{[\s\S]*?bottom:\s*calc\(100% \+ 5px\)/);
 });
 
+test("installed rows default to a calm summary with accessible details", () => {
+  const section = pluginsSection(stylesSource);
+
+  assert.match(section, /\.plugins-row\s*\{[\s\S]*?align-items:\s*center[\s\S]*?padding:\s*14px 16px/);
+  assert.match(section, /\.plugins-row-details\s*\{/);
+  assert.match(section, /\.plugins-row-details-body\s*\{[\s\S]*?box-shadow:\s*inset/);
+  assert.match(section, /\.plugins-row-details-toggle:focus-visible\s*\{/);
+  assert.match(section, /\.plugins-row-details\[open\] \.plugins-row-details-toggle > svg/);
+});
+
 // The 46px titlebar band floats over the destination pages: it is a native drag
 // rectangle, and on Windows/Linux the renderer-drawn window controls own its
 // rightmost 112px. The plugins page is the one destination page with controls in

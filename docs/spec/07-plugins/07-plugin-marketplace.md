@@ -171,13 +171,24 @@ Extensions
 └─ Permission dialog (install / upgrade)
 ```
 
-All four surfaces live under one segmented control that carries relevant
+All five surfaces live under one segmented control that carries relevant
 per-tab counts. There is no separate numeric overview band; the update alert,
 tab counts, and installed group counts retain the actionable state without
 duplicating it in a static card row (D196). The header keeps a single
 contextual primary action (Browse marketplace / Refresh marketplace) and moves
 Check for updates, Apply automatic updates, Install package, and Load local
 plugin into an overflow menu (D169).
+
+Installed rows intentionally default to a quiet two-line summary containing the
+plugin name, optional local-source marker, id, and version. The state group
+heading carries Active / Turned off / Updates available / Needs attention, and
+load errors remain inline. Capabilities, resident service status, and
+risk-tinted permission chips are rendered inside a collapsed native Details
+disclosure; expanding it exposes the existing full readout without making every
+row tall. Installed rows use the compact icon-only scope track, while its
+accessible label and per-state tooltip preserve the meaning of Off / This
+project / Everywhere. This is a renderer-only presentation choice; plugin
+permissions and activation contracts are unchanged.
 
 The Detail sheet must show:
 - Permissions, grouped and labeled by risk tier

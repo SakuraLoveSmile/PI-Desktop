@@ -260,9 +260,9 @@
 
 .plugins-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   transition: background var(--motion-duration-fast) var(--motion-ease-out);
 }
 
@@ -286,13 +286,16 @@
   background: var(--ds-bg-hover);
 }
 
+.plugins-row:has(.plugins-row-details[open]) {
+  align-items: flex-start;
+}
+
 .plugins-glyph {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   align-items: center;
   justify-content: center;
-  margin-top: 1px;
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
   color: var(--ds-text-secondary);
@@ -319,13 +322,13 @@
   flex: 1;
   min-width: 0;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .plugins-row-title {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -349,7 +352,7 @@
   gap: 5px;
   flex-wrap: wrap;
   color: var(--ds-text-muted);
-  font-size: var(--text-xs-plus);
+  font-size: var(--text-xs);
 }
 
 .plugins-row-id {
@@ -372,7 +375,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Tags carry row state; the section label carries the grouping. */
+/* The group heading carries state; the only row tag is the local-source marker. */
 .plugins-tag {
   display: inline-flex;
   align-items: center;
@@ -392,15 +395,79 @@
   color: var(--ds-success);
 }
 
-.plugins-tag.is-error {
-  background: color-mix(in oklab, var(--ds-error) 15%, transparent);
-  color: var(--ds-error);
+/* Capabilities, services and permissions are deliberately disclosed on demand. */
+.plugins-row-details {
+  margin-top: 2px;
 }
 
-.plugins-tag.is-quiet {
-  background: transparent;
+.plugins-row-details-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-2xs);
+  padding: 1px 4px;
   color: var(--ds-text-muted);
-  box-shadow: inset 0 0 0 0.5px var(--ds-border-strong);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.plugins-row-details-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.plugins-row-details-toggle > svg {
+  flex: 0 0 auto;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.plugins-row-details[open] .plugins-row-details-toggle > svg {
+  transform: rotate(180deg);
+}
+
+.plugins-row-details-toggle:hover {
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  color: var(--ds-text-primary);
+}
+
+.plugins-row-details-toggle:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ds-accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.plugins-row-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 7px;
+  border-radius: var(--radius-md);
+  padding: 9px 10px;
+  background: color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-subtle);
+}
+
+.plugins-row-detail {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.plugins-row-detail-label {
+  flex: 0 0 72px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.plugins-row-detail > .plugins-cap-chips,
+.plugins-row-detail > .plugins-service-chips,
+.plugins-row-detail > .plugins-perm-chips {
+  flex: 1 1 auto;
 }
 
 /* Permission chips: risk is encoded in the tint, not in a separate legend. */

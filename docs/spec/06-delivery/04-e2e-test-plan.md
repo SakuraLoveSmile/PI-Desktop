@@ -886,7 +886,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: At least one enabled plugin, one disabled plugin, and one plugin whose load failed.
 - **Steps**: 1) Open Extensions → Installed. 2) Read the tab and group counts. 3) Confirm the failed plugin sits under Needs attention with its error message. 4) Search by author and by permission. 5) Clear the search.
-- **Expected**: Rows group as Needs attention / Updates available / Active / Turned off with counts; `status: "error" | "load_error"` renders the error message inline instead of being silent; permission chips are tinted by risk tier with overflow collapsed; the result count reflects the filtered subset and clearing restores every group.
+- **Expected**: Rows group as Needs attention / Updates available / Active / Turned off with counts; `status: "error" | "load_error"` renders the error message inline instead of being silent; each row defaults to a two-line name/id/version summary, while a Details disclosure reveals risk-tinted permission chips, capabilities, and resident service status; the compact scope track remains keyboard and tooltip accessible; the result count reflects the filtered subset and clearing restores every group.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `07-plugins/13-plugin-permissions-matrix.md`
 - **Acceptance**: G (installed plugin management)
 - **Status**: Documented
@@ -939,8 +939,8 @@ Each scenario is documented in this format:
 #### E2E-024L: Resident plugin service is supervised and visible
 
 - **Preconditions**: `examples/plugins/hello` enabled with `background.service` granted.
-- **Steps**: 1) Open Extensions → Installed and read the `Greeter heartbeat` chip. 2) Kill the plugin's utility process and watch the chip. 3) Kill it repeatedly past the restart ceiling. 4) Disable and re-enable the plugin. 5) Revoke `background.service` and reload.
-- **Expected**: The chip reports `running` after load; a kill shows `failed` then `running` again with an incremented restart count and backoff between attempts; past five attempts the plugin stays `failed` and stops retrying; manual disable/enable cancels the pending timer and resets the counter; without the permission the service never starts and the skip is audited.
+- **Steps**: 1) Open Extensions → Installed and expand Details on the plugin row to read the `Greeter heartbeat` chip. 2) Kill the plugin's utility process and watch the chip. 3) Kill it repeatedly past the restart ceiling. 4) Disable and re-enable the plugin. 5) Revoke `background.service` and reload.
+- **Expected**: The Details disclosure exposes a chip that reports `running` after load; a kill shows `failed` then `running` again with an incremented restart count and backoff between attempts; past five attempts the plugin stays `failed` and stops retrying; manual disable/enable cancels the pending timer and resets the counter; without the permission the service never starts and the skip is audited.
 - **Specs linked**: `07-plugins/05-plugin-lifecycle.md` §3.1, ADR 0040, D177
 - **Acceptance**: G (resident services)
 - **Status**: Unit-covered (`plugin-services.test.mjs` supervision + backoff); manual kill scenario Draft
@@ -959,15 +959,21 @@ Each scenario is documented in this format:
 - **Preconditions**: App running with at least one installed extension and one
   available marketplace action; dark and light themes available.
 - **Steps**: 1) Open Extensions in dark theme. 2) Confirm the header and
-  Installed / MCP / Skills / Marketplace tabs reach the content without a
-  four-card numeric overview band. 3) Use the contextual primary action and a
-  secondary update/action button. 4) Switch to light theme and repeat. 5)
-  Keyboard-focus each action.
+  Installed / MCP / Skills / Subagents / Marketplace tabs reach the content
+  without a four-card numeric overview band. 3) Confirm installed rows begin
+  as a quiet two-line summary, then expand Details on one row and inspect its
+  capabilities, service status, and permissions. 4) Use the compact scope
+  control, contextual primary action, and a secondary update/action button. 5)
+  Switch to light theme and repeat. 6) Keyboard-focus the Details disclosure,
+  scope states, and each action.
 - **Expected**: The four numeric overview cards are absent; tab counts,
   installed group counts, and any update alert remain available in their
-  relevant surfaces. Primary and secondary buttons keep visible semantic
-  surfaces, text, borders, hover states, and focus rings in both themes, and
-  keyboard focus does not depend on pointer hover.
+  relevant surfaces. Installed rows keep their default height low while the
+  disclosure exposes the complete secondary readout. Scope states remain
+  understandable through accessible labels/tooltips. Primary and secondary
+  buttons keep visible semantic surfaces, text, borders, hover states, and
+  focus rings in both themes, and keyboard focus does not depend on pointer
+  hover.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `07-plugins/07-plugin-marketplace.md`, ADR 0058, D196
 - **Acceptance**: G (Extensions page) + Quality

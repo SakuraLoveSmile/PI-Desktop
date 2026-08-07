@@ -7,6 +7,7 @@ import {
   IconCheck,
   IconCircleAlert,
   IconCloudDown,
+  IconChevronDown,
   IconDownload,
   IconLink,
   IconMore,
@@ -120,7 +121,7 @@ const RISK_LABEL_KEYS: Record<RiskTier, string> = {
   low: "plugins.riskLow",
 };
 
-/** Chips rendered inline on a row or card before collapsing into a "+N" counter. */
+/** Chips rendered in row details or cards before collapsing into a "+N" counter. */
 const INLINE_PERMISSION_LIMIT = 3;
 
 /**
@@ -280,6 +281,58 @@ function ServiceChips({ statuses }: { statuses: readonly PluginServiceStatus[] |
         </span>
       ))}
     </span>
+  );
+}
+
+/** Keep the installed row calm while retaining the full capability readout on demand. */
+function PluginRowDetails({
+  plugin,
+  services,
+}: {
+  plugin: PluginSummary;
+  services: readonly PluginServiceStatus[] | undefined;
+}) {
+  const { t } = useTranslation();
+  const hasCapabilities = (plugin.capabilities?.length ?? 0) > 0;
+  const hasServices = (services?.length ?? 0) > 0;
+  const hasPermissions = (plugin.permissions?.length ?? 0) > 0;
+
+  if (!hasCapabilities && !hasServices && !hasPermissions) return null;
+
+  return (
+    <details className="plugins-row-details">
+      <summary
+        className="plugins-row-details-toggle"
+        aria-label={t("plugins.viewDetailsOf", { name: plugin.name })}
+      >
+        <IconChevronDown size={13} aria-hidden="true" />
+        <span>{t("plugins.details")}</span>
+      </summary>
+      <div className="plugins-row-details-body">
+        {hasCapabilities ? (
+          <div className="plugins-row-detail">
+            <span className="plugins-row-detail-label">
+              {t("plugins.capabilitiesTitle")}
+            </span>
+            <CapabilityChips capabilities={plugin.capabilities} />
+          </div>
+        ) : null}
+        {hasServices ? (
+          <div className="plugins-row-detail">
+            <span className="plugins-row-detail-label">{t("plugins.servicesTitle")}</span>
+            <ServiceChips statuses={services} />
+          </div>
+        ) : null}
+        {hasPermissions ? (
+          <div className="plugins-row-detail">
+            <span className="plugins-row-detail-label">
+              {t("plugins.permissionsTitle")}
+            </span>
+            <PermissionChips permissions={plugin.permissions} />
+          </div>
+        ) : null}
+      </div>
+    </details>
   );
 }
 
@@ -1050,25 +1103,8 @@ export function PluginsPage() {
                           <div className="plugins-row-copy">
                             <div className="plugins-row-title">
                               <span className="plugins-row-name">{plugin.name}</span>
-                              {broken ? (
-                                <span className="plugins-tag is-error">
-                                  {t("plugins.tagError")}
-                                </span>
-                              ) : null}
-                              {update ? (
-                                <span className="plugins-tag is-update">
-                                  {t("plugins.updateAvailable", {
-                                    version: update.version,
-                                  })}
-                                </span>
-                              ) : null}
                               {plugin.source === "dev" ? (
                                 <span className="plugins-tag">{t("plugins.tagLocal")}</span>
-                              ) : null}
-                              {!plugin.enabled && !broken ? (
-                                <span className="plugins-tag is-quiet">
-                                  {t("plugins.tagOff")}
-                                </span>
                               ) : null}
                             </div>
                             <div className="plugins-row-meta">
@@ -1077,21 +1113,14 @@ export function PluginsPage() {
                                 ·
                               </span>
                               <span>v{plugin.version}</span>
-                              {plugin.autoUpdate ? (
-                                <>
-                                  <span className="plugins-dot" aria-hidden>
-                                    ·
-                                  </span>
-                                  <span>{t("plugins.autoUpdateOn")}</span>
-                                </>
-                              ) : null}
                             </div>
                             {plugin.errorMessage ? (
                               <p className="plugins-row-error">{plugin.errorMessage}</p>
                             ) : null}
-                            <CapabilityChips capabilities={plugin.capabilities} />
-                            <ServiceChips statuses={servicesByPlugin.get(plugin.id)} />
-                            <PermissionChips permissions={plugin.permissions} />
+                            <PluginRowDetails
+                              plugin={plugin}
+                              services={servicesByPlugin.get(plugin.id)}
+                            />
                           </div>
                           <div className="plugins-row-controls">
                             {update ? (
@@ -1117,6 +1146,7 @@ export function PluginsPage() {
                             <ScopeControl
                               target={plugin}
                               label={plugin.name}
+                              compact
                               projects={projects}
                               currentProjectPath={currentProjectPath}
                               onSetEnabled={(enabled) =>
