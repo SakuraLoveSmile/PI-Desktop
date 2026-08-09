@@ -72,10 +72,6 @@
   font-size: var(--text-xs-plus, var(--text-sm));
 }
 
-.composer-ac-path {
-  font-family: var(--font-mono, ui-monospace, monospace);
-}
-
 .composer-ac-hl {
   color: var(--ds-accent);
   font-weight: var(--font-weight-semibold);

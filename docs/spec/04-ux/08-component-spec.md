@@ -1620,11 +1620,13 @@ Anatomy:
   `argument-hint` ghost text + description, project source before
   user-global), app commands (builtin slash aliases), plugin commands.
   Matched characters highlight in accent.
-- File mode (`@` token at cursor, boundary-preceded): rows show file name as
-  the primary line and relative path as the secondary line; directories get
-  a trailing `/` and continue completion on accept; entries come from
-  `fs/index` (D124). A truncation footnote appears when the index is capped;
-  without a workspace the menu shows an "open a project" empty state.
+- File mode (`@` token at cursor, boundary-preceded): rows persistently show
+  only the leaf file or directory name; directories get a trailing `/` and
+  continue completion on accept. The complete relative path remains available
+  through the row tooltip and accessible name, while the original `entry.path`
+  remains the insertion value. Entries come from `fs/index` (D124). A
+  truncation footnote appears when the index is capped; without a workspace the
+  menu shows an "open a project" empty state.
 - Accepting always inserts text (`/name ` / `@path ` / `@dir/`); dispatch
   happens only at send time (D123). Builtin/plugin dispatch bypasses the
   model-ready gate since no prompt is sent.
@@ -1634,15 +1636,6 @@ Anatomy:
   the transcript. An alias-only mode command remains local. The composer is
   cleared only after the local action or prompt dispatch is accepted; a failed
   dispatch retains the complete draft for retry.
-- A paste containing files is intercepted only when the clipboard exposes at
-  least one `File`. The renderer transfers bounded file bytes, name, and MIME
-  metadata to Electron main with the durable session id. Main validates the
-  session, writes unique sanitized files under
-  `<data_dir>/scratch/<sessionId>/pasted/`, and returns absolute paths. The
-  composer inserts each path using the same `@` reference formatting as the
-  file menu; paths containing whitespace are quoted. A home composer creates
-  or reuses a durable session before saving. The scratch lifecycle removes
-  pasted files with the session and never dirties the workspace git tree.
 - A paste containing files is intercepted only when the clipboard exposes at
   least one `File`. The renderer transfers bounded file bytes, name, and MIME
   metadata to Electron main with the durable session id. Main validates the

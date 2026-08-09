@@ -110,18 +110,17 @@ export function ComposerAutocomplete({
     }
     const isDir = item.entry.kind === "dir";
     const name = item.entry.path.split("/").pop() ?? item.entry.path;
+    const displayName = `${name}${isDir ? "/" : ""}`;
     return (
-      <button {...commonProps}>
+      <button
+        {...commonProps}
+        aria-label={`${displayName} — ${item.entry.path}`}
+        title={item.entry.path}
+      >
         <span className="composer-ac-icon">
           {isDir ? <IconFolder size={14} /> : <IconFileText size={14} />}
         </span>
-        <span className="composer-ac-name">
-          {name}
-          {isDir ? "/" : ""}
-        </span>
-        <span className="composer-ac-desc composer-ac-path">
-          <Highlighted text={item.entry.path} ranges={item.match.ranges} />
-        </span>
+        <span className="composer-ac-name">{displayName}</span>
       </button>
     );
   };

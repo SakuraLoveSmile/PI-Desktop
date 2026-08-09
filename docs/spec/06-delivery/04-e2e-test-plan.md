@@ -3593,6 +3593,33 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`apps/desktop/test/composer-paste-files.test.mjs`);
   full UI journey Draft (do not run E2E locally unless explicitly requested)
 
+#### E2E-102a: Composer file reference results use compact leaf names
+
+- **Preconditions**: The app is running with an Agent session in a workspace
+  containing nested files, duplicate leaf names in different directories, and
+  a directory whose name contains whitespace.
+- **Steps**: 1) Type `@` and filter to the nested and duplicate entries. 2)
+  Inspect the visible rows, then hover them and inspect their accessible names.
+  3) Accept a file and a directory result. 4) Send the completed file reference
+  and inspect the persisted user message.
+- **Expected**:
+  - Each result persistently renders only its leaf name; directories retain a
+    trailing `/`, and no parent path consumes horizontal row space.
+  - The tooltip and accessible name retain the complete relative path so
+    duplicate leaf names remain distinguishable.
+  - Accepting still inserts the original complete `entry.path`, including the
+    existing whitespace quoting and directory continuation behavior. The sent
+    and persisted prompt remains unchanged and the agent can read the selected
+    file normally.
+- **Specs linked**: `04-ux/08-component-spec.md` §11.8,
+  `04-ux/09-interaction-patterns.md` §8a, `03-runtime/01-ipc-protocol.md` §13c,
+  `08-meta/decisions-log.md` (D124), ADR 0024
+- **Acceptance**: C (conversation & stream), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered
+  (`apps/desktop/test/composer-file-reference-display.test.mjs`); full UI
+  journey Draft (do not run E2E locally unless explicitly requested)
+
 #### E2E-103: A subagent written in the UI reaches Task, scoped and shadowed
 
 - **Preconditions**: The app is running with two projects registered, A and B,

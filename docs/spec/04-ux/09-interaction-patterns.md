@@ -760,6 +760,10 @@ When drag/drop is implemented, these patterns should apply:
   token (`@"…`) is treated as one token until the closing quote.
 - Pasting text never opens a menu unless the caret lands inside a valid
   trigger token.
+- File results keep each row compact by rendering only the leaf name (with a
+  trailing `/` for directories). The full relative path remains available as
+  the row tooltip and accessible name, and accepting the row still inserts the
+  original full `entry.path` value.
 
 ### 8a.4 Clipboard files
 
