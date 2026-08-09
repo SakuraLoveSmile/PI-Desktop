@@ -234,7 +234,16 @@ describe("DesktopAgentRuntime configuration matching", () => {
       "prefer the Read, Grep, and Glob tools over shell",
     );
     expect(prompt).toContain("`outputMode`");
-    expect(prompt).toContain("paginates any file, however large");
+    expect(prompt).toContain(
+      "paginates any supported text file, however large",
+    );
+    expect(prompt).toContain(
+      "Read accepts only an existing regular text file, never a directory",
+    );
+    expect(prompt).toContain(
+      "in Agent mode, activate it with ToolSearch for the current prompt",
+    );
+    expect(prompt).toContain("Grep takes a file-or-directory `path`");
     expect(prompt).toContain("use `rg` only when it is available");
     expect(prompt).toContain("Workspace-relative paths are portable");
     expect(prompt).toContain(
@@ -270,6 +279,19 @@ describe("DesktopAgentRuntime configuration matching", () => {
         expect.objectContaining({ const: "filesWithMatches" }),
         expect.objectContaining({ const: "count" }),
       ]),
+    );
+    expect(byName("Read").description).toContain("never a directory");
+    expect(byName("Read").parameters.properties.path.description).toContain(
+      "Existing regular file only",
+    );
+    expect(byName("Glob").parameters.properties.path.description).toContain(
+      "Directory to search",
+    );
+    expect(byName("Grep").description).toContain(
+      "one file or a directory tree",
+    );
+    expect(byName("Grep").parameters.properties.path.description).toContain(
+      "File or directory to search",
     );
 
     await runtime.dispose();
@@ -3633,6 +3655,10 @@ describe("DesktopAgentRuntime subagents", () => {
       "\n\n",
     );
     expect(readOnly).toContain("prefer Read, Grep, and Glob");
+    expect(readOnly).toContain(
+      "Read accepts only an existing regular text file, never a directory",
+    );
+    expect(readOnly).toContain("Grep takes a file-or-directory `path`");
     expect(readOnly).not.toContain("use Edit for one small unique replacement");
     expect(readOnly).toContain("Use project rules.");
 

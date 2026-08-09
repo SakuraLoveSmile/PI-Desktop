@@ -44,7 +44,7 @@ Rules:
 | `AGENT_UNAVAILABLE` | yes | pi sidecar not running/reachable |
 | `APP_DEGRADED` | yes | app running with limited capabilities |
 | `INTERNAL` | maybe | unexpected internal failure |
-| `INVALID_ARGUMENT` | no | request schema/args invalid |
+| `INVALID_ARGUMENT` | no | request schema/args invalid, including a native-tool path of the wrong file/directory kind |
 | `UNAUTHORIZED` | no | capability/auth boundary rejected call |
 | `NOT_FOUND` | no | entity not found |
 | `CONFLICT` | maybe | state conflict / busy resource |

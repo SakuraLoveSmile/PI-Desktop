@@ -234,6 +234,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D204 | Empty home task-entry surface | *(supersedes D111's non-docked home-composer clause and its contextual quick-action clauses; starter-grid amendment in D205 is superseded by D206)* **The empty chat home keeps the restrained hero and optional first-run checklist in the scrollable content region. The home composer is a bottom-reserved sibling of the scroller, remains visible at the bottom of the chat surface, and never covers the content.** | The direct composer remains the stable primary action and the flow layout preserves checklist reachability in short windows (ADR 0066). |
 | D205 | ChatGPT-inspired empty-home guidance | *(superseded by D206)* **The empty chat home adds a compact four-card developer starter grid between the hero and optional checklist: Explore a codebase, Build a feature, Fix a bug, and Review a change. Each localized card only prefills and focuses the bottom composer; it never sends a prompt or creates a turn. The bottom-reserved composer and single scrollable home flow from D204 remain unchanged.** | The previous hero-only middle left too much unused space and offered no starting cues. ChatGPT's clear empty-state hierarchy improves first-task discoverability while developer-specific prompts keep the surface purposeful rather than promotional. |
 | D206 | Remove empty-home developer starter cards | **The empty chat home does not render developer starter cards, starter glyphs, or a contextual quick-action row. It keeps the restrained hero, short supporting line, optional onboarding checklist, and D204's bottom-reserved composer; task entry starts directly in the composer. This supersedes D205 without changing D204's scroll and bottom-reservation layout.** | Review confirmed that the direct composer is the preferred task-entry surface and that the cards add an unnecessary decision layer to the empty home. |
+| D208 | Recoverable native-tool path contracts | **Keep D185's deferred Glob/Grep boundary, but make every prompt and schema explicit that Read accepts an existing regular file, Glob accepts a directory, and Grep accepts a file or directory. A directory Read returns `INVALID_ARGUMENT` plus structured Glob recovery args; an explicit-file Grep searches only that file and applies `include` to its basename. Tool errors remain visible on their ToolCallRows, while activity groups report processing duration only and never infer terminal turn failure from a child row; terminal agent events and the dedicated outcome surfaces remain authoritative (ADR 0069).** | Durable sessions showed directory Read and file-as-directory Grep mistakes repeatedly, then displayed recovered work as terminally failed. Compatibility at the narrow host boundary plus one outcome owner removes retries and false failure UI without restoring every search schema to the Agent core. |
 
 ## P. Transcript storage decisions
 
@@ -1395,3 +1396,12 @@ D193, and D194.
   no-launcher presentation. See ADR 0068, `04-ux/01-ui-ia.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`, and
   E2E-056.
+
+## 2026-08-10 — Native path mistakes recover without false turn failure
+
+- Read is file-only, Glob is directory-only, and Grep accepts a file or
+  directory; directory Read errors include structured Glob recovery args.
+- Recovered tool errors remain visible on their own rows but no longer turn the
+  containing processing group into a terminal failure surface.
+- D185's deferred Agent search tools remain unchanged. Decision D208 and ADR
+  0069 define the compatible tool and transcript contracts.

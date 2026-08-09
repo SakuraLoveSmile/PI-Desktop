@@ -528,6 +528,10 @@ const GREP_MAX_CANDIDATE_FILES: usize = 20_000;
 const GLOB_DEFAULT_LIMIT: usize = 100;
 const GLOB_MAX_LIMIT: usize = 1000;
 
+/// Internal-only classifier used to enrich a public INVALID_ARGUMENT result
+/// with a machine-actionable Glob recovery. It never crosses the RPC boundary.
+const READ_PATH_IS_DIRECTORY: &str = "READ_PATH_IS_DIRECTORY";
+
 /// Extensions we refuse to read as text even when the byte sniff is
 /// inconclusive (a short archive header can look printable).
 const BINARY_EXTENSIONS: &[&str] = &[
@@ -1024,16 +1028,34 @@ pub async fn execute_tool_with_path_access(
                 command_shell_id,
             }
         }
-        Err((code, message)) => ToolsExecuteResult {
-            tool_call_id,
-            ok: false,
-            is_error: Some(true),
-            content: json!({ "error": message, "code": code }),
-            duration_ms: started.elapsed().as_millis() as u64,
-            denied: Some(code == "TOOL_DENIED" || code == "PATH_OUTSIDE_WORKSPACE"),
-            error_code: Some(code),
-            command_shell_id,
-        },
+        Err((code, message)) => {
+            let read_path_is_directory = code == READ_PATH_IS_DIRECTORY;
+            let public_code = if read_path_is_directory {
+                "INVALID_ARGUMENT".to_string()
+            } else {
+                code
+            };
+            let mut content = json!({ "error": message, "code": public_code.clone() });
+            if read_path_is_directory {
+                content["suggestedTool"] = json!("Glob");
+                content["suggestedArgs"] = json!({
+                    "path": args.get("path").and_then(Value::as_str).unwrap_or_default(),
+                    "pattern": "**/*",
+                });
+            }
+            ToolsExecuteResult {
+                tool_call_id,
+                ok: false,
+                is_error: Some(true),
+                content,
+                duration_ms: started.elapsed().as_millis() as u64,
+                denied: Some(
+                    public_code == "TOOL_DENIED" || public_code == "PATH_OUTSIDE_WORKSPACE",
+                ),
+                error_code: Some(public_code),
+                command_shell_id,
+            }
+        }
     }
 }
 
@@ -1093,8 +1115,16 @@ fn tool_read(
         .map_err(|e| ("TOOL_FAILED".into(), format!("read failed: {e}")))?;
     if meta.is_dir() {
         return Err((
-            "TOOL_FAILED".into(),
-            "path is a directory; use Glob to list it".into(),
+            READ_PATH_IS_DIRECTORY.into(),
+            format!(
+                "Read requires a file, but {path} is a directory; use Glob with path={path:?} and pattern=\"**/*\" (activate Glob first if it is deferred)"
+            ),
+        ));
+    }
+    if !meta.is_file() {
+        return Err((
+            "INVALID_ARGUMENT".into(),
+            format!("Read requires a regular file: {path}"),
         ));
     }
     let display = display_tool_path(root_kind, root, &resolved);
@@ -1327,11 +1357,18 @@ fn glob_matches(set: &globset::GlobSet, relative: &Path) -> bool {
 /// files at or below it count. Otherwise a `path` pointing into an ignored tree
 /// (`node_modules`, `dist`) would be filtered to zero matches by the
 /// workspace's own `.gitignore` — again pushing the model back to the shell.
+#[derive(Debug, Clone, Copy)]
+enum SearchPathKind {
+    DirectoryOnly,
+    FileOrDirectory,
+}
+
 fn search_root(
     root: &Path,
     scratch: Option<&Path>,
     args: &Value,
     allow_external_paths: bool,
+    expected: SearchPathKind,
 ) -> Result<(PathBuf, ToolRoot, bool), (String, String)> {
     match args
         .get("path")
@@ -1343,10 +1380,16 @@ fn search_root(
             let (resolved, kind) =
                 resolve_tool_path_with_external(root, scratch, path, allow_external_paths)
                     .map_err(|e| (e.clone(), e))?;
-            if !resolved.is_dir() {
+            let accepted = resolved.is_dir()
+                || matches!(expected, SearchPathKind::FileOrDirectory) && resolved.is_file();
+            if !accepted {
+                let expected_label = match expected {
+                    SearchPathKind::DirectoryOnly => "a directory",
+                    SearchPathKind::FileOrDirectory => "a file or directory",
+                };
                 return Err((
                     "INVALID_ARGUMENT".into(),
-                    format!("path is not a directory: {path}"),
+                    format!("path is not {expected_label}: {path}"),
                 ));
             }
             Ok((resolved, kind, true))
@@ -1361,6 +1404,17 @@ fn candidate_files(
     include: Option<&globset::GlobSet>,
     max_files: usize,
 ) -> (Vec<PathBuf>, bool) {
+    if search_root.is_file() {
+        let relative = search_root
+            .file_name()
+            .map(Path::new)
+            .unwrap_or(search_root);
+        if include.is_some_and(|set| !glob_matches(set, relative)) {
+            return (Vec::new(), false);
+        }
+        return (vec![search_root.to_path_buf()], false);
+    }
+
     let mut walker = WalkBuilder::new(search_root);
     walker.hidden(false).git_ignore(true);
     if scoped {
@@ -1412,7 +1466,13 @@ fn tool_glob(
         .and_then(|v| v.as_str())
         .unwrap_or("**/*");
     let set = build_glob_set(pattern)?;
-    let (search_dir, root_kind, scoped) = search_root(root, scratch, args, allow_external_paths)?;
+    let (search_dir, root_kind, scoped) = search_root(
+        root,
+        scratch,
+        args,
+        allow_external_paths,
+        SearchPathKind::DirectoryOnly,
+    )?;
     let limit = args
         .get("limit")
         .and_then(|v| v.as_u64())
@@ -1470,7 +1530,13 @@ fn tool_grep(
         )
         .build()
         .map_err(|e| ("INVALID_ARGUMENT".into(), e.to_string()))?;
-    let (search_dir, root_kind, scoped) = search_root(root, scratch, args, allow_external_paths)?;
+    let (search_dir, root_kind, scoped) = search_root(
+        root,
+        scratch,
+        args,
+        allow_external_paths,
+        SearchPathKind::FileOrDirectory,
+    )?;
     let include = args
         .get("include")
         .and_then(|v| v.as_str())
@@ -2316,7 +2382,8 @@ pub fn builtin_tool_defs() -> Value {
         {
             "name": "Read",
             "description": format!(
-                "Read a window of a text file inside the workspace or the session scratch directory. \
+                "Read a window of an existing regular text file inside the workspace or the session scratch directory. \
+                 Read never accepts a directory; activate and use Glob when a directory must be listed or the file name is uncertain. \
                  Returns at most {} lines ({}KB) starting at `offset`; lines longer than {} characters are cut. \
                  Prefer this over `cat`/`sed`/`head` in Bash. Paginate with `offset` instead of dumping whole files — \
                  the `notice` field tells you the next offset when more remains.",
@@ -2328,7 +2395,7 @@ pub fn builtin_tool_defs() -> Value {
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string", "description": "Workspace-relative path, or an absolute path inside the scratch directory" },
+                    "path": { "type": "string", "description": "Existing regular file only, never a directory; workspace-relative or absolute inside the scratch directory" },
                     "offset": { "type": "integer", "description": "0-based line to start at (default 0)", "minimum": 0 },
                     "limit": { "type": "integer", "description": format!("Lines to read (default {}, max {})", DEFAULT_READ_LINES, BUDGET_SEARCH.max_lines), "minimum": 1 }
                 },
@@ -2358,6 +2425,7 @@ pub fn builtin_tool_defs() -> Value {
             "name": "Grep",
             "description": format!(
                 "Search file contents by regex, results ordered by file modification time (newest first). \
+                 `path` may name one file or a directory tree. \
                  Returns at most `headLimit` matches (default {}, hard budget {}KB) and cuts matching lines at \
                  {} characters. Scope with `path` and `include` rather than filtering shell `grep` output; use \
                  `outputMode: \"filesWithMatches\"` or `\"count\"` when you only need the file list or tallies.",
@@ -2370,7 +2438,7 @@ pub fn builtin_tool_defs() -> Value {
                 "type": "object",
                 "properties": {
                     "pattern": { "type": "string", "description": "Rust-regex pattern matched per line" },
-                    "path": { "type": "string", "description": "Directory to search in; defaults to the workspace root. Pass it explicitly to search inside a git-ignored tree such as node_modules or dist" },
+                    "path": { "type": "string", "description": "File or directory to search; defaults to the workspace root. Pass it explicitly to search inside a git-ignored tree such as node_modules or dist" },
                     "include": { "type": "string", "description": "Glob filter on file path or name, e.g. `*.{ts,tsx}`" },
                     "outputMode": { "type": "string", "enum": ["content", "filesWithMatches", "count"], "description": "content (default): matching lines; filesWithMatches: matching file paths; count: per-file match counts" },
                     "headLimit": { "type": "integer", "description": format!("Max matches (content) or files (other modes); default {}", GREP_DEFAULT_HEAD_LIMIT), "minimum": 1 },
@@ -2699,6 +2767,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn read_rejects_directories_as_invalid_arguments_with_glob_guidance() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("src/nested")).unwrap();
+
+        let result = execute_tool(
+            Some(dir.path()),
+            None,
+            "Read",
+            &serde_json::json!({ "path": "src" }),
+            5_000,
+        )
+        .await;
+
+        assert!(!result.ok);
+        assert_eq!(result.error_code.as_deref(), Some("INVALID_ARGUMENT"));
+        let error = result.content["error"].as_str().unwrap_or_default();
+        assert!(error.contains("Read requires a file"));
+        assert!(error.contains("use Glob"));
+        assert!(error.contains("pattern=\"**/*\""));
+        assert_eq!(result.content["suggestedTool"].as_str(), Some("Glob"));
+        assert_eq!(
+            result.content["suggestedArgs"]["path"].as_str(),
+            Some("src")
+        );
+        assert_eq!(
+            result.content["suggestedArgs"]["pattern"].as_str(),
+            Some("**/*")
+        );
+    }
+
+    #[tokio::test]
     async fn approved_external_paths_work_for_read_and_search_tools() {
         let workspace = tempfile::tempdir().unwrap();
         let outside = tempfile::tempdir().unwrap();
@@ -2738,6 +2837,30 @@ mod tests {
         assert_eq!(grep.content["count"].as_u64(), Some(1));
         assert_eq!(
             grep.content["matches"][0]["path"].as_str(),
+            Some(canonical_file.to_str().unwrap())
+        );
+
+        let exact_grep = execute_tool_with_path_access(
+            Some(workspace.path()),
+            None,
+            "Grep",
+            &serde_json::json!({
+                "pattern": "needle",
+                "path": file.to_str().unwrap(),
+            }),
+            None,
+            None,
+            true,
+        )
+        .await;
+        assert!(
+            exact_grep.ok,
+            "external exact-file grep failed: {:?}",
+            exact_grep.content
+        );
+        assert_eq!(exact_grep.content["count"].as_u64(), Some(1));
+        assert_eq!(
+            exact_grep.content["matches"][0]["path"].as_str(),
             Some(canonical_file.to_str().unwrap())
         );
 
@@ -2894,6 +3017,44 @@ mod tests {
         assert!(counts.ok, "grep failed: {:?}", counts.content);
         assert_eq!(counts.content["count"].as_u64(), Some(2));
         assert_eq!(counts.content["counts"].as_array().unwrap().len(), 2);
+
+        let single_file = execute_tool(
+            Some(dir.path()),
+            None,
+            "Grep",
+            &serde_json::json!({
+                "pattern": "needle",
+                "path": "src/a.ts",
+                "include": "*.ts",
+            }),
+            5_000,
+        )
+        .await;
+        assert!(
+            single_file.ok,
+            "single-file grep failed: {:?}",
+            single_file.content
+        );
+        assert_eq!(single_file.content["count"].as_u64(), Some(1));
+        assert_eq!(
+            single_file.content["matches"][0]["path"].as_str(),
+            Some("src/a.ts")
+        );
+
+        let excluded_file = execute_tool(
+            Some(dir.path()),
+            None,
+            "Grep",
+            &serde_json::json!({
+                "pattern": "needle",
+                "path": "src/a.ts",
+                "include": "*.md",
+            }),
+            5_000,
+        )
+        .await;
+        assert!(excluded_file.ok);
+        assert_eq!(excluded_file.content["count"].as_u64(), Some(0));
     }
 
     #[tokio::test]
@@ -3013,6 +3174,21 @@ mod tests {
         .await;
         assert_eq!(limited.content["count"].as_u64(), Some(1));
         assert_eq!(limited.content["truncated"].as_bool(), Some(true));
+
+        let file_path = execute_tool(
+            Some(dir.path()),
+            None,
+            "Glob",
+            &serde_json::json!({ "pattern": "*.rs", "path": "new.rs" }),
+            5_000,
+        )
+        .await;
+        assert!(!file_path.ok);
+        assert_eq!(file_path.error_code.as_deref(), Some("INVALID_ARGUMENT"));
+        assert!(file_path.content["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("not a directory"));
     }
 
     #[test]
@@ -3039,6 +3215,14 @@ mod tests {
         }
         assert!(by_name("Glob")["parameters"]["properties"]["limit"].is_object());
         assert!(read["description"].as_str().unwrap().contains("2000 lines"));
+        assert!(read["description"]
+            .as_str()
+            .unwrap()
+            .contains("never accepts a directory"));
+        assert!(grep["parameters"]["properties"]["path"]["description"]
+            .as_str()
+            .unwrap()
+            .contains("File or directory"));
     }
 
     #[tokio::test]

@@ -289,7 +289,6 @@ export const en = {
     processedFor: "Processed for {{time}}",
     thinkingFor: "Thinking · {{time}}",
     thoughtFor: "Thought for {{time}}",
-    processingFailedAfter: "Failed after {{time}}",
     processingSteps: "{{count}} step",
     processingSteps_other: "{{count}} steps",
     tool: "Tool",

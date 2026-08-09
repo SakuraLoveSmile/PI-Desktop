@@ -65,9 +65,13 @@ test("stream event bursts are coalesced until a paint or terminal event", () => 
   assert.match(store, /event\.type === "tool_update"/);
 });
 
-test("intermediate retry errors do not paint an active group as terminal", () => {
-  assert.match(transcript, /const hasFailure = items\.some/);
-  assert.match(transcript, /const failed = !isActive && hasFailure/);
+test("tool errors stay local to their rows instead of failing the activity group", () => {
+  assert.doesNotMatch(transcript, /const hasFailure = items\.some/);
+  assert.doesNotMatch(transcript, /processingFailedAfter/);
+  assert.doesNotMatch(transcript, /tool-activity-group[\s\S]*?failed/);
+  assert.match(transcript, /const \[open, setOpen\] = useState\(status === "error"\)/);
+  assert.match(transcript, /if \(status === "error"\) setOpen\(true\)/);
+  assert.match(transcript, /status === "error"\s*\? t\("chat\.toolFailed"\)/);
 });
 
 test("manual upward scrolling cancels pending transcript follow work", () => {

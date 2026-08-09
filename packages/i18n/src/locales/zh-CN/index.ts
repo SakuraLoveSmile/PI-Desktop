@@ -290,7 +290,6 @@ export const zhCN = {
     processedFor: "已处理 {{time}}",
     thinkingFor: "思考中 · {{time}}",
     thoughtFor: "已思考 {{time}}",
-    processingFailedAfter: "处理失败 · {{time}}",
     processingSteps: "{{count}} 个步骤",
     processingSteps_other: "{{count}} 个步骤",
     tool: "工具",

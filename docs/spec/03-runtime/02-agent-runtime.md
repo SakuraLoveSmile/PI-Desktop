@@ -500,12 +500,16 @@ Required behaviours, each one an observed failure inverted:
 It also states a search preference that matches the host-side budgets in
 [16-tool-result-limits](16-tool-result-limits.md): scope `Read`, `Grep`, and
 `Glob` with their own parameters instead of hand-rolling `cat`/`sed`/`grep`/
-`find`; use `Read.offset/limit`, `Glob.path/limit`, and
-`Grep.path/include/outputMode/headLimit`; use `filesWithMatches` or `count`
-when content is unnecessary; use workspace-relative paths for portability; and
-fall back to a bounded command in the active shell only when the native tools
-are insufficient. `rg` is optional rather than assumed, and the agent must not
-repeat a search whose answer is already in context.
+`find`. `Read` accepts only an existing regular text file. When a file name is
+uncertain or a directory must be listed, an Agent activates `Glob` for the
+current prompt through `ToolSearch` instead of guessing a name or reading the
+directory. `Glob.path` is a directory, while `Grep.path` may be one file or a
+directory tree. Calls use `Read.offset/limit`, `Glob.path/limit`, and
+`Grep.path/include/outputMode/headLimit`; `filesWithMatches` or `count` avoids
+unneeded content. Workspace-relative paths remain the portable default, with a
+bounded command in the active shell only when native tools are insufficient.
+`rg` is optional rather than assumed, and the agent must not repeat a search
+whose answer is already in context.
 
 ### 7.1 Active tool context and on-demand loading (D185, ADR 0048)
 

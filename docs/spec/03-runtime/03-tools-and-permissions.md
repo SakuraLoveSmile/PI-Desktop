@@ -73,6 +73,21 @@ Every tool must have:
 
 ## 4. Path Rules
 
+Native file and search tools enforce distinct path shapes (D208, ADR 0069):
+
+- `Read.path` is an existing regular file. A directory returns
+  `INVALID_ARGUMENT` with a structured `Glob` suggestion rather than a generic
+  execution failure.
+- `Glob.path` is a directory search root.
+- `Grep.path` may be one file or a directory tree. A directly named file is
+  searched without walking siblings, while `include` still filters its base
+  name and every output budget remains unchanged.
+
+Agent mode keeps `Glob`/`Grep` deferred under D185. Each new user prompt resets
+their activation, so directory discovery activates `Glob` through `ToolSearch`
+for that prompt instead of guessing a file name or calling `Read` on a
+directory.
+
 - For a durable `sessionId`, `workspaceRoot` is resolved from that session's
   persisted project binding. It is not read from the mutable active sidebar
   tab at execution time.

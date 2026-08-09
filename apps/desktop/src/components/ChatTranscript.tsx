@@ -1133,33 +1133,22 @@ const ActivityGroup = memo(function ActivityGroup({
     Math.floor(((isActive ? now : completedAt) - startedAt) / 1000),
   );
   const elapsed = formatToolDuration(elapsedSeconds);
-  const hasFailure = items.some((item) =>
-    item.kind === "tool"
-      ? item.message.toolStatus === "error"
-      : item.message.status === "error",
-  );
-  // A provider/tool retry can leave an intermediate error row while the
-  // active turn is still running. Do not paint the whole group as terminally
-  // failed until the run has actually settled.
-  const failed = !isActive && hasFailure;
   const lastItem = items[items.length - 1];
   const thinkingNow =
     isActive &&
     lastItem?.kind === "thinking" &&
     lastItem.message.status === "streaming";
   const onlyThinking = items.every((item) => item.kind === "thinking");
-  const label = failed
-    ? t("chat.processingFailedAfter", { time: elapsed })
-    : isActive
-      ? t(thinkingNow || onlyThinking ? "chat.thinkingFor" : "chat.processingFor", {
-          time: elapsed,
-        })
-      : onlyThinking
-        ? elapsedSeconds > 0
-          ? t("chat.thoughtFor", { time: elapsed })
-          : // History reloads keep no end timestamp for pure-thinking groups.
-            t("chat.thinking", { defaultValue: "Thinking" })
-        : t("chat.processedFor", { time: elapsed });
+  const label = isActive
+    ? t(thinkingNow || onlyThinking ? "chat.thinkingFor" : "chat.processingFor", {
+        time: elapsed,
+      })
+    : onlyThinking
+      ? elapsedSeconds > 0
+        ? t("chat.thoughtFor", { time: elapsed })
+        : // History reloads keep no end timestamp for pure-thinking groups.
+          t("chat.thinking", { defaultValue: "Thinking" })
+      : t("chat.processedFor", { time: elapsed });
   const tail = isActive && !open && lastItem ? activityItemSummary(lastItem, t) : "";
 
   useEffect(() => {
@@ -1175,7 +1164,7 @@ const ActivityGroup = memo(function ActivityGroup({
     <div
       className={`tool-activity-group ${open ? "open" : ""} ${
         isActive ? "active" : ""
-      } ${failed ? "failed" : ""}`}
+      }`}
     >
       <button
         className="tool-activity-header"
@@ -1184,7 +1173,7 @@ const ActivityGroup = memo(function ActivityGroup({
         onClick={() => setOpen((value) => !value)}
       >
         <span className="tool-activity-icon" aria-hidden>
-          {failed ? <IconCircleAlert size={14} /> : <IconSparkles size={14} />}
+          <IconSparkles size={14} />
         </span>
         <span className={`tool-activity-label ${isActive ? "running" : ""}`}>
           {label}

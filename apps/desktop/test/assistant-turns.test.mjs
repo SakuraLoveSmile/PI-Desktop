@@ -47,6 +47,37 @@ test("groups assistant fragments and tools into one conversational turn", () => 
   );
 });
 
+test("keeps a recovered tool error inside one successful assistant turn", () => {
+  const { entries } = buildTranscriptEntries([
+    message("user", "user", "Inspect the handlers"),
+    message("read", "tool", "directory", {
+      toolName: "Read",
+      toolCallId: "read",
+      toolStatus: "error",
+      isError: true,
+    }),
+    message("recovery", "assistant", "I will list the directory instead."),
+    message("glob", "tool", "router.go", {
+      toolName: "Glob",
+      toolCallId: "glob",
+      toolStatus: "success",
+    }),
+    message("final", "assistant", "The handler is registered in router.go."),
+  ]);
+
+  assert.equal(entries.length, 2);
+  const turn = entries[1];
+  assert.equal(turn.kind, "assistant-turn");
+  assert.deepEqual(
+    turn.parts.map((part) => part.kind),
+    ["activity", "message", "activity", "message"],
+  );
+  assert.equal(turn.parts[0].items[0].message.toolStatus, "error");
+  assert.equal(turn.parts[0].items[0].message.isError, true);
+  assert.equal(turn.parts[2].items[0].message.toolStatus, "success");
+  assert.match(assistantTurnContent(turn), /registered in router\.go/);
+});
+
 test("starts a new assistant turn only after the next user message", () => {
   const { entries } = buildTranscriptEntries([
     message("user-1", "user", "First"),

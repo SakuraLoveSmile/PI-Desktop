@@ -1154,7 +1154,10 @@ and is intentionally not an elevated card.
 Consecutive tool calls form one ChatGPT-style processing group. The group is
 collapsed by default and its header shows `Processing · 12s` while active or
 `Processed for 12s` after completion. Expanding it reveals the ordered tool
-activity rows and their nested result disclosures.
+activity rows and their nested result disclosures. The group reports duration
+and containment, not turn outcome: a failed child remains an error on its own
+ToolCallRow but never changes the group header to a terminal failure. Terminal
+agent errors remain owned by the assistant error and TurnOutcomeCard surfaces.
 
 ### 9.2 Anatomy
 
@@ -1237,8 +1240,10 @@ twice.
   collapsed and failed rows open automatically.
 - Click the processing header: expand/collapse the ordered activity list.
   Processing groups default collapsed, including while the turn is active.
-- Failed groups use an explicit `Failed after {elapsed}` header. Expansion uses
-  a short height/opacity transition and keeps collapsed content inert.
+- A failed child row remains auto-expanded and error-hued, while the containing
+  group settles as `Processed for {elapsed}` even when a later tool recovered.
+  Expansion uses a short height/opacity transition and keeps collapsed content
+  inert.
 - Running updates replace the latest partial output in place. Blocks are built
   on expansion only, so streaming ticks stay cheap.
 - Results are presented before arguments so the primary result has higher

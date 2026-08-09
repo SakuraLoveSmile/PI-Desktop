@@ -1463,10 +1463,6 @@
   color: var(--ds-text-muted);
 }
 
-.tool-activity-group.failed .tool-activity-icon {
-  color: var(--ds-error);
-}
-
 .tool-activity-label {
   flex: none;
   font-weight: var(--font-weight-medium);

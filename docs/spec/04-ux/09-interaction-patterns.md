@@ -515,10 +515,11 @@ may be retained while exactly one workspace supplies the visible shell context.
 - Consecutive tool activity is wrapped in one collapsed processing group. Its
   header updates elapsed time once per second while active, freezes after the
   next transcript message, and exposes the number of contained steps.
-- A failed row inside an active group is an intermediate result while the
-  bounded provider/tool retry or follow-up may still recover. The group uses
-  terminal failure styling only after the active run settles; the individual
-  failed row remains visible immediately.
+- A failed row is invocation-local truth and remains visible immediately. The
+  containing group reports processing duration only and settles as processed,
+  even when a later call recovers. Terminal turn failure is derived only from
+  the terminal agent event and appears through the assistant error,
+  TurnOutcomeCard, sidebar state, and notification surfaces.
 - Expanding the processing group reveals the ordered rows; each row retains its
   own nested disclosure for output and input.
 - Activating the row reveals clamped output first and raw input second.

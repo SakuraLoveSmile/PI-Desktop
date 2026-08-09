@@ -583,15 +583,20 @@ Each scenario is documented in this format:
   available on macOS, Linux, or Windows.
 - **Steps**: 1) Activate `Glob`/`Grep` when deferred and inspect their schemas.
   2) Search with workspace-relative `path`, `include`, `headLimit`, and
-  `outputMode: "filesWithMatches"` or `"count"`. 3) Repeat with the platform's
-  native shell selected, without changing the tool arguments.
+  `outputMode: "filesWithMatches"` or `"count"`, first with a directory and
+  then one explicit file. 3) Call `Read` with a directory and follow its
+  structured Glob suggestion. 4) Repeat with the platform's native shell
+  selected, without changing the tool arguments.
 - **Expected**: The schemas expose the same bounded search controls on every
-  platform; `filesWithMatches` is accepted as the canonical output mode; search
+  platform; `Read` declares file-only input, `Glob` declares directory input,
+  and `Grep` accepts a file or directory. `filesWithMatches` is accepted as the
+  canonical output mode. A directory Read returns `INVALID_ARGUMENT` with
+  `suggestedTool=Glob` and bounded args; the corrected call succeeds. Search
   results use workspace-relative paths inside the project and absolute paths
-  only for approved external directories. No shell-specific path syntax is
+  only for approved external locations. No shell-specific path syntax is
   required and oversized results remain bounded.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
-  `03-runtime/16-tool-result-limits.md`, ADR 0057
+  `03-runtime/16-tool-result-limits.md`, ADR 0057, ADR 0069
 - **Acceptance**: E (bounded cross-platform search)
 - **Milestone**: M5
 - **Status**: Unit-covered (host-core and agent-runtime); live multi-platform
@@ -1872,26 +1877,33 @@ Each scenario is documented in this format:
 
 #### E2E-095: Terminal failures expose recovery without a success card
 
-- **Preconditions**: A deterministic provider can complete a turn with a
-  workspace edit and can fail a second turn with a retriable error; the session
-  has a visible composer.
-- **Steps**: 1) Complete the workspace-edit turn. 2) Confirm that no success
-  outcome card appears and inspect the inline review card immediately after the
-  change tool row. 3) Expand the inline card and verify its hunks. 4) Commit
+- **Preconditions**: A deterministic provider can recover from a failed
+  directory `Read` with `Glob`, complete a turn with a workspace edit, and fail
+  another turn with a retriable error; the session has a visible composer.
+- **Steps**: 1) Run the failed-Read then successful-Glob recovery turn and
+  inspect its activity group. 2) Complete the workspace-edit turn. 3) Confirm
+  that no success outcome card appears and inspect the inline review card
+  immediately after the change tool row. 4) Expand the inline card and verify
+  its hunks. 5) Commit
   the edited file and confirm the recorded card remains, then use rollback
-  once. 5) Trigger the retriable failure. 6) Inspect the failure card, then
-  choose Retry. 7) Start another new prompt and inspect the old card.
-- **Expected**: Completion uses the transcript and inline review card as its
-  evidence without adding a "Task complete" card. File status, counts, and
-  hunks remain on the adjacent card after commit, and guarded rollback restores
-  the pre-tool state. Failure shows that existing work remains, exposes Retry
-  and Continue, and retry preserves the latest prompt. A new turn clears the
-  previous failure card; an abort creates no failure outcome copy.
+  once. 6) Trigger the retriable failure. 7) Inspect the failure card, then
+  choose Retry. 8) Start another new prompt and inspect the old card.
+- **Expected**: The recovered turn keeps the failed Read visible on its own row,
+  labels the containing group as processed, completes its session outcome, and
+  shows no failure card. Completion uses the transcript and inline review card
+  as its evidence without adding a "Task complete" card. File status, counts,
+  and hunks remain on the adjacent card after commit, and guarded rollback
+  restores the pre-tool state. Failure shows that existing work remains,
+  exposes Retry and Continue, and retry preserves the latest prompt. A new turn
+  clears the previous failure card; an abort creates no failure outcome copy.
 - **Specs linked**: `04-ux/08-component-spec.md`,
-  `04-ux/09-interaction-patterns.md`, `03-runtime/10-session-state-machine.md`
+  `04-ux/09-interaction-patterns.md`, `03-runtime/10-session-state-machine.md`,
+  ADR 0069
 - **Acceptance**: C (chat stream), Quality (completion and recovery)
 - **Milestone**: M5
-- **Status**: Unit-covered (`turn-outcome-card.test.mjs`); full UI scenario Draft
+- **Status**: Unit-covered (`assistant-turns.test.mjs`,
+  `interaction-performance.test.mjs`, `turn-outcome-card.test.mjs`); full UI
+  scenario Draft
 
 #### E2E-064: Durable notification inbox records terminal task outcomes
 
@@ -2565,9 +2577,10 @@ Each scenario is documented in this format:
     stays at latest without visible oscillation.
   - Replaceable message/tool partials are coalesced to the next paint, while
     terminal, permission, planning, and error states remain immediate.
-  - An intermediate failed row during a still-running retry does not mark the
-    containing activity group as terminally failed; terminal styling appears
-    only after the run settles.
+  - A failed tool row remains error-hued and locally expandable, but never marks
+    the containing activity group as terminally failed. The group reports only
+    processing duration; terminal turn styling comes from the terminal agent
+    outcome surfaces.
   - Sidebar, composer, completed message/activity rows, work panel, titlebar,
     and global overlays do not visibly repaint or lose pointer/keyboard
     responsiveness for each token update.

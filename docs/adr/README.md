@@ -83,3 +83,4 @@ Each ADR includes:
 | 0066 | Empty home direct bottom composer | Accepted for implementation (amends D111) |
 | 0067 | ChatGPT-inspired empty-home starter guidance | Superseded by D206 |
 | 0068 | Add a keyboard entry point for the work panel | Accepted for implementation |
+| 0069 | Make native-tool path mistakes recoverable | Accepted for implementation |

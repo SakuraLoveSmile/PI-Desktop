@@ -971,7 +971,7 @@ export class DesktopAgentRuntime {
       // Search-tool steering. Read/Grep/Glob are host-bounded and scopeable;
       // hand-rolled shell pipelines are not, and unbounded shell output is
       // what exhausted context and forced repeated re-searching.
-      "Searching and reading: prefer the Read, Grep, and Glob tools over shell `cat`, `sed`, `head`, `grep`, or `find`. Scope every search with the native parameters: Grep takes `path`, `include`, `outputMode`, and `headLimit`; Glob takes `path` and `limit`; Read takes `offset` and `limit` and paginates any file, however large. Use `outputMode: \"filesWithMatches\"` or `\"count\"` when file contents are not needed, and use `include` to avoid scanning generated or vendor trees. These tools bound their own output; a shell pipeline does not, and one unscoped search over a whole workspace costs context you will need later. Workspace-relative paths are portable across macOS, Linux, and Windows; an explicit path outside the workspace and session scratch roots asks for permission unless the effective mode is Auto, so do not retry a denied path blindly. When a search genuinely needs Bash, use the active shell's syntax and a bounded command; use `rg` only when it is available, and never assume POSIX utilities, `/`-based paths, or PowerShell commands on every platform. Do not re-run a search whose answer you already have.",
+      "Searching and reading: prefer the Read, Grep, and Glob tools over shell `cat`, `sed`, `head`, `grep`, or `find`. Read accepts only an existing regular text file, never a directory. If a file name is uncertain or a directory must be listed, use Glob instead of guessing a file name or calling Read on the directory; in Agent mode, activate it with ToolSearch for the current prompt when it is unavailable. Scope every search with the native parameters: Grep takes a file-or-directory `path` plus `include`, `outputMode`, and `headLimit`; Glob takes a directory `path` and `limit`; Read takes `offset` and `limit` and paginates any supported text file, however large. Use `outputMode: \"filesWithMatches\"` or `\"count\"` when file contents are not needed, and use `include` to avoid scanning generated or vendor trees. These tools bound their own output; a shell pipeline does not, and one unscoped search over a whole workspace costs context you will need later. Workspace-relative paths are portable across macOS, Linux, and Windows; an explicit path outside the workspace and session scratch roots asks for permission unless the effective mode is Auto, so do not retry a denied path blindly. When a search genuinely needs Bash, use the active shell's syntax and a bounded command; use `rg` only when it is available, and never assume POSIX utilities, `/`-based paths, or PowerShell commands on every platform. Do not re-run a search whose answer you already have.",
       // Observed leak: OpenAI-style models sometimes emit the internal
       // `multi_tool_use.parallel` wrapper as assistant text. PI-Desktop has no
       // such tool, so the whole batch is silently lost as prose.
@@ -1347,8 +1347,9 @@ export class DesktopAgentRuntime {
           return "Open a workspace HTML file in PI-Desktop's built-in browser panel. `path` is workspace-relative (e.g. \"demo/index.html\"). The preview live-reloads on later edits to the file or its sibling assets, so call once per page.";
         case "Read":
           return (
-            "Read a bounded window from a text file. Use `offset` and `limit` " +
-            "to paginate large files." +
+            "Read a bounded window from an existing regular text file, never a directory. " +
+            "Use `offset` and `limit` to paginate large files; activate and use Glob " +
+            "when a directory must be listed or the file name is uncertain." +
             `${scratchPathHint}${externalPathHint}`
           );
         case "Glob":
@@ -1360,7 +1361,8 @@ export class DesktopAgentRuntime {
           );
         case "Grep":
           return (
-            "Search file contents with a Rust-compatible regex. Use `path` and " +
+            "Search file contents with a Rust-compatible regex. `path` may name one file " +
+            "or a directory tree. Use `path` and " +
             "`include` to narrow the scan, `headLimit` to bound results, and " +
             'outputMode: "filesWithMatches" or "count" when content is unnecessary; ' +
             "`path` accepts portable relative paths." +
@@ -1386,7 +1388,10 @@ export class DesktopAgentRuntime {
     // stopped being readable.
     const parameters: Record<string, Parameters<typeof Type.Object>[0]> = {
       Read: {
-        path: Type.String({ description: "Workspace-relative or explicitly approved file path." }),
+        path: Type.String({
+          description:
+            "Existing regular file only, never a directory; workspace-relative or explicitly approved.",
+        }),
         offset: Type.Optional(
           Type.Number({ minimum: 0, description: "0-based line offset; defaults to 0." }),
         ),
@@ -1412,7 +1417,7 @@ export class DesktopAgentRuntime {
         path: Type.Optional(
           Type.String({
             description:
-              "Directory to search; defaults to the workspace root and accepts an absolute scratch path.",
+              "File or directory to search; defaults to the workspace root and accepts an absolute scratch path.",
           }),
         ),
         include: Type.Optional(
@@ -1984,7 +1989,7 @@ export class DesktopAgentRuntime {
     const blocks: string[] = [];
     if (tools.has("Read") || tools.has("Grep") || tools.has("Glob")) {
       blocks.push(
-        "Searching and reading: prefer Read, Grep, and Glob over shell text utilities, and scope every call — Grep takes `path`, `include`, `outputMode`, and `headLimit`; Glob takes `path` and `limit`; Read takes `offset` and `limit`. Use `outputMode: \"filesWithMatches\"` or `\"count\"` when contents are not needed. Your context is finite too: an unscoped search over the whole workspace costs the tokens you need to finish.",
+        "Searching and reading: prefer Read, Grep, and Glob over shell text utilities. Read accepts only an existing regular text file, never a directory. If a file name is uncertain or a directory must be listed, use Glob when it is available; otherwise use a bounded available search or listing tool instead of guessing a file name or reading the directory. Scope every call — Grep takes a file-or-directory `path` plus `include`, `outputMode`, and `headLimit`; Glob takes a directory `path` and `limit`; Read takes `offset` and `limit`. Use `outputMode: \"filesWithMatches\"` or `\"count\"` when contents are not needed. Your context is finite too: an unscoped search over the whole workspace costs the tokens you need to finish.",
       );
     }
     if (tools.has("Edit") || tools.has("Write")) {
