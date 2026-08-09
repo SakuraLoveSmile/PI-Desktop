@@ -395,7 +395,7 @@ export function Sidebar({
     return () => window.removeEventListener("resize", hideTooltip);
   }, [projectPathTooltip]);
 
-  // Footer utility bar: build chip + settings / theme / logs / notifications.
+  // Footer utility bar: settings / theme / logs / notifications + build chip.
   const theme: ThemeChoice = (THEME_ORDER as readonly string[]).includes(
     settings?.theme ?? "",
   )
@@ -1550,29 +1550,6 @@ export function Sidebar({
         </div>
 
         <div className="sidebar-footer no-drag">
-          <button
-            type="button"
-            className={`footer-build ${updateReady ? "has-update" : ""}`}
-            data-nav="build"
-            title={buildTitle}
-            aria-label={buildTitle}
-            onClick={() => {
-              if (updateReady) {
-                setSettingsAnchor("updates.title");
-                setSettingsTab("about");
-                return;
-              }
-              void (async () => {
-                try {
-                  await api.updatesCheck();
-                } catch { /* ignore */ }
-              })();
-            }}
-          >
-            <span className="footer-build-version">{buildLabel}</span>
-            {updateReady ? <span className="footer-build-dot" aria-hidden /> : null}
-          </button>
-
           <div className="footer-actions">
             <button
               type="button"
@@ -1606,6 +1583,29 @@ export function Sidebar({
             </button>
             <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
           </div>
+
+          <button
+            type="button"
+            className={`footer-build ${updateReady ? "has-update" : ""}`}
+            data-nav="build"
+            title={buildTitle}
+            aria-label={buildTitle}
+            onClick={() => {
+              if (updateReady) {
+                setSettingsAnchor("updates.title");
+                setSettingsTab("about");
+                return;
+              }
+              void (async () => {
+                try {
+                  await api.updatesCheck();
+                } catch { /* ignore */ }
+              })();
+            }}
+          >
+            <span className="footer-build-version">{buildLabel}</span>
+            {updateReady ? <span className="footer-build-dot" aria-hidden /> : null}
+          </button>
         </div>
       </div>
       {renderFloatingMenu()}

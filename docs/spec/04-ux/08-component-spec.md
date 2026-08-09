@@ -235,7 +235,7 @@ Expanded (~275px, D034/D070):
 |   • Project session      |
 | project-B      [>] [+] … |
 |                           |
-| [version]       [⚙][@][☾][bell]|
+| [⚙][@][☾][bell]       [version]|
 +---------------------------+
 
 Collapsed (48px):
@@ -256,12 +256,12 @@ tier; weight, indentation, and disclosure icons preserve their hierarchy:
 
 | Surface | Token | Notes |
 |---|---|---|
-| Footer action icons | `--text-base` (14px) | Settings, Extensions, theme, notifications |
+| Footer action icons | `--text-base` (14px) | Settings, Extensions, theme, notifications; left side of footer |
 | Session / thread titles | `--text-md` (13px) | Compact list content |
 | Project / group titles, empty copy | `--text-md` (13px) | Hierarchy comes from weight and indentation |
 | Section labels (`SESSIONS`, `PROJECTS`) | `--text-sm` (12px) | Uppercase secondary labels |
 | Footer profile name + profile menu items | `--text-base` (14px) | Identity cluster matches nav body |
-| Footer status / profile menu secondary | `--text-sm` (12px) | Secondary line only |
+| Footer status / version | `--text-sm` (12px) | Right-aligned build/version chip |
 
 Do not render primary sidebar list content below `--text-md`. Keep row heights
 (≈28–32px) so density stays WorkBuddy/Codex-like while primary actions remain
@@ -307,6 +307,9 @@ visually distinct from list content.
   intentionally omits this brand control from the sidebar header
 - Click the footer Plugins icon immediately right of Settings to open the
   Extensions destination; the icon exposes the localized label on hover/focus
+- The footer action group stays on the left and the build/version chip stays
+  right-aligned; clicking the chip checks for updates or opens the available
+  release in Settings
 - Click Search or Collapse sidebar at the right of the header row to
   open global search or collapse the sidebar respectively
 - While the work panel is open, click the session-pane top-right panel collapse

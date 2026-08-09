@@ -395,15 +395,11 @@ Light theme: minimal shadows only where layering is insufficient.
 | `elevation-2` | bg-tertiary | bg-tertiary + `shadow-md` | Hover, dropdowns |
 | `elevation-3` | bg-tertiary + border-accent | bg-white + `shadow-lg` | Dialogs, overlays |
 
-Sidebar footer (D113): a transparent `58px`-high band with no separator. The
-left profile trigger is `44px` high and flexes to fill the available width. It
-contains a `30px` circular user glyph, a two-line identity stack (`Custom` at
-the primary text size and `Local profile` / localized equivalent as muted
-metadata), and a trailing chevron. The notification inbox trigger is a separate
-`32px` square Bell icon button on the right, carries the unread badge, and opens
-its popover above the footer. Hover and active
-states use semantic sidebar surfaces; neither control adds a persistent card
-fill.
+Sidebar footer: a transparent utility band with no separator. The Settings,
+Plugins, theme, and notification icon buttons stay grouped on the left. The
+build/version chip is right-aligned and remains the update check/release entry
+point. Hover and active states use semantic sidebar surfaces; neither side adds
+a persistent card fill.
 
 The profile menu is `280px` wide, opens `8px` above the footer, and uses the
 standard opaque elevated-menu surface, subtle border, and dialog shadow. Its

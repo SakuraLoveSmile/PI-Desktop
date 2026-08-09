@@ -3747,14 +3747,15 @@ This test plan spec is accepted when:
 - Empty hero title is 28px / 34px line-height, weight 400.
 - Window restores ≥1000×700 (target 1200×800) if Stage Manager collapses it.
 
-### US-UI-16 WorkBuddy-inspired local profile footer
-- On the light/dark home shell, the sidebar footer is a transparent 58px band
-  with no separator. It shows a 44px profile trigger containing a 30px circular
-  user glyph, `Custom` + `Local profile` / `本地配置` on two lines, and a
-  trailing chevron.
-- A separate 32px notification Bell remains visible at the right with its
-  unread badge. It replaces the former Help shortcut and opens the inbox above
-  the footer; the main titlebar has no duplicate Bell.
+### US-UI-16 Sidebar footer utility layout
+- On the light/dark home shell, the sidebar footer is a transparent utility
+  band with no separator. Settings, Plugins, theme, and notification actions
+  are grouped on the left, while the build/version chip is right-aligned.
+- The notification Bell remains visible in the left action group with its
+  unread badge and opens the inbox above the footer; the main titlebar has no
+  duplicate Bell.
+- Clicking the build/version chip checks for updates when current, or opens
+  Settings → Info when an actionable update is available.
 - Traffic lights sit at Codex `{x:16,y:16}` with a 46px toolbar; the expanded
   macOS sidebar places Search plus Collapse sidebar at the right in that same
   row, with no Logo/Home brand or back/forward buttons.

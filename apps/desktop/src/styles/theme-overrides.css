@@ -150,6 +150,7 @@
 .footer-build {
   display: inline-flex;
   min-width: 0;
+  margin-left: auto;
   align-items: center;
   gap: 6px;
   border-radius: var(--radius-sm);
@@ -188,7 +189,6 @@
 
 .footer-actions {
   display: flex;
-  margin-left: auto;
   align-items: center;
   gap: 0;
 }
