@@ -2717,7 +2717,7 @@ Each scenario is documented in this format:
 - **Steps**:
   1. Open the app at the default window width and inspect session titles,
      project/group titles, empty-state copy, section labels, and the footer's
-     Settings, Plugins, Theme, and notification icons.
+     Settings, Plugins, and notification icons.
   2. Switch between light and dark themes, then narrow the window to the
      minimum supported expanded-sidebar width.
   3. Compare the sidebar hierarchy with 14px chat body text and inspect long
@@ -3747,7 +3747,7 @@ This test plan spec is accepted when:
 ### US-UI-13 Light theme shell parity
 - Set theme to system/light on a light macOS appearance.
 - Expect sidebar `#f3f3f3`, main `#ffffff`, text `#1a1c1f`, white floating composer, and home hero with project underline.
-- Sidebar project/session labels, footer Settings/Plugins/Theme/notification
+- Sidebar project/session labels, footer Settings/Plugins/notification
   icons, current-project identity, thread titles, and composer controls must remain
   readable dark-on-light (≥4.5:1). Never white/translucent text on the light
   sidebar.
@@ -3769,7 +3769,7 @@ This test plan spec is accepted when:
 
 ### US-UI-16 Sidebar footer utility layout
 - On the light/dark home shell, the sidebar footer is a transparent utility
-  band with no separator. Settings, Plugins, theme, and notification actions
+  band with no separator. Settings, Plugins, and notification actions
   are grouped on the left, while the build/version chip is right-aligned.
 - The notification Bell remains visible in the left action group with its
   unread badge and opens the inbox above the footer; the main titlebar has no

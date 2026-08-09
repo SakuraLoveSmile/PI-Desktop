@@ -33,7 +33,7 @@ destination, chat as the home surface, tools and permissions inline.
   **Sessions** section with new-session and sort actions, retained open-project
   groups under a following **Projects** section with a persistent new-project
   action, and the WorkBuddy-inspired footer. The footer keeps compact Settings,
-  Extensions, Theme, and notification icon actions; Pull requests and Scheduled
+  Extensions, and notification icon actions; Pull requests and Scheduled
   are intentionally omitted from the home sidebar. Each retained project is a
   path-keyed tab/group that can be
   collapsed independently. Project and conversation rows expose

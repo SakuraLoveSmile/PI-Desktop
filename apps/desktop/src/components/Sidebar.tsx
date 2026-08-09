@@ -61,21 +61,14 @@ import {
   IconCircleAlert,
   IconNewSession,
   IconFolder,
-  IconMonitor,
-  IconMoon,
   IconMore,
   IconNewProject,
   IconPin,
   IconSearch,
   IconSidebar,
   IconSettings,
-  IconSun,
   IconX,
 } from "./icons";
-
-/** Theme rotation for the footer toggle; also the shape guard for settings. */
-const THEME_ORDER = ["system", "light", "dark"] as const;
-type ThemeChoice = (typeof THEME_ORDER)[number];
 
 type ProjectEntry = {
   path: string;
@@ -204,7 +197,6 @@ export function Sidebar({
   const sessionOutcomes = useAppStore((s) => s.sessionOutcomes);
   const pendingPermissions = useAppStore((s) => s.pendingPermissions);
   const setPage = useAppStore((s) => s.setPage);
-  const settings = useAppStore((s) => s.settings);
   const page = useAppStore((s) => s.page);
   const prefetchSession = useAppStore((s) => s.prefetchSession);
   const selectSession = useAppStore((s) => s.selectSession);
@@ -395,32 +387,7 @@ export function Sidebar({
     return () => window.removeEventListener("resize", hideTooltip);
   }, [projectPathTooltip]);
 
-  // Footer utility bar: settings / theme / logs / notifications + build chip.
-  const theme: ThemeChoice = (THEME_ORDER as readonly string[]).includes(
-    settings?.theme ?? "",
-  )
-    ? (settings?.theme as ThemeChoice)
-    : "system";
-  const ThemeIcon =
-    theme === "light" ? IconSun : theme === "dark" ? IconMoon : IconMonitor;
-  const themeTitle = `${t("nav.profileTheme")} · ${t(
-    theme === "light"
-      ? "settings.themeLight"
-      : theme === "dark"
-        ? "settings.themeDark"
-        : "settings.themeSystem",
-  )}`;
-
-  const cycleTheme = useCallback(async () => {
-    const current = useAppStore.getState().settings;
-    if (!current) return;
-    const index = THEME_ORDER.indexOf(current.theme as ThemeChoice);
-    const next = THEME_ORDER[(index + 1) % THEME_ORDER.length];
-    try {
-      await api.setSettings({ ...current, theme: next });
-      useAppStore.setState({ settings: { ...current, theme: next } });
-    } catch { /* ignore */ }
-  }, []);
+  // Footer utility bar: settings / plugins / notifications + build chip.
 
   // An update only earns the accent dot once it is actionable — a pending
   // check or a failed one keeps the chip quiet.
@@ -1570,16 +1537,6 @@ export function Sidebar({
               onClick={() => setPage("plugins")}
             >
               <IconAt size={14} aria-hidden />
-            </button>
-            <button
-              type="button"
-              className="footer-action"
-              data-nav="theme"
-              title={themeTitle}
-              aria-label={themeTitle}
-              onClick={() => void cycleTheme()}
-            >
-              <ThemeIcon size={14} aria-hidden />
             </button>
             <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
           </div>

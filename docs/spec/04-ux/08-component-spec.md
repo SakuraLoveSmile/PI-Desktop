@@ -235,7 +235,7 @@ Expanded (~275px, D034/D070):
 |   • Project session      |
 | project-B      [>] [+] … |
 |                           |
-| [⚙][@][☾][bell]       [version]|
+| [⚙][@][bell]          [version]|
 +---------------------------+
 
 Collapsed (48px):
@@ -256,7 +256,7 @@ tier; weight, indentation, and disclosure icons preserve their hierarchy:
 
 | Surface | Token | Notes |
 |---|---|---|
-| Footer action icons | `--text-base` (14px) | Settings, Extensions, theme, notifications; left side of footer |
+| Footer action icons | `--text-base` (14px) | Settings, Extensions, notifications; left side of footer |
 | Session / thread titles | `--text-md` (13px) | Compact list content |
 | Project / group titles, empty copy | `--text-md` (13px) | Hierarchy comes from weight and indentation |
 | Section labels (`SESSIONS`, `PROJECTS`) | `--text-sm` (12px) | Uppercase secondary labels |
@@ -368,7 +368,7 @@ visually distinct from list content.
   through `:focus-within`; keyboard focus never depends on pointer hover
 - Collapsed state: each icon has `aria-label` with session title
 - Keyboard: arrow keys navigate session list
-- Footer Settings, Plugins, Theme, and notification controls expose localized
+- Footer Settings, Plugins, and notification controls expose localized
   accessible names and visible focus treatment
 - The profile trigger exposes `aria-haspopup="menu"` and its expanded state;
   the menu has a stable accessible relationship to the trigger
