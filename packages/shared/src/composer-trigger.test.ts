@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   applyCompletion,
   detectTrigger,
+  fileReferenceLabel,
   formatCommandInsert,
   formatFileInsert,
+  serializeComposerFileReferences,
 } from "./composer-trigger.js";
 
 describe("detectTrigger — slash mode", () => {
@@ -151,5 +153,33 @@ describe("applyCompletion", () => {
     expect(step1.value).toBe("@src/");
     const next = detectTrigger(step1.value, step1.cursor);
     expect(next).toMatchObject({ mode: "file", query: "src/" });
+  });
+});
+
+describe("compact file references", () => {
+  it("derives leaf labels across path separators without changing unicode", () => {
+    expect(fileReferenceLabel("src/components/Composer.tsx")).toBe("Composer.tsx");
+    expect(fileReferenceLabel("C:\\work\\界面\\截图.png")).toBe("截图.png");
+    expect(fileReferenceLabel("src/fallback.ts", "original name.ts")).toBe(
+      "original name.ts",
+    );
+  });
+
+  it("serializes canonical paths after the visible draft", () => {
+    expect(
+      serializeComposerFileReferences("inspect these", [
+        { path: "src/a.ts" },
+        { path: "/tmp/session scratch/image.png" },
+      ]),
+    ).toBe('inspect these\n@src/a.ts @"/tmp/session scratch/image.png"');
+  });
+
+  it("supports reference-only prompts and preserves duplicate paths", () => {
+    expect(
+      serializeComposerFileReferences("", [
+        { path: "src/index.ts" },
+        { path: "test/index.ts" },
+      ]),
+    ).toBe("@src/index.ts @test/index.ts");
   });
 });

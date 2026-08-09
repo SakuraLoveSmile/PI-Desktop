@@ -6,7 +6,11 @@ import type {
   ProviderPublic,
   ThinkingLevel,
 } from "@pi-desktop/shared";
-import { formatFileInsert, PERMISSION_MODES } from "@pi-desktop/shared";
+import {
+  fileReferenceLabel,
+  PERMISSION_MODES,
+  serializeComposerFileReferences,
+} from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import { isActivePlanExecution } from "../lib/plan-mode-state";
@@ -26,10 +30,34 @@ import {
   IconListChecks,
   IconSparkles,
   IconTarget,
+  IconFileText,
+  IconX,
 } from "./icons";
 
 const COMPOSER_MIN_HEIGHT_PX = 28;
 const COMPOSER_MAX_VISIBLE_ROWS = 7;
+let composerFileReferenceSequence = 0;
+
+type ComposerFileReference = {
+  id: string;
+  sessionId: string;
+  path: string;
+  name: string;
+};
+
+function createFileReference(
+  path: string,
+  preferredName?: string,
+  sessionId = "",
+): ComposerFileReference {
+  composerFileReferenceSequence += 1;
+  return {
+    id: `composer-file-${composerFileReferenceSequence}`,
+    sessionId,
+    path,
+    name: fileReferenceLabel(path, preferredName),
+  };
+}
 
 /**
  * The composer-left chip is the only mode control, so one click steps through
@@ -175,6 +203,7 @@ export function Composer({
   const settings = useAppStore((s) => s.settings);
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const workspacePath = useAppStore((s) => s.workspace?.path ?? "");
   const newSession = useAppStore((s) => s.newSession);
   const providers = useAppStore((s) => s.providers);
   const configureActiveSession = useAppStore((s) => s.configureActiveSession);
@@ -185,6 +214,7 @@ export function Composer({
     s.activeSessionId ? s.planCheckpoints[s.activeSessionId] : undefined,
   );
   const [value, setValue] = useState("");
+  const [fileReferences, setFileReferences] = useState<ComposerFileReference[]>([]);
   const [cursor, setCursor] = useState(0);
   const [composing, setComposing] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
@@ -199,6 +229,10 @@ export function Composer({
   const executionActive = isActivePlanExecution(planCheckpoint);
   const composerBlocked = isRunning || executionActive || approvalPending || pasting;
   const runActive = isRunning || executionActive;
+  const referenceSessionId = activeSessionId ?? "";
+  const activeFileReferences = fileReferences.filter(
+    (fileReference) => fileReference.sessionId === referenceSessionId,
+  );
 
   useEffect(() => {
     if (!composerBlocked) return;
@@ -207,8 +241,15 @@ export function Composer({
   }, [composerBlocked]);
 
   useEffect(() => {
+    // Relative autocomplete references belong to the workspace that produced
+    // them. Never carry hidden canonical paths into another project.
+    setFileReferences([]);
+  }, [workspacePath]);
+
+  useEffect(() => {
     if (!composerPrefill) return;
     setValue(composerPrefill);
+    setFileReferences([]);
     clearComposerPrefill();
     requestAnimationFrame(() => {
       const el = ref.current;
@@ -222,6 +263,7 @@ export function Composer({
   useEffect(() => {
     if (!prefill?.text) return;
     setValue(prefill.text);
+    setFileReferences([]);
     requestAnimationFrame(() => {
       const el = ref.current;
       if (!el) return;
@@ -345,9 +387,19 @@ export function Composer({
     !!modelId &&
     (provider.hasSecret || provider.authKind === "none");
   const enterToSend = settings?.enterToSend ?? true;
+  const hasDraftContent = Boolean(value.trim() || activeFileReferences.length);
+
+  const clearDraft = () => {
+    setValue("");
+    setFileReferences((current) =>
+      current.filter(
+        (fileReference) => fileReference.sessionId !== referenceSessionId,
+      ),
+    );
+  };
 
   const submit = async () => {
-    const content = value.trim();
+    const content = serializeComposerFileReferences(value, activeFileReferences);
     if (!content || composerBlocked || pasting) return;
     // Slash dispatch (D123): builtin/plugin aliases execute locally without
     // a session or a model; templates and unknown /names stay prompt text
@@ -374,7 +426,7 @@ export function Composer({
           try {
             await runPaletteCommand(command.id);
             const accepted = await sendPrompt(commandBody);
-            if (accepted) setValue("");
+            if (accepted) clearDraft();
           } catch (e) {
             showToast(e instanceof Error ? e.message : String(e), {
               variant: "error",
@@ -390,7 +442,7 @@ export function Composer({
           try {
             if (command.kind === "builtin") await runPaletteCommand(command.id);
             else await api.executeCommand(command.id);
-            setValue("");
+            clearDraft();
           } catch (e) {
             showToast(e instanceof Error ? e.message : String(e), {
               variant: "error",
@@ -402,7 +454,7 @@ export function Composer({
     }
     if (!modelReady) return;
     const accepted = await sendPrompt(content);
-    if (accepted) setValue("");
+    if (accepted) clearDraft();
   };
 
   const pasteClipboardFiles = async (event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -411,10 +463,8 @@ export function Composer({
     if (!files.length) return;
 
     event.preventDefault();
-    const input = ref.current;
-    const current = input?.value ?? value;
-    const start = input?.selectionStart ?? current.length;
-    const end = input?.selectionEnd ?? start;
+    const selectionStart = event.currentTarget.selectionStart ?? cursor;
+    const selectionEnd = event.currentTarget.selectionEnd ?? selectionStart;
     setPasting(true);
     try {
       const payload = await Promise.all(
@@ -430,20 +480,28 @@ export function Composer({
         sessionId = useAppStore.getState().activeSessionId;
       }
       if (!sessionId) throw new Error("session unavailable");
+      if (!activeSessionId) {
+        setFileReferences((current) =>
+          current.map((fileReference) =>
+            fileReference.sessionId === ""
+              ? { ...fileReference, sessionId }
+              : fileReference,
+          ),
+        );
+      }
 
       const result = await api.pasteFiles(sessionId, payload);
-      const insertion = result.files
-        .map((file) => formatFileInsert(file.path, "file"))
-        .join("");
-      const next = current.slice(0, start) + insertion + current.slice(end);
-      const nextCursor = start + insertion.length;
-      setValue(next);
-      setCursor(nextCursor);
+      setFileReferences((current) => [
+        ...current,
+        ...result.files.map((file) =>
+          createFileReference(file.path, file.name, sessionId),
+        ),
+      ]);
       requestAnimationFrame(() => {
         const el = ref.current;
         if (!el) return;
         el.focus();
-        el.setSelectionRange(nextCursor, nextCursor);
+        el.setSelectionRange(selectionStart, selectionEnd);
       });
       showToast(t("chat.filesPasted", { count: result.files.length }), {
         variant: "success",
@@ -469,6 +527,17 @@ export function Composer({
     if (!result) return;
     setValue(result.value);
     setCursor(result.cursor);
+    const acceptedFileReference = result.fileReference;
+    if (acceptedFileReference) {
+      setFileReferences((current) => [
+        ...current,
+        createFileReference(
+          acceptedFileReference.path,
+          acceptedFileReference.name,
+          referenceSessionId,
+        ),
+      ]);
+    }
     requestAnimationFrame(() => {
       const el = ref.current;
       if (!el) return;
@@ -511,6 +580,49 @@ export function Composer({
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
           ) : null}
           <div className="composer-input-wrap">
+            {activeFileReferences.length ? (
+              <div
+                className="composer-file-references"
+                role="list"
+                aria-label={t("chat.fileReferences")}
+              >
+                {activeFileReferences.map((fileReference) => (
+                  <div
+                    key={fileReference.id}
+                    className="composer-file-reference"
+                    role="listitem"
+                    title={fileReference.path}
+                    aria-label={`${fileReference.name} — ${fileReference.path}`}
+                  >
+                    <IconFileText size={13} aria-hidden />
+                    <span className="composer-file-reference-name">
+                      {fileReference.name}
+                    </span>
+                    <button
+                      type="button"
+                      className="composer-file-reference-remove"
+                      title={t("chat.removeFileReference", {
+                        name: fileReference.name,
+                      })}
+                      aria-label={t("chat.removeFileReference", {
+                        name: fileReference.name,
+                      })}
+                      disabled={composerBlocked}
+                      onClick={() => {
+                        setFileReferences((current) =>
+                          current.filter(
+                            (candidate) => candidate.id !== fileReference.id,
+                          ),
+                        );
+                        requestAnimationFrame(() => ref.current?.focus());
+                      }}
+                    >
+                      <IconX size={11} aria-hidden />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <textarea
               ref={ref}
               className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}
@@ -544,6 +656,20 @@ export function Composer({
                 // never drive the autocomplete menu (D125).
                 if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229)
                   return;
+                if (
+                  e.key === "Backspace" &&
+                  value.length === 0 &&
+                  activeFileReferences.length
+                ) {
+                  e.preventDefault();
+                  const lastReference = activeFileReferences.at(-1);
+                  setFileReferences((current) =>
+                    current.filter(
+                      (fileReference) => fileReference.id !== lastReference?.id,
+                    ),
+                  );
+                  return;
+                }
                 if (composerAc.open && e.key === "Escape") {
                   // Escape closes only the menu; overlay handlers must not
                   // also fire on the same press.
@@ -759,7 +885,7 @@ export function Composer({
                     modelReady ? t("chat.send") : t("settings.addProvider")
                   }
                   disabled={
-                    !value.trim() ||
+                    !hasDraftContent ||
                     composerBlocked ||
                     (!modelReady && !value.trim().startsWith("/"))
                   }

@@ -156,6 +156,8 @@ export const en = {
     slashGroupPlugins: "Plugin commands",
     slashEmpty: "No matching commands",
     fileMenu: "File references",
+    fileReferences: "Files referenced by this draft",
+    removeFileReference: "Remove file reference {{name}}",
     fileEmpty: "No matching files",
     fileNoWorkspace: "Open a project to reference files",
     fileTruncated: "Showing the first 8000 matching files",

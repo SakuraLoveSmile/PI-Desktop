@@ -84,3 +84,4 @@ Each ADR includes:
 | 0067 | ChatGPT-inspired empty-home starter guidance | Superseded by D206 |
 | 0068 | Add a keyboard entry point for the work panel | Accepted for implementation |
 | 0069 | Make native-tool path mistakes recoverable | Accepted for implementation |
+| 0070 | Separate composer file-reference display from prompt serialization | Accepted for implementation |

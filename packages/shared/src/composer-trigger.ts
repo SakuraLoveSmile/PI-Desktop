@@ -112,6 +112,31 @@ export function formatFileInsert(path: string, kind: "dir" | "file"): string {
   return needsQuote ? `@"${path}" ` : `@${path} `;
 }
 
+/** Return a compact leaf label without changing the canonical reference path. */
+export function fileReferenceLabel(path: string, preferredName?: string): string {
+  const candidate = preferredName?.trim() || path;
+  const normalized = candidate.replaceAll("\\", "/").replace(/\/+$/, "");
+  return normalized.slice(normalized.lastIndexOf("/") + 1) || candidate;
+}
+
+/**
+ * Serialize renderer-owned file references only at send time. The textarea can
+ * stay compact while the persisted/model-facing prompt keeps exact @ paths.
+ */
+export function serializeComposerFileReferences(
+  draft: string,
+  references: ReadonlyArray<{ path: string }>,
+): string {
+  const content = draft.trim();
+  const paths = references
+    .map((reference) => formatFileInsert(reference.path, "file"))
+    .join("")
+    .trim();
+  if (!content) return paths;
+  if (!paths) return content;
+  return `${content}\n${paths}`;
+}
+
 /** Replace the trigger token with `insert`, returning the new draft+cursor. */
 export function applyCompletion(
   value: string,

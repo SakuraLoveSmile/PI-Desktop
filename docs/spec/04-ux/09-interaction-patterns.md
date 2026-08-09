@@ -762,24 +762,33 @@ When drag/drop is implemented, these patterns should apply:
   trigger token.
 - File results keep each row compact by rendering only the leaf name (with a
   trailing `/` for directories). The full relative path remains available as
-  the row tooltip and accessible name, and accepting the row still inserts the
-  original full `entry.path` value.
+  the row tooltip and accessible name. Accepting a file creates a compact
+  reference backed by the full `entry.path`; accepting a directory keeps the
+  full literal path in the textarea so deeper completion can continue.
 
-### 8a.4 Clipboard files
+### 8a.2 Reference chips and clipboard files
 
 - A paste containing one or more OS `File` objects is intercepted in the
   textarea; text-only paste stays native.
 - While bytes are being transferred, the textarea is read-only and exposes
   `aria-busy="true"`; the send and autocomplete controls are disabled.
 - Electron main saves bounded bytes under the originating session's scratch
-  root and returns unique absolute paths. The composer inserts each as an
-  `@` reference at the current selection, quoting paths with whitespace, then
-  restores focus and places the caret after the inserted references.
+  root and returns unique absolute paths plus sanitized original leaf names.
+  The composer leaves visible text unchanged, appends leaf-name reference
+  chips in clipboard order, then restores the textarea selection and focus.
 - If the home composer has no active session, it creates or reuses one before
   writing. Failure leaves the existing draft unchanged and shows the error in
   the normal toast surface.
+- A chip remove button removes only that draft reference and restores textarea
+  focus; it does not eagerly delete session scratch bytes. Backspace on an
+  empty textarea removes the most recent active reference.
+- A reference-only draft enables Send. Before dispatch, active references are
+  appended after visible text and serialized with the canonical relative or
+  absolute paths and existing whitespace quoting. Successful dispatch clears
+  both; failed or rejected dispatch retains both. References are session-scoped
+  and never cross a workspace change.
 
-### 8a.2 Keyboard while open
+### 8a.3 Keyboard while open
 
 - ↑/↓ move the highlight with wraparound; Home/End are left to the textarea.
 - Enter / Tab accept the highlighted item; Enter never sends while the menu
@@ -789,7 +798,7 @@ When drag/drop is implemented, these patterns should apply:
   "clear input or blur" Escape and must not propagate to overlay handlers.
 - Any other typing re-filters in place; zero matches behaves as closed.
 
-### 8a.3 IME (first normative IME rules)
+### 8a.4 IME (first normative IME rules)
 
 - All autocomplete key handling sits behind the standard guard
   (`isComposing || keyCode === 229`).
@@ -798,7 +807,7 @@ When drag/drop is implemented, these patterns should apply:
 - Enter that confirms an IME candidate never sends and never accepts a menu
   item; ↑/↓ during candidate navigation belong to the IME.
 
-### 8a.4 Close and focus rules
+### 8a.5 Close and focus rules
 
 - Close on: outside mousedown, textarea blur, deleting past the trigger
   character, session or workspace switch, accepting an item (except `@dir/`

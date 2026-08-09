@@ -157,6 +157,8 @@ export const zhCN = {
     slashGroupPlugins: "插件命令",
     slashEmpty: "没有匹配的指令",
     fileMenu: "引用文件",
+    fileReferences: "此草稿引用的文件",
+    removeFileReference: "移除文件引用 {{name}}",
     fileEmpty: "没有匹配的文件",
     fileNoWorkspace: "打开项目后即可引用文件",
     fileTruncated: "仅显示前 8000 个匹配文件",

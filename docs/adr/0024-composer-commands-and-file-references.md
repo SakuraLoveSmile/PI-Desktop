@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-07-27
 - Deciders: PI-Desktop core
-- Related: D123, D124, D125, D197, ADR 0019 (work panel subsystems), ADR 0059 (clipboard file paste), D114 (scratch dir), D119 (transcript file store)
+- Related: D123, D124, D125, D197, D209, ADR 0019 (work panel subsystems), ADR 0059 (clipboard file paste), ADR 0070 (compact reference display), D114 (scratch dir), D119 (transcript file store)
 
 ## Context
 
@@ -43,14 +43,16 @@ exported by the installed package and directly reusable.
    model context stays identical across restarts; the transcript renders the
    `command` field as a compact chip. Extra message fields are already
    tolerated by host storage (revision* precedent).
-3. **`@path` stays a plain-text light reference** exactly like pi CLI
-   interactive input: the composer only provides fuzzy autocomplete and
-   inserts `@relative/path ` (quoted `@"a b.txt"` when the path contains
-   spaces, `@dir/` without trailing space for directories). Both chat and
-   agent modes carry Read/Glob/Grep, so references work in both. No content
-   inlining or binary content enters the prompt. OS clipboard file/image paste
-   is materialized as a session-scratch file reference by ADR 0059; it does
-   not use pi-ai `ImageContent` or change the text-only prompt contract.
+3. **`@path` stays a plain-text light reference** exactly like pi CLI at prompt
+   dispatch. The composer provides fuzzy autocomplete; directory acceptance
+   inserts `@dir/` so completion can continue, while completed files become
+   renderer-owned compact references under ADR 0070. Before dispatch those
+   references serialize to `@relative/path ` (quoted `@"a b.txt"` when the
+   path contains spaces). Plan and Agent carry Read/Glob/Grep, so references
+   work in both. No content inlining or binary content enters the prompt. OS
+   clipboard file/image paste is materialized as a session-scratch file
+   reference by ADR 0059; it does not use pi-ai `ImageContent` or change the
+   text-only prompt contract.
 4. **Workspace file index is served by Electron main**, not agent tools —
    same rationale as ADR 0019: user-initiated browsing must not spam
    permission prompts or the audit trail. New read-only channel
@@ -83,5 +85,6 @@ exported by the installed package and directly reusable.
   PI-Desktop.
 - The transcript user-message schema gains an optional `command` field;
   renderers that ignore it keep working.
-- Inline binary attachments and preview chips remain deferred. Clipboard
-  files/images use session-scratch `@` references as defined by ADR 0059.
+- Inline binary attachments and preview tiles remain deferred. Compact textual
+  reference chips are renderer-only draft state under ADR 0070; clipboard
+  files/images still use session-scratch `@` references as defined by ADR 0059.

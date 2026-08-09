@@ -1605,15 +1605,16 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 ### 11.7 MVP constraints
 
 - Pasting one or more OS clipboard files or images saves their bytes into the
-  originating session's scratch directory and inserts `@<absolute-path>` text;
-  text-only paste keeps the browser's native textarea behavior (D197,
-  ADR 0059)
-- No inline binary/ImageContent payloads or attachment preview chips; the
-  prompt remains text-only and the agent follows the inserted paths with its
-  file tools
+  originating session's scratch directory and adds a compact leaf-name
+  reference above the textarea; text-only paste keeps the browser's native
+  textarea behavior (D197, D209, ADR 0059, ADR 0070)
+- No inline binary/ImageContent payloads or visual attachment previews. The
+  compact chips are textual draft references; immediately before dispatch
+  they serialize to canonical `@<absolute-path>` text, so the prompt remains
+  text-only and the agent follows the paths with its file tools
 - No voice input
 
-### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, ADR 0024, ADR 0059)
+### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, D209, ADR 0024, ADR 0059, ADR 0070)
 
 The composer owns an inline autocomplete menu — one component serving two
 modes. Focus never leaves the textarea (D125).
@@ -1628,6 +1629,7 @@ Anatomy:
 │  …                                           │
 │  ↑↓ select · Enter confirm · Esc close       │  ← hint bar (footer)
 └──────────────────────────────────────────────┘
+[ file.ext × ] [ another-file.ts × ]            ← when references exist
 [ composer textarea                            ]
 ```
 
@@ -1643,28 +1645,41 @@ Anatomy:
 - File mode (`@` token at cursor, boundary-preceded): rows persistently show
   only the leaf file or directory name; directories get a trailing `/` and
   continue completion on accept. The complete relative path remains available
-  through the row tooltip and accessible name, while the original `entry.path`
-  remains the insertion value. Entries come from `fs/index` (D124). A
+  through the row tooltip and accessible name. Accepting a completed file adds
+  a compact reference whose canonical value is the original `entry.path`;
+  accepting a directory keeps the literal path in the textarea so completion
+  can continue. Entries come from `fs/index` (D124, D209). A
   truncation footnote appears when the index is capped; without a workspace the
   menu shows an "open a project" empty state.
-- Accepting always inserts text (`/name ` / `@path ` / `@dir/`); dispatch
-  happens only at send time (D123). Builtin/plugin dispatch bypasses the
-  model-ready gate since no prompt is sent.
+- Accepting commands and directories inserts text (`/name ` / `@dir/`);
+  accepting a completed file creates a renderer-owned reference. Immediately
+  before dispatch, references serialize in stable order after the visible
+  draft as complete `@path` text using D124's quoting. Reference-only drafts
+  are sendable. Builtin/plugin dispatch still bypasses the model-ready gate
+  when no prompt text or file reference is sent.
 - The Agent/Plan mode aliases can prefix a prompt in the same draft:
   `/agent-mode <prompt>` and `/plan-mode <prompt>` apply the mode first, then
-  send `<prompt>` through the normal prompt path so the user turn remains in
-  the transcript. An alias-only mode command remains local. The composer is
-  cleared only after the local action or prompt dispatch is accepted; a failed
-  dispatch retains the complete draft for retry.
+  send `<prompt>` plus any serialized references through the normal prompt
+  path so the user turn remains in the transcript. Goal follows the same rule.
+  An alias-only mode command remains local. The composer is cleared only after
+  the local action or prompt dispatch is accepted; a failed dispatch retains
+  the complete visible draft and references for retry.
 - A paste containing files is intercepted only when the clipboard exposes at
   least one `File`. The renderer transfers bounded file bytes, name, and MIME
   metadata to Electron main with the durable session id. Main validates the
   session, writes unique sanitized files under
-  `<data_dir>/scratch/<sessionId>/pasted/`, and returns absolute paths. The
-  composer inserts each path using the same `@` reference formatting as the
-  file menu; paths containing whitespace are quoted. A home composer creates
-  or reuses a durable session before saving. The scratch lifecycle removes
-  pasted files with the session and never dirties the workspace git tree.
+  `<data_dir>/scratch/<sessionId>/pasted/`, and returns each UUID-backed
+  absolute path with its sanitized original leaf name. The composer displays
+  the leaf name, keeps the path in session-scoped transient reference state,
+  and serializes that path with the same `@` quoting as the file menu only when
+  sending. Removing a chip does not delete scratch bytes. A home composer
+  creates or reuses a durable session before saving. The scratch lifecycle
+  removes pasted files with the session and never dirties the workspace git
+  tree.
+- Reference chips wrap within the prompt area, expose the canonical path in
+  their tooltip and accessible name, and provide a focus-visible localized
+  remove button that restores textarea focus. Duplicate leaf labels remain
+  separate because identity and dispatch use the canonical path, not the name.
 - Sent template invocations render in the transcript as a monospace command
   chip from the message's `command` field instead of the expanded body.
 - States: keyboard-active row uses the shared `kb-active` treatment; empty

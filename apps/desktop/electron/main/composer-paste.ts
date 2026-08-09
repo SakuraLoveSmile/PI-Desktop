@@ -91,7 +91,7 @@ export async function saveComposerPasteFiles(
       const outputName = `pasted-${randomUUID()}-${name}`;
       const path = join(root, outputName);
       await writeFile(path, bytes, { flag: "wx" });
-      return { path, name: outputName, mimeType, size: bytes.byteLength };
+      return { path, name, mimeType, size: bytes.byteLength };
     }),
   );
 }

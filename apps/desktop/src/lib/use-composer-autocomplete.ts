@@ -3,6 +3,7 @@ import {
   applyCompletion,
   compareMatches,
   detectTrigger,
+  fileReferenceLabel,
   formatCommandInsert,
   formatFileInsert,
   fuzzyMatchCommand,
@@ -247,10 +248,27 @@ export function useComposerAutocomplete({
   }, [triggerKey]);
 
   const accept = useCallback(
-    (index: number): { value: string; cursor: number } | null => {
+    (
+      index: number,
+    ):
+      | {
+          value: string;
+          cursor: number;
+          fileReference?: { path: string; name: string };
+        }
+      | null => {
       if (!trigger) return null;
       const item = items[index];
       if (!item) return null;
+      if (item.kind === "path" && item.entry.kind === "file") {
+        return {
+          ...applyCompletion(value, trigger, ""),
+          fileReference: {
+            path: item.entry.path,
+            name: fileReferenceLabel(item.entry.path),
+          },
+        };
+      }
       const insert =
         item.kind === "command"
           ? formatCommandInsert(item.command.name)

@@ -927,7 +927,9 @@ export type ComposerPasteFile = {
 
 /** A clipboard file materialized in the originating session's scratch root. */
 export type ComposerPastedFile = {
+  /** UUID-backed canonical path used by the prompt and file tools. */
   path: string;
+  /** Sanitized original leaf name used only for compact composer display. */
   name: string;
   mimeType: string;
   size: number;

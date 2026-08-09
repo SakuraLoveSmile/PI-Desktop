@@ -69,12 +69,13 @@ test("mode slash prefixes send the trailing prompt and retain failed drafts", ()
   assert.match(submit, /const isModeCommand =/);
   assert.match(
     submit,
-    /if \(isModeCommand && commandBody\)[\s\S]*?await runPaletteCommand\(command\.id\);[\s\S]*?await sendPrompt\(commandBody\)[\s\S]*?if \(accepted\) setValue\(""\);/,
+    /if \(isModeCommand && commandBody\)[\s\S]*?await runPaletteCommand\(command\.id\);[\s\S]*?await sendPrompt\(commandBody\)[\s\S]*?if \(accepted\) clearDraft\(\);/,
   );
   assert.match(
     submit,
-    /const accepted = await sendPrompt\(content\);[\s\S]*?if \(accepted\) setValue\(""\);/,
+    /const accepted = await sendPrompt\(content\);[\s\S]*?if \(accepted\) clearDraft\(\);/,
   );
+  assert.match(composer, /setFileReferences\(\[\]\)/);
   assert.match(store, /sendPrompt: \(content: string\) => Promise<boolean>/);
   const sendPrompt = store.match(
     /sendPrompt: async \(content\)[\s\S]*?\n  compactContext:/,

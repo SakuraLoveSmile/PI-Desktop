@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-08-05
 - Deciders: PI-Desktop core
-- Related: D197, ADR 0024 (composer commands and @ file references), D114 (session scratch directory), D119 (transcript file store)
+- Related: D197, D209, ADR 0024 (composer commands and @ file references), ADR 0070 (compact reference display), D114 (session scratch directory), D119 (transcript file store)
 
 ## Context
 
@@ -31,9 +31,11 @@ rules.
    <data_dir>/scratch/<sessionId>/pasted/
    ```
 
-4. Main returns absolute paths. The renderer inserts them into the draft as
-   `@` references using the existing quoting rule for whitespace. The prompt
-   and transcript carry paths, never clipboard bytes.
+4. Main returns each UUID-backed absolute path plus its sanitized original leaf
+   name. Under ADR 0070 the renderer keeps the path in transient reference
+   state, shows the leaf name as a compact chip, and serializes the path into
+   the prompt as an `@` reference using the existing whitespace quoting rule.
+   The prompt and transcript carry paths, never clipboard bytes.
 5. Pasted files follow the existing scratch lifecycle: deleting the session or
    the orphan/stale startup sweep removes them. They are not workspace
    artifacts and never change project git status.
@@ -64,7 +66,8 @@ rules.
 
 - File and image paste works from both home and docked composers without a
   project file mutation.
-- The prompt gains one or more normal `@absolute/path` references, so existing
-  Read/Glob/Grep behavior handles the materialized files.
+- The visible draft gains compact leaf-name references; the dispatched prompt
+  gains the same normal `@absolute/path` references, so existing Read/Glob/Grep
+  behavior handles the materialized files.
 - Large or malformed clipboard payloads fail visibly in the composer and do
   not partially write because bytes are validated before the first write.

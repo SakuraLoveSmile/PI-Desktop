@@ -1104,8 +1104,8 @@ type ComposerPasteFile = {
 };
 
 type ComposerPastedFile = {
-  path: string;
-  name: string;
+  path: string;     // UUID-backed absolute storage path
+  name: string;     // sanitized original leaf display name
   mimeType: string;
   size: number;
 };
@@ -1115,8 +1115,10 @@ Electron main verifies that `sessionId` resolves to a durable host session,
 limits the request to 20 files, 64 MiB per file, and 128 MiB total, strips
 renderer-provided directory components, and writes unique names below
 `<data_dir>/scratch/<sessionId>/pasted/` with exclusive-create semantics. The
-returned absolute paths are inserted into the text prompt as `@` references;
-clipboard bytes never enter the persisted prompt or host agent message.
+renderer holds returned paths in transient reference state, displays `name`,
+and serializes each exact path into the text prompt as an `@` reference at
+dispatch. Clipboard bytes never enter the persisted prompt or host agent
+message.
 Invalid sessions and malformed/oversized payloads fail with an IPC error, and
 the operation cannot write to the workspace.
 

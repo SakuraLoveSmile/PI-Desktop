@@ -644,15 +644,14 @@ model):
   a localized title/description, and a quiet arrow affordance; hover/focus
   uses the shared hover fill, border, shadow, and motion tokens.
 
-## 8.1 Composer workspace chips (Codex parity)
+## 8.1 Composer transient file references
 
-The project / Local / branch controls share one context rail (not three
-independent pills). The rail docks directly into the composer shell with no
-visible gap, uses the same theme surface, and has no independent drop shadow
-or bottom edge. Its rounded top corners, the shell outline, and the shell's
-single elevation read as one immersive composite surface. Internal 1px
-separators remain. On an empty home without a project the rail is omitted; it
-appears on project home and in the thread-docked composer.
+The passive project / Local / branch rail remains removed under D095. When the
+draft references files, a transient wrapping row appears inside the composer
+above the textarea. Each quiet text chip uses the inset surface, a subtle
+border, a file glyph, an ellipsized leaf name, and a focus-visible remove
+action. No references means no reserved row or extra composer height. The
+canonical path is tooltip/accessibility metadata, never persistent body copy.
 
 ## 8.2 Composer runtime controls
 

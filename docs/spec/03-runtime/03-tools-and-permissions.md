@@ -136,9 +136,10 @@ session gets a scratch directory outside the workspace:
 
 OS clipboard files and images pasted into the composer are materialized by
 Electron main below `<data_dir>/scratch/<sessionId>/pasted/` before their
-absolute paths are inserted as `@` references. They use the same session
-lifecycle as other scratch data and do not enter the workspace, artifacts, or
-the persisted prompt as binary content.
+absolute paths are captured as transient composer references and serialized as
+`@` references at prompt dispatch. They use the same session lifecycle as other
+scratch data and do not enter the workspace, artifacts, or the persisted prompt
+as binary content.
 
 - **Addressing.** The model addresses scratch by absolute path only; the path
   is advertised in the system prompt. Relative tool paths always resolve
