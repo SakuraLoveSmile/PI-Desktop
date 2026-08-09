@@ -31,11 +31,11 @@ test("the sidebar footer is an action bar, not a fabricated identity", () => {
   }
 });
 
-test("footer exposes settings, plugins, theme and notifications in one row", () => {
+test("footer exposes settings, plugins and notifications in one row", () => {
   assert.match(sidebarSource, /className="footer-actions"/);
   assert.match(sidebarSource, /data-nav="settings"/);
   assert.match(sidebarSource, /data-nav="plugins"/);
-  assert.match(sidebarSource, /data-nav="theme"/);
+  assert.doesNotMatch(sidebarSource, /data-nav="theme"/);
   assert.match(
     sidebarSource,
     /<NotificationCenter onBeforeOpen=\{\(\) => closeMenus\(false\)\} \/>/,
@@ -46,7 +46,7 @@ test("footer exposes settings, plugins, theme and notifications in one row", () 
   const actions = sidebarSource
     .split("<button")
     .filter((chunk) => /className=(?:"footer-action"|\{`footer-action )/.test(chunk));
-  assert.equal(actions.length, 3);
+  assert.equal(actions.length, 2);
   for (const action of actions) {
     const attrs = action.slice(0, action.indexOf(">"));
     assert.match(attrs, /title=/);
@@ -68,16 +68,6 @@ test("footer action buttons share the notification trigger's hit target", () => 
   assert.match(block, /width:\s*32px/);
   assert.match(block, /height:\s*32px/);
   assert.match(block, /transition:[^;]*var\(--motion-duration-fast\)/);
-});
-
-test("theme toggle rotates system → light → dark and mirrors the current choice", () => {
-  assert.match(sidebarSource, /const THEME_ORDER = \["system", "light", "dark"\] as const/);
-  assert.match(sidebarSource, /THEME_ORDER\[\(index \+ 1\) % THEME_ORDER\.length\]/);
-  assert.match(
-    sidebarSource,
-    /theme === "light" \? IconSun : theme === "dark" \? IconMoon : IconMonitor/,
-  );
-  assert.match(sidebarSource, /api\.setSettings\(\{ \.\.\.current, theme: next \}\)/);
 });
 
 test("build chip surfaces the version and only dots an actionable update", () => {
