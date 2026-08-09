@@ -181,6 +181,42 @@ test("nests delegate rows under the Task call that spawned them", () => {
   );
 });
 
+test("parallel delegate nodes keep parent Task order when child rows interleave", () => {
+  const { entries } = buildTranscriptEntries([
+    message("user", "user", "Fan out"),
+    message("task-a", "tool", "first report", {
+      toolName: "Task",
+      toolCallId: "task-a",
+    }),
+    message("task-b", "tool", "second report", {
+      toolName: "Task",
+      toolCallId: "task-b",
+    }),
+    message("b-read", "tool", "b", {
+      toolName: "Read",
+      parentToolCallId: "task-b",
+      agentName: "scout-b",
+    }),
+    message("a-read", "tool", "a", {
+      toolName: "Read",
+      parentToolCallId: "task-a",
+      agentName: "scout-a",
+    }),
+    message("final", "assistant", "Both finished."),
+  ]);
+
+  const activity = entries[1].parts[0];
+  assert.equal(activity.kind, "activity");
+  assert.deepEqual(
+    activity.items.map((item) => item.message.id),
+    ["task-a", "task-b"],
+  );
+  assert.deepEqual(
+    activity.items.map((item) => item.delegate.agentName),
+    ["scout-a", "scout-b"],
+  );
+});
+
 test("a delegate turn with both reasoning and text keeps both rows", () => {
   const { entries } = buildTranscriptEntries([
     message("user", "user", "Delegate"),

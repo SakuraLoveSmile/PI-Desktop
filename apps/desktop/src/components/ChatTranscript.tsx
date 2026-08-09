@@ -37,6 +37,12 @@ import {
   hasToolDetails,
   toolResultChips,
 } from "../lib/tool-presentation";
+import {
+  isDelegationActivityItem,
+  subagentOutcome,
+  summarizeSubagentActivity,
+  type DelegationActivityItem,
+} from "../lib/subagent-topology";
 import { useOpenPreviewTarget } from "../lib/use-preview-target";
 import {
   getToolPreviewTarget,
@@ -84,9 +90,11 @@ import {
   IconSearch,
   IconReview,
   IconSparkles,
+  IconStop,
   IconTarget,
   IconTerminal,
   IconTrash,
+  IconWorkflow,
   IconWrench,
 } from "./icons";
 import { useAppStore } from "../stores/app-store";
@@ -796,10 +804,13 @@ function delegateAgentName(
 function ToolRow({
   message,
   delegate,
+  variant = "default",
 }: {
   message: UiMessage;
   /** Rows the delegate produced, when this row is a `Task` call (ADR 0062). */
   delegate?: SubagentRun;
+  /** Card treatment used when several Task calls form a delegation topology. */
+  variant?: "default" | "topology";
 }) {
   const { t } = useTranslation();
   const detailsId = useId();
@@ -836,90 +847,160 @@ function ToolRow({
           ...(nestedReport ? { hideDelegateReport: true } : {}),
         })
       : null;
-  const statusLabel =
-    status === "running"
+  const outcome = variant === "topology" ? subagentOutcome(message) : null;
+  const statusLabel = outcome
+    ? t(`chat.subagentStatus.${outcome}`)
+    : status === "running"
       ? t("chat.running")
       : status === "error"
         ? t("chat.toolFailed")
         : status === "denied"
           ? t("chat.toolDenied")
           : t("chat.toolCompleted");
+  const duration =
+    typeof message.toolDurationMs === "number" && message.toolDurationMs > 0
+      ? formatToolDuration(message.toolDurationMs / 1000)
+      : "";
 
   useEffect(() => {
     if (status === "error") setOpen(true);
   }, [status]);
 
+  useEffect(() => {
+    if (outcome === "failed") setOpen(true);
+  }, [outcome]);
+
   return (
     <div
-      className={`tool-row ${open ? "open" : ""} status-${status || "success"}`}
-      role="region"
+      className={`tool-row ${variant === "topology" ? "subagent-topology-node" : ""} ${
+        open ? "open" : ""
+      } status-${status || "success"}${outcome ? ` outcome-${outcome}` : ""}`}
+      role={variant === "topology" ? "listitem" : "region"}
       aria-label={`${t("chat.toolCall")}: ${rawName}, ${statusLabel}`}
     >
-      <button
-        className="tool-row-header"
-        aria-expanded={open}
-        aria-controls={hasDetails ? detailsId : undefined}
-        disabled={!hasDetails}
-        title={summary || rawName}
-        onClick={() => hasDetails && setOpen((value) => !value)}
-      >
-        <span className="tool-row-icon">
-          <ToolActionIcon action={action} />
-        </span>
-        <span className={`tool-row-name ${status === "running" ? "running" : ""}`}>
-          {actionLabel}
-        </span>
-        {agentName ? (
-          <span className="tool-row-agent" title={t("chat.subagentAgent")}>
-            {agentName}
+      {variant === "topology" ? (
+        <button
+          className="subagent-topology-node-header"
+          aria-expanded={open}
+          aria-controls={hasDetails ? detailsId : undefined}
+          disabled={!hasDetails}
+          title={summary || agentName || rawName}
+          onClick={() => hasDetails && setOpen((value) => !value)}
+        >
+          <span className="subagent-topology-avatar" aria-hidden>
+            <IconBot size={15} />
+            <span className="subagent-topology-status-icon">
+              {outcome === "completed" ? (
+                <IconCheck size={8} />
+              ) : outcome === "aborted" ? (
+                <IconStop size={7} />
+              ) : outcome === "running" ? (
+                <span />
+              ) : (
+                <IconCircleAlert size={8} />
+              )}
+            </span>
           </span>
-        ) : null}
-        {summary ? (
-          <span
-            className={`tool-row-summary${previewTarget || terminalArtifact ? " linked" : ""}`}
-            title={
-              previewTarget
-                ? previewTarget.kind === "file"
-                  ? t("chat.previewFile")
-                  : t("chat.previewUrl")
-                : terminalArtifact
-                  ? t("chat.openTerminal")
-                : undefined
-            }
-            onClick={
-              previewTarget || terminalArtifact
-                ? (e) => {
-                    // Open the produced surface instead of toggling details.
-                    e.stopPropagation();
-                    if (previewTarget) openTarget(previewTarget);
-                    else openTerminal();
-                  }
-                : undefined
-            }
-          >
-            {summary}
+          <span className="subagent-topology-node-copy">
+            <span className="subagent-topology-node-title-row">
+              <span className="subagent-topology-node-title">
+                {agentName || t("chat.subagentUnnamed")}
+              </span>
+              <span className="subagent-topology-node-status">
+                {statusLabel}
+                {duration ? ` · ${duration}` : ""}
+              </span>
+            </span>
+            {summary ? (
+              <span className="subagent-topology-node-summary">{summary}</span>
+            ) : null}
+            {delegate?.items.length ? (
+              <span className="subagent-topology-node-steps">
+                {t("chat.processingSteps", { count: delegate.items.length })}
+              </span>
+            ) : null}
           </span>
-        ) : null}
-        <ToolChips chips={chips} />
-        {status === "running" ? (
-          <span className="tool-spinner" aria-label={t("chat.running")} />
-        ) : status === "error" ? (
-          <span className="tool-row-status error" aria-label={t("chat.toolFailed")}>
-            <IconCircleAlert size={13} />
-            {t("chat.toolFailed")}
+          {outcome === "running" ? (
+            <span className="tool-spinner" aria-label={t("chat.running")} />
+          ) : null}
+          {hasDetails ? (
+            <span className="tool-row-caret" aria-hidden>
+              <IconChevronRight size={12} />
+            </span>
+          ) : null}
+        </button>
+      ) : (
+        <button
+          className="tool-row-header"
+          aria-expanded={open}
+          aria-controls={hasDetails ? detailsId : undefined}
+          disabled={!hasDetails}
+          title={summary || rawName}
+          onClick={() => hasDetails && setOpen((value) => !value)}
+        >
+          <span className="tool-row-icon">
+            <ToolActionIcon action={action} />
           </span>
-        ) : status === "denied" ? (
-          <span className="tool-row-status">{t("chat.toolDenied")}</span>
-        ) : null}
+          <span className={`tool-row-name ${status === "running" ? "running" : ""}`}>
+            {actionLabel}
+          </span>
+          {agentName ? (
+            <span className="tool-row-agent" title={t("chat.subagentAgent")}>
+              {agentName}
+            </span>
+          ) : null}
+          {summary ? (
+            <span
+              className={`tool-row-summary${previewTarget || terminalArtifact ? " linked" : ""}`}
+              title={
+                previewTarget
+                  ? previewTarget.kind === "file"
+                    ? t("chat.previewFile")
+                    : t("chat.previewUrl")
+                  : terminalArtifact
+                    ? t("chat.openTerminal")
+                    : undefined
+              }
+              onClick={
+                previewTarget || terminalArtifact
+                  ? (e) => {
+                      // Open the produced surface instead of toggling details.
+                      e.stopPropagation();
+                      if (previewTarget) openTarget(previewTarget);
+                      else openTerminal();
+                    }
+                  : undefined
+              }
+            >
+              {summary}
+            </span>
+          ) : null}
+          <ToolChips chips={chips} />
+          {status === "running" ? (
+            <span className="tool-spinner" aria-label={t("chat.running")} />
+          ) : status === "error" ? (
+            <span className="tool-row-status error" aria-label={t("chat.toolFailed")}>
+              <IconCircleAlert size={13} />
+              {t("chat.toolFailed")}
+            </span>
+          ) : status === "denied" ? (
+            <span className="tool-row-status">{t("chat.toolDenied")}</span>
+          ) : null}
+          <span className="sr-only" role="status" aria-live="polite">
+            {statusLabel}
+          </span>
+          {hasDetails ? (
+            <span className="tool-row-caret" aria-hidden>
+              <IconChevronRight size={12} />
+            </span>
+          ) : null}
+        </button>
+      )}
+      {variant === "topology" ? (
         <span className="sr-only" role="status" aria-live="polite">
           {statusLabel}
         </span>
-        {hasDetails ? (
-          <span className="tool-row-caret" aria-hidden>
-            <IconChevronRight size={12} />
-          </span>
-        ) : null}
-      </button>
+      ) : null}
       {blocks && blocks.length > 0 ? (
         <div className="tool-row-body" id={detailsId}>
           <ToolDetailBlocks blocks={blocks} />
@@ -987,6 +1068,49 @@ function SubagentRunRows({
         ),
       )}
     </div>
+  );
+}
+
+/**
+ * A truthful one-level graph of one parent fan-out (ADR 0062).
+ *
+ * The runtime has no delegate-to-delegate edges, so this deliberately stops at
+ * main agent -> Task nodes instead of implying dependencies that do not exist.
+ */
+function SubagentTopology({ items }: { items: DelegationActivityItem[] }) {
+  const { t } = useTranslation();
+  const labelId = useId();
+  const summary = summarizeSubagentActivity(items);
+
+  return (
+    <section className="subagent-topology" aria-labelledby={labelId}>
+      <div className="subagent-topology-root">
+        <span className="subagent-topology-root-icon" aria-hidden>
+          <IconTarget size={16} />
+        </span>
+        <span className="subagent-topology-root-copy">
+          <strong id={labelId}>{t("chat.subagentCoordinator")}</strong>
+          <span>
+            {t("chat.subagentCoordinating", { count: summary.total })}
+          </span>
+        </span>
+      </div>
+      <span className="subagent-topology-connector" aria-hidden />
+      <div
+        className="subagent-topology-agents"
+        role="list"
+        aria-label={t("chat.subagentTopology")}
+      >
+        {items.map((item) => (
+          <ToolRow
+            key={item.message.id}
+            message={item.message}
+            {...(item.delegate ? { delegate: item.delegate } : {})}
+            variant="topology"
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1108,10 +1232,14 @@ const ActivityGroup = memo(function ActivityGroup({
 }: ActivityGroupProps) {
   const { t } = useTranslation();
   const detailsId = useId();
-  const [open, setOpen] = useState(false);
+  const delegateItems = items.filter(isDelegationActivityItem);
+  const hasSubagentTopology = delegateItems.length > 1;
+  const subagentSummary = summarizeSubagentActivity(delegateItems);
+  const [open, setOpen] = useState(isActive && hasSubagentTopology);
   const [now, setNow] = useState(Date.now);
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
   const wasActiveRef = useRef(isActive);
+  const topologyAutoOpenedRef = useRef(isActive && hasSubagentTopology);
   const messages = items.map((item) => item.message);
   const startedAt = Date.parse(messages[0]?.createdAt || "") || now;
   const fallbackEnd =
@@ -1139,16 +1267,26 @@ const ActivityGroup = memo(function ActivityGroup({
     lastItem?.kind === "thinking" &&
     lastItem.message.status === "streaming";
   const onlyThinking = items.every((item) => item.kind === "thinking");
-  const label = isActive
-    ? t(thinkingNow || onlyThinking ? "chat.thinkingFor" : "chat.processingFor", {
-        time: elapsed,
-      })
-    : onlyThinking
-      ? elapsedSeconds > 0
-        ? t("chat.thoughtFor", { time: elapsed })
-        : // History reloads keep no end timestamp for pure-thinking groups.
-          t("chat.thinking", { defaultValue: "Thinking" })
-      : t("chat.processedFor", { time: elapsed });
+  const label = hasSubagentTopology
+    ? t(
+        isActive || subagentSummary.running > 0
+          ? "chat.subagentsWorking"
+          : subagentSummary.issues > 0
+            ? "chat.subagentsFinishedWithIssues"
+            : subagentSummary.warnings > 0
+              ? "chat.subagentsFinishedWithWarnings"
+              : "chat.subagentsFinished",
+      )
+    : isActive
+      ? t(thinkingNow || onlyThinking ? "chat.thinkingFor" : "chat.processingFor", {
+          time: elapsed,
+        })
+      : onlyThinking
+        ? elapsedSeconds > 0
+          ? t("chat.thoughtFor", { time: elapsed })
+          : // History reloads keep no end timestamp for pure-thinking groups.
+            t("chat.thinking", { defaultValue: "Thinking" })
+        : t("chat.processedFor", { time: elapsed });
   const tail = isActive && !open && lastItem ? activityItemSummary(lastItem, t) : "";
 
   useEffect(() => {
@@ -1160,9 +1298,43 @@ const ActivityGroup = memo(function ActivityGroup({
     return () => window.clearInterval(id);
   }, [isActive]);
 
+  useEffect(() => {
+    if (!isActive || !hasSubagentTopology || topologyAutoOpenedRef.current) return;
+    topologyAutoOpenedRef.current = true;
+    setOpen(true);
+  }, [hasSubagentTopology, isActive]);
+
+  const renderActivityItems = () => {
+    let renderedTopology = false;
+    return items.map((item) => {
+      if (hasSubagentTopology && isDelegationActivityItem(item)) {
+        if (renderedTopology) return null;
+        renderedTopology = true;
+        return <SubagentTopology key="subagent-topology" items={delegateItems} />;
+      }
+      return item.kind === "tool" ? (
+        <Fragment key={item.message.id}>
+          <ToolRow
+            message={item.message}
+            {...(item.delegate ? { delegate: item.delegate } : {})}
+          />
+          <ReviewChangeCard message={item.message} />
+        </Fragment>
+      ) : (
+        <ThinkingRow
+          key={`thinking-${item.message.id}`}
+          message={item.message}
+          streaming={isActive && item.message.status === "streaming"}
+        />
+      );
+    });
+  };
+
   return (
     <div
-      className={`tool-activity-group ${open ? "open" : ""} ${
+      className={`tool-activity-group ${hasSubagentTopology ? "has-subagents" : ""} ${
+        open ? "open" : ""
+      } ${
         isActive ? "active" : ""
       }`}
     >
@@ -1173,12 +1345,27 @@ const ActivityGroup = memo(function ActivityGroup({
         onClick={() => setOpen((value) => !value)}
       >
         <span className="tool-activity-icon" aria-hidden>
-          <IconSparkles size={14} />
+          {hasSubagentTopology ? (
+            <IconWorkflow size={15} />
+          ) : (
+            <IconSparkles size={14} />
+          )}
         </span>
         <span className={`tool-activity-label ${isActive ? "running" : ""}`}>
           {label}
         </span>
-        {items.length > 1 ? (
+        {hasSubagentTopology ? (
+          <span className="subagent-activity-metrics">
+            {t("chat.subagentCount", { count: subagentSummary.total })}
+            <span aria-hidden> · </span>
+            {t("chat.subagentFinishedCount", {
+              finished: subagentSummary.finished,
+              total: subagentSummary.total,
+            })}
+            <span aria-hidden> · </span>
+            {elapsed}
+          </span>
+        ) : items.length > 1 ? (
           <span className="tool-activity-count">
             {t("chat.processingSteps", { count: items.length })}
           </span>
@@ -1199,23 +1386,7 @@ const ActivityGroup = memo(function ActivityGroup({
       >
         <div className="tool-activity-collapse-inner">
           <div className="tool-activity-body" id={detailsId}>
-            {items.map((item) =>
-              item.kind === "tool" ? (
-                <Fragment key={item.message.id}>
-                  <ToolRow
-                    message={item.message}
-                    {...(item.delegate ? { delegate: item.delegate } : {})}
-                  />
-                  <ReviewChangeCard message={item.message} />
-                </Fragment>
-              ) : (
-                <ThinkingRow
-                  key={`thinking-${item.message.id}`}
-                  message={item.message}
-                  streaming={isActive && item.message.status === "streaming"}
-                />
-              ),
-            )}
+            {renderActivityItems()}
           </div>
         </div>
       </div>

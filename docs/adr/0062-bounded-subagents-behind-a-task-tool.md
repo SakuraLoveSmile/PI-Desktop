@@ -123,7 +123,7 @@ A delegate's termination — success, cap, failure, abort — collapses into the
 tool result. It never reaches Electron main's turn handling, so the parent turn
 remains the only thing that can end a turn.
 
-### 6. Attribution is persisted, and the transcript nests by it
+### 6. Attribution is persisted, and the transcript derives its topology from it
 
 host-core stores `parentToolCallId` and `agentName` in the message `meta`
 object, so a reloaded session nests identically to a live one. The renderer
@@ -131,6 +131,18 @@ groups every attributed row under the `Task` row that spawned it and renders
 them one level in; the turn stream and the minimap see only the parent's rows.
 The report is printed once: in the `Task` body when the delegate produced no
 answer row, as the nested answer row otherwise.
+
+A single `Task` keeps that compact row. When an activity group contains two or
+more `Task` calls, the renderer replaces the independent rows with one
+delegation summary. Its header derives agent count, settled count, elapsed time
+and aggregate status from those same tool messages; its expanded body renders a
+one-level main-agent-to-delegate topology. Each delegate node retains the
+original row disclosure, brief, report, counters and nested steps. Live fan-out
+opens the topology once when it first appears, then leaves expansion under user
+control; reloaded history stays collapsed. No graph record, edge, IPC field or
+storage schema is added: live and reload both derive the same topology from the
+persisted parent ids, and the UI never invents delegate-to-delegate edges or a
+parent summary it does not own.
 
 ### 7. Permission requests queue per session
 

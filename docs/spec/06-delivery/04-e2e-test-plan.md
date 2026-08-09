@@ -3303,7 +3303,8 @@ Each scenario is documented in this format:
   `<data_dir>/sessions/<id>.jsonl` and the `messages` index.
 - **Steps**:
   1. Prompt a turn in which the assistant emits two `Task` calls — `scout` and
-     `pinned` — in one message.
+     `pinned` — in one message. Observe the delegation card while both run and
+     after each one settles; collapse it, then expand each node.
   2. Prompt a turn in which two `fixer` delegates each edit a different file, and
      answer only the first permission card.
   3. Answer the second card, then prompt a third turn where two `fixer`
@@ -3313,14 +3314,22 @@ Each scenario is documented in this format:
   5. Prompt a `Task` call naming `broken`, then one naming an agent that does not
      exist, then one whose definition pins an unconfigured provider.
   6. Switch the session to Plan, then to Goal, and inspect the tool catalog.
-  7. Reload the session and re-expand every `Task` row.
+  7. Reload the session and re-expand the delegation card and every `Task`
+     node.
 - **Expected**:
   - Both delegates in step 1 run concurrently, and `pinned` streams on its own
     provider/model while the parent keeps the session's.
-  - Each `Task` row collapses to one line with the `delegate` icon and the agent
-    chip; expanding shows the brief, the report exactly once, and
-    `status`/`turns`/`toolCalls`. Delegate rows appear only inside the nested
-    block, never in the turn stream or the minimap.
+  - The two `Task` calls in step 1 form one full-width delegation card. While
+    active it opens once and its header updates the subagent and settled counts;
+    after settlement it keeps the user's expansion choice and reports aggregate
+    success, warning, or issue state plus elapsed time. A single `Task` still
+    uses the compact one-line row.
+  - The expanded card shows one main-agent root connected to `scout` and
+    `pinned` in parent-row order, with no invented edge between delegates. Each
+    node shows its agent, short description, explicit outcome, duration and step
+    count. Expanding a node shows the brief, report exactly once, and
+    `status`/`turns`/`toolCalls`. Delegate rows appear only inside that node,
+    never in the turn stream or the minimap.
   - The parent's next request contains the reports and **no** delegate message or
     tool row; the rows are nonetheless present in the transcript file and the
     index with `meta.parentToolCallId` and `meta.agentName`.
@@ -3330,13 +3339,16 @@ Each scenario is documented in this format:
   - `scout` cannot call `Edit` or `Write` at all; `fixer` can. Same-file edits in
     step 3 apply in a defined order and neither loses the other's write.
   - Stop denies both the shown and the queued request, and both delegates end
-    `aborted` inside their own `Task` results — the parent turn ends once.
+    `aborted` in text and icon inside their own `Task` nodes — the parent turn
+    ends once and the aggregate card settles with a warning.
   - `broken` is absent from the catalog with a launch diagnostic and the session
     keeps its other three delegates; an unknown agent and an unresolvable model
     pin each fail as a `Task` tool error naming the cause, with no fallback to
     the session provider and no turn failure.
   - `Task` is absent from the catalog in Plan and Goal.
-  - After reload every `Task` row nests exactly as it did live.
+  - After reload the card is collapsed by default; re-expanding preserves node
+    order, attribution, outcome and nested content exactly as they appeared
+    live.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5f/§7.2b/§8,
   `03-runtime/03-tools-and-permissions.md` §10.2,
   `03-runtime/04-data-storage.md` §4.7a, `04-ux/03-permission-ux.md` §6a,
@@ -3353,7 +3365,9 @@ Each scenario is documented in this format:
   (queue order, id-matched removal, tool-call removal, abort denying the queue,
   card copy), `subagent-wiring.test.mjs` (main-process discovery and model pins)
   and `subagent-transcript.test.mjs` + `assistant-turns.test.mjs` (nesting,
-  single report print, memoization). Full multi-provider fan-out remains manual.
+  single report print, memoization), plus `subagent-topology.test.mjs`
+  (delegate detection, structured outcomes and aggregate counts). Full
+  multi-provider fan-out and rendered topology interaction remain manual.
 
 #### E2E-097: Tool results read as structured blocks, never JSON
 

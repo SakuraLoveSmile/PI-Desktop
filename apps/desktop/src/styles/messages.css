@@ -1537,6 +1537,325 @@
   padding: 2px 0 2px 12px;
 }
 
+/*
+ * Parallel Task calls become one compact, truthful topology. The runtime only
+ * supports one delegation level, so the canvas connects the main agent to a
+ * flat list instead of implying dependencies between delegates (ADR 0062).
+ */
+.tool-activity-group.has-subagents {
+  container: subagent-activity / inline-size;
+  overflow: hidden;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md-plus);
+  background: color-mix(in oklab, var(--ds-bg-primary) 94%, transparent);
+}
+
+.tool-activity-group.has-subagents .tool-activity-header {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  min-height: 42px;
+  margin: 0;
+  border-radius: 0;
+  padding: 8px 12px;
+}
+
+.tool-activity-group.has-subagents.open .tool-activity-header {
+  border-bottom: 1px solid var(--ds-border-subtle);
+}
+
+.tool-activity-group.has-subagents .tool-activity-caret {
+  margin-inline-start: auto;
+}
+
+.subagent-activity-metrics {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-activity-group.has-subagents .tool-activity-preview {
+  margin: -3px 38px 8px;
+}
+
+.tool-activity-group.has-subagents .tool-activity-body {
+  margin: 0;
+  border-left: 0;
+  padding: 0;
+}
+
+.subagent-topology {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(138px, 0.58fr) 34px minmax(248px, 1.42fr);
+  align-items: center;
+  padding: 14px;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--ds-border-default) 55%, transparent) 0.8px,
+    transparent 0.9px
+  );
+  background-position: 0 0;
+  background-size: 18px 18px;
+}
+
+.subagent-topology-root {
+  display: flex;
+  min-width: 0;
+  min-height: 72px;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-elevated-opaque);
+  padding: 11px;
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+}
+
+.subagent-topology-root-icon,
+.subagent-topology-avatar {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-round);
+  background: var(--ds-bg-active);
+  color: var(--ds-text-secondary);
+}
+
+.subagent-topology-root-copy,
+.subagent-topology-node-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.subagent-topology-root-copy strong {
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-topology-root-copy > span {
+  margin-top: 4px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.subagent-topology-connector {
+  height: 1px;
+  background: var(--ds-border-default);
+}
+
+.subagent-topology-agents {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding-left: 14px;
+}
+
+.subagent-topology-agents::before {
+  position: absolute;
+  top: 36px;
+  bottom: 36px;
+  left: 0;
+  border-left: 1px solid var(--ds-border-default);
+  content: "";
+}
+
+.subagent-topology-node {
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-elevated-opaque);
+  box-shadow: 0 1px 2px color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+}
+
+.subagent-topology-node::before {
+  position: absolute;
+  top: 35px;
+  right: 100%;
+  width: 15px;
+  border-top: 1px solid var(--ds-border-default);
+  content: "";
+}
+
+.subagent-topology-node-header {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 70px;
+  align-items: flex-start;
+  gap: 9px;
+  border-radius: inherit;
+  padding: 10px;
+  color: var(--ds-text-secondary);
+  text-align: left;
+}
+
+.subagent-topology-node-header:hover {
+  background: var(--ds-bg-hover);
+}
+
+.subagent-topology-node-header:disabled {
+  cursor: default;
+}
+
+.subagent-topology-node-header:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ds-accent) 58%, transparent);
+  outline-offset: -2px;
+}
+
+.subagent-topology-status-icon {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--ds-bg-elevated-opaque);
+  border-radius: var(--radius-round);
+  background: var(--ds-text-muted);
+  color: var(--ds-bg-primary);
+}
+
+.subagent-topology-status-icon > span {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-round);
+  background: currentColor;
+}
+
+.subagent-topology-node.outcome-completed .subagent-topology-status-icon {
+  background: var(--ds-success);
+}
+
+.subagent-topology-node.outcome-truncated .subagent-topology-status-icon {
+  background: var(--ds-warning);
+}
+
+.subagent-topology-node.outcome-failed .subagent-topology-status-icon {
+  background: var(--ds-error);
+}
+
+.subagent-topology-node.outcome-aborted .subagent-topology-status-icon,
+.subagent-topology-node.outcome-denied .subagent-topology-status-icon {
+  background: var(--ds-text-muted);
+}
+
+.subagent-topology-node-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.subagent-topology-node-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-topology-node-status {
+  flex: none;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+
+.subagent-topology-node-summary,
+.subagent-topology-node-steps {
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-topology-node-summary {
+  margin-top: 4px;
+}
+
+.subagent-topology-node-steps {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+}
+
+.subagent-topology-node > .tool-row-body,
+.subagent-topology-node > .subagent-run {
+  margin-right: 10px;
+  margin-left: 38px;
+}
+
+.subagent-topology-node.open {
+  border-color: color-mix(
+    in oklab,
+    var(--ds-text-secondary) 42%,
+    var(--ds-border-default)
+  );
+}
+
+@container subagent-activity (max-width: 520px) {
+  .tool-activity-group.has-subagents .tool-activity-header {
+    flex-wrap: wrap;
+  }
+
+  .subagent-activity-metrics {
+    order: 3;
+    width: calc(100% - 24px);
+    margin-left: 20px;
+  }
+
+  .subagent-topology {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .subagent-topology-connector {
+    width: 1px;
+    height: 18px;
+    margin-left: 28px;
+    background: var(--ds-border-default);
+  }
+
+  .subagent-topology-agents {
+    padding-left: 28px;
+  }
+
+  .subagent-topology-agents::before {
+    top: 0;
+    bottom: 36px;
+    left: 14px;
+  }
+
+  .subagent-topology-node::before {
+    width: 14px;
+  }
+}
+
 .tool-row {
   margin: 3px 0;
 }

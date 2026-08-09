@@ -1340,10 +1340,15 @@ D193, and D194.
   them when rebuilding context, and a delegate's termination collapses into the
   tool result rather than reaching Electron main's turn handling.
 - The transcript nests attributed rows one level inside their `Task` row and
-  keeps them out of the turn stream and the minimap. Pending permission requests
-  become a per-session queue: head-only answering, id-matched removal, whole
-  queue denied on abort, and a card that names the delegate that asked and how
-  many wait behind it.
+  keeps them out of the turn stream and the minimap. One `Task` stays compact;
+  two or more in an activity group derive one renderer-only delegation card
+  with aggregate status and a main-agent-to-delegate topology. Nodes reuse the
+  existing row disclosure, structured outcome and nested rows. The topology is
+  derived from persisted attribution on live and reload, adds no protocol or
+  storage shape, and invents neither delegate dependencies nor an unavailable
+  parent-summary node. Pending permission requests become a per-session queue:
+  head-only answering, id-matched removal, whole queue denied on abort, and a
+  card that names the delegate that asked and how many wait behind it.
 - Decision D201 and ADR 0062 define this. See
   `03-runtime/02-agent-runtime.md` §5f/§7.2b/§8,
   `03-runtime/03-tools-and-permissions.md` §10.2,

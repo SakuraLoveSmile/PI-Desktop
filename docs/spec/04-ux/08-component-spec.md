@@ -1270,7 +1270,7 @@ twice.
 - No cross-row activity grouping until turn boundaries are available to the
   transcript component
 
-### 9.9 Delegation rows (D201, ADR 0062)
+### 9.9 Delegation rows and fan-out topology (D201, ADR 0062)
 
 A `Task` call is a ToolCallRow like any other, with the `delegate` action icon
 and one extra header element: a quiet chip naming the delegate it ran, taken
@@ -1315,6 +1315,26 @@ argument. The row hint is the call's short `description`.
 - Runs are rebuilt from the message list on every render, so group memoization
   compares them by row identity and length rather than by object identity —
   otherwise a streaming delegate would freeze at its first row.
+- A single `Task` keeps the compact row above. Two or more `Task` calls in one
+  activity group become one full-width delegation card rather than unrelated
+  rows. Its header presents aggregate state, the number of subagents, the
+  settled/total count and elapsed time; it keeps the standard disclosure caret.
+- The expanded card renders a low-noise dotted canvas with one main-agent root
+  connected to the `Task` nodes in parent-row order. The runtime exposes no
+  delegate dependencies and forbids nested `Task`, so the renderer must not
+  invent delegate-to-delegate edges or a downstream summary node.
+- Each node shows the definition name, short description, explicit outcome,
+  duration and step count. Outcome prefers the structured `Task` result
+  (`completed`, `truncated`, `aborted`, `failed`) and falls back to transport
+  state (`running`, `error`, `denied`, `success`). Clicking the node expands the
+  existing brief/report/counters and nested rows; the report remains printed
+  exactly once.
+- A topology that first appears while the turn is active opens once so progress
+  is visible, and does not auto-collapse when the turn settles. Reloaded history
+  remains collapsed by default. The header and every node are keyboard
+  disclosures with `aria-expanded`/`aria-controls`; status is written in text
+  and reinforced visually rather than conveyed by color alone. At narrow chat
+  widths the graph becomes a vertical flow without horizontal page overflow.
 
 ---
 

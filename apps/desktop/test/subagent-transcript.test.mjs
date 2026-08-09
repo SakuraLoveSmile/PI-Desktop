@@ -77,3 +77,34 @@ test("the nested run is visibly one level inside the call", () => {
   assert.match(messagesCss, /\.subagent-run-count \{[^}]*margin-inline-start: auto/);
   assert.match(messagesCss, /\.tool-row-agent \{/);
 });
+
+test("parallel Task rows render as one accessible delegation topology", () => {
+  assert.match(
+    transcriptSource,
+    /const hasSubagentTopology = delegateItems\.length > 1/,
+  );
+  assert.match(
+    transcriptSource,
+    /<SubagentTopology key="subagent-topology" items=\{delegateItems\} \/>/,
+  );
+  assert.match(transcriptSource, /className="subagent-topology" aria-labelledby=/);
+  assert.match(transcriptSource, /className="subagent-topology-agents"/);
+  assert.match(transcriptSource, /role="list"/);
+  assert.match(transcriptSource, /variant="topology"/);
+  assert.match(transcriptSource, /className="subagent-topology-node-header"/);
+  assert.match(transcriptSource, /aria-expanded=\{open\}/);
+  assert.match(transcriptSource, /aria-controls=\{hasDetails \? detailsId : undefined\}/);
+});
+
+test("the topology uses semantic low-noise surfaces and responsive connectors", () => {
+  assert.match(messagesCss, /\.tool-activity-group\.has-subagents \{/);
+  assert.match(messagesCss, /\.subagent-topology \{[^}]*display: grid/);
+  assert.match(messagesCss, /\.subagent-topology-node \{[^}]*var\(--ds-border-default\)/);
+  assert.match(messagesCss, /\.subagent-topology-node\.outcome-completed/);
+  assert.match(messagesCss, /\.subagent-topology-node\.outcome-failed/);
+  assert.match(
+    messagesCss,
+    /@container subagent-activity \(max-width: 520px\)[\s\S]*?\.subagent-topology/,
+  );
+  assert.match(messagesCss, /\.subagent-topology-node-header:focus-visible/);
+});
