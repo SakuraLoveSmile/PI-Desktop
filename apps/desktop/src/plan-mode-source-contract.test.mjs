@@ -182,9 +182,18 @@ test("pending approval keeps the draft while gating every composer control", () 
   assert.match(composerSource, /readOnly=\{composerBlocked\}/);
   assert.match(composerSource, /aria-readonly=\{composerBlocked\}/);
   assert.match(composerSource, /enabled: !composerBlocked/);
-  assert.match(composerSource, /disabled=\{composerBlocked \|\| !activeSession\}/);
+  assert.match(composerSource, /disabled=\{composerBlocked\}/);
+  assert.doesNotMatch(composerSource, /disabled=\{composerBlocked \|\| !activeSession\}/);
   assert.match(composerSource, /composerBlocked\s*\|\|\s*\(!modelReady/);
   assert.match(storeSource, /if \(get\(\)\.pendingPlans\[sessionId\]\?\.status === "pending"\) return/);
+});
+
+test("composer configuration materializes a draft when navigation has no active session", () => {
+  assert.match(
+    storeSource,
+    /let sessionId = get\(\)\.activeSessionId;[\s\S]*?if \(!sessionId\) \{[\s\S]*?await get\(\)\.newSession\(\);[\s\S]*?sessionId = get\(\)\.activeSessionId;/,
+  );
+  assert.match(composerSource, /disabled=\{composerBlocked\}/);
 });
 
 test("Plan approval labels and Auto file-change warning are locale-backed", () => {

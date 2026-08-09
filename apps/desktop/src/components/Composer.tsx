@@ -581,7 +581,7 @@ export function Composer({
               <button
                 className="icon-btn mode-chip"
                 title={t("settings.mode")}
-                disabled={composerBlocked || !activeSession}
+                disabled={composerBlocked}
                 onClick={async () => {
                   setThinkingOpen(false);
                   setPermissionOpen(false);
@@ -613,7 +613,7 @@ export function Composer({
                     title={`${t("chat.thinking")} · ${thinkingLabel}`}
                     aria-haspopup="menu"
                     aria-expanded={thinkingOpen}
-                    disabled={composerBlocked || !activeSession}
+                    disabled={composerBlocked}
                     onClick={() => {
                       setPermissionOpen(false);
                       setThinkingOpen((open) => !open);
@@ -690,7 +690,7 @@ export function Composer({
                     }
                     aria-haspopup="menu"
                     aria-expanded={permissionOpen}
-                    disabled={composerBlocked || !activeSession}
+                    disabled={composerBlocked}
                     onClick={() => {
                       setThinkingOpen(false);
                       setPermissionOpen((open) => !open);

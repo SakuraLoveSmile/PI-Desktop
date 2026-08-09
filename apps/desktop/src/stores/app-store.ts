@@ -1303,7 +1303,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   configureActiveSession: async (config) => {
-    const sessionId = get().activeSessionId;
+    let sessionId = get().activeSessionId;
+    // The home composer can be visible while project/session navigation has
+    // cleared the active id. Materialize the draft before persisting a
+    // toolbar choice instead of silently dropping the user's click.
+    if (!sessionId) {
+      await get().newSession();
+      sessionId = get().activeSessionId;
+    }
     if (!sessionId || get().runningSessions[sessionId]) return;
     if (get().pendingPlans[sessionId]?.status === "pending") return;
     const result = await api.configureSession(sessionId, config);

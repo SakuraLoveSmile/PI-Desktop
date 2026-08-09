@@ -397,6 +397,26 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
+#### E2E-088a: Composer configuration controls survive project/session initialization
+
+- **Preconditions**: Provider configured; a new project or new session flow is
+  visible while the destination `activeSessionId` is still resolving.
+- **Steps**: 1) Inspect the Composer mode, Thinking, and permission controls
+  during the empty/home transition. 2) Click the mode control and confirm it
+  advances to the next mode. 3) Open Thinking and select a supported level.
+  4) Open permission mode and select Auto. 5) Inspect the destination session
+  after navigation completes.
+- **Expected**: None of the idle configuration triggers is disabled merely
+  because the destination session has not been projected yet. The first
+  configuration action creates or reuses the destination draft, persists the
+  selected value, and does not require a second click. Running turns and
+  pending approvals still disable the controls.
+- **Specs linked**: `04-ux/08-component-spec.md` (§11),
+  `04-ux/09-interaction-patterns.md` (§5A)
+- **Acceptance**: C (new project/session composer)
+- **Milestone**: M2
+- **Status**: Draft
+
 #### E2E-089: Top-bar model picker opens downward and switches model
 
 - **Preconditions**: Chat route active; provider configured.

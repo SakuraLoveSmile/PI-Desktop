@@ -609,6 +609,12 @@ action, and the UI is not required to present the interrupted terminal
 snapshot. The Composer-left Agent/Plan chip is the only active-session mode
 control.
 
+During project or session initialization, the home composer can render before
+an `activeSessionId` is projected. Idle mode, Thinking, and permission
+controls remain usable in that interval; their first configuration action
+creates or reuses the destination draft and persists the selection. Running
+turns and pending approvals continue to gate the controls.
+
 ## 6. Toast vs inline error
 
 ### 6.1 Toast notifications (use for)

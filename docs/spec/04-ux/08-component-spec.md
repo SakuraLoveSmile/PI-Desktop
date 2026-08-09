@@ -1487,6 +1487,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 |---|---|---|
 | Idle (no model) | textarea active, send button disabled + tooltip "Configure a model first" | Agent link remains available in model menu |
 | Idle (ready) | textarea active, send button enabled | Send active |
+| Home/new-session initialization | textarea and mode/thinking/permission triggers remain available while no active session is projected; the first configuration selection creates or reuses the destination draft before persisting it | Configure the draft, then send |
 | New session (reasoning model) | Thinking trigger shows the model's highest published level | User may select any published level, including Off when supported |
 | New session / switch while another session is running | textarea active, send button enabled for the destination session's own run state | Send active, Abort hidden unless the destination session itself is running |
 | Running | textarea disabled, abort button visible | Abort active, Send hidden |
@@ -1527,6 +1528,11 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   same active-session configuration path; after host confirmation resolves an
   approval, the approval surface is removed rather than remaining as a terminal
   action card.
+- During project or session navigation, the home composer may briefly have no
+  `activeSessionId`. Its idle mode, Thinking, and permission triggers remain
+  enabled; the first configuration action creates or reuses the destination
+  draft, then persists the selected mode, thinking level, or permission mode.
+  A running turn or pending approval still gates those controls.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing

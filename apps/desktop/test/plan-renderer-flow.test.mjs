@@ -49,7 +49,8 @@ test("pending input is retained but every composer/model mutation control is gat
   assert.match(composer, /readOnly=\{composerBlocked\}/);
   assert.match(composer, /aria-readonly=\{composerBlocked\}/);
   assert.match(composer, /enabled: !composerBlocked/);
-  assert.match(composer, /disabled=\{composerBlocked \|\| !activeSession\}/);
+  assert.match(composer, /disabled=\{composerBlocked\}/);
+  assert.doesNotMatch(composer, /disabled=\{composerBlocked \|\| !activeSession\}/);
   assert.match(composer, /composerBlocked\s*\|\|\s*\(!modelReady/);
   assert.match(model, /disabled=\{modelBlocked\}/);
   assert.match(store, /pendingPlans\[sessionId\]\?\.status === "pending"/);
