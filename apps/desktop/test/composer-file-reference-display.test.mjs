@@ -50,9 +50,25 @@ test("composer renders removable leaf-name references and serializes paths on se
     composer,
     /serializeComposerFileReferences\(value, activeFileReferences\)/,
   );
+  assert.match(composer, /sendPrompt\(content, draftSnapshot\(value\)\)/);
+  assert.match(
+    composer,
+    /sendPrompt\(\s*commandBody,\s*draftSnapshot\(visibleCommandBody\)/,
+  );
   assert.match(composer, /current\.filter\(/);
   assert.match(
     composerStyles,
     /\.composer-file-reference-name[\s\S]*?text-overflow: ellipsis/,
   );
+});
+
+test("unanswered stop restores compact references instead of serialized paths", () => {
+  assert.match(composer, /setValue\(composerPrefill\.text\)/);
+  assert.match(composer, /composerPrefill\.fileReferences\.map/);
+  assert.match(composer, /composerPrefill\.sessionId !== activeSessionId/);
+  assert.match(
+    composer,
+    /createFileReference\(\s*fileReference\.path,\s*fileReference\.name,\s*composerPrefill\.sessionId/,
+  );
+  assert.doesNotMatch(composer, /setValue\(composerPrefill\);/);
 });

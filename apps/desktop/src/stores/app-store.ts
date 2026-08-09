@@ -96,6 +96,11 @@ import {
   mergePlanCheckpoint,
   terminalizeMissingPlan,
 } from "../lib/plan-mode-state";
+import {
+  resolveComposerSmartStop,
+  type ComposerDraftSnapshot,
+  type ComposerPrefill,
+} from "../lib/composer-smart-stop";
 
 const ErrorCodes = {
   ...SharedErrorCodes,
@@ -151,6 +156,13 @@ let sessionWorkspaceQueue: Promise<void> = Promise.resolve();
 const sessionTranscriptCache = new Map<string, UiMessage[]>();
 const planResolutionRequests = new Map<string, Promise<PlanResolutionResult>>();
 const planSyncGenerations = new Map<string, number>();
+type SubmittedComposerDraft = {
+  messageCountBeforeSend: number;
+  draft: ComposerDraftSnapshot;
+  abortResolution?: Promise<boolean>;
+  resolveAbort?: (restored: boolean) => void;
+};
+const submittedComposerDrafts = new Map<string, SubmittedComposerDraft>();
 const sessionDetailLoads = new Map<
   string,
   ReturnType<typeof api.getSession>
@@ -393,8 +405,11 @@ export type AppState = {
     thinkingLevel: ThinkingLevel;
     permissionMode?: PermissionMode;
   }) => Promise<void>;
-  /** Returns true once the prompt has been handed to Electron Main. */
-  sendPrompt: (content: string) => Promise<boolean>;
+  /** Returns true once accepted unless concurrent smart Stop restores it. */
+  sendPrompt: (
+    content: string,
+    draft?: ComposerDraftSnapshot,
+  ) => Promise<boolean>;
   compactContext: () => Promise<void>;
   retryAssistantMessage: (messageId: string) => Promise<void>;
   /** Replace a user prompt and regenerate from it; the old branch stays in the revision pager. */
@@ -472,7 +487,7 @@ export type AppState = {
   resolvePlan: (resolution: PlanResolveRequest) => Promise<PlanResolutionResult>;
   showToast: (message: string, options?: ToastOptions) => void;
   dismissToast: (id: number) => void;
-  composerPrefill: string | null;
+  composerPrefill: ComposerPrefill | null;
   clearComposerPrefill: () => void;
   workPanelOpen: boolean;
   workPanelTabs: WorkPanelTab[];
@@ -1331,7 +1346,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
-  sendPrompt: async (content) => {
+  sendPrompt: async (content, draft) => {
     let sessionId = get().activeSessionId;
     if (sessionId && get().pendingPlans[sessionId]?.status === "pending") {
       return false;
@@ -1343,6 +1358,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!sessionId) throw new Error("No active session");
     if (get().pendingPlans[sessionId]?.status === "pending") return false;
     const startedIn = sessionId;
+    const submission: SubmittedComposerDraft = {
+      messageCountBeforeSend: get().messages.length,
+      draft: draft
+        ? {
+            text: draft.text,
+            fileReferences: draft.fileReferences.map((reference) => ({
+              ...reference,
+            })),
+          }
+        : { text: content, fileReferences: [] },
+    };
+    submittedComposerDrafts.set(startedIn, submission);
     set((s) => ({
       isRunning: true,
       error: null,
@@ -1365,15 +1392,24 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
       if (get().pendingPlans[sessionId]?.status === "pending") {
+        submittedComposerDrafts.delete(startedIn);
         set((s) => ({
           isRunning: s.activeSessionId === startedIn ? false : s.isRunning,
           runningSessions: { ...s.runningSessions, [startedIn]: false },
         }));
         return false;
       }
+      if (submission.abortResolution && (await submission.abortResolution)) {
+        submittedComposerDrafts.delete(startedIn);
+        return false;
+      }
       await api.prompt({ sessionId, content });
+      if (submission.abortResolution && (await submission.abortResolution)) {
+        return false;
+      }
       return true;
     } catch (e) {
+      submittedComposerDrafts.delete(startedIn);
       const messageError = messageErrorFromUnknown(e);
       set((s) => ({
         // The user may have switched sessions while the request was in
@@ -1711,6 +1747,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     const stateBeforeAbort = get();
     const sessionId = stateBeforeAbort.activeSessionId;
     if (!sessionId) return;
+    // Capture before awaiting the abort IPC: its terminal event may arrive
+    // first and clear the pending snapshot.
+    const submittedDraft = submittedComposerDrafts.get(sessionId);
+    if (submittedDraft && !submittedDraft.abortResolution) {
+      submittedDraft.abortResolution = new Promise<boolean>((resolve) => {
+        submittedDraft.resolveAbort = resolve;
+      });
+    }
     // Stopping the turn denies every request the session had open, not just
     // the one on screen: a queued delegate would otherwise keep its tool call
     // alive behind an abort the user already asked for.
@@ -1735,47 +1779,38 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
     const state = get();
     if (state.activeSessionId !== sessionId) {
+      submittedDraft?.resolveAbort?.(false);
+      submittedComposerDrafts.delete(sessionId);
       set((s) => ({
         runningSessions: { ...s.runningSessions, [sessionId]: false },
       }));
       return;
     }
     const messages = state.messages;
-    let lastUserIndex = -1;
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      if (messages[i].role === "user") {
-        lastUserIndex = i;
-        break;
-      }
-    }
-    const tail = lastUserIndex >= 0 ? messages.slice(lastUserIndex + 1) : [];
-    const replyStarted = tail.some(
-      (message) =>
-        message.role === "tool" ||
-        (message.role === "assistant" &&
-          Boolean(
-            (message.content || "").trim() ||
-              (typeof message.thinking === "string" && message.thinking.trim()),
-          )),
-    );
-    if (lastUserIndex >= 0 && !replyStarted) {
+    const smartStop = resolveComposerSmartStop(messages, submittedDraft);
+    if (smartStop.kind === "restore") {
       // Nothing came back yet — undo the send: pull the prompt into the
-      // composer and drop the turn from the transcript.
-      const prompt = messages[lastUserIndex].content;
-      const kept = messages.slice(0, lastUserIndex);
+      // composer and drop the turn from the transcript. Prefer the renderer
+      // snapshot so serialized file paths return as compact references.
+      submittedComposerDrafts.delete(sessionId);
+      submittedDraft?.resolveAbort?.(true);
       set((s) => ({
-        messages: kept,
-        composerPrefill: prompt,
+        messages: smartStop.kept,
+        composerPrefill: { ...smartStop.draft, sessionId },
         isRunning: false,
         runningSessions: { ...s.runningSessions, [sessionId]: false },
       }));
-      try {
-        await api.replaceSessionMessages(sessionId, kept);
-      } catch {
-        // Best effort — the local transcript already reflects the undo.
+      if (smartStop.kept.length < messages.length) {
+        try {
+          await api.replaceSessionMessages(sessionId, smartStop.kept);
+        } catch {
+          // Best effort — the local transcript already reflects the undo.
+        }
       }
       return;
     }
+    submittedDraft?.resolveAbort?.(false);
+    submittedComposerDrafts.delete(sessionId);
     // A partial reply exists: settle it in place. Streaming assistant text
     // becomes an aborted-but-kept answer; still-running tools close out.
     const settled = messages.map((message) => {
@@ -2468,6 +2503,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   handleAgentEvent: (envelope) => {
     const event = envelope.event;
+    if (event.type === "agent_end" || event.type === "error") {
+      submittedComposerDrafts.delete(envelope.sessionId);
+    }
     if (!flushingStreamUpdates) {
       if (event.type === "message_update") {
         streamUpdates.enqueue(

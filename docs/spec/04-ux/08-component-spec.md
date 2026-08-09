@@ -1532,7 +1532,12 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Enter: send message (configurable: Shift+Enter for newline)
 - Shift+Enter: newline in textarea
 - Escape: when textarea focused, clears input or blurs (not abort)
-- Abort: stops running turn and cancels pending permission
+- Abort: stops the running turn and cancels pending permission. Before any
+  assistant text, thinking, or tool row begins, it also removes the just-sent
+  user row and restores the pre-serialization composer draft. Ordinary text
+  returns to the textarea and file references return as leaf-name chips; their
+  canonical paths never become textarea text. After a reply begins, Abort keeps
+  the partial transcript and restores no draft.
 - `turn_end` is not an idle signal. The composer, model/mode controls, and
   session actions remain blocked through subsequent tool turns and blocking
   automatic checkpoint generation until `agent_end` or `error`. A manual-only
@@ -1664,6 +1669,11 @@ Anatomy:
   An alias-only mode command remains local. The composer is cleared only after
   the local action or prompt dispatch is accepted; a failed dispatch retains
   the complete visible draft and references for retry.
+- Accepted prompt dispatch retains a renderer-only, session/turn-scoped
+  structured undo snapshot while the turn remains unanswered. Smart Stop
+  restores that snapshot in its original reference order instead of copying
+  serialized message paths back into the textarea. Stop after reply start does
+  not restore or duplicate the submitted draft.
 - A paste containing files is intercepted only when the clipboard exposes at
   least one `File`. The renderer transfers bounded file bytes, name, and MIME
   metadata to Electron main with the durable session id. Main validates the

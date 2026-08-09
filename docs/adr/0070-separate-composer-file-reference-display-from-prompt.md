@@ -41,12 +41,20 @@ paths.
 5. Reference-only drafts are sendable. References are appended after visible
    text so slash templates and `/agent-mode`, `/plan-mode`, and `/goal-mode`
    remain recognizable at the start of the draft. Successful local or prompt
-   dispatch clears the visible draft and its active-session references;
-   rejected or failed dispatch retains both.
-6. References are scoped by durable session id and cleared when their workspace
+   dispatch clears the active editor, while rejected or failed dispatch retains
+   it. An accepted prompt also retains a renderer-only, session- and turn-scoped
+   snapshot of its pre-serialization text and references until the turn leaves
+   the unanswered smart-stop window.
+6. Stopping before assistant text, thinking, or a tool row begins removes the
+   just-sent user row and restores the structured snapshot. Canonical paths
+   return behind their leaf-name chips, never as textarea text. Once a reply
+   begins, abort keeps the partial transcript and restores no draft. The
+   snapshot is not reconstructed from persisted message content and adds no
+   IPC, host RPC, or storage field.
+7. References are scoped by durable session id and cleared when their workspace
    changes. Removing a chip removes only the draft reference; scratch bytes keep
    the existing session lifecycle.
-7. `ComposerPastedFile.name` is the sanitized original leaf display name. The
+8. `ComposerPastedFile.name` is the sanitized original leaf display name. The
    unique UUID storage name is represented by `path`, not duplicated into the
    display label. This is an additive semantic clarification inside the
    existing Electron-only shape; no host protocol or storage schema changes.
@@ -61,6 +69,10 @@ paths.
 - **Replace the textarea with `contenteditable`:** rejected for this focused
   change because it would reopen the complete IME, selection, undo, paste, and
   accessibility contract.
+- **Parse serialized `@path` tokens back out of an unanswered user message:**
+  rejected because user-authored references and renderer-appended references
+  are indistinguishable, and the persisted text no longer carries the original
+  display label or duplicate-reference identity.
 - **Send provider-specific binary attachments:** rejected because file tools
   already consume the materialized path and the prompt contract remains
   provider-independent plain text.

@@ -77,7 +77,11 @@ accept_prompt
 
 1. Only one active turn per session
 2. New prompt rejected with `AGENT_BUSY` while running/waiting_permission
-3. Abort from running or waiting_permission is allowed
+3. Abort from running or waiting_permission is allowed. Renderer smart Stop
+   removes an unanswered root user row and restores its session/turn-scoped
+   pre-serialization composer snapshot; once assistant text, thinking, or any
+   tool row begins, abort preserves the partial transcript and restores no
+   draft.
 4. Permission timeout moves to tool denied, then agent may continue or end based on runtime handling
 5. Session status returns to idle after terminal turn states are persisted
 6. Changing the renderer's active project/session does not transition or abort
@@ -132,6 +136,9 @@ transcript-file line first, index transaction second.
 - notification row: same transaction as an unseen completed/error terminal
   update; never for a visible-current result or abort
 - assistant/tool messages: on message_end/tool_end
+- unanswered smart Stop: mark the turn aborted through the existing lifecycle,
+  then atomically rewrite the transcript to the prefix before its root user row;
+  the structured composer snapshot remains renderer-memory-only
 - mode/project fields: on change
 - Plan/Goal submission: write exact Markdown bytes to a new unique
   `.pi/<kind>/*.md`,

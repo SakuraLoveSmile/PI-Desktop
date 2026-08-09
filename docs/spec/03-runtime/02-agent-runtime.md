@@ -683,6 +683,9 @@ does not dispose, abort, or re-root a runtime belonging to another session.
 - attempt cancel interruptible tools
 - do not auto-rollback completed writes
 - mark turn aborted in UI/storage
+- renderer smart-stop transcript undo and structured Composer restoration are
+  reconciliation after abort; they do not change runtime cancellation or roll
+  back completed tool effects
 
 ## 10. Explicit non-goals
 

@@ -651,7 +651,9 @@ draft references files, a transient wrapping row appears inside the composer
 above the textarea. Each quiet text chip uses the inset surface, a subtle
 border, a file glyph, an ellipsized leaf name, and a focus-visible remove
 action. No references means no reserved row or extra composer height. The
-canonical path is tooltip/accessibility metadata, never persistent body copy.
+canonical path is tooltip/accessibility metadata and never textarea body copy,
+including after unanswered smart-stop restoration. Dispatch and persisted user
+messages still carry the canonical path required by D124.
 
 ## 8.2 Composer runtime controls
 

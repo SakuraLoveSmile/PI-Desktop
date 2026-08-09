@@ -12,6 +12,7 @@ import {
   serializeComposerFileReferences,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
+import type { ComposerDraftSnapshot } from "../lib/composer-smart-stop";
 import { api } from "../lib/api";
 import { isActivePlanExecution } from "../lib/plan-mode-state";
 import { runPaletteCommand } from "../lib/commands";
@@ -248,8 +249,20 @@ export function Composer({
 
   useEffect(() => {
     if (!composerPrefill) return;
-    setValue(composerPrefill);
-    setFileReferences([]);
+    if (composerPrefill.sessionId !== activeSessionId) return;
+    setValue(composerPrefill.text);
+    setFileReferences((current) => [
+      ...current.filter(
+        (fileReference) => fileReference.sessionId !== composerPrefill.sessionId,
+      ),
+      ...composerPrefill.fileReferences.map((fileReference) =>
+        createFileReference(
+          fileReference.path,
+          fileReference.name,
+          composerPrefill.sessionId,
+        ),
+      ),
+    ]);
     clearComposerPrefill();
     requestAnimationFrame(() => {
       const el = ref.current;
@@ -258,7 +271,7 @@ export function Composer({
       const len = el.value.length;
       el.setSelectionRange(len, len);
     });
-  }, [composerPrefill, clearComposerPrefill]);
+  }, [activeSessionId, composerPrefill, clearComposerPrefill]);
 
   useEffect(() => {
     if (!prefill?.text) return;
@@ -398,6 +411,11 @@ export function Composer({
     );
   };
 
+  const draftSnapshot = (text: string): ComposerDraftSnapshot => ({
+    text: text.trim(),
+    fileReferences: activeFileReferences.map(({ path, name }) => ({ path, name })),
+  });
+
   const submit = async () => {
     const content = serializeComposerFileReferences(value, activeFileReferences);
     if (!content || composerBlocked || pasting) return;
@@ -425,7 +443,16 @@ export function Composer({
         if (isModeCommand && commandBody) {
           try {
             await runPaletteCommand(command.id);
-            const accepted = await sendPrompt(commandBody);
+            const visibleDraft = value.trim();
+            const visibleCommandEnd = visibleDraft.search(/\s/);
+            const visibleCommandBody =
+              visibleCommandEnd === -1
+                ? ""
+                : visibleDraft.slice(visibleCommandEnd).trim();
+            const accepted = await sendPrompt(
+              commandBody,
+              draftSnapshot(visibleCommandBody),
+            );
             if (accepted) clearDraft();
           } catch (e) {
             showToast(e instanceof Error ? e.message : String(e), {
@@ -453,7 +480,7 @@ export function Composer({
       }
     }
     if (!modelReady) return;
-    const accepted = await sendPrompt(content);
+    const accepted = await sendPrompt(content, draftSnapshot(value));
     if (accepted) clearDraft();
   };
 

@@ -148,10 +148,18 @@ test("stopping a turn undoes an unanswered prompt or settles the partial reply",
     new URL("../src/stores/app-store.ts", import.meta.url),
     "utf8",
   );
-  assert.match(storeSource, /composerPrefill:\s*prompt/);
-  assert.match(storeSource, /replyStarted/);
+  assert.match(storeSource, /const submittedDraft = submittedComposerDrafts\.get\(sessionId\)/);
+  assert.match(storeSource, /resolveComposerSmartStop\(messages, submittedDraft\)/);
+  assert.match(storeSource, /composerPrefill:\s*\{ \.\.\.smartStop\.draft, sessionId \}/);
+  assert.match(storeSource, /submittedDraft\?\.resolveAbort\?\.\(true\)/);
+  assert.match(storeSource, /submittedDraft\?\.resolveAbort\?\.\(false\)/);
+  assert.match(storeSource, /submittedComposerDrafts\.delete\(sessionId\)/);
+  assert.match(storeSource, /smartStop\.kind === "restore"/);
   assert.match(storeSource, /status:\s*"aborted" as const/);
-  assert.match(storeSource, /replaceSessionMessages\(sessionId,\s*kept\)/);
+  assert.match(
+    storeSource,
+    /replaceSessionMessages\(sessionId,\s*smartStop\.kept\)/,
+  );
   assert.match(storeSource, /replaceSessionMessages\(sessionId,\s*settled\)/);
 });
 

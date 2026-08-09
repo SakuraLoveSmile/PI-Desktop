@@ -146,6 +146,11 @@ type AgentAbortRequest = {
 };
 ```
 
+The abort request and response carry no Composer draft or file-reference data.
+If renderer smart Stop undoes an unanswered user turn, restoration comes from
+the renderer's session/turn-scoped pre-serialization snapshot; the existing
+transcript rewrite removes the sent row without changing protocol version.
+
 ### 5.3 compact (protocol v9)
 
 ```ts

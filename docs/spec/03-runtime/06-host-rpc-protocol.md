@@ -224,7 +224,8 @@ type ToolBudgetHealth = {
   ids and non-negative `tokensBefore`; it does not insert a message/search row
   or change the visible transcript projection
 - `session.replaceMessages` — atomic transcript rewrite (temp-file rename +
-  one index transaction, D119) used by regenerate/edit flows; it preserves the
+  one index transaction, D119) used by regenerate/edit flows and unanswered
+  renderer smart-stop undo; it preserves the
   newest checkpoint only while both its boundary and optional first-kept id
   remain valid in the rewritten prefix, and it carries each surviving message's
   owning `turn_id` across the rewrite. It is only safe from a caller that owns

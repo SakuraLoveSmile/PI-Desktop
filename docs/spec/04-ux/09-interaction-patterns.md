@@ -455,16 +455,21 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 1. Cancel the current agent turn immediately
 2. Cancel any pending permission request (per [03-permission-ux.md](03-permission-ux.md) §7)
-3. Partial assistant message is preserved with "(aborted)" label
-4. Any running tool calls show "(aborted)" status
-5. Composer re-activates (unblocked)
-6. Abort is idempotent — pressing abort when already aborting does nothing
+3. If no assistant text, thinking, or tool row has begun, remove the just-sent
+   user row and restore its pre-serialization composer draft
+4. The restored draft keeps ordinary text and file-reference chips as separate
+   state; serialized canonical paths never occupy the textarea
+5. If a reply has begun, preserve the user turn and partial assistant/tool rows
+   with aborted status and restore no draft
+6. Composer re-activates (unblocked)
+7. Abort is idempotent — pressing abort when already aborting does nothing
 
 ### 3.3 Abort UX
 
 - Abort button changes to "Aborting..." briefly (100ms), then disappears
 - No confirmation dialog for abort — it is always immediate
-- Aborted message gets a muted "(aborted)" suffix, not deleted
+- A partial aborted message gets a muted "(aborted)" suffix. Only the
+  unanswered smart-stop branch deletes its just-sent user row.
 
 ## 3A. Context checkpoint lifecycle
 
@@ -787,6 +792,11 @@ When drag/drop is implemented, these patterns should apply:
   absolute paths and existing whitespace quoting. Successful dispatch clears
   both; failed or rejected dispatch retains both. References are session-scoped
   and never cross a workspace change.
+- Accepted dispatch retains an in-memory, session/turn-scoped copy of the
+  visible text and structured references only while unanswered smart Stop can
+  undo the send. That undo restores the original chip order and labels; it
+  never parses serialized `@path` text. Once reply content begins, abort keeps
+  the partial transcript and restores no draft.
 
 ### 8a.3 Keyboard while open
 

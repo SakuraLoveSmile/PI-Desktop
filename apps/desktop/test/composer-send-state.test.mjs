@@ -69,16 +69,15 @@ test("mode slash prefixes send the trailing prompt and retain failed drafts", ()
   assert.match(submit, /const isModeCommand =/);
   assert.match(
     submit,
-    /if \(isModeCommand && commandBody\)[\s\S]*?await runPaletteCommand\(command\.id\);[\s\S]*?await sendPrompt\(commandBody\)[\s\S]*?if \(accepted\) clearDraft\(\);/,
+    /if \(isModeCommand && commandBody\)[\s\S]*?await runPaletteCommand\(command\.id\);[\s\S]*?sendPrompt\(\s*commandBody,\s*draftSnapshot\(visibleCommandBody\)[\s\S]*?if \(accepted\) clearDraft\(\);/,
   );
   assert.match(
     submit,
-    /const accepted = await sendPrompt\(content\);[\s\S]*?if \(accepted\) clearDraft\(\);/,
+    /const accepted = await sendPrompt\(content, draftSnapshot\(value\)\);[\s\S]*?if \(accepted\) clearDraft\(\);/,
   );
-  assert.match(composer, /setFileReferences\(\[\]\)/);
-  assert.match(store, /sendPrompt: \(content: string\) => Promise<boolean>/);
+  assert.match(store, /draft\?: ComposerDraftSnapshot/);
   const sendPrompt = store.match(
-    /sendPrompt: async \(content\)[\s\S]*?\n  compactContext:/,
+    /sendPrompt: async \(content, draft\)[\s\S]*?\n  compactContext:/,
   )?.[0] ?? "";
   assert.match(sendPrompt, /return false;/);
   assert.match(sendPrompt, /await api\.prompt\(\{ sessionId, content \}\);[\s\S]*?return true;/);
