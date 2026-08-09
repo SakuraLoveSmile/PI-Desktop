@@ -136,6 +136,13 @@ test("user plaintext preserves hard newlines without forced mid-word breaks", ()
   assert.doesNotMatch(transcriptSource, /user-line-/);
 });
 
+test("wrapped user links keep plaintext alignment", () => {
+  const userLinkStyles = stylesSource.match(/\.chat-text-link \{([^}]*)\}/)?.[1];
+  assert.ok(userLinkStyles);
+  assert.match(userLinkStyles, /text-align:\s*start;/);
+  assert.match(userLinkStyles, /overflow-wrap:\s*anywhere;/);
+});
+
 test("stopping a turn undoes an unanswered prompt or settles the partial reply", async () => {
   const storeSource = await readFile(
     new URL("../src/stores/app-store.ts", import.meta.url),

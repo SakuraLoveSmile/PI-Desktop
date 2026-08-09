@@ -35,6 +35,8 @@
   font: inherit;
   color: inherit;
   cursor: pointer;
+  /* Chromium centers button labels by default; wrapped links should read as text. */
+  text-align: start;
   text-decoration: underline dotted;
   text-underline-offset: 2px;
   overflow-wrap: anywhere;

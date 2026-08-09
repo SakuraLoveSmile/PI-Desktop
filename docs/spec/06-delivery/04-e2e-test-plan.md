@@ -1747,16 +1747,19 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`user-select.test.mjs`, `thinking-ui.test.mjs`);
   full visual scenario Draft
 
-#### E2E-061: User message hard newlines stay visible
+#### E2E-061: User message plaintext layout survives wrapping and reload
 
 - **Preconditions**: Provider configured; composer can accept multi-line input
   via Shift+Enter (or Enter-to-send disabled).
-- **Steps**: 1) Compose a three-line prompt with two hard newlines. 2) Send.
-  3) Inspect the user bubble in the transcript. 4) Copy the user message and
-  paste into an external editor. 5) Reload the session.
+- **Steps**: 1) Compose a three-line prompt with two hard newlines and a URL
+  whose encoded path is wider than the user plate. 2) Send. 3) Inspect the user
+  bubble in the transcript. 4) Copy the user message and paste into an external
+  editor. 5) Reload the session.
 - **Expected**: The user plate shows three distinct lines (not collapsed to a
-  single paragraph). Copied text retains the original newlines. After reload
-  the same line breaks remain.
+  single paragraph). The linked URL wraps inside the plate without horizontal
+  overflow, and every continuation line stays logical-start aligned with the
+  first line instead of being centered. Copied text retains the original
+  newlines. After reload the same line breaks remain.
 - **Specs linked**: `04-ux/08-component-spec.md`
 - **Acceptance**: C (chat stream), Quality
 - **Milestone**: M5

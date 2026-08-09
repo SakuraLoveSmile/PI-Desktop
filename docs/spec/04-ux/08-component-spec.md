@@ -951,7 +951,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
   chat turns rather than full-width blocks. User body is plaintext with
   preserved hard newlines (`white-space: pre-wrap`);
   only trailing/leading composer trim is applied, never internal newline
-  collapse
+  collapse. Previewable path and URL controls remain inline with that plaintext;
+  long references wrap within the plate and continuation lines keep logical-start
+  alignment instead of inheriting the browser's centered button text.
 - Assistant: transparent surface, left-aligned, markdown rendered at full
   content width
 - Thinking: separate lightweight disclosure above the answer with no card
