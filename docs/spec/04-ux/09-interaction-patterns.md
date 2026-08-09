@@ -809,7 +809,7 @@ When drag/drop is implemented, these patterns should apply:
 - The first upward scroll movement pauses auto-scroll and shows the
   "↓ Scroll to bottom" button; queued stream or resize follow work must not
   reverse that movement
-- User send / retry / regenerate: re-pins, hides the jump control, and jumps to the latest content so the new turn is visible
+- User send / retry / regenerate: re-pins, hides the jump control, and positions the latest content in the layout phase so the new turn is visible without a top-of-history flash; subsequent persisted and streamed rows continue to follow the bottom
 - Scroll-to-bottom button: position fixed at bottom-right of transcript area, offset 12px
 - Button appears as soon as upward scrolling releases follow mode
 - Click button: scrolls to bottom, resumes auto-scroll
@@ -886,8 +886,9 @@ This does not prevent state changes — it makes them instant.
   first visible frame is already stable at the latest record.
 - Jump-to-latest and minimap navigation use smooth scrolling only when the OS
   has not requested reduced motion.
-- Pinned stream following is frame-coalesced and uses instant scroll updates;
-  it does not start overlapping smooth-scroll animations for token groups.
+- Turn-start following uses an immediate layout-phase update and then a
+  frame-coalesced instant follow; it does not start overlapping smooth-scroll
+  animations for token groups.
 - Manual upward movement cancels a queued pinned-follow frame before it can
   restore the previous bottom position. Follow remains released across content
   growth until the viewport is scrolled down within 48px of the bottom or an

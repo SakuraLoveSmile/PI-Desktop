@@ -80,6 +80,17 @@ test("manual upward scrolling cancels pending transcript follow work", () => {
   assert.match(transcript, /setShowJump\(transition\.showJump\)/);
 });
 
+test("send re-pins before paint instead of flashing the old transcript position", () => {
+  const turnStartEffect = transcript.match(
+    /\/\/ Send \/ retry \/ regenerate[\s\S]*?useLayoutEffect\(\(\) => \{([\s\S]*?)\n  \}, \[[\s\S]*?\]\);/,
+  )?.[1] ?? "";
+  assert.match(turnStartEffect, /const turnStarted = isRunning && !wasRunningRef\.current/);
+  assert.match(turnStartEffect, /cancelFollowScroll\(\)/);
+  assert.match(turnStartEffect, /pinnedRef\.current = true/);
+  assert.match(turnStartEffect, /scrollToBottom\(\)/);
+  assert.match(transcript, /const targetTop = Math\.max\(0, el\.scrollHeight - el\.clientHeight\)/);
+});
+
 test("session activation pins the latest record before the first paint", () => {
   assert.match(
     chatSurface,

@@ -483,7 +483,8 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 - Max content width: 720px (messages), centered
 - Scroll behavior: auto-scroll to bottom on new message while pinned; the first
   upward manual movement pauses auto-scroll without a snap-back; send / retry /
-  regenerate re-pins and jumps to bottom
+  regenerate re-pins and positions the latest content during the layout phase,
+  before the next painted frame, then keeps following streamed content
 - Destination entry uses one short opacity/translate transition. Streaming
   updates occur inside the mounted surface and never replay this transition.
 - The transcript's bottom reserve is **height-aware**, not a fixed gap. The
@@ -502,7 +503,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 | Streaming | Auto-scroll follows while pinned; new tokens append |
 | Active progress | Immediately after send, before the first assistant or tool event, a compact localized `Working…` status with elapsed time appears inline. It yields to concrete thinking, tool, and answer rows, while a permission card owns the approval state; no large generic progress card is rendered. |
 | Turn outcome | After a failed turn, a session-scoped recovery card summarizes the interruption and tool evidence. Completed turns use the existing transcript and message-scoped InlineReviewCard without an extra success card; failed turns can retry without losing the transcript. |
-| Turn start (send / retry / regenerate) | Re-pins and jumps to bottom even if the user had scrolled up |
+| Turn start (send / retry / regenerate) | Re-pins and positions the latest content before paint, even if the user had scrolled up; the later persisted user-message event does not flash the transcript at its top |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
 | Message-scoped review snapshot | Each successful workspace Write/Edit tool row is followed by one compact InlineReviewCard carrying that message's added/modified/deleted status and explicit addition/deletion totals. Its hunks sit behind an expandable disclosure: every review card (inline and in the Review tab) is collapsed by default, and the user expands it on demand. The card remains after a Git commit, never becomes a bottom/global entry, and offers hash-guarded rollback without leaking into another session's transcript. |
 

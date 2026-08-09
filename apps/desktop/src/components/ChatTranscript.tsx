@@ -1813,8 +1813,13 @@ export const ChatTranscript = memo(function ChatTranscript({
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior });
-    lastScrollTopRef.current = el.scrollTop;
+    const targetTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    el.scrollTo({ top: targetTop, behavior });
+    // `scrollTo({ behavior: "auto" })` is synchronous. Recording the exact
+    // target avoids the following native scroll event being mistaken for a
+    // user gesture when the composer or the new turn changes the content
+    // height in the same frame.
+    if (behavior === "auto") lastScrollTopRef.current = targetTop;
   }, []);
 
   const cancelFollowScroll = useCallback(() => {
@@ -1862,17 +1867,26 @@ export const ChatTranscript = memo(function ChatTranscript({
 
   // Send / retry / regenerate always re-pins follow mode so the new prompt and
   // its stream stay in view, even if the user had scrolled up through history.
-  useEffect(() => {
+  // This must run in the layout phase: the send state is committed before the
+  // persisted user-message event arrives, and a passive effect allows one
+  // frame where a long transcript can remain at its old/top position.
+  useLayoutEffect(() => {
     const turnStarted = isRunning && !wasRunningRef.current;
     wasRunningRef.current = isRunning;
     if (!turnStarted) return;
+    cancelFollowScroll();
     pinnedRef.current = true;
     setShowJump(false);
     scrollToBottom();
     scheduleFollowScroll();
-  }, [isRunning, scrollToBottom, scheduleFollowScroll]);
+  }, [
+    cancelFollowScroll,
+    isRunning,
+    scheduleFollowScroll,
+    scrollToBottom,
+  ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     scheduleFollowScroll();
   }, [
     messages,

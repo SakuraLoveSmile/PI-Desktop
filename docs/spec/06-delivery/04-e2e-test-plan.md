@@ -454,6 +454,24 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
+#### E2E-091: Sending a prompt keeps the transcript at the latest turn
+
+- **Preconditions**: Chat route active; the selected session contains enough
+  history to overflow the transcript viewport; the transcript is at the latest
+  message or has been scrolled upward.
+- **Steps**: 1) Send a prompt. 2) Observe the transcript from the first send
+  state through the persisted user-message event and the first streamed row.
+  3) Repeat after manually scrolling upward before sending.
+- **Expected**: Send immediately hides the jump control and re-pins the
+  transcript in the layout phase. The historical rows move upward only as the
+  new turn is added; the viewport never flashes to the top of the conversation,
+  and the new user turn plus streamed response remain visible at the bottom.
+- **Specs linked**: `04-ux/08-component-spec.md` (§4.3, §4.4),
+  `04-ux/09-interaction-patterns.md` (§9.1, §10.4)
+- **Acceptance**: C (send/UI), Quality
+- **Milestone**: M2
+- **Status**: Draft
+
 ### Workspace Open
 
 #### E2E-012: Open a project directory
