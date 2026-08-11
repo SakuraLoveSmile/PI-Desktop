@@ -138,6 +138,8 @@
     queued, and running Plan work interrupted before serving RPC, with no
     replay; an already-approved interrupted execution leaves the session Agent.
     Configuration is idle-only and each session has one running turn.
+    The renderer may stage one latest next-turn configuration while a turn is
+    running, but it submits that choice only after the host reports idle.
     `defaultCommandShell` selects the platform catalog entry; unavailable
     persisted choices fall back to the first available platform shell, each
     turn pins effective ID/dialect, and host rejects stale identity before

@@ -263,9 +263,13 @@ counts as running state until durable persistence completes.
   may still use `page = "chat"`
 - Mode is session-scoped and persisted with session metadata
 - Thinking level is session-scoped and persisted with session metadata
-- Composer configuration is mutable only while the session is idle
+- Host configuration is mutable only while the session is idle. The renderer
+  keeps mode/provider/model/thinking/permission controls editable during a run,
+  treats the latest selection as next-turn state, and flushes one full
+  configuration after the terminal event.
 - Changing mode/provider/model/thinking level applies to the next turn and
-  recreates the pi runtime when any runtime-affecting configuration changes
+  recreates the pi runtime when any runtime-affecting configuration changes;
+  no in-flight runtime observes a queued renderer choice.
 
 The live planning state is derived and projected as:
 
@@ -309,11 +313,12 @@ once with a new complete Markdown snapshot to create a new artifact. If approval
 already committed and a queued/running execution is interrupted, durable mode
 remains Agent and the execution is not replayed.
 
-Manual mode and configuration selection is allowed only while idle. Selecting
-Agent is an intentional user override and does not synthesize a plan or
-approval. Each session has one active turn, one pending approval, and one
-queued/running execution; a second prompt, configuration change, or execution
-is rejected.
+Manual mode and configuration selection may be staged by the renderer while a
+turn runs, but host persistence remains idle-only. Selecting Agent is an
+intentional user override and does not synthesize a plan or approval. Each
+session has one active turn, one pending approval, and one queued/running
+execution; a second prompt or execution is rejected, while staged
+configuration is submitted only after the session is idle.
 
 `Agent / inactive` enters `Goal / planning` the same two ways, by user selection
 while idle or by the Agent calling `EnterGoalMode`. Goal has the identical tool
@@ -683,6 +688,10 @@ does not dispose, abort, or re-root a runtime belonging to another session.
 - attempt cancel interruptible tools
 - do not auto-rollback completed writes
 - mark turn aborted in UI/storage
+- preserve elapsed response duration; when provider final usage is unavailable,
+  estimate visible thinking plus answer output at four Unicode code points per
+  token and persist it as `responseOutputTokens` so stopped-turn throughput is
+  still available and visibly approximate
 - renderer smart-stop transcript undo and structured Composer restoration are
   reconciliation after abort; they do not change runtime cancellation or roll
   back completed tool effects

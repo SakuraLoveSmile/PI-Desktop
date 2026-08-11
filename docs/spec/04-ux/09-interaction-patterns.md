@@ -11,6 +11,7 @@
 
 | Shortcut | Action | Context |
 |---|---|---|
+| `Option + Space` (macOS) / `Alt + Space` (Windows/Linux) | Open plugin launcher | OS-global after application boot; customizable |
 | `Cmd/Ctrl + Shift + P` | Open command palette | Global (D014) |
 | `Cmd/Ctrl + N` | New chat/session | Global |
 | `Cmd/Ctrl + O` | Open project | Global |
@@ -55,6 +56,18 @@
   history; each back/forward chord advances at most once per physical press.
 - Command-only shortcut changes require updating the command palette metadata;
   native roles and visible application-menu accelerators remain menu-owned
+- The plugin launcher is registered through Electron's native global shortcut
+  API. Windows keeps a focused-window `Alt + Space` fallback because the OS can
+  reserve that chord for a system menu; the app's frameless window has no such
+  menu. The launcher always opens on the display nearest the pointer.
+
+### 1.5 Plugin launcher shortcuts
+
+| Shortcut | Action | Context |
+|---|---|---|
+| `↑ / ↓` | Cycle matching plugins | Launcher focused |
+| `Enter` | Open selected plugin panel | Launcher focused, not composing IME text |
+| `Escape` | Dismiss launcher | Launcher focused |
 
 ### 1.5 Platform application menus
 
@@ -460,7 +473,9 @@ may be retained while exactly one workspace supplies the visible shell context.
 4. The restored draft keeps ordinary text and file-reference chips as separate
    state; serialized canonical paths never occupy the textarea
 5. If a reply has begun, preserve the user turn and partial assistant/tool rows
-   with aborted status and restore no draft
+   with aborted status and restore no draft. Preserve the measured stream
+   duration and use provider output usage when available; otherwise store a
+   visibly estimated output count so the conversation still shows throughput
 6. Composer re-activates (unblocked)
 7. Abort is idempotent — pressing abort when already aborting does nothing
 

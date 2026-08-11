@@ -116,7 +116,10 @@ type SessionConfigureRequest = {
 
 `session/configure` is accepted only while the session is idle. Mode, provider,
 model, permission, and shell-default changes are rejected while a turn or a
-Plan `pending`/`queued`/`running` record exists.
+Plan `pending`/`queued`/`running` record exists. The renderer may keep these
+controls editable during a turn, but it queues the latest full configuration
+locally and invokes this channel only after the terminal event; the running
+turn never observes that optimistic next-turn choice.
 
 Only a changed effective global `defaultCommandShell` is idle-only across all
 affected sessions: any active turn or pending/queued/running Plan work blocks
@@ -515,6 +518,7 @@ type UiMessage = {
  thinking?: string; // assistant reasoning, never folded into content
  usage?: MessageUsage; // provider-reported assistant usage
  responseDurationMs?: number; // model stream duration for throughput
+ responseOutputTokens?: number; // estimated partial output when stop has no final usage
  toolName?: string;
  toolCallId?: string;
  toolArgs?: unknown;
@@ -546,6 +550,18 @@ exact `(providerId, modelId)`. Missing pi model metadata yields
 `supportsReasoning: false` and `off`; cached discovery and legacy provider
 overrides do not replace pi semantics. The Rust host remains authoritative only
 for the durable `thinkingLevel`.
+
+The global plugin launcher uses Electron-only allowlisted channels:
+
+- `pi-desktop/pluginLauncher/toggle` shows or hides the centered utility window
+- `pi-desktop/pluginLauncher/dismiss` hides it only when invoked by that window
+- `pi-desktop/pluginLauncher/event/shown` resets its query, reloads installed
+  plugins, and restores input focus after every invocation
+
+The launcher reuses `plugin/list` and `plugin/openPanel`; it adds no host-core
+RPC. `responseDurationMs` and `responseOutputTokens` are optional transcript
+metadata persisted in message metadata, so protocol v9 and storage schema v11
+remain unchanged.
 
 Minimal interface:
 

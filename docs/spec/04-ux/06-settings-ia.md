@@ -75,6 +75,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     restored together
   - overrides persist in optional `AppSettings.keybindings`; macOS native-menu
     accelerators and renderer-owned shortcuts update from the same map
+  - the plugin launcher defaults to `Option + Space` on macOS and `Alt + Space`
+    on Windows/Linux; its native global registration follows the same override,
+    while the focused frameless window retains an `Alt + Space` fallback
 
 ### Model configuration (`agent` tab)
 - **Studio hero**: provider count, ready count, and current default provider/model summary

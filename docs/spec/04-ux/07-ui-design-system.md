@@ -684,7 +684,10 @@ The composer renders only controls connected to the active pi session:
   content, caps at 160px and the available viewport width, and truncates labels
   that exceed that cap. It contains only concrete supported levels, with no
   inherit/default row; models without reasoning support render no trigger.
-- Runtime controls are disabled while the active session is running.
+- While the active session is running, the draft and runtime controls stay
+  editable as next-turn choices; only Send is disabled. Host configuration
+  remains pinned for the in-flight turn and the latest queued choice is
+  persisted after its terminal event. Pending approval still blocks editing.
 - File, photo, and appshot controls remain hidden until their payload contracts
   are implemented end to end.
 - The Thinking menu persists changes to the active session and closes after a
@@ -701,6 +704,20 @@ The composer renders only controls connected to the active pi session:
   execution status retained for the current renderer lifetime. A renderer
   reload rehydrates only a pending row through `plans.pending`; terminal cards
   are not restored.
+
+## 8.3 Global plugin launcher
+
+`Option + Space` on macOS and `Alt + Space` on Windows/Linux opens a centered,
+frameless 620×440 utility window on the display nearest the pointer. The surface
+has no close, minimize, maximize, resize, or taskbar controls and dismisses on
+blur or Escape. Its solid elevated token surface works in light and dark themes
+without a backdrop blur.
+
+The focused search field filters enabled, ready plugins that contribute a panel.
+Chinese display names match their original characters, tone-free full pinyin,
+and pinyin initials; plugin IDs, names, and descriptions remain searchable.
+Arrow keys move the active option, Enter or click opens the existing sandboxed
+plugin panel, and IME composition keystrokes never navigate or dispatch.
 - Local and branch context are non-interactive status labels; the project name
   remains an action because it opens the project picker.
 - Runtime chip labels (Agent/Plan, Thinking, permission mode, model ID) use

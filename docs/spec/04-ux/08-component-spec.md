@@ -1525,12 +1525,12 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | Home/new-session initialization | textarea and mode/thinking/permission triggers remain available while no active session is projected; the first configuration selection creates or reuses the destination draft before persisting it | Configure the draft, then send |
 | New session (reasoning model) | Thinking trigger shows the model's highest published level | User may select any published level, including Off when supported |
 | New session / switch while another session is running | textarea active, send button enabled for the destination session's own run state | Send active, Abort hidden unless the destination session itself is running |
-| Running | textarea disabled, abort button visible | Abort active, Send hidden |
+| Running | textarea and mode/thinking/permission controls remain editable for the next turn; abort button visible | Abort active, Send hidden; configuration is queued |
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | Plan / planning | textarea active while idle; Plan badge and permission chip visible | inspect, send, or submit plan |
 | Plan / awaiting approval | transcript shows the title/question, artifact opener, expiry, and status for the exact `.pi/plan/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
-| Plan / queued or running | Agent badge remains selected; queue/running state is visible and composer remains blocked | abort; no replay control |
+| Plan / queued or running | Agent badge remains selected; queue/running state is visible; draft and next-turn controls remain editable | abort; Send hidden; no replay control |
 | Plan / planning after rejected, expired, or interrupted proposal | Plan chip remains visible and editable | send a later prompt; submit a new plan; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
 
@@ -1545,10 +1545,11 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   returns to the textarea and file references return as leaf-name chips; their
   canonical paths never become textarea text. After a reply begins, Abort keeps
   the partial transcript and restores no draft.
-- `turn_end` is not an idle signal. The composer, model/mode controls, and
-  session actions remain blocked through subsequent tool turns and blocking
-  automatic checkpoint generation until `agent_end` or `error`. A manual-only
-  checkpoint becomes idle on its matching `compaction_end`.
+- `turn_end` is not an idle signal. Send and host persistence remain blocked
+  through subsequent tool turns and blocking automatic checkpoint generation
+  until `agent_end` or `error`; the draft and runtime selectors stay editable
+  and hold the latest next-turn choice. A manual-only checkpoint becomes idle
+  on its matching `compaction_end`.
 - Auto-grow: textarea measures wrapped visual lines, starts at one visible
   line, expands through seven lines, then scrolls internally; deleting content
   shrinks it back to one line
@@ -1559,10 +1560,13 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   and mode triggers in the Composer use compact line-height rather than
   `leading-none` under overflow. The topbar model trigger still ellipsizes long
   IDs.
-- Mode, provider/model, permission, and shell-default changes update the
-  active session/settings only while idle; they are disabled while a turn or
-  active pending Plan or Goal approval exists. Approval actions are the exception
-  while awaiting approval. The Composer-left Agent/Plan/Goal chip is the sole mode
+- Mode, provider/model, thinking, and permission changes update the active
+  session immediately while idle. During a turn, the renderer applies the
+  latest selection optimistically as a next-turn choice and persists it only
+  after `agent_end` or `error`; the host never mutates the running turn's pinned
+  configuration. An active pending Plan or Goal approval still disables these
+  controls. Approval actions are the exception while awaiting approval. The
+  Composer-left Agent/Plan/Goal chip is the sole mode
   control and cycles Agent → Plan → Goal → Agent on click; the topbar model picker
   remains a model-only control. Palette and Composer slash mode commands use the
   same active-session configuration path; after host confirmation resolves an

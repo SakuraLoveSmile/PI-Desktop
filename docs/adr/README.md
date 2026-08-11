@@ -86,3 +86,5 @@ Each ADR includes:
 | 0069 | Make native-tool path mistakes recoverable | Accepted for implementation |
 | 0070 | Separate composer file-reference display from prompt serialization | Accepted for implementation |
 | 0071 | Adopt an Apple-inspired global corner hierarchy | Accepted for implementation |
+| 0072 | Add a global plugin launcher | Accepted for implementation |
+| 0073 | Stage next-turn composer configuration and preserve stopped throughput | Accepted for implementation |
