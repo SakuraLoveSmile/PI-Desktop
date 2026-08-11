@@ -313,6 +313,7 @@ export const en = {
     thoughtFor: "Thought for {{time}}",
     processingSteps: "{{count}} step",
     processingSteps_other: "{{count}} steps",
+    collapseDetails: "Collapse details",
     tool: "Tool",
     userMessage: "User message",
     assistantMessage: "Assistant message",

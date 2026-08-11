@@ -760,16 +760,19 @@ Each scenario is documented in this format:
 - **Steps**: 1) Run representative read, search, and command tools. 2) Inspect
   the collapsed processing header while it is active. 3) Wait for completion
   and expand the processing group. 4) Expand a completed row and copy its
-  output. 5) Reload the session and expand the restored group.
+  output. 5) Click the vertical rule beside the expanded row, then keyboard-focus
+  and activate the processing group's vertical rule. 6) Reload the session and
+  expand the restored group.
 - **Expected**: Consecutive calls are collapsed by default under one localized
   processing header that updates and then freezes its elapsed time and shows a
   step count. Expanded calls use transparent semantic activity rows with an
   action icon, natural-language verb, monospace primary argument, and quiet
   disclosure. The processing group uses the full assistant-column width, so a
   short label or payload does not shrink expanded details into a content-sized
-  chip. Nested expansion shows output before raw input in clamped scroll
-  regions. Live partial output updates in place. Reloaded rows preserve the tool
-  name, arguments, result, and status.
+  chip. Each expanded-content vertical rule is a pointer and keyboard-focusable
+  collapse control for its owning disclosure. Nested expansion shows output
+  before raw input in clamped scroll regions. Live partial output updates in
+  place. Reloaded rows preserve the tool name, arguments, result, and status.
 - **Specs linked**: `04-ux/01-ui-ia.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`

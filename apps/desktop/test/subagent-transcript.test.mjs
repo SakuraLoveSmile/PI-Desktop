@@ -29,7 +29,7 @@ test("delegate rows render under their Task row, one level in", () => {
   assert.match(transcriptSource, /delegate\?: SubagentRun/);
   assert.match(
     transcriptSource,
-    /\{open && delegate \? \(\n\s+<SubagentRunRows run=\{delegate\} agentName=\{agentName\}/,
+    /\{open && delegate \? \([\s\S]*?<SubagentRunRows[\s\S]*?run=\{delegate\}[\s\S]*?agentName=\{agentName\}/,
   );
   assert.match(transcriptSource, /function SubagentRunRows\(/);
   assert.match(transcriptSource, /<div className="subagent-run">/);
@@ -72,7 +72,10 @@ test("memoized activity rows compare delegate runs by their rows", () => {
 });
 
 test("the nested run is visibly one level inside the call", () => {
-  assert.match(messagesCss, /\.subagent-run \{[^}]*border-left: 1px solid/);
+  assert.match(
+    messagesCss,
+    /\.subagent-run > \.disclosure-collapse-rail::before \{[^}]*background: var\(--ds-border-default\)/,
+  );
   assert.match(messagesCss, /\.subagent-run \{[^}]*margin: 2px 0 8px 24px/);
   assert.match(messagesCss, /\.subagent-run-count \{[^}]*margin-inline-start: auto/);
   assert.match(messagesCss, /\.tool-row-agent \{/);

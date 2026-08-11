@@ -1532,8 +1532,8 @@
 }
 
 .tool-activity-body {
+  position: relative;
   margin: 3px 0 6px 7px;
-  border-left: 1px solid var(--ds-border-subtle);
   padding: 2px 0 2px 12px;
 }
 
@@ -1985,10 +1985,49 @@
 }
 
 .tool-row-body {
+  position: relative;
   margin: 4px 0 6px 24px;
   padding: 4px 0 8px 12px;
-  border-left: 1px solid var(--ds-border-subtle);
   color: var(--ds-text-secondary);
+}
+
+.disclosure-collapse-rail {
+  position: absolute;
+  inset-block: 0;
+  left: -8px;
+  width: 16px;
+  min-width: 16px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.disclosure-collapse-rail::before {
+  position: absolute;
+  inset-block: 0;
+  left: calc(50% - 0.5px);
+  width: 1px;
+  background: var(--ds-border-subtle);
+  content: "";
+  transition: background-color var(--motion-duration-fast) var(--motion-ease-out),
+    width var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.subagent-run > .disclosure-collapse-rail::before {
+  background: var(--ds-border-default);
+}
+
+.disclosure-collapse-rail:hover::before,
+.disclosure-collapse-rail:focus-visible::before {
+  width: 2px;
+  background: var(--ds-text-muted);
+}
+
+.disclosure-collapse-rail:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ds-accent) 58%, transparent);
+  outline-offset: -2px;
 }
 
 /*
@@ -1996,8 +2035,8 @@
  * boundary: everything past it happened in the delegate's own context.
  */
 .subagent-run {
+  position: relative;
   margin: 2px 0 8px 24px;
-  border-left: 1px solid var(--ds-border-default);
   padding: 2px 0 4px 12px;
 }
 

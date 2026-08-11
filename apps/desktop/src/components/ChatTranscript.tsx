@@ -1003,11 +1003,19 @@ function ToolRow({
       ) : null}
       {blocks && blocks.length > 0 ? (
         <div className="tool-row-body" id={detailsId}>
+          <DisclosureCollapseRail
+            label={t("chat.collapseDetails")}
+            onCollapse={() => setOpen(false)}
+          />
           <ToolDetailBlocks blocks={blocks} />
         </div>
       ) : null}
       {open && delegate ? (
-        <SubagentRunRows run={delegate} agentName={agentName} />
+        <SubagentRunRows
+          run={delegate}
+          agentName={agentName}
+          onCollapse={() => setOpen(false)}
+        />
       ) : null}
     </div>
   );
@@ -1023,14 +1031,20 @@ function ToolRow({
 function SubagentRunRows({
   run,
   agentName,
+  onCollapse,
 }: {
   run: SubagentRun;
   agentName: string;
+  onCollapse: () => void;
 }) {
   const { t } = useTranslation();
   if (run.items.length === 0) return null;
   return (
     <div className="subagent-run">
+      <DisclosureCollapseRail
+        label={t("chat.collapseDetails")}
+        onCollapse={onCollapse}
+      />
       <div className="subagent-run-heading">
         <IconBot size={13} aria-hidden />
         <span>
@@ -1145,6 +1159,24 @@ function activityItemSummary(
   return summary ? `${actionLabel} ${summary}` : actionLabel;
 }
 
+function DisclosureCollapseRail({
+  label,
+  onCollapse,
+}: {
+  label: string;
+  onCollapse: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="disclosure-collapse-rail"
+      aria-label={label}
+      title={label}
+      onClick={onCollapse}
+    />
+  );
+}
+
 /** A thinking segment rendered like a tool row: one-line summary, expandable. */
 function ThinkingRow({
   message,
@@ -1180,6 +1212,10 @@ function ThinkingRow({
       </button>
       {open ? (
         <div className="tool-row-body" id={detailsId}>
+          <DisclosureCollapseRail
+            label={t("chat.thinkingHide")}
+            onCollapse={() => setOpen(false)}
+          />
           <div className="prose-chat thinking-prose">
             <Markdown source={text} renderDiagrams={false} />
           </div>
@@ -1386,6 +1422,10 @@ const ActivityGroup = memo(function ActivityGroup({
       >
         <div className="tool-activity-collapse-inner">
           <div className="tool-activity-body" id={detailsId}>
+            <DisclosureCollapseRail
+              label={t("chat.collapseDetails")}
+              onCollapse={() => setOpen(false)}
+            />
             {renderActivityItems()}
           </div>
         </div>

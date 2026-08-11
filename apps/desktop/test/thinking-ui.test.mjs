@@ -162,6 +162,26 @@ test("transcript keeps assistant thinking in a separate disclosure", () => {
   assert.match(stylesSource, /\.thinking-prose/);
 });
 
+test("expanded assistant activity rails collapse their disclosures", () => {
+  assert.match(
+    transcriptSource,
+    /function DisclosureCollapseRail\([\s\S]*?className="disclosure-collapse-rail"[\s\S]*?aria-label=\{label\}[\s\S]*?onClick=\{onCollapse\}/,
+  );
+  assert.match(
+    transcriptSource,
+    /className="tool-row-body"[\s\S]*?<DisclosureCollapseRail[\s\S]*?onCollapse=\{\(\) => setOpen\(false\)\}/,
+  );
+  assert.match(
+    transcriptSource,
+    /className="tool-activity-body"[\s\S]*?<DisclosureCollapseRail[\s\S]*?onCollapse=\{\(\) => setOpen\(false\)\}/,
+  );
+  assert.match(
+    stylesSource,
+    /\.disclosure-collapse-rail\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?width:\s*16px;[\s\S]*?cursor:\s*pointer;/,
+  );
+  assert.match(stylesSource, /\.disclosure-collapse-rail:focus-visible\s*\{/);
+});
+
 test("thinking-only assistant streams open the transcript surface", () => {
   assert.match(appSource, /typeof message\.thinking === "string"/);
   assert.match(appSource, /hasContent \|\| hasThinking/);

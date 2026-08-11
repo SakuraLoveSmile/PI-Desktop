@@ -845,7 +845,9 @@ storage but compose into one assistant turn until the next user message.
   toolbar; Copy joins all contentful fragments in order, while Fork and
   Regenerate use the last contentful assistant message as the durable boundary.
 - Toggle Thinking disclosure: expand/collapse reasoning independently from the
-  final answer; streaming reopens it while reasoning is arriving
+  final answer; streaming reopens it while reasoning is arriving. The expanded
+  content's left rule is itself a pointer and keyboard-focusable collapse
+  control.
 - Hover code block: copy button appears
 - Hover or focus a minimap marker: show the localized sender and a bounded
   plaintext preview; multiple assistant fragments produced within one user
@@ -1242,6 +1244,9 @@ twice.
   collapsed and failed rows open automatically.
 - Click the processing header: expand/collapse the ordered activity list.
   Processing groups default collapsed, including while the turn is active.
+- Click or keyboard-activate the left rule beside expanded thinking, tool
+  details, delegated work, or processing steps: collapse that owning
+  disclosure without changing adjacent expansion state.
 - A failed child row remains auto-expanded and error-hued, while the containing
   group settles as `Processed for {elapsed}` even when a later tool recovered.
   Expansion uses a short height/opacity transition and keeps collapsed content
@@ -1261,6 +1266,8 @@ twice.
 - `role="region"` with `aria-label="Tool call: {toolName}"`
 - Status announced through localized `aria-label` text
 - Expand/collapse: `aria-expanded` + `aria-controls`
+- Expanded-content left-rule collapse controls are native buttons with a
+  localized accessible name and a visible keyboard focus ring.
 - Copy actions carry `aria-label="Copy {block label}"`
 - Keyboard focus uses the standard inset focus ring
 
