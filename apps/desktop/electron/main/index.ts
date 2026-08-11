@@ -2,6 +2,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  globalShortcut,
   ipcMain,
   Menu,
   nativeImage,
@@ -23,6 +24,9 @@ import {
   ErrorCodes as SharedErrorCodes,
   IPC,
   IPC_WHITELIST,
+  KEYBOARD_SHORTCUTS,
+  keybindingToElectronAccelerator,
+  resolveKeybinding,
   isCommandShellCatalog,
   isCommandShellId,
   isGlobalPermissionMode,
@@ -56,6 +60,7 @@ import {
   type PlanResolveRequest,
   type Result,
   type Risk,
+  type ShortcutPlatform,
   type ThinkingLevel,
   type UiMessage,
   type UserSkillRecord,
@@ -139,6 +144,8 @@ const WINDOW_MIN_WIDTH = 1040;
 const WINDOW_MIN_HEIGHT = 700;
 
 let mainWindow: BrowserWindow | null = null;
+let pluginLauncherWindow: BrowserWindow | null = null;
+let pluginLauncherAccelerator: string | null = null;
 let windowCreationPromise: Promise<void> | null = null;
 let applicationBooted = false;
 const isDevelopmentBuild =
@@ -920,6 +927,7 @@ function applyApplicationMenuSettings(settings?: {
     settings?.keybindings && typeof settings.keybindings === "object"
       ? (settings.keybindings as KeybindingOverrides)
       : undefined;
+  applyPluginLauncherShortcut(keybindings);
   const devMode = settings?.developerMode === true;
   const signature = JSON.stringify({ locale, keybindings, devMode });
   if (appliedMenuSettings === signature) return;
@@ -1196,6 +1204,141 @@ function applyWorkPanelReservation(): WorkPanelReservationState {
   return workPanelReservation;
 }
 
+const PLUGIN_LAUNCHER_WIDTH = 620;
+const PLUGIN_LAUNCHER_HEIGHT = 440;
+
+function pluginLauncherBounds() {
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const { x, y, width, height } = display.workArea;
+  return {
+    x: Math.round(x + (width - PLUGIN_LAUNCHER_WIDTH) / 2),
+    y: Math.round(y + (height - PLUGIN_LAUNCHER_HEIGHT) / 2),
+    width: PLUGIN_LAUNCHER_WIDTH,
+    height: PLUGIN_LAUNCHER_HEIGHT,
+  };
+}
+
+async function createPluginLauncherWindow(): Promise<BrowserWindow> {
+  if (pluginLauncherWindow && !pluginLauncherWindow.isDestroyed()) {
+    return pluginLauncherWindow;
+  }
+
+  const window = new BrowserWindow({
+    ...pluginLauncherBounds(),
+    title: `${APP_NAME} Plugin Launcher`,
+    show: false,
+    frame: false,
+    transparent: true,
+    backgroundColor: "#00000000",
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: true,
+    autoHideMenuBar: true,
+    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+    webPreferences: {
+      preload: join(__dirname, "../preload/index.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      additionalArguments: [`--pi-desktop-locale=${app.getLocale()}`],
+    },
+  });
+  pluginLauncherWindow = window;
+
+  if (process.platform === "darwin") {
+    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  }
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  window.webContents.on("will-navigate", (event, url) => {
+    const devOrigin = process.env.ELECTRON_RENDERER_URL;
+    if (devOrigin && url.startsWith(devOrigin)) return;
+    event.preventDefault();
+  });
+  window.on("blur", () => {
+    if (!window.isDestroyed() && !window.webContents.isDevToolsOpened()) {
+      window.hide();
+    }
+  });
+  window.on("closed", () => {
+    if (pluginLauncherWindow === window) pluginLauncherWindow = null;
+  });
+
+  if (process.env.ELECTRON_RENDERER_URL) {
+    const url = new URL(process.env.ELECTRON_RENDERER_URL);
+    url.searchParams.set("surface", "plugin-launcher");
+    await window.loadURL(url.toString());
+  } else {
+    await window.loadFile(join(__dirname, "../renderer/index.html"), {
+      query: { surface: "plugin-launcher" },
+    });
+  }
+  return window;
+}
+
+async function showPluginLauncher(): Promise<void> {
+  if (!applicationBooted) return;
+  const window = await createPluginLauncherWindow();
+  if (window.isDestroyed()) return;
+  window.setBounds(pluginLauncherBounds(), false);
+  if (process.platform === "darwin") app.focus({ steal: true });
+  window.show();
+  window.focus();
+  window.moveTop();
+  window.webContents.send(IPC.event.pluginLauncherShown);
+}
+
+async function togglePluginLauncher(): Promise<void> {
+  const window = pluginLauncherWindow;
+  if (window && !window.isDestroyed() && window.isVisible()) {
+    window.hide();
+    return;
+  }
+  await showPluginLauncher();
+}
+
+function applyPluginLauncherShortcut(keybindings?: KeybindingOverrides) {
+  const shortcut = KEYBOARD_SHORTCUTS.find(
+    (candidate) => candidate.id === "openPluginLauncher",
+  );
+  if (!shortcut || !app.isReady()) return;
+  const platform: ShortcutPlatform =
+    process.platform === "darwin"
+      ? "darwin"
+      : process.platform === "win32"
+        ? "win32"
+        : "linux";
+  const accelerator = keybindingToElectronAccelerator(
+    resolveKeybinding(shortcut, keybindings, platform),
+    platform,
+  );
+  if (!accelerator || accelerator === pluginLauncherAccelerator) return;
+  if (pluginLauncherAccelerator) {
+    globalShortcut.unregister(pluginLauncherAccelerator);
+  }
+  pluginLauncherAccelerator = null;
+  const registered = globalShortcut.register(accelerator, () => {
+    void togglePluginLauncher().catch((error) =>
+      logger.app("diagnostics", "error", "plugin launcher shortcut failed", {
+        data: String(error),
+      }),
+    );
+  });
+  if (registered) {
+    pluginLauncherAccelerator = accelerator;
+  } else {
+    logger.app("diagnostics", "error", "plugin launcher shortcut unavailable", {
+      data: { accelerator, platform: process.platform },
+    });
+  }
+}
+
 async function createWindow() {
   notificationViewingSessionId = null;
   requestedWorkPanelReservation = 0;
@@ -1266,6 +1409,21 @@ async function createWindow() {
   // null, so F12 is wired here; macOS additionally inherits Cmd+Alt+I from
   // the View menu role (see application-menu.ts).
   window.webContents.on("before-input-event", (event, input) => {
+    const isPluginLauncherChord =
+      input.type === "keyDown" &&
+      input.code === "Space" &&
+      input.alt &&
+      !input.control &&
+      !input.meta &&
+      !input.shift;
+    if (isPluginLauncherChord) {
+      // Windows normally assigns Alt+Space to the active window menu. The
+      // frameless shell has no such menu, so keep an in-app fallback even if
+      // the OS declines the global registration.
+      event.preventDefault();
+      void showPluginLauncher();
+      return;
+    }
     if (input.type !== "keyDown" || !developerMode) return;
     // `code` rather than `key`: Option+I on macOS produces a dead key.
     const isDevToolsChord =
@@ -1346,6 +1504,13 @@ async function createWindow() {
     if (mainWindow !== window) return;
     mainWindow = null;
     browserPane.setWindow(null);
+    if (
+      process.platform !== "darwin" &&
+      pluginLauncherWindow &&
+      !pluginLauncherWindow.isDestroyed()
+    ) {
+      pluginLauncherWindow.close();
+    }
   });
 
   // Block navigation away from the app shell (dev server origin or local file).
@@ -3661,6 +3826,20 @@ function registerIpc() {
     ipcMain.handle(channel, async (_event, ...args) => wrap(() => fn(...args)));
   };
 
+  handle(IPC.invoke.pluginLauncherToggle, async () => {
+    await togglePluginLauncher();
+    return { visible: pluginLauncherWindow?.isVisible() ?? false };
+  });
+  ipcMain.handle(IPC.invoke.pluginLauncherDismiss, async (event) =>
+    wrap(async () => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (window && window === pluginLauncherWindow && !window.isDestroyed()) {
+        window.hide();
+      }
+      return { visible: false };
+    }),
+  );
+
   handle(IPC.invoke.appGetVersion, async () => {
     const hostVersion = host
       ? await host.call<{ version: string; protocolVersion: number }>(
@@ -5896,6 +6075,7 @@ app.whenReady().then(async () => {
     dispatch: dispatchApplicationMenuCommand,
   });
   registerIpc();
+  applyPluginLauncherShortcut();
   updater.startAutoCheck();
   let bootError: unknown = null;
   try {
@@ -6026,6 +6206,10 @@ app.on("before-quit", (event) => {
   if (shutdownPromise) return;
 
   quitting = true;
+  if (pluginLauncherAccelerator) {
+    globalShortcut.unregister(pluginLauncherAccelerator);
+    pluginLauncherAccelerator = null;
+  }
   shutdownPromise = (async () => {
     const hostShutdown = host?.dispose();
     const pluginPanelShutdown = pluginPanels.closeAll();

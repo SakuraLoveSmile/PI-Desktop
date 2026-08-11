@@ -48,6 +48,19 @@ describe("keyboard shortcut mapping", () => {
     ).toBe(true);
   });
 
+  it("assigns Option/Alt+Space to the global plugin launcher", () => {
+    const launcher = KEYBOARD_SHORTCUTS.find(
+      (shortcut) => shortcut.id === "openPluginLauncher",
+    )!;
+    expect(launcher.defaultBinding).toBe("Alt+Space");
+    expect(resolveKeybinding(launcher, undefined, "darwin")).toBe("Alt+Space");
+    expect(keybindingDisplayParts("Alt+Space", "darwin")).toEqual(["⌥", "Space"]);
+    expect(keybindingDisplayParts("Alt+Space", "win32")).toEqual(["Alt", "Space"]);
+    expect(keybindingToElectronAccelerator("Alt+Space", "win32")).toBe(
+      "Alt+Space",
+    );
+  });
+
   it("converts DOM keyboard events into portable bindings", () => {
     expect(
       keybindingFromEvent(

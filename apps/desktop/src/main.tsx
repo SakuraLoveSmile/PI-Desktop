@@ -4,9 +4,12 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { en, zhCN, flattenCatalog, resolveLocale } from "@pi-desktop/i18n";
 import App from "./App";
+import { PluginLauncher } from "./components/PluginLauncher";
 import { initLanguageSync, resolveOsLocale } from "./lib/app-language";
 import "./styles/globals.css";
 
+const rendererSurface = new URLSearchParams(window.location.search).get("surface");
+if (rendererSurface) document.documentElement.dataset.surface = rendererSurface;
 document.documentElement.dataset.theme = "dark";
 // Window-chrome layout differs per OS (traffic lights left on macOS,
 // controls overlay right on Windows/Linux); set before first paint.
@@ -38,7 +41,7 @@ if (!rootEl) {
 try {
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
-      <App />
+      {rendererSurface === "plugin-launcher" ? <PluginLauncher /> : <App />}
     </React.StrictMode>,
   );
 } catch (error) {

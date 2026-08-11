@@ -120,6 +120,8 @@ export const IPC = {
     pluginUninstall: "pi-desktop/plugin/uninstall",
     pluginSetAutoUpdate: "pi-desktop/plugin/setAutoUpdate",
     pluginOpenPanel: "pi-desktop/plugin/openPanel",
+    pluginLauncherToggle: "pi-desktop/pluginLauncher/toggle",
+    pluginLauncherDismiss: "pi-desktop/pluginLauncher/dismiss",
     pluginThemes: "pi-desktop/plugin/themes",
     pluginServices: "pi-desktop/plugin/services",
     mcpList: "pi-desktop/mcp/list",
@@ -185,6 +187,7 @@ export const IPC = {
   },
   event: {
     pluginChanged: "pi-desktop/event/pluginChanged",
+    pluginLauncherShown: "pi-desktop/pluginLauncher/event/shown",
     agentMessage: "pi-desktop/agent/event/message",
     hostStatus: "pi-desktop/app/event/hostStatus",
     toast: "pi-desktop/app/event/toast",

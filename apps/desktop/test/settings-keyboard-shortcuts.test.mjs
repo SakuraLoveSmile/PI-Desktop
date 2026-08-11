@@ -45,6 +45,7 @@ test("shared shortcut map drives renderer dispatch and native menu accelerators"
     "openCommandPalette",
     "toggleSidebar",
     "openWorkPanel",
+    "openPluginLauncher",
     "abort",
     "closeWindow",
     "resetZoom",
@@ -64,6 +65,8 @@ test("shared shortcut map drives renderer dispatch and native menu accelerators"
   assert.match(menuSource, /keybindingToElectronAccelerator/);
   assert.match(mainSource, /applyApplicationMenuSettings/);
   assert.match(mainSource, /keybindings\?:\s*unknown/);
+  assert.match(mainSource, /applyPluginLauncherShortcut/);
+  assert.match(mainSource, /globalShortcut\.register/);
 });
 
 test("global shortcut dispatch ignores incomplete keyboard events", () => {

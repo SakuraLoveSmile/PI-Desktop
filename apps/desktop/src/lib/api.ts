@@ -494,6 +494,8 @@ export const api = {
   revealSubagent: (target: { id?: string; path?: string }) =>
     invoke(IPC.invoke.subagentReveal, target),
   openPluginPanel: (id: string) => invoke(IPC.invoke.pluginOpenPanel, id),
+  togglePluginLauncher: () => invoke(IPC.invoke.pluginLauncherToggle),
+  dismissPluginLauncher: () => invoke(IPC.invoke.pluginLauncherDismiss),
   listPluginThemes: () => invoke<PluginTheme[]>(IPC.invoke.pluginThemes),
   listPluginServices: () => invoke<PluginServiceStatus[]>(IPC.invoke.pluginServices),
   marketRefresh: (force = true) =>
@@ -686,5 +688,9 @@ export const api = {
     return window.piDesktop.on(IPC.event.pluginChanged, (payload) =>
       listener((payload ?? {}) as { reason?: string; pluginId?: string }),
     );
+  },
+  onPluginLauncherShown: (listener: () => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.pluginLauncherShown, () => listener());
   },
 };

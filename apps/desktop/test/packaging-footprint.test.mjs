@@ -22,6 +22,7 @@ test("packaging installs only native PTY and updater runtime dependencies", () =
     "@pi-desktop/plugin-sdk",
     "@pi-desktop/shared",
     "mermaid",
+    "pinyin-pro",
     "react",
     "shiki",
   ]) {
