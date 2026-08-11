@@ -2,6 +2,10 @@
 
 > Directory: `docs/spec/07-plugins`
 
+Plugin authors should start with the task-oriented
+[zero-to-one development guide](../../plugin-development.md). The documents in
+this directory define the normative contracts and implementation boundaries.
+
 | Document | Description |
 |---|---|
 | [01-plugin-system.md](01-plugin-system.md) | Plugin system overview |

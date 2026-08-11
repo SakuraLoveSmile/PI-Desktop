@@ -197,7 +197,25 @@ window.pluginBridge.invoke(channel, payload?)
 window.pluginBridge.on(event, handler)
 ```
 
-The plugin's own preload/main forwards to the plugin runtime.
+The host-owned preload forwards only fixed channels to the plugin runtime:
+
+| Channel | Required permission |
+|---|---|
+| `ui.showToast`, `ui.closePanel` | None beyond the loaded panel |
+| `ui.notify` | `notify` |
+| `plugin.getSettings`, `workspace.get` | None |
+| `fs.readText`, `fs.glob` | `fs.read.workspace` |
+| `fs.writeText` | `fs.write.workspace` |
+| `clipboard.readText` | `clipboard.read` |
+| `clipboard.writeText` | `clipboard.write` |
+| `shell.openExternal` | `shell.openExternal` |
+| `net.fetch` | `net.fetch` |
+
+`plugin.setSettings`, `fs.remove`, arbitrary Electron IPC, and general custom
+panel RPC are not exposed. `onPanelInvoke(channel, payload)` is currently
+reachable only for the host-supported `skill.list`, `skill.read`,
+`skill.create`, `skill.update`, `skill.remove`, and `skill.setEnabled` channels;
+it is not a general-purpose extension point.
 
 ## 7. Call auditing
 

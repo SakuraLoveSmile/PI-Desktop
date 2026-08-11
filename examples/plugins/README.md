@@ -1,16 +1,21 @@
 # Example Plugins
 
-Sample plugins for specification and future integration tests.
+Sample plugins for development, specification, and integration tests. Start
+with the [zero-to-one plugin development guide](../../docs/plugin-development.md)
+before using these as API references.
 
 ## hello
 
-Minimal example covering:
+Reference example covering:
 
 - `commands`
 - `ui.panel`
 - `agentTools`
 - `skills`
 - `settings`
+- `themes`
+- resident `services`
+- inter-plugin `bus`
 - `permissions`
 
 Related specs:
@@ -42,4 +47,3 @@ Prefer the official warehouse template:
 
 - https://github.com/vastsa/pi-desktop-plugins/tree/main/plugins/demo.workspace-summary
 - Contribution guide: https://github.com/vastsa/pi-desktop-plugins/blob/main/CONTRIBUTING.md
-

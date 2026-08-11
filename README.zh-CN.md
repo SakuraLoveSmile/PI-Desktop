@@ -122,6 +122,7 @@ git push origin main v0.2.0            # Release 工作流自动构建并发布
 
 ### 文档
 
+- [插件开发：从零到一](docs/plugin-development.md)
 - [规格索引](docs/spec/README.md) — 从这里开始
 - [基线决策](docs/spec/00-baseline.md)
 - [架构](docs/spec/02-architecture/01-architecture.md)

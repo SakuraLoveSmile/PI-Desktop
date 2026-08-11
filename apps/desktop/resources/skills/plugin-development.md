@@ -47,22 +47,36 @@ the plugin directory and may not escape it.
 
 ## Entry point
 
-`main.js` is CommonJS, evaluated in a dedicated process with no access to the host's
-environment variables. Export lifecycle hooks and receive the host API as `pi`:
+`main.js` is directly executable JavaScript, evaluated in a dedicated process with no access
+to the host's environment variables. The host injects a global `pi` object. Export lifecycle
+hooks without arguments:
 
 ```js
-module.exports = {
-  async onLoad(pi) {
-    pi.registerCommand("my-plugin.hello", async () => {
+async function onLoad() {
+  await pi.commands.register({
+    id: "my-plugin.hello",
+    title: "Say hello",
+    run: async () => {
       await pi.ui.showToast("Hello from my plugin");
-    });
-  },
-  async onUnload() {},
-};
+    },
+  });
+}
+
+async function onUnload() {
+  await pi.commands.unregister("my-plugin.hello");
+}
+
+module.exports = { onLoad, onUnload };
 ```
 
 `onLoad` must finish within 15s, other hooks within 5s, agent tools within 110s. An
 uncaught error during load rolls the whole load back and leaves the plugin in `load_error`.
+Only `onLoad` and `onUnload` are fired today.
+
+The panel receives `window.pluginBridge`, not `pi`. Use the fixed bridge channels such as
+`ui.showToast`, `ui.closePanel`, `plugin.getSettings`, `workspace.get`, `fs.readText`,
+`fs.writeText`, `fs.glob`, `clipboard.readText`, `clipboard.writeText`, `shell.openExternal`,
+and `net.fetch`. Arbitrary Electron IPC and general custom panel RPC are not exposed.
 
 ## Permissions
 
@@ -70,22 +84,27 @@ Every permission is declared in the manifest and granted at install time; an und
 fails at runtime. Ask for the least you need — the plugins page shows the risk tier to the
 user.
 
-- High risk: `net.fetch`, `fs.write.workspace`, `fs.delete.workspace`, `agent.prompt.inject`, `agent.tool.register`
-- Medium: `fs.read.workspace`, `clipboard.read`, `clipboard.write`, `shell.openExternal`
-- Low: `ui.panel`, `notify`
+- High risk: `net.fetch`, `fs.write.workspace`, `fs.delete.workspace`, `agent.prompt.inject`,
+  `agent.tool.register`, `mcp.server.local`, `mcp.server.remote`
+- Medium: `fs.read.workspace`, `clipboard.read`, `clipboard.write`, `shell.openExternal`,
+  `background.service`, `bus.publish`, `bus.subscribe`
+- Low: `ui.panel`, `ui.theme`, `notify`
 
-Host APIs, and nothing else: `app.getVersion`, `app.getLocale`, `plugin.getSettings`,
-`plugin.setSettings`, `plugin.getDataPath`, `ui.openPanel`, `ui.closePanel`, `ui.showToast`,
-`ui.notify`, `workspace.get`, `fs.readText`, `fs.writeText`, `fs.glob`, `fs.remove`, `clipboard.readText`,
-`clipboard.writeText`, `shell.openExternal`, `net.fetch`. There is no archive, process or
-network-server API.
+Supported host API groups are `app`, `plugin`, `commands`, `ui`, `workspace`, `fs`, `agent`,
+`services`, `bus`, `clipboard`, `shell`, `net`, and `events`. There is no host archive,
+arbitrary process, or network-server API. Skills, themes, and MCP servers are declarative
+manifest contributions rather than runtime registration APIs.
 
-## Skills
+Prefer these host APIs over raw Node file or network APIs. The permission gateway covers the
+host API surface; the separate Node plugin process is not yet an operating-system capability
+sandbox, so only load code from a trusted source.
 
-A file listed in `contributes.skills` is injected into the agent's system prompt, so it needs
+## Declarative contributions
+
+A file listed in `contributes.skills` is indexed for the Agent's `Skill` tool, so it needs
 `agent.prompt.inject`. Without that permission the file is simply ignored. Give each skill
-`name` and `description` front matter — the description is what tells the model when the skill
-applies:
+`name` and `description` front matter — the description is what tells the model when to load
+it:
 
 ```markdown
 ---
@@ -96,9 +115,16 @@ description: the user asks for release notes or a changelog entry
 Write one line per user-visible change, imperative mood, newest first.
 ```
 
-Skills share a 16 KiB budget (8 KiB per skill) and are read fresh on every prompt, so an edit
-takes effect on the next message. Keep them short and specific; a skill that always applies is
-a skill that wastes context.
+The prompt receives only a bounded catalog; a selected body is read on demand. A plugin may
+contribute 32 skills, each at most 128 KiB, with descriptions capped at 240 characters. Keep
+them short and specific; a skill that always applies wastes context.
+
+Themes need `ui.theme`; local and remote MCP servers need `mcp.server.local` and
+`mcp.server.remote` respectively. A resident service must be declared in
+`contributes.services`, granted `background.service`, and registered with `pi.services`.
+Bus publish topics and subscribe patterns must be declared under `contributes.bus` and use
+their matching permissions. Never put secrets in theme CSS, manifests, MCP literal values, or
+bus payloads.
 
 ## Packaging
 

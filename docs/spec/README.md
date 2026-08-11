@@ -56,11 +56,12 @@ docs/spec/
 7. `07-plugins/01-plugin-system.md`
 
 ### Plugin authors
-1. `07-plugins/01-plugin-system.md`
-2. `07-plugins/02-plugin-manifest-schema.md`
-3. `07-plugins/03-plugin-api.md`
-4. `07-plugins/10-plugin-devex.md`
-5. `examples/plugins/hello`
+1. [`../plugin-development.md`](../plugin-development.md)
+2. `07-plugins/01-plugin-system.md`
+3. `07-plugins/02-plugin-manifest-schema.md`
+4. `07-plugins/03-plugin-api.md`
+5. `07-plugins/10-plugin-devex.md`
+6. `examples/plugins/hello`
 
 ## Frozen decisions (short)
 

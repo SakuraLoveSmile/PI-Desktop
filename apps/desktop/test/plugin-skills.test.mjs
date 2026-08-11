@@ -118,9 +118,12 @@ test("the built-in skill documents the constraints a plugin author will hit", ()
     "agent.prompt.inject",
     "store-only",
     "schemaVersion",
+    "pi.commands.register",
+    "window.pluginBridge",
   ]) {
     assert.ok(skillDoc.includes(token), `built-in skill must mention ${token}`);
   }
+  assert.doesNotMatch(skillDoc, /onLoad\(pi\)|pi\.registerCommand/);
 });
 
 test("plugin dev tools resolve paths inside the workspace and report failures", () => {

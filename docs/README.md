@@ -1,5 +1,9 @@
 # PI-Desktop Docs
 
+## Guides
+
+- [Plugin development: zero to one](plugin-development.md)
+
 ## Spec
 
 Domain-organized specifications.
@@ -33,4 +37,4 @@ Rules for AI-assisted development.
 
 ## Examples
 
-- `examples/plugins/hello`
+- [`examples/plugins/hello`](../examples/plugins/hello)

@@ -124,6 +124,7 @@ git push origin main v0.2.0            # Release workflow builds & publishes
 
 ### Documentation
 
+- [Plugin development: zero to one](docs/plugin-development.md)
 - [Spec index](docs/spec/README.md) — start here
 - [Baseline decisions](docs/spec/00-baseline.md)
 - [Architecture](docs/spec/02-architecture/01-architecture.md)

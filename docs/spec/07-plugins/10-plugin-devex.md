@@ -4,6 +4,10 @@
 
 Let a developer create and load a local plugin within 10 minutes.
 
+The task-oriented [zero-to-one plugin development guide](../../plugin-development.md)
+covers the complete author journey. This specification freezes the developer
+surfaces and their acceptance criteria.
+
 ## 2. Developer path
 
 ```text
@@ -60,7 +64,15 @@ everywhere.
 
 ## 5. Local development commands
 
+The CLI is currently delivered as a private workspace package. From a checkout
+of this repository, install dependencies and build the devkit plus its
+dependencies once:
+
 ```bash
+# repository setup
+pnpm install
+pnpm --filter @pi-desktop/plugin-devkit... build
+
 # create from a template
 pnpm pi-plugin init full-demo /tmp/my-plugin
 
@@ -135,14 +147,20 @@ restarts: the folder is picked once, not once per edit.
 
 ## 8. Debugging
 
-Minimum requirements:
-- Plugin log panel (filter by pluginId)
-- View registered commands/tools
-- Copy error stack traces
+Implemented today:
+
+- Load and hot-reload failures appear as toasts; persisted load failures also
+  appear on the plugin row.
+- Open **Settings → Info → Logs** and filter records by `pluginId` to inspect
+  lifecycle, host API, tool, service, and bus activity.
+- The Plugins page shows declared capabilities, permissions, and resident
+  service state. Registered commands can be verified in global search.
 
 Later:
+
+- Dedicated per-plugin log panel with stack-copy affordance
 - Dedicated DevTools for the panel
-- mock tool invoker
+- Mock tool invoker
 
 ## 9. Documentation checklist (developer site / repo docs)
 
