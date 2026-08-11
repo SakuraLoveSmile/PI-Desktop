@@ -23,6 +23,17 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.5.5",
+    date: "2026-08-11",
+    highlights: [
+      "Visualize parallel subagents and their task relationships directly in the conversation.",
+      "Keep pasted file references compact and restore their chips after stopping a turn.",
+      "Keep mode controls available during session creation and the transcript pinned after sending.",
+      "Recover more gracefully when native tools receive an incorrect file path.",
+      "Polish sidebar footer actions and wrapped links in user messages.",
+    ],
+  },
+  {
     version: "0.5.4",
     date: "2026-08-08",
     highlights: [
@@ -219,6 +230,17 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.5.5",
+    date: "2026-08-11",
+    highlights: [
+      "在对话中直接展示并行子代理及其任务关系。",
+      "让粘贴的文件引用保持紧凑，并在停止任务后恢复文件标签。",
+      "创建会话时保持模式控件可用，发送消息后让对话继续停留在最新位置。",
+      "原生工具收到错误文件路径时可更稳妥地恢复。",
+      "优化侧边栏底部操作和用户消息中换行链接的排版。",
+    ],
+  },
   {
     version: "0.5.4",
     date: "2026-08-08",
