@@ -1437,3 +1437,19 @@ D193, and D194.
   `03-runtime/03-tools-and-permissions.md` §4b,
   `04-ux/07-ui-design-system.md` §8.1, `04-ux/08-component-spec.md` §11.7–11.8,
   `04-ux/09-interaction-patterns.md` §8a, and E2E-102/E2E-102a.
+
+## 2026-08-11 — Global corners use an Apple-inspired shape hierarchy
+
+- Fixed radii use a regular 4/6/8/10/12/14/16/18/20/24px ladder. Compact and
+  medium desktop controls use rounded rectangles; explicit pill and circle
+  tokens remain reserved for semantic capsules, equal-width icon controls,
+  switches, tracks, avatars, and dots.
+- Nested surfaces follow Apple's concentricity rule when their corners align:
+  the outer radius equals the inner radius plus the inset between their edges.
+  Structural full-width shell panels remain square.
+- The composer keeps its 20px visible radius through the shared radius scale.
+  Experimental `corner-shape` rendering is deferred because Electron 37's
+  Chromium 138 runtime does not support it.
+- Decision D210 amends D072's previously pixel-preserving radius ladder without
+  changing its token-only enforcement. ADR 0071 records the rationale. See
+  `04-ux/07-ui-design-system.md` §6.2 and US-UI-72.

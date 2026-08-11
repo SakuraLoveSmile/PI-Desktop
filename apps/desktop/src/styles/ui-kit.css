@@ -14,7 +14,7 @@
 .field-textarea {
   width: 100%;
   border: 1px solid var(--ds-border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
   padding: 8px 10px;
   color: var(--ds-text-primary);
@@ -55,7 +55,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   padding: 7px 12px;
   font-size: var(--text-md);
   transition:

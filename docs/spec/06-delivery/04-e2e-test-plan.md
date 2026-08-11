@@ -4411,3 +4411,25 @@ This test plan spec is accepted when:
 - **Specs linked**: `04-ux/07-ui-design-system.md` §8.2, `04-ux/08-component-spec.md` §11.5, decisions-log D150
 - **Milestone**: M5
 - **Status**: Partially automated (renderer source test: chip line-height + no leading-none)
+
+### US-UI-72 Apple-inspired global corner hierarchy (D210)
+- Open the empty home, a populated transcript, Settings, Plugins, Project
+  archive, a menu, and a dialog at the default supported desktop size in light
+  and dark themes.
+- Expect fixed corners to follow the global 4/6/8/10/12/14/16/18/20/24px
+  ladder, with visually larger or more elevated surfaces receiving the larger
+  radii.
+- Standard compact and medium buttons and fields remain rounded rectangles,
+  not capsules. Pills, segmented selections, status labels, progress tracks,
+  switches, equal-width circular icon controls, and dots retain their explicit
+  capsule or circle shape.
+- Where a rounded child sits against a rounded parent corner, expect the radii
+  to read concentrically with the intervening inset. Full-width sidebar,
+  titlebar, and work-panel edges remain square rather than becoming floating
+  cards.
+- Resize to the minimum supported window and inspect menus/dialogs near each
+  edge. Rounded surfaces must not clip text, focus rings, actions, or scrollable
+  content.
+- **Specs linked**: `04-ux/07-ui-design-system.md` §6.2, ADR 0071
+- **Milestone**: M5
+- **Status**: Partially automated (radius token and shared-control source test)

@@ -367,18 +367,31 @@ Weights use `--font-weight-*` tokens only (Codex uses variable-font intermediate
 
 All radii come from `--radius-*` tokens (raw px forbidden, same guard as typography):
 
+The scale follows Apple's current shape guidance while preserving the density
+of a desktop coding tool:
+
+- Fixed rounded rectangles are the default for compact and medium controls.
+- Capsules are reserved for pills, segmented selections, status labels, and
+  intentionally prominent actions; circles are reserved for equal-width icon
+  controls, avatars, and dots.
+- Nested surfaces should be concentric where their corners visually align:
+  `outer radius = inner radius + the gap between their edges`.
+- Radius grows with surface size and elevation. Full-width structural panels
+  such as the sidebar, titlebar, and work panel remain square at the window
+  edge.
+
 | Token | Value | Usage |
 |---|---|---|
-| `--radius-3xs` | 5px | Inline code |
+| `--radius-3xs` | 4px | Inline code |
 | `--radius-2xs` | 6px | Small inline chips |
-| `--radius-xs` | 7px | Compact buttons, copy buttons |
-| `--radius-sm` | 8px | Menu items, tool rows, kbd |
-| `--radius-md` | 10px | Buttons, inputs, menus |
-| `--radius-md-plus` | 12px | Cards, code blocks, dialogs |
-| `--radius-lg` | 14px | Panels, settings cards |
-| `--radius-lg-plus` | 16px | Large panels |
-| `--radius-xl` | 18px | Message bubbles |
-| `--radius-2xl` | 22px | Composer-adjacent large surfaces |
+| `--radius-xs` | 8px | Compact buttons, copy buttons |
+| `--radius-sm` | 10px | Standard buttons, inputs, menu items, tool rows, kbd |
+| `--radius-md` | 12px | Menus and compact cards |
+| `--radius-md-plus` | 14px | Cards and code blocks |
+| `--radius-lg` | 16px | Panels and settings cards |
+| `--radius-lg-plus` | 18px | Large panels and dialogs |
+| `--radius-xl` | 20px | Message bubbles and the composer |
+| `--radius-2xl` | 24px | Composer-adjacent prominent surfaces |
 | `--radius-full` | 9999px | Pills, badges, scroll thumbs |
 | `--radius-round` | 50% | Circular buttons, avatars, dots |
 
@@ -803,7 +816,7 @@ These are **token-level foundations** for common primitives. Detailed component 
 |---|---|
 | Padding | p-3 |
 | Border | 1px border-default |
-| Radius | radius-md |
+| Radius | radius-lg |
 | Background | bg-secondary |
 | Hover (interactive) | bg-tertiary, no shadow change |
 
@@ -813,7 +826,7 @@ These are **token-level foundations** for common primitives. Detailed component 
 |---|---|
 | Max width | 480px |
 | Padding | p-6 |
-| Radius | radius-lg |
+| Radius | radius-lg-plus |
 | Background | bg-secondary (dark); bg-white (light) + shadow-lg |
 | Backdrop | rgba(0,0,0,0.5) with `z-dialog` |
 | Close | Escape key + X button top-right |

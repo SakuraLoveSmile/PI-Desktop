@@ -85,3 +85,4 @@ Each ADR includes:
 | 0068 | Add a keyboard entry point for the work panel | Accepted for implementation |
 | 0069 | Make native-tool path mistakes recoverable | Accepted for implementation |
 | 0070 | Separate composer file-reference display from prompt serialization | Accepted for implementation |
+| 0071 | Adopt an Apple-inspired global corner hierarchy | Accepted for implementation |

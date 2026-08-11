@@ -87,8 +87,8 @@
   --ds-bg-elevated-primary: color-mix(in oklab, var(--gray-800) 96%, transparent);
   --ds-sidebar-width: clamp(240px, 275px, min(520px, calc(100vw - 320px)));
   --ds-toolbar-height: 46px;
-  --ds-composer-radius: 20px; /* Codex radius-3xl-base 1.25rem */
-  --ds-composer-radius-lg: 20px;
+  --ds-composer-radius: var(--radius-xl);
+  --ds-composer-radius-lg: var(--radius-xl);
 
   /* Motion tokens (design-system §8) */
   --motion-duration-fast: 150ms;
@@ -178,16 +178,22 @@
     letter-spacing, and border-radius are forbidden in component CSS
     and TSX (enforced by scripts/check-style-tokens.mjs).
   */
-  --radius-3xs: 5px;
+  /*
+    Apple-inspired fixed-radius ladder for dense desktop UI. Compact controls
+    remain rounded rectangles; capsules and circles use the explicit shape
+    tokens below. The regular two-pixel rhythm keeps adjacent levels legible
+    and makes concentric nesting predictable.
+  */
+  --radius-3xs: 4px;
   --radius-2xs: 6px;
-  --radius-xs: 7px;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-md-plus: 12px;
-  --radius-lg: 14px;
-  --radius-lg-plus: 16px;
-  --radius-xl: 18px;
-  --radius-2xl: 22px;
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-md-plus: 14px;
+  --radius-lg: 16px;
+  --radius-lg-plus: 18px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
   --radius-full: 9999px;
   --radius-round: 50%;
 
