@@ -107,7 +107,7 @@ type ThinkingLevel =
 
 type SessionConfigureRequest = {
   id: string;
-  mode: "plan" | "agent";
+  mode: "plan" | "goal" | "agent";
   providerId?: string;
   modelId?: string;
   thinkingLevel: ThinkingLevel;
@@ -116,13 +116,13 @@ type SessionConfigureRequest = {
 
 `session/configure` is accepted only while the session is idle. Mode, provider,
 model, permission, and shell-default changes are rejected while a turn or a
-Plan `pending`/`queued`/`running` record exists. The renderer may keep these
+Plan/Goal `pending`/`queued`/`running` record exists. The renderer may keep these
 controls editable during a turn, but it queues the latest full configuration
 locally and invokes this channel only after the terminal event; the running
 turn never observes that optimistic next-turn choice.
 
 Only a changed effective global `defaultCommandShell` is idle-only across all
-affected sessions: any active turn or pending/queued/running Plan work blocks
+affected sessions: any active turn or pending/queued/running Plan/Goal work blocks
 that shell change, while an omitted or idempotent shell field does not.
 
 Image and file payloads are not part of the current prompt contract.
@@ -315,7 +315,7 @@ renderer initializes each approval to Ask, which remains the product default,
 and the host does not persist the selection as the next approval default.
 `reject` carries no permission mode.
 Responses with a wrong proposal, session, turn, tool-call, version, or expired
-host-owned deadline fail with a stable Plan approval error. There is no
+host-owned deadline fail with a stable Plan/Goal approval error. There is no
 request-changes action.
 
 ### 5.5 getStatus
@@ -503,7 +503,7 @@ type SessionSummary = {
  projectPath?: string;
  modelId?: string;
  providerId?: string;
-  mode: "plan" | "agent";
+  mode: "plan" | "goal" | "agent";
  thinkingLevel: ThinkingLevel;
  supportsReasoning?: boolean;
  supportedThinkingLevels?: ThinkingLevel[];
@@ -672,7 +672,7 @@ Preload methods:
 
 Settings shell writes accept only an available ID for the current platform and
 reject unknown, unavailable, or wrong-platform IDs. A genuine effective shell
-change is accepted only while all sessions and Plan work are idle. If a
+change is accepted only while all sessions and Plan/Goal work are idle. If a
 persisted ID later becomes unavailable, the catalog selects the first available
 platform shell and sets `fallback: true`; if no choice is available, Bash
 returns `SHELL_NOT_FOUND`.

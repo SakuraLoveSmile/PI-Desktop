@@ -672,13 +672,13 @@ messages still carry the canonical path required by D124.
 
 The composer renders only controls connected to the active pi session:
 
-- Agent / Plan updates the durable session mode and changes the next pi toolset;
-  Plan is the same Agent in planning state.
+- Agent / Plan / Goal updates the durable session mode and changes the next pi
+  toolset. Plan and Goal are contract states of the same Agent.
 - The model trigger shows only the active model ID. Its menu selects a
   configured provider/default-model pair for the active session and links to
   Agent.
 - A reasoning-capable model exposes a separate Thinking trigger immediately to
-  the right of Agent / Plan in the left toolbar group. The trigger shows the
+  the right of Agent / Plan / Goal in the left toolbar group. The trigger shows the
   current level and opens the model's real `supportedThinkingLevels` as a
   compact single-column list with a check on the selected row. The menu fits its
   content, caps at 160px and the available viewport width, and truncates labels
@@ -695,9 +695,9 @@ The composer renders only controls connected to the active pi session:
   model. Unknown Custom/OpenAI-compatible models expose no invented reasoning
   action or graded ladder. Changing provider clamps or resets the durable
   session value before the next turn.
-- The left-of-input Composer Agent/Plan chip is the sole active-session mode
-  control. The top bar has no duplicate mode segmented control. The model
-  picker closes and is disabled while an active `pending` Plan approval exists;
+- The left-of-input Composer Agent/Plan/Goal chip is the sole active-session mode
+  control and cycles Agent → Plan → Goal → Agent. The top bar has no duplicate mode segmented control. The model
+  picker closes and is disabled while an active `pending` Plan or Goal approval exists;
   terminal proposal snapshots do not disable it. Each new pending proposal's
   explicit approval selector starts at Ask, regardless of the previous
   proposal's selected mode. Live Host events update the latest checkpoint or
@@ -720,7 +720,7 @@ Arrow keys move the active option, Enter or click opens the existing sandboxed
 plugin panel, and IME composition keystrokes never navigate or dispatch.
 - Local and branch context are non-interactive status labels; the project name
   remains an action because it opens the project picker.
-- Runtime chip labels (Agent/Plan, Thinking, permission mode, model ID) use
+- Runtime chip labels (Agent/Plan/Goal, Thinking, permission mode, model ID) use
   `--text-sm` with `--leading-compact` inside the 28px hit target. They must not
   use `leading-none` with overflow clipping: descenders on glyphs such as
   `g`/`y`/`p` stay fully visible. Long model IDs still truncate horizontally via
@@ -1002,7 +1002,7 @@ Full component contract and usage rules: [08-component-spec.md §17](08-componen
   the earlier standalone Projects destination and card grid (D042) are
   superseded by D133
 - **Settings**: full-page Codex shell per D063/D090/D133/D166 (275px compact
-  seven-destination rail, `#f4f4f4` light, elevated content cards, Back to app);
+  eight-destination rail, `#f4f4f4` light, elevated content cards, Back to app);
   per D092, the content cards fill the pane width available from the current
   window instead of retaining D070's fixed 720px cap — the earlier in-shell
   200px rail and broad grouped directory are superseded

@@ -43,9 +43,9 @@ MVP passes when:
 - [x] Tool paths resolve against the project root — auto:host-core tests (`workspace::tests`)
 
 ### E. Tools and permissions
-- [x] Plan denies Write/Edit/plugin tools under every permission mode —
+- [x] Plan and Goal deny Write/Edit/plugin tools under every permission mode —
   auto:`test:e2e:plan` E2E-105 + host-core permission tests
-- [x] Plan Bash prompts under Ask/Accept edits and runs without confirmation
+- [x] Plan and Goal Bash prompt under Ask/Accept edits and run without confirmation
   under explicit Auto — auto:`test:e2e:plan` E2E-105 + host-core permission tests
 - [x] Agent mode uses permission policy for Write/Edit/Bash — manual:M3
 - [x] Permission timeout (120s) becomes deny — manual:M3 (D005)
@@ -61,6 +61,9 @@ MVP passes when:
 ### M6. Plan checkpoint and shell execution
 - [x] One pi Agent owns Agent, planning, approval, and post-approval execution —
   auto:agent-runtime + `test:e2e:plan`/`test:e2e:plan-ui`
+- [x] Goal reuses the same host-owned approval pipeline, writes a distinct
+  `.pi/goal/*.md` artifact, and resumes in Agent mode to verify acceptance
+  criteria — auto:agent-runtime + desktop/runtime contract coverage
 - [x] `EnterPlanMode` and UI/session Plan selection converge on the same state —
   auto:host-core CAS tests + `test:e2e:plan-ui`
 - [x] `SubmitPlan(title, markdown, question)` preserves exact Markdown bytes in
@@ -71,33 +74,42 @@ MVP passes when:
   E2E-106/E2E-117
 - [x] The approval deadline is an absolute 30 minutes and stale responses fail
   closed — auto:`test:e2e:plan` E2E-107 + host-core late-expiry test
-- [x] Renderer retains the latest Plan proposal/execution snapshot only for the
+- [x] Renderer retains the latest Plan/Goal proposal/execution snapshot only for the
   current renderer lifetime; `plans.pending` rehydrates only pending rows and
   original deadlines after renderer reload, terminal cards are not rehydrated
   after renderer reload, and Host restart restores no stale action —
   auto:`test:e2e:plan-ui` same-Host PID/negative reload assertions +
   `test:e2e:plan` E2E-108/E2E-109
-- [x] Schema v7 first reaches v8 and then uses the guarded v8→v10 path; the
-  v8→v10 migration is one atomic transaction with a WAL checkpoint and exact
-  readable `pi.sqlite.v8.bak` before destructive work, while schema v9 receives
-  `pi.sqlite.v9.bak`. Malformed app settings/scheduled config, invalid
+- [x] Schema v7 first reaches v8 and then uses the guarded v8→v11 path; the
+  v8→v11 migration is one atomic transaction with a WAL checkpoint and exact
+  readable `pi.sqlite.v8.bak` before destructive work, while schema v9 and v10
+  receive readable backups. Malformed app settings/scheduled config, invalid
   top-level operating modes, and unknown or wrong-platform default shells fail
   closed with schema v8 authoritative; platform-valid shells remain migratable
   when temporarily unavailable. Sessions, transcripts, nested extension modes,
   and `plan_approvals` artifact/execution fields survive — auto:host-core
   migration tests (139/139; 15 focused DB tests)
-- [x] Pending, queued, and running Plan work is interrupted on host restart with
+- [x] Pending, queued, and running Plan/Goal work is interrupted on host restart with
   no replay; an already-approved interrupted execution leaves the session Agent —
   auto:`test:e2e:plan` E2E-108/E2E-109
-- [x] Scheduled/unattended Plan runs fail before the provider request —
+- [x] Scheduled/unattended Plan/Goal runs fail before the provider request —
   auto:`test:e2e:plan` E2E-110
-- [x] Plan plugin tools remain denied despite low risk, grants, or Auto —
+- [x] Plan/Goal plugin tools remain denied despite low risk, grants, or Auto —
   auto:`test:e2e:plan` E2E-105 + host-core policy tests
 - [x] Shell catalog selection persists a platform-valid ID, falls back to the
   first available platform shell when a later lookup is unavailable, rejects a
   stale turn ID/dialect, streams stdout/stderr, enforces the 60s default
   timeout, and kills process trees on abort — auto:`test:e2e:plan`
   E2E-112–E2E-116 + host-core fallback test
+
+### M6+ Current product increment
+- [x] Extensions page manages installed plugins, standalone MCP servers,
+  Skills, and Subagents with global/project activation scopes — unit/source
+  contracts plus E2E-100–E2E-103
+- [x] Session import, scheduled task records, composer file references and
+  clipboard files, global plugin launcher, and next-turn configuration are
+  represented by the current E2E catalog — E2E-036, E2E-059, E2E-102,
+  E2E-102a, E2E-103, E2E-120
 
 ### F. Persistence
 - [x] Sessions survive restart — manual:M2 (SQLite via host-core)

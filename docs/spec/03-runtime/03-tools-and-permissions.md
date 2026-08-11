@@ -43,7 +43,7 @@ Let the agent get things done, but stay under control by default.
 
 Following pi's coding-agent default, the first Agent request activates only
 `Read`, `Bash`, `Edit`, and `Write`; `Glob` and `Grep` are loaded on demand.
-Plan keeps its read/inspection core. The runtime also registers capabilities
+Plan and Goal keep their read/inspection core. The runtime also registers capabilities
 without sending their full schemas up front:
 
 - `Glob` and `Grep` in Agent mode
@@ -358,7 +358,7 @@ Rules:
   session; under `accept-edits`/`auto` they are simply never needed.
 - Scratch-directory writes (D114) stay prompt-free in every mode.
 - UI: Settings → segmented global default; composer shows a per-session chip in
-  both Agent and Plan whose menu offers the three effective modes without a
+  Agent, Plan, and Goal whose menu offers the three effective modes without a
   separate global-default/inherit entry. The chip and selected menu item
   display the effective mode; choosing an item stores that explicit session
   override. Existing inherited sessions continue to resolve through the
@@ -415,13 +415,14 @@ matching log lines.
 |---|---|---|---|---|---|
 | Agent | allow | allow | permission policy | permission policy | registered risk policy |
 | Plan | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | deny |
+| Goal | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | deny |
 
 ### Notes
-- Plan hard-denies Write/Edit/plugin tools before permission UI; a direct host
+- Plan and Goal hard-deny Write/Edit/plugin tools before permission UI; a direct host
   call cannot bypass the matrix.
 - Agent mode uses permission cards or the selected automatic policy for
   Write/Edit/Bash and registered plugin tools.
-- Plan Bash may mutate workspace or scratch state when the user selected Auto;
+- Plan and Goal Bash may mutate workspace or scratch state when the user selected Auto;
   the UI must make that tradeoff visible.
 - allow-session is remembered per toolName for the active session only
 - Session grants follow `sessionId` across project-tab switches and are never

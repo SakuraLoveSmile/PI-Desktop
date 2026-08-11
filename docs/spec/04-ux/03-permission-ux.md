@@ -10,6 +10,7 @@ Make high-risk local actions visible, interruptible, and predictable.
 |---|---|---|---|---|---|
 | Agent | allow | allow | permission policy | permission policy | registered risk policy |
 | Plan | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | deny |
+| Goal | allow | allow | deny | `ask`/`accept-edits`: confirm; `auto`: allow | deny |
 
 The Read/Glob/Grep `allow` cells apply to paths inside the session workspace
 and scratch roots. An explicit path outside both roots is an exception:
@@ -19,10 +20,10 @@ requested path, and the external result remains absolute in the transcript.
 
 Decision source: **D003/D189/D190/D195 (ADR 0057)**.
 
-Plan keeps this permission-mode control visible. It is planning intent, not a
-strict read-only security profile: a Bash command can mutate workspace or
-scratch state when the user selects Auto. Write/Edit/plugin tools are denied by
-the host before a permission card, regardless of grants or Auto.
+Plan and Goal keep this permission-mode control visible. They are contract
+intents, not strict read-only security profiles: a Bash command can mutate
+workspace or scratch state when the user selects Auto. Write/Edit/plugin tools
+are denied by the host before a permission card, regardless of grants or Auto.
 
 ## 3. Decision types
 
@@ -115,12 +116,12 @@ Session grants are unchanged and still per `toolName` per session: a delegate's
 
 - user may continue editing text
 - sending another prompt or changing active-session mode/provider/model/permission
-  is blocked while a `pending` Plan approval exists
-- For a pending Plan proposal specifically, the existing draft is preserved and
+  is blocked while a `pending` Plan or Goal approval exists
+- For a pending Plan or Goal proposal specifically, the existing draft is preserved and
   the prompt becomes read-only. Composer mode, thinking, permission, model, and
   send controls are disabled; the approval surface's Approve and Reject actions
   remain enabled.
-- the left-of-input Composer Agent/Plan chip and model picker re-enable when the
+- the left-of-input Composer Agent/Plan/Goal chip and model picker re-enable when the
   host closes the approval as rejected, expired, or interrupted; terminal
   proposal snapshots are not gates
 - Abort concurrently cancels the turn and explicitly denies the matching host
@@ -135,20 +136,20 @@ A durable grants-management surface is deferred until a host-backed settings
 schema exists; Settings must not render a control that cannot persist or affect
 the permission runtime.
 
-## 9. Plan checkpoint approval card
+## 9. Plan and Goal contract approval card
 
-Plan approval is not a generic tool permission card. It is rendered inline in
-the originating session after `SubmitPlan(title, markdown, question)` causes
-host-core to preserve the exact Markdown bytes in a new immutable
-`.pi/plan/*.md` artifact.
+Plan and Goal approval are not generic tool permission cards. They are rendered
+inline in the originating session after `SubmitPlan(...)` or `SubmitGoal(...)`
+causes host-core to preserve the exact Markdown bytes in a new immutable
+`.pi/plan/*.md` or `.pi/goal/*.md` artifact.
 
 The card shows the structured title and question, an opener for the exact
 artifact path, the current status, and the absolute deadline. It offers only:
 
 - **Approve** with an explicit target permission mode (`Ask`, `Accept edits`,
   or `Auto`; default `Ask`)
-- **Reject**, which stops the run and leaves Plan/planning active; a later turn
-  must submit a new complete snapshot/artifact
+- **Reject**, which stops the run and leaves the contract state active; a later
+  turn must submit a new complete snapshot/artifact
 
 The card has distinct `pending`, `resolving`, `approved`, `queued`, `running`,
 `rejected`, `expired`, and `interrupted` states. Approval is enabled only for a
@@ -168,8 +169,8 @@ after a full Host/app restart.
 
 ## 10. Acceptance
 
-1. Plan denies Write/Edit/plugins in every permission mode
-2. Plan Bash prompts under Ask and Accept edits and runs without confirmation
+1. Plan and Goal deny Write/Edit/plugins in every permission mode
+2. Plan and Goal Bash prompt under Ask and Accept edits and run without confirmation
    under Auto, with the mutation tradeoff visible
 3. Agent mode uses the normal high-risk permission policy
 4. timeout becomes deny in UI + tool result
@@ -177,12 +178,12 @@ after a full Host/app restart.
 6. concurrent session requests remain isolated and never take over the visible
    conversation or its work panel; post-approval artifacts remain assigned to
    the request's originating session
-7. Plan approval displays title/question, opens the immutable artifact, shows
+7. Plan/Goal approval displays title/question, opens the immutable artifact, shows
    expiry/status, and sends the selected permission mode only on approval; no
    inline Markdown/hash/byte-size or revision/feedback action is rendered
 8. reject, expiry, abort, crash, stale response, and persistence failure close
-   pending Plan work in Plan/planning with no execution capability; a later
-   prompt may revise and submit a new immutable artifact
+   pending Plan/Goal work in its contract state with no execution capability; a
+   later prompt may revise and submit a new immutable artifact
 9. host restart interrupts pending/queued/running work without replay or stale
    action and keeps already-approved interrupted sessions in Agent; no terminal
    card restoration is required after restart

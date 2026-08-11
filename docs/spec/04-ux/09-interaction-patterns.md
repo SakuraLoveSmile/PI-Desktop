@@ -559,7 +559,7 @@ may be retained while exactly one workspace supplies the visible shell context.
 ### 5.1 Flow sequence
 
 ```text
-Agent calls a permission-gated tool (including Plan Bash under Ask or Accept edits)
+Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accept edits)
   → PermissionCard inserted inline in transcript
   → Composer disabled (cannot send new prompt)
   → Countdown starts (120s)
@@ -585,26 +585,26 @@ Agent calls a permission-gated tool (including Plan Bash under Ask or Accept edi
 - After resolution: focus returns to composer
 - Full spec: [03-permission-ux.md](03-permission-ux.md)
 
-## 5A. Plan workflow
+## 5A. Plan and Goal workflow
 
-1. The user selects Plan while the session is idle, or the same Agent calls
-   `EnterPlanMode`; the host persists/validates `mode = plan` and the renderer
-   projects `planning`.
-2. The Agent investigates with the Plan tool set. Read/Glob/Grep and
+1. The user selects Plan or Goal while the session is idle, or the same Agent
+   calls `EnterPlanMode` / `EnterGoalMode`; the host persists/validates the
+   matching contract mode and the renderer projects `planning`.
+2. The Agent investigates with the selected contract tool set. Read/Glob/Grep and
    BrowserPreview are allowed; Bash follows the visible permission mode. A
-   Plan Bash command may mutate under Auto, so the mode chip remains visible.
-3. The Agent calls `SubmitPlan(title, markdown, question)` alone in its tool
-   batch. Host-core preserves the exact Markdown bytes in a new immutable
-   `.pi/plan/*.md` artifact, records its path/hash/size and structured
-   title/question, and the renderer displays `PlanApprovalCard` with the
+   contract-mode Bash command may mutate under Auto, so the mode chip remains visible.
+3. The Agent calls `SubmitPlan` or `SubmitGoal` alone in its tool batch.
+   Host-core preserves the exact Markdown bytes in a new immutable
+   `.pi/plan/*.md` or `.pi/goal/*.md` artifact, records its path/hash/size and structured
+   title/question, and the renderer displays the shared contract approval card with the
    artifact opener and 30-minute absolute deadline.
 4. Approve requires Ask / Accept edits / Auto selection, with Ask selected by
    default. Host-core commits the approval, `mode = agent`, permission mode,
    and `queued` state atomically; the same Agent continues on a fresh turn with
    Agent tools.
-5. Reject stops the pending run and keeps the durable session in Plan. The live
-   state returns to editable planning; revisions are new-turn `SubmitPlan` calls
-   with a new complete Markdown snapshot and new artifact. Earlier snapshots
+5. Reject stops the pending run and keeps the durable session in its contract
+   mode. The live state returns to editable planning; revisions are new-turn
+   `SubmitPlan`/`SubmitGoal` calls with a new complete Markdown snapshot and new artifact. Earlier snapshots
    remain immutable; there is no request-changes action.
 6. Expiry, abort, persistence failure, renderer/host/sidecar crash, or stale
    response renders a failed-closed state. A host restart interrupts pending,
@@ -627,7 +627,7 @@ queued, and running outcomes may remain visible across session switches. A
 renderer reload rehydrates only a pending row; terminal cards are dropped and
 are not restored. Host restart interrupts prior work without replay or stale
 action, and the UI is not required to present the interrupted terminal
-snapshot. The Composer-left Agent/Plan chip is the only active-session mode
+snapshot. The Composer-left Agent/Plan/Goal chip is the only active-session mode
 control.
 
 During project or session initialization, the home composer can render before

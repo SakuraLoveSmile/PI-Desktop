@@ -107,11 +107,11 @@ destination, chat as the home surface, tools and permissions inline.
   (D111/D204/D206), bottom-docked in a transcript, with no project / Local / branch
   rail (D095).
   Its left-of-input operating-mode chip is the sole active-session control for
-  exactly **Agent** and **Plan**. Plan shows the same Agent's planning state,
-  keeps the permission-mode chip, and exposes the host-written immutable
-  `.pi/plan/*.md` artifact opener and approval surface after `SubmitPlan`.
-  The conversation top bar retains the model picker and window actions but has
-  no duplicate Agent/Plan control.
+  **Agent**, **Plan**, and **Goal**. Plan shows the same Agent's planning state;
+  Goal shows the same approval boundary for an outcome contract. Both keep the
+  permission-mode chip and expose their host-written immutable `.pi/plan/*.md`
+  or `.pi/goal/*.md` artifact opener after submission. The conversation top bar
+  retains the model picker and window actions but has no duplicate mode control.
 - **Backend status capsule**: appears under the titlebar while the backend
   restarts or is fatally degraded (D080), with an Open-logs action.
 
@@ -183,10 +183,10 @@ title, status badge, branch meta, external link, and "Review with agent"
 ### 3.4 Scheduled
 Create card + task rows (cadence/enabled badges, prompt preview, last run,
 Run now / toggle / Delete). Run now opens a session seeded with the prompt.
-New tasks default to Agent. A migrated Plan task is allowed to remain stored,
-but an unattended run is explicitly rejected before provider, artifact, or
-queue work with `PLAN_REQUIRES_INTERACTIVE_SESSION`; it cannot display or
-auto-approve a plan.
+New tasks default to Agent. A migrated Plan or Goal task is allowed to remain
+stored, but an unattended run is explicitly rejected before provider, artifact,
+or queue work with `PLAN_REQUIRES_INTERACTIVE_SESSION`; it cannot display or
+auto-approve a contract.
 The user must explicitly switch it to Agent before enabling unattended
 execution.
 
@@ -220,13 +220,13 @@ that groups requests by risk tier and marks permissions new to an upgrade.
 
 ### 3.6 Settings (full-page takeover)
 Settings replaces the whole shell (D063): back-to-app + search + a compact
-seven-destination rail in the exact order Basics / 全局 AI / Shortcuts / Model
-configuration / Import / Project archive / Info (D133, D166), with elevated
-content cards.
+eight-destination rail in the exact order Basics / 全局 AI / Shortcuts /
+Instructions / Model configuration / Import / Project archive / Info, with
+elevated content cards.
 Appearance lives inside Basics; global AI behavior (permissions and context
-management) lives inside 全局 AI; keyboard shortcuts has its own destination;
-provider management lives inside
-Agent. Import scans supported local agent stores and presents
+management) lives inside 全局 AI; keyboard shortcuts and global/project
+instructions have their own destinations; provider management lives inside
+Model configuration. Import scans supported local agent stores and presents
 candidates in collapsible groups. Project path is an alternate grouping
 alongside the default source grouping, and every scan or grouping change starts
 with all groups collapsed. Project archive owns the durable D086 Projects index
@@ -302,7 +302,7 @@ Extensions destination described in §3.5.
   event never navigates by itself; only explicit activation does.
 - Backend degraded → status capsule (restarting) or fatal banner with Open
   logs (D080); composer submits are rejected with readable errors while down.
-- Plan checkpoint → the originating session shows the structured title and
+  - Plan/Goal checkpoint → the originating session shows the structured title and
   question, an opener for its immutable `.pi/plan/*.md` artifact, absolute
   approval deadline, and current status. The renderer retains the latest
   proposal/execution snapshot per session only for the current renderer
@@ -312,7 +312,7 @@ Extensions destination described in §3.5.
   expired, approved/completed, and interrupted terminal cards are not
   rehydrated; a terminal card may remain visible and non-actionable only until
   renderer reload. Reject, expiry, or interruption clears the approval gate,
-  leaves the session Plan/planning and editable, and requires a later turn to
+  leaves the session in its contract state and editable, and requires a later turn to
   create a new artifact. While pending, the draft remains visible but
   read-only and only Approve or Reject actions are enabled. Host/app restart
   interrupts prior work before RPC with no replay or stale action; pending

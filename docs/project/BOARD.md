@@ -17,7 +17,7 @@ Until that is enabled, track delivery with:
 | Review | Waiting validation |
 | Done | Completed |
 
-## Status snapshot (2026-08-05)
+## Status snapshot (2026-08-11)
 
 | Milestone | GitHub | Local status |
 |---|---|---|
@@ -27,7 +27,7 @@ Until that is enabled, track delivery with:
 | M3 Workspace Tools | [closed](https://github.com/vastsa/PI-Desktop/milestone/4) | Done |
 | M4 Plugin Foundation | [closed](https://github.com/vastsa/PI-Desktop/milestone/5) | Done |
 | M5 Desktop Hardening | [open](https://github.com/vastsa/PI-Desktop/milestone/6) | Done except notarization (credential-gated) |
-| M6 Plan Operating State | planned | Complete (2026-08-05) |
+| M6 Plan Operating State | planned | Complete (2026-08-05); Goal and current extension increment shipped |
 
 Open issue:
 - [#6 M5: Packaging and desktop hardening](https://github.com/vastsa/PI-Desktop/issues/6)
@@ -71,27 +71,40 @@ Open issue:
   synced to real automation, decisions-log restructured (A–I) with
   supersession chains, acceptance criteria evidence-tagged
 - Codex visual parity pass (D034–D072 series; capture suite)
-- M6 Plan operating state implementation: one-Agent Agent/Plan transitions,
-  immutable `.pi/plan/*.md` checkpoints, approve/reject with explicit
-  Ask-defaulted permission selection, restart interruption without replay,
-  scheduled Plan rejection, selectable shell identity/stream/timeout/abort
-  handling, and English/Simplified Chinese renderer coverage
-  (E2E-104–E2E-117)
+- M6 Plan/Goal operating state implementation: one-Agent Agent/Plan/Goal
+  transitions, immutable `.pi/plan/*.md` and `.pi/goal/*.md` checkpoints,
+  approve/reject with explicit Ask-defaulted permission selection, restart
+  interruption without replay, scheduled contract rejection, selectable shell
+  identity/stream/timeout/abort handling, and English/Simplified Chinese
+  renderer coverage (E2E-104–E2E-120)
 
 ### In Progress
 - Codex visual gold polish (ongoing capture-driven iteration)
-- Composer slash commands + @ file references wired to pi prompt templates
-  (D123–D125 / ADR 0024)
+- Signed/notarized macOS distribution and native Windows/Linux qualification
+- Stronger plugin runtime sandbox and publisher-signature/provenance path
+- Full Playwright/UI-driven E2E coverage
 
 ### Blocked (external)
 - Full DMG notarization — needs Apple Developer credentials; runbook ready
   ([06-release-runbook](../spec/06-delivery/06-release-runbook.md))
 
 ### Backlog
-- Playwright automated desktop e2e (UI-driven journeys)
-- Marketplace
-- Windows/Linux release qualification (native CI, signing, upgrade tests)
-- Skills depth / MCP / additional locales (post-MVP)
+- Additional locales beyond the shipped English/zh-CN catalog
+
+## Current product increment (0.5.6)
+
+The M6 checkpoint is complete. The current application also includes:
+
+- Agent / Plan / Goal contract modes on one pi Agent, including Goal approval
+  and autonomous acceptance-criteria execution
+- Extensions management for plugins, MCP servers, Skills, and Subagents, with
+  global/project activation scopes and a plugin marketplace
+- Global plugin launcher, session import, scheduled prompts, notifications,
+  composer slash commands, `@` file references, and clipboard file paste
+- Parallel bounded Subagents with attributed transcript rows and a managed
+  user-level registry
+- Context checkpoint inspection, message-scoped review/rollback, and staged
+  next-turn configuration while a response is running
 
 ## Validation snapshot (2026-08-05 — M6 Plan acceptance)
 

@@ -16,8 +16,9 @@ It does **not** replace pi. It provides safe host capabilities to:
    explicit outside paths
 2. Builtin tool execution (Read/Glob/Grep/Write/Edit/Bash)
 3. Authoritative durable session-mode and tool-policy evaluation
-4. Permission policy evaluation, including Plan Bash prompts
-5. Immutable `.pi/plan/*.md` artifact writer, `plan_approvals` broker, and
+4. Permission policy evaluation, including Plan/Goal Bash prompts
+5. Immutable `.pi/plan/*.md` and `.pi/goal/*.md` artifact writer,
+   `plan_approvals` broker, and
    startup interruption fence
 6. Selectable shell catalog, identity validation, streamed output, and process
    tree shutdown
@@ -109,11 +110,11 @@ notification.list
    explicit outside path is resolved only after host permission evaluation
 2. Host resolves the durable session mode; request-supplied mode is never
    authoritative
-3. Plan denies Write/Edit/plugin/unknown tools before permission evaluation
-4. Plan Bash follows the durable permission mode and may mutate under Auto
-5. Plan artifact bytes, path, hash, size, and approval/execution identity are
+3. Plan and Goal deny Write/Edit/plugin/unknown tools before permission evaluation
+4. Plan and Goal Bash follow the durable permission mode and may mutate under Auto
+5. Plan and Goal artifact bytes, path, hash, size, and approval/execution identity are
    host-authenticated
-6. Plan approval is host-authenticated, durable, and atomic before Agent entry
+6. Plan/Goal approval is host-authenticated, durable, and atomic before Agent entry
 7. Effective shell ID/dialect is checked before spawn; settings reject
    unavailable/wrong-platform IDs, and a persisted unavailable choice falls
    back only during catalog selection
@@ -136,15 +137,15 @@ notification.list
 5. unseen completed/failed turns create exactly one durable notification
    through the `session.endTurn` transaction; results already visible in the
    focused current chat and aborted turns create none
-6. a durable Plan session cannot authorize Write/Edit/plugin tools through a
-   conflicting request mode, and Plan Bash follows the resolved permission
+6. a durable Plan or Goal session cannot authorize Write/Edit/plugin tools through
+   a conflicting request mode, and Plan/Goal Bash follows the resolved permission
    mode
 7. SubmitPlan writes exact Markdown bytes to a new `.pi/plan/*.md` artifact and
    stores durable path/hash/size plus structured title/question in
    `plan_approvals`; approval is approve/reject-only, session/turn/version
    scoped, and expires at 30 absolute minutes with
    `PLAN_APPROVAL_TIMEOUT`
-8. Pending/queued/running Plan work is interrupted on host restart with no
+8. Pending/queued/running Plan or Goal work is interrupted on host restart with no
    replay; approved interruptions leave the session Agent
 9. Shell selection/fallback, stale ID/dialect rejection, stdout/stderr
    streaming, 60s timeout, bounded override, and process-tree abort are

@@ -312,7 +312,7 @@ than appending it to answer `content`.
 - `commandShells.list`
 - `settings.set` with a partial settings object; omitted fields are preserved,
   and a changed effective `defaultCommandShell` is accepted only when every
-  session has no active turn and no pending/queued/running Plan work
+  session has no active turn and no pending/queued/running Plan/Goal work
 
 Tool execution starts only after admission. Shell spawn retries transient
 resource exhaustion (`EAGAIN` / `WouldBlock`) with bounded backoff, never
@@ -414,7 +414,7 @@ type ToolsExecuteParams = {
   toolName: string
   args: unknown
   /** Diagnostic/request context only; never used for authorization. */
-  requestedMode?: "plan" | "agent"
+  requestedMode?: "plan" | "goal" | "agent"
   expectedCommandShellId?: CommandShellId
   /** Bash only: dialect pinned by the same runtime turn. */
   expectedCommandShellDialect?: "powershell" | "cmd" | "posix"

@@ -8,6 +8,7 @@
 - Rust host backend core
 - pi Agent Harness for model/agent loop
 - user-installable plugin extensibility
+- standalone MCP servers, Skills, and Subagents
 
 ## Product formula
 
@@ -31,6 +32,10 @@ PI-Desktop =
 6. Ship as a global product with English as default language
 7. Let the same Agent inspect a task, submit a structured Plan, and continue in
    Agent only after a separate user approval
+8. Let the same Agent negotiate an approved Goal contract and then pursue its
+   acceptance criteria autonomously in Agent mode
+9. Make project sessions, imports, extensions, and scheduled prompts practical
+   for daily local work
 
 ## Non-goals (MVP)
 
@@ -60,10 +65,12 @@ PI-Desktop =
 2. Configure provider/API key
 3. Open a project workspace
 4. Create a session and send a task
-5. Optionally enter Plan, inspect the project, and submit a Markdown checkpoint
+5. Choose Agent, Plan, or Goal; optionally inspect the project and submit a
+   Markdown checkpoint
 6. Approve or reject the checkpoint and choose the execution permission mode
 7. Approve local tool execution when required
-8. Restart the app; interrupted Plan work is not replayed
+8. Review diffs, terminal output, browser previews, and files in the work panel
+9. Restart the app; interrupted contract work is not replayed
 
 ## Quality principles
 

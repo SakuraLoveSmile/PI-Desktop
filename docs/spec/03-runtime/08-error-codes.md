@@ -226,9 +226,9 @@ Examples:
 
 1. Every IPC failure returns `AppError.code`
 2. No raw untyped string-only failures on main paths
-3. Plan hard-denies use explicit tool-specific codes; Bash is never denied by
-   Plan solely because of the operating mode and instead follows permission
-   policy
+3. Plan/Goal hard-denies use explicit tool-specific codes; Bash is never denied
+   by either contract mode solely because of the operating mode and instead
+   follows permission policy
 4. Host numeric codes map to stable string codes
 5. Invalid shell settings, no-effective-shell/stale-pin, artifact-write,
    expiry, scheduled-rejection, and restart-interruption paths map to stable

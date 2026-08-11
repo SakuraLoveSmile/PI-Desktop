@@ -3,7 +3,7 @@
 ## 0. Ownership decision
 
 **Rust host-core owns SQLite exclusively (D002), and the transcript file
-store with it (D119). Plan artifacts and queue records are also host-owned
+store with it (D119). Plan/Goal artifacts and queue records are also host-owned
 (D189); shell defaults are host settings (D190).**
 
 - Node pi sidecar does not open the DB or transcript files directly
@@ -29,7 +29,7 @@ schema v7, v8, and v11:
 4. **Extensible without migrations** where cheap (block vocabulary, JSONL line
    types, kv namespaces, `config_json` columns), **with migrations** where
    structural (new entities), versioned by `PRAGMA user_version`.
-5. **Plan checkpoints are immutable host artifacts** with recorded path,
+5. **Plan/Goal checkpoints are immutable host artifacts** with recorded path,
    hash, and size; the existing approval row also carries execution fields.
    Startup interruption is the process-epoch fence and no work is replayed.
 
@@ -159,7 +159,7 @@ PRAGMA auto_vacuum = INCREMENTAL; -- set at creation, before any table
   `plan_approvals` row with `status='pending'` as `interrupted` and every row
   with `execution_state IN ('queued', 'running')` as `interrupted`; it also
   aborts running turns and appends the recovery audit records. No process epoch
-  is serialized. An already-approved queued/running Plan interruption leaves
+is serialized. An already-approved queued/running Plan/Goal interruption leaves
   `sessions.mode = 'agent'`. The transaction then proceeds to the normal
   `PRAGMA incremental_vacuum` and audit retention pruning (§9).
 
@@ -463,7 +463,7 @@ CREATE INDEX idx_plan_approvals_execution_id
 `plan_json` is the exact Markdown snapshot kept for the approval/execution
 record; it is not a canonical wrapper. `title` and `question` are separate
 structured fields. Each artifact file is immutable and unique, so a later
-Plan turn creates a new complete snapshot/approval row and never replaces an
+Plan/Goal turn creates a new complete snapshot/approval row and never replaces an
 earlier file. Hash and byte size authenticate the file before approval, but the
 approval UI may simply open the relative path.
 

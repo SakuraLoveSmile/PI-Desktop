@@ -14,7 +14,7 @@
 > composer placeholder per D094/D066, home empty stack and bottom composer per
 > D111/D204/D206,
 > Projects index table per D066/D133, settings full-page shell per D063 with the
-> compact seven-destination directory from D090/D133/D166, and retained path-keyed
+> compact eight-destination directory from D090/D133/D166, and retained path-keyed
 > project groups per D093 (which preserves D088's Temporary/exact-path boundary
 > while restoring scoped project and conversation organization actions), and
 > product branding/icon contract per D094/D160.
@@ -135,7 +135,7 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 ### 2.1 Purpose
 
 Global controls bar: task title, model selection, and window actions. Project
-scope remains available in the title tooltip. The active session's Agent/Plan
+scope remains available in the title tooltip. The active session's Agent/Plan/Goal
 control belongs solely to the
 left-of-input Composer chip. (Settings is reached from the command palette /
 application menu, not the top bar.)
@@ -154,7 +154,7 @@ The conversation top bar renders for the chat route only; Pull requests, Schedul
 Plugins, and Settings keep the frameless drag band. It owns the task title, the
 downward-opening model picker, and window actions only. Project scope remains in
 the title tooltip instead of adding another visible label. The left-of-input
-Composer chip is the sole Agent/Plan control and writes the session `mode`; the
+Composer chip is the sole Agent/Plan/Goal control and writes the session `mode`; the
 Thinking and permission triggers remain in the Composer (§11).
 
 ### 2.3 Layout
@@ -1421,19 +1421,19 @@ fields. It is never a JSON dump.
 
 ---
 
-## 10A. PlanApprovalCard
+## 10A. ContractApprovalCard (Plan / Goal)
 
 ### 10A.1 Purpose
 
 Inline approval surface for the exact Markdown bytes submitted by the same pi
-Agent and preserved in a new immutable `.pi/plan/*.md` artifact. It is distinct
-from `PermissionCard`: it approves a Plan → Agent transition and an explicit
+Agent and preserved in a new immutable `.pi/<kind>/*.md` artifact. It is distinct
+from `PermissionCard`: it approves a Plan or Goal → Agent transition and an explicit
 execution permission mode, not an individual tool call.
 
 ### 10A.2 Content
 
 The card renders the host-issued request identity, structured title and
-question, an opener for the exact `.pi/plan/*.md` path, status, and absolute
+question, an opener for the exact `.pi/<kind>/*.md` path, status, and absolute
 expiry. Opening the artifact reads the host-written file; renderer edits do
 not change the approved bytes. Inline Markdown, SHA-256, byte size, and
 revision/feedback controls are not rendered card content.
@@ -1446,8 +1446,8 @@ revision/feedback controls are not rendered card content.
 | Resolving | all actions disabled | retain the proposal until host result |
 | Approved | no actions | same Agent continues in Agent with selected permission mode |
 | Queued / Running | no actions | approved execution is active and tied to the same approval row |
-| Rejected | no actions | run stops and session remains Plan |
-| Expired / Interrupted | no actions | failed closed; a new plan must be submitted unless approval already committed, in which case session remains Agent |
+| Rejected | no actions | run stops and session remains in its contract mode |
+| Expired / Interrupted | no actions | failed closed; a new contract must be submitted unless approval already committed, in which case session remains Agent |
 
 Approve opens the explicit Ask / Accept edits / Auto choice with Ask selected for
 each new proposal, independent of any prior approval choice. Reject carries no
@@ -1468,7 +1468,7 @@ present the interrupted terminal snapshot after restart.
 - The card is a session-scoped `region` with a localized plan title.
 - Approval, reject, and abort controls have explicit labels and
   keyboard focus.
-- The selected permission mode exposes radio semantics and its Plan Bash
+- The selected permission mode exposes radio semantics and its Plan/Goal Bash
   consequence is available in the accessible description.
 - Resolution does not navigate to another session or take focus from a
   different session.
@@ -1485,7 +1485,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 
 ```text
 +----------------------------------------------+
-| [Agent/Plan] [Thinking] [permission mode]    |
+| [Agent/Plan/Goal] [Thinking] [permission mode] |
 | ───────────────────────────                  |
 | textarea (auto-growing, 1 line → max 7)      |
 | placeholder: "Ask PI-Desktop to do anything"      |
@@ -1512,7 +1512,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   layer.
 - Border: border-default top
 - Padding: px-4 py-3 inner textarea
-- Font: text-sm for both Agent and Plan; mode changes semantics and tool
+- Font: text-sm for Agent, Plan, and Goal; mode changes semantics and tool
   controls, not the typography
 - Bottom-anchored: fixed at bottom of MainChat area
 
@@ -1528,10 +1528,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | Running | textarea and mode/thinking/permission controls remain editable for the next turn; abort button visible | Abort active, Send hidden; configuration is queued |
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
-| Plan / planning | textarea active while idle; Plan badge and permission chip visible | inspect, send, or submit plan |
-| Plan / awaiting approval | transcript shows the title/question, artifact opener, expiry, and status for the exact `.pi/plan/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
+| Plan / Goal / planning | textarea active while idle; contract badge and permission chip visible | inspect, send, or submit a contract |
+| Plan / Goal / awaiting approval | transcript shows the title/question, artifact opener, expiry, and status for the exact `.pi/<kind>/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
 | Plan / queued or running | Agent badge remains selected; queue/running state is visible; draft and next-turn controls remain editable | abort; Send hidden; no replay control |
-| Plan / planning after rejected, expired, or interrupted proposal | Plan chip remains visible and editable | send a later prompt; submit a new plan; no execution action |
+| Plan / Goal / planning after rejected, expired, or interrupted proposal | contract chip remains visible and editable | send a later prompt; submit a new contract; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
 
 ### 11.5 Interactions
@@ -1673,10 +1673,10 @@ Anatomy:
   draft as complete `@path` text using D124's quoting. Reference-only drafts
   are sendable. Builtin/plugin dispatch still bypasses the model-ready gate
   when no prompt text or file reference is sent.
-- The Agent/Plan mode aliases can prefix a prompt in the same draft:
-  `/agent-mode <prompt>` and `/plan-mode <prompt>` apply the mode first, then
-  send `<prompt>` plus any serialized references through the normal prompt
-  path so the user turn remains in the transcript. Goal follows the same rule.
+- The Agent/Plan/Goal mode aliases can prefix a prompt in the same draft:
+  `/agent-mode <prompt>`, `/plan-mode <prompt>`, and `/goal-mode <prompt>` apply
+  the mode first, then send `<prompt>` plus any serialized references through
+  the normal prompt path so the user turn remains in the transcript.
   An alias-only mode command remains local. The composer is cleared only after
   the local action or prompt dispatch is accepted; a failed dispatch retains
   the complete visible draft and references for retry.
@@ -1819,7 +1819,7 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 |---|---|---|
 | No sessions | "Start your first conversation" | "New Task" button → focus composer |
 | No provider | "No model provider configured" | "Add provider" link → Settings → Agent → Providers |
-| No project (Agent or Plan) | "No project open — workspace tools unavailable" | "Open folder" button → ProjectPicker |
+| No project (Agent, Plan, or Goal) | "No project open — workspace tools unavailable" | "Open folder" button → ProjectPicker |
 | Session empty (first message) | "Ask PI-Desktop to do anything" placeholder (home variant "Ask anything", D094/D066) | N/A |
 
 ### 15.3 Layout
@@ -1861,6 +1861,7 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 |     ▸ Delete Current Session                 |
 |   Category: Mode                             |
 |     ▸ Switch to Plan                         |
+|     ▸ Switch to Goal                         |
 |     ▸ Switch to Agent                        |
 |   Category: Turn                             |
 |     ▸ Abort Active Turn                      |

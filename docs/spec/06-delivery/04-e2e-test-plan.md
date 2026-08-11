@@ -1,7 +1,7 @@
 # 04. E2E Test Plan
 
-> Scope: MVP acceptance scenarios for PI-Desktop  
-> Status: Accepted (protocol automation started; full desktop Playwright deferred to M5+)  
+> Scope: MVP acceptance scenarios plus current shipped product increments for PI-Desktop
+> Status: Accepted (protocol/Electron automation is active; full desktop Playwright remains planned)
 > Cross-references: [acceptance-criteria](02-acceptance-criteria.md) · [milestones](01-mvp-milestones.md) · [ai-development-workflow](03-ai-development-workflow.md) · [change-checklist](05-change-checklist.md)
 
 ---
@@ -15,11 +15,13 @@
 
 ## 2. Non-goals
 
-- Full automated test suite in MVP phase (document scenarios first; automate later).
+- Full UI-driven automated coverage; protocol and source-contract automation is
+  active while the broader desktop suite remains planned.
 - Performance / stress testing (post-MVP).
-- Windows/Linux release qualification (macOS arm64 remains the first-release
-  acceptance platforms per D126; native qualification gaps remain documented).
-- Plugin marketplace scenarios (post-MVP).
+- Native Windows/Linux release qualification (published artifacts exist; native
+  qualification gaps remain documented).
+- Marketplace publisher provenance and hostile-plugin sandbox scenarios; basic
+  browse/install/update flows are already part of the catalog.
 - Remote gateway / control-plane scenarios (post-MVP — ADR 0004 / baseline #20).
 
 ---
@@ -36,7 +38,7 @@
 |---|---|---|---|
 | **Unit** | Single module, no IPC | Many | Vitest / Rust #[test] |
 | **Integration** | IPC contract, host↔renderer, host↔sidecar | Moderate | Vitest + IPC mocks or live Electron |
-| **E2E** | Full user journey through the desktop app | ~89 functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
+| **E2E** | Full user journey through the desktop app | 100+ functional + US-UI visual catalog | protocol smoke + Electron probes now; Playwright later |
 
 **Strategy**: document all E2E scenarios now; add or update unit/integration
 tests alongside code when change risk makes them necessary; automate E2E after
@@ -50,7 +52,7 @@ M5.
 |---|---|---|
 | **Vitest** | Unit + integration (TS side) | Active (`pnpm test`, shared package) |
 | **Rust #[test]** | Host-core unit tests | Active (`cargo test -p host-core`) |
-| **Protocol smoke** | Host RPC + tools + plugins headless | Active (`test:e2e`, 15 checks) |
+| **Protocol smoke** | Host RPC + tools + plugins headless | Active (`test:e2e`, 20 checks) |
 | **Electron probes** | Boot bridge + crash supervision | Active (`test:e2e:boot`, `test:e2e:supervision`) |
 | **Playwright** | Full UI-driven journeys | Planned (post-M5) |
 
@@ -367,8 +369,8 @@ Each scenario is documented in this format:
   the sidebar owns that control). 4) Switch to the Pull requests, Scheduled,
   Plugins, or Settings routes and inspect the same top region.
 - **Expected**: On the chat route the conversation top bar renders with its
-  title, model picker, and actions; it has no Agent|Plan mode control. The
-  left-of-input Composer chip owns the active session's Agent/Plan switch. The
+  title, model picker, and actions; it has no Agent|Plan|Goal mode control. The
+  left-of-input Composer chip owns the active session's Agent/Plan/Goal switch. The
   task title is the only visible title text and is capped at 10 characters
   with an ellipsis; project scope is available through its tooltip. A compact
   status dot appears while running. The sidebar
@@ -384,15 +386,15 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
-#### E2E-088: Composer Agent/Plan chip updates the session
+#### E2E-088: Composer Agent/Plan/Goal chip updates the session
 
 - **Preconditions**: Chat route active; a session selected.
 - **Steps**: 1) Click the left-of-input Composer mode chip to enter Plan. 2)
   Send a prompt that would normally require Write/Edit and observe behavior. 3)
   Click the same Composer chip to return to Agent. 4) Begin a turn and try to
   toggle mode mid-run or while a pending Plan approval is visible.
-- **Expected**: The Composer chip updates the active session `mode` (Plan
-  hard-denies Write/Edit and plugin tools while Bash follows the selected
+- **Expected**: The Composer chip updates the active session `mode` (Plan and
+  Goal hard-deny Write/Edit and plugin tools while Bash follows the selected
   permission mode; Agent allows its normal tools per permission settings). The
   chip is disabled while a turn or active pending approval exists and re-enables
   after the session returns idle/planning. No top-bar mode control is rendered.
@@ -632,8 +634,8 @@ Each scenario is documented in this format:
 #### E2E-019c: Permission modes govern high-risk approval (D115/D132)
 
 - **Preconditions**: Agent mode; project open; global default `ask`.
-- **Steps**: 1) With a newly inherited session and global default Ask every time, open the composer menu — expect Ask every time to be selected with no global-default/inherit label — then ask the Agent to write a workspace file and expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Create another inherited session after setting the global default to Accept edits in Settings — expect the composer chip and menu selection to display Accept edits directly and Write/Edit to be auto-allowed. 5) Switch the session to Plan with Auto set — expect Write/Edit/plugin denied but Bash allowed without confirmation.
-- **Expected**: Effective mode = session override → global default → ask; Plan's Write/Edit/plugin hard deny outranks every mode while Plan Bash follows the selected mode; the composer chip and menu always display the effective mode without default/inherit provenance.
+- **Steps**: 1) With a newly inherited session and global default Ask every time, open the composer menu — expect Ask every time to be selected with no global-default/inherit label — then ask the Agent to write a workspace file and expect a permission card. 2) Switch the session chip to Accept edits; repeat — expect no card for Write/Edit but still a card for Bash. 3) Switch to Auto — expect no card for Bash either. 4) Create another inherited session after setting the global default to Accept edits in Settings — expect the composer chip and menu selection to display Accept edits directly and Write/Edit to be auto-allowed. 5) Switch the session to Plan, then Goal, with Auto set — expect Write/Edit/plugin denied but Bash allowed without confirmation.
+- **Expected**: Effective mode = session override → global default → ask; Plan and Goal Write/Edit/plugin hard denies outrank every mode while their Bash follows the selected mode; the composer chip and menu always display the effective mode without default/inherit provenance.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md §6`, `03-runtime/04-data-storage.md`, `08-meta/decisions-log.md` (D115/D132)
 - **Acceptance**: E (permission modes resolve and enforce host-side)
 - **Milestone**: M5
@@ -703,8 +705,8 @@ Each scenario is documented in this format:
 #### E2E-038: Settings owns the project archive destination
 
 - **Preconditions**: App running with at least one configured provider, one supported local session store, one retained project, and one archived project.
-- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card using the theme preview cards. 4) Open 全局 AI and inspect the Permissions and Context management cards. 5) Open Shortcuts and inspect the Keyboard shortcuts card. 6) Open Model configuration and inspect the provider studio. 7) Open Import, Project archive, and Info in order. 8) Search Settings for "project" or "archive". 9) In Project archive, read the overview counters and compare them with the rendered sections. 10) Switch the sort control from Recent to Name. 11) Search for a known session title, inspect its expanded project row, then reveal more than eight sessions; clear the search with the clear affordance. 12) Open a row menu, dismiss it with Escape and with an outside press. 13) Restore the archived project, then activate it. 14) Return to the app shell and open Plugins.
-- **Expected**: The rail contains exactly Basics, 全局 AI/AI, Shortcuts, Model configuration, Import, Project archive, and Info in that order, each with its semantic Lucide icon (SlidersHorizontal / Sparkles / Keyboard / Bot / Download / Archive / Info); Appearance and Providers remain merged into their owning destinations; Permissions and Context management live under 全局 AI; Keyboard shortcuts has its own destination; Developer lives under Info; Project archive shows active, closed, and archived durable rows without a visibility toggle, grouping them under the always-visible Pinned / All projects / Archived sections (D168) with per-section counts. The overview banner's projects, open, archived, and session counters agree with the rendered rows; sorting by Name reorders rows inside every section without hiding any; search matches project fields and session titles and reports a match count, a session-title result expands its owning project, lists sessions by latest activity with relative update times, and reveals history in batches of eight; clearing the search restores the complete index. The row menu closes on Escape and on an outside press. Restore keeps the archive open and activation returns to chat with the restored project retained in the sidebar; the home sidebar and global page results have no standalone Projects destination; Settings search finds Project archive; Plugins remains an independent app-shell destination.
+- **Steps**: 1) Open Settings. 2) Inspect the complete settings rail. 3) Open Basics and change the theme in its Appearance card using the theme preview cards. 4) Open 全局 AI and inspect the Permissions and Context management cards. 5) Open Shortcuts and inspect the Keyboard shortcuts card. 6) Open Instructions and save global instructions. 7) Open Model configuration and inspect the provider studio. 8) Open Import, Project archive, and Info in order. 9) Search Settings for "project" or "archive". 10) In Project archive, read the overview counters and compare them with the rendered sections. 11) Switch the sort control from Recent to Name. 12) Search for a known session title, inspect its expanded project row, then reveal more than eight sessions; clear the search with the clear affordance. 13) Open a row menu, dismiss it with Escape and with an outside press. 14) Restore the archived project, then activate it. 15) Return to the app shell and open Plugins.
+- **Expected**: The rail contains exactly Basics, 全局 AI/AI, Shortcuts, Instructions, Model configuration, Import, Project archive, and Info in that order, each with its semantic Lucide icon (Sliders / Sparkles / Keyboard / FileText / Bot / Download / Archive / Info); Appearance and Providers remain merged into their owning destinations; Permissions and Context management live under 全局 AI; Keyboard shortcuts and global instructions have their own destinations; Developer lives under Info; Project archive shows active, closed, and archived durable rows without a visibility toggle, grouping them under the always-visible Pinned / All projects / Archived sections (D168) with per-section counts. The overview banner's projects, open, archived, and session counters agree with the rendered rows; sorting by Name reorders rows inside every section without hiding any; search matches project fields and session titles and reports a match count, a session-title result expands its owning project, lists sessions by latest activity with relative update times, and reveals history in batches of eight; clearing the search restores the complete index. The row menu closes on Escape and on an outside press. Restore keeps the archive open and activation returns to chat with the restored project retained in the sidebar; the home sidebar and global page results have no standalone Projects destination; Settings search finds Project archive; Plugins remains an independent app-shell destination.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/01-ui-ia.md`, `03-runtime/11-provider-model-system.md`
 - **Acceptance**: B (model configuration), F (session import)
 - **Milestone**: M4
@@ -1362,10 +1364,10 @@ Each scenario is documented in this format:
 - **Preconditions**: One catalogued reasoning model, one non-reasoning model,
   and one unknown free-form model id.
 - **Steps**: 1) Select each provider/model in turn. 2) Inspect the composer
-  controls beside Agent / Plan. 3) Open the Thinking trigger and choose multiple
+  controls beside Agent / Plan / Goal. 3) Open the Thinking trigger and choose multiple
   supported levels. 4) Inspect the unknown model's menu and Provider Settings.
 - **Expected**: Reasoning models show the current Thinking level immediately to
-  the right of Agent / Plan, expose only their sparse supported levels as a
+  the right of Agent / Plan / Goal, expose only their sparse supported levels as a
   single-column list in canonical order, mark the selected row with a trailing
   check, expose no inherit/default row, size the menu to its content without
   exceeding 160px or the available viewport, truncate overlong labels, and close
@@ -1385,7 +1387,7 @@ Each scenario is documented in this format:
 #### E2E-051: Thinking level persists with the session
 
 - **Preconditions**: A reasoning-capable session is idle.
-- **Steps**: 1) Select `high`. 2) Change Plan/Agent mode without changing the
+- **Steps**: 1) Select `high`. 2) Change Plan/Goal/Agent mode without changing the
   thinking level. 3) Restart the app and reopen the session. 4) Switch to
   another session and back.
 - **Expected**: Every configuration update sends the complete session config;
@@ -2317,7 +2319,7 @@ Each scenario is documented in this format:
   survives restart, and updates the macOS menu; duplicate, modifier-free, and
   reserved assignments show an inline error without changing either action;
   individual and global reset restore the shared defaults; Keyboard shortcuts is
-  its own Settings destination (the seven-item rail remains unchanged). Modifier-only
+  its own Settings destination (the eight-item rail remains unchanged). Modifier-only
   and IME keydowns dispatch nothing, and a held history chord traverses only
   once per physical press.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
@@ -2929,7 +2931,7 @@ Each scenario is documented in this format:
   provider/UI journey Draft
 ## 7A. M6 Plan and shell scenarios
 
-#### E2E-104: Legacy Plan values migrate to schema v10
+#### E2E-104: Legacy contract values migrate to schema v11
 
 - **Preconditions**: Schema-v8 fixtures contain sessions, app defaults, and
   scheduled records with legacy `chat` values plus transcripts and permissions;
@@ -2943,9 +2945,10 @@ Each scenario is documented in this format:
   shell marked temporarily unavailable and nested extension `mode` fields.
 - **Expected**: Every legacy mode is `plan`, Agent remains the new-session and
   new-task default, transcripts/permissions survive, `plan_approvals` retains
-  approval data and has artifact/execution fields, v8→v10 is one atomic
-  transaction after its WAL checkpoint and v8 backup, v9 creates a v9 backup,
-  and migration failure leaves schema v8 authoritative. Every malformed or
+  approval data and has artifact/execution fields, v8→v11 is one atomic
+  transaction after its WAL checkpoint and v8 backup, v9 and v10 create
+  readable backups, and migration failure leaves the source schema
+  authoritative. Every malformed or
   invalid fixture fails closed before schema promotion. The temporarily
   unavailable platform-valid shell remains persisted for runtime fallback, and
   nested extension modes remain unchanged.
@@ -2954,7 +2957,8 @@ Each scenario is documented in this format:
 - **Acceptance**: F (persistence), H (diagnostics)
 - **Milestone**: M6
 - **Status**: Automated (passed 2026-08-05): host-core 139/139, including 15
-  focused DB tests, covers schema-v7→v8→v10, v8→v10, and v9→v10 guarded paths,
+  focused DB tests, covers schema-v7→v8→v11, v8→v11, v9→v11, and v10→v11
+  guarded paths,
   exact readable backups, fail-closed rollback, restart, transcript, settings,
   scheduled-mode, approval-field, and index tests
 
@@ -3226,11 +3230,11 @@ Each scenario is documented in this format:
   descendant process tree and verifies no late marker/output; host-core tests
   verify cancellation registry cleanup
 
-#### E2E-117: Agent/Plan UX and locales contain no Chat controls
+#### E2E-117: Agent/Plan/Goal UX and locales contain no Chat controls
 
 - **Preconditions**: App can run in English and zh-CN with an idle session,
   Plan artifact fixture, shell settings, and command palette available.
-- **Steps**: 1) Inspect Agent/Plan, permission, artifact approval, and shell
+- **Steps**: 1) Inspect Agent/Plan/Goal, permission, artifact approval, and shell
   controls in English. 2) Enter Plan and inspect planning/approval/queue/
   terminal states while the renderer remains alive. 3) Approve and reject a
   proposal, confirming that the approval surface disappears after host
@@ -3246,9 +3250,10 @@ Each scenario is documented in this format:
   Chat mode and request-changes controls. Host/app restart recovery is
   exercised separately by E2E-108 and E2E-109.
 - **Expected**: Agent is the default; the left-of-input Composer chip is the
-  sole active-session Agent/Plan control; Plan shows Ask/Accept edits/Auto, the
-  submitted title/question, an artifact opener, expiry/status, approve/reject
-  only, shell catalog/fallback status, and localized failed-closed states. No
+  sole active-session Agent/Plan/Goal control; Plan and Goal show
+  Ask/Accept edits/Auto, the submitted title/question, an artifact opener,
+  expiry/status, approve/reject only, shell catalog/fallback status, and
+  localized failed-closed states. No
   Chat mode, `/chat-mode`, request-changes action, inline Markdown/hash/size
   requirement, or stale actionable queue is exposed; terminal checkpoint
   metadata may remain non-actionable only for the current renderer lifetime,
@@ -3766,6 +3771,36 @@ Each scenario is documented in this format:
 - **Status**: Unit/source-contract covered; full cross-platform UI journey Draft
   (do not run E2E locally unless explicitly requested)
 
+#### E2E-121: Goal approval resumes autonomous acceptance-criteria execution
+
+- **Preconditions**: A project-bound session has a configured provider and is
+  idle in Agent mode; the workspace permits host artifact creation and has no
+  prior test goal artifact.
+- **Steps**: 1) Switch the session to Goal and let the Agent call
+  `EnterGoalMode`, then `SubmitGoal(title, markdown, question)`. 2) Inspect the
+  exact Markdown bytes in the new `.pi/goal/*.md` artifact and the matching
+  `plan_approvals` row. 3) Confirm the shared approval card exposes only
+  Approve/Reject and that Goal denies Write/Edit/plugin tools while Bash follows
+  the selected permission mode. 4) Approve with Ask and observe the same Agent
+  resume in Agent mode. 5) Inspect the final response for criterion-by-criterion
+  verification or an explicit boundary, then reload the session.
+- **Expected**: Goal uses the Plan approval pipeline without a second planner;
+  the artifact is immutable and the row records `kind = goal`, path, hash,
+  size, and execution state. Approval is a separate user decision, transitions
+  the session to Agent, and starts autonomous work only after approval. The
+  transcript remains reviewable after reload and no scheduled/unattended Goal
+  run can bypass the approval boundary.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`,
+  `03-runtime/03-tools-and-permissions.md`, `03-runtime/04-data-storage.md`,
+  `03-runtime/06-host-rpc-protocol.md`, `03-runtime/10-session-state-machine.md`,
+  `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`, D198
+- **Acceptance**: C (conversation & stream), E (tools & permissions),
+  F (persistence), H (diagnostics), Security
+- **Milestone**: M6+
+- **Status**: Unit/source-contract covered (`packages/agent-runtime` and
+  host-core Goal tests); full UI journey Draft (do not run E2E locally unless
+  explicitly requested)
+
 ## 8. Traceability Matrix
 
 
@@ -3776,13 +3811,13 @@ Each scenario is documented in this format:
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
-| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-AGENTS-001 |
+| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120 |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121 |
 | G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120 |
-| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118 |
-| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119 |
+| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121 |
+| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121 |
 | Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120 |
 
 | Milestone | Scenarios |
@@ -3793,6 +3828,7 @@ Each scenario is documented in this format:
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
 | M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095 |
 | M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103 |
+| M6+ | E2E-121 |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
@@ -3806,7 +3842,8 @@ rather than the A–H criteria; their gold source is the capture suite.
 When adding or changing a feature that affects user-visible or protocol-visible behavior:
 
 1. **Add a new scenario** using the template in §6. Assign the next available ID (`E2E-<N>`).
-2. **Link it** to the relevant acceptance criterion (A–H) and milestone (M1–M6).
+2. **Link it** to the relevant acceptance criterion (A–H) and milestone (M1–M6
+   or M6+ for the current product increment).
 3. **Set status** to `Draft` unless an automated test already exists.
 4. **Update the traceability matrix** in §8.
 5. **Commit** the update as part of the change (per [ai-development-workflow](03-ai-development-workflow.md) R3).
@@ -3864,8 +3901,8 @@ This test plan spec is accepted when:
 ### US-UI-04 Composer without workspace context
 - With a git workspace open, composer does not show project, Local, or branch
   labels above the prompt surface.
-- Operating-mode selector switches between Agent and Plan; Plan keeps the
-  permission-mode chip and explains its Bash tradeoff.
+- Operating-mode selector switches between Agent, Plan, and Goal; both contract
+  modes keep the permission-mode chip and explain their Bash tradeoff.
 
 ### US-UI-05 Locale chrome
 - On a zh-CN system locale, sidebar labels render in Chinese (项目 / 临时会话),
@@ -3873,8 +3910,8 @@ This test plan spec is accepted when:
   localized accessible name 插件.
 - Empty-thread hero and supporting line are localized Chinese copy; project
   name remains a dotted-underline action when a workspace is open.
-- Composer omits the 本地 workspace label and shows Plan/Agent plus the active
-  model ID; both locales expose the Plan approval copy.
+- Composer omits the 本地 workspace label and shows Agent/Plan/Goal plus the
+  active model ID; both locales expose the Plan and Goal approval copy.
 
 ### US-UI-06 Session auto-title
 - Create a new task and send a first prompt such as "同步代码".
@@ -3957,7 +3994,7 @@ This test plan spec is accepted when:
 - On chat home and a docked thread, inspect every composer control.
 - Expect no file, photo, or appshot controls while those payloads are
   unsupported by the pi runtime. Exact reasoning-capable models expose the
-  current Thinking level immediately to the right of Agent / Plan; unsupported
+  current Thinking level immediately to the right of Agent / Plan / Goal; unsupported
   models show no trigger. Unknown compatible models can explicitly enable
   thinking from the model menu, and changes update the durable session.
 - Expect no project, Local, or branch context labels in the composer.
@@ -3978,7 +4015,7 @@ This test plan spec is accepted when:
 - Create a session with provider A/model A, then open the top-bar model menu.
 - Expect enabled, runnable provider/default-model pairs and an Agent entry. The
   model trigger shows only the model ID; a capability-gated Thinking trigger is
-  placed beside Agent / Plan instead of being nested in the model menu.
+  placed beside Agent / Plan / Goal instead of being nested in the model menu.
 - Select provider B/model B, send a prompt, and expect the main-to-sidecar
   `agent.prompt` payload and pi runtime to use B for that session.
 - Switch away and back; expect B to remain selected. While a turn runs, expect
@@ -4119,8 +4156,8 @@ This test plan spec is accepted when:
 ### US-UI-44 Settings compact directory + merged sections
 - Open Settings light theme at ~1200×690.
 - Full-page shell: rail ~260px on `#f3f3f3`, main `#fff`; Back to app; search pill; Basics active pill with icon.
-- Rail order is exactly Basics, 全局 AI/AI, Shortcuts, Model configuration,
-  Import, Project archive, and Info;
+- Rail order is exactly Basics, 全局 AI/AI, Shortcuts, Instructions, Model
+  configuration, Import, Project archive, and Info;
   there are no Personal/Integrations/Coding group headings, plugin duplicate,
   or placeholder destinations.
 - Basics content: large title and an **Appearance** card with working
@@ -4444,7 +4481,7 @@ This test plan spec is accepted when:
 ### US-UI-71 Composer runtime chip descenders (D150)
 - Open empty home and a docked thread with a model ID that contains descenders
   (for example `gpt`, `gemini`, or any id with `g`/`y`/`p`/`q`/`j`).
-- Inspect Agent/Plan, Thinking (when present), permission mode, and the
+- Inspect Agent/Plan/Goal, Thinking (when present), permission mode, and the
   model chip in light and dark.
 - Expect every chip label to show full glyph ink — bottoms of `g`/`y`/`p` are not
   clipped by the 28px capsule — while long model IDs still ellipsize horizontally.

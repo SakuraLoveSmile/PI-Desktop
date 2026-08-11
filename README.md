@@ -29,13 +29,16 @@ There is no account, no subscription, and no cloud in the middle: you connect th
 ## Highlights
 
 - **Any model, your keys.** Anthropic, OpenAI, or anything that speaks an OpenAI-compatible API — hosted relays as well as local gateways like Ollama or LM Studio. Model IDs are free-form (no hardcoded allowlist), with per-model context window, output limit, temperature, and thinking-mode controls.
-- **Agent and Plan modes.** Agent mode reads, edits, and runs commands to get things done. Plan keeps the same agent in a host-authoritative planning state, blocks file edits and plugin tools, and submits an immutable checkpoint for explicit approval before implementation.
+- **Agent, Plan, and Goal modes.** Agent mode reads, edits, and runs commands to get things done. Plan has the same agent inspect the project and submit an immutable implementation checkpoint for approval. Goal lets the agent agree on an outcome and acceptance criteria, then continue autonomously after approval.
 - **You approve every change.** File writes and shell commands ask first, with session-scoped grants and a configurable default policy. Unanswered prompts deny by default.
-- **A real workbench.** Review the agent's edits as diffs, open a terminal, preview in a browser, and browse project files — all in a side panel, without leaving the conversation.
-- **Projects and sessions.** Sessions are grouped by project in a multi-project sidebar, with pinning, archiving, sorting, and throwaway scratch sessions.
+- **A real workbench.** Review the agent's edits as message-scoped diffs with guarded rollback, open a terminal, preview a local app in a browser, and browse project files — all in a side panel, without leaving the conversation.
+- **Projects and sessions.** Sessions are grouped by project in a multi-project sidebar, with pinning, archiving, sorting, branching, notifications, and throwaway scratch sessions.
 - **Local-first and private.** Transcripts live on disk as plain JSONL with a SQLite index — easy to back up, grep, or delete. API keys go into the OS keychain. Logs stay local; there is no telemetry.
-- **Extensible with plugins.** Install `.piplug` packages (or load a folder in dev mode) to add commands, panels, agent tools, and skills. Plugins run out-of-process and are default-deny.
-- **Comfortable to live in.** English and 简体中文, light/dark/system themes, command palette, onboarding checklist, and update notifications for packaged builds.
+- **Extensions beyond plugins.** Manage standalone MCP servers, Skills, and Subagents from the Extensions page, with global or project-scoped activation. Plugins can add commands, panels, agent tools, skills, themes, MCP servers, resident services, and a message bus; the local/official marketplace and `.piplug` package workflow are available today.
+- **A fast daily workflow.** Use slash commands and `@` file references, paste files into session scratch, stage the next turn while an answer streams, search plugins globally with Option/Alt+Space, and create manual or recurring task prompts.
+- **Comfortable to live in.** English and 简体中文, light/dark/system and plugin themes, command palette, onboarding checklist, local notifications, context checkpoints, and update notifications for packaged builds.
+
+Plugin APIs and panels are permission-gated and run out-of-process. Plugin code is still user-trusted code rather than a complete OS sandbox, so review permissions and only install plugins you trust.
 
 <table>
   <tr>
@@ -68,29 +71,30 @@ Packaged builds check GitHub Releases for new versions and show an in-app update
 
 ## Getting started
 
-1. **Add a model provider.** Open **Settings → Models → Add provider**: pick the API style, paste the base URL and your API key, then choose or type a model ID. The key is stored in your OS keychain and never shown again.
+1. **Add a model provider.** Open **Settings → Model configuration → Add provider**: pick the API style, paste the base URL and your API key, then choose or type a model ID. The key is stored in your OS keychain and never shown again.
 2. **Open a project.** Add a project folder from the sidebar — sessions, tools, and permissions are scoped to it.
-3. **Describe the task.** Start in Agent mode to make changes, or switch to Plan when you want the same agent to inspect the project and submit an implementation checkpoint for approval first. Review approved work in the **Review** diff panel before you commit anything.
+3. **Describe the task.** Start in Agent mode to make changes, switch to Plan for an approval checkpoint, or use Goal when you want to approve an outcome rather than prescribe the steps. Review work in the **Review** diff panel before you commit anything.
+4. **Extend the workspace when needed.** Open **Extensions** to add an MCP server, a Skill, a Subagent, or a plugin. Use **Settings → Import** to bring in local sessions from Claude Code, OpenCode, Codex, or Pi.
 
 ## How it works
 
-PI-Desktop keeps privileged work out of the UI process:
+PI-Desktop keeps renderer privileges narrow and separates the agent loop from the desktop UI:
 
-- **Electron shell** — a sandboxed React renderer plus a thin main process that only orchestrates.
-- **Rust host core** — owns SQLite, secrets, permissions, and workspace access, over stdio JSON-RPC.
+- **Electron shell** — a sandboxed React renderer plus the main/preload bridge for desktop-only services such as panels, terminal, browser preview, updates, and supervision.
+- **Rust host core** — owns SQLite, transcript persistence, secrets, permissions, and workspace access over stdio JSON-RPC.
 - **pi agent sidecar** — a Node process running the pi agent engine (`pi-ai` + `pi-agent-core`) for the actual agent loop.
 
 The full picture lives in the [architecture spec](docs/spec/02-architecture/01-architecture.md).
 
 ## Status & roadmap
 
-PI-Desktop is an early preview under active development. Shipped so far: the app shell, streaming agent runtime, the host-authoritative Agent/Plan workflow, workspace tools with the permission system, the plugin foundation, and cross-platform packaging with update checks.
+PI-Desktop is an early preview under active development. The current 0.5.x line ships the app shell, streaming agent runtime, Agent/Plan/Goal contracts, workspace tools with permissions, the workbench, projects and sessions, imports, extensions (plugins/MCP/Skills/Subagents), context checkpoints, notifications, and cross-platform packaging with update checks.
 
-Up next: signed and notarized macOS builds, and the plugin marketplace protocol. See the [milestones](docs/spec/06-delivery/01-mvp-milestones.md) and the [project board](docs/project/BOARD.md).
+Still in progress: signed and notarized macOS builds, native Windows/Linux qualification, a stronger plugin sandbox and publisher-signature path, and full UI-driven E2E coverage. See the [milestones](docs/spec/06-delivery/01-mvp-milestones.md) and the [project board](docs/project/BOARD.md).
 
 ## Development
 
-Prerequisites: Node.js (LTS) with pnpm, and a stable Rust toolchain.
+Prerequisites: Node.js `>=22.19`, pnpm `>=10` (the repository uses pnpm 11), and a stable Rust toolchain.
 
 ```bash
 # build the Rust host core
@@ -98,7 +102,7 @@ cargo build -p host-core
 
 # install JS dependencies and build packages + app
 pnpm install
-pnpm -r --if-present build
+pnpm build:js
 
 # run in dev mode
 pnpm dev
@@ -111,6 +115,11 @@ PI_DESKTOP_E2E_LONG_TIMEOUT=1 pnpm test:e2e:plan
 
 # rendered English / Simplified Chinese Plan acceptance through Electron CDP
 pnpm test:e2e:plan-ui
+
+# focused desktop probes
+pnpm test:e2e:boot
+pnpm test:e2e:supervision
+pnpm test:e2e:subagents
 ```
 
 CI runs JS build / typecheck / lint / unit tests plus `cargo test` for
@@ -126,8 +135,11 @@ git push origin main v0.2.0            # Release workflow builds & publishes
 
 - [Plugin development: zero to one](docs/plugin-development.md)
 - [Spec index](docs/spec/README.md) — start here
+- [Product scope](docs/spec/01-product/01-product-scope.md)
 - [Baseline decisions](docs/spec/00-baseline.md)
 - [Architecture](docs/spec/02-architecture/01-architecture.md)
+- [UI information architecture](docs/spec/04-ux/01-ui-ia.md)
+- [E2E test plan](docs/spec/06-delivery/04-e2e-test-plan.md)
 - [Plugin system](docs/spec/07-plugins/01-plugin-system.md)
 - [ADRs](docs/adr/) · [Milestones](docs/spec/06-delivery/01-mvp-milestones.md) · [Agent guide](AGENTS.md)
 

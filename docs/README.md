@@ -1,15 +1,24 @@
 # PI-Desktop Docs
 
+The current application line is `0.5.6`. The frozen implementation baseline is
+`0.4.15`; later additive behavior is recorded in the ADRs and the current
+product/runtime specifications. The wire protocol remains v9 and the host
+storage schema is v11.
+
 ## Guides
 
 - [Plugin development: zero to one](plugin-development.md)
+- [Product scope](spec/01-product/01-product-scope.md)
+- [UI information architecture](spec/04-ux/01-ui-ia.md)
+- [E2E test plan](spec/06-delivery/04-e2e-test-plan.md)
 
 ## Spec
 
 Domain-organized specifications.
 
 - Index: `docs/spec/README.md`
-- Baseline: `docs/spec/00-baseline.md` (`0.4.12`)
+- Baseline: `docs/spec/00-baseline.md` (`0.4.15`)
+- Current implementation snapshot: [product scope](spec/01-product/01-product-scope.md)
 
 ## ADR
 

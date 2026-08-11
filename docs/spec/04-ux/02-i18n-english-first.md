@@ -97,8 +97,9 @@ Plugins may include localized display fields later, but English fields are requi
    engineering terms (`host`/`backend`/`repo refresh`/`workspace` where the UI
    already says project). Status, empty states, errors, and setup hints explain
     what happened and what to do next (D149)
-10. Agent/Plan selector, Plan states, title/question/artifact-opener/
+10. Agent/Plan/Goal selector, contract states, title/question/artifact-opener/
     expiry/status actions, Bash/Auto mutation warning,
-    shell catalog/unavailable state, fail-closed recovery, and Plan error codes
+    shell catalog/unavailable state, fail-closed recovery, and shared
+    Plan/Goal error codes
     have matching English and zh-CN keys; no Chat operating-mode key or command
     is shipped

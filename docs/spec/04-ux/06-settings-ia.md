@@ -12,10 +12,11 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   1. **Basics** — Lucide `SlidersHorizontal` (appearance, defaults)
   2. **全局 AI / AI** — Lucide `Sparkles` (permissions, context management)
   3. **Shortcuts** — Lucide `Keyboard` (keyboard shortcuts)
-  4. **Model configuration** — Lucide `Bot` (providers and default model)
-  5. **Import** — Lucide `Download` (bring sessions in from other tools)
-  6. **Project archive** — Lucide `Archive` (durable project index)
-  7. **Info** — Lucide `Info` (versions, logs, updates, developer)
+  4. **Instructions** — Lucide `FileText` (global and project instruction files)
+  5. **Model configuration** — Lucide `Bot` (providers and default model)
+  6. **Import** — Lucide `Download` (bring sessions in from other tools)
+  7. **Project archive** — Lucide `Archive` (durable project index)
+  8. **Info** — Lucide `Info` (versions, logs, updates, developer)
   Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
   with the rail label; do not reuse refresh/rotate glyphs here.
 - No additional settings destinations or placeholder navigation rows are shown
@@ -82,7 +83,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 ### Model configuration (`agent` tab)
 - **Studio hero**: provider count, ready count, and current default provider/model summary
 - **Defaults** card:
-  - default operating mode via segmented control (Agent / Plan), with Agent
+  - default operating mode via segmented control (Agent / Plan / Goal), with Agent
     selected for new sessions and new scheduled tasks
   - persisted legacy `Chat` default values are displayed and stored as Plan
   - default model id
@@ -98,10 +99,16 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - API keys are never shown raw after save
 
 The permission-mode selector remains available in the composer while the
-session is in either Agent or Plan. In Plan it controls Bash confirmation only:
-Ask and Accept edits prompt, while Auto may run a mutating Bash command without
-confirmation. The Defaults card must describe that Plan is planning intent,
-not a strict read-only security profile.
+session is in Agent, Plan, or Goal. In Plan and Goal it controls Bash
+confirmation only: Ask and Accept edits prompt, while Auto may run a mutating
+Bash command without confirmation. The Defaults card must describe that both
+contract modes are intent boundaries, not strict read-only security profiles.
+
+### Instructions (`instructions` tab)
+- Edit the global instruction Markdown used by every PI-Desktop Agent session.
+- Show the resolved instruction-file path and save through the host-backed
+  instruction API; project instructions remain managed from the active project
+  menu and are resolved after the global layer.
 
 ### Import
 - Scan supported local agent stores and review candidates through
@@ -176,8 +183,9 @@ not a strict read-only security profile.
 ## 4. Acceptance
 
 1. Opening Settings hides the coding app sidebar (full-page takeover)
-2. Rail shows search + back and exactly Basics, 全局 AI/AI, Shortcuts, Model
-   configuration, Import, Project archive, and Info in that order
+2. Rail shows search + back and exactly Basics, 全局 AI/AI, Shortcuts,
+   Instructions, Model configuration, Import, Project archive, and Info in that
+   order
 3. Appearance is part of Basics and has no standalone rail destination
 4. Providers is part of Agent and has no standalone rail destination
 5. Plugins has no Settings destination; the app-shell Plugins page supports
@@ -214,7 +222,7 @@ not a strict read-only security profile.
 18. Context management exposes no settings at all; protection is always on and
     its budgets scale with the active model's context window, so no persisted
     value can leave a small-window model uncompactable or the guard disabled
-19. The default operating-mode selector contains only Agent and Plan; legacy
+19. The default operating-mode selector contains Agent, Plan, and Goal; legacy
     Chat values migrate to Plan and do not reappear as a selectable option
 20. Command shell selection persists a platform-valid catalog ID, exposes
     unavailable/fallback status, and never authorizes a stale ID/dialect

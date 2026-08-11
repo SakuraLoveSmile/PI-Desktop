@@ -82,7 +82,7 @@ Exit criteria:
 - disable removes contributions
 
 ### M5 — Desktop Hardening
-Status: **In Progress**
+Status: **Complete except credential-gated macOS notarization**
 
 Goal: daily-usable package.
 
@@ -110,24 +110,26 @@ Progress:
 ### M6 — Plan Operating State
 Status: **Complete (2026-08-05)**
 
-Goal: replace the former Chat operating profile with a host-authoritative Plan
-state on the same pi Agent, including a separate approval boundary.
+Goal: replace the former Chat operating profile with host-authoritative Plan
+and Goal contract states on the same pi Agent, including a separate approval
+boundary.
 
 Deliverables:
-- Agent | Plan selector with Agent as the default
+- Agent | Plan | Goal selector with Agent as the default
 - persisted session/settings/scheduled `chat` → `plan` migration
-- protocol v9 and schema v10 with immutable host-written `.pi/plan/*.md`
-  artifacts, structured title/question fields, and `plan_approvals` artifact/
-  execution fields
+- protocol v9 and schema v11 with immutable host-written `.pi/plan/*.md` and
+  `.pi/goal/*.md` artifacts, structured title/question fields, and
+  `plan_approvals` artifact/execution fields
 - Rust-owned mode resolution, Plan tool policy, selectable shell catalog with
   fallback and turn-pinned identity,
   streamed Bash output, bounded timeout, and process-tree cancellation
-- one-Agent `EnterPlanMode` / `SubmitPlan` lifecycle with approve/reject-only
-  resolution and fail-closed recovery
+- one-Agent `EnterPlanMode` / `SubmitPlan` and `EnterGoalMode` / `SubmitGoal`
+  lifecycles with approve/reject-only resolution and fail-closed recovery
 - Plan artifact approval IPC/RPC/events, current-lifetime renderer projection,
   pending-only reload hydration, shell selection, approval UX, and EN/zh-CN copy
-- plugin denial, scheduled Plan rejection, and focused unit/integration
-  verification documented in the E2E plan
+- plugin denial, scheduled contract rejection, selectable shell execution,
+  focused unit/integration verification, and the current extension/subagent
+  flows documented in the E2E plan
 
 Exit criteria:
 - only one pi Agent is used before, during, and after planning
@@ -155,12 +157,21 @@ same-Host UI run covers pending restore, live terminal controls, stable
 Electron/Host identity, and terminal-card absence after renderer reload;
 E2E-108/E2E-109 cover Host restart interruption and no replay.
 
-### M6+ (Post-MVP)
-- Skills depth
-- MCP
-- `.piplug` packaging UX polish
-- marketplace preview
-- Windows/Linux hardening
+### M6+ (Current product increment)
+Implemented after the M6 Plan checkpoint:
+
+- Goal contracts and autonomous post-approval execution
+- standalone MCP and Skills management with global/project activation scopes
+- bounded Subagents with project, user, and builtin definition sources
+- plugin marketplace installation/update review and global plugin launcher
+- session import, scheduled task records, notifications, clipboard file paste,
+  slash commands, `@` file references, and next-turn composer configuration
+
+Remaining work is tracked as product hardening rather than unstarted MVP scope:
+
+- stronger plugin runtime sandboxing and publisher signatures
+- signed/notarized macOS distribution and native Windows/Linux qualification
+- full Playwright/UI-driven E2E coverage
 - additional locales beyond the shipped zh-CN catalog
 
 ## Release constraint

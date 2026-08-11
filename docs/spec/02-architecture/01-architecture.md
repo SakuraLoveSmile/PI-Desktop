@@ -93,8 +93,8 @@ not pass through Rust host-core or the agent sidecar (D120 / ADR 0022).
 5. On tool call:
  5.1 pi requests tool execution via host bridge
   5.2 Rust resolves the durable session mode and evaluates the authoritative
-      Plan/Agent tool policy before permission modes
-  5.3 UI confirms if required, including a separate Plan approval request and
+      Plan/Goal/Agent tool policy before permission modes
+  5.3 UI confirms if required, including a separate Plan/Goal approval request and
       the selected shell identity for Bash
  5.4 Rust resolves the durable session's project and executes the tool in that
      workspace sandbox (never whichever sidebar tab is currently active)
