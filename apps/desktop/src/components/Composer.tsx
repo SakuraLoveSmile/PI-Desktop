@@ -228,18 +228,20 @@ export function Composer({
   const dockRef = useRef<HTMLDivElement>(null);
   const approvalPending = planCheckpoint?.status === "pending";
   const executionActive = isActivePlanExecution(planCheckpoint);
-  const composerBlocked = isRunning || executionActive || approvalPending || pasting;
   const runActive = isRunning || executionActive;
+  const inputBlocked = approvalPending || pasting;
+  const controlsBlocked = approvalPending;
+  const sendBlocked = runActive || approvalPending || pasting;
   const referenceSessionId = activeSessionId ?? "";
   const activeFileReferences = fileReferences.filter(
     (fileReference) => fileReference.sessionId === referenceSessionId,
   );
 
   useEffect(() => {
-    if (!composerBlocked) return;
+    if (!controlsBlocked) return;
     setPermissionOpen(false);
     setThinkingOpen(false);
-  }, [composerBlocked]);
+  }, [controlsBlocked]);
 
   useEffect(() => {
     // Relative autocomplete references belong to the workspace that produced
@@ -418,7 +420,7 @@ export function Composer({
 
   const submit = async () => {
     const content = serializeComposerFileReferences(value, activeFileReferences);
-    if (!content || composerBlocked || pasting) return;
+    if (!content || sendBlocked) return;
     // Slash dispatch (D123): builtin/plugin aliases execute locally without
     // a session or a model; templates and unknown /names stay prompt text
     // (main expands templates). Runs before the model-ready gate on purpose.
@@ -485,7 +487,7 @@ export function Composer({
   };
 
   const pasteClipboardFiles = async (event: ClipboardEvent<HTMLTextAreaElement>) => {
-    if (composerBlocked || pasting) return;
+    if (inputBlocked) return;
     const files = clipboardFiles(event.clipboardData);
     if (!files.length) return;
 
@@ -546,7 +548,7 @@ export function Composer({
     value,
     cursor,
     composing,
-    enabled: !composerBlocked,
+    enabled: !inputBlocked,
   });
 
   const acceptCompletion = (index: number) => {
@@ -602,7 +604,7 @@ export function Composer({
         {planCheckpoint?.status === "pending" ? (
           <PlanApprovalBar proposal={planCheckpoint} />
         ) : null}
-        <div className={`composer-shell${composerBlocked ? " is-gated" : ""}`}>
+        <div className={`composer-shell${inputBlocked ? " is-gated" : ""}`}>
           {inputFocused ? (
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
           ) : null}
@@ -634,7 +636,7 @@ export function Composer({
                       aria-label={t("chat.removeFileReference", {
                         name: fileReference.name,
                       })}
-                      disabled={composerBlocked}
+                      disabled={inputBlocked}
                       onClick={() => {
                         setFileReferences((current) =>
                           current.filter(
@@ -653,8 +655,8 @@ export function Composer({
             <textarea
               ref={ref}
               className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}
-              readOnly={composerBlocked}
-              aria-readonly={composerBlocked}
+              readOnly={inputBlocked}
+              aria-readonly={inputBlocked}
               aria-busy={pasting}
               rows={2}
               placeholder={t(variant === "home" ? "chat.placeholderHome" : "chat.placeholder")}
@@ -734,7 +736,7 @@ export function Composer({
               <button
                 className="icon-btn mode-chip"
                 title={t("settings.mode")}
-                disabled={composerBlocked}
+                disabled={controlsBlocked}
                 onClick={async () => {
                   setThinkingOpen(false);
                   setPermissionOpen(false);
@@ -766,7 +768,7 @@ export function Composer({
                     title={`${t("chat.thinking")} · ${thinkingLabel}`}
                     aria-haspopup="menu"
                     aria-expanded={thinkingOpen}
-                    disabled={composerBlocked}
+                    disabled={controlsBlocked}
                     onClick={() => {
                       setPermissionOpen(false);
                       setThinkingOpen((open) => !open);
@@ -794,7 +796,7 @@ export function Composer({
                             }`}
                             role="menuitemradio"
                             aria-checked={thinkingLevel === level}
-                            disabled={composerBlocked}
+                            disabled={controlsBlocked}
                             onClick={async () => {
                               try {
                                 await configureActiveSession({
@@ -843,7 +845,7 @@ export function Composer({
                     }
                     aria-haspopup="menu"
                     aria-expanded={permissionOpen}
-                    disabled={composerBlocked}
+                    disabled={controlsBlocked}
                     onClick={() => {
                       setThinkingOpen(false);
                       setPermissionOpen((open) => !open);
@@ -863,7 +865,7 @@ export function Composer({
                             type="button"
                             role="menuitemradio"
                             aria-checked={effectivePermissionMode === candidate}
-                            disabled={composerBlocked}
+                            disabled={controlsBlocked}
                             className={`composer-plus-item ${
                               effectivePermissionMode === candidate ? "active" : ""
                             }`}
@@ -913,7 +915,7 @@ export function Composer({
                   }
                   disabled={
                     !hasDraftContent ||
-                    composerBlocked ||
+                    sendBlocked ||
                     (!modelReady && !value.trim().startsWith("/"))
                   }
                   onClick={() => void submit()}

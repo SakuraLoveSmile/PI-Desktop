@@ -2293,6 +2293,35 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     });
     await runtime.dispose();
   });
+
+  it("keeps timing and an output estimate when a streamed answer is aborted", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    (runtime as any).streamStartedAt = Date.now() - 2_000;
+    (runtime as any).currentAssistant = {
+      id: "assistant-aborted",
+      role: "assistant",
+      content: "A partial answer that remains visible",
+      thinking: "Brief reasoning",
+      createdAt: new Date().toISOString(),
+      status: "streaming",
+    };
+
+    (runtime as any).finalizeCurrentAssistant("aborted");
+
+    const terminal = onEvent.mock.calls.at(-1)?.[0] as any;
+    expect(terminal.event).toMatchObject({
+      type: "message_end",
+      message: {
+        status: "aborted",
+        responseDurationMs: expect.any(Number),
+        responseOutputTokens: expect.any(Number),
+      },
+    });
+    expect(terminal.event.message.responseDurationMs).toBeGreaterThanOrEqual(2_000);
+    expect(terminal.event.message.responseOutputTokens).toBeGreaterThan(0);
+    await runtime.dispose();
+  });
 });
 
 describe("DesktopAgentRuntime compaction restore", () => {

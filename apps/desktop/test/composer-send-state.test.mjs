@@ -21,6 +21,21 @@ test("composer send/stop button follows the visible session's run state", () => 
   assert.match(composerRight, /stop-btn/);
   assert.match(composerRight, /send-btn/);
   assert.match(composerRight, /onClick=\{\(\) => void abort\(\)\}/);
+  assert.match(composer, /const inputBlocked = approvalPending \|\| pasting;/);
+  assert.match(composer, /const controlsBlocked = approvalPending;/);
+  assert.match(composer, /readOnly=\{inputBlocked\}/);
+  assert.match(composer, /disabled=\{controlsBlocked\}/);
+  assert.match(composer, /sendBlocked[\s\S]*\(!modelReady/);
+  assert.doesNotMatch(composer, /const inputBlocked = [^;]*runActive/);
+});
+
+test("running session configuration is queued for the next turn", () => {
+  assert.match(store, /pendingSessionConfigurations = new Map/);
+  assert.match(
+    store,
+    /get\(\)\.runningSessions\[sessionId\][\s\S]*pendingSessionConfigurations\.set\(sessionId, config\)/,
+  );
+  assert.match(store, /event\.type === "agent_end"[\s\S]*flushPendingSessionConfiguration\(envelope\.sessionId\)/);
 });
 
 test("creating a session resets the run flag to the new session's own state", () => {

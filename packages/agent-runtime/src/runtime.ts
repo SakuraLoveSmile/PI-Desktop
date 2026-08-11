@@ -825,6 +825,14 @@ function estimateToolTokenUsage(
   };
 }
 
+function estimateVisibleResponseOutputTokens(
+  message: Pick<UiMessage, "content" | "thinking">,
+): number | undefined {
+  const visible = `${message.thinking ?? ""}\n${message.content}`.trim();
+  if (!visible) return undefined;
+  return Math.max(1, Math.ceil(Array.from(visible).length / 4));
+}
+
 export class DesktopAgentRuntime {
   private agent: Agent;
   private models: Models;
@@ -3585,6 +3593,13 @@ export class DesktopAgentRuntime {
             this.streamStartedAt !== undefined
               ? Math.max(0, endedAt - this.streamStartedAt)
               : undefined;
+          const responseOutputTokens =
+            aborted && (!usage || usage.outputTokens <= 0)
+              ? estimateVisibleResponseOutputTokens({
+                  content: nextText,
+                  thinking: nextThinking,
+                })
+              : undefined;
           this.currentAssistant = {
             ...this.currentAssistant,
             content: nextText,
@@ -3602,6 +3617,9 @@ export class DesktopAgentRuntime {
             providerId: this.provider.id,
             ...(usage ? { usage } : {}),
             ...(responseDurationMs !== undefined ? { responseDurationMs } : {}),
+            ...(responseOutputTokens !== undefined
+              ? { responseOutputTokens }
+              : {}),
             ...(classifiedError
               ? { error: classifiedError, isError: true }
               : {}),
@@ -3743,9 +3761,21 @@ export class DesktopAgentRuntime {
       };
       this.emit({ type: "message_start", message: this.currentAssistant });
     } else {
+      const responseDurationMs =
+        this.streamStartedAt !== undefined
+          ? Math.max(0, Date.now() - this.streamStartedAt)
+          : undefined;
+      const responseOutputTokens =
+        status === "aborted"
+          ? estimateVisibleResponseOutputTokens(this.currentAssistant)
+          : undefined;
       this.currentAssistant = {
         ...this.currentAssistant,
         status,
+        ...(responseDurationMs !== undefined ? { responseDurationMs } : {}),
+        ...(responseOutputTokens !== undefined
+          ? { responseOutputTokens }
+          : {}),
         ...(error ? { error, isError: true } : {}),
       };
     }

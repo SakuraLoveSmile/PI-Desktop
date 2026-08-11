@@ -5,10 +5,12 @@ import {
   calculateCacheRate,
   calculateTokenRate,
   calculateContextUsage,
+  estimateResponseOutputTokens,
   estimateToolTokenUsage,
   resolveContextWindow,
   toolTokenUsage,
   usageTokenTotal,
+  settleStoppedAssistantMetrics,
 } from "../src/lib/context-usage.ts";
 
 test("context usage exposes the remaining ring percentage", () => {
@@ -64,6 +66,26 @@ test("generation throughput uses provider output and stream duration", () => {
   assert.equal(calculateTokenRate(1_200, 4_000), 300);
   assert.equal(calculateTokenRate(0, 4_000), undefined);
   assert.equal(calculateTokenRate(1_200, undefined), undefined);
+});
+
+test("stopped responses get immediate estimated output and duration metadata", () => {
+  const message = {
+    id: "assistant-1",
+    role: "assistant",
+    content: "Partial answer",
+    thinking: "Reasoning",
+    createdAt: "2026-08-11T00:00:00.000Z",
+    status: "streaming",
+  };
+  assert.equal(estimateResponseOutputTokens(message), 6);
+  assert.deepEqual(
+    settleStoppedAssistantMetrics(message, Date.parse("2026-08-11T00:00:02.500Z")),
+    {
+      ...message,
+      responseDurationMs: 2_500,
+      responseOutputTokens: 6,
+    },
+  );
 });
 
 test("cache rate measures cached prompt tokens against the full prompt", () => {

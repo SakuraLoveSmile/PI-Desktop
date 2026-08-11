@@ -61,6 +61,7 @@ import {
   type SessionSort,
 } from "../lib/sidebar-preferences";
 import { createFrameBatcher } from "../lib/frame-batcher";
+import { settleStoppedAssistantMetrics } from "../lib/context-usage";
 import { formatToolValue } from "../lib/tool-display";
 import { withReviewChangeState } from "../lib/workspace-review";
 import {
@@ -163,6 +164,18 @@ type SubmittedComposerDraft = {
   resolveAbort?: (restored: boolean) => void;
 };
 const submittedComposerDrafts = new Map<string, SubmittedComposerDraft>();
+type SessionConfiguration = Pick<
+  SessionSummary,
+  "mode" | "providerId" | "modelId" | "thinkingLevel"
+> &
+  Partial<Pick<SessionSummary, "permissionMode">>;
+/**
+ * The host pins one configuration for an active turn. Composer changes made
+ * while that turn runs are optimistic next-turn choices and flush once the
+ * durable turn reaches a terminal event.
+ */
+const pendingSessionConfigurations = new Map<string, SessionConfiguration>();
+const sessionConfigurationFlushes = new Map<string, Promise<void>>();
 const sessionDetailLoads = new Map<
   string,
   ReturnType<typeof api.getSession>
@@ -1326,8 +1339,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       await get().newSession();
       sessionId = get().activeSessionId;
     }
-    if (!sessionId || get().runningSessions[sessionId]) return;
+    if (!sessionId) return;
     if (get().pendingPlans[sessionId]?.status === "pending") return;
+    if (
+      get().runningSessions[sessionId] ||
+      sessionConfigurationFlushes.has(sessionId)
+    ) {
+      pendingSessionConfigurations.set(sessionId, config);
+      set((state) => ({
+        sessions: state.sessions.map((session) =>
+          session.id === sessionId ? { ...session, ...config } : session,
+        ),
+        planningStates: {
+          ...state.planningStates,
+          [sessionId]: config.mode === "plan" ? "planning" : "inactive",
+        },
+      }));
+      return;
+    }
     const result = await api.configureSession(sessionId, config);
     set((state) => ({
       sessions: state.sessions.map((session) =>
@@ -1750,6 +1779,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Capture before awaiting the abort IPC: its terminal event may arrive
     // first and clear the pending snapshot.
     const submittedDraft = submittedComposerDrafts.get(sessionId);
+    const stoppedAtMs = Date.now();
     if (submittedDraft && !submittedDraft.abortResolution) {
       submittedDraft.abortResolution = new Promise<boolean>((resolve) => {
         submittedDraft.resolveAbort = resolve;
@@ -1807,6 +1837,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           // Best effort — the local transcript already reflects the undo.
         }
       }
+      void flushPendingSessionConfiguration(sessionId);
       return;
     }
     submittedDraft?.resolveAbort?.(false);
@@ -1815,7 +1846,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     // becomes an aborted-but-kept answer; still-running tools close out.
     const settled = messages.map((message) => {
       if (message.role === "assistant" && message.status === "streaming") {
-        return { ...message, status: "aborted" as const };
+        return {
+          ...settleStoppedAssistantMetrics(message, stoppedAtMs),
+          status: "aborted" as const,
+        };
       }
       if (message.role === "tool" && message.toolStatus === "running") {
         return {
@@ -1837,6 +1871,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch {
       // Best effort — the host may persist its own copy of the turn.
     }
+    void flushPendingSessionConfiguration(sessionId);
   },
 
   activateProject: async (path, opts) => {
@@ -2058,6 +2093,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   deleteSession: async (id) => {
     if (!id) return;
     await api.deleteSession(id);
+    pendingSessionConfigurations.delete(id);
     sessionTranscriptCache.delete(id);
     if (get().activeSessionId === id) get().resetWorkPanelContext();
     set((state) => {
@@ -2544,6 +2580,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: false },
       }));
+      void flushPendingSessionConfiguration(envelope.sessionId);
     } else if (
       event.type === "agent_end" ||
       event.type === "error"
@@ -2581,6 +2618,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                     : "completed",
               },
       }));
+      void flushPendingSessionConfiguration(envelope.sessionId);
     }
     if (event.type === "planning_state") {
       nextPlanSyncGeneration(envelope.sessionId);
@@ -2662,6 +2700,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ),
         },
       }));
+      void flushPendingSessionConfiguration(envelope.sessionId);
     }
     if (envelope.sessionId !== get().activeSessionId) {
       // Cross-session events update only their scoped state. They never
@@ -3218,3 +3257,57 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clearComposerPrefill: () => set({ composerPrefill: null }),
 }));
+
+function flushPendingSessionConfiguration(sessionId: string): Promise<void> {
+  const active = sessionConfigurationFlushes.get(sessionId);
+  if (active) return active;
+  if (useAppStore.getState().runningSessions[sessionId]) {
+    return Promise.resolve();
+  }
+
+  const flush = (async () => {
+    while (!useAppStore.getState().runningSessions[sessionId]) {
+      const config = pendingSessionConfigurations.get(sessionId);
+      if (!config) break;
+      pendingSessionConfigurations.delete(sessionId);
+      try {
+        const result = await api.configureSession(sessionId, config);
+        useAppStore.setState((state) => ({
+          sessions: state.sessions.map((session) =>
+            session.id === sessionId
+              ? {
+                  ...result.session,
+                  pinned: sessionIsPinned(sessionId, state.sessionMeta),
+                  archived: sessionIsArchived(sessionId, state.sessionMeta),
+                }
+              : session,
+          ),
+          planningStates: {
+            ...state.planningStates,
+            [sessionId]:
+              result.session.mode === "plan" ? "planning" : "inactive",
+          },
+        }));
+      } catch (error) {
+        useAppStore.getState().showToast(
+          error instanceof Error ? error.message : String(error),
+          { variant: "error" },
+        );
+        void useAppStore.getState().refreshSessions();
+      }
+    }
+  })();
+  sessionConfigurationFlushes.set(sessionId, flush);
+  void flush.finally(() => {
+    if (sessionConfigurationFlushes.get(sessionId) === flush) {
+      sessionConfigurationFlushes.delete(sessionId);
+    }
+    if (
+      pendingSessionConfigurations.has(sessionId) &&
+      !useAppStore.getState().runningSessions[sessionId]
+    ) {
+      void flushPendingSessionConfiguration(sessionId);
+    }
+  });
+  return flush;
+}

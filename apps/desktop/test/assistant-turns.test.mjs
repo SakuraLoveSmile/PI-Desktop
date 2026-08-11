@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   assistantTurnContent,
+  assistantTurnResponseOutputTokens,
+  assistantTurnResponseOutputIsEstimated,
   assistantTurnUsage,
   buildTranscriptEntries,
   subagentRunsEqual,
@@ -45,6 +47,21 @@ test("groups assistant fragments and tools into one conversational turn", () => 
     assistantTurnContent(entries[1]),
     "I will inspect the code.\n\nThe problem is in the renderer.\n\nFixed and verified.",
   );
+});
+
+test("assistant turn output prefers exact usage and falls back to stopped estimates", () => {
+  const { entries } = buildTranscriptEntries([
+    message("user", "user", "Stop"),
+    message("first", "assistant", "Partial", { responseOutputTokens: 7 }),
+    message("second", "assistant", "Done", {
+      usage: { inputTokens: 10, outputTokens: 3, totalTokens: 13 },
+      responseOutputTokens: 99,
+    }),
+  ]);
+  const turn = entries[1];
+  assert.equal(turn.kind, "assistant-turn");
+  assert.equal(assistantTurnResponseOutputTokens(turn), 10);
+  assert.equal(assistantTurnResponseOutputIsEstimated(turn), true);
 });
 
 test("keeps a recovered tool error inside one successful assistant turn", () => {

@@ -179,12 +179,12 @@ test("mode commands configure the active session instead of only changing defaul
 });
 
 test("pending approval keeps the draft while gating every composer control", () => {
-  assert.match(composerSource, /readOnly=\{composerBlocked\}/);
-  assert.match(composerSource, /aria-readonly=\{composerBlocked\}/);
-  assert.match(composerSource, /enabled: !composerBlocked/);
-  assert.match(composerSource, /disabled=\{composerBlocked\}/);
-  assert.doesNotMatch(composerSource, /disabled=\{composerBlocked \|\| !activeSession\}/);
-  assert.match(composerSource, /composerBlocked\s*\|\|\s*\(!modelReady/);
+  assert.match(composerSource, /readOnly=\{inputBlocked\}/);
+  assert.match(composerSource, /aria-readonly=\{inputBlocked\}/);
+  assert.match(composerSource, /enabled: !inputBlocked/);
+  assert.match(composerSource, /disabled=\{controlsBlocked\}/);
+  assert.match(composerSource, /const controlsBlocked = approvalPending;/);
+  assert.match(composerSource, /const sendBlocked = runActive \|\| approvalPending \|\| pasting;/);
   assert.match(storeSource, /if \(get\(\)\.pendingPlans\[sessionId\]\?\.status === "pending"\) return/);
 });
 
@@ -193,7 +193,7 @@ test("composer configuration materializes a draft when navigation has no active 
     storeSource,
     /let sessionId = get\(\)\.activeSessionId;[\s\S]*?if \(!sessionId\) \{[\s\S]*?await get\(\)\.newSession\(\);[\s\S]*?sessionId = get\(\)\.activeSessionId;/,
   );
-  assert.match(composerSource, /disabled=\{composerBlocked\}/);
+  assert.match(composerSource, /disabled=\{controlsBlocked\}/);
 });
 
 test("Plan approval labels and Auto file-change warning are locale-backed", () => {

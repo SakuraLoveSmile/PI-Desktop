@@ -46,12 +46,12 @@ test("each pending proposal starts with Ask and never reads the previous proposa
 });
 
 test("pending input is retained but every composer/model mutation control is gated", () => {
-  assert.match(composer, /readOnly=\{composerBlocked\}/);
-  assert.match(composer, /aria-readonly=\{composerBlocked\}/);
-  assert.match(composer, /enabled: !composerBlocked/);
-  assert.match(composer, /disabled=\{composerBlocked\}/);
-  assert.doesNotMatch(composer, /disabled=\{composerBlocked \|\| !activeSession\}/);
-  assert.match(composer, /composerBlocked\s*\|\|\s*\(!modelReady/);
+  assert.match(composer, /readOnly=\{inputBlocked\}/);
+  assert.match(composer, /aria-readonly=\{inputBlocked\}/);
+  assert.match(composer, /enabled: !inputBlocked/);
+  assert.match(composer, /disabled=\{controlsBlocked\}/);
+  assert.match(composer, /const controlsBlocked = approvalPending;/);
+  assert.match(composer, /const sendBlocked = runActive \|\| approvalPending \|\| pasting;/);
   assert.match(model, /disabled=\{modelBlocked\}/);
   assert.match(store, /pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.match(store, /pendingPlans\[resolution\.sessionId\]/);

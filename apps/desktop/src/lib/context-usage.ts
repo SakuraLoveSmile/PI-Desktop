@@ -198,6 +198,38 @@ export function calculateTokenRate(
 }
 
 /**
+ * Estimate visible assistant output when an interrupted provider response does
+ * not include final usage. This mirrors the runtime's durable fallback.
+ */
+export function estimateResponseOutputTokens(
+  message: Pick<UiMessage, "content" | "thinking">,
+): number | undefined {
+  const visible = `${message.thinking ?? ""}${message.content ?? ""}`.trim();
+  return visible ? Math.max(1, Math.ceil(Array.from(visible).length / 4)) : undefined;
+}
+
+/** Add the timing metadata needed to show throughput immediately after stop. */
+export function settleStoppedAssistantMetrics(
+  message: UiMessage,
+  stoppedAtMs = Date.now(),
+): UiMessage {
+  const createdAtMs = Date.parse(message.createdAt);
+  const responseDurationMs =
+    message.responseDurationMs ??
+    (Number.isFinite(createdAtMs) ? Math.max(1, stoppedAtMs - createdAtMs) : undefined);
+  const responseOutputTokens =
+    positiveTokenCount(message.usage?.outputTokens) > 0
+      ? message.responseOutputTokens
+      : message.responseOutputTokens ?? estimateResponseOutputTokens(message);
+
+  return {
+    ...message,
+    responseDurationMs,
+    responseOutputTokens,
+  };
+}
+
+/**
  * Calculate the provider-reported prompt cache hit rate.
  * `inputTokens` is the uncached prompt portion and `cacheReadTokens` is the
  * portion served from cache, so cache writes do not affect this denominator.

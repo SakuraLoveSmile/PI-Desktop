@@ -53,6 +53,8 @@ import {
   assistantTurnContent,
   assistantTurnMessages,
   assistantTurnResponseDuration,
+  assistantTurnResponseOutputIsEstimated,
+  assistantTurnResponseOutputTokens,
   assistantTurnTools,
   assistantTurnUsage,
   buildTranscriptEntries,
@@ -156,12 +158,16 @@ function ContextUsageInspector({
   contextWindow,
   tools,
   responseDurationMs,
+  responseOutputTokens,
+  responseOutputEstimated = false,
 }: {
   usage: MessageUsage;
   turnUsage: MessageUsage;
   contextWindow: number;
   tools: UiMessage[];
   responseDurationMs?: number;
+  responseOutputTokens?: number;
+  responseOutputEstimated?: boolean;
 }) {
   const { t } = useTranslation();
   const tooltipId = useId();
@@ -181,7 +187,7 @@ function ContextUsageInspector({
   const context = calculateContextUsage(usage, contextWindow);
   const turnTotal = usageTokenTotal(turnUsage);
   const throughput = calculateTokenRate(
-    turnUsage.outputTokens,
+    responseOutputTokens ?? turnUsage.outputTokens,
     responseDurationMs,
   );
   const cacheRate = calculateCacheRate(
@@ -383,9 +389,14 @@ function ContextUsageInspector({
           <strong>
             {throughput === undefined
               ? t("chat.usageThroughputUnavailable")
-              : t("chat.usageThroughput", {
-                  count: formatTokenCount(throughput),
-                })}
+              : t(
+                  responseOutputEstimated
+                    ? "chat.usageThroughputEstimated"
+                    : "chat.usageThroughput",
+                  {
+                    count: formatTokenCount(throughput),
+                  },
+                )}
           </strong>
         </div>
       </div>
@@ -581,6 +592,8 @@ function MessageMeta({
   contextWindow = DEFAULT_CONTEXT_WINDOW,
   tools = [],
   responseDurationMs,
+  responseOutputTokens,
+  responseOutputEstimated,
 }: {
   modelId?: string;
   usage?: MessageUsage;
@@ -588,9 +601,18 @@ function MessageMeta({
   contextWindow?: number;
   tools?: UiMessage[];
   responseDurationMs?: number;
+  responseOutputTokens?: number;
+  responseOutputEstimated?: boolean;
 }) {
+  const { t } = useTranslation();
   const visibleContextUsage = contextUsage ?? usage;
-  if (!modelId && !usage && !visibleContextUsage) return null;
+  const throughput = calculateTokenRate(
+    responseOutputTokens ?? usage?.outputTokens ?? 0,
+    responseDurationMs,
+  );
+  if (!modelId && !usage && !visibleContextUsage && throughput === undefined) {
+    return null;
+  }
   return (
     <div className="message-meta">
       {modelId ? (
@@ -605,7 +627,16 @@ function MessageMeta({
           contextWindow={contextWindow}
           tools={tools}
           responseDurationMs={responseDurationMs}
+          responseOutputTokens={responseOutputTokens}
+          responseOutputEstimated={responseOutputEstimated}
         />
+      ) : null}
+      {!visibleContextUsage && throughput !== undefined ? (
+        <span className="message-meta-chip throughput">
+          {t("chat.usageThroughputEstimated", {
+            count: formatTokenCount(throughput),
+          })}
+        </span>
       ) : null}
     </div>
   );
@@ -1842,7 +1873,13 @@ const AssistantTurn = memo(function AssistantTurn({
     .find((message) => (message.content || "").trim());
   const metaMessage = [...messages]
     .reverse()
-    .find((message) => message.modelId || message.usage);
+    .find(
+      (message) =>
+        message.modelId ||
+        message.usage ||
+        message.responseDurationMs ||
+        message.responseOutputTokens,
+    );
   const latestUsageMessage = [...messages]
     .reverse()
     .find((message) => message.usage);
@@ -1850,6 +1887,8 @@ const AssistantTurn = memo(function AssistantTurn({
   const usage = assistantTurnUsage(entry);
   const tools = assistantTurnTools(entry);
   const responseDurationMs = assistantTurnResponseDuration(entry);
+  const responseOutputTokens = assistantTurnResponseOutputTokens(entry);
+  const responseOutputEstimated = assistantTurnResponseOutputIsEstimated(entry);
   const modelId = metaMessage?.modelId ?? latestUsageMessage?.modelId;
   const contextWindow = latestUsage
     ? resolveContextWindow(
@@ -1901,7 +1940,7 @@ const AssistantTurn = memo(function AssistantTurn({
             </div>
           ),
         )}
-        {!isActive && metaMessage && (metaMessage.modelId || usage) ? (
+        {!isActive && metaMessage ? (
           <MessageMeta
             modelId={modelId}
             usage={usage}
@@ -1909,6 +1948,8 @@ const AssistantTurn = memo(function AssistantTurn({
             contextWindow={contextWindow}
             tools={tools}
             responseDurationMs={responseDurationMs}
+            responseOutputTokens={responseOutputTokens}
+            responseOutputEstimated={responseOutputEstimated}
           />
         ) : null}
         {(content || hasError) && actionMessage ? (
