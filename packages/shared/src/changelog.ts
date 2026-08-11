@@ -23,6 +23,16 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.5.6",
+    date: "2026-08-11",
+    highlights: [
+      "Open installed plugins from a global keyboard launcher without leaving the current workspace.",
+      "Collapse expanded thinking, tool, and subagent details to keep long conversations readable.",
+      "Keep task configuration available during active turns and show throughput statistics after stopping.",
+      "Refine corner hierarchy across the interface for clearer visual grouping.",
+    ],
+  },
+  {
     version: "0.5.5",
     date: "2026-08-11",
     highlights: [
@@ -230,6 +240,16 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.5.6",
+    date: "2026-08-11",
+    highlights: [
+      "通过全局键盘启动器打开已安装插件，无需离开当前工作区。",
+      "可收起展开的思考、工具和子代理详情，让长对话更易阅读。",
+      "任务运行期间仍可调整下一轮配置，并在停止后查看吞吐统计。",
+      "优化全局圆角层级，让界面分组更清晰。",
+    ],
+  },
   {
     version: "0.5.5",
     date: "2026-08-11",
