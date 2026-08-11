@@ -90,7 +90,8 @@ After development:
 8. Verify the expected commits are present
 9. Remove the request worktree
 10. Delete the merged request branch
-11. Do not push to remote
+11. Push only when the user explicitly requested remote publishing for the
+    current request
 
 If another agent has updated `main`, the request branch must be refreshed before merging:
 
@@ -103,7 +104,10 @@ Use merge instead of rebase when repository policy requires it.
 
 Do not overwrite, reset, or discard changes already merged by another agent.
 
-Remote publishing is the user's responsibility.
+Remote publishing is opt-in. Never infer a push from ordinary development,
+commit, merge, or completion requests. When the user explicitly requests a
+push, verify the remote, branch, commit set, and Git identity before publishing.
+Never force-push unless the user explicitly requests that exact operation.
 
 ### 5. Clean Up the Request Worktree
 
@@ -138,7 +142,7 @@ Requirements:
 11. Refresh the branch against the latest local `main`
 12. Merge into local `main`
 13. Remove the request worktree and delete the merged branch
-14. Do not push
+14. Push only when explicitly requested by the user for the current request
 
 Development must not begin before steps 1–3 are complete.
 
@@ -187,7 +191,8 @@ See:
 * [ ] Changes were merged into local `main`
 * [ ] The request worktree was removed after the merge
 * [ ] The merged request branch was deleted
-* [ ] Nothing was pushed to remote
+* [ ] Remote publishing was skipped unless explicitly requested
+* [ ] If pushed, the remote, branch, commit set, and Git identity were verified
 
 ## Final Report
 
@@ -200,4 +205,4 @@ Report:
 * Commit hashes and messages
 * Merge result
 * Worktree and branch cleanup result
-* Confirmation that nothing was pushed
+* Push target and result, or confirmation that nothing was pushed
