@@ -23,6 +23,16 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.5.7",
+    date: "2026-08-12",
+    highlights: [
+      "Add asktool questions with single-select, multi-select, custom answers, skip, and decline flows.",
+      "Keep multi-question progress visible with answered, unanswered, and skipped indicators.",
+      "Place interactive questions in the same composer approval surface as Plan and Goal approvals.",
+      "Simplify approval cards and remember the selected approval mode for the next request.",
+    ],
+  },
+  {
     version: "0.5.6",
     date: "2026-08-11",
     highlights: [
@@ -240,6 +250,16 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.5.7",
+    date: "2026-08-12",
+    highlights: [
+      "新增 asktool 提问能力，支持单选、多选、自定义回答、跳过和拒绝回答。",
+      "通过已回答、未回答和已跳过指示器展示多问题进度。",
+      "将交互式提问放置在与 Plan 和 Goal 审批相同的 Composer 审批区域。",
+      "简化审批确认卡片，并记住下次请求使用的审批模式。",
+    ],
+  },
   {
     version: "0.5.6",
     date: "2026-08-11",
