@@ -282,15 +282,19 @@ fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
-fn ascii_slug(value: &str, fallback: &str) -> String {
+fn title_slug(value: &str, fallback: &str) -> String {
     let mut slug = String::new();
     for ch in value.trim().chars() {
-        if ch.is_ascii_alphanumeric() {
-            slug.push(ch.to_ascii_lowercase());
+        if ch.is_alphanumeric() {
+            slug.push(if ch.is_ascii() {
+                ch.to_ascii_lowercase()
+            } else {
+                ch
+            });
         } else if !slug.is_empty() && !slug.ends_with('-') {
             slug.push('-');
         }
-        if slug.len() >= 64 {
+        if slug.chars().count() >= 64 {
             break;
         }
     }
@@ -305,7 +309,7 @@ fn ascii_slug(value: &str, fallback: &str) -> String {
 }
 
 fn plan_filename(kind: &str, title: &str, now: DateTime<Local>, suffix: u32) -> String {
-    let slug = ascii_slug(title, kind);
+    let slug = title_slug(title, kind);
     let stamp = now.format("%Y%m%d-%H%M");
     if suffix == 1 {
         format!("{slug}-{stamp}.md")
@@ -436,7 +440,6 @@ fn safe_artifact_path(
         .to_str()
         .ok_or_else(|| plan_error("PLAN_ARTIFACT_PATH_UNSAFE"))?;
     if filename.is_empty()
-        || !filename.is_ascii()
         || !filename.ends_with(".md")
         || filename.contains('/')
         || filename.contains('\\')
@@ -1182,15 +1185,16 @@ mod tests {
     }
 
     #[test]
-    fn slug_and_filename_are_ascii_and_local_minute_shaped() {
+    fn title_slug_and_filename_are_descriptive_and_local_minute_shaped() {
         let now = Local::now();
         let filename = plan_filename(KIND_PLAN, "Build API / v2", now, 1);
         assert!(filename.starts_with("build-api-v2-"));
         assert!(filename.ends_with(".md"));
         assert!(filename.is_ascii());
         assert_eq!(filename.len(), "build-api-v2-YYYYMMDD-HHmm.md".len());
-        assert_eq!(ascii_slug("中文 / ???", KIND_PLAN), "plan");
-        assert_eq!(ascii_slug("中文 / ???", KIND_GOAL), "goal");
+        assert_eq!(title_slug("中文 / ???", KIND_PLAN), "中文");
+        assert_eq!(title_slug("中文 / ???", KIND_GOAL), "中文");
+        assert!(plan_filename(KIND_PLAN, "中文审批卡片", now, 1).starts_with("中文审批卡片-"));
     }
 
     #[test]

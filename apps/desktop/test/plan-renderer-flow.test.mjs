@@ -38,9 +38,10 @@ test("terminal proposals and execution states stay session-scoped and readable",
   assert.doesNotMatch(store, /planApprovalPermissionMode/);
 });
 
-test("each pending proposal starts with Ask and never reads the previous proposal choice", () => {
-  assert.match(approvalBar, /useState<GlobalPermissionMode>\(\s*PLAN_APPROVAL_DEFAULT_MODE/);
-  assert.match(approvalBar, /setApprovalMode\(PLAN_APPROVAL_DEFAULT_MODE\)/);
+test("each pending proposal restores the remembered approval choice", () => {
+  assert.match(approvalBar, /useState<GlobalPermissionMode>\(\s*readPlanApprovalMode\(\)/);
+  assert.match(approvalBar, /setApprovalMode\(readPlanApprovalMode\(\)\)/);
+  assert.match(approvalBar, /rememberPlanApprovalMode\(selectedMode\)/);
   assert.match(approvalBar, /\}, \[proposal\.id\]\);/);
   assert.doesNotMatch(approvalBar, /state\.settings|planApprovalPermissionMode/);
 });

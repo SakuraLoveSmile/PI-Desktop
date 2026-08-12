@@ -1432,11 +1432,11 @@ execution permission mode, not an individual tool call.
 
 ### 10A.2 Content
 
-The card renders the host-issued request identity, structured title and
-question, an opener for the exact `.pi/<kind>/*.md` path, status, and absolute
-expiry. Opening the artifact reads the host-written file; renderer edits do
-not change the approved bytes. Inline Markdown, SHA-256, byte size, and
-revision/feedback controls are not rendered card content.
+The card renders the structured title and an opener for the exact
+`.pi/<kind>/*.md` path. Opening the artifact reads the host-written file;
+renderer edits do not change the approved bytes. The submitted question/
+description, status, validity/deadline, inline Markdown, SHA-256, byte size,
+and revision/feedback controls are not rendered card content.
 
 ### 10A.3 Actions and states
 
@@ -1449,9 +1449,8 @@ revision/feedback controls are not rendered card content.
 | Rejected | no actions | run stops and session remains in its contract mode |
 | Expired / Interrupted | no actions | failed closed; a new contract must be submitted unless approval already committed, in which case session remains Agent |
 
-Approve opens the explicit Ask / Accept edits / Auto choice with Ask selected for
-each new proposal, independent of any prior approval choice. Reject carries no
-permission mode. The renderer keeps the latest proposal/execution snapshot per
+Approve opens the explicit Ask / Accept edits / Auto choice with the last selected
+mode remembered on this device. Reject carries no permission mode. The renderer keeps the latest proposal/execution snapshot per
 session only for the current renderer lifetime from live Host events, while only
 a pending snapshot has actions or gates the Composer. Renderer reload calls
 `plans.pending` and restores a still-pending row with its original deadline while
@@ -1529,7 +1528,7 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | Plan / Goal / planning | textarea active while idle; contract badge and permission chip visible | inspect, send, or submit a contract |
-| Plan / Goal / awaiting approval | transcript shows the title/question, artifact opener, expiry, and status for the exact `.pi/<kind>/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
+| Plan / Goal / awaiting approval | approval surface shows only the title and artifact opener for the exact `.pi/<kind>/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
 | Plan / queued or running | Agent badge remains selected; queue/running state is visible; draft and next-turn controls remain editable | abort; Send hidden; no replay control |
 | Plan / Goal / planning after rejected, expired, or interrupted proposal | contract chip remains visible and editable | send a later prompt; submit a new contract; no execution action |
 | No workspace | textarea active, warning banner "No project — tools limited" | Send enabled |
@@ -1604,9 +1603,9 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   confirmation under Auto; it does not imply that Write/Edit/plugin tools are
   available.
 - Goal shares the Plan approval surface (D198). The bar reads its copy from the
-  proposal's `kind`, so a goal contract shows "Goal approval", "Open goal", and
-  "Working toward goal" while the layout, permission split-button, expiry
-  reconciliation, and terminal-status behavior stay identical.
+  proposal's `kind`, so a goal contract shows the matching approval label and
+  artifact opener while the layout and remembered permission split-button stay
+  identical.
 
 ### 11.6 Accessibility
 

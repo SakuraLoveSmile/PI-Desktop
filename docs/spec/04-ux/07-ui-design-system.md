@@ -698,9 +698,9 @@ The composer renders only controls connected to the active pi session:
 - The left-of-input Composer Agent/Plan/Goal chip is the sole active-session mode
   control and cycles Agent → Plan → Goal → Agent. The top bar has no duplicate mode segmented control. The model
   picker closes and is disabled while an active `pending` Plan or Goal approval exists;
-  terminal proposal snapshots do not disable it. Each new pending proposal's
-  explicit approval selector starts at Ask, regardless of the previous
-  proposal's selected mode. Live Host events update the latest checkpoint or
+  terminal proposal snapshots do not disable it. The approval selector remembers
+  the last selected mode on this device and uses it for the next pending proposal.
+  Live Host events update the latest checkpoint or
   execution status retained for the current renderer lifetime. A renderer
   reload rehydrates only a pending row through `plans.pending`; terminal cards
   are not restored.

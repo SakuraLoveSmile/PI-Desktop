@@ -1501,3 +1501,18 @@ D193, and D194.
   Host RPC and storage schema versions remain unchanged; see
   `07-plugins/10-plugin-devex.md`, `07-plugins/12-plugin-ipc-and-host-services.md`,
   and E2E-022B.
+
+## 2026-08-12 — Approval cards focus on the artifact and remember the mode
+
+- Plan/Goal approval cards now show only the title, host-created artifact
+  opener/path, Reject, and Approve. Submitted question/description, status,
+  validity/deadline, and inline warnings are not rendered.
+- The selected Ask / Accept edits / Auto approval mode is remembered in
+  renderer-local device preferences and becomes the next approval's default;
+  Ask remains the safe fallback.
+- Title-derived artifact filenames preserve Unicode alphanumeric characters so
+  localized plan titles remain recognizable. The host's existing internal
+  deadline remains a compatibility/fail-closed boundary but is not exposed by
+  the approval card.
+- Decision D215 and ADR 0076 amend D189/ADR 0053. Protocol and storage versions
+  remain unchanged.

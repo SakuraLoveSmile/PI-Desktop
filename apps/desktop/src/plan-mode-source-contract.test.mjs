@@ -160,8 +160,7 @@ test("terminal Plan checkpoints stop rendering the approval bar", () => {
   for (const status of ["rejected", "expired", "interrupted", "approved", "queued", "running"]) {
     assert.match(planStateSource, new RegExp(`"${status}"`));
   }
-  assert.match(barSource, /planCheckpointStatus\(proposal, resolving\)/);
-  assert.match(barSource, /data-execution-state=\{proposal\.executionState \|\| ""\}/);
+  assert.doesNotMatch(barSource, /planCheckpointStatus|plan-approval-status|plan-approval-expiry/);
   assert.match(
     composerSource,
     /planCheckpoint\?\.status === "pending"[\s\S]*<PlanApprovalBar proposal=\{planCheckpoint\} \/>/,
@@ -196,7 +195,7 @@ test("composer configuration materializes a draft when navigation has no active 
   assert.match(composerSource, /disabled=\{controlsBlocked\}/);
 });
 
-test("Plan approval labels and Auto file-change warning are locale-backed", () => {
+test("Plan approval labels and remembered modes are locale-backed", () => {
   assert.match(englishSource, /modePlan: "Plan"/);
   assert.match(chineseSource, /modePlan: "规划"/);
   assert.match(englishSource, /modeGoal: "Goal"/);
@@ -211,6 +210,8 @@ test("Plan approval labels and Auto file-change warning are locale-backed", () =
   assert.match(chineseSource, /statusQueued: "目标已排队"/);
   assert.match(englishSource, /approveAuto: "Approve \(Auto\)"/);
   assert.match(chineseSource, /approveAuto: "批准（全自动）"/);
+  assert.doesNotMatch(englishSource, /expiresAt:/);
+  assert.doesNotMatch(chineseSource, /expiresAt:/);
   assert.match(englishSource, /autoWarning: "Auto runs Bash without asking and may change files\."/);
   assert.match(chineseSource, /autoWarning: "自动模式会直接运行 Bash，且可能修改文件。"/);
   assert.doesNotMatch(englishSource, new RegExp(legacyModeKey));

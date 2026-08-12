@@ -143,11 +143,13 @@ inline in the originating session after `SubmitPlan(...)` or `SubmitGoal(...)`
 causes host-core to preserve the exact Markdown bytes in a new immutable
 `.pi/plan/*.md` or `.pi/goal/*.md` artifact.
 
-The card shows the structured title and question, an opener for the exact
-artifact path, the current status, and the absolute deadline. It offers only:
+The card shows only the structured title and an opener for the exact artifact
+path. It does not render the submitted question/description, status, or
+approval validity/deadline. It offers only:
 
 - **Approve** with an explicit target permission mode (`Ask`, `Accept edits`,
-  or `Auto`; default `Ask`)
+  or `Auto`; the last selected mode is remembered on this device and is the
+  default for the next approval)
 - **Reject**, which stops the run and leaves the contract state active; a later
   turn must submit a new complete snapshot/artifact
 
@@ -178,9 +180,10 @@ after a full Host/app restart.
 6. concurrent session requests remain isolated and never take over the visible
    conversation or its work panel; post-approval artifacts remain assigned to
    the request's originating session
-7. Plan/Goal approval displays title/question, opens the immutable artifact, shows
-   expiry/status, and sends the selected permission mode only on approval; no
-   inline Markdown/hash/byte-size or revision/feedback action is rendered
+7. Plan/Goal approval displays only the title and artifact opener, remembers the
+   selected permission mode for the next approval on this device, and sends that
+   mode only on approval; no question/description, validity/deadline, status,
+   inline Markdown/hash/byte-size, or revision/feedback action is rendered
 8. reject, expiry, abort, crash, stale response, and persistence failure close
    pending Plan/Goal work in its contract state with no execution capability; a
    later prompt may revise and submit a new immutable artifact
