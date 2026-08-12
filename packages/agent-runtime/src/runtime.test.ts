@@ -922,6 +922,7 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
       "Bash",
       "Edit",
       "Write",
+      "asktool",
       "EnterPlanMode",
       "EnterGoalMode",
       "new_context",
@@ -937,6 +938,45 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     expect(prompt).toContain("BrowserPreview");
     expect(prompt).toContain("plugin_demo_validate");
 
+    await runtime.dispose();
+  });
+
+  it("pauses asktool until the renderer resolves every question", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const askTool = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "asktool",
+    );
+    const pending = askTool.execute("ask-call-1", {
+      questions: [
+        { question: "Color?", options: ["Blue", "Green"] },
+        { question: "Targets?", options: ["Web", "Desktop"], multiSelect: true },
+      ],
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const request = onEvent.mock.calls
+      .map(([envelope]) => envelope as any)
+      .map((envelope) => envelope.event)
+      .find((event) => event.type === "asktool_request")?.request;
+    expect(request).toMatchObject({
+      sessionId: "session-1",
+      toolCallId: "ask-call-1",
+      questions: [
+        { question: "Color?", options: ["Blue", "Green"] },
+        { question: "Targets?", options: ["Web", "Desktop"], multiSelect: true },
+      ],
+    });
+    expect(
+      runtime.resolveAskTool({
+        requestId: request.requestId,
+        sessionId: "session-1",
+        answers: [["Blue"], null],
+      }),
+    ).toEqual({ ok: true });
+    await expect(pending).resolves.toMatchObject({
+      content: [{ text: "Color?：Blue\n---\nTargets?：" }],
+      details: { answers: [["Blue"], null] },
+    });
     await runtime.dispose();
   });
 

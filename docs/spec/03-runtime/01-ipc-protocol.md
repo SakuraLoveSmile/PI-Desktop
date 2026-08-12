@@ -16,7 +16,7 @@ Principles:
 | Domain | Description |
 |---|---|
 | `app` | App info, health checks |
-| `agent` | Conversation, abort, status |
+| `agent` | Conversation, abort, status, and interactive asktool resolution |
 | `plan` | Plan proposal listing, resolution, and change events |
 | `session` | Session CRUD / history |
 | `settings` | Config read/write |
@@ -47,6 +47,7 @@ Examples:
 - `pi-desktop/agent/prompt`
 - `pi-desktop/agent/abort`
 - `pi-desktop/agent/event/message`
+- `pi-desktop/agent/askTool/resolve`
 - `pi-desktop/session/list`
 - `pi-desktop/project/open`
 - `pi-desktop/project/openFolder`

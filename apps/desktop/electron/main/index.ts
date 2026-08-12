@@ -44,6 +44,7 @@ import {
   normalizeGlobalPermissionMode,
   normalizeProposalKind,
   type AgentEventEnvelope,
+  type AskToolResolution,
   type AppMenuCommand,
   type AppNotification,
   type CommandShellCatalog,
@@ -5484,6 +5485,18 @@ function registerIpc() {
       data: { requestId: resolution.requestId, decision: resolution.decision },
     });
     return host.call("permissions.resolve", resolution);
+  });
+
+  handle(IPC.invoke.askToolResolve, async (resolution: AskToolResolution) => {
+    if (!sidecar) throw new Error("sidecar unavailable");
+    const sessionId = String(resolution?.sessionId ?? "").trim();
+    const requestId = String(resolution?.requestId ?? "").trim();
+    if (!sessionId || !requestId) throw new Error("asktool resolution identity required");
+    return sidecar.call("asktool.resolve", {
+      ...resolution,
+      sessionId,
+      requestId,
+    });
   });
 
   handle(IPC.invoke.plansPending, async (input: { sessionId?: string } = {}) => {

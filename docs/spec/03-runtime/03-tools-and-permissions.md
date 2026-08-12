@@ -15,6 +15,7 @@
 | Permission timeout | 120s → deny |
 | allow-session scope | toolName |
 | Bash style | non-interactive; selected host catalog shell with streamed output |
+| asktool | interactive multi-question tool; no validity deadline; skipped answers become empty output fields |
 
 ## 1. Goal
 
@@ -36,6 +37,7 @@ Let the agent get things done, but stay under control by default.
 | `Write` | high | Create/overwrite files |
 | `Edit` | high | Modify files |
 | `Bash` | high | Execute commands |
+| `asktool` | low | Ask one or more user questions and return the submitted answers as tool output |
 
 > Names may be fine-tuned during implementation, but semantics stay consistent.
 
@@ -62,7 +64,7 @@ operation and never bypasses host-core policy.
 
 ## 3. Common Tool Constraints
 
-Every tool must have:
+Every non-interactive execution tool must have:
 
 1. JSON schema / typebox parameter definition
 2. timeout
@@ -70,6 +72,10 @@ Every tool must have:
 4. output truncation policy
 5. trace id
 6. structured results
+
+`asktool` is the interactive exception: it has a typed request event, waits for
+the renderer response without an expiry, and returns a bounded structured tool
+result. Stopping the turn resolves outstanding questions as skipped.
 
 ## 4. Path Rules
 

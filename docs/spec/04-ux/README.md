@@ -12,3 +12,4 @@
 | [08-component-spec.md](08-component-spec.md) | Key component specs (shell, chat, tools, permissions) |
 | [09-interaction-patterns.md](09-interaction-patterns.md) | Interaction patterns (keyboard, streaming, abort, collapse) |
 | [10-workbuddy-benchmark-ux.md](10-workbuddy-benchmark-ux.md) | WorkBuddy benchmark walkthrough + adopt/adapt/reject proposals |
+| [11-asktool-question-card.md](11-asktool-question-card.md) | Inline multi-question card |

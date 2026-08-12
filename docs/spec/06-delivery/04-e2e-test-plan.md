@@ -4540,3 +4540,25 @@ This test plan spec is accepted when:
 - **Specs linked**: `04-ux/07-ui-design-system.md` §6.2, ADR 0071
 - **Milestone**: M5
 - **Status**: Partially automated (radius token and shared-control source test)
+
+#### E2E-123: asktool collects multiple answers and returns skipped placeholders
+
+- **Preconditions**: Agent, Plan, or Goal mode; a configured provider; a
+  session with an active transcript.
+- **Steps**: 1) Ask the agent to call `asktool` with a single-select question,
+  a multi-select question, and an option list for each. 2) Confirm each card
+  shows the fixed custom-input choice. 3) Answer the first question, click
+  Next, and select two answers on the multi-select question. 4) Skip the final
+  question without entering text. 5) Inspect the completed tool row and the
+  next model response.
+- **Expected**: One question is visible at a time; the small indicators show
+  answered, current, and skipped states. The request has no countdown. The
+  tool output is ordered as `question：answer`, uses `、` between multiple
+  answers and `\n---\n` between questions, and keeps `question：` for the
+  skipped question. Decline all produces empty placeholders for every question
+  and still completes the tool call.
+- **Specs linked**: `03-runtime/17-asktool-questions.md`,
+  `04-ux/11-asktool-question-card.md`, ADR 0077
+- **Acceptance**: E (interactive tool output), C (inline card)
+- **Milestone**: M5
+- **Status**: Draft (unit coverage active; desktop journey pending)

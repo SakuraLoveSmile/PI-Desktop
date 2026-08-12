@@ -10,6 +10,7 @@ import {
   headPermission,
   queuedPermissionCount,
 } from "../lib/pending-permissions";
+import { headAsk, queuedAskCount } from "../lib/pending-asks";
 
 const StableComposer = memo(Composer);
 
@@ -42,6 +43,12 @@ export const ChatSurface = memo(function ChatSurface() {
   const queuedPermissions = useAppStore((state) =>
     queuedPermissionCount(state.pendingPermissions, state.activeSessionId),
   );
+  const activeAsk = useAppStore((state) =>
+    headAsk(state.pendingAsks, state.activeSessionId),
+  );
+  const queuedAsks = useAppStore((state) =>
+    queuedAskCount(state.pendingAsks, state.activeSessionId),
+  );
   const planCheckpoint = useAppStore((state) =>
     state.activeSessionId
       ? state.planCheckpoints[state.activeSessionId]
@@ -70,6 +77,8 @@ export const ChatSurface = memo(function ChatSurface() {
       isRunning,
       pendingPermission: activePermission,
       queuedPermissions,
+      pendingAsk: activeAsk,
+      queuedAsks,
       approvalPending: planCheckpoint?.status === "pending",
       planCheckpoint,
       planningState: activePlanningState,
@@ -77,6 +86,8 @@ export const ChatSurface = memo(function ChatSurface() {
     [
       activePermission,
       queuedPermissions,
+      activeAsk,
+      queuedAsks,
       planCheckpoint,
       activePlanningState,
       activeSessionId,
@@ -103,6 +114,7 @@ export const ChatSurface = memo(function ChatSurface() {
     transcriptView.approvalPending ||
     Boolean(transcriptView.planCheckpoint) ||
     Boolean(transcriptView.pendingPermission) ||
+    Boolean(transcriptView.pendingAsk) ||
     (transcriptView.isRunning && transcriptView.planningState === "planning") ||
     transcriptView.messages.some((message) => {
       const hasContent = Boolean((message.content || "").trim());
@@ -165,6 +177,8 @@ export const ChatSurface = memo(function ChatSurface() {
             isRunning={transcriptView.isRunning}
             pendingPermission={transcriptView.pendingPermission}
             queuedPermissions={transcriptView.queuedPermissions}
+            pendingAsk={transcriptView.pendingAsk}
+            queuedAsks={transcriptView.queuedAsks}
             planningState={transcriptView.planningState}
           />
           <StableComposer variant="docked" />

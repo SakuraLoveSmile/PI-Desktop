@@ -18,3 +18,4 @@
 | [14-secrets-storage.md](14-secrets-storage.md) | Secrets storage & redaction |
 | [15-workspace-ignore-rules.md](15-workspace-ignore-rules.md) | Workspace ignore & denylist |
 | [16-tool-result-limits.md](16-tool-result-limits.md) | Tool result size limits |
+| [17-asktool-questions.md](17-asktool-questions.md) | Interactive multi-question tool |

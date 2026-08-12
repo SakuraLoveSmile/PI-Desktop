@@ -432,6 +432,40 @@ export type ToolPermissionResolution = {
   decision: PermissionDecision;
 };
 
+/** A model-created question shown in the inline asktool card. */
+export type AskToolQuestion = {
+  question: string;
+  options: string[];
+  multiSelect?: boolean;
+};
+
+export type AskToolRequest = {
+  requestId: string;
+  sessionId: string;
+  toolCallId: string;
+  questions: AskToolQuestion[];
+};
+
+/** `null` means the user skipped that question or declined the whole prompt. */
+export type AskToolResolution = {
+  requestId: string;
+  sessionId: string;
+  answers: Array<string[] | null>;
+};
+
+/** Stable model-facing serialization for one asktool result. */
+export function formatAskToolOutput(
+  questions: AskToolQuestion[],
+  answers: Array<string[] | null>,
+): string {
+  return questions
+    .map((question, index) => {
+      const answer = answers[index]?.join("、") ?? "";
+      return `${question.question}：${answer}`;
+    })
+    .join("\n---\n");
+}
+
 export type AgentEvent =
   | { type: "agent_start" }
   | { type: "agent_end"; messageIds: string[] }
@@ -456,6 +490,7 @@ export type AgentEvent =
     }
   | ({ type: "planning_state" } & Omit<PlanningStateEvent, "sessionId">)
   | { type: "tool_permission_request"; request: ToolPermissionRequest }
+  | { type: "asktool_request"; request: AskToolRequest }
   | {
       type: "compaction_start";
       reason: ContextCompactionReason;

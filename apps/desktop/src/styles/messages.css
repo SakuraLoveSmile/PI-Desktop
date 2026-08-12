@@ -48,6 +48,176 @@
   background: var(--ds-bg-secondary);
 }
 
+.asktool-card {
+  width: min(100%, 720px);
+  margin: 10px 0;
+  padding: 16px;
+  border: 1px solid var(--ds-border-default);
+  border-left: 3px solid var(--ds-accent);
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-secondary);
+}
+
+.asktool-card-header,
+.asktool-card-actions {
+  display: flex;
+  align-items: center;
+}
+
+.asktool-card-header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.asktool-card-title {
+  color: var(--ds-text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.asktool-card-progress,
+.asktool-question-number {
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+}
+
+.asktool-decline {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--ds-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.asktool-decline:hover {
+  color: var(--ds-text-primary);
+}
+
+.asktool-indicators {
+  display: flex;
+  gap: 6px;
+  margin: 14px 0 16px;
+}
+
+.asktool-indicator {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--radius-full);
+  background: transparent;
+  cursor: pointer;
+}
+
+.asktool-indicator.current {
+  outline: 2px solid color-mix(in oklab, var(--ds-accent) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.asktool-indicator.answered {
+  border-color: var(--ds-success);
+  background: var(--ds-success);
+}
+
+.asktool-indicator.skipped {
+  border-color: var(--ds-text-muted);
+  background: var(--ds-text-muted);
+}
+
+.asktool-question-number {
+  margin-bottom: 5px;
+}
+
+.asktool-question {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-compact-plus);
+}
+
+.asktool-options {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.asktool-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-primary);
+  color: var(--ds-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+  transition: border-color var(--motion-duration-fast) var(--motion-ease-out),
+    background-color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.asktool-option:hover,
+.asktool-option.selected {
+  border-color: var(--ds-accent);
+  background: color-mix(in oklab, var(--ds-accent) 8%, var(--ds-bg-primary));
+  color: var(--ds-text-primary);
+}
+
+.asktool-option-mark {
+  display: grid;
+  width: 17px;
+  height: 17px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--radius-3xs);
+  color: var(--ds-accent);
+  font-size: var(--text-sm);
+  line-height: var(--leading-none);
+}
+
+.asktool-option[role="radio"] .asktool-option-mark {
+  border-radius: var(--radius-full);
+}
+
+.asktool-option.selected .asktool-option-mark {
+  border-color: var(--ds-accent);
+}
+
+.asktool-custom-input {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-primary);
+  color: var(--ds-text-primary);
+  font: inherit;
+}
+
+.asktool-card-actions {
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+@media (max-width: 560px) {
+  .asktool-card-header {
+    align-items: flex-start;
+  }
+
+  .asktool-card-actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
 /* Compact pre-stream feedback: visible immediately after send without
    competing with the assistant rail, tool rows, or permission card. */
 .working-indicator {

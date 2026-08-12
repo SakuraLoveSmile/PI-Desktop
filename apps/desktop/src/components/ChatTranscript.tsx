@@ -102,6 +102,8 @@ import {
 import { useAppStore } from "../stores/app-store";
 import type { PendingPermission } from "../lib/pending-permissions";
 import { PermissionCard } from "./PermissionCard";
+import type { PendingAsk } from "../lib/pending-asks";
+import { AskToolCard } from "./AskToolCard";
 
 /**
  * Copy chip. Message toolbars are glyph-only (`icon`) with the label in a
@@ -2012,6 +2014,8 @@ export const ChatTranscript = memo(function ChatTranscript({
   isRunning,
   pendingPermission,
   queuedPermissions = 0,
+  pendingAsk,
+  queuedAsks = 0,
   planningState,
 }: {
   sessionId: string | undefined;
@@ -2020,6 +2024,8 @@ export const ChatTranscript = memo(function ChatTranscript({
   pendingPermission?: PendingPermission;
   /** Requests waiting behind this one, from other delegates (ADR 0062). */
   queuedPermissions?: number;
+  pendingAsk?: PendingAsk;
+  queuedAsks?: number;
   planningState?: PlanningState;
 }) {
   const { t } = useTranslation();
@@ -2133,6 +2139,7 @@ export const ChatTranscript = memo(function ChatTranscript({
     messages,
     isRunning,
     pendingPermission?.requestId,
+    pendingAsk?.requestId,
     approvalPending,
     planningState,
     scheduleFollowScroll,
@@ -2173,12 +2180,17 @@ export const ChatTranscript = memo(function ChatTranscript({
   const showWorking =
     isRunning &&
     !pendingPermission &&
+    !pendingAsk &&
     !approvalPending &&
     planningState !== "planning" &&
     !activeToolGroup &&
     !assistantIsAnswering;
   const showPlanning =
-    isRunning && planningState === "planning" && !approvalPending && !pendingPermission;
+    isRunning &&
+    planningState === "planning" &&
+    !approvalPending &&
+    !pendingPermission &&
+    !pendingAsk;
 
   return (
     <div className="thread-wrap">
@@ -2208,6 +2220,13 @@ export const ChatTranscript = memo(function ChatTranscript({
               key={pendingPermission.requestId}
               permission={pendingPermission}
               queued={queuedPermissions}
+            />
+          ) : null}
+          {pendingAsk ? (
+            <AskToolCard
+              key={pendingAsk.requestId}
+              request={pendingAsk}
+              queued={queuedAsks}
             />
           ) : null}
           {showPlanning ? <PlanningIndicator kind={planningKind} /> : null}
