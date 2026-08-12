@@ -57,9 +57,12 @@
 - Command-only shortcut changes require updating the command palette metadata;
   native roles and visible application-menu accelerators remain menu-owned
 - The plugin launcher is registered through Electron's native global shortcut
-  API. Windows keeps a focused-window `Alt + Space` fallback because the OS can
-  reserve that chord for a system menu; the app's frameless window has no such
-  menu. The launcher always opens on the display nearest the pointer.
+  API. Windows' reserved default `Alt + Space` additionally uses a host-core
+  low-level keyboard hook that consumes the system-menu chord and emits an
+  Electron host notification, so it works while another application is
+  focused. A focused-window fallback remains available if the hook cannot be
+  installed. Custom bindings continue to use Electron's global shortcut API.
+  The launcher always opens on the display nearest the pointer.
 
 ### 1.5 Plugin launcher shortcuts
 

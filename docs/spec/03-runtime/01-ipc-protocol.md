@@ -560,7 +560,13 @@ The global plugin launcher uses Electron-only allowlisted channels:
   plugins, and restores input focus after every invocation
 
 The launcher reuses `plugin/list` and `plugin/openPanel`; it adds no host-core
-RPC. `responseDurationMs` and `responseOutputTokens` are optional transcript
+plugin RPC. The Electron main process also calls the additive host method
+`keyboard.setGlobalShortcut({ binding })` to enable the Windows-only fallback
+for the reserved `Alt+Space` binding. Host-core emits the notification
+`keyboard.shortcut({ binding: "Alt+Space" })` when its low-level Windows
+keyboard hook detects the chord; the hook consumes that chord so the active
+window system menu does not open. Non-Windows hosts treat the method as a
+no-op. `responseDurationMs` and `responseOutputTokens` are optional transcript
 metadata persisted in message metadata, so protocol v9 and storage schema v11
 remain unchanged.
 

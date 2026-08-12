@@ -2,6 +2,7 @@ mod activation;
 mod artifacts;
 mod audit;
 mod db;
+mod keyboard;
 mod mcp_servers;
 mod notifications;
 mod permissions;

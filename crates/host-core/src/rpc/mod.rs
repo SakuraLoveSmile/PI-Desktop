@@ -181,6 +181,10 @@ pub async fn serve(state: Arc<Mutex<AppState>>) -> Result<()> {
     let (writer_done_tx, mut writer_done_rx) = oneshot::channel::<Option<String>>();
     let _writer = spawn_stdout_writer(rx, writer_done_tx)
         .map_err(|error| anyhow!("host stdout writer unavailable: {error}"))?;
+    // Electron's RegisterHotKey cannot claim Windows' Alt+Space system-menu
+    // chord. Keep the native fallback beside the host transport so it remains
+    // active even when PI-Desktop is unfocused.
+    crate::keyboard::start(tx.clone());
     let (input_tx, mut input_rx) = mpsc::unbounded_channel::<StdinEvent>();
     let _stdin_reader = match spawn_stdin_reader(input_tx) {
         Ok(handle) => handle,
@@ -894,6 +898,15 @@ async fn handle_request(
                     "plugins": budget.plugins
                 }
             }))
+        }
+        "keyboard.setGlobalShortcut" => {
+            let binding = params
+                .get("binding")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default();
+            let enabled = crate::keyboard::uses_windows_fallback(binding);
+            crate::keyboard::set_enabled(enabled);
+            Ok(json!({ "enabled": enabled }))
         }
         "app.getVersion" => Ok(json!({
             "name": "pi-desktop-host-core",
