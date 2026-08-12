@@ -101,6 +101,23 @@
   window events, so the restore affordance never depends only on optimistic
   renderer state.
 
+### 1.5.1 Tray-resident minimize
+
+- Minimize means **hide to tray** on macOS, Windows, and Linux. The renderer's
+  Windows/Linux minimize button, the macOS traffic-light minimize button, and
+  the macOS Window → Minimize role share this behavior.
+- Hiding removes the main window from the taskbar/dock window list while the
+  Electron process and background work remain alive. It does not persist a
+  minimized geometry or dispose the host/sidecar.
+- Clicking or double-clicking the PI-Desktop tray icon, choosing Show from its
+  menu, or activating the app from the macOS dock restores and focuses the
+  existing window. If the window was closed, the same action creates a fresh
+  window.
+- The tray menu is localized with the active English/zh-CN shell locale and
+  exposes Show PI-Desktop plus an explicit Quit PI-Desktop action. Quit uses
+  the existing ordered shutdown path; closing the window remains a quit action
+  rather than an implicit tray hide.
+
 ### 1.6 Sidebar project and conversation organization
 
 The sidebar is a path-keyed presentation of host-owned projects and sessions.

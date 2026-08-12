@@ -16,7 +16,7 @@ PI-Desktop.app
 
 | Process | Owns |
 |---|---|
-| Electron Main | window lifecycle, IPC fan-in/out, child process supervision, fixed-feed app update lifecycle |
+| Electron Main | window lifecycle, cross-platform tray integration, IPC fan-in/out, child process supervision, fixed-feed app update lifecycle |
 | Renderer | UI only |
 | Rust host-core | DB, tools, permissions, immutable Plan/Goal artifacts/`plan_approvals` execution fields, shell catalog, plugin host services, secrets adapters |
 | Node pi sidecar | pi agent loop, provider streaming, tool-call planning |
@@ -93,6 +93,13 @@ Supervision parameters (implemented in Electron main):
 7. Stop Rust host
 8. Dispose update polling
 9. Close windows / exit
+
+Minimizing the main window is a resident-shell action, not an application
+shutdown: Electron Main hides the window and keeps the process alive through
+the cross-platform tray. The tray owns restore/focus and an explicit Quit
+action. Quit from the tray, the existing close path, or an update install still
+enters the normal shutdown sequence above; destroying the tray happens during
+`before-quit` so shutdown cannot be intercepted by a stale shell affordance.
 
 `updates/install` invokes Electron's quit-and-install path only after an update
 reaches `downloaded`. Electron still emits `before-quit`, so the normal

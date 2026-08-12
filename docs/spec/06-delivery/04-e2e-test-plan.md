@@ -4563,3 +4563,27 @@ This test plan spec is accepted when:
 - **Acceptance**: E (interactive tool output), C (inline card)
 - **Milestone**: M5
 - **Status**: Draft (unit coverage active; desktop journey pending)
+
+#### E2E-124: Minimize hides the window in the cross-platform tray
+
+- **Preconditions**: Built desktop app on macOS, Windows, and Linux; English
+  and zh-CN locales are available; a normal main window is open.
+- **Steps**: 1) Minimize from the platform's window control (macOS traffic
+  light or Windows/Linux renderer control). 2) Confirm the main window is
+  hidden while the app process remains resident. 3) Click or double-click the
+  tray icon and confirm the same window is restored and focused. 4) Open the
+  tray menu and choose Show, then repeat with Quit. 5) Repeat in zh-CN and
+  invoke macOS app activation while the window is hidden.
+- **Expected**: All minimize paths hide to one tray icon instead of quitting or
+  leaving a taskbar-minimized window. Show/click/double-click/app activation
+  restores the existing window; the localized menu contains Show PI-Desktop
+  and Quit PI-Desktop. Quit runs the normal shutdown sequence and leaves no
+  orphan host, sidecar, or tray process. Closing the window remains an explicit
+  quit action.
+- **Specs linked**: `03-runtime/07-process-model.md`,
+  `04-ux/09-interaction-patterns.md`, `08-meta/decisions-log.md` (D216),
+  ADR 0078
+- **Acceptance**: A (app lifecycle), Quality
+- **Milestone**: M6+
+- **Status**: Unit/source-contract covered; native cross-platform tray journey
+  Draft (do not run local E2E unless explicitly requested)

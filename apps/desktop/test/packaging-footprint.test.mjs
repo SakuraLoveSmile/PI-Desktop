@@ -91,6 +91,10 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
   );
   assert.deepEqual(packageJson.build.extraResources, [
     {
+      from: "build/icon.png",
+      to: "tray-icon.png",
+    },
+    {
       from: "../../packages/agent-runtime/dist-bundle",
       to: "agent-runtime",
     },

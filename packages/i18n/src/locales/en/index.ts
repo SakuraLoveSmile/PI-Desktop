@@ -21,6 +21,10 @@ export const en = {
     restore: "Restore",
     close: "Close",
   },
+  tray: {
+    show: "Show PI-Desktop",
+    quit: "Quit PI-Desktop",
+  },
   pluginLauncher: {
     title: "Open a plugin",
     placeholder: "Search plugins by name or pinyin",

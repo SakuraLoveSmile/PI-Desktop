@@ -10,6 +10,7 @@ import {
   Notification as SystemNotification,
   screen,
   shell,
+  Tray,
 } from "electron";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -118,6 +119,7 @@ import {
 } from "./importers";
 import { installApplicationMenu } from "./application-menu";
 import { AppUpdaterController } from "./updater";
+import { en, resolveLocale, zhCN } from "@pi-desktop/i18n";
 import {
   baseWindowBounds,
   displayWorkAreaKey,
@@ -150,6 +152,7 @@ const WINDOW_MIN_WIDTH = 1040;
 const WINDOW_MIN_HEIGHT = 700;
 
 let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
 let pluginLauncherWindow: BrowserWindow | null = null;
 let pluginLauncherAccelerator: string | null = null;
 let windowCreationPromise: Promise<void> | null = null;
@@ -868,6 +871,74 @@ function applyDevelopmentBranding() {
   app.dock.setIcon(icon);
 }
 
+function trayIconPath() {
+  const candidates = app.isPackaged
+    ? [
+        join(process.resourcesPath, "tray-icon.png"),
+        join(app.getAppPath(), "build", "icon.png"),
+      ]
+    : [join(app.getAppPath(), "build", "icon.png")];
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
+
+function restoreMainWindow() {
+  void ensureWindow()
+    .then(() => {
+      const window = mainWindow;
+      if (!window || window.isDestroyed()) return;
+      if (window.isMinimized()) window.restore();
+      window.show();
+      window.focus();
+    })
+    .catch((error) => {
+      logger.app("diagnostics", "error", "tray restore failed", {
+        data: String(error),
+      });
+    });
+}
+
+function updateTrayMenu(locale = app.getLocale()) {
+  if (!tray) return;
+  const labels = resolveLocale(locale) === "zh-CN" ? zhCN.tray : en.tray;
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: labels.show, click: restoreMainWindow },
+      { type: "separator" },
+      { label: labels.quit, click: () => app.quit() },
+    ]),
+  );
+}
+
+function createTray() {
+  if (tray) return;
+  const iconPath = trayIconPath();
+  if (!iconPath) {
+    logger.app("lifecycle", "warn", "tray icon missing", {
+      data: { packaged: app.isPackaged, resourcesPath: process.resourcesPath },
+    });
+    return;
+  }
+
+  const source = nativeImage.createFromPath(iconPath);
+  if (source.isEmpty()) {
+    logger.app("lifecycle", "warn", "tray icon could not be loaded", {
+      data: { iconPath },
+    });
+    return;
+  }
+  const icon = source.resize({
+    width: process.platform === "darwin" ? 18 : 16,
+    height: process.platform === "darwin" ? 18 : 16,
+  });
+  if (process.platform === "darwin") icon.setTemplateImage(true);
+
+  tray = new Tray(icon);
+  tray.setToolTip(APP_NAME);
+  tray.on("click", restoreMainWindow);
+  tray.on("double-click", restoreMainWindow);
+  updateTrayMenu();
+}
+
 function sendToRenderer(channel: string, payload: unknown) {
   if (!IPC_WHITELIST.has(channel)) return;
   const window = mainWindow;
@@ -1009,6 +1080,7 @@ function applyApplicationMenuSettings(settings?: {
     developerMode: devMode,
     dispatch: dispatchApplicationMenuCommand,
   });
+  updateTrayMenu(locale);
 }
 
 function flushPendingApplicationMenuCommands() {
@@ -1454,6 +1526,13 @@ async function createWindow() {
     mainWindow === window &&
     !window.isDestroyed() &&
     !window.webContents.isDestroyed();
+
+  // Keep the process resident and make every platform's minimize affordance
+  // consistent: minimizing hides the window into the application tray.
+  window.on("minimize", () => {
+    if (quitting) return;
+    window.hide();
+  });
   let workPanelReconcileTimer: NodeJS.Timeout | null = null;
   const scheduleWorkPanelReservation = () => {
     if (workPanelReconcileTimer) clearTimeout(workPanelReconcileTimer);
@@ -5022,7 +5101,7 @@ function registerIpc() {
         case "getState":
           break;
         case "minimize":
-          window.minimize();
+          window.hide();
           break;
         case "toggleMaximize":
           if (window.isMaximized()) window.unmaximize();
@@ -5099,7 +5178,7 @@ function registerIpc() {
           window.setFullScreen(!window.isFullScreen());
           break;
         case "minimize":
-          window.minimize();
+          window.hide();
           break;
         case "toggleMaximize":
           if (window.isMaximized()) window.unmaximize();
@@ -6162,6 +6241,7 @@ function registerIpc() {
 
 app.whenReady().then(async () => {
   applyDevelopmentBranding();
+  createTray();
   app.setAboutPanelOptions({
     applicationName: APP_NAME,
     applicationVersion: APP_VERSION,
@@ -6303,6 +6383,8 @@ app.on("before-quit", (event) => {
   if (shutdownPromise) return;
 
   quitting = true;
+  tray?.destroy();
+  tray = null;
   if (pluginLauncherAccelerator) {
     globalShortcut.unregister(pluginLauncherAccelerator);
     pluginLauncherAccelerator = null;
@@ -6334,5 +6416,5 @@ app.on("before-quit", (event) => {
 });
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) void ensureWindow();
+  restoreMainWindow();
 });

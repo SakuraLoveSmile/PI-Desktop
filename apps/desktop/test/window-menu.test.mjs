@@ -222,6 +222,23 @@ test("menu and window IPC reject actions outside their shared allowlists", () =>
   );
 });
 
+test("minimize is resident in the cross-platform tray", () => {
+  assert.match(mainSource, /import \{[\s\S]*Tray[\s\S]*\} from "electron"/);
+  assert.match(mainSource, /function createTray\(\)/);
+  assert.match(mainSource, /tray\.on\("click", restoreMainWindow\)/);
+  assert.match(mainSource, /tray\.on\("double-click", restoreMainWindow\)/);
+  assert.match(mainSource, /window\.on\("minimize", \(\) => \{[\s\S]*window\.hide\(\)/);
+  assert.match(mainSource, /tray\?\.destroy\(\)/);
+  assert.doesNotMatch(mainSource, /window\.minimize\(\)/);
+  const trayResource = packageJson.build.extraResources.find(
+    (resource) => resource.to === "tray-icon.png",
+  );
+  assert.deepEqual(trayResource, {
+    from: "build/icon.png",
+    to: "tray-icon.png",
+  });
+});
+
 test("desktop packaging builds the native host before every local target", () => {
   assert.match(
     packageJson.scripts["build:host-release"],

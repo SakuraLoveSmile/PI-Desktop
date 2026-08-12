@@ -22,6 +22,10 @@ export const zhCN = {
     restore: "还原",
     close: "关闭",
   },
+  tray: {
+    show: "显示 PI-Desktop",
+    quit: "退出 PI-Desktop",
+  },
   pluginLauncher: {
     title: "打开插件",
     placeholder: "输入插件名称、拼音或拼音首字母",
