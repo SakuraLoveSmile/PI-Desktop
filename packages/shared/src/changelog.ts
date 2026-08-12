@@ -23,6 +23,15 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.5.8",
+    date: "2026-08-12",
+    highlights: [
+      "Restore the Windows Alt+Space global plugin launcher, including when another app is focused.",
+      "Keep PI-Desktop available from the system tray when minimized across macOS, Windows, and Linux.",
+      "Improve native select menu readability in light and dark themes.",
+    ],
+  },
+  {
     version: "0.5.7",
     date: "2026-08-12",
     highlights: [
@@ -250,6 +259,15 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.5.8",
+    date: "2026-08-12",
+    highlights: [
+      "修复 Windows 下的 Alt+Space 全局插件启动器，即使当前焦点在其他应用也能唤起。",
+      "最小化后可通过系统托盘访问 PI-Desktop，并支持 macOS、Windows 和 Linux。",
+      "优化浅色和深色主题下原生选择菜单的可读性。",
+    ],
+  },
   {
     version: "0.5.7",
     date: "2026-08-12",
