@@ -863,9 +863,9 @@ Each scenario is documented in this format:
 #### E2E-022B: Development plugin hot reload
 
 - **Preconditions**: A plugin loaded from a local folder and enabled.
-- **Steps**: 1) Edit `main.js` to change a command title and save. 2) Save several files at once. 3) Introduce a syntax error and save. 4) Fix the error and save. 5) Add a new permission to `manifest.json` and save. 6) Restart the app and edit again.
-- **Expected**: The single edit reloads the plugin without re-picking the folder and the command palette shows the new title; a save burst produces one reload, and writes under `dist/` or `node_modules/` produce none; the syntax error reports a reload failure without crashing the app, and the fixing save recovers the plugin; the added permission refuses the reload with `PERMISSION_DENIED` and asks the user to load the plugin again, and the plugin keeps its previous grants until they do; after a restart the folder is still watched.
-- **Specs linked**: `07-plugins/10-plugin-devex.md` §7, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0039
+- **Steps**: 1) Edit `main.js` to change a command title and save. 2) Save several files at once. 3) Introduce a syntax error and save. 4) Fix the error and save. 5) Add a new permission to `manifest.json` and save. 6) Click Reload on the development-plugin card. 7) Edit again and restart the app.
+- **Expected**: The single edit reloads the plugin without re-picking the folder and the command palette shows the new title; a save burst produces one reload, and writes under `dist/` or `node_modules/` produce none; the syntax error reports a reload failure without crashing the app, and the fixing save recovers the plugin; the added permission refuses automatic reload with `PERMISSION_DENIED`, while the explicit Reload action loads the registered folder, refreshes the permission ceiling, and reports success; a later edit uses the refreshed ceiling, and after a restart the folder is still watched.
+- **Specs linked**: `07-plugins/10-plugin-devex.md` §7, `07-plugins/13-plugin-permissions-matrix.md`, ADR 0039, ADR 0075
 - **Acceptance**: G (hot reload), D (permissions cannot widen without review)
 - **Milestone**: Post-MVP
 - **Status**: Automated in part (`apps/desktop/test/plugin-hot-reload.test.mjs`: debounce, ignore list, permission ceiling, recovery, teardown); manual edit loop Documented

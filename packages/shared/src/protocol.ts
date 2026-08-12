@@ -111,6 +111,7 @@ export const IPC = {
     providersListModels: "pi-desktop/providers/listModels",
     pluginList: "pi-desktop/plugin/list",
     pluginLoadDev: "pi-desktop/plugin/loadDev",
+    pluginReload: "pi-desktop/plugin/reload",
     pluginCreateFromTemplate: "pi-desktop/plugin/createFromTemplate",
     pluginInstallFromPath: "pi-desktop/plugin/installFromPath",
     pluginInstallFromPackage: "pi-desktop/plugin/installFromPackage",

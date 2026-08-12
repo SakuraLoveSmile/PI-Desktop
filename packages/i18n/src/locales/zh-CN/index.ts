@@ -851,6 +851,8 @@ export const zhCN = {
     subtitle: "插件、MCP 服务器、技能与子智能体——你为应用添加的一切，可全局启用，也可只在指定项目里启用。",
     loadDev: "加载本地插件",
     loadDevDone: "本地插件已加载",
+    reload: "重载插件",
+    reloadDone: "插件已重载",
     installPackage: "安装插件包",
     installPackageDone: "插件包已安装",
     newFromTemplate: "从模板新建插件",

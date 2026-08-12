@@ -850,6 +850,8 @@ export const en = {
     subtitle: "Plugins, MCP servers, skills, and subagents — everything you add to the app, on everywhere or only in the projects you pick.",
     loadDev: "Load local plugin",
     loadDevDone: "Local plugin loaded",
+    reload: "Reload plugin",
+    reloadDone: "Plugin reloaded",
     installPackage: "Install package",
     installPackageDone: "Plugin package installed",
     newFromTemplate: "New plugin from template",

@@ -92,6 +92,15 @@ test("every path that loads a dev plugin arms the watcher", () => {
   assert.match(mainSrc, /if \(res\.plugin\.source === "dev"\) plugins\.watchDevPlugin\(id\)/);
 });
 
+test("manual reload uses the registry path and refreshes the dev permission ceiling", () => {
+  const reload = slice(mainSrc, "handle(IPC.invoke.pluginReload", "// Scaffold a starter plugin");
+  assert.match(reload, /host\.call<\{ plugins: any\[\] \}>\("plugins\.list"\)/);
+  assert.match(reload, /find\(\(candidate\) => candidate\?\.id === id\)/);
+  assert.match(reload, /plugins\.loadFromPath\(plugin\.path, plugin\.permissions \?\? \[\]\)/);
+  assert.match(reload, /if \(plugin\.source === "dev"\) plugins\.watchDevPlugin\(id\)/);
+  assert.match(reload, /reason: "reload", pluginId: id/);
+});
+
 test("watchers are released on teardown and reloads reach the renderer", () => {
   const quit = slice(mainSrc, 'app.on("before-quit"', "});");
   assert.match(quit, /plugins\.disposeWatchers\(\)/);

@@ -400,6 +400,7 @@ export const api = {
   listPlugins: () =>
     invoke<{ plugins: PluginSummary[] }>(IPC.invoke.pluginList),
   loadDevPlugin: () => invoke(IPC.invoke.pluginLoadDev),
+  reloadPlugin: (id: string) => invoke(IPC.invoke.pluginReload, id),
   createPluginFromTemplate: (template: string) =>
     invoke<{
       canceled?: boolean;

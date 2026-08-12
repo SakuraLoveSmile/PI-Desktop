@@ -789,6 +789,8 @@ Minimal interface:
 
 - `plugin/list`
 - `plugin/loadDev(path)`
+- `plugin/reload(id)` — reload a registered development plugin from its stored
+  path and refresh its permission ceiling
 - `plugin/installFromPath(path)`
 - `plugin/enable(id)`
 - `plugin/disable(id)`

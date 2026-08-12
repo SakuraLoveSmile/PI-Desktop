@@ -13,6 +13,7 @@ import {
   IconMore,
   IconPanel,
   IconPlug,
+  IconReview,
   IconSearch,
   IconShield,
   IconSparkles,
@@ -411,6 +412,7 @@ export function PluginsPage() {
   const [market, setMarket] = useState<MarketPluginSummary[]>([]);
   const [marketLoading, setMarketLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [reloadingId, setReloadingId] = useState<string | null>(null);
   const [pendingInstall, setPendingInstall] = useState<{
     id: string;
     name: string;
@@ -665,6 +667,18 @@ export function PluginsPage() {
       await api.loadDevPlugin();
       await refreshPlugins();
       showToast(t("plugins.loadDevDone"), { variant: "success" });
+    });
+
+  const reloadPlugin = (id: string) =>
+    run(async () => {
+      setReloadingId(id);
+      try {
+        await api.reloadPlugin(id);
+        await refreshPlugins();
+        showToast(t("plugins.reloadDone"), { variant: "success" });
+      } finally {
+        setReloadingId(null);
+      }
     });
 
   const installPackage = () =>
@@ -1164,6 +1178,21 @@ export function PluginsPage() {
                               }
                             />
                             <div className="plugins-row-actions">
+                              {plugin.source === "dev" ? (
+                                <button
+                                  type="button"
+                                  className="plugins-icon-btn"
+                                  aria-label={t("plugins.reload")}
+                                  title={t("plugins.reload")}
+                                  data-tip={t("plugins.reload")}
+                                  disabled={
+                                    busyId === plugin.id || reloadingId === plugin.id
+                                  }
+                                  onClick={() => void reloadPlugin(plugin.id)}
+                                >
+                                  <IconReview size={15} />
+                                </button>
+                              ) : null}
                               {plugin.ui?.panel ? (
                                 <button
                                   type="button"

@@ -31,6 +31,8 @@ PluginManager
 - `plugin/list`
 - `plugin/detail`
 - `plugin/loadDev`
+- `plugin/reload` — resolve the registered plugin path, reload it in Electron
+  main, and refresh the development-plugin permission ceiling
 - `plugin/installFromPath` ✅
 - `plugin/installFromPackage` ✅
 - `plugin/enable`

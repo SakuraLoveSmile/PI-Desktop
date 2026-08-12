@@ -89,3 +89,4 @@ Each ADR includes:
 | 0072 | Add a global plugin launcher | Accepted for implementation |
 | 0073 | Stage next-turn composer configuration and preserve stopped throughput | Accepted for implementation |
 | 0074 | Native notification permission for plugins | Accepted |
+| 0075 | Manual reload for development-plugin permission ceilings | Accepted |

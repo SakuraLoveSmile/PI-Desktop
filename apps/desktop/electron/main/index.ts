@@ -5573,6 +5573,20 @@ function registerIpc() {
     return loaded;
   });
 
+  handle(IPC.invoke.pluginReload, async (id: string) => {
+    if (!host) throw new Error("host unavailable");
+    const listed = await host.call<{ plugins: any[] }>("plugins.list");
+    const plugin = (listed.plugins ?? []).find((candidate) => candidate?.id === id);
+    if (!plugin?.path) throw new Error(`PLUGIN_NOT_FOUND: ${id}`);
+    await plugins.loadFromPath(plugin.path, plugin.permissions ?? []);
+    if (plugin.source === "dev") plugins.watchDevPlugin(id);
+    for (const toast of plugins.drainToasts()) {
+      sendToRenderer(IPC.event.toast, { message: toast });
+    }
+    sendToRenderer(IPC.event.pluginChanged, { reason: "reload", pluginId: id });
+    return { plugin };
+  });
+
   // Scaffold a starter plugin and load it as a dev plugin in one step (D171),
   // so "I want to write a plugin" never starts with an empty folder.
   handle(

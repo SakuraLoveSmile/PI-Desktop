@@ -1488,3 +1488,16 @@ D193, and D194.
   D117's application-owned task notification contract. See
   `07-plugins/01-plugin-system.md`, `07-plugins/03-plugin-api.md`,
   `07-plugins/13-plugin-permissions-matrix.md`, and E2E-122.
+
+## 2026-08-12 — Development plugins get an explicit permission-ceiling reload
+
+- Automatic development-plugin reloads continue to reject manifest permission
+  additions, preserving the no-silent-widening boundary.
+- The Plugins page now offers Reload for `source: "dev"` rows. The new
+  `plugin/reload` invoke resolves the registered folder, reloads it through the
+  existing Electron runtime path, and re-arms the watcher with the current
+  declared permissions as its new ceiling.
+- Decision D214 and ADR 0075 define this additive renderer/main IPC surface.
+  Host RPC and storage schema versions remain unchanged; see
+  `07-plugins/10-plugin-devex.md`, `07-plugins/12-plugin-ipc-and-host-services.md`,
+  and E2E-022B.
