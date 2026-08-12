@@ -8,9 +8,10 @@ const readDesktop = (relativePath) =>
 const readPackage = (relativePath) =>
   readFile(new URL(`../../../packages/i18n/${relativePath}`, import.meta.url), "utf8");
 
-const [approvalBar, apiSource, storeSource, settingsPage, settingsSearch, styles, english, chinese, planStateSource, composerSource] =
+const [approvalBar, approvalPreferences, apiSource, storeSource, settingsPage, settingsSearch, styles, english, chinese, planStateSource, composerSource] =
   await Promise.all([
     readDesktop("src/components/PlanApprovalBar.tsx"),
+    readDesktop("src/lib/plan-approval-preferences.ts"),
     readDesktop("src/lib/api.ts"),
     readDesktop("src/stores/app-store.ts"),
     readDesktop("src/pages/SettingsPage.tsx"),
@@ -22,15 +23,18 @@ const [approvalBar, apiSource, storeSource, settingsPage, settingsSearch, styles
     readDesktop("src/components/Composer.tsx"),
   ]);
 
-test("plan approval exposes the submitted artifact and safe default mode", () => {
+test("plan approval exposes only the artifact and remembers the selected mode", () => {
   assert.match(approvalBar, /proposal\.title/);
-  assert.match(approvalBar, /proposal\.question/);
   assert.match(approvalBar, /fileWorkPanelTab\(artifactPath\)/);
   assert.match(approvalBar, /openWorkPanelTabForSession/);
-  assert.match(approvalBar, /proposal\.expiresAt/);
   assert.match(approvalBar, /const isPending = proposal\.status === "pending"/);
   assert.match(approvalBar, /PLAN_APPROVAL_DEFAULT_MODE/);
-  assert.match(approvalBar, /setApprovalMode\(PLAN_APPROVAL_DEFAULT_MODE\)/);
+  assert.match(approvalBar, /readPlanApprovalMode\(\)/);
+  assert.match(approvalBar, /rememberPlanApprovalMode\(selectedMode\)/);
+  assert.match(approvalPreferences, /PLAN_APPROVAL_MODE_STORAGE_KEY/);
+  assert.match(approvalPreferences, /store\.setItem\(PLAN_APPROVAL_MODE_STORAGE_KEY, mode\)/);
+  assert.match(approvalPreferences, /PLAN_APPROVAL_FALLBACK_MODE/);
+  assert.doesNotMatch(approvalBar, /proposal\.question|proposal\.expiresAt|autoWarning|expiresAt|statusText/);
   assert.doesNotMatch(approvalBar, /planApprovalPermissionMode|feedback|changes_requested/);
   assert.doesNotMatch(apiSource, /planApprovalPermissionMode/);
   assert.doesNotMatch(storeSource, /planApprovalPermissionMode/);
@@ -38,28 +42,17 @@ test("plan approval exposes the submitted artifact and safe default mode", () =>
   // both `plan.*` and `goal.*` copy (D198).
   assert.match(approvalBar, /return `\$\{kind\}\.\$\{name\}`/);
   assert.match(approvalBar, /const copy = \(name: string\) => t\(copyKey\(kind, name\)\)/);
-  assert.match(approvalBar, /copy\("autoWarning"\)/);
   assert.doesNotMatch(approvalBar, /t\("plan\./);
   assert.match(approvalBar, /data-testid="plan-open-artifact"/);
   assert.doesNotMatch(approvalBar, /request_changes|requestChanges/);
 });
 
-test("plan expiry and canonical timeout reconcile host state without stale actions", () => {
-  assert.match(approvalBar, /const PLAN_APPROVAL_RECONCILE_RETRY_MS = 5_000/);
-  assert.match(approvalBar, /window\.setTimeout/);
-  assert.match(approvalBar, /scheduleReconcile\(Math\.max\(0, expiresAt - Date\.now\(\)\)\)/);
-  assert.match(approvalBar, /scheduleReconcile\(PLAN_APPROVAL_RECONCILE_RETRY_MS\)/);
-  assert.match(approvalBar, /result === "pending" \|\| result === "unavailable"/);
-  assert.match(approvalBar, /window\.clearTimeout\(reconcileTimer\)/);
-  assert.match(approvalBar, /cancelled = true;[\s\S]*?window\.clearTimeout\(reconcileTimer\)/);
-  assert.match(approvalBar, /if \(cancelled\) return;[\s\S]*?restorePendingPlan\(proposal\.sessionId\)/);
-  assert.match(approvalBar, /restorePendingPlan\(proposal\.sessionId\)/);
-  assert.match(approvalBar, /ErrorCodes\.PLAN_APPROVAL_TIMEOUT/);
+test("approval card omits validity details while the pending gate stays actionable", () => {
+  assert.doesNotMatch(approvalBar, /PLAN_APPROVAL_RECONCILE_RETRY_MS|window\.setTimeout|restorePendingPlan/);
+  assert.doesNotMatch(approvalBar, /plan-approval-question|plan-approval-expiry|plan-approval-status|plan-approval-warning/);
+  assert.match(approvalBar, /className="plan-approval-title"/);
+  assert.match(approvalBar, /className="plan-approval-artifact"/);
   assert.match(approvalBar, /disabled=\{busy\}/);
-  assert.match(
-    approvalBar,
-    /\}, \[isPending, proposal\.expiresAt, proposal\.sessionId, restorePendingPlan\]\);/,
-  );
   assert.match(
     storeSource,
     /PendingPlanRefreshResult = "pending" \| "terminal" \| "unavailable"/,
@@ -123,6 +116,6 @@ test("approval and shell surfaces have locale-backed responsive copy", () => {
   }
   assert.match(styles, /grid-template-columns: minmax\(0, 1fr\) auto/);
   assert.match(styles, /container-name: composer-stack/);
-  assert.match(styles, /\.plan-approval-warning\s*\{[^}]*grid-column: 1 \/ -1/s);
+  assert.doesNotMatch(styles, /\.plan-approval-warning|\.plan-approval-expiry|\.plan-approval-status/);
   assert.match(styles, /@media \(max-width: 820px\)\s*\{[\s\S]*\.settings-row/);
 });

@@ -596,9 +596,10 @@ Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accep
 3. The Agent calls `SubmitPlan` or `SubmitGoal` alone in its tool batch.
    Host-core preserves the exact Markdown bytes in a new immutable
    `.pi/plan/*.md` or `.pi/goal/*.md` artifact, records its path/hash/size and structured
-   title/question, and the renderer displays the shared contract approval card with the
-   artifact opener and 30-minute absolute deadline.
-4. Approve requires Ask / Accept edits / Auto selection, with Ask selected by
+   title/question, and the renderer displays the shared contract approval card with
+   only the title and artifact opener; the question remains host-side contract data.
+4. Approve requires Ask / Accept edits / Auto selection. The renderer remembers
+   the last selected mode on this device and uses it as the next approval's
    default. Host-core commits the approval, `mode = agent`, permission mode,
    and `queued` state atomically; the same Agent continues on a fresh turn with
    Agent tools.
@@ -614,8 +615,9 @@ Agent calls a permission-gated tool (including Plan/Goal Bash under Ask or Accep
 The approval card is session-scoped. Background sessions may retain a pending
 approval or queued/running execution state in `plan_approvals`, but opening
 another session never covers it or moves focus; returning to the originating
-session restores the renderer-lifetime snapshot; while the host remains alive,
-`plans.pending` can rehydrate a still-pending row with its original deadline.
+  session restores the renderer-lifetime snapshot; while the host remains alive,
+  `plans.pending` can rehydrate a still-pending row. The approval card does not
+  expose a validity/deadline concept.
 Mode/provider/model/permission/shell configuration and new prompts remain
 disabled while an active `pending` approval or turn exists. During pending
 approval the existing draft remains in the textarea but is read-only; only

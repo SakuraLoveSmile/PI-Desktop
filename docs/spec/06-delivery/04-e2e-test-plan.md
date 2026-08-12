@@ -2988,21 +2988,27 @@ Each scenario is documented in this format:
   creation.
 - **Steps**: 1) Let the Agent call `SubmitPlan` with fixed title, Markdown, and
   question. 2) Inspect the new `.pi/plan/*.md` file byte-for-byte and the
-  `plan_approvals` row. 3) Inspect the card's title, question, artifact opener,
-  expiry, and status; confirm only Approve and Reject are offered. 4) Reject the
-  proposal. 5) Confirm durable mode is Plan, live state is editable `planning`,
-  the approval gate is cleared, and a later prompt is accepted. 6) Let the
+  `plan_approvals` row. 3) Inspect the card's title and artifact opener; confirm
+  the question/description, validity/deadline, and status are absent and only
+  Approve and Reject are offered. 4) Open the approval mode menu, choose Auto,
+  and verify the next approval defaults to Auto. 5) Reject the
+  proposal. 6) Confirm durable mode is Plan, live state is editable `planning`,
+  the approval gate is cleared, and a later prompt is accepted. 7) Let the
   Agent revise and call `SubmitPlan` once in that new turn with a complete
-  snapshot. 7) Approve the second proposal with Ask selected.
+  snapshot. 8) Approve the second proposal with the remembered Auto mode.
 - **Expected**: Host preserves the exact submitted Markdown bytes in a new
   unique artifact, records its relative path/hash/size with structured
   title/question, and never lets the renderer or sidecar write or replace it.
-  The card opens the artifact and does not require inline Markdown/hash/size.
+  The title-derived artifact filename is recognizable from the title, including
+  non-ASCII title characters. The card shows the title and opens the artifact;
+  it does not require inline question/Markdown/hash/size or a validity/deadline
+  indicator. The selected approval mode is remembered locally for the next
+  approval.
   Rejection is terminal for the first row, leaves durable mode Plan, and returns
   live state to editable planning. The later prompt/resubmission creates a
   second complete Markdown snapshot and a different `.pi/plan/*.md` artifact;
   the first artifact bytes remain unchanged. Approving the second proposal with
-  Ask still changes the same Agent to Agent and queues execution.
+  the remembered Auto mode still changes the same Agent to Agent and queues execution.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/04-data-storage.md`,
   `03-runtime/06-host-rpc-protocol.md`, `04-ux/03-permission-ux.md`,
@@ -3251,9 +3257,9 @@ Each scenario is documented in this format:
   exercised separately by E2E-108 and E2E-109.
 - **Expected**: Agent is the default; the left-of-input Composer chip is the
   sole active-session Agent/Plan/Goal control; Plan and Goal show
-  Ask/Accept edits/Auto, the submitted title/question, an artifact opener,
-  expiry/status, approve/reject only, shell catalog/fallback status, and
-  localized failed-closed states. No
+  Ask/Accept edits/Auto, the submitted title, an artifact opener,
+  remembered approval mode, approve/reject only, shell catalog/fallback status,
+  and localized failed-closed states. No
   Chat mode, `/chat-mode`, request-changes action, inline Markdown/hash/size
   requirement, or stale actionable queue is exposed; terminal checkpoint
   metadata may remain non-actionable only for the current renderer lifetime,

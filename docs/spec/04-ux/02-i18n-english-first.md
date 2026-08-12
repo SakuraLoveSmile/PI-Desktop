@@ -52,8 +52,6 @@ Examples:
 - `plan.approval.title`
 - `plan.approval.artifactPath`
 - `plan.approval.openArtifact`
-- `plan.approval.expiry`
-- `plan.approval.status`
 - `plan.approval.approve`
 - `plan.approval.reject`
 - `plan.approval.permissionAutoWarning`
@@ -97,8 +95,8 @@ Plugins may include localized display fields later, but English fields are requi
    engineering terms (`host`/`backend`/`repo refresh`/`workspace` where the UI
    already says project). Status, empty states, errors, and setup hints explain
     what happened and what to do next (D149)
-10. Agent/Plan/Goal selector, contract states, title/question/artifact-opener/
-    expiry/status actions, Bash/Auto mutation warning,
+10. Agent/Plan/Goal selector, contract states, title/artifact-opener/
+    remembered approval-mode actions, Bash/Auto mutation warning,
     shell catalog/unavailable state, fail-closed recovery, and shared
     Plan/Goal error codes
     have matching English and zh-CN keys; no Chat operating-mode key or command

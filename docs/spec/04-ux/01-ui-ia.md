@@ -302,9 +302,8 @@ Extensions destination described in §3.5.
   event never navigates by itself; only explicit activation does.
 - Backend degraded → status capsule (restarting) or fatal banner with Open
   logs (D080); composer submits are rejected with readable errors while down.
-  - Plan/Goal checkpoint → the originating session shows the structured title and
-  question, an opener for its immutable `.pi/plan/*.md` artifact, absolute
-  approval deadline, and current status. The renderer retains the latest
+  - Plan/Goal checkpoint → the originating session shows only the structured title
+  and an opener for its immutable `.pi/plan/*.md` artifact. The renderer retains the latest
   proposal/execution snapshot per session only for the current renderer
   lifetime, updated by live Host events; only a live `pending` row forms the
   approval gate. Reload through `plans.pending` while the same Host remains
