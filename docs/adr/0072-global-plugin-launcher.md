@@ -22,8 +22,11 @@ author to add aliases to every manifest.
 1. Add the shared, customizable `openPluginLauncher` shortcut, defaulting to
    `Alt+Space`. Electron renders it as Option+Space on macOS and Alt+Space on
    Windows/Linux and registers it with `globalShortcut` after application boot.
-   The focused main window also intercepts Alt+Space so Windows still works when
-   the operating system declines the global registration.
+   Windows reserves Alt+Space for the active window system menu, so host-core
+   also installs a narrow low-level keyboard hook for that exact default
+   binding. The hook consumes the chord and emits a host notification to
+   Electron, allowing the launcher to work while another application is
+   focused. The focused main window remains a last-resort fallback.
 2. Electron main owns one lazy, centered, frameless 620×440 utility window on
    the display nearest the pointer. It is non-resizable, absent from the
    taskbar, always on top while visible, and hides on blur or Escape. macOS uses
@@ -44,11 +47,13 @@ author to add aliases to every manifest.
 - The shortcut remains visible and resettable in Settings → Shortcuts.
 - `pinyin-pro` is bundled into renderer output rather than shipped as a runtime
   package tree.
-- An unavailable global chord is logged; the focused Windows fallback remains
-  usable, but another application or OS reservation can still prevent a truly
-  global invocation.
-- The IPC additions are Electron-local and additive; protocol v9 and storage
-  schema v11 do not change.
+- A custom shortcut continues to use Electron's global shortcut API. The
+  host-core hook is enabled only for Windows' reserved default chord, and a
+  hook installation failure is logged; the focused-window fallback remains
+  usable in that case.
+- The renderer IPC additions remain Electron-local and additive; the native
+  fallback adds one host method/notification without changing protocol v9 or
+  storage schema v11.
 
 ## Alternatives considered
 

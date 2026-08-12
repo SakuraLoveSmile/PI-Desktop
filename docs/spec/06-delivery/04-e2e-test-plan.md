@@ -3745,8 +3745,10 @@ Each scenario is documented in this format:
   partial answer. Run once on macOS and once on Windows.
 - **Steps**:
   1. With PI-Desktop unfocused, press Option+Space on macOS or Alt+Space on
-     Windows. Confirm a centered launcher appears on the pointer's display with
-     no native close, minimize, maximize, resize, or taskbar controls.
+     Windows while another application owns the foreground window. Confirm a
+     centered launcher appears on the pointer's display with no native close,
+     minimize, maximize, resize, or taskbar controls, and Windows does not show
+     the active application's system menu.
   2. Search separately for `无限`, `wuxianhuabu`, and `wxhb`. Use Up/Down and
      Enter for one run and click for another; confirm the existing plugin panel
      opens. Confirm Chinese IME candidate Enter does not open a result.

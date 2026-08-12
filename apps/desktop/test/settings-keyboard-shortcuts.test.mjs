@@ -67,6 +67,8 @@ test("shared shortcut map drives renderer dispatch and native menu accelerators"
   assert.match(mainSource, /keybindings\?:\s*unknown/);
   assert.match(mainSource, /applyPluginLauncherShortcut/);
   assert.match(mainSource, /globalShortcut\.register/);
+  assert.match(mainSource, /keyboard\.setGlobalShortcut/);
+  assert.match(mainSource, /method === "keyboard\.shortcut"/);
 });
 
 test("global shortcut dispatch ignores incomplete keyboard events", () => {

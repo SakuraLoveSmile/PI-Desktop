@@ -155,6 +155,7 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let pluginLauncherWindow: BrowserWindow | null = null;
 let pluginLauncherAccelerator: string | null = null;
+let pluginLauncherBinding = "Alt+Space";
 let windowCreationPromise: Promise<void> | null = null;
 let applicationBooted = false;
 const isDevelopmentBuild =
@@ -1457,10 +1458,30 @@ function applyPluginLauncherShortcut(keybindings?: KeybindingOverrides) {
       : process.platform === "win32"
         ? "win32"
         : "linux";
-  const accelerator = keybindingToElectronAccelerator(
-    resolveKeybinding(shortcut, keybindings, platform),
-    platform,
-  );
+  const binding = resolveKeybinding(shortcut, keybindings, platform);
+  const accelerator = keybindingToElectronAccelerator(binding, platform);
+  pluginLauncherBinding = binding;
+
+  if (process.platform === "win32" && host?.isAvailable()) {
+    void host
+      .call("keyboard.setGlobalShortcut", { binding })
+      .catch((error) =>
+        logger.app("diagnostics", "warn", "Windows global shortcut mode update failed", {
+          data: String(error),
+        }),
+      );
+  }
+
+  // Windows reserves Alt+Space for the active window system menu. The
+  // host-core low-level hook owns this exact binding so it still works while
+  // another application is focused; do not ask Electron to register it too.
+  if (process.platform === "win32" && binding === "Alt+Space") {
+    if (pluginLauncherAccelerator) {
+      globalShortcut.unregister(pluginLauncherAccelerator);
+      pluginLauncherAccelerator = null;
+    }
+    return;
+  }
   if (!accelerator || accelerator === pluginLauncherAccelerator) return;
   if (pluginLauncherAccelerator) {
     globalShortcut.unregister(pluginLauncherAccelerator);
@@ -1560,6 +1581,8 @@ async function createWindow() {
   // the View menu role (see application-menu.ts).
   window.webContents.on("before-input-event", (event, input) => {
     const isPluginLauncherChord =
+      process.platform === "win32" &&
+      pluginLauncherBinding === "Alt+Space" &&
       input.type === "keyDown" &&
       input.code === "Space" &&
       input.alt &&
@@ -1567,9 +1590,8 @@ async function createWindow() {
       !input.meta &&
       !input.shift;
     if (isPluginLauncherChord) {
-      // Windows normally assigns Alt+Space to the active window menu. The
-      // frameless shell has no such menu, so keep an in-app fallback even if
-      // the OS declines the global registration.
+      // Keep a focused-window fallback if the host's Windows hook could not
+      // be installed. The frameless shell has no system menu of its own.
       event.preventDefault();
       void showPluginLauncher();
       return;
@@ -2688,6 +2710,16 @@ function wireHost(h: HostProcess) {
           sendToRenderer(IPC.event.toast, { message: toast });
         }
       })();
+    } else if (
+      method === "keyboard.shortcut" &&
+      process.platform === "win32" &&
+      (params as { binding?: unknown })?.binding === "Alt+Space"
+    ) {
+      void togglePluginLauncher().catch((error) =>
+        logger.app("diagnostics", "error", "Windows global shortcut failed", {
+          data: String(error),
+        }),
+      );
     } else if (method === "plans.changed") {
       sendToRenderer(IPC.event.plansChanged, params);
     }

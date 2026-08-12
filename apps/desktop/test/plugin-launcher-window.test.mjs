@@ -18,6 +18,8 @@ test("global plugin launcher is a centered frameless cross-platform utility wind
   assert.match(main, /process\.platform === "darwin" \? \{ type: "panel" as const \}/);
   assert.match(main, /input\.code === "Space"[\s\S]*input\.alt/);
   assert.match(main, /globalShortcut\.register\(accelerator/);
+  assert.match(main, /keyboard\.setGlobalShortcut/);
+  assert.match(main, /pluginLauncherBinding === "Alt\+Space"/);
   assert.match(main, /window\.on\("blur"[\s\S]*window\.hide\(\)/);
 });
 
