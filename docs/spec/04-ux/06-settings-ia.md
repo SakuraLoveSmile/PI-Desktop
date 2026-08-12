@@ -38,7 +38,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     (`app.getLocale()`) rather than the renderer's `navigator.language`, and the
     Auto card shows the detected language inline (e.g. "当前：简体中文")
   - native select triggers and their opened option lists use the active theme's
-    readable foreground/background pairing on macOS, Windows, and Linux
+    readable foreground/background pairing on macOS, Windows, and Linux; the
+    shared native-select contract applies to every app surface
 - **Defaults** card retains the host-backed default mode and Enter-to-send
   controls.
 - File-open target, menu-bar behavior, and bottom-panel behavior are not
@@ -212,7 +213,8 @@ contract modes are intent boundaries, not strict read-only security profiles.
 14. Info renders disabled, checking, up-to-date, available, downloading,
     downloaded, and error update states without adding another destination
 15. Native select option lists remain readable in both light and dark themes,
-    including when Chromium delegates the opened list surface to Windows
+    including when Chromium delegates the opened list surface to Windows; the
+    same global rule covers non-Settings native selects
 16. Shortcut recording rejects modifier-free non-function keys, reserved
     editor/OS chords, and conflicts; successful overrides immediately drive
     app behavior and macOS menu accelerators and survive restart

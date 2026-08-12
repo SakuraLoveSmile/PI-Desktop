@@ -44,6 +44,23 @@ select {
 }
 
 /*
+  Native select menus are rendered outside the page box by Chromium on some
+  platforms (notably Windows). Keep both the trigger and its opened list on
+  the active theme instead of relying on the OS default palette.
+*/
+select {
+  color-scheme: inherit;
+  background-color: var(--ds-bg-elevated-opaque);
+  color: var(--ds-text-primary);
+}
+
+select option,
+select optgroup {
+  background-color: var(--ds-bg-elevated-opaque);
+  color: var(--ds-text-primary);
+}
+
+/*
   Preserve editing and copy affordances inside the non-selectable shell.
   `-webkit-user-select` is required by the Chromium runtime used by Electron.
 */

@@ -2282,18 +2282,19 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`sidebar-collapse-animation.test.mjs`); rendered
   interaction scenario Draft
 
-#### E2E-070: Settings native select menus follow the Windows theme
+#### E2E-070: Native select menus follow the Windows theme across the app
 
-- **Preconditions**: PI-Desktop is running on Windows with Settings available
-  in both light and dark themes.
-- **Steps**: 1) Open Settings → Basics in light theme. 2) Open the Language and
-  Default permission mode selects. 3) Repeat in dark theme. 4) Open Settings →
-  Model configuration and inspect the default-model and provider API-style
-  selects. 5) Scan importable sessions and open the Import grouping select.
+- **Preconditions**: PI-Desktop is running on Windows with light and dark
+  themes available.
+- **Steps**: 1) In light theme, open native selects in Settings → Basics,
+  Settings → Model configuration, Settings → Import, and one scheduled-task
+  form. 2) Repeat every surface in dark theme. 3) Open each list after
+  switching themes without restarting the app.
 - **Expected**: Every closed trigger and opened native option list uses the
   active theme's readable foreground/background pairing. No dark-theme list
   falls back to a light Windows surface with light text, no light-theme list
-  uses dark-theme ink, and changing theme updates subsequent openings.
+  uses dark-theme ink, and changing theme updates subsequent openings. The
+  same result holds for native selects outside Settings.
 - **Specs linked**: `04-ux/06-settings-ia.md`,
   `04-ux/07-ui-design-system.md`
 - **Acceptance**: Quality (cross-platform theme readability)

@@ -123,11 +123,12 @@ test("settings nav renders grouped sections with keyword search", () => {
   );
 });
 
-test("settings native select menus keep readable theme colors on Windows", () => {
+test("native select menus keep readable theme colors across the app on Windows", () => {
   assert.match(
     stylesSource,
-    /\.settings-shell select option,\s*\.settings-shell select optgroup\s*\{[^}]*background-color:\s*var\(--ds-bg-elevated-opaque\);[^}]*color:\s*var\(--ds-text-primary\);/s,
+    /select option,\s*select optgroup\s*\{[^}]*background-color:\s*var\(--ds-bg-elevated-opaque\);[^}]*color:\s*var\(--ds-text-primary\);/s,
   );
+  assert.match(stylesSource, /select\s*\{[^}]*color-scheme:\s*inherit;/s);
   assert.match(
     stylesSource,
     /:root,\s*:root\[data-theme="dark"\]\s*\{[^}]*color-scheme:\s*dark;/s,

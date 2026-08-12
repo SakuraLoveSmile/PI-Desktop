@@ -195,9 +195,10 @@ Light-surface polish (D148):
 - `system` theme follows `prefers-color-scheme` media query
 - Transition between themes must not flash white when switching to dark on launch
 - Initial load: detect system preference before first paint (Electron preload can relay this)
-- Native controls inherit the active `color-scheme`. Opened Settings select
-  lists also set opaque semantic foreground/background colors explicitly so
-  Windows Chromium does not fall back to an unreadable system palette.
+- Native controls inherit the active `color-scheme`. Every native `select`
+  trigger and its opened `option`/`optgroup` list also uses opaque semantic
+  foreground/background colors, so Windows Chromium does not fall back to an
+  unreadable system palette outside Settings either.
 
 ### 4.5 Sidebar task status semantics
 
