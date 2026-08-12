@@ -82,6 +82,11 @@ import {
   type UserSubagentDocument,
 } from "@pi-desktop/agent-runtime";
 import { isTemplateName, scaffold } from "@pi-desktop/plugin-devkit";
+import type {
+  PluginNativeNotificationInput,
+  PluginNativeNotificationResult,
+  PluginNotificationPermission,
+} from "@pi-desktop/plugin-sdk";
 import { HostProcess } from "./host-process";
 import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
@@ -169,6 +174,68 @@ let sidecar: AgentSidecar | null = null;
 let quitting = false;
 let shutdownComplete = false;
 let shutdownPromise: Promise<void> | null = null;
+let pluginNotificationPermission: PluginNotificationPermission = "unknown";
+const pluginNativeNotifications = new Set<SystemNotification>();
+const PLUGIN_NOTIFICATION_TIMEOUT_MS = 2_000;
+
+function getPluginNotificationPermission(): PluginNotificationPermission {
+  if (!SystemNotification.isSupported()) return "unsupported";
+  return pluginNotificationPermission;
+}
+
+function showPluginNativeNotification(
+  input: PluginNativeNotificationInput,
+): Promise<PluginNativeNotificationResult> {
+  if (!SystemNotification.isSupported()) {
+    return Promise.resolve({ shown: false, permission: "unsupported" });
+  }
+
+  const title = String(input.title ?? "Plugin").trim().slice(0, 100) || "Plugin";
+  const body = String(input.body ?? "").trim().slice(0, 240);
+
+  return new Promise((resolve) => {
+    const notification = new SystemNotification({ title, body });
+    pluginNativeNotifications.add(notification);
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+
+    const finish = (permission: PluginNotificationPermission, shown: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      if (permission === "granted" || permission === "denied") {
+        pluginNotificationPermission = permission;
+      }
+      if (!shown) pluginNativeNotifications.delete(notification);
+      resolve({ shown, permission });
+    };
+
+    notification.once("show", () => finish("granted", true));
+    notification.once("close", () => pluginNativeNotifications.delete(notification));
+    (notification as unknown as {
+      once: (event: string, listener: (...args: unknown[]) => void) => unknown;
+    }).once("failed", () => finish("denied", false));
+
+    timer = setTimeout(() => {
+      finish(getPluginNotificationPermission(), false);
+    }, PLUGIN_NOTIFICATION_TIMEOUT_MS);
+
+    try {
+      notification.show();
+    } catch {
+      finish("denied", false);
+    }
+  });
+}
+
+async function requestPluginNotificationPermission(): Promise<PluginNotificationPermission> {
+  const result = await showPluginNativeNotification({
+    title: `${APP_NAME} notifications`,
+    body: "Native notifications are enabled for this app.",
+  });
+  return result.permission;
+}
+
 const pluginPanels = new PluginPanelHost(async (pluginId, channel, payload) =>
   plugins.invokePanelBridge(pluginId, channel, payload),
 );
@@ -182,6 +249,9 @@ const plugins = new PluginRuntime({
     sendToRenderer(IPC.event.toast, {
       message: `${input.title}${input.body ? `: ${input.body}` : ""}`,
     }),
+  getNotificationPermission: getPluginNotificationPermission,
+  requestNotificationPermission: requestPluginNotificationPermission,
+  showNativeNotification: showPluginNativeNotification,
   openExternal: async (url) => {
     await shell.openExternal(url);
   },

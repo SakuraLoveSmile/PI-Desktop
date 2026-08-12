@@ -343,12 +343,20 @@ These APIs require explicit permissions:
 | `clipboard.write` | `pi.clipboard.writeText` | `clipboard.writeText` |
 | `net.fetch` | `pi.net.fetch` | `net.fetch` |
 | `shell.openExternal` | `pi.shell.openExternal` | `shell.openExternal` |
-| `notify` | `pi.ui.notify` | `ui.notify` |
+| `notify` | `pi.ui.notify`, `pi.ui.getNotificationPermission`, `pi.ui.requestNotificationPermission`, `pi.ui.showNativeNotification` | `ui.notify`, `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` |
 
 Workspace paths are relative to the active workspace. Absolute paths and `..`
 escapes are rejected. `fs.remove` is non-recursive and cannot remove the
 workspace root. `openExternal` accepts only HTTP(S) and `mailto:` URLs;
 `net.fetch` accepts HTTP(S).
+
+`pi.ui.notify` shows an in-app Toast. Native notifications are opt-in: call
+`pi.ui.requestNotificationPermission()` before
+`pi.ui.showNativeNotification(...)`. The returned permission is best-effort
+because Electron does not expose a cross-platform read-only OS permission API;
+`unknown` means the platform has not reported a result yet, and
+`unsupported` means desktop notifications are unavailable. Native plugin
+notifications are not added to PI-Desktop's durable task notification inbox.
 
 The panel bridge also exposes `ui.showToast`, `ui.closePanel`,
 `plugin.getSettings`, and `workspace.get`. It does not expose arbitrary custom

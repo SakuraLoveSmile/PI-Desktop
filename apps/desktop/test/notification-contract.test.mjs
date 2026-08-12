@@ -4,7 +4,15 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [protocolSource, mainSource, apiSource, storeSource, appSource, sidebarSource] =
+const [
+  protocolSource,
+  mainSource,
+  apiSource,
+  storeSource,
+  appSource,
+  sidebarSource,
+  pluginRuntimeSource,
+] =
   await Promise.all([
     read("../../../packages/shared/src/protocol.ts"),
     read("../electron/main/index.ts"),
@@ -12,6 +20,7 @@ const [protocolSource, mainSource, apiSource, storeSource, appSource, sidebarSou
     read("../src/stores/app-store.ts"),
     read("../src/App.tsx"),
     read("../src/components/Sidebar.tsx"),
+    read("../electron/main/plugin-runtime.ts"),
   ]);
 
 test("notification IPC stays behind the shared preload allowlist", () => {
@@ -74,4 +83,16 @@ test("native notifications only show for an unfocused window and navigate back",
     storeSource,
     /await get\(\)\.selectSession\(notification\.sessionId,\s*\{\s*navigationIntent: intent/,
   );
+});
+
+test("plugins can request and send native notifications behind notify permission", () => {
+  assert.match(pluginRuntimeSource, /"ui\.getNotificationPermission"/);
+  assert.match(pluginRuntimeSource, /"ui\.requestNotificationPermission"/);
+  assert.match(pluginRuntimeSource, /"ui\.showNativeNotification"/);
+  assert.match(pluginRuntimeSource, /this\.assertPermission\(loaded, "notify"\)/);
+  assert.match(mainSource, /getPluginNotificationPermission/);
+  assert.match(mainSource, /requestPluginNotificationPermission/);
+  assert.match(mainSource, /showPluginNativeNotification/);
+  assert.match(mainSource, /PLUGIN_NOTIFICATION_TIMEOUT_MS/);
+  assert.match(mainSource, /pluginNotificationPermission/);
 });

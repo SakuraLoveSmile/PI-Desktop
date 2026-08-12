@@ -230,6 +230,9 @@ Namespace: `pi.plugin.*`
 - `pi.ui.openPanel(options?)`
 - `pi.ui.showToast(message)`
 - `pi.ui.notify(title, body)`
+- `pi.ui.getNotificationPermission()`
+- `pi.ui.requestNotificationPermission()`
+- `pi.ui.showNativeNotification({ title, body? })`
 
 ### Workspace (requires permission)
 - `pi.workspace.get()`
@@ -264,6 +267,13 @@ manifest declared it and the permission was granted, and supervises restarts.
 - `pi.clipboard.writeText(text)`
 - `pi.shell.openExternal(url)` // confirmation by default
 - `pi.net.fetch(input)`
+
+`pi.ui.notify` is an in-app Toast. Native plugin notifications use the
+Electron main-process notification API and share the manifest `notify`
+permission. `requestNotificationPermission()` returns the best-effort native
+permission state (`granted`, `denied`, `unknown`, or `unsupported`) after
+performing a short native probe. These notifications are not durable task
+inbox records and do not activate a session when clicked.
 
 ### Explicitly not provided directly
 - Arbitrary host-internal Electron objects

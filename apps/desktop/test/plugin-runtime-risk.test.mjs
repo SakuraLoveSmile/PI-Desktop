@@ -27,6 +27,20 @@ test("plugin runtime exposes gated high-risk host APIs", () => {
   }
 });
 
+test("native plugin notifications stay behind the existing notify permission", () => {
+  for (const channel of [
+    "ui.getNotificationPermission",
+    "ui.requestNotificationPermission",
+    "ui.showNativeNotification",
+  ]) {
+    assert.match(runtimeSrc, new RegExp(`\\"${channel}\\"`));
+  }
+  assert.match(runtimeSrc, /getNotificationPermission: async \(\) => \{/);
+  assert.match(runtimeSrc, /requestNotificationPermission: async \(\) => \{/);
+  assert.match(runtimeSrc, /showNativeNotification: async \(input/);
+  assert.match(runtimeSrc, /this\.assertPermission\(loaded, "notify"\)/);
+});
+
 test("workspace deletion and panel operations stay bounded", () => {
   assert.match(runtimeSrc, /PANEL_SKILL_CHANNELS/);
   assert.match(runtimeSrc, /method: "panel.invoke"/);

@@ -219,7 +219,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 
 | ID | Topic | Decision | Rationale |
 |---|---|---|---|
-| D117 | Durable task notification inbox | **Rust host-core exclusively owns a schema-v6 `notifications` table and atomically inserts one structured `task.completed` / `task.failed` row when `session.endTurn` moves a running turn to completed/error only if Electron reports that result was not already visible. Renderer supplies the current chat session through an allowlisted viewing-context IPC; Main suppresses insertion only when its window is visible/focused and that session matches, while unknown, background, hidden, or unfocused state fails safe to notification. `turn_id UNIQUE` prevents duplicates, abort is silent, session deletion cascades, and only the newest 200 rows remain. The titlebar bell exposes exact unread count, All/Unread, row mark-read/session activation, mark-all-read, and clear with complete keyboard/accessibility behavior. Protocol v4 adds singular `notification.list/markRead/markAllRead/clear`; `session.endTurn` returns an inserted record, Electron emits renderer `notification.changed`, and only while the main window is unfocused it also shows a native system notification whose click restores/focuses the window and emits `notification.activated`. Persisted rows contain structured kind/session/turn/error data plus the session-name snapshot, never localized notification title/body prose. No permission, scheduled-reminder, plugin, preference, or cloud-notification capability is implied; D113's profile footer remains unchanged.** | Notifications should recover task outcomes the user did not see, not duplicate a result already visible in the current chat. A bounded host-owned inbox keeps background/unfocused outcomes durable and navigable without violating SQLite ownership, duplicating events, or turning every terminal event into notification history. |
+| D117 | Durable task notification inbox | **Rust host-core exclusively owns a schema-v6 `notifications` table and atomically inserts one structured `task.completed` / `task.failed` row when `session.endTurn` moves a running turn to completed/error only if Electron reports that result was not already visible. Renderer supplies the current chat session through an allowlisted viewing-context IPC; Main suppresses insertion only when its window is visible/focused and that session matches, while unknown, background, hidden, or unfocused state fails safe to notification. `turn_id UNIQUE` prevents duplicates, abort is silent, session deletion cascades, and only the newest 200 rows remain. The titlebar bell exposes exact unread count, All/Unread, row mark-read/session activation, mark-all-read, and clear with complete keyboard/accessibility behavior. Protocol v4 adds singular `notification.list/markRead/markAllRead/clear`; `session.endTurn` returns an inserted record, Electron emits renderer `notification.changed`, and only while the main window is unfocused it also shows a native system notification whose click restores/focuses the window and emits `notification.activated`. Persisted rows contain structured kind/session/turn/error data plus the session-name snapshot, never localized notification title/body prose. The task inbox has no permission, scheduled-reminder, preference, cloud-notification, or plugin-notification source; plugin-native notifications are the separate D213 surface. D113's profile footer remains unchanged.** | Notifications should recover task outcomes the user did not see, not duplicate a result already visible in the current chat. A bounded host-owned inbox keeps background/unfocused outcomes durable and navigable without violating SQLite ownership, duplicating events, or turning every terminal event into notification history. |
 
 ## O. Desktop shell decisions
 
@@ -1473,3 +1473,18 @@ D193, and D194.
   `03-runtime/01-ipc-protocol.md`, `03-runtime/02-agent-runtime.md`,
   `04-ux/07-ui-design-system.md`, `04-ux/08-component-spec.md`,
   `04-ux/09-interaction-patterns.md`, and E2E-120.
+
+## 2026-08-12 — Plugins can request and send native notifications
+
+- `pi.ui.notify` remains an in-app Toast for compatibility. Plugins with the
+  existing `notify` permission gain `getNotificationPermission`,
+  `requestNotificationPermission`, and `showNativeNotification` APIs.
+- Native plugin notification objects remain owned by Electron main. The API
+  returns a best-effort `granted` / `denied` / `unknown` / `unsupported` state
+  because Electron has no cross-platform read-only permission query. Native
+  plugin notifications do not create durable task inbox rows or session
+  activation events.
+- Decision D213 and ADR 0074 define the public API and the separation from
+  D117's application-owned task notification contract. See
+  `07-plugins/01-plugin-system.md`, `07-plugins/03-plugin-api.md`,
+  `07-plugins/13-plugin-permissions-matrix.md`, and E2E-122.

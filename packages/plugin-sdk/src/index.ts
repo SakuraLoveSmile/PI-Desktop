@@ -139,6 +139,22 @@ export type PluginBusMessage = {
   at: string;
 };
 
+export type PluginNotificationPermission =
+  | "granted"
+  | "denied"
+  | "unknown"
+  | "unsupported";
+
+export type PluginNativeNotificationInput = {
+  title: string;
+  body?: string;
+};
+
+export type PluginNativeNotificationResult = {
+  shown: boolean;
+  permission: PluginNotificationPermission;
+};
+
 export type PluginHostApi = {
   app: {
     getVersion: () => Promise<string>;
@@ -160,6 +176,11 @@ export type PluginHostApi = {
     closePanel: () => Promise<void>;
     showToast: (message: string, level?: "info" | "warn" | "error") => Promise<void>;
     notify: (input: { title: string; body?: string }) => Promise<void>;
+    getNotificationPermission: () => Promise<PluginNotificationPermission>;
+    requestNotificationPermission: () => Promise<PluginNotificationPermission>;
+    showNativeNotification: (
+      input: PluginNativeNotificationInput,
+    ) => Promise<PluginNativeNotificationResult>;
   };
   workspace: {
     get: () => Promise<{ path: string; name: string } | null>;

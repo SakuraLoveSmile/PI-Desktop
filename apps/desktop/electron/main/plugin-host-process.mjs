@@ -126,6 +126,9 @@ function buildApi() {
       closePanel: () => call("ui.closePanel"),
       showToast: (message, level) => call("ui.showToast", [message, level]),
       notify: (input) => call("ui.notify", [input]),
+      getNotificationPermission: () => call("ui.getNotificationPermission"),
+      requestNotificationPermission: () => call("ui.requestNotificationPermission"),
+      showNativeNotification: (input) => call("ui.showNativeNotification", [input]),
     },
     workspace: {
       get: () => call("workspace.get"),

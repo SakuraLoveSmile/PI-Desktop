@@ -12,7 +12,7 @@ Provide a permission–capability–risk–default-policy reference table for re
 | `ui.theme` | low | `contributes.themes` CSS is loaded and offered in Settings | Granted at install | CSS is sanitized by the host; it cannot script |
 | `clipboard.read` | medium | `clipboard.readText` | Confirm on first use | May read sensitive information |
 | `clipboard.write` | medium | `clipboard.writeText` | Confirm on first use | Prevents clipboard pollution |
-| `notify` | low | `ui.notify` | Can be granted by default | Avoid notification-spam abuse |
+| `notify` | low | `ui.notify`, `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | Can be granted by default | Native delivery is OS-controlled; avoid notification-spam abuse |
 | `fs.read.workspace` | medium | `fs.readText` / `fs.glob` | Confirm on first use | Workspace only |
 | `fs.write.workspace` | high | `fs.writeText` | Confirm each time or per session | High risk |
 | `fs.delete.workspace` | high | `fs.remove` | Confirm each time or per session | Non-recursive; workspace root is protected |
@@ -53,6 +53,7 @@ English is the primary copy. The zh-CN column holds the localized example string
 | `fs.read.workspace` | Read files in the current project | 读取当前项目文件 |
 | `fs.write.workspace` | Modify files in the current project | 修改当前项目文件 |
 | `fs.delete.workspace` | Delete files in the current project | 删除当前项目文件 |
+| `notify` | Show in-app and native notifications | 显示应用内和系统通知 |
 | `agent.tool.register` | Provide executable tools to the AI Agent | 向 AI Agent 提供可执行工具 |
 | `agent.prompt.inject` | Adjust agent instructions | 调整智能体指令 |
 | `net.fetch` | Access the network | 访问网络 |

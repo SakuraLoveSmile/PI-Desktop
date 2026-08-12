@@ -17,6 +17,9 @@ import {
   validateManifest,
   validateMcpServer,
   type PluginManifest,
+  type PluginNativeNotificationInput,
+  type PluginNativeNotificationResult,
+  type PluginNotificationPermission,
   type PluginServiceContrib,
   type PluginSkillContrib,
 } from "@pi-desktop/plugin-sdk";
@@ -103,6 +106,11 @@ export type PluginHostServices = {
   getAppVersion?: () => string;
   showToast: (message: string, level?: "info" | "warn" | "error") => void;
   notify: (input: { title: string; body?: string }) => void;
+  getNotificationPermission: () => PluginNotificationPermission | Promise<PluginNotificationPermission>;
+  requestNotificationPermission: () => Promise<PluginNotificationPermission>;
+  showNativeNotification: (
+    input: PluginNativeNotificationInput,
+  ) => Promise<PluginNativeNotificationResult>;
   openExternal: (url: string) => Promise<void>;
   readClipboard: () => Promise<string>;
   writeClipboard: (text: string) => Promise<void>;
@@ -149,6 +157,9 @@ const HOST_API_ALLOWLIST = new Set([
   "ui.closePanel",
   "ui.showToast",
   "ui.notify",
+  "ui.getNotificationPermission",
+  "ui.requestNotificationPermission",
+  "ui.showNativeNotification",
   "workspace.get",
   "fs.readText",
   "fs.writeText",
@@ -380,6 +391,12 @@ export class PluginRuntime {
       notify: (input) => {
         this.toasts.push({ message: `${input.title}${input.body ? `: ${input.body}` : ""}` });
       },
+      getNotificationPermission: () => "unsupported",
+      requestNotificationPermission: async () => "unsupported",
+      showNativeNotification: async () => ({
+        shown: false,
+        permission: "unsupported",
+      }),
       openExternal: async () => {
         throw apiError("UNSUPPORTED", "openExternal service missing");
       },
@@ -729,6 +746,15 @@ export class PluginRuntime {
           body: payload?.body ? String(payload.body) : undefined,
         });
         return { ok: true };
+      case "ui.getNotificationPermission":
+        return api.ui.getNotificationPermission();
+      case "ui.requestNotificationPermission":
+        return api.ui.requestNotificationPermission();
+      case "ui.showNativeNotification":
+        return api.ui.showNativeNotification({
+          title: String(payload?.title ?? "Plugin"),
+          body: payload?.body ? String(payload.body) : undefined,
+        });
       case "ui.closePanel":
         await api.ui.closePanel();
         return { ok: true };
@@ -1776,6 +1802,18 @@ export class PluginRuntime {
         notify: async (input: { title: string; body?: string }) => {
           this.assertPermission(loaded, "notify");
           this.services.notify(input);
+        },
+        getNotificationPermission: async () => {
+          this.assertPermission(loaded, "notify");
+          return this.services.getNotificationPermission();
+        },
+        requestNotificationPermission: async () => {
+          this.assertPermission(loaded, "notify");
+          return this.services.requestNotificationPermission();
+        },
+        showNativeNotification: async (input: PluginNativeNotificationInput) => {
+          this.assertPermission(loaded, "notify");
+          return this.services.showNativeNotification(input);
         },
       },
       workspace: {

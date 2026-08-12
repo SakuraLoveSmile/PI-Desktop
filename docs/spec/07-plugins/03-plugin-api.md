@@ -51,7 +51,24 @@ pi.ui.openPanel(options?: { title?: string }): Promise<void>
 pi.ui.closePanel(): Promise<void>
 pi.ui.showToast(message: string, level?: "info"|"warn"|"error"): Promise<void>
 pi.ui.notify(input: { title: string; body?: string }): Promise<void>
+pi.ui.getNotificationPermission(): Promise<PluginNotificationPermission>
+pi.ui.requestNotificationPermission(): Promise<PluginNotificationPermission>
+pi.ui.showNativeNotification(input: {
+  title: string
+  body?: string
+}): Promise<{ shown: boolean; permission: PluginNotificationPermission }>
+
+type PluginNotificationPermission = "granted" | "denied" | "unknown" | "unsupported"
 ```
+
+`ui.notify` remains an in-app Toast. Native delivery is opt-in through
+`ui.showNativeNotification` and is guarded by the same manifest `notify`
+permission. `requestNotificationPermission` performs the platform-native
+permission probe by showing a short confirmation notification; Electron does
+not expose a cross-platform read-only notification permission API, so
+`unknown` is returned before the first probe and when the operating system does
+not report a result. Native delivery is best-effort: an OS policy may suppress
+the banner without changing the durable task notification inbox.
 
 ### workspace / fs
 ```ts
@@ -203,6 +220,7 @@ The host-owned preload forwards only fixed channels to the plugin runtime:
 |---|---|
 | `ui.showToast`, `ui.closePanel` | None beyond the loaded panel |
 | `ui.notify` | `notify` |
+| `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`, `workspace.get` | None |
 | `fs.readText`, `fs.glob` | `fs.read.workspace` |
 | `fs.writeText` | `fs.write.workspace` |
@@ -253,6 +271,10 @@ The desktop plugin runtime now implements the MVP host API surface used by local
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
 - `services.register` / `unregister`, `bus.publish` / `subscribe`, `events.on` / `off`
+
+Native plugin notifications use the Electron main-process notification surface;
+they do not create durable rows in the task notification inbox and do not
+activate a session on click.
 
 Declarative contributions have no `pi.*` counterpart on purpose: skills, themes,
 and MCP servers are read from the manifest by the host, so a plugin cannot add

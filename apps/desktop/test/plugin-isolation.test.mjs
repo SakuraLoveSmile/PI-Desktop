@@ -226,6 +226,47 @@ test("plugin host process routes panel calls and workspace removal", async (t) =
   assert.equal(host.calls().some((message) => message.api === "fs.remove"), true);
 });
 
+test("plugin host process round-trips native notification permission APIs", async (t) => {
+  const { dir, manifest } = writePlugin(`
+    async function onLoad() {
+      await pi.commands.register({
+        id: "iso.notify",
+        title: "Isolation: Notify",
+        run: async () => {
+          await pi.ui.getNotificationPermission();
+          await pi.ui.requestNotificationPermission();
+          await pi.ui.showNativeNotification({ title: "Native", body: "Hello" });
+        },
+      });
+    }
+    module.exports = { onLoad };
+  `);
+  const calls = [];
+  const host = startHostProcess(dir, manifest, {
+    "ui.getNotificationPermission": () => {
+      calls.push("get");
+      return "unknown";
+    },
+    "ui.requestNotificationPermission": () => {
+      calls.push("request");
+      return "granted";
+    },
+    "ui.showNativeNotification": (input) => {
+      calls.push({ type: "show", input });
+      return { shown: true, permission: "granted" };
+    },
+  });
+  t.after(() => host.stop());
+
+  await host.init();
+  await host.call("command.run", { id: "iso.notify" });
+  assert.deepEqual(calls, [
+    "get",
+    "request",
+    { type: "show", input: { title: "Native", body: "Hello" } },
+  ]);
+});
+
 test("plugin host process reports denied host APIs and failing tools as errors", async (t) => {
   const { dir, manifest } = writePlugin(`
     async function onLoad() {

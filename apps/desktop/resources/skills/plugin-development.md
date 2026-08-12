@@ -74,9 +74,11 @@ uncaught error during load rolls the whole load back and leaves the plugin in `l
 Only `onLoad` and `onUnload` are fired today.
 
 The panel receives `window.pluginBridge`, not `pi`. Use the fixed bridge channels such as
-`ui.showToast`, `ui.closePanel`, `plugin.getSettings`, `workspace.get`, `fs.readText`,
-`fs.writeText`, `fs.glob`, `clipboard.readText`, `clipboard.writeText`, `shell.openExternal`,
-and `net.fetch`. Arbitrary Electron IPC and general custom panel RPC are not exposed.
+`ui.showToast`, `ui.closePanel`, `ui.getNotificationPermission`,
+`ui.requestNotificationPermission`, `ui.showNativeNotification`, `plugin.getSettings`,
+`workspace.get`, `fs.readText`, `fs.writeText`, `fs.glob`, `clipboard.readText`,
+`clipboard.writeText`, `shell.openExternal`, and `net.fetch`. Arbitrary Electron IPC and
+general custom panel RPC are not exposed.
 
 ## Permissions
 
@@ -88,7 +90,16 @@ user.
   `agent.tool.register`, `mcp.server.local`, `mcp.server.remote`
 - Medium: `fs.read.workspace`, `clipboard.read`, `clipboard.write`, `shell.openExternal`,
   `background.service`, `bus.publish`, `bus.subscribe`
-- Low: `ui.panel`, `ui.theme`, `notify`
+- Low: `ui.panel`, `ui.theme`, `notify` (Toast and best-effort native notifications)
+
+`pi.ui.notify` shows an in-app Toast. A plugin may call
+`pi.ui.getNotificationPermission()`, then
+`pi.ui.requestNotificationPermission()`, and finally
+`pi.ui.showNativeNotification({ title, body })` for OS-level delivery. The
+permission result is best-effort (`granted`, `denied`, `unknown`, or
+`unsupported`) because Electron has no cross-platform read-only native
+notification permission query. Native plugin notifications do not enter the
+durable task notification inbox.
 
 Supported host API groups are `app`, `plugin`, `commands`, `ui`, `workspace`, `fs`, `agent`,
 `services`, `bus`, `clipboard`, `shell`, `net`, and `events`. There is no host archive,

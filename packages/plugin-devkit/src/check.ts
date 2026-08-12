@@ -22,7 +22,12 @@ export const HIGH_RISK_PERMISSIONS = [
 /** Host API surface each permission unlocks, used for the unused-permission hint. */
 const PERMISSION_API_HINTS: Record<string, string[]> = {
   "ui.panel": ["ui.openPanel", "ui.closePanel"],
-  notify: ["ui.notify"],
+  notify: [
+    "ui.notify",
+    "ui.getNotificationPermission",
+    "ui.requestNotificationPermission",
+    "ui.showNativeNotification",
+  ],
   "clipboard.read": ["clipboard.readText"],
   "clipboard.write": ["clipboard.writeText"],
   "fs.read.workspace": ["fs.readText", "fs.glob"],
