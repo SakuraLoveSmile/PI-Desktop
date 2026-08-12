@@ -21,6 +21,7 @@ import {
 import { isCommandShellOption, normalizeMode } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
+  AskToolResolution,
   SubagentDefinition,
   ContextCompactionRecord,
   ContextCompactionSettings,
@@ -329,6 +330,16 @@ async function handle(method: string, params: any): Promise<unknown> {
       const runtime = runtimes.get(sessionId);
       if (runtime) await runtime.abort();
       return { ok: true };
+    }
+    case "asktool.resolve": {
+      const sessionId = String(params.sessionId ?? "");
+      const runtime = runtimes.get(sessionId);
+      if (!runtime) {
+        throw Object.assign(new Error("runtime not found for asktool request"), {
+          errorCode: "ASKTOOL_NOT_FOUND",
+        });
+      }
+      return runtime.resolveAskTool(params as AskToolResolution);
     }
     case "agent.getStatus": {
       const sessionId = String(params.sessionId);

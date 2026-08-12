@@ -8,6 +8,7 @@ import type {
   MessageRevisionSummary,
   AgentPromptResponse,
   AgentStatus,
+  AskToolResolution,
   AgentInstructionFile,
   AppSettings,
   CommandShellCatalog,
@@ -390,6 +391,8 @@ export const api = {
     }),
   resolvePermission: (resolution: ToolPermissionResolution) =>
     invoke(IPC.invoke.toolResolvePermission, resolution),
+  resolveAskTool: (resolution: AskToolResolution) =>
+    invoke(IPC.invoke.askToolResolve, resolution),
   pendingPlans: (sessionId?: string) =>
     invoke<PlansPendingResult>(
       IPC.invoke.plansPending,

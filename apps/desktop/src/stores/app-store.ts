@@ -2,6 +2,7 @@ import { create } from "zustand";
 import i18n from "i18next";
 import type {
   AgentEventEnvelope,
+  AskToolResolution,
   AppError,
   AppNotification,
   AppSettings,
@@ -85,6 +86,14 @@ import {
   sessionPermissions,
   type PermissionQueues,
 } from "../lib/pending-permissions";
+import {
+  clearSessionAsks,
+  enqueueAsk,
+  headAsk,
+  removeAsk,
+  removeAskForToolCall,
+  type AskQueues,
+} from "../lib/pending-asks";
 import {
   WORK_PANEL_DEFAULT_WIDTH,
   WORK_PANEL_MAX_WIDTH,
@@ -374,6 +383,8 @@ export type AppState = {
   /** Per-session permission queue, oldest first; parallel delegates can each
    * be waiting on one (ADR 0062). */
   pendingPermissions: PermissionQueues;
+  /** Inline asktool requests, queued per session without an expiry. */
+  pendingAsks: AskQueues;
   /** Planning state is durable per session, including sessions outside view. */
   planningStates: Record<string, PlanningState>;
   /** Live host approval rows keyed by session; only pending rows form the gate. */
@@ -496,6 +507,10 @@ export type AppState = {
     sessionId: string,
     requestId: string,
     decision: "allow-once" | "allow-session" | "deny",
+  ) => Promise<void>;
+  resolveAsk: (
+    sessionId: string,
+    resolution: AskToolResolution,
   ) => Promise<void>;
   resolvePlan: (resolution: PlanResolveRequest) => Promise<PlanResolutionResult>;
   showToast: (message: string, options?: ToastOptions) => void;
@@ -733,6 +748,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   plugins: [],
   pluginThemes: [],
   pendingPermissions: {},
+  pendingAsks: {},
   planningStates: {},
   pendingPlans: {},
   planCheckpoints: {},
@@ -2109,6 +2125,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         state.pendingPermissions,
         id,
       );
+      const pendingAsks = clearSessionAsks(state.pendingAsks, id);
       const latestTurnResults = withoutRecordKey(state.latestTurnResults, id);
       const planningStates = withoutRecordKey(state.planningStates, id);
       const pendingPlans = withoutRecordKey(state.pendingPlans, id);
@@ -2132,6 +2149,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         messages: state.activeSessionId === id ? [] : state.messages,
         isRunning: state.activeSessionId === id ? false : state.isRunning,
         pendingPermissions,
+        pendingAsks,
         latestTurnResults,
         planningStates,
         pendingPlans,
@@ -2591,6 +2609,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           s.pendingPermissions,
           envelope.sessionId,
         ),
+        pendingAsks: clearSessionAsks(s.pendingAsks, envelope.sessionId),
         latestTurnResults:
           event.type === "error" && event.error.code === "TURN_ABORTED"
             ? withoutRecordKey(s.latestTurnResults, envelope.sessionId)
@@ -2671,9 +2690,15 @@ export const useAppStore = create<AppState>((set, get) => ({
           envelope.sessionId,
           event.toolCallId,
         );
-        return pendingPermissions === state.pendingPermissions
+        const pendingAsks = removeAskForToolCall(
+          state.pendingAsks,
+          envelope.sessionId,
+          event.toolCallId,
+        );
+        return pendingPermissions === state.pendingPermissions &&
+          pendingAsks === state.pendingAsks
           ? {}
-          : { pendingPermissions };
+          : { pendingPermissions, pendingAsks };
       });
       const reviewArtifact = shouldOpenReviewArtifact({
         toolName,
@@ -2711,6 +2736,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             ...event.request,
             receivedAt: envelope.ts,
           }),
+        }));
+      } else if (event.type === "asktool_request") {
+        set((state) => ({
+          pendingAsks: enqueueAsk(state.pendingAsks, event.request),
         }));
       } else if (event.type === "agent_end") {
         void get().refreshSessions();
@@ -2889,6 +2918,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           }),
         }));
         break;
+      case "asktool_request":
+        set((state) => ({
+          pendingAsks: enqueueAsk(state.pendingAsks, event.request),
+        }));
+        break;
       case "error": {
         // A user-initiated stop is not an error; just settle the run state.
         const aborted = event.error.code === "TURN_ABORTED";
@@ -3019,6 +3053,17 @@ export const useAppStore = create<AppState>((set, get) => ({
           sessionId,
           requestId,
         ),
+      }));
+    }
+  },
+  resolveAsk: async (sessionId, resolution) => {
+    const ask = headAsk(get().pendingAsks, sessionId);
+    if (!ask || ask.requestId !== resolution.requestId) return;
+    try {
+      await api.resolveAskTool(resolution);
+    } finally {
+      set((state) => ({
+        pendingAsks: removeAsk(state.pendingAsks, sessionId, resolution.requestId),
       }));
     }
   },

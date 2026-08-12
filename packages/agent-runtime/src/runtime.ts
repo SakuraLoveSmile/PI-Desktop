@@ -39,6 +39,9 @@ import { DEFAULT_COMMAND_TIMEOUT_MS } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   AgentStatus,
+  AskToolQuestion,
+  AskToolRequest,
+  AskToolResolution,
   ContextCompactionFallback,
   CommandShellOption,
   ContextCompactionReason,
@@ -58,6 +61,7 @@ import type {
 import {
   checkpointGeneration,
   contextCompactionMark,
+  formatAskToolOutput,
   isCommandShellOption,
   isToolsOutputParams,
   MAX_SUBAGENT_CONCURRENCY,
@@ -115,6 +119,7 @@ const PROVIDER_STREAM_RETRY_BACKOFF_MS = 750;
 const MAX_MUTATION_RECOVERY_FAILURES = 2;
 const BASH_PATCH_FAILURE_KEY = "__bash_patch_command__";
 export const TOOL_SEARCH_NAME = "ToolSearch";
+export const ASK_TOOL_NAME = "asktool";
 /**
  * Tokens held back from the context window for the summary prompt and the
  * model's own output. Compaction thresholds are derived from the active model's
@@ -152,12 +157,13 @@ const PATH_SCOPED_INSTRUCTION_TOOLS = new Set([
 /** Tools whose `path` argument is rewritten, and which therefore must not run
  * concurrently against the same file (see `PathMutex`). */
 const PATH_MUTATING_TOOLS = new Set(["Write", "Edit"]);
-const CHAT_CORE_TOOL_NAMES = new Set(["Read", "Glob", "Grep"]);
+const CHAT_CORE_TOOL_NAMES = new Set(["Read", "Glob", "Grep", ASK_TOOL_NAME]);
 const AGENT_CORE_TOOL_NAMES = new Set([
   "Read",
   "Write",
   "Edit",
   "Bash",
+  ASK_TOOL_NAME,
 ]);
 const MAX_ON_DEMAND_TOOL_PROMPT_ENTRIES = 64;
 const MAX_TOOL_SEARCH_RESULT_NAMES = 24;
@@ -901,6 +907,13 @@ export class DesktopAgentRuntime {
     string,
     { toolName: string; args: unknown }
   >();
+  private pendingAskTools = new Map<
+    string,
+    {
+      request: AskToolRequest;
+      resolve: (answers: Array<string[] | null>) => void;
+    }
+  >();
   /** Host failures need to reach pi-agent-core's tool error channel without
    * discarding the structured diagnostics returned in `details`. */
   private failedHostToolCalls = new Set<string>();
@@ -1382,6 +1395,8 @@ export class DesktopAgentRuntime {
           return `Replace one unique occurrence of old_string in a file. Use Edit for a small localized change and Write for a whole-file rewrite; never guess old_string. After one failed edit, perform one fresh Read and regenerate the edit from that content. If the second attempt fails, stop instead of looping or repairing an old patch; do not repair an old patch repeatedly. Do not edit the same path concurrently.${scratchPathHint}${externalPathHint}`;
         case "Bash":
           return `${commandShellToolDescription(this.commandShell, this.scratchDir)} Use Edit or Write instead of apply_patch, git apply, or patch; do not retry a failed shell patch command repeatedly.`;
+        case ASK_TOOL_NAME:
+          return "Ask the user one or more questions. Each question has selectable options and the desktop card always provides a custom user-input option; unanswered questions are returned as empty answers.";
         case "PluginScaffold":
           return "Create a PI-Desktop plugin from a template and load it for development. `directory` is workspace-relative and must be empty or new; `template` is one of panel-basic, agent-tool-basic, skill-pack, full-demo. Use this instead of hand-writing plugin files.";
         case "PluginCheck":
@@ -1691,6 +1706,49 @@ export class DesktopAgentRuntime {
       };
     };
 
+    const askTool: AgentTool = {
+      name: ASK_TOOL_NAME,
+      label: "Ask questions",
+      description: describe(ASK_TOOL_NAME),
+      parameters: Type.Object({
+        questions: Type.Array(
+          Type.Object({
+            question: Type.String(),
+            options: Type.Array(Type.String()),
+            multiSelect: Type.Optional(Type.Boolean()),
+          }),
+        ),
+      }),
+      executionMode: "sequential",
+      execute: async (toolCallId, params, signal) => {
+        const questions = this.normalizeAskQuestions(params);
+        if (!questions) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `${ASK_TOOL_NAME} requires one or more questions, each with a question and at least one option.`,
+              },
+            ],
+            details: { errorCode: "ASKTOOL_INVALID_ARGUMENT" },
+            isError: true,
+          };
+        }
+        const request: AskToolRequest = {
+          requestId: randomUUID(),
+          sessionId: this.sessionId,
+          toolCallId,
+          questions,
+        };
+        const answers = await this.waitForAskTool(request, signal);
+        const text = formatAskToolOutput(questions, answers);
+        return {
+          content: [{ type: "text", text }],
+          details: { questions, answers },
+        };
+      },
+    };
+
     // BrowserPreview is non-mutating (renders an existing workspace file in
     // the work panel browser), so it ships in every mode. PluginCheck only
     // reads a directory; PluginScaffold and PluginPack write, so they follow
@@ -1760,6 +1818,7 @@ export class DesktopAgentRuntime {
       : [];
     return [
       ...builtins,
+      askTool,
       ...pluginTools,
       ...skillTools,
       ...modeTools,
@@ -1817,6 +1876,7 @@ export class DesktopAgentRuntime {
       "Grep",
       "BrowserPreview",
       "Bash",
+      ASK_TOOL_NAME,
       CONTEXT_COMPACTION_TOOL_NAME,
       SUBMIT_TOOL_NAMES[kind],
     ]).has(name);
@@ -1833,7 +1893,14 @@ export class DesktopAgentRuntime {
       (this.mode === "agent"
         ? AGENT_CORE_TOOL_NAMES.has(name)
         : proposalKindForMode(this.mode)
-          ? new Set(["Read", "Glob", "Grep", "Bash", "BrowserPreview"]).has(name)
+          ? new Set([
+              "Read",
+              "Glob",
+              "Grep",
+              "Bash",
+              "BrowserPreview",
+              ASK_TOOL_NAME,
+            ]).has(name)
           : CHAT_CORE_TOOL_NAMES.has(name))
     );
   }
@@ -2341,6 +2408,97 @@ export class DesktopAgentRuntime {
         };
       },
     };
+  }
+
+  private normalizeAskQuestions(params: unknown): AskToolQuestion[] | undefined {
+    if (!isRecord(params) || !Array.isArray(params.questions)) return undefined;
+    const questions: AskToolQuestion[] = [];
+    for (const raw of params.questions) {
+      if (!isRecord(raw)) return undefined;
+      const question = typeof raw.question === "string" ? raw.question.trim() : "";
+      const options = Array.isArray(raw.options)
+        ? raw.options
+            .filter((option): option is string => typeof option === "string")
+            .map((option) => option.trim())
+            .filter(Boolean)
+        : [];
+      if (!question || options.length === 0) return undefined;
+      const uniqueOptions = [...new Set(options)];
+      questions.push({
+        question,
+        options: uniqueOptions,
+        ...(raw.multiSelect === true ? { multiSelect: true } : {}),
+      });
+    }
+    return questions.length > 0 && questions.length <= 20 ? questions : undefined;
+  }
+
+  private waitForAskTool(
+    request: AskToolRequest,
+    signal?: AbortSignal,
+  ): Promise<Array<string[] | null>> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (answers: Array<string[] | null>) => {
+        if (settled) return;
+        settled = true;
+        signal?.removeEventListener("abort", abort);
+        this.pendingAskTools.delete(request.requestId);
+        resolve(answers);
+      };
+      const abort = () => finish(request.questions.map(() => null));
+      this.pendingAskTools.set(request.requestId, { request, resolve: finish });
+      this.emit({ type: "asktool_request", request });
+      if (signal?.aborted) abort();
+      else signal?.addEventListener("abort", abort, { once: true });
+    });
+  }
+
+  resolveAskTool(resolution: AskToolResolution): { ok: boolean } {
+    if (resolution.sessionId !== this.sessionId) {
+      throw Object.assign(new Error("asktool session mismatch"), {
+        errorCode: "ASKTOOL_NOT_FOUND",
+      });
+    }
+    const pending = this.pendingAskTools.get(resolution.requestId);
+    if (!pending) {
+      throw Object.assign(new Error("asktool request is no longer pending"), {
+        errorCode: "ASKTOOL_NOT_FOUND",
+      });
+    }
+    if (!Array.isArray(resolution.answers) || resolution.answers.length !== pending.request.questions.length) {
+      throw Object.assign(new Error("asktool answer count does not match questions"), {
+        errorCode: "ASKTOOL_INVALID_ARGUMENT",
+      });
+    }
+    const answers = resolution.answers.map((answer, index) => {
+      if (answer === null) return null;
+      if (!Array.isArray(answer)) {
+        throw Object.assign(new Error(`asktool answer ${index + 1} must be an array or null`), {
+          errorCode: "ASKTOOL_INVALID_ARGUMENT",
+        });
+      }
+      const values = answer
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (!pending.request.questions[index].multiSelect && values.length > 1) {
+        throw Object.assign(new Error(`asktool question ${index + 1} accepts one answer`), {
+          errorCode: "ASKTOOL_INVALID_ARGUMENT",
+        });
+      }
+      return [...new Set(values)];
+    });
+    pending.resolve(answers);
+    return { ok: true };
+  }
+
+  private resolvePendingAskTools(): void {
+    const pending = [...this.pendingAskTools.values()];
+    this.pendingAskTools.clear();
+    for (const entry of pending) {
+      entry.resolve(entry.request.questions.map(() => null));
+    }
   }
 
   private async loadPathInstructions(
@@ -4026,6 +4184,7 @@ export class DesktopAgentRuntime {
   }
 
   async abort(): Promise<void> {
+    this.resolvePendingAskTools();
     this.agent.abort();
     this.providerRetryAbort?.abort();
     this.compactionAbort?.abort();
@@ -4045,6 +4204,7 @@ export class DesktopAgentRuntime {
 
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.resolvePendingAskTools();
     this.pathInstructionClaims.clear();
     this.failedHostToolCalls.clear();
     this.mutationFailureCounts.clear();

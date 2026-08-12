@@ -11,15 +11,24 @@ import {
   removePermission,
   removePermissionForToolCall,
 } from "../src/lib/pending-permissions.ts";
+import {
+  clearSessionAsks,
+  enqueueAsk,
+  headAsk,
+  queuedAskCount,
+  removeAsk,
+  removeAskForToolCall,
+} from "../src/lib/pending-asks.ts";
 import { createNavigationIntentController } from "../src/lib/navigation-intent.ts";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [appSource, chatSurfaceSource, transcriptSource, cardSource, storeSource, browserSource] =
+const [appSource, chatSurfaceSource, transcriptSource, cardSource, askCardSource, storeSource, browserSource] =
   await Promise.all([
     read("../src/App.tsx"),
     read("../src/components/ChatSurface.tsx"),
     read("../src/components/ChatTranscript.tsx"),
     read("../src/components/PermissionCard.tsx"),
+    read("../src/components/AskToolCard.tsx"),
     read("../src/stores/app-store.ts"),
     read("../src/components/workpanel/BrowserTab.tsx"),
   ]);
@@ -109,6 +118,39 @@ test("a session with nothing pending keeps no empty queue", () => {
   assert.equal("session-a" in emptied, false);
   assert.equal(queuedPermissionCount(emptied, "session-a"), 0);
   assert.equal(headPermission(emptied, undefined), undefined);
+});
+
+test("asktool requests queue independently and never expire", () => {
+  const first = {
+    sessionId: "session-a",
+    requestId: "ask-a",
+    toolCallId: "tool-a",
+    questions: [{ question: "Color?", options: ["Blue"] }],
+  };
+  const second = { ...first, requestId: "ask-b", toolCallId: "tool-b" };
+  const queues = enqueueAsk(enqueueAsk({}, first), second);
+
+  assert.equal(headAsk(queues, "session-a"), first);
+  assert.equal(queuedAskCount(queues, "session-a"), 1);
+  assert.equal(enqueueAsk(queues, second), queues);
+  const next = removeAsk(queues, "session-a", "ask-a");
+  assert.equal(headAsk(next, "session-a"), second);
+  assert.equal(
+    headAsk(removeAskForToolCall(next, "session-a", "tool-b"), "session-a"),
+    undefined,
+  );
+  assert.deepEqual(Object.keys(clearSessionAsks(next, "session-a")), []);
+});
+
+test("asktool card is a stepwise, non-expiring inline question surface", () => {
+  assert.match(chatSurfaceSource, /pendingAsk/);
+  assert.match(transcriptSource, /<AskToolCard/);
+  assert.match(storeSource, /event\.type === "asktool_request"/);
+  assert.match(askCardSource, /current\.multiSelect/);
+  assert.match(askCardSource, /customOption/);
+  assert.match(askCardSource, /Decline all|askTool\.decline/);
+  assert.match(askCardSource, /draft\.skipped/);
+  assert.doesNotMatch(askCardSource, /permissionSecondsLeft|setInterval/);
 });
 
 test("permission countdown uses its absolute receipt time", () => {
