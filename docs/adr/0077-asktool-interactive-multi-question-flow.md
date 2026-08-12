@@ -23,7 +23,8 @@ stable tool output so the model can distinguish it from a missing tool result.
    option, regardless of the model's option list.
 3. The renderer owns draft selection state and displays one question at a time.
    Skip and decline resolve to `null`; answer arrays carry selected labels and
-   custom text. There is no asktool timeout or expiry.
+   custom text. The card is mounted in the shared composer approval surface
+   used by Plan and Goal approvals. There is no asktool timeout or expiry.
 4. The runtime formats the resolved values as normal tool content: each line is
    `question：answer`, multiple questions use `\n---\n`, and null answers use an
    empty value after the separator.

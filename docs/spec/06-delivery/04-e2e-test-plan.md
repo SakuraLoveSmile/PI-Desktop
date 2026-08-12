@@ -4552,11 +4552,12 @@ This test plan spec is accepted when:
   question without entering text. 5) Inspect the completed tool row and the
   next model response.
 - **Expected**: One question is visible at a time; the small indicators show
-  answered, current, and skipped states. The request has no countdown. The
-  tool output is ordered as `question：answer`, uses `、` between multiple
-  answers and `\n---\n` between questions, and keeps `question：` for the
-  skipped question. Decline all produces empty placeholders for every question
-  and still completes the tool call.
+  answered, current, and skipped states in the composer approval area, at the
+  same dock position used by Plan and Goal approval. The request has no
+  countdown. The tool output is ordered as `question：answer`, uses `、`
+  between multiple answers and `\n---\n` between questions, and keeps
+  `question：` for the skipped question. Decline all produces empty
+  placeholders for every question and still completes the tool call.
 - **Specs linked**: `03-runtime/17-asktool-questions.md`,
   `04-ux/11-asktool-question-card.md`, ADR 0077
 - **Acceptance**: E (interactive tool output), C (inline card)
