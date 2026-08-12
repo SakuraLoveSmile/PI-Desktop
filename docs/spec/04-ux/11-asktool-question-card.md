@@ -1,8 +1,12 @@
 # 11. asktool Question Card
 
-The asktool card is an inline transcript surface, not a permission dialog. It
-uses the existing message width, border, background, typography, and button
-tokens so that a paused question feels like part of the conversation.
+The asktool card is an inline composer approval surface, not a permission
+dialog. It is mounted in the same dock area as the Plan and Goal approval card,
+immediately above the composer input, so a paused question stays available at
+the active decision point instead of moving into transcript history.
+
+It uses the existing message width, border, background, typography, and button
+tokens so that a paused question remains visually part of the conversation.
 
 The header identifies the prompt and shows progress. Small clickable indicators
 encode answered, unanswered, skipped, and current state without competing with

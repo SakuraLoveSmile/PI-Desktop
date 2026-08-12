@@ -10,7 +10,7 @@ import {
   headPermission,
   queuedPermissionCount,
 } from "../lib/pending-permissions";
-import { headAsk, queuedAskCount } from "../lib/pending-asks";
+import { headAsk } from "../lib/pending-asks";
 
 const StableComposer = memo(Composer);
 
@@ -46,9 +46,6 @@ export const ChatSurface = memo(function ChatSurface() {
   const activeAsk = useAppStore((state) =>
     headAsk(state.pendingAsks, state.activeSessionId),
   );
-  const queuedAsks = useAppStore((state) =>
-    queuedAskCount(state.pendingAsks, state.activeSessionId),
-  );
   const planCheckpoint = useAppStore((state) =>
     state.activeSessionId
       ? state.planCheckpoints[state.activeSessionId]
@@ -78,7 +75,6 @@ export const ChatSurface = memo(function ChatSurface() {
       pendingPermission: activePermission,
       queuedPermissions,
       pendingAsk: activeAsk,
-      queuedAsks,
       approvalPending: planCheckpoint?.status === "pending",
       planCheckpoint,
       planningState: activePlanningState,
@@ -87,7 +83,6 @@ export const ChatSurface = memo(function ChatSurface() {
       activePermission,
       queuedPermissions,
       activeAsk,
-      queuedAsks,
       planCheckpoint,
       activePlanningState,
       activeSessionId,
@@ -177,8 +172,7 @@ export const ChatSurface = memo(function ChatSurface() {
             isRunning={transcriptView.isRunning}
             pendingPermission={transcriptView.pendingPermission}
             queuedPermissions={transcriptView.queuedPermissions}
-            pendingAsk={transcriptView.pendingAsk}
-            queuedAsks={transcriptView.queuedAsks}
+            askPending={Boolean(transcriptView.pendingAsk)}
             planningState={transcriptView.planningState}
           />
           <StableComposer variant="docked" />

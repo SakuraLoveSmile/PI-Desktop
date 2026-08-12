@@ -22,10 +22,11 @@ import {
 import { createNavigationIntentController } from "../src/lib/navigation-intent.ts";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [appSource, chatSurfaceSource, transcriptSource, cardSource, askCardSource, storeSource, browserSource] =
+const [appSource, chatSurfaceSource, composerSource, transcriptSource, cardSource, askCardSource, storeSource, browserSource] =
   await Promise.all([
     read("../src/App.tsx"),
     read("../src/components/ChatSurface.tsx"),
+    read("../src/components/Composer.tsx"),
     read("../src/components/ChatTranscript.tsx"),
     read("../src/components/PermissionCard.tsx"),
     read("../src/components/AskToolCard.tsx"),
@@ -142,9 +143,12 @@ test("asktool requests queue independently and never expire", () => {
   assert.deepEqual(Object.keys(clearSessionAsks(next, "session-a")), []);
 });
 
-test("asktool card is a stepwise, non-expiring inline question surface", () => {
+test("asktool card is a stepwise, non-expiring composer question surface", () => {
   assert.match(chatSurfaceSource, /pendingAsk/);
-  assert.match(transcriptSource, /<AskToolCard/);
+  assert.match(composerSource, /<AskToolCard/);
+  assert.match(composerSource, /headAsk\(s\.pendingAsks/);
+  assert.doesNotMatch(transcriptSource, /AskToolCard/);
+  assert.match(chatSurfaceSource, /askPending=\{Boolean\(transcriptView\.pendingAsk\)\}/);
   assert.match(storeSource, /event\.type === "asktool_request"/);
   assert.match(askCardSource, /current\.multiSelect/);
   assert.match(askCardSource, /customOption/);

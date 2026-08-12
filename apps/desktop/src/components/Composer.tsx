@@ -15,12 +15,14 @@ import { useAppStore } from "../stores/app-store";
 import type { ComposerDraftSnapshot } from "../lib/composer-smart-stop";
 import { api } from "../lib/api";
 import { isActivePlanExecution } from "../lib/plan-mode-state";
+import { headAsk, queuedAskCount } from "../lib/pending-asks";
 import { runPaletteCommand } from "../lib/commands";
 import {
   resolveComposerCommand,
   useComposerAutocomplete,
 } from "../lib/use-composer-autocomplete";
 import { ComposerAutocomplete } from "./ComposerAutocomplete";
+import { AskToolCard } from "./AskToolCard";
 import { PlanApprovalBar } from "./PlanApprovalBar";
 import {
   IconArrowUp,
@@ -213,6 +215,12 @@ export function Composer({
   const clearComposerPrefill = useAppStore((s) => s.clearComposerPrefill);
   const planCheckpoint = useAppStore((s) =>
     s.activeSessionId ? s.planCheckpoints[s.activeSessionId] : undefined,
+  );
+  const pendingAsk = useAppStore((s) =>
+    headAsk(s.pendingAsks, s.activeSessionId),
+  );
+  const queuedAsks = useAppStore((s) =>
+    queuedAskCount(s.pendingAsks, s.activeSessionId),
   );
   const [value, setValue] = useState("");
   const [fileReferences, setFileReferences] = useState<ComposerFileReference[]>([]);
@@ -603,6 +611,9 @@ export function Composer({
       <div className="composer-stack">
         {planCheckpoint?.status === "pending" ? (
           <PlanApprovalBar proposal={planCheckpoint} />
+        ) : null}
+        {pendingAsk ? (
+          <AskToolCard request={pendingAsk} queued={queuedAsks} />
         ) : null}
         <div className={`composer-shell${inputBlocked ? " is-gated" : ""}`}>
           {inputFocused ? (
