@@ -98,7 +98,11 @@ Codex as a visual reference. The identity contract is deliberately small:
   previous one. Frames swap discretely inside the fixed 100px viewport, while
   the completed pose rests for several seconds before the next selection
   (single-frame poses rest longer). Reduced motion holds the current group's
-  first frame.
+  first frame. The sheet is monochrome with recovered edge alpha: the frames
+  were keyed off a magenta background, so a partially covered pixel carries its
+  own coverage rather than the key colour, and the mascot leaves no coloured
+  fringe on a dark surface. `python3 scripts/clean-mascot-sprite.py` restores
+  that property if the sheet is ever recompiled with a hard alpha threshold.
   `BrandLogo` remains 20px/18px in the expanded/collapsed sidebar and 64px in
   the startup splash. Composer prompt rows do not render a leading brand icon
   in either home or thread-docked mode.
