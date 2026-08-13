@@ -3744,11 +3744,13 @@ Each scenario is documented in this format:
   name is `无限画布`. Configure a provider that streams slowly enough to stop a
   partial answer. Run once on macOS and once on Windows.
 - **Steps**:
-  1. With PI-Desktop unfocused, press Option+Space on macOS or Alt+Space on
-     Windows while another application owns the foreground window. Confirm a
-     centered launcher appears on the pointer's display with no native close,
-     minimize, maximize, resize, or taskbar controls, and Windows does not show
-     the active application's system menu.
+  1. Immediately after PI-Desktop finishes booting, leave it unfocused and press
+     Option+Space on macOS or Alt+Space on Windows while another application
+     owns the foreground window. Confirm the first invocation promptly reveals
+     a fully rendered, centered launcher on the pointer's display without a
+     blank initialization frame, native close, minimize, maximize, resize, or
+     taskbar controls. Confirm Windows does not show the active application's
+     system menu.
   2. Search separately for `无限`, `wuxianhuabu`, and `wxhb`. Use Up/Down and
      Enter for one run and click for another; confirm the existing plugin panel
      opens. Confirm Chinese IME candidate Enter does not open a result.
@@ -3761,9 +3763,10 @@ Each scenario is documented in this format:
   5. Inspect the stopped answer's conversation statistics, reload the session,
      and inspect again.
 - **Expected**:
-  - Launcher search returns only enabled, ready panel plugins and every
-    invocation starts with an empty, focused query. Escape and focus loss hide
-    it without closing the main application.
+  - Post-boot warm-up removes BrowserWindow and renderer loading from the first
+    shortcut's visible path. Launcher search returns only enabled, ready panel
+    plugins and every invocation starts with an empty, focused query. Escape and
+    focus loss hide it without closing the main application.
   - No running turn observes the staged mode/model/thinking/permission change,
     and a second prompt cannot be sent concurrently.
   - Stopped throughput is present before and after reload. It uses exact output

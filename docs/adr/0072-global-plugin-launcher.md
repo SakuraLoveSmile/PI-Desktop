@@ -27,8 +27,9 @@ author to add aliases to every manifest.
    binding. The hook consumes the chord and emits a host notification to
    Electron, allowing the launcher to work while another application is
    focused. The focused main window remains a last-resort fallback.
-2. Electron main owns one lazy, centered, frameless 620×440 utility window on
-   the display nearest the pointer. It is non-resizable, absent from the
+2. Electron main owns one centered, frameless 620×440 utility window on the
+   display nearest the pointer. ADR 0080 supersedes its original first-use lazy
+   creation with hidden post-boot warm-up. It is non-resizable, absent from the
    taskbar, always on top while visible, and hides on blur or Escape. macOS uses
    a panel window visible across workspaces; no platform receives native window
    controls.

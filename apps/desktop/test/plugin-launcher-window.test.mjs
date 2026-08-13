@@ -20,6 +20,13 @@ test("global plugin launcher is a centered frameless cross-platform utility wind
   assert.match(main, /globalShortcut\.register\(accelerator/);
   assert.match(main, /keyboard\.setGlobalShortcut/);
   assert.match(main, /pluginLauncherBinding === "Alt\+Space"/);
+  assert.match(main, /let pluginLauncherCreationPromise: Promise<BrowserWindow>/);
+  assert.match(
+    main,
+    /if \(pluginLauncherCreationPromise\) return pluginLauncherCreationPromise/,
+  );
+  assert.match(main, /function prewarmPluginLauncher\(\): void/);
+  assert.match(main, /await ensureWindow\(\);\s+prewarmPluginLauncher\(\)/);
   assert.match(main, /window\.on\("blur"[\s\S]*window\.hide\(\)/);
 });
 

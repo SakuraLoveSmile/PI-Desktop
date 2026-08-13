@@ -96,3 +96,4 @@ Each ADR includes:
 | 0075 | Manual reload for development-plugin permission ceilings | Accepted |
 | 0076 | Capture the Windows-reserved plugin launcher chord in host-core | Accepted |
 | 0079 | Use VitePress for the bilingual documentation site | Accepted |
+| 0080 | Prewarm the global plugin launcher after boot | Accepted |

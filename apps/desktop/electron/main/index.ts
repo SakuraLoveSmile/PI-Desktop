@@ -154,6 +154,7 @@ const WINDOW_MIN_HEIGHT = 700;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let pluginLauncherWindow: BrowserWindow | null = null;
+let pluginLauncherCreationPromise: Promise<BrowserWindow> | null = null;
 let pluginLauncherAccelerator: string | null = null;
 let pluginLauncherBinding = "Alt+Space";
 let windowCreationPromise: Promise<void> | null = null;
@@ -1362,68 +1363,99 @@ function pluginLauncherBounds() {
   };
 }
 
-async function createPluginLauncherWindow(): Promise<BrowserWindow> {
+function createPluginLauncherWindow(): Promise<BrowserWindow> {
+  if (pluginLauncherCreationPromise) return pluginLauncherCreationPromise;
   if (pluginLauncherWindow && !pluginLauncherWindow.isDestroyed()) {
-    return pluginLauncherWindow;
+    return Promise.resolve(pluginLauncherWindow);
   }
 
-  const window = new BrowserWindow({
-    ...pluginLauncherBounds(),
-    title: `${APP_NAME} Plugin Launcher`,
-    show: false,
-    frame: false,
-    transparent: true,
-    backgroundColor: "#00000000",
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    hasShadow: true,
-    autoHideMenuBar: true,
-    ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
-    webPreferences: {
-      preload: join(__dirname, "../preload/index.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      additionalArguments: [`--pi-desktop-locale=${app.getLocale()}`],
-    },
-  });
-  pluginLauncherWindow = window;
-
-  if (process.platform === "darwin") {
-    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  }
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
-    return { action: "deny" };
-  });
-  window.webContents.on("will-navigate", (event, url) => {
-    const devOrigin = process.env.ELECTRON_RENDERER_URL;
-    if (devOrigin && url.startsWith(devOrigin)) return;
-    event.preventDefault();
-  });
-  window.on("blur", () => {
-    if (!window.isDestroyed() && !window.webContents.isDevToolsOpened()) {
-      window.hide();
-    }
-  });
-  window.on("closed", () => {
-    if (pluginLauncherWindow === window) pluginLauncherWindow = null;
-  });
-
-  if (process.env.ELECTRON_RENDERER_URL) {
-    const url = new URL(process.env.ELECTRON_RENDERER_URL);
-    url.searchParams.set("surface", "plugin-launcher");
-    await window.loadURL(url.toString());
-  } else {
-    await window.loadFile(join(__dirname, "../renderer/index.html"), {
-      query: { surface: "plugin-launcher" },
+  const creation = (async () => {
+    const window = new BrowserWindow({
+      ...pluginLauncherBounds(),
+      title: `${APP_NAME} Plugin Launcher`,
+      show: false,
+      frame: false,
+      transparent: true,
+      backgroundColor: "#00000000",
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      hasShadow: true,
+      autoHideMenuBar: true,
+      ...(process.platform === "darwin" ? { type: "panel" as const } : {}),
+      webPreferences: {
+        preload: join(__dirname, "../preload/index.cjs"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        additionalArguments: [`--pi-desktop-locale=${app.getLocale()}`],
+      },
     });
-  }
-  return window;
+    pluginLauncherWindow = window;
+
+    if (process.platform === "darwin") {
+      window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    }
+    window.webContents.setWindowOpenHandler(({ url }) => {
+      void shell.openExternal(url);
+      return { action: "deny" };
+    });
+    window.webContents.on("will-navigate", (event, url) => {
+      const devOrigin = process.env.ELECTRON_RENDERER_URL;
+      if (devOrigin && url.startsWith(devOrigin)) return;
+      event.preventDefault();
+    });
+    window.on("blur", () => {
+      if (!window.isDestroyed() && !window.webContents.isDevToolsOpened()) {
+        window.hide();
+      }
+    });
+    window.on("closed", () => {
+      if (pluginLauncherWindow === window) pluginLauncherWindow = null;
+    });
+
+    try {
+      if (process.env.ELECTRON_RENDERER_URL) {
+        const url = new URL(process.env.ELECTRON_RENDERER_URL);
+        url.searchParams.set("surface", "plugin-launcher");
+        await window.loadURL(url.toString());
+      } else {
+        await window.loadFile(join(__dirname, "../renderer/index.html"), {
+          query: { surface: "plugin-launcher" },
+        });
+      }
+      return window;
+    } catch (error) {
+      if (!window.isDestroyed()) window.destroy();
+      throw error;
+    }
+  })();
+
+  pluginLauncherCreationPromise = creation;
+  void creation.then(
+    () => {
+      if (pluginLauncherCreationPromise === creation) {
+        pluginLauncherCreationPromise = null;
+      }
+    },
+    () => {
+      if (pluginLauncherCreationPromise === creation) {
+        pluginLauncherCreationPromise = null;
+      }
+    },
+  );
+  return creation;
+}
+
+function prewarmPluginLauncher(): void {
+  void createPluginLauncherWindow().catch((error) =>
+    logger.app("diagnostics", "warn", "plugin launcher warm-up failed", {
+      data: String(error),
+    }),
+  );
 }
 
 async function showPluginLauncher(): Promise<void> {
@@ -6311,6 +6343,7 @@ app.whenReady().then(async () => {
     }
   }
   await ensureWindow();
+  prewarmPluginLauncher();
   // createWindow awaits the initial load (loadFile resolves on
   // did-finish-load), so the page is up; give React a beat to mount its
   // event subscriptions before pushing the boot outcome.
