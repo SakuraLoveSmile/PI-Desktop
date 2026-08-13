@@ -14,8 +14,9 @@ slower than later invocations even though the window was retained after use.
 
 ## Decision
 
-After the main application and backends finish booting, Electron creates and
-loads the launcher window in the background while keeping it hidden. Shortcut
+As soon as Electron is ready, before backend/plugin boot completes, Electron
+starts creating and loading the launcher window in the background while keeping
+it hidden. This work runs in parallel with primary startup. Shortcut
 invocations continue to set the current display bounds, show, and focus the
 same retained window.
 
@@ -33,7 +34,8 @@ v11.
 ## Consequences
 
 - The first post-boot shortcut no longer pays BrowserWindow and renderer load
-  latency on its visible path once background warm-up completes.
+  latency on its visible path; warm-up starts early enough to overlap backend
+  startup.
 - One hidden sandboxed renderer remains resident after boot, trading a bounded
   memory cost for consistent launch latency.
 - Application boot is not blocked on launcher warm-up, and warm-up failure does

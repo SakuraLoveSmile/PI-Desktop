@@ -18,6 +18,7 @@ export function PluginLauncher() {
   const [loading, setLoading] = useState(true);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const loadPromiseRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -58,15 +59,27 @@ export function PluginLauncher() {
   );
 
   const load = useCallback(async () => {
+    if (loadPromiseRef.current) {
+      await loadPromiseRef.current;
+      return;
+    }
     setLoading(true);
     setError(null);
+    const request = (async () => {
+      try {
+        const result = await api.listPlugins();
+        setPlugins(result.plugins);
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : String(loadError));
+      } finally {
+        setLoading(false);
+      }
+    })();
+    loadPromiseRef.current = request;
     try {
-      const result = await api.listPlugins();
-      setPlugins(result.plugins);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : String(loadError));
+      await request;
     } finally {
-      setLoading(false);
+      if (loadPromiseRef.current === request) loadPromiseRef.current = null;
     }
   }, []);
 
@@ -75,7 +88,20 @@ export function PluginLauncher() {
     setHighlighted(0);
     setOpeningId(null);
     setError(null);
-    window.requestAnimationFrame(() => inputRef.current?.focus());
+    // Warm-up may run before the host is ready, so retry the persisted theme
+    // when the launcher is actually shown instead of keeping the fallback.
+    void api
+      .getSettings()
+      .then((settings) => {
+        document.documentElement.dataset.theme =
+          settings.theme === "light" || settings.theme === "dark"
+            ? settings.theme
+            : window.matchMedia("(prefers-color-scheme: light)").matches
+              ? "light"
+              : "dark";
+      })
+      .catch(() => undefined);
+    inputRef.current?.focus();
     void load();
   }, [load]);
 

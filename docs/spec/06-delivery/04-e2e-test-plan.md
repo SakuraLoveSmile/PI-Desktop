@@ -3768,8 +3768,10 @@ Each scenario is documented in this format:
   5. Inspect the stopped answer's conversation statistics, reload the session,
      and inspect again.
 - **Expected**:
-  - Post-boot warm-up removes BrowserWindow and renderer loading from the first
-    shortcut's visible path. Launcher search returns only enabled, ready panel
+  - Early warm-up starts before backend boot completes and removes BrowserWindow
+    and renderer loading from the first shortcut's visible path. On macOS the
+    panel is activated once without a second app/window-stack hop, so the reveal
+    does not visibly stutter. Launcher search returns only enabled, ready panel
     plugins and every invocation starts with an empty, focused query. Escape and
     focus loss hide it without closing the main application.
   - No running turn observes the staged mode/model/thinking/permission change,

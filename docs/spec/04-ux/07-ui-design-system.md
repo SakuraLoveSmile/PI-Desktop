@@ -712,9 +712,10 @@ The composer renders only controls connected to the active pi session:
 frameless 620×440 utility window on the display nearest the pointer. The surface
 has no close, minimize, maximize, resize, or taskbar controls and dismisses on
 blur or Escape. Its solid elevated token surface works in light and dark themes
-without a backdrop blur. Electron preloads the hidden launcher after application
-boot so the first shortcut invocation reveals an already-rendered surface rather
-than waiting for a new renderer process and document load.
+without a backdrop blur. Electron starts loading the hidden launcher as soon as
+the runtime is ready, in parallel with application boot, so the first shortcut
+invocation reveals an already-rendered surface rather than waiting for a new
+renderer process and document load.
 
 The focused search field filters enabled, ready plugins that contribute a panel.
 Chinese display names match their original characters, tone-free full pinyin,

@@ -64,7 +64,11 @@ test("macOS installs a standard application menu before window creation", () => 
   assert.match(menuSource, /Menu\.setApplicationMenu\(null\)/);
   assert.match(
     mainSource,
-    /installApplicationMenu\(\{\s+locale: app\.getLocale\(\),\s+dispatch: dispatchApplicationMenuCommand,\s+\}\);\s+registerIpc\(\)/,
+    /installApplicationMenu\(\{\s+locale: app\.getLocale\(\),\s+dispatch: dispatchApplicationMenuCommand,\s+\}\);/,
+  );
+  assert.ok(
+    mainSource.indexOf("prewarmPluginLauncher();") < mainSource.indexOf("registerIpc();"),
+    "launcher warm-up should start before IPC registration completes",
   );
 });
 

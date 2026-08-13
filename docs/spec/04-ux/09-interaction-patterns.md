@@ -62,9 +62,12 @@
   Electron host notification, so it works while another application is
   focused. A focused-window fallback remains available if the hook cannot be
   installed. Custom bindings continue to use Electron's global shortcut API.
-  After the main application finishes booting, Electron warms the launcher in a
-  hidden window; shortcut delivery during warm-up joins the same in-flight load.
-  The launcher always opens on the display nearest the pointer.
+  Electron starts warming the launcher in a hidden window as soon as Electron
+  is ready, in parallel with backend and main-window boot; shortcut delivery
+  during warm-up joins the same in-flight load. The macOS show path relies on
+  the panel's normal activation instead of issuing a second application
+  activation or window-stack move. The launcher always opens on the display
+  nearest the pointer.
 
 ### 1.5 Plugin launcher shortcuts
 

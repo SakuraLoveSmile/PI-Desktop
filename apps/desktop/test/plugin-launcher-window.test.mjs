@@ -26,7 +26,14 @@ test("global plugin launcher is a centered frameless cross-platform utility wind
     /if \(pluginLauncherCreationPromise\) return pluginLauncherCreationPromise/,
   );
   assert.match(main, /function prewarmPluginLauncher\(\): void/);
-  assert.match(main, /await ensureWindow\(\);\s+prewarmPluginLauncher\(\)/);
+  assert.ok(
+    main.indexOf("prewarmPluginLauncher();") < main.indexOf("await bootBackends();"),
+    "launcher warm-up should start before backend boot",
+  );
+  assert.doesNotMatch(main, /await ensureWindow\(\);\s+prewarmPluginLauncher\(\)/);
+  assert.match(main, /window\.show\(\);\s+\/\/ `show\(\)` already activates and focuses a macOS panel\./);
+  assert.match(main, /process\.platform !== "darwin"\) \{[\s\S]*window\.focus\(\);[\s\S]*window\.moveTop\(\);/);
+  assert.doesNotMatch(main, /process\.platform === "darwin"\) app\.focus\(\{ steal: true \}\)/);
   assert.match(main, /window\.on\("blur"[\s\S]*window\.hide\(\)/);
 });
 
@@ -37,6 +44,9 @@ test("launcher renderer supports keyboard selection and has no window controls",
   assert.match(launcher, /event\.key === "Enter"/);
   assert.match(launcher, /event\.key === "Escape"/);
   assert.match(launcher, /api\.openPluginPanel\(plugin\.id\)/);
+  assert.match(launcher, /loadPromiseRef/);
+  assert.match(launcher, /inputRef\.current\?\.focus\(\)/);
+  assert.doesNotMatch(launcher, /requestAnimationFrame\(\(\) => inputRef/);
   assert.doesNotMatch(launcher, /WindowControls|window-controls/);
   assert.match(styles, /html\[data-surface="plugin-launcher"\][\s\S]*background: transparent/);
 });

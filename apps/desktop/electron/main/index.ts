@@ -1467,10 +1467,16 @@ async function showPluginLauncher(): Promise<void> {
   const window = await createPluginLauncherWindow();
   if (window.isDestroyed()) return;
   window.setBounds(pluginLauncherBounds(), false);
-  if (process.platform === "darwin") app.focus({ steal: true });
   window.show();
-  window.focus();
-  window.moveTop();
+  // `show()` already activates and focuses a macOS panel. Avoid a second
+  // native focus/activation and window-stack move there; each adds visible
+  // compositor work when another app owns the foreground window. Windows and
+  // Linux retain the explicit focus and move for their frameless utility
+  // window.
+  if (process.platform !== "darwin") {
+    window.focus();
+    window.moveTop();
+  }
   window.webContents.send(IPC.event.pluginLauncherShown);
 }
 
@@ -6331,6 +6337,10 @@ app.whenReady().then(async () => {
     locale: app.getLocale(),
     dispatch: dispatchApplicationMenuCommand,
   });
+  // Start the retained launcher as soon as Electron is ready. It can load in
+  // parallel with host/plugin boot, so the first post-boot Option+Space does
+  // not race the renderer allocation just because backend startup was slow.
+  prewarmPluginLauncher();
   registerIpc();
   applyPluginLauncherShortcut();
   updater.startAutoCheck();
@@ -6359,7 +6369,6 @@ app.whenReady().then(async () => {
     }
   }
   await ensureWindow();
-  prewarmPluginLauncher();
   // createWindow awaits the initial load (loadFile resolves on
   // did-finish-load), so the page is up; give React a beat to mount its
   // event subscriptions before pushing the boot outcome.
