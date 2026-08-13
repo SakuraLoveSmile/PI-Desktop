@@ -220,6 +220,7 @@ function AppShell() {
   const splashStartedAt = useRef(
     typeof performance !== "undefined" ? performance.now() : 0,
   );
+  const bootstrapStartedRef = useRef(false);
 
   useEffect(() => {
     presentedWorkPanelRef.current = presentedWorkPanelOpen;
@@ -434,7 +435,12 @@ function AppShell() {
   }, [settings?.theme, pluginThemes]);
 
   useEffect(() => {
+    if (bootstrapStartedRef.current) return;
+    bootstrapStartedRef.current = true;
     void bootstrap();
+  }, [bootstrap]);
+
+  useEffect(() => {
     const offEvent = api.onAgentEvent(handleAgentEvent);
     const offPlansChanged = api.onPlansChanged(handlePlansChanged);
     // Host-pushed toasts (plugin runtime etc.) are informational.

@@ -52,7 +52,9 @@ destination, chat as the home surface, tools and permissions inline.
   the traffic-light row. `Codex` remains only an external import source or a
   design-reference term.
 - **Main pane**: exactly one destination at a time; destinations replace the
-  pane (they are pages, not modals).
+  pane (they are pages, not modals). Once Settings or Extensions is selected,
+  bootstrap completion and background refreshes must not replace that
+  destination with the chat home; only an explicit navigation action may do so.
 - **Titlebar**: platform-native desktop chrome (D118). macOS uses
   `hiddenInset` traffic lights and the system application menu. The expanded
   sidebar keeps Search and Collapse sidebar in the same 46px row, aligned to

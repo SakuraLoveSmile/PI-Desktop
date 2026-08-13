@@ -35,6 +35,18 @@ test("secondary destinations stay outside the initial shell bundle", () => {
   assert.match(app, /<Suspense fallback=\{<RoutePending \/>\}>/);
 });
 
+test("bootstrap cannot replay navigation after destination state changes", () => {
+  assert.match(app, /const bootstrapStartedRef = useRef\(false\);/);
+  assert.match(
+    app,
+    /useEffect\(\(\) => \{\s*if \(bootstrapStartedRef\.current\) return;\s*bootstrapStartedRef\.current = true;\s*void bootstrap\(\);\s*\}, \[bootstrap\]\);/,
+  );
+  const subscriptions =
+    app.match(/useEffect\(\(\) => \{\s*const offEvent = api\.onAgentEvent[\s\S]*?\n  \}, \[/)?.[0] ?? "";
+  assert.ok(subscriptions);
+  assert.doesNotMatch(subscriptions, /bootstrap\(\)/);
+});
+
 test("stream rendering avoids duplicate frame state and coalesces following", () => {
   assert.match(transcript, /const displayed = message\.content \|\| "";/);
   assert.doesNotMatch(transcript, /useTypewriter/);
