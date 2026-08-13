@@ -345,10 +345,25 @@ await pi.plugin.setSettings({ greeting: "Welcome" });
 const dataPath = await pi.plugin.getDataPath();
 ```
 
-Settings and the data path are private to the plugin id. A dedicated generated
-settings UI is not implemented yet; a plugin must provide its own supported
-interaction for changes. Do not put credentials in `manifest.json` or source
-control.
+Settings and the data path are private to the plugin id. The installed Plugins
+page generates controls for `string`, `number`, `boolean`, `select`, `json`, and
+`shortcut` fields. A shortcut field must name a declared command:
+
+```json
+{
+  "key": "openShortcut",
+  "title": "Open panel shortcut",
+  "type": "shortcut",
+  "default": "Mod+Shift+H",
+  "command": "hello.open",
+  "scope": "plugin"
+}
+```
+
+Plugin shortcuts run only in the focused PI-Desktop window and are checked
+against the app shortcut map. Global registration is not supported yet. The
+plugin receives `plugin:settingsChanged` after a user edit. Do not put
+credentials in `manifest.json` or source control.
 
 ### 6.4 Workspace files, clipboard, network, and notifications
 

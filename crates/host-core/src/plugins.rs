@@ -15,6 +15,36 @@ const MAX_PACKAGE_FILES: usize = 2000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PluginSettingOption {
+    pub label: String,
+    pub value: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginSettingDefinition {
+    pub key: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub setting_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<Value>,
+    #[serde(rename = "enum", default, skip_serializing_if = "Vec::is_empty")]
+    pub enum_values: Vec<PluginSettingOption>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    #[serde(default = "plugin_setting_scope")]
+    pub scope: String,
+}
+
+fn plugin_setting_scope() -> String {
+    "plugin".into()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PluginSummary {
     pub id: String,
     pub name: String,
@@ -50,6 +80,8 @@ pub struct PluginSummary {
     pub update_available: Option<PluginUpdateInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ui: Option<PluginUiMeta>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub settings: Vec<PluginSettingDefinition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -326,6 +358,19 @@ impl PluginManager {
         }
         let raw = fs::read_to_string(path)?;
         self.runtime = serde_json::from_str(&raw).unwrap_or_default();
+        for plugin in &mut self.runtime {
+            let Some(plugin_path) = plugin.path.as_deref() else {
+                continue;
+            };
+            let manifest_path = Path::new(plugin_path).join("manifest.json");
+            let Ok(manifest_raw) = fs::read_to_string(manifest_path) else {
+                continue;
+            };
+            let Ok(manifest) = serde_json::from_str::<PluginManifest>(&manifest_raw) else {
+                continue;
+            };
+            plugin.settings = derive_settings(&manifest);
+        }
         Ok(())
     }
 
@@ -400,6 +445,7 @@ impl PluginManager {
             auto_update: Some(false),
             update_available: None,
             ui: manifest.ui.clone(),
+            settings: derive_settings(&manifest),
         };
         self.upsert_summary(summary)
     }
@@ -534,6 +580,7 @@ impl PluginManager {
                 ),
                 update_available: None,
                 ui: manifest.ui.clone(),
+                settings: derive_settings(&manifest),
             };
             let plugin = self.upsert_summary(summary)?;
             Ok(InstallResult {
@@ -1646,6 +1693,97 @@ fn validate_contributions(root: &Path, manifest: &PluginManifest) -> Result<()> 
         bail!("PLUGIN_INVALID: contributes must be an object");
     };
 
+    if let Some(settings) = map.get("settings") {
+        let entries = array_of(settings, "contributes.settings")?;
+        let mut seen: Vec<&str> = Vec::new();
+        let command_ids: Vec<&str> = map
+            .get("commands")
+            .and_then(Value::as_array)
+            .map(|commands| {
+                commands
+                    .iter()
+                    .filter_map(|command| command.get("id").and_then(Value::as_str))
+                    .collect()
+            })
+            .unwrap_or_default();
+        for entry in entries {
+            let obj = entry.as_object().ok_or_else(|| {
+                anyhow!("PLUGIN_INVALID: contributes.settings entry must be an object")
+            })?;
+            let key = obj
+                .get("key")
+                .and_then(Value::as_str)
+                .filter(|key| is_setting_key(key))
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: setting key is missing or invalid"))?;
+            if seen.contains(&key) {
+                bail!("PLUGIN_INVALID: duplicate setting key {key}");
+            }
+            seen.push(key);
+            if obj
+                .get("title")
+                .and_then(Value::as_str)
+                .map(|title| title.trim().is_empty())
+                .unwrap_or(true)
+            {
+                bail!("PLUGIN_INVALID: setting {key} requires a title");
+            }
+            let setting_type = obj
+                .get("type")
+                .and_then(Value::as_str)
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: setting {key} requires a type"))?;
+            if !matches!(setting_type, "string" | "number" | "boolean" | "select" | "json" | "shortcut") {
+                bail!("PLUGIN_INVALID: setting {key} has unsupported type {setting_type}");
+            }
+            if obj.get("secret").and_then(Value::as_bool) == Some(true) {
+                bail!("PLUGIN_INVALID: setting {key} cannot be secret in this release");
+            }
+            if setting_type == "shortcut" {
+                if let Some(scope) = obj.get("scope").and_then(Value::as_str) {
+                    if scope != "plugin" {
+                        bail!("PLUGIN_INVALID: setting {key} only supports the plugin shortcut scope");
+                    }
+                }
+                if obj
+                    .get("command")
+                    .and_then(Value::as_str)
+                    .map(|command| command.trim().is_empty())
+                    .unwrap_or(true)
+                {
+                    bail!("PLUGIN_INVALID: shortcut setting {key} requires a command");
+                }
+                let command = obj.get("command").and_then(Value::as_str).unwrap_or_default();
+                if !command_ids.contains(&command) {
+                    bail!("PLUGIN_INVALID: shortcut setting {key} references an undeclared command");
+                }
+                if let Some(default) = obj.get("default") {
+                    if !is_shortcut_shape(default) {
+                        bail!("PLUGIN_INVALID: shortcut setting {key} has an invalid default");
+                    }
+                }
+            }
+            if setting_type == "select" {
+                let options = obj
+                    .get("enum")
+                    .and_then(Value::as_array)
+                    .filter(|options| !options.is_empty())
+                    .ok_or_else(|| anyhow!("PLUGIN_INVALID: select setting {key} requires enum options"))?;
+                for option in options {
+                    let option = option.as_object().ok_or_else(|| {
+                        anyhow!("PLUGIN_INVALID: select setting {key} has an invalid enum option")
+                    })?;
+                    if option.get("label").and_then(Value::as_str).is_none()
+                        || !option
+                            .get("value")
+                            .map(|value| value.is_string() || value.is_number() || value.is_boolean())
+                            .unwrap_or(false)
+                    {
+                        bail!("PLUGIN_INVALID: select setting {key} has an invalid enum option");
+                    }
+                }
+            }
+        }
+    }
+
     if let Some(skills) = map.get("skills") {
         let entries = array_of(skills, "contributes.skills")?;
         for entry in entries {
@@ -1835,6 +1973,100 @@ fn validate_contributions(root: &Path, manifest: &PluginManifest) -> Result<()> 
     }
 
     Ok(())
+}
+
+fn is_setting_key(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .next()
+            .map(|ch| ch.is_ascii_alphabetic())
+            .unwrap_or(false)
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
+}
+
+fn is_shortcut_shape(value: &Value) -> bool {
+    let Some(value) = value.as_str() else {
+        return false;
+    };
+    let parts: Vec<&str> = value.split('+').filter(|part| !part.is_empty()).collect();
+    if parts.len() < 2 && !matches!(parts.first(), Some(key) if key.starts_with('F') && key[1..].parse::<u8>().map(|n| (1..=12).contains(&n)).unwrap_or(false)) {
+        return false;
+    }
+    let Some(key) = parts.last() else {
+        return false;
+    };
+    let named = matches!(
+        *key,
+        "Enter" | "Space" | "Tab" | "Backspace" | "Delete" | "Insert" | "Home" | "End"
+            | "PageUp" | "PageDown" | "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight"
+            | "Comma" | "Period" | "Equal" | "Minus" | "Slash" | "Backslash" | "Semicolon"
+            | "Quote" | "BracketLeft" | "BracketRight" | "Backquote"
+    );
+    let alpha_numeric = key.len() == 1 && key.chars().all(|ch| ch.is_ascii_alphanumeric());
+    let function_key = key.starts_with('F')
+        && key[1..]
+            .parse::<u8>()
+            .map(|number| (1..=12).contains(&number))
+            .unwrap_or(false);
+    if !(named || alpha_numeric || function_key) {
+        return false;
+    }
+    parts[..parts.len().saturating_sub(1)]
+        .iter()
+        .all(|part| matches!(*part, "Mod" | "Ctrl" | "Alt" | "Shift"))
+}
+
+fn derive_settings(manifest: &PluginManifest) -> Vec<PluginSettingDefinition> {
+    let Some(entries) = manifest
+        .contributes
+        .as_ref()
+        .and_then(Value::as_object)
+        .and_then(|map| map.get("settings"))
+        .and_then(Value::as_array)
+    else {
+        return Vec::new();
+    };
+    entries
+        .iter()
+        .filter_map(|entry| {
+            let obj = entry.as_object()?;
+            Some(PluginSettingDefinition {
+                key: obj.get("key")?.as_str()?.to_string(),
+                title: obj.get("title")?.as_str()?.to_string(),
+                description: obj
+                    .get("description")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                setting_type: obj.get("type")?.as_str()?.to_string(),
+                default: obj.get("default").cloned(),
+                enum_values: obj
+                    .get("enum")
+                    .and_then(Value::as_array)
+                    .map(|values| {
+                        values
+                            .iter()
+                            .filter_map(|value| {
+                                let option = value.as_object()?;
+                                Some(PluginSettingOption {
+                                    label: option.get("label")?.as_str()?.to_string(),
+                                    value: option.get("value")?.clone(),
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                command: obj
+                    .get("command")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                scope: "plugin".into(),
+            })
+        })
+        .collect()
 }
 
 /// Capability tokens the UI renders as badges.
@@ -2299,6 +2531,14 @@ mod tests {
                 "ui": { "panel": "renderer/index.html" },
                 "contributes": {
                     "commands": [{ "id": "a", "title": "A" }],
+                    "settings": [{
+                        "key": "openShortcut",
+                        "title": "Open shortcut",
+                        "type": "shortcut",
+                        "default": "Mod+Shift+A",
+                        "command": "a",
+                        "scope": "plugin"
+                    }],
                     "agentTools": [{ "name": "t", "description": "d" }],
                     "skills": ["./skills/a.md", { "path": "skills/b.md", "id": "b" }],
                     "themes": [{ "id": "midnight", "label": "Midnight", "path": "themes/m.css", "base": "dark" }],
@@ -2341,6 +2581,8 @@ mod tests {
         let summary = mgr.load_dev(root.to_str().unwrap()).unwrap();
         assert!(summary.capabilities.contains(&"mcp".to_string()));
         assert!(summary.capabilities.contains(&"bus".to_string()));
+        assert_eq!(summary.settings.len(), 1);
+        assert_eq!(summary.settings[0].scope, "plugin");
         unsafe {
             std::env::remove_var("PI_DESKTOP_DATA_DIR");
         }

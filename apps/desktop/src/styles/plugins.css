@@ -758,6 +758,148 @@
   background: var(--ds-border-subtle);
 }
 
+/* Generated settings surface for declarative plugin fields. */
+.plugins-settings-modal {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 32px));
+}
+
+.plugins-settings-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.plugins-settings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 460px;
+  overflow: auto;
+  padding: 0 18px;
+}
+
+.plugins-setting-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--ds-border-subtle);
+}
+
+.plugins-setting-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.plugins-setting-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium-plus);
+}
+
+.plugins-setting-title > svg {
+  color: var(--ds-text-muted);
+  flex: 0 0 auto;
+}
+
+.plugins-setting-description {
+  margin: 4px 0 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+}
+
+.plugins-setting-scope {
+  display: inline-flex;
+  margin-top: 5px;
+  border-radius: var(--radius-full);
+  padding: 2px 7px;
+  color: var(--ds-text-muted);
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  font-size: var(--text-3xs);
+}
+
+.plugins-setting-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 min(290px, 48%);
+}
+
+.plugins-setting-control > .field-input,
+.plugins-setting-control > .field-select {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.plugins-setting-json {
+  min-height: 72px;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.plugins-setting-reset {
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+  white-space: nowrap;
+}
+
+.plugins-setting-reset:hover {
+  color: var(--ds-text-primary);
+}
+
+.plugins-shortcut-recorder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 126px;
+  height: 32px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-md);
+  padding: 0 10px;
+  color: var(--ds-text-primary);
+  background: var(--ds-bg-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.plugins-shortcut-recorder:hover,
+.plugins-shortcut-recorder:focus-visible,
+.plugins-shortcut-recorder.recording {
+  border-color: color-mix(in oklab, var(--ds-accent) 60%, var(--ds-border-default));
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 18%, transparent);
+}
+
+.plugins-shortcut-recorder.error {
+  border-color: color-mix(in oklab, var(--ds-error) 60%, var(--ds-border-default));
+}
+
+.plugins-settings-error {
+  margin: 10px 18px 0;
+  color: var(--ds-error);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+}
+
+@media (max-width: 620px) {
+  .plugins-setting-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .plugins-setting-control {
+    width: 100%;
+    flex-basis: auto;
+  }
+}
+
 /* Empty / no-match states. */
 .plugins-empty {
   align-items: center;

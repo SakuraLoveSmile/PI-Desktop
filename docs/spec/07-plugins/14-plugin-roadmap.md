@@ -22,8 +22,9 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
   catalog in the system prompt when `agent.prompt.inject` is granted, and the model
   loads a body on demand through the `Skill` tool ✅ (ADR 0039, D174)
 - Unified namespace and audit ✅
-- Per-plugin settings API is implemented; a dedicated settings UI is not
-  implemented
+- Per-plugin settings API and generated settings UI are implemented. The UI
+  supports string/number/boolean/select/json fields and plugin-local command
+  shortcuts; OS-global plugin shortcuts remain out of scope.
 - Plugin log panel remains planned; runtime audit logs exist without a dedicated
   plugin-log surface
 

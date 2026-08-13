@@ -328,10 +328,22 @@ await pi.plugin.setSettings({ greeting: "Welcome" });
 const dataPath = await pi.plugin.getDataPath();
 ```
 
-设置和数据路径是插件 ID 私有的。专用生成
-设置 UI 尚未实现；插件必须提供自己的支持
-互动以求改变。请勿将凭据放入 `manifest.json` 或源中
-控制。
+设置和数据路径是插件 ID 私有的。插件页面会为 `string`、`number`、`boolean`、
+`select`、`json` 和 `shortcut` 字段生成控件。快捷键字段必须关联一个已声明的命令：
+
+```json
+{
+  "key": "openShortcut",
+  "title": "Open panel shortcut",
+  "type": "shortcut",
+  "default": "Mod+Shift+H",
+  "command": "hello.open",
+  "scope": "plugin"
+}
+```
+
+插件快捷键只在聚焦的 PI-Desktop 窗口中生效，并会避让应用快捷键；暂不支持全局注册。
+用户编辑后插件会收到 `plugin:settingsChanged`。请勿将凭据放入 `manifest.json` 或源代码管理。
 
 ### 6.4 工作区文件、剪贴板、网络和通知
 

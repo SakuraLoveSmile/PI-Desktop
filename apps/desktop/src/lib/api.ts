@@ -30,6 +30,7 @@ import type {
   McpServerStatus,
   OnboardingState,
   PluginSummary,
+  PluginSettingDefinition,
   PluginServiceStatus,
   PluginTheme,
   MarketPluginSummary,
@@ -419,6 +420,13 @@ export const api = {
   uninstallPlugin: (id: string) => invoke(IPC.invoke.pluginUninstall, id),
   setPluginAutoUpdate: (id: string, enabled: boolean) =>
     invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
+  getPluginSettings: (id: string) =>
+    invoke<{ settings: PluginSettingDefinition[] }>(IPC.invoke.pluginSettingsGet, id),
+  setPluginSettings: (id: string, settings: Record<string, unknown>) =>
+    invoke<{ settings: PluginSettingDefinition[] }>(IPC.invoke.pluginSettingsSet, {
+      id,
+      settings,
+    }),
   /**
    * Where a plugin's contributions apply. Separate from enable/disable so
    * narrowing a plugin to two projects and then switching it off keeps the list.

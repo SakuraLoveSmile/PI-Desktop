@@ -93,9 +93,13 @@ type PluginSettingContrib = {
  key: string;
  title: string;
  description?: string;
- type: "string" | "number" | "boolean" | "select" | "json";
+ type: "string" | "number" | "boolean" | "select" | "json" | "shortcut";
  default?: unknown;
  enum?: Array<{ label: string; value: string | number | boolean }>;
+ /** Required for shortcut settings; invokes a declared plugin command. */
+ command?: string;
+ /** Fixed to plugin for now; global shortcut registration is not supported. */
+ scope?: "plugin";
  secret?: boolean;
 };
 
@@ -218,6 +222,9 @@ MVP may implement only:
    `skills` is the exception — it predates the permission gate, so a manifest
    without `agent.prompt.inject` still validates and the runtime simply skips
    the skills
+13. Settings keys are unique. `shortcut` settings require `command`, may only
+    use the `plugin` scope, and are validated as modifier-plus-key or F-key
+    bindings. Secrets are rejected until secure plugin-secret storage exists.
 
 ## 8. Example: minimal plugin
 

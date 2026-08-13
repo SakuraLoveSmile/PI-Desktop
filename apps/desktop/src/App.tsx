@@ -14,6 +14,7 @@ import i18n from "i18next";
 import { useTranslation } from "react-i18next";
 import {
   KEYBOARD_SHORTCUTS,
+  isActiveInProject,
   keybindingDisplayParts,
   keybindingMatchesEvent,
   resolveKeybinding,
@@ -172,6 +173,8 @@ function AppShell() {
   const workPanelWidth = useAppStore((s) => s.workPanelWidth);
   const pluginThemes = useAppStore((s) => s.pluginThemes);
   const refreshPluginThemes = useAppStore((s) => s.refreshPluginThemes);
+  const plugins = useAppStore((s) => s.plugins);
+  const projectPath = useAppStore((s) => s.workspace?.path ?? null);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -381,6 +384,12 @@ function AppShell() {
   }, [ready, refreshPluginThemes]);
 
   useEffect(() => {
+    if (!ready) return;
+    void useAppStore.getState().refreshPlugins();
+    return api.onPluginChanged(() => void useAppStore.getState().refreshPlugins());
+  }, [ready]);
+
+  useEffect(() => {
     const preference = settings?.theme ?? "system";
     const pluginTheme = preference.startsWith("plugin:")
       ? pluginThemes.find((entry) => entry.id === preference)
@@ -504,7 +513,27 @@ function AppShell() {
           platform as ShortcutPlatform,
         ),
       );
-      if (!shortcut) return;
+      if (!shortcut) {
+        const pluginShortcut = plugins
+          .filter((plugin) => isActiveInProject(plugin, projectPath))
+          .flatMap((plugin) =>
+            (plugin.settings ?? []).map((setting) => ({ plugin, setting })),
+          )
+          .find(
+            ({ setting }) =>
+              setting.type === "shortcut" &&
+              typeof setting.command === "string" &&
+              keybindingMatchesEvent(
+                String(setting.value ?? setting.default ?? ""),
+                e,
+                platform as ShortcutPlatform,
+              ),
+          );
+        if (!pluginShortcut) return;
+        e.preventDefault();
+        void api.executeCommand(pluginShortcut.setting.command!);
+        return;
+      }
       if (
         e.repeat &&
         (shortcut.id === "navigateBack" || shortcut.id === "navigateForward")
@@ -579,6 +608,8 @@ function AppShell() {
     t,
     platform,
     runMenuCommand,
+    plugins,
+    projectPath,
     settings?.keybindings,
     toggleSidebar,
   ]);

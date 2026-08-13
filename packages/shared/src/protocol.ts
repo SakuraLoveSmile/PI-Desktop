@@ -121,6 +121,8 @@ export const IPC = {
     pluginSetScope: "pi-desktop/plugin/setScope",
     pluginUninstall: "pi-desktop/plugin/uninstall",
     pluginSetAutoUpdate: "pi-desktop/plugin/setAutoUpdate",
+    pluginSettingsGet: "pi-desktop/plugin/settings/get",
+    pluginSettingsSet: "pi-desktop/plugin/settings/set",
     pluginOpenPanel: "pi-desktop/plugin/openPanel",
     pluginLauncherToggle: "pi-desktop/pluginLauncher/toggle",
     pluginLauncherDismiss: "pi-desktop/pluginLauncher/dismiss",

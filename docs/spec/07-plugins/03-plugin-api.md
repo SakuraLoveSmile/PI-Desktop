@@ -33,6 +33,15 @@ pi.plugin.setSettings(partial: Record<string, unknown>): Promise<void>
 pi.plugin.getDataPath(): Promise<string> // plugin-private directory
 ```
 
+The installed Plugins page renders every `contributes.settings` field and
+persists edits in the plugin's private settings file. Supported generated
+controls are `string`, `number`, `boolean`, `select`, `json`, and `shortcut`.
+Shortcut settings are plugin-local: they invoke the declared `command` only
+while the PI-Desktop app window is focused and while the plugin's activation
+scope matches the current project. They are never registered as OS-global
+shortcuts in this release. The host emits `plugin:settingsChanged` after a
+user edit so a plugin can refresh in-memory configuration.
+
 ### commands
 ```ts
 pi.commands.register(def: {
@@ -202,7 +211,8 @@ A throwing handler is logged and does not affect other listeners or the plugin.
 Planned events:
 - `workspace:changed`
 - `session:activated`
-- `plugin:settingsChanged`
+- `plugin:settingsChanged` is delivered after edits from the generated Plugins
+  settings UI.
 - `app:themeChanged`
 
 ## 6. Panel bridge API

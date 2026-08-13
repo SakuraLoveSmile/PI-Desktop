@@ -90,6 +90,31 @@ describe("validateContributions", () => {
     expect(validateContributions({ skills: [{ path: "" } as never] })).toMatch(/need a path/);
     expect(validateContributions({ services: [{ id: "1bad" }] })).toMatch(/id must match/);
   });
+
+  it("accepts plugin-local shortcut settings and rejects undeclared commands", () => {
+    expect(
+      validateContributions({
+        commands: [{ id: "demo.open", title: "Open" }],
+        settings: [
+          {
+            key: "openShortcut",
+            title: "Open shortcut",
+            type: "shortcut",
+            default: "Mod+Shift+O",
+            command: "demo.open",
+            scope: "plugin",
+          },
+        ],
+      }),
+    ).toBeUndefined();
+    expect(
+      validateContributions({
+        settings: [
+          { key: "openShortcut", title: "Open shortcut", type: "shortcut", command: "demo.open" },
+        ],
+      }),
+    ).toMatch(/undeclared command/);
+  });
 });
 
 describe("naming helpers", () => {

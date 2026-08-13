@@ -5739,8 +5739,39 @@ function registerIpc() {
     if (!host) throw new Error("host unavailable");
     const result = await host.call<{ plugins: any[] }>("plugins.list");
     rememberPluginScopes(result.plugins ?? []);
-    return result;
+    const pluginsWithSettings = await Promise.all(
+      (result.plugins ?? []).map(async (plugin) => {
+        if (!plugin?.settings?.length || !plugins.getLoaded(plugin.id)) return plugin;
+        try {
+          const settings = await plugins.getPluginSettings(plugin.id);
+          return { ...plugin, settings };
+        } catch {
+          return plugin;
+        }
+      }),
+    );
+    return { ...result, plugins: pluginsWithSettings };
   });
+
+  handle(IPC.invoke.pluginSettingsGet, async (id: string) => {
+    const settings = await plugins.getPluginSettings(String(id ?? ""));
+    return { settings };
+  });
+
+  handle(
+    IPC.invoke.pluginSettingsSet,
+    async (payload: { id?: string; settings?: Record<string, unknown> }) => {
+      const settings = await plugins.setPluginSettings(
+        String(payload?.id ?? ""),
+        payload?.settings ?? {},
+      );
+      sendToRenderer(IPC.event.pluginChanged, {
+        reason: "settings",
+        pluginId: String(payload?.id ?? ""),
+      });
+      return { settings };
+    },
+  );
 
   handle(IPC.invoke.pluginLoadDev, async () => {
     if (!host) throw new Error("host unavailable");

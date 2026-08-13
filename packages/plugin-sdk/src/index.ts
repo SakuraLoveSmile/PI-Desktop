@@ -31,12 +31,7 @@ export type PluginManifest = {
     }>;
     /** Relative skill paths, or entries that override the parsed metadata. */
     skills?: Array<string | PluginSkillContrib>;
-    settings?: Array<{
-      key: string;
-      type: string;
-      default?: unknown;
-      title?: string;
-    }>;
+    settings?: PluginSettingContrib[];
     themes?: PluginThemeContrib[];
     mcpServers?: PluginMcpServerContrib[];
     services?: PluginServiceContrib[];
@@ -64,6 +59,34 @@ export function resolvePluginLocalizedString(
   const preferred = locale?.toLowerCase().startsWith("zh") ? value["zh-CN"] : value.en;
   return preferred || value.en || value["zh-CN"] || fallback;
 }
+
+export type PluginSettingType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "select"
+  | "json"
+  | "shortcut";
+
+export type PluginSettingOption = {
+  label: string;
+  value: string | number | boolean;
+};
+
+export type PluginSettingContrib = {
+  key: string;
+  title: string;
+  description?: string;
+  type: PluginSettingType;
+  default?: unknown;
+  enum?: PluginSettingOption[];
+  /** Recognized so the validator can reject secrets until secure storage exists. */
+  secret?: boolean;
+  /** Shortcut settings invoke this command in the current app window. */
+  command?: string;
+  /** Reserved for the future; only plugin-local shortcuts are accepted today. */
+  scope?: "plugin";
+};
 
 export type PluginSkillContrib = {
   /** Plugin-local skill id. Defaults to the file name without its extension. */
@@ -351,6 +374,70 @@ export function validateContributions(
     return "manifest.contributes must be an object";
   }
 
+  const settings = contributes.settings ?? [];
+  const settingKeys = new Set<string>();
+  const commandIds = new Set((contributes.commands ?? []).map((command) => command.id));
+  for (const setting of settings) {
+    if (!setting || typeof setting !== "object") {
+      return "contributes.settings entries must be objects";
+    }
+    if (
+      typeof setting.key !== "string" ||
+      !/^[a-zA-Z][a-zA-Z0-9._-]{0,63}$/.test(setting.key)
+    ) {
+      return "contributes.settings key must match [a-zA-Z][a-zA-Z0-9._-]{0,63}";
+    }
+    if (settingKeys.has(setting.key)) {
+      return `duplicate setting key "${setting.key}"`;
+    }
+    settingKeys.add(setting.key);
+    if (typeof setting.title !== "string" || !setting.title.trim()) {
+      return `setting "${setting.key}" requires a title`;
+    }
+    if (
+      setting.type !== "string" &&
+      setting.type !== "number" &&
+      setting.type !== "boolean" &&
+      setting.type !== "select" &&
+      setting.type !== "json" &&
+      setting.type !== "shortcut"
+    ) {
+      return `setting "${setting.key}" has an unsupported type`;
+    }
+    if (setting.secret === true) {
+      return `setting "${setting.key}" cannot be secret in this release`;
+    }
+    if (setting.type === "shortcut") {
+      if (setting.scope !== undefined && setting.scope !== "plugin") {
+        return `setting "${setting.key}" only supports the plugin shortcut scope`;
+      }
+      if (typeof setting.command !== "string" || !setting.command.trim()) {
+        return `shortcut setting "${setting.key}" requires a command`;
+      }
+      if (!commandIds.has(setting.command)) {
+        return `shortcut setting "${setting.key}" references an undeclared command`;
+      }
+      if (setting.default !== undefined && !isValidShortcutShape(setting.default)) {
+        return `shortcut setting "${setting.key}" has an invalid default`;
+      }
+    }
+    if (setting.type === "select") {
+      if (!Array.isArray(setting.enum) || setting.enum.length === 0) {
+        return `select setting "${setting.key}" requires enum options`;
+      }
+      for (const option of setting.enum) {
+        if (
+          !option ||
+          typeof option !== "object" ||
+          typeof option.label !== "string" ||
+          !["string", "number", "boolean"].includes(typeof option.value)
+        ) {
+          return `select setting "${setting.key}" has an invalid enum option`;
+        }
+      }
+    }
+  }
+
   for (const entry of contributes.skills ?? []) {
     const path = typeof entry === "string" ? entry : entry?.path;
     if (typeof path !== "string" || !path.trim()) {
@@ -416,6 +503,18 @@ export function validateContributions(
   }
 
   return undefined;
+}
+
+function isValidShortcutShape(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const parts = value.split("+").filter(Boolean);
+  if (parts.length < 2 && !/^F(?:[1-9]|1[0-2])$/i.test(value)) return false;
+  const key = parts.at(-1) ?? "";
+  if (!/^(?:[a-z]|[0-9]|F(?:[1-9]|1[0-2]))$/i.test(key) &&
+      !/^(?:Enter|Space|Tab|Backspace|Delete|Insert|Home|End|PageUp|PageDown|Arrow(?:Up|Down|Left|Right)|Comma|Period|Equal|Minus|Slash|Backslash|Semicolon|Quote|Bracket(?:Left|Right)|Backquote)$/.test(key)) {
+    return false;
+  }
+  return parts.slice(0, -1).every((part) => ["Mod", "Ctrl", "Alt", "Shift"].includes(part));
 }
 
 function relativePathError(value: string, field: string): string | undefined {

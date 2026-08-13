@@ -93,9 +93,11 @@ type PluginSettingContrib = {
  key: string;
  title: string;
  description?: string;
- type: "string" | "number" | "boolean" | "select" | "json";
+ type: "string" | "number" | "boolean" | "select" | "json" | "shortcut";
  default?: unknown;
  enum?: Array<{ label: string; value: string | number | boolean }>;
+ command?: string; // shortcut 设置调用这个已声明的插件命令
+ scope?: "plugin"; // 暂不支持全局插件快捷键
  secret?: boolean;
 };
 

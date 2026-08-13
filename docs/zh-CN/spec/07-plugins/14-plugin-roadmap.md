@@ -25,7 +25,8 @@ Local plugins usable → developer-friendly → marketplace distribution → sig
   授予 `agent.prompt.inject` 时系统提示中的目录，以及模型
   通过 `Skill` 工具按需加载主体 ✅ (ADR 0039, D174)
 - 统一命名空间和审计 ✅
-- 实现了每个插件设置 API；没有专用的设置 UI
+- 每个插件设置 API 和生成式设置 UI 已实现。UI 支持字符串、数字、布尔、枚举、JSON
+  字段与插件域命令快捷键；操作系统全局插件快捷键暂不在范围内。
   已实施
 - 插件日志面板仍在计划中；运行时审计日志的存在没有专用的
   插件日志表面

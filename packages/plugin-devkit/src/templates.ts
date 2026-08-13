@@ -163,6 +163,13 @@ function manifestJson(template: TemplateName, vars: TemplateVars): string {
   if (template === "full-demo") {
     contributes.settings = [
       { key: "greeting", type: "string", default: `Hello from ${vars.name}`, title: "Greeting" },
+      {
+        key: "openShortcut",
+        type: "shortcut",
+        default: "Mod+Shift+H",
+        title: "Open panel shortcut",
+        command: `${vars.slug}.open`,
+      },
     ];
   }
 

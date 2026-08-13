@@ -36,6 +36,11 @@ pi.plugin.setSettings(partial: Record<string, unknown>): Promise<void>
 pi.plugin.getDataPath(): Promise<string> // plugin-private directory
 ```
 
+插件页面会渲染 `contributes.settings` 中声明的字段，并将修改持久化到插件私有设置文件。
+支持生成字符串、数字、布尔、枚举、JSON 和 `shortcut` 控件。快捷键仅属于插件域：只有在
+PI-Desktop 窗口聚焦且插件激活范围匹配当前项目时，才会调用声明的命令；本版本不会注册操作系统
+全局快捷键。用户编辑后，主机会向插件发送 `plugin:settingsChanged`，便于刷新内存中的配置。
+
 ### 命令
 ```ts
 pi.commands.register(def: {
@@ -205,7 +210,7 @@ pi.events.off(event, handler)
 计划活动：
 - `workspace:changed`
 - `session:activated`
-- `plugin:settingsChanged`
+- `plugin:settingsChanged`（由插件设置页面编辑触发）
 - `app:themeChanged`
 
 ## 6. 面板桥 API

@@ -705,6 +705,35 @@ export type PluginCapability =
   | "services"
   | "bus";
 
+export type PluginSettingType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "select"
+  | "json"
+  | "shortcut";
+
+export type PluginSettingOption = {
+  label: string;
+  value: string | number | boolean;
+};
+
+/** Declarative setting rendered by the installed-plugin settings surface. */
+export type PluginSettingDefinition = {
+  key: string;
+  title: string;
+  description?: string;
+  type: PluginSettingType;
+  default?: unknown;
+  enum?: PluginSettingOption[];
+  /** Shortcut settings invoke this plugin command in the app window. */
+  command?: string;
+  /** The first shortcut scope; global registration is intentionally not supported. */
+  scope?: "plugin";
+  /** Resolved private value, returned only to the owning plugin settings UI. */
+  value?: unknown;
+};
+
 /** A theme contributed by a loaded plugin, with its sanitized CSS payload. */
 export type PluginTheme = {
   /** `plugin:<pluginId>:<themeId>`; matches `AppSettings.theme`. */
@@ -754,6 +783,7 @@ export type PluginSummary = {
   autoUpdate?: boolean;
   updateAvailable?: PluginUpdateInfo;
   ui?: PluginUiMeta;
+  settings?: PluginSettingDefinition[];
 };
 
 /** Transport of an MCP server the user configured themselves. */

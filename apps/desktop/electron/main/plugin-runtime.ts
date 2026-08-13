@@ -22,9 +22,16 @@ import {
   type PluginNativeNotificationResult,
   type PluginNotificationPermission,
   type PluginServiceContrib,
+  type PluginSettingContrib,
   type PluginSkillContrib,
 } from "@pi-desktop/plugin-sdk";
-import type { PluginServiceStatus } from "@pi-desktop/shared";
+import {
+  isAllowedKeybinding,
+  isReservedKeybinding,
+  normalizeKeybinding,
+  type PluginServiceStatus,
+  type PluginSettingDefinition,
+} from "@pi-desktop/shared";
 import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
 
@@ -496,6 +503,105 @@ export class PluginRuntime {
 
   getLoaded(pluginId: string): LoadedPlugin | undefined {
     return this.loaded.get(pluginId);
+  }
+
+  /** Return the manifest-backed settings view for the installed-plugin UI. */
+  async getPluginSettings(pluginId: string): Promise<PluginSettingDefinition[]> {
+    const loaded = this.loaded.get(pluginId);
+    if (!loaded) throw apiError("NOT_FOUND", `plugin not loaded: ${pluginId}`);
+    const values = await this.hostApi(loaded).plugin.getSettings();
+    return this.settingsView(loaded, values);
+  }
+
+  /** Validate and persist user settings, then notify the plugin process. */
+  async setPluginSettings(
+    pluginId: string,
+    partial: Record<string, unknown>,
+  ): Promise<PluginSettingDefinition[]> {
+    const loaded = this.loaded.get(pluginId);
+    if (!loaded) throw apiError("NOT_FOUND", `plugin not loaded: ${pluginId}`);
+    if (!partial || typeof partial !== "object" || Array.isArray(partial)) {
+      throw apiError("INVALID_ARGUMENT", "plugin settings must be an object");
+    }
+    const definitions = loaded.manifest.contributes?.settings ?? [];
+    const definitionByKey = new Map(definitions.map((setting) => [setting.key, setting]));
+    for (const [key, value] of Object.entries(partial)) {
+      const definition = definitionByKey.get(key);
+      if (!definition) throw apiError("INVALID_ARGUMENT", `unknown plugin setting: ${key}`);
+      this.validateSettingValue(definition, value);
+    }
+    const current = await this.hostApi(loaded).plugin.getSettings();
+    const next = { ...current, ...partial };
+    await this.hostApi(loaded).plugin.setSettings(partial);
+    loaded.child?.postMessage({
+      t: "event",
+      event: "plugin:settingsChanged",
+      args: [next],
+    });
+    return this.settingsView(loaded, next);
+  }
+
+  private settingsView(
+    loaded: LoadedPlugin,
+    values: Record<string, unknown>,
+  ): PluginSettingDefinition[] {
+    return (loaded.manifest.contributes?.settings ?? []).map((setting) => ({
+      key: setting.key,
+      title: setting.title,
+      ...(setting.description ? { description: setting.description } : {}),
+      type: setting.type as PluginSettingDefinition["type"],
+      ...(setting.default === undefined ? {} : { default: setting.default }),
+      ...(setting.enum ? { enum: setting.enum } : {}),
+      ...(setting.command ? { command: setting.command } : {}),
+      scope: "plugin",
+      value: values[setting.key] ?? setting.default,
+    }));
+  }
+
+  private validateSettingValue(
+    setting: PluginSettingContrib,
+    value: unknown,
+  ): void {
+    switch (setting.type) {
+      case "string":
+        if (typeof value !== "string") throw apiError("INVALID_ARGUMENT", `setting ${setting.key} must be a string`);
+        return;
+      case "number":
+        if (typeof value !== "number" || !Number.isFinite(value)) {
+          throw apiError("INVALID_ARGUMENT", `setting ${setting.key} must be a finite number`);
+        }
+        return;
+      case "boolean":
+        if (typeof value !== "boolean") throw apiError("INVALID_ARGUMENT", `setting ${setting.key} must be a boolean`);
+        return;
+      case "json":
+        try {
+          if (JSON.stringify(value) === undefined) {
+            throw new Error("not JSON serializable");
+          }
+        } catch {
+          throw apiError("INVALID_ARGUMENT", `setting ${setting.key} must be JSON serializable`);
+        }
+        return;
+      case "select":
+        if (!setting.enum?.some((option) => Object.is(option.value, value))) {
+          throw apiError("INVALID_ARGUMENT", `setting ${setting.key} has an invalid option`);
+        }
+        return;
+      case "shortcut": {
+        if (typeof value !== "string") {
+          throw apiError("INVALID_ARGUMENT", `setting ${setting.key} must be a shortcut`);
+        }
+        const normalized = normalizeKeybinding(value);
+        const platform = process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "win32" : "linux";
+        if (!normalized || !isAllowedKeybinding(normalized) || isReservedKeybinding(normalized, platform)) {
+          throw apiError("INVALID_ARGUMENT", `setting ${setting.key} has an invalid shortcut`);
+        }
+        return;
+      }
+      default:
+        throw apiError("INVALID_ARGUMENT", `setting ${setting.key} has an unsupported type`);
+    }
   }
 
   listLoaded(): LoadedPlugin[] {

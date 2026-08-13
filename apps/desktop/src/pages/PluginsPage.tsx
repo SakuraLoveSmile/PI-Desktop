@@ -15,6 +15,7 @@ import {
   IconPlug,
   IconReview,
   IconSearch,
+  IconSettings,
   IconShield,
   IconSparkles,
   IconTrash,
@@ -26,6 +27,7 @@ import { ScopeControl } from "../components/extensions/ScopeControl";
 import { McpSection } from "../components/extensions/McpSection";
 import { SkillsSection } from "../components/extensions/SkillsSection";
 import { SubagentsSection } from "../components/extensions/SubagentsSection";
+import { PluginSettingsSheet } from "../components/plugins/PluginSettingsSheet";
 import type {
   ActivationScope,
   MarketPluginDetail,
@@ -432,6 +434,7 @@ export function PluginsPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [services, setServices] = useState<PluginServiceStatus[]>([]);
   const [selectedVersion, setSelectedVersion] = useState("");
+  const [settingsPlugin, setSettingsPlugin] = useState<PluginSummary | null>(null);
   const headerMenuRef = useRef<HTMLDivElement | null>(null);
   const rowMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -1209,6 +1212,18 @@ export function PluginsPage() {
                                   <IconPanel size={15} />
                                 </button>
                               ) : null}
+                              {plugin.enabled && plugin.settings?.length ? (
+                                <button
+                                  type="button"
+                                  className="plugins-icon-btn"
+                                  aria-label={t("plugins.openSettings")}
+                                  title={t("plugins.openSettings")}
+                                  data-tip={t("plugins.openSettings")}
+                                  onClick={() => setSettingsPlugin(plugin)}
+                                >
+                                  <IconSettings size={15} />
+                                </button>
+                              ) : null}
                               <div
                                 className="plugins-menu-wrap"
                                 ref={menuOpen ? rowMenuRef : undefined}
@@ -1811,6 +1826,21 @@ export function PluginsPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {settingsPlugin ? (
+        <PluginSettingsSheet
+          plugin={settingsPlugin}
+          platform={(window.piDesktop?.platform ?? "darwin") as "darwin" | "win32" | "linux"}
+          onClose={() => setSettingsPlugin(null)}
+          onSaved={async () => {
+            await refreshPlugins();
+            const updated = useAppStore
+              .getState()
+              .plugins.find((plugin) => plugin.id === settingsPlugin.id);
+            if (updated) setSettingsPlugin(updated);
+          }}
+        />
       ) : null}
 
       {templatePick ? (
