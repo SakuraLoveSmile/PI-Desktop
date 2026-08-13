@@ -852,21 +852,29 @@ impl PluginManager {
     }
 
     fn load_catalog(&self) -> Result<MarketCatalogFile> {
-        // Always try a cheap refresh; on failure fall back to cache / bundled demos.
-        match self.refresh_catalog_from_remote(false) {
-            Ok(catalog) => Ok(catalog),
-            Err(_) => {
-                self.ensure_default_catalog()?;
-                let raw = fs::read_to_string(self.catalog_path())?;
-                let mut catalog: MarketCatalogFile = serde_json::from_str(&raw)
-                    .map_err(|e| anyhow!("PLUGIN_MARKET_INVALID: {e}"))?;
-                if catalog.plugins.is_empty() {
-                    catalog = built_in_catalog();
-                    self.materialize_local_package_urls(&catalog)?;
+        // Search, detail, and offline install fall back to the local snapshot.
+        // Remote refresh is explicit so these RPCs never block the Extensions
+        // surface behind a marketplace network timeout.
+        self.load_cached_catalog()
+    }
+
+    /// Read the last valid catalog without attempting network access.
+    ///
+    /// Silent checks run while the Extensions surface is opening. They must
+    /// never hold the host RPC state lock behind a remote timeout; an explicit
+    /// refresh remains responsible for fetching the latest catalog.
+    fn load_cached_catalog(&self) -> Result<MarketCatalogFile> {
+        if let Ok(raw) = fs::read_to_string(self.catalog_path()) {
+            if let Ok(catalog) = serde_json::from_str::<MarketCatalogFile>(&raw) {
+                if !catalog.plugins.is_empty() {
+                    return Ok(catalog);
                 }
-                Ok(catalog)
             }
         }
+
+        let catalog = built_in_catalog();
+        self.materialize_local_package_urls(&catalog)?;
+        Ok(catalog)
     }
 
     /// Resolve install metadata from a fresh catalog snapshot whenever the
@@ -991,13 +999,18 @@ impl PluginManager {
         })
     }
 
-    pub fn check_updates(&mut self) -> Result<Vec<PluginUpdateInfo>> {
+    pub fn check_updates(&mut self, refresh_remote: bool) -> Result<Vec<PluginUpdateInfo>> {
         // An explicit update check must not reuse the short-lived marketplace
         // cache: a publisher may have released a plugin since the last search.
-        // Offline checks still use the last valid catalog.
-        let catalog = match self.refresh_catalog_from_remote(true) {
-            Ok(catalog) => catalog,
-            Err(_) => self.load_catalog()?,
+        // Silent checks use only the last valid catalog so opening Extensions
+        // cannot block on a remote marketplace timeout.
+        let catalog = if refresh_remote {
+            match self.refresh_catalog_from_remote(true) {
+                Ok(catalog) => catalog,
+                Err(_) => self.load_cached_catalog()?,
+            }
+        } else {
+            self.load_cached_catalog()?
         };
         let mut updates = Vec::new();
         for plugin in self.runtime.iter_mut() {
@@ -1058,7 +1071,7 @@ impl PluginManager {
     }
 
     pub fn apply_updates(&mut self, only_auto: bool) -> Result<Vec<InstallResult>> {
-        let _ = self.check_updates()?;
+        let _ = self.check_updates(true)?;
         let pending: Vec<(String, PluginUpdateInfo, bool, Vec<String>)> = self
             .runtime
             .iter()
@@ -2640,6 +2653,55 @@ mod tests {
             assert_eq!(compare_plugin_versions("0.5.1", "0.5.1-beta.1"), Ordering::Greater);
             unsafe {
                 std::env::remove_var("PI_DESKTOP_DATA_DIR");
+            }
+        });
+    }
+
+    #[test]
+    fn silent_update_check_uses_cached_catalog_without_refreshing_remote() {
+        with_local_market(|| {
+            let dir = tempdir().unwrap();
+            unsafe {
+                std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+            }
+            let mut mgr = PluginManager::new(dir.path());
+            mgr.install_from_market("demo.hello", None, true, false, None)
+                .unwrap();
+
+            let mut cached = built_in_catalog();
+            cached.plugins[0].versions[0].version = "0.3.0".into();
+            fs::write(
+                mgr.catalog_path(),
+                serde_json::to_string_pretty(&cached).unwrap(),
+            )
+            .unwrap();
+
+            let mut remote = cached.clone();
+            remote.plugins[0].versions[0].version = "0.9.0".into();
+            let remote_path = dir.path().join("remote-catalog.json");
+            fs::write(&remote_path, serde_json::to_string_pretty(&remote).unwrap()).unwrap();
+            unsafe {
+                std::env::set_var(
+                    "PI_DESKTOP_PLUGIN_MARKET_URL",
+                    format!("file://{}", remote_path.to_string_lossy()),
+                );
+            }
+
+            let updates = mgr.check_updates(false).unwrap();
+            assert_eq!(updates.len(), 1);
+            assert_eq!(updates[0].version, "0.3.0");
+            assert_eq!(
+                mgr.market_search(Some("Hello"), None).unwrap()[0].latest_version,
+                "0.3.0"
+            );
+            assert_eq!(
+                mgr.market_get("demo.hello").unwrap().summary.latest_version,
+                "0.3.0"
+            );
+
+            unsafe {
+                std::env::remove_var("PI_DESKTOP_DATA_DIR");
+                std::env::remove_var("PI_DESKTOP_PLUGIN_MARKET_URL");
             }
         });
     }

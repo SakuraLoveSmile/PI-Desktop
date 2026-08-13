@@ -10,6 +10,7 @@ const repoRoot = join(desktopRoot, "../..");
 
 const runtimeSrc = readFileSync(join(desktopRoot, "electron/main/plugin-runtime.ts"), "utf8");
 const panelSrc = readFileSync(join(desktopRoot, "electron/main/plugin-panel-host.ts"), "utf8");
+const mainSrc = readFileSync(join(desktopRoot, "electron/main/index.ts"), "utf8");
 const pageSrc = readFileSync(join(desktopRoot, "src/pages/PluginsPage.tsx"), "utf8");
 const protocolSrc = readFileSync(join(repoRoot, "packages/shared/src/protocol.ts"), "utf8");
 
@@ -64,7 +65,11 @@ test("plugins page includes marketplace install and auto-update controls", () =>
 });
 
 test("plugins page refreshes installed update metadata when it opens", () => {
-  assert.match(pageSrc, /useEffect\(\(\) => \{[\s\S]*api\.marketCheckUpdates\(\)[\s\S]*refreshPlugins\(\)/);
+  assert.match(pageSrc, /useEffect\(\(\) => \{[\s\S]*api\.marketCheckUpdates\(false\)[\s\S]*refreshPlugins\(\)/);
+  assert.match(
+    mainSrc,
+    /IPC\.invoke\.marketCheckUpdates[\s\S]*refreshRemote: payload\?\.refreshRemote \?\? true/,
+  );
 });
 
 test("shared protocol declares marketplace and package install IPC", () => {

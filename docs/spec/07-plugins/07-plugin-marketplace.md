@@ -169,7 +169,9 @@ combination.
 4. Download and upgrade after user confirmation
 
 Strategy:
-- Installed update metadata is checked silently when Extensions opens.
+- Installed update metadata is checked silently when Extensions opens using
+  only the last valid local catalog; this cache-only check must not hold the
+  host RPC state lock behind a marketplace network timeout.
 - An explicit check refreshes the remote catalog and falls back to the last
   valid cache when offline.
 - Optional auto-update remains per-plugin and never silently accepts a new
@@ -325,8 +327,9 @@ Maintenance flow:
 
 An explicit update check performs a fresh remote catalog fetch and falls back
 to the last valid local catalog when offline. Opening the Extensions page also
-performs a silent update check so installed rows do not remain stale after a
-marketplace release.
+performs a cache-only silent update check so installed rows can refresh without
+making the Marketplace surface wait for a remote request. The Marketplace
+header refresh action remains the explicit remote-refresh path.
 
 Override catalog URL with env:
 

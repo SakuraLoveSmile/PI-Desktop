@@ -6293,10 +6293,15 @@ function registerIpc() {
     return installed;
   });
 
-  handle(IPC.invoke.marketCheckUpdates, async () => {
-    if (!host) throw new Error("host unavailable");
-    return host.call("market.checkUpdates", {});
-  });
+  handle(
+    IPC.invoke.marketCheckUpdates,
+    async (payload?: { refreshRemote?: boolean }) => {
+      if (!host) throw new Error("host unavailable");
+      return host.call("market.checkUpdates", {
+        refreshRemote: payload?.refreshRemote ?? true,
+      });
+    },
+  );
 
   handle(IPC.invoke.marketApplyUpdates, async (payload?: { onlyAuto?: boolean }) => {
     if (!host) throw new Error("host unavailable");
