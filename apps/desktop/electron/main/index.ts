@@ -89,6 +89,7 @@ import type {
   PluginNativeNotificationResult,
   PluginNotificationPermission,
 } from "@pi-desktop/plugin-sdk";
+import { resolvePluginLocalizedString } from "@pi-desktop/plugin-sdk";
 import { HostProcess } from "./host-process";
 import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
@@ -269,8 +270,13 @@ const plugins = new PluginRuntime({
     const { clipboard } = await import("electron");
     clipboard.writeText(value);
   },
+  getLocale: () => updaterLocale,
   openPanel: async (request) => {
-    await pluginPanels.open(request);
+    await pluginPanels.open({
+      ...request,
+      locale: updaterLocale,
+      theme: pluginPanelTheme,
+    });
   },
   closePanel: async (pluginId) => {
     await pluginPanels.close(pluginId);
@@ -391,6 +397,10 @@ const persistenceOutbox = new PersistenceOutbox(dataDir, (level, message, data) 
 
 /** Product UI locale for dual-locale update notes (mirrored from settings). */
 let updaterLocale = "en";
+type PluginPanelTheme = "light" | "dark";
+let pluginPanelTheme: PluginPanelTheme = nativeTheme.shouldUseDarkColors
+  ? "dark"
+  : "light";
 
 const updater = new AppUpdaterController({
   logger,
@@ -1058,6 +1068,7 @@ function applyDeveloperMode(settings?: { developerMode?: unknown } | null) {
 /** Keep native labels and accelerators aligned with persisted app settings. */
 function applyApplicationMenuSettings(settings?: {
   language?: unknown;
+  theme?: unknown;
   keybindings?: unknown;
   developerMode?: unknown;
 } | null) {
@@ -1070,6 +1081,16 @@ function applyApplicationMenuSettings(settings?: {
   if (locale !== updaterLocale) {
     updaterLocale = locale;
     updater.refreshReleaseNotes();
+  }
+  const preference = settings?.theme;
+  if (preference === "light" || preference === "dark") {
+    pluginPanelTheme = preference;
+  } else if (typeof preference === "string" && preference.startsWith("plugin:")) {
+    const pluginTheme = plugins.getThemes().find((theme) => theme.id === preference);
+    pluginPanelTheme =
+      pluginTheme?.base ?? (nativeTheme.shouldUseDarkColors ? "dark" : "light");
+  } else {
+    pluginPanelTheme = nativeTheme.shouldUseDarkColors ? "dark" : "light";
   }
   const keybindings =
     settings?.keybindings && typeof settings.keybindings === "object"
@@ -6180,7 +6201,9 @@ function registerIpc() {
     }
     await pluginPanels.open({
       pluginId: id,
-      title: manifest.ui.title || manifest.name,
+      title: resolvePluginLocalizedString(manifest.ui.title, updaterLocale, manifest.name),
+      locale: updaterLocale,
+      theme: pluginPanelTheme,
       width: manifest.ui.width ?? 480,
       height: manifest.ui.height ?? 360,
       htmlPath: join(loaded.path, manifest.ui.panel),

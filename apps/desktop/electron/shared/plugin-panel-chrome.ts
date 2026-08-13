@@ -1,5 +1,9 @@
 export const PLUGIN_PANEL_TITLEBAR_HEIGHT = 46;
 
+export type PluginPanelTheme = "light" | "dark";
+
+export const PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX = "--pi-plugin-panel-locale=";
+
 export const PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL =
   "pi-plugin-panel-window-control";
 export const PLUGIN_PANEL_WINDOW_STATE_CHANNEL =

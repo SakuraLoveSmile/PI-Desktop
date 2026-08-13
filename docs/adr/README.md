@@ -98,3 +98,4 @@ Each ADR includes:
 | 0079 | Use VitePress for the bilingual documentation site | Accepted |
 | 0080 | Prewarm the global plugin launcher after boot | Accepted |
 | 0081 | Host-owned cross-platform plugin panel chrome | Accepted |
+| 0082 | Localized and page-adaptive plugin panel chrome | Accepted |

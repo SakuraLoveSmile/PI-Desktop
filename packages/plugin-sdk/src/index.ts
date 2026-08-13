@@ -14,7 +14,7 @@ export type PluginManifest = {
     panel?: string;
     width?: number;
     height?: number;
-    title?: string;
+    title?: PluginLocalizedString | string;
   };
   contributes?: {
     commands?: Array<{
@@ -46,6 +46,24 @@ export type PluginManifest = {
   engines?: { piDesktop?: string };
   activationEvents?: string[];
 };
+
+/** A plugin-provided label for the two locales supported by the desktop shell. */
+export type PluginLocalizedString = {
+  en: string;
+  "zh-CN": string;
+};
+
+/** Resolve a plugin label using the active PI-Desktop locale. */
+export function resolvePluginLocalizedString(
+  value: string | PluginLocalizedString | undefined,
+  locale: string | undefined,
+  fallback = "",
+): string {
+  if (typeof value === "string") return value || fallback;
+  if (!value) return fallback;
+  const preferred = locale?.toLowerCase().startsWith("zh") ? value["zh-CN"] : value.en;
+  return preferred || value.en || value["zh-CN"] || fallback;
+}
 
 export type PluginSkillContrib = {
   /** Plugin-local skill id. Defaults to the file name without its extension. */
@@ -286,6 +304,33 @@ export function validateManifest(raw: unknown): {
   }
   if (typeof m.schemaVersion !== "number") {
     return { ok: false, error: "manifest.schemaVersion is required" };
+  }
+  const ui = m.ui as
+    | { title?: unknown }
+    | null
+    | undefined;
+  if (ui !== undefined) {
+    if (!ui || typeof ui !== "object" || Array.isArray(ui)) {
+      return { ok: false, error: "manifest.ui must be an object" };
+    }
+    const title = ui.title;
+    if (title !== undefined && typeof title !== "string") {
+      if (!title || typeof title !== "object" || Array.isArray(title)) {
+        return {
+          ok: false,
+          error: "manifest.ui.title must be a string or { en, \"zh-CN\" }",
+        };
+      }
+      const localized = title as Record<string, unknown>;
+      for (const locale of ["en", "zh-CN"] as const) {
+        if (typeof localized[locale] !== "string" || !localized[locale]?.trim()) {
+          return {
+            ok: false,
+            error: `manifest.ui.title.${locale} is required for localized titles`,
+          };
+        }
+      }
+    }
   }
   const contributesError = validateContributions(m.contributes);
   if (contributesError) {

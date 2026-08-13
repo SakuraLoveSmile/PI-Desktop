@@ -14,6 +14,7 @@ import {
   resolveMcpRefs,
   sanitizeThemeCss,
   skillIdFromPath,
+  resolvePluginLocalizedString,
   validateManifest,
   validateMcpServer,
   type PluginManifest,
@@ -83,6 +84,8 @@ export type PluginPanelRequest = {
   width: number;
   height: number;
   htmlPath: string;
+  locale?: string;
+  theme?: "light" | "dark";
   /** Development panels show the host safe-area reminder in their chrome. */
   development?: boolean;
 };
@@ -1786,7 +1789,13 @@ export class PluginRuntime {
           }
           await this.services.openPanel({
             pluginId,
-            title: options?.title || loaded.manifest.ui?.title || loaded.manifest.name,
+            title:
+              options?.title ||
+              resolvePluginLocalizedString(
+                loaded.manifest.ui?.title,
+                this.services.getLocale?.(),
+                loaded.manifest.name,
+              ),
             width: loaded.manifest.ui?.width ?? 480,
             height: loaded.manifest.ui?.height ?? 360,
             htmlPath,

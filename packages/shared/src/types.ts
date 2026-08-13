@@ -686,7 +686,13 @@ export type PluginUiMeta = {
   panel?: string;
   width?: number;
   height?: number;
-  title?: string;
+  title?: string | PluginLocalizedString;
+};
+
+/** Localized plugin labels match the desktop shell's supported locales. */
+export type PluginLocalizedString = {
+  en: string;
+  "zh-CN": string;
 };
 
 export type PluginCapability =

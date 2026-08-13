@@ -65,6 +65,11 @@ Section labels that use Latin micro-style (`text-transform: uppercase` +
 Applies to sidebar section labels, settings rail group labels, destination
 section labels, and keyboard-shortcut group labels.
 
+Plugin panel chrome follows the same shell context: localized panel titles use
+the active app locale, and the host-owned titlebar uses the panel page's
+computed surface/text colors with the active theme as a transparent-page
+fallback. It must not force a black surface on a light plugin page.
+
 ### 3.3 Product identity and marks
 
 The visible product identity is **PI-Desktop**, even where the shell borrows

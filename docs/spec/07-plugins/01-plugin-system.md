@@ -218,6 +218,12 @@ are reachable there) and CPU/memory limits.
 - Reserve a host-owned 46px custom titlebar above plugin content: macOS keeps
   hidden-inset traffic lights at `{x:16,y:16}`; Windows/Linux use a frameless
   window with custom minimize, maximize/restore, and close controls
+- Panel titles may be a legacy string or a localized `{ "en": string,
+  "zh-CN": string }` object. The host resolves the title using the active
+  PI-Desktop UI language, not the plugin window's OS/browser locale.
+- The titlebar follows the loaded plugin page's computed background and text
+  colors. The active PI-Desktop theme (`light` / `dark`, including a plugin
+  theme's base palette) is the fallback while the page is transparent.
 - Expose the titlebar height as `--pi-plugin-titlebar-height: 46px`; normal-flow
   content is offset automatically, while fixed/sticky top UI must use
   `top: var(--pi-plugin-titlebar-height, 46px)` rather than `top: 0`

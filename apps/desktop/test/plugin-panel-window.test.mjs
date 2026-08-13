@@ -20,7 +20,7 @@ test("plugin panels match the cross-platform main-window chrome contract", () =>
     hostSource,
     /process\.platform === "darwin"[\s\S]*titleBarStyle: "hiddenInset"[\s\S]*trafficLightPosition: \{ x: 16, y: 16 \}[\s\S]*frame: false/,
   );
-  assert.match(hostSource, /nativeTheme\.shouldUseDarkColors/);
+  assert.match(hostSource, /request\.theme === "light"/);
   assert.match(hostSource, /win\.setMenu\(null\)/);
   assert.match(hostSource, /pi-plugin-panel-development=1/);
   assert.match(chromeSource, /PLUGIN_PANEL_TITLEBAR_HEIGHT = 46/);
@@ -38,6 +38,8 @@ test("plugin panel window controls stay private, bounded, and accessible", () =>
   assert.match(preloadSource, /attachShadow\(\{ mode: "closed" \}\)/);
   assert.match(preloadSource, /setAttribute\("aria-label", label\)/);
   assert.match(preloadSource, /focus-visible/);
+  assert.match(preloadSource, /pageColor\("backgroundColor"/);
+  assert.match(preloadSource, /--pi-plugin-panel-page-background/);
   const publicBridgeSource = preloadSource.slice(
     preloadSource.indexOf("const bridge ="),
     preloadSource.indexOf('contextBridge.exposeInMainWorld("pluginBridge"'),
@@ -55,6 +57,9 @@ test("plugin content is offset below the host-owned titlebar", () => {
   assert.match(preloadSource, /--pi-plugin-titlebar-height/);
   assert.match(preloadSource, /46px safe area/);
   assert.match(preloadSource, /isDevelopmentPanel/);
-  assert.match(preloadSource, /prefers-color-scheme: light/);
+  assert.match(preloadSource, /--pi-plugin-panel-theme=/);
+  assert.match(preloadSource, /PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX/);
+  assert.match(preloadSource, /panelLocale\(\)\.toLowerCase\(\)/);
+  assert.match(preloadSource, /host\.dataset\.theme = theme/);
   assert.match(preloadSource, /prefers-reduced-motion: reduce/);
 });

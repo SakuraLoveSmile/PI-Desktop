@@ -84,7 +84,7 @@ pub struct PluginUiMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
+    pub title: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

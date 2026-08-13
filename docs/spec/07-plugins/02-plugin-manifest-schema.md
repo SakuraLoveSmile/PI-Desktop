@@ -50,7 +50,10 @@ type PluginUiConfig = {
  width?: number;
  height?: number;
  resizable?: boolean;
- title?: string;
+ title?: string | {
+   en: string;
+   "zh-CN": string;
+ }; // localized panel title; both locales are required for an object
 };
 ```
 

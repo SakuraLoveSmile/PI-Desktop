@@ -11,7 +11,10 @@
  "panel": "renderer/index.html",
  "width": 420,
  "height": 320,
- "title": "Hello Plugin"
+ "title": {
+   "en": "Hello Plugin",
+   "zh-CN": "你好插件"
+ }
  },
  "contributes": {
  "commands": [

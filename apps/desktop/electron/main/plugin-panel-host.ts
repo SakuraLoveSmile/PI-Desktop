@@ -1,16 +1,20 @@
-import { BrowserWindow, ipcMain, nativeTheme, session } from "electron";
+import { BrowserWindow, ipcMain, session } from "electron";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import {
   isPluginPanelWindowControlAction,
   PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
   PLUGIN_PANEL_WINDOW_STATE_CHANNEL,
+  PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX,
+  type PluginPanelTheme,
   type PluginPanelWindowControlAction,
 } from "../shared/plugin-panel-chrome";
 
 export type PluginPanelOpenRequest = {
   pluginId: string;
   title: string;
+  locale: string;
+  theme: PluginPanelTheme;
   width: number;
   height: number;
   htmlPath: string;
@@ -145,9 +149,9 @@ export class PluginPanelHost {
       title: request.title,
       show: false,
       autoHideMenuBar: true,
-      backgroundColor: nativeTheme.shouldUseDarkColors
-        ? "#181818"
-        : "#ffffff",
+      // The host theme is only a fallback; the preload samples the actual
+      // plugin page colors after it has loaded and paints the chrome from them.
+      backgroundColor: request.theme === "light" ? "#ffffff" : "#181818",
       // Match the main application chrome: macOS retains inset traffic lights,
       // while Windows/Linux use renderer-drawn controls in a frameless window.
       ...(process.platform === "darwin"
@@ -165,6 +169,8 @@ export class PluginPanelHost {
         webviewTag: false,
         additionalArguments: [
           `--pi-plugin-panel-title=${encodeURIComponent(request.title)}`,
+          `${PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX}${encodeURIComponent(request.locale)}`,
+          `--pi-plugin-panel-theme=${request.theme}`,
           ...(request.development
             ? ["--pi-plugin-panel-development=1"]
             : []),

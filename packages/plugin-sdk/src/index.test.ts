@@ -4,6 +4,7 @@ import {
   pluginSkillId,
   pluginThemeId,
   pluginToolName,
+  resolvePluginLocalizedString,
   validateContributions,
   validateManifest,
   PLUGIN_PERMISSIONS,
@@ -12,6 +13,22 @@ import {
 const base = { schemaVersion: 1, id: "demo.x", name: "X", version: "0.1.0", main: "main.js" };
 
 describe("validateManifest", () => {
+  it("accepts and resolves English/Chinese panel titles", () => {
+    const result = validateManifest({
+      ...base,
+      ui: { panel: "renderer/index.html", title: { en: "Hello", "zh-CN": "你好" } },
+    });
+    expect(result.ok).toBe(true);
+    expect(resolvePluginLocalizedString(result.manifest?.ui?.title, "en-US")).toBe("Hello");
+    expect(resolvePluginLocalizedString(result.manifest?.ui?.title, "zh-CN")).toBe("你好");
+  });
+
+  it("requires both supported locales for localized panel titles", () => {
+    expect(
+      validateManifest({ ...base, ui: { title: { en: "Hello" } } }).error,
+    ).toMatch(/zh-CN is required/);
+  });
+
   it("accepts the new contribution shapes", () => {
     const result = validateManifest({
       ...base,

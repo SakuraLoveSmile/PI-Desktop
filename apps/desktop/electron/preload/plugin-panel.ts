@@ -1,9 +1,11 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
   PLUGIN_PANEL_TITLEBAR_HEIGHT,
+  PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX,
   PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
   PLUGIN_PANEL_WINDOW_STATE_CHANNEL,
   type PluginPanelWindowControlAction,
+  type PluginPanelTheme,
 } from "../shared/plugin-panel-chrome";
 
 const bridge = {
@@ -47,8 +49,45 @@ function panelTitle(): string {
   }
 }
 
+function panelTheme(): PluginPanelTheme {
+  const prefix = "--pi-plugin-panel-theme=";
+  const raw = process.argv.find((argument) => argument.startsWith(prefix));
+  if (raw?.slice(prefix.length) === "light") return "light";
+  if (raw?.slice(prefix.length) === "dark") return "dark";
+  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function panelLocale(): string {
+  const raw = process.argv.find((argument) =>
+    argument.startsWith(PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX),
+  );
+  if (!raw) return navigator.language;
+  try {
+    return decodeURIComponent(raw.slice(PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX.length));
+  } catch {
+    return navigator.language;
+  }
+}
+
+function usableColor(value: string): boolean {
+  return value !== "transparent" && value !== "rgba(0, 0, 0, 0)";
+}
+
+function pageColor(property: "backgroundColor" | "color", fallback: string): string {
+  for (const element of [document.body, document.documentElement]) {
+    if (!element) continue;
+    const value = window.getComputedStyle(element)[property];
+    if (usableColor(value)) return value;
+  }
+  return fallback;
+}
+
+function pageSurface(theme: PluginPanelTheme): string {
+  return pageColor("backgroundColor", theme === "light" ? "#ffffff" : "#181818");
+}
+
 function chromeLabels(): ChromeLabels {
-  if (navigator.language.toLowerCase().startsWith("zh")) {
+  if (panelLocale().toLowerCase().startsWith("zh")) {
     return {
       toolbar: "插件面板窗口控制",
       minimize: "最小化",
@@ -109,7 +148,18 @@ function installPanelChrome(): void {
   );
 
   const labels = chromeLabels();
+  const theme = panelTheme();
+  const surface = pageSurface(theme);
   const host = document.createElement("pi-plugin-panel-titlebar");
+  host.dataset.theme = theme;
+  host.style.setProperty(
+    "--pi-plugin-panel-page-background",
+    surface,
+  );
+  host.style.setProperty(
+    "--pi-plugin-panel-page-foreground",
+    pageColor("color", theme === "light" ? "#1a1c1f" : "#ffffff"),
+  );
   host.setAttribute("role", "toolbar");
   host.setAttribute("aria-label", labels.toolbar);
   const shadow = host.attachShadow({ mode: "closed" });
@@ -135,10 +185,10 @@ function installPanelChrome(): void {
       height: ${PLUGIN_PANEL_TITLEBAR_HEIGHT}px;
       align-items: center;
       overflow: hidden;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(24, 24, 24, 0.96);
-      color: #ffffff;
-      box-shadow: 0 1px 10px rgba(0, 0, 0, 0.08);
+      border-bottom: 1px solid color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 12%, transparent);
+      background: var(--pi-plugin-panel-page-background);
+      color: var(--pi-plugin-panel-page-foreground);
+      box-shadow: 0 1px 10px color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 8%, transparent);
       backdrop-filter: blur(18px);
       user-select: none;
     }
@@ -147,7 +197,7 @@ function installPanelChrome(): void {
       flex: 1 1 auto;
       overflow: hidden;
       padding: 0 12px;
-      color: rgba(255, 255, 255, 0.92);
+      color: var(--pi-plugin-panel-page-foreground);
       font-size: 13px;
       font-weight: 550;
       letter-spacing: -0.01em;
@@ -170,11 +220,11 @@ function installPanelChrome(): void {
       max-width: 180px;
       margin-right: 8px;
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.16);
+      border: 1px solid color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 20%, transparent);
       border-radius: 999px;
       padding: 4px 8px;
-      background: rgba(255, 255, 255, 0.06);
-      color: rgba(255, 255, 255, 0.68);
+      background: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 6%, transparent);
+      color: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 68%, transparent);
       font-size: 10px;
       font-weight: 600;
       letter-spacing: 0.01em;
@@ -190,7 +240,7 @@ function installPanelChrome(): void {
       width: 112px;
       height: ${PLUGIN_PANEL_TITLEBAR_HEIGHT}px;
       flex: 0 0 112px;
-      border-left: 1px solid rgba(255, 255, 255, 0.06);
+      border-left: 1px solid color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 10%, transparent);
     }
     .control {
       -webkit-app-region: no-drag;
@@ -206,16 +256,16 @@ function installPanelChrome(): void {
       border-radius: 0;
       outline: none;
       background: transparent;
-      color: rgba(255, 255, 255, 0.55);
+      color: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 58%, transparent);
       cursor: default;
       transition: background 150ms cubic-bezier(0.22, 1, 0.36, 1), color 150ms cubic-bezier(0.22, 1, 0.36, 1);
     }
     .control:hover {
-      background: rgba(255, 255, 255, 0.06);
-      color: #ffffff;
+      background: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 8%, transparent);
+      color: var(--pi-plugin-panel-page-foreground);
     }
     .control:focus-visible {
-      box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+      box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 50%, transparent);
     }
     .control-close:hover {
       background: rgba(210, 43, 51, 0.92);
@@ -257,10 +307,10 @@ function installPanelChrome(): void {
     .glyph-restore::after {
       bottom: 1px;
       left: 1px;
-      background: #181818;
+      background: var(--pi-plugin-panel-page-background);
     }
     .control:hover .glyph-restore::after {
-      background: #212121;
+      background: var(--pi-plugin-panel-page-background);
     }
     .glyph-close::before,
     .glyph-close::after {
@@ -275,44 +325,11 @@ function installPanelChrome(): void {
     .glyph-close::after {
       transform: rotate(-45deg);
     }
-    @media (prefers-color-scheme: light) {
-      .titlebar {
-        border-bottom-color: rgba(26, 28, 31, 0.1);
-        background: rgba(255, 255, 255, 0.96);
-        color: #1a1c1f;
-        box-shadow: 0 1px 10px rgba(26, 28, 31, 0.06);
-      }
-      .title {
-        color: #1a1c1f;
-      }
-      .safe-area-hint {
-        border-color: rgba(26, 28, 31, 0.14);
-        background: rgba(26, 28, 31, 0.05);
-        color: rgba(26, 28, 31, 0.68);
-      }
-      .controls {
-        border-left-color: rgba(26, 28, 31, 0.08);
-      }
-      .control {
-        color: rgba(26, 28, 31, 0.55);
-      }
-      .control:hover {
-        background: rgba(26, 28, 31, 0.05);
-        color: #1a1c1f;
-      }
-      .control:focus-visible {
-        box-shadow: inset 0 0 0 2px rgba(26, 28, 31, 0.45);
-      }
-      .control-close:hover {
-        background: rgba(194, 35, 45, 0.92);
-        color: #ffffff;
-      }
-      .glyph-restore::after {
-        background: #ffffff;
-      }
-      .control:hover .glyph-restore::after {
-        background: #f3f3f3;
-      }
+    :host([data-theme="light"]) {
+      color-scheme: light;
+    }
+    :host([data-theme="dark"]) {
+      color-scheme: dark;
     }
     @media (max-width: 520px) {
       .titlebar.platform-win32 .title,
