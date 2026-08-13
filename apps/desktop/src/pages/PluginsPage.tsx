@@ -1197,21 +1197,6 @@ export function PluginsPage() {
                               }
                             />
                             <div className="plugins-row-actions">
-                              {plugin.source === "dev" ? (
-                                <button
-                                  type="button"
-                                  className="plugins-icon-btn"
-                                  aria-label={t("plugins.reload")}
-                                  title={t("plugins.reload")}
-                                  data-tip={t("plugins.reload")}
-                                  disabled={
-                                    busyId === plugin.id || reloadingId === plugin.id
-                                  }
-                                  onClick={() => void reloadPlugin(plugin.id)}
-                                >
-                                  <IconReview size={15} />
-                                </button>
-                              ) : null}
                               {plugin.ui?.panel ? (
                                 <button
                                   type="button"
@@ -1274,6 +1259,23 @@ export function PluginsPage() {
                                     )}
                                     role="menu"
                                   >
+                                    {plugin.source === "dev" ? (
+                                      <button
+                                        type="button"
+                                        role="menuitem"
+                                        disabled={
+                                          busyId === plugin.id ||
+                                          reloadingId === plugin.id
+                                        }
+                                        onClick={() => {
+                                          setRowMenu(null);
+                                          void reloadPlugin(plugin.id);
+                                        }}
+                                      >
+                                        <IconReview size={14} />
+                                        {t("plugins.reload")}
+                                      </button>
+                                    ) : null}
                                     <button
                                       type="button"
                                       role="menuitem"
