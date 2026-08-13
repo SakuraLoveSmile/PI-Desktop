@@ -23,6 +23,17 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.5.11",
+    date: "2026-08-13",
+    highlights: [
+      "Add offline availability and metadata refresh for the plugin marketplace.",
+      "Cache composer drafts per conversation for faster session recovery.",
+      "Localize plugin panel titles and adapt panel window chrome.",
+      "Fix mascot key colour on dark surfaces.",
+      "Reduce macOS launcher shortcut latency for snappier interactions.",
+    ],
+  },
+  {
     version: "0.5.10",
     date: "2026-08-13",
     highlights: [
@@ -278,6 +289,17 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.5.11",
+    date: "2026-08-13",
+    highlights: [
+      "为插件市场添加离线可用性和元数据刷新功能。",
+      "为 composer 添加按对话缓存草稿功能，加快会话恢复速度。",
+      "本地化插件面板标题并适配面板窗口框架。",
+      "修复深色表面上的吉祥物键颜色。",
+      "减少 macOS 启动器快捷键延迟，交互更灵敏。",
+    ],
+  },
   {
     version: "0.5.10",
     date: "2026-08-13",
