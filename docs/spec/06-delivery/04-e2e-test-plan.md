@@ -356,6 +356,27 @@ Each scenario is documented in this format:
 - **Status**: Source-level regression covered (`app-store-sidebar.test.mjs`);
   full UI scenario Draft
 
+#### E2E-011c: Session-scoped composer drafts
+
+- **Preconditions**: Provider configured; sessions A and B exist; the composer
+  is visible and both sessions are idle.
+- **Steps**: 1) Select A and type a prompt without sending it. 2) Switch to B
+  and inspect the composer. 3) Type a different prompt in B, then switch back
+  to A. 4) Create a new session and inspect its composer. 5) Return to B and
+  then delete B; revisit the remaining sessions and the home composer if it is
+  available.
+- **Expected**: B initially shows an empty composer, A restores its original
+  unsent prompt, and the new session starts empty rather than inheriting A or
+  B. Each session keeps only its own draft (including file-reference chips).
+  Deleting B removes its cached draft. If a prompt is sent while its request is
+  in flight and the user switches sessions, successful completion clears only
+  the submitting session's draft and never clears the destination composer.
+- **Specs linked**: `04-ux/09-interaction-patterns.md`
+- **Acceptance**: C (session isolation and composer input)
+- **Milestone**: M2
+- **Status**: Source-level regression covered
+  (`composer-draft-cache.test.mjs`); full UI scenario Draft
+
 ### Conversation Top Bar
 
 #### E2E-087: Conversation top bar renders on the chat route

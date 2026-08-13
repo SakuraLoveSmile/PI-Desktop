@@ -192,6 +192,12 @@ export type ComposerPrefill = {
   token: number;
 };
 
+const HOME_DRAFT_KEY = "__home__";
+
+function draftKeyForSession(sessionId: string | null | undefined) {
+  return sessionId ?? HOME_DRAFT_KEY;
+}
+
 export function Composer({
   variant = "docked",
   prefill,
@@ -234,6 +240,9 @@ export function Composer({
   const thinkingRef = useRef<HTMLDivElement>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
+  const draftKey = draftKeyForSession(activeSessionId);
+  const draftCacheRef = useRef(new Map<string, ComposerDraftSnapshot>());
+  const draftKeyRef = useRef(draftKey);
   const approvalPending = planCheckpoint?.status === "pending";
   const executionActive = isActivePlanExecution(planCheckpoint);
   const runActive = isRunning || executionActive;
@@ -244,6 +253,44 @@ export function Composer({
   const activeFileReferences = fileReferences.filter(
     (fileReference) => fileReference.sessionId === referenceSessionId,
   );
+
+  useEffect(() => {
+    const previousKey = draftKeyRef.current;
+    if (previousKey !== draftKey) {
+      draftCacheRef.current.set(previousKey, {
+        text: value,
+        fileReferences: fileReferences
+          .filter((fileReference) => fileReference.sessionId === previousKey)
+          .map(({ path, name }) => ({ path, name })),
+      });
+      draftKeyRef.current = draftKey;
+      const nextDraft = draftCacheRef.current.get(draftKey);
+      setValue(nextDraft?.text ?? "");
+      setFileReferences(
+        nextDraft?.fileReferences.map((fileReference) =>
+          createFileReference(fileReference.path, fileReference.name, referenceSessionId),
+        ) ?? [],
+      );
+      setCursor(nextDraft?.text.length ?? 0);
+      return;
+    }
+
+    draftCacheRef.current.set(draftKey, {
+      text: value,
+      fileReferences: fileReferences
+        .filter((fileReference) => fileReference.sessionId === referenceSessionId)
+        .map(({ path, name }) => ({ path, name })),
+    });
+  }, [draftKey, fileReferences, referenceSessionId, value]);
+
+  useEffect(() => {
+    const sessionIds = new Set(sessions.map((session) => session.id));
+    for (const key of draftCacheRef.current.keys()) {
+      if (key !== HOME_DRAFT_KEY && key !== draftKey && !sessionIds.has(key)) {
+        draftCacheRef.current.delete(key);
+      }
+    }
+  }, [draftKey, sessions]);
 
   useEffect(() => {
     if (!controlsBlocked) return;
@@ -414,13 +461,17 @@ export function Composer({
   const enterToSend = settings?.enterToSend ?? true;
   const hasDraftContent = Boolean(value.trim() || activeFileReferences.length);
 
-  const clearDraft = () => {
+  const clearDraftForKey = (key: string) => {
+    draftCacheRef.current.delete(key);
+    const currentKey = draftKeyForSession(useAppStore.getState().activeSessionId);
+    if (currentKey !== key) return;
     setValue("");
     setFileReferences((current) =>
       current.filter(
-        (fileReference) => fileReference.sessionId !== referenceSessionId,
+        (fileReference) => fileReference.sessionId !== key,
       ),
     );
+    setCursor(0);
   };
 
   const draftSnapshot = (text: string): ComposerDraftSnapshot => ({
@@ -431,6 +482,7 @@ export function Composer({
   const submit = async () => {
     const content = serializeComposerFileReferences(value, activeFileReferences);
     if (!content || sendBlocked) return;
+    const submittedDraftKey = draftKey;
     // Slash dispatch (D123): builtin/plugin aliases execute locally without
     // a session or a model; templates and unknown /names stay prompt text
     // (main expands templates). Runs before the model-ready gate on purpose.
@@ -465,7 +517,7 @@ export function Composer({
               commandBody,
               draftSnapshot(visibleCommandBody),
             );
-            if (accepted) clearDraft();
+            if (accepted) clearDraftForKey(submittedDraftKey);
           } catch (e) {
             showToast(e instanceof Error ? e.message : String(e), {
               variant: "error",
@@ -481,7 +533,7 @@ export function Composer({
           try {
             if (command.kind === "builtin") await runPaletteCommand(command.id);
             else await api.executeCommand(command.id);
-            clearDraft();
+            clearDraftForKey(submittedDraftKey);
           } catch (e) {
             showToast(e instanceof Error ? e.message : String(e), {
               variant: "error",
@@ -493,7 +545,7 @@ export function Composer({
     }
     if (!modelReady) return;
     const accepted = await sendPrompt(content, draftSnapshot(value));
-    if (accepted) clearDraft();
+    if (accepted) clearDraftForKey(submittedDraftKey);
   };
 
   const pasteClipboardFiles = async (event: ClipboardEvent<HTMLTextAreaElement>) => {

@@ -1574,6 +1574,12 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Auto-grow: textarea measures wrapped visual lines, starts at one visible
   line, expands through seven lines, then scrolls internally; deleting content
   shrinks it back to one line
+- Draft text and file-reference chips are retained in renderer memory per
+  session. Switching sessions saves the source draft and restores the target
+  draft; an uncached target and every newly created session start empty. The
+  no-active-session home composer has its own slot. A successful send clears
+  only the submitting session's slot, including when navigation occurs while
+  the request is in flight, and deleting a session drops its slot.
 - Text correction off (D145): composer textarea sets `spellCheck={false}`,
   `autoCorrect="off"`, and `autoCapitalize="off"` so browser/OS spelling and
   autocorrect never rewrite coding prompts
