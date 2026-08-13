@@ -35,6 +35,32 @@ The host is responsible for:
 - Package URLs may be absolute `https://` / `http://` / `file://`, or relative paths resolved against the catalog URL
 - HTTPS fetch uses `curl` in host-core
 
+### Catalog source selection
+
+Settings → Extensions picks where the catalog comes from. host-core resolves
+the URL with the environment override on top, so dev builds and tests can point
+at a local catalog without touching persisted settings:
+
+| Precedence | Source | Value |
+| --- | --- | --- |
+| 1 | `PI_DESKTOP_PLUGIN_MARKET_URL` | any URL |
+| 2 | `pluginMarketSource: "mirror"` | `https://cnb.cool/aixk/pi-desktop-plugins/-/git/raw/main/catalog.json` |
+| 2 | `pluginMarketSource: "custom"` | `pluginMarketCustomUrl` |
+| 3 | `pluginMarketSource: "official"` (default) | the default catalog URL above |
+
+The mirror exists for networks that cannot reach `raw.githubusercontent.com`.
+It serves a byte-identical catalog, and catalog package URLs are relative, so
+`resolve_package_url` keeps package downloads on whichever source served the
+catalog and shasum verification is unaffected by the switch.
+
+Cached catalogs are keyed to their source in `plugins/market/cache-meta.json`.
+A snapshot fetched from a different source is ignored rather than deleted —
+its package URLs point at the provider the user just switched away from — so
+switching back recovers that catalog without a round trip. `settings.set` only
+re-pins the source in memory; fetching there would hold the host RPC state lock
+behind a marketplace timeout, so the renderer triggers `market.refresh` after
+the switch.
+
 ### Client-visible catalog policy
 
 Development-only sample entries whose stable ID starts with `demo.` remain
@@ -80,6 +106,7 @@ type MarketPluginSummary = {
  categories?: string[]
  permissionSummary: string[]
  verified?: boolean
+ installable?: boolean
 }
 ```
 
@@ -111,6 +138,11 @@ first, and an install without an explicit version targets that same latest
 version. Invalid version strings are lower priority than valid semantic
 versions. A version without `shasum` or `url` remains visible for discovery
 but is not installable until the publisher completes its package metadata.
+
+`installable` reports whether `latestVersion` carries that package metadata.
+Marketplace rows and the detail sheet disable their install action and label
+the version as not yet published rather than starting a download the host will
+refuse; a batch update skips such a version instead of failing the whole run.
 
 ### Catalog release gate
 

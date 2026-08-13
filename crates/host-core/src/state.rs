@@ -61,7 +61,14 @@ impl AppState {
     pub fn open(data_dir: &std::path::Path) -> Result<Self> {
         let db = Database::open_in_dir(data_dir)?;
         let secrets = SecretStore::open(data_dir)?;
-        let plugins = PluginManager::new(data_dir);
+        // The marketplace source is read before the manager builds its first
+        // catalog, so a mirror configured for networks without GitHub access
+        // applies on launch instead of only after a manual refresh.
+        let app_settings = db.get_setting("app").unwrap_or_default();
+        let plugins = PluginManager::new(
+            data_dir,
+            crate::plugins::market_source_from_settings(app_settings.as_ref()),
+        );
         let mcp_servers = McpServerRegistry::new(data_dir);
         let user_skills = UserSkillRegistry::new(data_dir);
         let user_subagents = UserSubagentRegistry::new(data_dir);

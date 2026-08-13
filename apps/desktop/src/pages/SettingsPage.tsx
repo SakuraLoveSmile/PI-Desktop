@@ -6,6 +6,7 @@ import type {
   CommandShellCatalog,
   CommandShellId,
   GlobalPermissionMode,
+  PluginMarketSource,
   ShortcutPlatform,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
@@ -19,7 +20,7 @@ import {
   groupImportCandidates,
   type ImportGroupBy,
 } from "../lib/import-groups";
-import { Badge, Button, Select, cx } from "../components/ui";
+import { Badge, Button, Input, Select, cx } from "../components/ui";
 import {
   SETTINGS_GROUP_LABEL_KEYS,
   SETTINGS_NAV,
@@ -38,6 +39,7 @@ import {
   IconMonitor,
   IconMoon,
   IconPalette,
+  IconPlug,
   IconSearch,
   IconSliders,
   IconSparkles,
@@ -704,6 +706,124 @@ function DeveloperSection({
   );
 }
 
+function ExtensionMarketSection({
+  settings,
+  saveSettings,
+}: {
+  settings: AppSettings;
+  saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const showToast = useAppStore((s) => s.showToast);
+  const source: PluginMarketSource = settings.pluginMarketSource ?? "official";
+  const [customUrl, setCustomUrl] = useState(settings.pluginMarketCustomUrl ?? "");
+  const [activeUrl, setActiveUrl] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    // Read-only probe: search serves the cached catalog, so this never waits
+    // on the network the way an explicit refresh does.
+    api
+      .marketSearch()
+      .then((res) => {
+        if (!cancelled) setActiveUrl(res.sourceUrl ?? "");
+      })
+      .catch(() => {
+        if (!cancelled) setActiveUrl("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [source, settings.pluginMarketCustomUrl]);
+
+  /**
+   * Persist the source, then pull the new catalog.
+   *
+   * The host deliberately does not fetch inside `settings.set` — that would
+   * hold its state lock behind a marketplace timeout — so the refresh is the
+   * renderer's job, and its failure is what tells the user the source is
+   * unreachable.
+   */
+  const applySource = async (patch: Partial<AppSettings>) => {
+    try {
+      await saveSettings(patch);
+      const meta = await api.marketRefresh(true);
+      setActiveUrl(meta.sourceUrl ?? "");
+      showToast(
+        t("plugins.marketRefreshed", {
+          count: meta.pluginCount,
+          defaultValue: `Marketplace refreshed (${meta.pluginCount} plugins)`,
+        }),
+        { variant: "success" },
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : String(e), { variant: "error" });
+    }
+  };
+
+  const commitCustomUrl = () => {
+    const next = customUrl.trim();
+    if (next === (settings.pluginMarketCustomUrl ?? "")) return;
+    void applySource({ pluginMarketCustomUrl: next });
+  };
+
+  return (
+    <SettingsCard title={t("settings.marketProviderTitle")}>
+      <SettingsRow
+        title={t("settings.marketProvider")}
+        description={
+          <>
+            {t("settings.marketProviderDesc")}
+            {source === "mirror" ? (
+              <>
+                {" "}
+                {t("settings.marketProviderMirrorHint")}
+              </>
+            ) : null}
+            {activeUrl ? (
+              <div className="settings-row-desc">
+                {t("settings.marketActiveSource", { url: activeUrl })}
+              </div>
+            ) : null}
+          </>
+        }
+      >
+        <Select
+          value={source}
+          aria-label={t("settings.marketProvider")}
+          onChange={(event) =>
+            void applySource({
+              pluginMarketSource: event.target.value as PluginMarketSource,
+            })
+          }
+        >
+          <option value="official">{t("settings.marketProviderOfficial")}</option>
+          <option value="mirror">{t("settings.marketProviderMirror")}</option>
+          <option value="custom">{t("settings.marketProviderCustom")}</option>
+        </Select>
+      </SettingsRow>
+      {source === "custom" && (
+        <SettingsRow
+          title={t("settings.marketCustomUrl")}
+          description={t("settings.marketCustomUrlDesc")}
+        >
+          <Input
+            type="url"
+            value={customUrl}
+            placeholder={t("settings.marketCustomUrlPlaceholder")}
+            aria-label={t("settings.marketCustomUrl")}
+            onChange={(event) => setCustomUrl(event.target.value)}
+            onBlur={commitCustomUrl}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") commitCustomUrl();
+            }}
+          />
+        </SettingsRow>
+      )}
+    </SettingsCard>
+  );
+}
+
 export function SettingsPage() {
   const { t } = useTranslation();
   const tab = useAppStore((s) => s.settingsTab);
@@ -779,6 +899,7 @@ export function SettingsPage() {
       shortcuts: <IconKeyboard size={14} />,
       instructions: <IconFileText size={14} />,
       agent: <IconBot size={14} />,
+      extensions: <IconPlug size={14} />,
       import: <IconDownload size={14} />,
       projects: <IconArchive size={14} />,
       about: <IconInfo size={14} />,
@@ -1156,6 +1277,15 @@ export function SettingsPage() {
           )}
 
           {tab === "agent" && <ProvidersSection />}
+
+          {tab === "extensions" && settings && (
+            <div className="settings-stack">
+              <ExtensionMarketSection
+                settings={settings}
+                saveSettings={saveSettings}
+              />
+            </div>
+          )}
 
           {tab === "instructions" && <AgentInstructionsSection />}
 

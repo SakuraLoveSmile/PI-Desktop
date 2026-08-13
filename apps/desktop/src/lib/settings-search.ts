@@ -11,6 +11,7 @@ export type SettingsTabId =
   | "shortcuts"
   | "instructions"
   | "agent"
+  | "extensions"
   | "import"
   | "projects"
   | "about";
@@ -93,6 +94,19 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.apiKey",
       "settings.baseUrl",
       "settings.apiStyle",
+    ],
+  },
+  {
+    id: "extensions",
+    labelKey: "settings.extensions",
+    groupId: "integrations",
+    keywordKeys: [
+      "settings.marketProviderTitle",
+      "settings.marketProvider",
+      "settings.marketProviderOfficial",
+      "settings.marketProviderMirror",
+      "settings.marketProviderCustom",
+      "settings.marketCustomUrl",
     ],
   },
   {

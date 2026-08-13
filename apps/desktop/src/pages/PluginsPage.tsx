@@ -175,6 +175,15 @@ function shortSha(value?: string): string {
   return value.length > 12 ? `${value.slice(0, 12)}…` : value;
 }
 
+/**
+ * A catalog version is installable only once its package is published. The
+ * host refuses the download otherwise, so every install affordance reads this
+ * instead of offering a button that can only fail.
+ */
+function versionInstallable(version?: { url?: string; shasum?: string } | null): boolean {
+  return !!version?.url?.trim() && !!version?.shasum?.trim();
+}
+
 /** Single-glyph stand-in for a marketplace icon we deliberately do not fetch. */
 function monogram(name: string): string {
   const first = [...name.trim()][0];
@@ -455,11 +464,9 @@ export function PluginsPage() {
       const res = await api.marketSearch(q);
       setMarket((res.plugins ?? []).filter(isClientVisibleMarketPlugin));
       if (!marketSource) {
-        setMarketSource(
-          res.providerId === "official"
-            ? "https://github.com/vastsa/pi-desktop-plugins"
-            : res.providerId || "",
-        );
+        // The host reports the catalog URL actually in effect, so a mirror or
+        // custom source shows up here instead of the official repo.
+        setMarketSource(res.sourceUrl || res.providerId || "");
       }
     } catch (e) {
       showToast(e instanceof Error ? e.message : String(e), { variant: "error" });
@@ -829,6 +836,13 @@ export function PluginsPage() {
     activeVersion?.permissions ?? detail?.permissions ?? [],
   );
   const detailUpToDate = !!installedDetail && installedDetail.version === installTarget;
+  // The sheet knows each version's package fields, so it judges the selected
+  // version rather than the summary's latest one.
+  const detailPackagePending = detail
+    ? activeVersion
+      ? !versionInstallable(activeVersion)
+      : detail.installable === false
+    : false;
 
   return (
     <div className="thread-scroll">
@@ -1400,6 +1414,9 @@ export function PluginsPage() {
                 {visibleMarket.map((item) => {
                   const installed = installedById.get(item.id);
                   const upgradable = !!installed && !!item.updateAvailable;
+                  // Older hosts do not report the field; absence means the
+                  // catalog was trusted, so only an explicit false blocks.
+                  const packagePending = item.installable === false;
                   return (
                     <article
                       key={item.id}
@@ -1468,7 +1485,14 @@ export function PluginsPage() {
                           <Button
                             variant="primary"
                             size="sm"
-                            disabled={busyId === item.id}
+                            disabled={busyId === item.id || packagePending}
+                            title={
+                              packagePending
+                                ? t("plugins.packagePendingHint", {
+                                    version: item.latestVersion,
+                                  })
+                                : undefined
+                            }
                             onClick={() =>
                               queueInstall({
                                 id: item.id,
@@ -1478,11 +1502,13 @@ export function PluginsPage() {
                               })
                             }
                           >
-                            {busyId === item.id
-                              ? t("plugins.installing")
-                              : upgradable
-                                ? t("plugins.updateNow")
-                                : t("plugins.install")}
+                            {packagePending
+                              ? t("plugins.packagePending")
+                              : busyId === item.id
+                                ? t("plugins.installing")
+                                : upgradable
+                                  ? t("plugins.updateNow")
+                                  : t("plugins.install")}
                           </Button>
                         )}
                       </div>
@@ -1565,15 +1591,21 @@ export function PluginsPage() {
                   <div className="plugins-sheet-cta-copy">
                     <span className="plugins-sheet-cta-version">v{installTarget}</span>
                     <span className="plugins-sheet-cta-meta">
-                      {formatDate(activeVersion?.publishedAt, locale)}
-                      {activeVersion?.sizeBytes ? (
-                        <>
-                          <span className="plugins-dot" aria-hidden>
-                            ·
-                          </span>
-                          {formatBytes(activeVersion.sizeBytes)}
-                        </>
-                      ) : null}
+                      {detailPackagePending
+                        ? t("plugins.packagePendingHint", { version: installTarget })
+                        : (
+                            <>
+                              {formatDate(activeVersion?.publishedAt, locale)}
+                              {activeVersion?.sizeBytes ? (
+                                <>
+                                  <span className="plugins-dot" aria-hidden>
+                                    ·
+                                  </span>
+                                  {formatBytes(activeVersion.sizeBytes)}
+                                </>
+                              ) : null}
+                            </>
+                          )}
                     </span>
                   </div>
                   {detailUpToDate ? (
@@ -1584,7 +1616,7 @@ export function PluginsPage() {
                   ) : (
                     <Button
                       variant="primary"
-                      disabled={busyId === detail.id}
+                      disabled={busyId === detail.id || detailPackagePending}
                       onClick={() =>
                         queueInstall({
                           id: detail.id,
@@ -1594,11 +1626,13 @@ export function PluginsPage() {
                         })
                       }
                     >
-                      {busyId === detail.id
-                        ? t("plugins.installing")
-                        : installedDetail
-                          ? t("plugins.updateNow")
-                          : t("plugins.installVersion", { version: installTarget })}
+                      {detailPackagePending
+                        ? t("plugins.packagePending")
+                        : busyId === detail.id
+                          ? t("plugins.installing")
+                          : installedDetail
+                            ? t("plugins.updateNow")
+                            : t("plugins.installVersion", { version: installTarget })}
                     </Button>
                   )}
                 </div>
@@ -1686,6 +1720,7 @@ export function PluginsPage() {
                     <div className="plugins-version-list">
                       {(detail.versions ?? []).map((version) => {
                         const active = activeVersion?.version === version.version;
+                        const pending = !versionInstallable(version);
                         return (
                           <button
                             key={version.version}
@@ -1703,11 +1738,21 @@ export function PluginsPage() {
                                 <span>{formatDate(version.publishedAt, locale)}</span>
                               </span>
                               <span className="plugins-version-meta">
-                                {formatBytes(version.sizeBytes)}
-                                <span className="plugins-dot" aria-hidden>
-                                  ·
-                                </span>
-                                <code title={version.shasum}>{shortSha(version.shasum)}</code>
+                                {pending ? (
+                                  <span className="plugins-version-pending">
+                                    {t("plugins.packagePending")}
+                                  </span>
+                                ) : (
+                                  <>
+                                    {formatBytes(version.sizeBytes)}
+                                    <span className="plugins-dot" aria-hidden>
+                                      ·
+                                    </span>
+                                    <code title={version.shasum}>
+                                      {shortSha(version.shasum)}
+                                    </code>
+                                  </>
+                                )}
                               </span>
                               {version.changelog ? (
                                 <span className="plugins-version-changelog">

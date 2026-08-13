@@ -520,10 +520,11 @@ export const api = {
       sourceUrl: string;
     }>(IPC.invoke.marketRefresh, { force }),
   marketSearch: (query = "", category = "") =>
-    invoke<{ plugins: MarketPluginSummary[]; providerId: string }>(
-      IPC.invoke.marketSearch,
-      { query, category },
-    ),
+    invoke<{
+      plugins: MarketPluginSummary[];
+      providerId: string;
+      sourceUrl: string;
+    }>(IPC.invoke.marketSearch, { query, category }),
   marketGetDetail: (id: string) =>
     invoke<{ plugin: MarketPluginDetail }>(IPC.invoke.marketGetDetail, id),
   marketInstall: (input: {
