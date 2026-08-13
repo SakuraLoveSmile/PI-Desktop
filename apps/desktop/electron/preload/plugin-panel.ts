@@ -29,7 +29,12 @@ type ChromeLabels = {
   maximize: string;
   restore: string;
   close: string;
+  safeArea: string;
 };
+
+function isDevelopmentPanel(): boolean {
+  return process.argv.includes("--pi-plugin-panel-development=1");
+}
 
 function panelTitle(): string {
   const prefix = "--pi-plugin-panel-title=";
@@ -50,6 +55,7 @@ function chromeLabels(): ChromeLabels {
       maximize: "最大化",
       restore: "还原",
       close: "关闭",
+      safeArea: "开发提示 · 安全区 46px",
     };
   }
   return {
@@ -58,6 +64,7 @@ function chromeLabels(): ChromeLabels {
     maximize: "Maximize",
     restore: "Restore",
     close: "Close",
+    safeArea: "Dev hint · 46px safe area",
   };
 }
 
@@ -82,6 +89,11 @@ function createControlButton(
 function installPanelChrome(): void {
   const body = document.body;
   if (!body || document.querySelector("pi-plugin-panel-titlebar")) return;
+
+  document.documentElement.style.setProperty(
+    "--pi-plugin-titlebar-height",
+    `${PLUGIN_PANEL_TITLEBAR_HEIGHT}px`,
+  );
 
   const originalPaddingTop = Number.parseFloat(
     window.getComputedStyle(body).paddingTop,
@@ -123,9 +135,11 @@ function installPanelChrome(): void {
       height: ${PLUGIN_PANEL_TITLEBAR_HEIGHT}px;
       align-items: center;
       overflow: hidden;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      background: #181818;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(24, 24, 24, 0.96);
       color: #ffffff;
+      box-shadow: 0 1px 10px rgba(0, 0, 0, 0.08);
+      backdrop-filter: blur(18px);
       user-select: none;
     }
     .title {
@@ -134,8 +148,8 @@ function installPanelChrome(): void {
       overflow: hidden;
       padding: 0 12px;
       color: rgba(255, 255, 255, 0.92);
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 13px;
+      font-weight: 550;
       letter-spacing: -0.01em;
       line-height: 1.25;
       text-align: center;
@@ -150,6 +164,24 @@ function installPanelChrome(): void {
     .titlebar.platform-linux .title {
       padding-left: 112px;
     }
+    .safe-area-hint {
+      box-sizing: border-box;
+      flex: 0 0 auto;
+      max-width: 180px;
+      margin-right: 8px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 999px;
+      padding: 4px 8px;
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.68);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      line-height: 1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .controls {
       -webkit-app-region: no-drag;
       app-region: no-drag;
@@ -158,6 +190,7 @@ function installPanelChrome(): void {
       width: 112px;
       height: ${PLUGIN_PANEL_TITLEBAR_HEIGHT}px;
       flex: 0 0 112px;
+      border-left: 1px solid rgba(255, 255, 255, 0.06);
     }
     .control {
       -webkit-app-region: no-drag;
@@ -185,7 +218,7 @@ function installPanelChrome(): void {
       box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
     }
     .control-close:hover {
-      background: #ff6764;
+      background: rgba(210, 43, 51, 0.92);
       color: #ffffff;
     }
     .glyph {
@@ -244,12 +277,21 @@ function installPanelChrome(): void {
     }
     @media (prefers-color-scheme: light) {
       .titlebar {
-        border-bottom-color: rgba(26, 28, 31, 0.05);
-        background: #ffffff;
+        border-bottom-color: rgba(26, 28, 31, 0.1);
+        background: rgba(255, 255, 255, 0.96);
         color: #1a1c1f;
+        box-shadow: 0 1px 10px rgba(26, 28, 31, 0.06);
       }
       .title {
         color: #1a1c1f;
+      }
+      .safe-area-hint {
+        border-color: rgba(26, 28, 31, 0.14);
+        background: rgba(26, 28, 31, 0.05);
+        color: rgba(26, 28, 31, 0.68);
+      }
+      .controls {
+        border-left-color: rgba(26, 28, 31, 0.08);
       }
       .control {
         color: rgba(26, 28, 31, 0.55);
@@ -262,7 +304,7 @@ function installPanelChrome(): void {
         box-shadow: inset 0 0 0 2px rgba(26, 28, 31, 0.45);
       }
       .control-close:hover {
-        background: #e02e2a;
+        background: rgba(194, 35, 45, 0.92);
         color: #ffffff;
       }
       .glyph-restore::after {
@@ -270,6 +312,19 @@ function installPanelChrome(): void {
       }
       .control:hover .glyph-restore::after {
         background: #f3f3f3;
+      }
+    }
+    @media (max-width: 520px) {
+      .titlebar.platform-win32 .title,
+      .titlebar.platform-linux .title {
+        padding-left: 80px;
+      }
+      .safe-area-hint {
+        max-width: 100px;
+        margin-right: 4px;
+        padding-right: 6px;
+        padding-left: 6px;
+        font-size: 9px;
       }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -287,6 +342,15 @@ function installPanelChrome(): void {
   title.textContent = panelTitle();
   title.title = panelTitle();
   titlebar.append(title);
+
+  if (isDevelopmentPanel()) {
+    const safeAreaHint = document.createElement("span");
+    safeAreaHint.className = "safe-area-hint";
+    safeAreaHint.textContent = labels.safeArea;
+    safeAreaHint.title = labels.safeArea;
+    safeAreaHint.setAttribute("aria-label", labels.safeArea);
+    titlebar.append(safeAreaHint);
+  }
 
   if (process.platform !== "darwin") {
     const controls = document.createElement("div");

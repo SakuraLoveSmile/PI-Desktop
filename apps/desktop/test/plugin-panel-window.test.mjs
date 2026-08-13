@@ -21,6 +21,8 @@ test("plugin panels match the cross-platform main-window chrome contract", () =>
     /process\.platform === "darwin"[\s\S]*titleBarStyle: "hiddenInset"[\s\S]*trafficLightPosition: \{ x: 16, y: 16 \}[\s\S]*frame: false/,
   );
   assert.match(hostSource, /nativeTheme\.shouldUseDarkColors/);
+  assert.match(hostSource, /win\.setMenu\(null\)/);
+  assert.match(hostSource, /pi-plugin-panel-development=1/);
   assert.match(chromeSource, /PLUGIN_PANEL_TITLEBAR_HEIGHT = 46/);
   assert.match(preloadSource, /-webkit-app-region: drag/);
   assert.match(preloadSource, /width: 112px/);
@@ -50,6 +52,9 @@ test("plugin content is offset below the host-owned titlebar", () => {
   assert.match(preloadSource, /getComputedStyle\(body\)\.paddingTop/);
   assert.match(preloadSource, /padding-top/);
   assert.match(preloadSource, /PLUGIN_PANEL_TITLEBAR_HEIGHT/);
+  assert.match(preloadSource, /--pi-plugin-titlebar-height/);
+  assert.match(preloadSource, /46px safe area/);
+  assert.match(preloadSource, /isDevelopmentPanel/);
   assert.match(preloadSource, /prefers-color-scheme: light/);
   assert.match(preloadSource, /prefers-reduced-motion: reduce/);
 });

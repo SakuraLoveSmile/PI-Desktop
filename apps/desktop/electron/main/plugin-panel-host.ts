@@ -14,6 +14,8 @@ export type PluginPanelOpenRequest = {
   width: number;
   height: number;
   htmlPath: string;
+  /** Adds a non-interactive authoring hint to development panels. */
+  development?: boolean;
 };
 
 type BridgeHandler = (
@@ -163,9 +165,17 @@ export class PluginPanelHost {
         webviewTag: false,
         additionalArguments: [
           `--pi-plugin-panel-title=${encodeURIComponent(request.title)}`,
+          ...(request.development
+            ? ["--pi-plugin-panel-development=1"]
+            : []),
         ],
       },
     });
+    if (process.platform !== "darwin") {
+      // A frameless panel must not reveal Electron's application menu when the
+      // user presses Alt; the host titlebar is the only window chrome.
+      win.setMenu(null);
+    }
 
     const sendWindowState = () => {
       if (win.isDestroyed() || win.webContents.isDestroyed()) return;

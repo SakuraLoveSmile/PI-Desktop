@@ -58,7 +58,7 @@ test("hot reload can never widen the permissions the user approved", () => {
     "the permission check must precede the load",
   );
   // Grants track the manifest downwards, so a removed permission goes away.
-  assert.match(reload, /this\.loadFromPath\(dev\.path, declared\)/);
+  assert.match(reload, /this\.loadFromPath\(dev\.path, declared, \{ development: true \}\)/);
   // The ceiling stays what the user approved, not what the last reload used.
   assert.match(reload, /permissions: dev\.permissions/);
   // An unreadable manifest grants nothing.
@@ -96,7 +96,10 @@ test("manual reload uses the registry path and refreshes the dev permission ceil
   const reload = slice(mainSrc, "handle(IPC.invoke.pluginReload", "// Scaffold a starter plugin");
   assert.match(reload, /host\.call<\{ plugins: any\[\] \}>\("plugins\.list"\)/);
   assert.match(reload, /find\(\(candidate\) => candidate\?\.id === id\)/);
-  assert.match(reload, /plugins\.loadFromPath\(plugin\.path, plugin\.permissions \?\? \[\]\)/);
+  assert.match(
+    reload,
+    /plugins\.loadFromPath\(plugin\.path, plugin\.permissions \?\? \[\], \{\s*development: plugin\.source === "dev",\s*\}\)/,
+  );
   assert.match(reload, /if \(plugin\.source === "dev"\) plugins\.watchDevPlugin\(id\)/);
   assert.match(reload, /reason: "reload", pluginId: id/);
 });

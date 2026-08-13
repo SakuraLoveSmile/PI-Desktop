@@ -65,7 +65,10 @@ test("main validates the template and loads what it scaffolds", () => {
     handler.indexOf("scaffold({ dir, template })") <
       handler.indexOf('host.call<{ plugin: any }>("plugins.loadDev"'),
   );
-  assert.match(handler, /plugins\.loadFromPath\(dir, loaded\.plugin\?\.permissions \?\? \[\]\)/);
+  assert.match(
+    handler,
+    /plugins\.loadFromPath\(dir, loaded\.plugin\?\.permissions \?\? \[\], \{\s*development: true,\s*\}\)/,
+  );
   assert.match(handler, /plugins\.drainToasts\(\)/);
 });
 

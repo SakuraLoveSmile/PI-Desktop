@@ -83,6 +83,8 @@ export type PluginPanelRequest = {
   width: number;
   height: number;
   htmlPath: string;
+  /** Development panels show the host safe-area reminder in their chrome. */
+  development?: boolean;
 };
 
 /** Transport to one plugin host process (ADR 0008). */
@@ -230,6 +232,7 @@ type PendingCall = {
 type LoadedPlugin = {
   manifest: PluginManifest;
   path: string;
+  development: boolean;
   permissions: Set<string>;
   child?: PluginProcessHandle;
   pending: Map<string, PendingCall>;
@@ -510,6 +513,7 @@ export class PluginRuntime {
   async loadFromPath(
     pluginPath: string,
     grantedPermissions?: string[],
+    options: { development?: boolean } = {},
   ): Promise<PluginManifest> {
     const manifestPath = join(pluginPath, "manifest.json");
     if (!existsSync(manifestPath)) {
@@ -544,6 +548,7 @@ export class PluginRuntime {
     const loaded: LoadedPlugin = {
       manifest,
       path: pluginPath,
+      development: options.development ?? this.devPlugins.has(manifest.id),
       permissions: granted,
       child,
       pending: new Map(),
@@ -693,7 +698,7 @@ export class PluginRuntime {
       }
       // Grants follow the manifest downwards, never upwards: a permission the
       // author removed stops being available on the next reload.
-      const manifest = await this.loadFromPath(dev.path, declared);
+      const manifest = await this.loadFromPath(dev.path, declared, { development: true });
       this.devPlugins.set(pluginId, { path: dev.path, permissions: dev.permissions });
       this.services.audit?.({
         pluginId,
@@ -1785,6 +1790,7 @@ export class PluginRuntime {
             width: loaded.manifest.ui?.width ?? 480,
             height: loaded.manifest.ui?.height ?? 360,
             htmlPath,
+            ...(loaded.development ? { development: true } : {}),
           });
           this.services.audit?.({
             pluginId,
