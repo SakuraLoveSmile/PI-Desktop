@@ -270,6 +270,12 @@ counts as running state until durable persistence completes.
 - Changing mode/provider/model/thinking level applies to the next turn and
   recreates the pi runtime when any runtime-affecting configuration changes;
   no in-flight runtime observes a queued renderer choice.
+- The live planning indicator follows the turn that is actually running. A
+  mode choice staged while a turn runs never flips the projected
+  `planning`/`inactive` state mid-turn: the renderer keeps the state of the
+  in-flight turn and only moves it to the staged contract mode after the
+  terminal event flushes the configuration, so `Plan / planning` surfaces
+  when the next prompt starts under the new mode.
 
 The live planning state is derived and projected as:
 

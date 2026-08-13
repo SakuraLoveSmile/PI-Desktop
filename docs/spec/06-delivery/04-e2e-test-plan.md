@@ -3187,6 +3187,27 @@ Each scenario is documented in this format:
   boundaries and `test:e2e:plan-ui` verifies pending-only gating plus editable
   rejected/terminal states during the current renderer lifetime
 
+#### E2E-111a: A staged mode switch does not move the live planning indicator mid-turn
+
+- **Preconditions**: A project-bound session is running an Agent turn with a
+  provider; the renderer shows the working indicator and no
+  `Plan / planning` indicator.
+- **Steps**: 1) While the Agent turn is still running, switch the Composer mode
+  chip from Agent to Plan. 2) Inspect the transcript status area before the
+  turn ends. 3) Let the turn reach its terminal event. 4) Inspect the status
+  area again while idle, then send a new prompt.
+- **Expected**: The staged Plan choice updates the chip immediately, but the
+  live planning indicator stays away while the in-flight Agent turn runs; it
+  does not show `Plan / planning` until the new prompt starts under the staged
+  mode. After the terminal event flushes the configuration the session is
+  durable Plan with editable planning state, and the sent prompt surfaces the
+  `Plan / planning` indicator.
+- **Specs linked**: `03-runtime/02-agent-runtime.md`,
+  `03-runtime/10-session-state-machine.md`, `04-ux/08-component-spec.md`
+- **Acceptance**: C (conversation/stream), Quality
+- **Milestone**: M6
+- **Status**: Draft
+
 #### E2E-112: Selectable shell catalog persists the default
 
 - **Preconditions**: Host has an available platform catalog entry, a fixture can
