@@ -9,10 +9,10 @@ description: PI-Desktop 的桌面壳、进程边界、存储所有权和工程�
 
 ## 阅读顺序
 
-1. [系统架构](/spec/02-architecture/01-architecture)
-2. [应用技术栈](/spec/02-architecture/02-tech-stack)
-3. [仓库结构](/spec/02-architecture/03-repo-structure)
-4. [文档站](/spec/02-architecture/04-documentation-site)
+1. [系统架构](/zh-CN/spec/02-architecture/01-architecture)
+2. [应用技术栈](/zh-CN/spec/02-architecture/02-tech-stack)
+3. [仓库结构](/zh-CN/spec/02-architecture/03-repo-structure)
+4. [文档站](/zh-CN/spec/02-architecture/04-documentation-site)
 
 ## 系统地图
 

@@ -9,9 +9,9 @@ description: PI-Desktop 的产品定位、交付范围和明确的非目标。
 
 ## 阅读顺序
 
-1. [产品概览](/spec/01-product/00-overview)
-2. [产品范围](/spec/01-product/01-product-scope)
-3. [非目标](/spec/01-product/02-non-goals)
+1. [产品概览](/zh-CN/spec/01-product/00-overview)
+2. [产品范围](/zh-CN/spec/01-product/01-product-scope)
+3. [非目标](/zh-CN/spec/01-product/02-non-goals)
 
 ## 核心判断
 
@@ -19,4 +19,4 @@ description: PI-Desktop 的产品定位、交付范围和明确的非目标。
 - 工作区、代理运行时、权限边界和模型配置需要可见、可检查。
 - 日常编码体验优先于远程控制、云端网关和无法审计的自动化。
 
-需要逐条实现约束时，继续阅读 [英文产品规格](/spec/01-product/README)。
+需要逐条实现约束时，继续阅读 [完整产品规格](/zh-CN/spec/01-product/README)。

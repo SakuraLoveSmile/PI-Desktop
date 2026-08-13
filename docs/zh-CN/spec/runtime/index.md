@@ -9,12 +9,12 @@ description: PI-Desktop 的 IPC、代理循环、工具权限、Rust host 和模
 
 ## 阅读顺序
 
-1. [IPC 协议](/spec/03-runtime/01-ipc-protocol)
-2. [Agent 运行时](/spec/03-runtime/02-agent-runtime)
-3. [工具与权限](/spec/03-runtime/03-tools-and-permissions)
-4. [Rust host core](/spec/03-runtime/05-host-core-rust)
-5. [Host RPC 协议](/spec/03-runtime/06-host-rpc-protocol)
-6. [Provider 与模型系统](/spec/03-runtime/11-provider-model-system)
+1. [IPC 协议](/zh-CN/spec/03-runtime/01-ipc-protocol)
+2. [Agent 运行时](/zh-CN/spec/03-runtime/02-agent-runtime)
+3. [工具与权限](/zh-CN/spec/03-runtime/03-tools-and-permissions)
+4. [Rust host core](/zh-CN/spec/03-runtime/05-host-core-rust)
+5. [Host RPC 协议](/zh-CN/spec/03-runtime/06-host-rpc-protocol)
+6. [Provider 与模型系统](/zh-CN/spec/03-runtime/11-provider-model-system)
 
 ## 关注边界
 

@@ -1,0 +1,231 @@
+# 12. 提供商配置架构
+
+> **翻译说明：** 本页是与 [英文源规格](/spec/03-runtime/12-provider-config-schema) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
+
+
+## 1. 存储位置
+
+由 Rust 主机 DB/settings 存储拥有。
+
+表（[04-data-storage](/zh-CN/spec/03-runtime/04-data-storage) §4.3–4.4、§4.11 中的规范 DDL）：
+
+- `providers`
+- `models`（单个目录表；`source: bundled | discovered | user` 替换旧的 `provider_models` / `model_catalog_cache` 拆分）
+- `secrets_meta`（无原始秘密值）
+- 最近模型的 MRU 位于 `kv(ns='cache')` 中，而不是表中
+
+## 2. 提供商记录 JSON 架构（逻辑）
+
+```json
+{
+  "$id": "pi-desktop.provider.v1",
+  "type": "object",
+  "required": ["id", "name", "vendorKey", "type", "protocol", "enabled", "authKind"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "vendorKey": { "type": "string", "minLength": 1 },
+    "type": { "enum": ["native", "openai_compatible", "custom"] },
+    "protocol": {
+      "enum": ["openai", "anthropic", "google", "openai_compatible", "bedrock", "custom_http"]
+    },
+    "enabled": { "type": "boolean" },
+    "baseUrl": { "type": "string" },
+    "authKind": {
+      "enum": [
+        "api_key",
+        "api_key_and_base_url",
+        "bearer",
+        "azure_api_key",
+        "aws_sdk_default",
+        "custom_headers",
+        "none"
+      ]
+    },
+    "secretRef": { "type": "string" },
+    "headers": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "apiStyle": { "enum": ["chat_completions", "responses", "auto"] },
+    "compatibility": {
+      "type": "object",
+      "properties": {
+        "supportsTools": { "type": "boolean" },
+        "supportsVision": { "type": "boolean" },
+        "supportsStreaming": { "type": "boolean" },
+        "supportsReasoning": { "type": "boolean" },
+        "supportedThinkingLevels": {
+          "type": "array",
+          "items": {
+            "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "defaultModelId": { "type": "string" },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" }
+  }
+}
+```
+
+`compatibility.supportsReasoning` 和
+`compatibility.supportedThinkingLevels` 对于存储的记录保持可读状态
+旧客户端兼容性，但 Electron main 在运行时忽略它们
+模型分辨率。公共提供商形状是从精确的 pi-ai 中丰富的
+代替模型记录。未知的自由形式模型暴露了 `supportsReasoning=false`
+和 `supportedThinkingLevels=["off"]`。原始秘密和内部兼容性
+JSON 保持隐藏状态。
+
+## 3. 内置供应商预设
+
+仅预设预填表单默认值；他们不是一个封闭的世界。
+
+| 供应商密钥 | 默认协议 | 授权类型 | 需要基本网址 |
+|---|---|---|---|
+| 开放性 | 开放性 | api_key | 不 |
+| 人择的 | 人择的 | api_key | 不 |
+| 谷歌 | 谷歌 | api_key | 不 |
+| 开放路由器 | openai_兼容 | api_key_and_base_url | 是的 |
+| 深度搜索 | openai_兼容 | api_key_and_base_url | 是的 |
+| 格罗克 | openai_兼容 | api_key_and_base_url | 是的 |
+| 在一起 | openai_兼容 | api_key_and_base_url | 是的 |
+| 烟花 | openai_兼容 | api_key_and_base_url | 是的 |
+| 米斯塔拉尔 | openai_兼容或本机 | api_key | 可选的 |
+| 赛 | openai_兼容 | api_key_and_base_url | 是的 |
+| azure_openai | openai_兼容 | azure_api_key | 是的 |
+| 基岩 | 基岩 | aws_sdk_默认 | 不 |
+| 奥拉马 | openai_兼容 | 无 | 是的 |
+| 工作室 | openai_兼容 | 无 | 是的 |
+| 定制 | openai_兼容 | api_key_and_base_url | 是的 |
+
+## 4. 模型目录缓存记录
+
+```ts
+type ModelCatalogCacheRecord = {
+  providerId?: string // empty for global bundled
+  modelId: string
+  displayName: string
+  vendorKey: string
+  capabilities: string[]
+  contextWindow?: number
+  source: "bundled" | "discovered" | "user"
+  updatedAt: string
+  raw?: unknown
+}
+```
+
+## 5. IPC / 主机方法（提供商域）
+
+- `providers.list`
+- `providers.get`
+- `providers.create`
+- `providers.update`
+- `providers.delete`
+- `providers.testConnection`
+- `providers.listModels`
+- `providers.cacheModels`（内部 Electron-main 到主机持久桥）
+- `providers.refreshModels`
+- `providers.upsertUserModel`
+- `providers.deleteUserModel`
+
+## 6. 安全限制
+
+1. list/get 提供商 API 从未返回原始机密
+2. 如果可以使用密钥存储，`headers` 不得存储 `Authorization: Bearer <secret>`
+3.导出设置默认排除机密
+
+## 7. 迁移
+
+- 通过 `PRAGMA user_version` 的架构版本（04-数据存储§7）
+- 提供商记录累加进化；每个提供商的扩展字段登陆 `config_json`
+- 未知的未来协议值不应使旧的应用程序版本崩溃（ignore/disable，带有警告）
+
+## 8. SQL（Rust 拥有的 SQLite）
+
+规范的 DDL 位于 [04-data-storage](/zh-CN/spec/03-runtime/04-data-storage) (D086) 中。提供商域表摘要：
+
+```sql
+-- providers: id/name/vendor_key/type/protocol/api_style/auth_kind/base_url/
+--            enabled/secret_ref/default_model_id + config_json (headers,
+--            compatibility, future knobs), INTEGER ms timestamps
+-- models:    PK(provider_id, model_id), display_name, source
+--            (bundled|discovered|user), capabilities_json, context_window,
+--            max_output_tokens, deprecated — refresh upserts never overwrite
+--            source='user' rows
+-- secrets_meta: secret_ref PK, owner_kind/owner_id, kind, backend
+```
+
+> 原始秘密材料**不**存储在这些表中。
+
+## 9. 宿主方法合约 (v1)
+
+### `providers.list`
+- 在：`{ includeDisabled?: boolean }`
+- 输出：`{ providers: ProviderPublic[] }`
+- `ProviderPublic` 排除原始秘密；包括 `hasSecret: boolean`
+
+### `providers.create` / `providers.update`
+- 在：提供商字段+可选的`secretValue`；旧客户端仍可能发送
+  `supportsReasoning` / `supportedThinkingLevels`
+- 行为：保留配置；如果存在secretValue，则写入密钥存储并设置
+  `secretRef`；传统思维领域可能仍保留在
+  `config_json.compatibility` 但不影响运行时分辨率
+- 输出：`ProviderPublic`
+
+### `providers.delete`
+- 在：`{ id, deleteSecret?: boolean }` 默认 `deleteSecret=true`
+- 输出：`{ ok: true }`
+
+### `providers.testConnection`
+- 在：`{ id, modelId?: string }`
+- 输出：`{ ok: boolean, latencyMs?: number, error?: AppError, sampleModelId?: string }`
+
+### `providers.listModels`
+- 渲染器 IPC 位于：`{ providerId, source?: "cache"|"refresh" }`； `cache`
+  返回没有提供商网络访问权限的持久目录，而 `refresh`
+  在 Electron main 中运行发现
+- 将 RPC 托管在：`{ providerId?: string }` 中；只读取 Rust 拥有的 `models`
+  表
+- 输出：`{ models: ModelCatalogItem[] }`；每个模型都带有 pi-resolved
+  `reasoning` 功能和 `supportedThinkingLevels`。缓存的功能标签
+  旧提供程序字段无法覆盖 pi 模型记录。
+
+### `providers.cacheModels`（内部主机 RPC）
+- 在：`{ providerId, models: DiscoveredModelInput[] }`
+- 行为：以事务方式将成功的实时发现更新到 `models` 中
+`source='discovered'`；永远不会覆盖 `source='user'` 行并且永远不会删除
+  失败或部分刷新时先前的缓存行
+- 输出：`{ cached: number, models: ModelCatalogItem[] }`
+- 原始机密和授权标头绝不是此调用的一部分
+
+### `providers.refreshModels`
+- 在：`{ id }`
+- 输出：`{ added: number, updated: number, removed: number, models: ModelCatalogItem[] }`
+
+### `providers.upsertUserModel` / `providers.deleteUserModel`
+- 管理自由格式/覆盖模型条目
+
+## 10. 验证规则
+
+1. `name` 在提供商中是唯一的（不区分大小写）
+2. `openai_compatible` / 本地网关需要绝对 `baseUrl`，除非预设表示可选
+3. `authKind=none` 禁止用于需要密钥的云预设
+4. headers key 不区分大小写，唯一
+5. 强制实施 SecretValue 最大长度（例如 8KB）
+6. modelId 必须是非空的修剪字符串；允许 `/`、`.`、`:`、`-`
+7.旧客户端上的未知协议 => 提供程序显示为禁用并带有警告，而不是崩溃
+8. 旧版 `supportsReasoning`（如果存在）仍必须验证为布尔值，但
+   没有运行时效果
+9. 旧版 `supportedThinkingLevels`（如果存在）仍必须验证为
+   一系列规范思维水平，但没有运行时效果
+
+## 11. 秘密引用格式
+
+```text
+secret:provider:<providerId>:api_key
+```
+
+未来的多重秘密提供商可能会添加后缀（`:client_secret` 等）。

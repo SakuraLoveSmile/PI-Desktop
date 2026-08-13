@@ -4607,27 +4607,32 @@ This test plan spec is accepted when:
 - **Status**: Unit/source-contract covered; native cross-platform tray journey
   Draft (do not run local E2E unless explicitly requested)
 
-#### E2E-125: Bilingual VitePress documentation entry points remain usable
+#### E2E-125: Complete bilingual VitePress documentation remains usable
 
 - **Preconditions**: Docs dependencies are installed and the VitePress preview
   server is running from the repository.
-- **Steps**: 1) Open `/` at desktop width and verify the English landing page,
+- **Steps**: 1) Open `/` at 1440×900 and verify the English landing page,
   system map, read-by-intent journeys, reference shelf, global search,
   Guide/Specs/ADRs navigation, and language selector. 2) Switch to `/zh-CN/`
-  and verify the translated hero, mirrored topic map, localized landing pages,
-  and links to the same technical source pages. 3) Search for `Rust host core`
-  and open the matching spec. 4) Repeat at approximately 390px wide in light
-  and dark mode.
-- **Expected**: Both locale entry points render without broken links or
-  horizontal overflow. Search returns local results. The mobile navigation can
-  be opened and closed without shifting or obscuring the page. Code blocks and
-  tables remain readable, theme contrast stays clear, and the Chinese entry
-  explicitly identifies the English technical pages as the source of truth.
-  Directly refresh `/zh-CN/spec/`, `/zh-CN/adr/`, `/spec/README`, and
+  and verify the translated hero, mirrored topic map, and Chinese specification
+  links. 3) Open `/spec/03-runtime/01-ipc-protocol`, switch languages, and
+  verify that `/zh-CN/spec/03-runtime/01-ipc-protocol` contains translated prose,
+  preserved code identifiers, and a link back to the English source. 4) Search
+  in each locale and open a matching result. 5) Repeat the homepage and a long
+  table-heavy specification at 390×844 in light and dark mode.
+- **Expected**: Both locale entry points and every English/Chinese specification
+  pair render without broken links or page-level horizontal overflow. Landing
+  and reading columns are visually centered within their available layout; the
+  mobile hero presents text before the system visual. Search returns local
+  results. The mobile navigation opens and closes without shifting or obscuring
+  the page. Code blocks and tables remain readable through contained scrolling,
+  theme contrast stays clear, and every Chinese spec identifies the English
+  page as its canonical source. Directly refresh `/zh-CN/spec/README`,
+  `/zh-CN/spec/03-runtime/01-ipc-protocol`, `/zh-CN/adr/`, `/spec/README`, and
   `/adr/README` on Vercel; each route resolves through the documented
   `cleanUrls` configuration instead of returning 404.
 - **Specs linked**: `02-architecture/04-documentation-site.md`, ADR 0079
 - **Acceptance**: Quality, documentation discoverability, responsive layout
 - **Milestone**: M6+
-- **Status**: Draft (browser-rendered verification; do not run local E2E unless
-  explicitly requested)
+- **Status**: Browser-rendered desktop/mobile verification is authorized for
+  this documentation redesign; remote deployment refresh checks remain Draft.

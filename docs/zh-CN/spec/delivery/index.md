@@ -9,12 +9,12 @@ description: PI-Desktop 的里程碑、验收、E2E、变更和发布流程。
 
 ## 阅读顺序
 
-1. [MVP 里程碑](/spec/06-delivery/01-mvp-milestones)
-2. [验收标准](/spec/06-delivery/02-acceptance-criteria)
-3. [AI 开发工作流](/spec/06-delivery/03-ai-development-workflow)
-4. [E2E 测试计划](/spec/06-delivery/04-e2e-test-plan)
-5. [变更清单](/spec/06-delivery/05-change-checklist)
-6. [发布手册](/spec/06-delivery/06-release-runbook)
+1. [MVP 里程碑](/zh-CN/spec/06-delivery/01-mvp-milestones)
+2. [验收标准](/zh-CN/spec/06-delivery/02-acceptance-criteria)
+3. [AI 开发工作流](/zh-CN/spec/06-delivery/03-ai-development-workflow)
+4. [E2E 测试计划](/zh-CN/spec/06-delivery/04-e2e-test-plan)
+5. [变更清单](/zh-CN/spec/06-delivery/05-change-checklist)
+6. [发布手册](/zh-CN/spec/06-delivery/06-release-runbook)
 
 ## 交付闭环
 

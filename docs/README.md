@@ -10,6 +10,7 @@ the repository's English technical source of truth remains organized under
 pnpm docs:dev
 pnpm docs:build
 pnpm docs:preview
+pnpm docs:check
 ```
 
 ## Entry points
@@ -20,8 +21,10 @@ pnpm docs:preview
 - [Specification index](spec/README.md)
 - [ADR index](adr/README.md)
 - [Plugin development](plugin-development.md)
+- [Visual verification](project/2026-08-13-docs-redesign-verification.md)
 
-The Chinese entry point mirrors the English reading paths, translates the
-orientation and eight topic landing pages, and links to the same English
-technical contracts. This keeps the repository's English-first source policy
-without leaving the Chinese site as a partial or disconnected navigation tree.
+The Chinese entry point mirrors the English reading paths and includes a
+path-for-path companion for every specification. Each translated page links to
+the canonical English source and preserves code, protocol fields, and
+identifiers. The generated sidebar keeps both locale trees complete as the
+specification set grows.

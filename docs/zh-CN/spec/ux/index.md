@@ -9,11 +9,11 @@ description: PI-Desktop 的信息架构、国际化、设计系统和交互模�
 
 ## 阅读顺序
 
-1. [信息架构](/spec/04-ux/01-ui-ia)
-2. [国际化策略](/spec/04-ux/02-i18n-english-first)
-3. [UI 设计系统](/spec/04-ux/07-ui-design-system)
-4. [组件规格](/spec/04-ux/08-component-spec)
-5. [交互模式](/spec/04-ux/09-interaction-patterns)
+1. [信息架构](/zh-CN/spec/04-ux/01-ui-ia)
+2. [国际化策略](/zh-CN/spec/04-ux/02-i18n-english-first)
+3. [UI 设计系统](/zh-CN/spec/04-ux/07-ui-design-system)
+4. [组件规格](/zh-CN/spec/04-ux/08-component-spec)
+5. [交互模式](/zh-CN/spec/04-ux/09-interaction-patterns)
 
 ## 体验原则
 

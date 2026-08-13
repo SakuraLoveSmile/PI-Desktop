@@ -9,10 +9,10 @@ description: PI-Desktop 的权限、路径、插件和进程隔离边界。
 
 ## 关键入口
 
-- [安全模型](/spec/05-security/01-security)
-- [工具与权限](/spec/03-runtime/03-tools-and-permissions)
-- [插件安全](/spec/07-plugins/04-plugin-security)
-- [Host RPC 与资源隔离](/spec/03-runtime/06-host-rpc-protocol)
+- [安全模型](/zh-CN/spec/05-security/01-security)
+- [工具与权限](/zh-CN/spec/03-runtime/03-tools-and-permissions)
+- [插件安全](/zh-CN/spec/07-plugins/04-plugin-security)
+- [Host RPC 与资源隔离](/zh-CN/spec/03-runtime/06-host-rpc-protocol)
 
 ## 维护规则
 

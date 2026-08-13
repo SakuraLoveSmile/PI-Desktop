@@ -38,10 +38,10 @@ The pi sidecar owns the agent loop and provider-facing model work.
 ## Working with the docs
 
 The documentation is English-first at the source-of-truth level. The [中文入口](/zh-CN/)
-provides the same information architecture with translated orientation pages and
-topic landing pages. Technical contracts, protocol names, and decision records
-remain linked to their English source pages so the two locales cannot silently
-drift. Use the global search when you know a term, protocol method, or decision
+provides the same information architecture and a complete translated companion
+for every specification. Each Chinese page links back to its English source;
+technical identifiers remain unchanged so search and cross-reference paths stay
+stable. Use global search when you know a term, protocol method, or decision
 number; use the sidebar when you are exploring a domain.
 
 ## Before you change a boundary

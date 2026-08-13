@@ -9,13 +9,13 @@ description: PI-Desktop 的插件包、API、权限、生命周期和开发体�
 
 ## 阅读顺序
 
-1. [插件系统](/spec/07-plugins/01-plugin-system)
-2. [插件开发](/plugin-development)
-3. [Manifest schema](/spec/07-plugins/02-plugin-manifest-schema)
-4. [插件 API](/spec/07-plugins/03-plugin-api)
-5. [插件安全](/spec/07-plugins/04-plugin-security)
-6. [插件生命周期](/spec/07-plugins/05-plugin-lifecycle)
-7. [开发体验](/spec/07-plugins/10-plugin-devex)
+1. [插件系统](/zh-CN/spec/07-plugins/01-plugin-system)
+2. [插件开发](/zh-CN/plugin-development)
+3. [Manifest schema](/zh-CN/spec/07-plugins/02-plugin-manifest-schema)
+4. [插件 API](/zh-CN/spec/07-plugins/03-plugin-api)
+5. [插件安全](/zh-CN/spec/07-plugins/04-plugin-security)
+6. [插件生命周期](/zh-CN/spec/07-plugins/05-plugin-lifecycle)
+7. [开发体验](/zh-CN/spec/07-plugins/10-plugin-devex)
 
 ## 当前边界
 

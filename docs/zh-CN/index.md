@@ -12,7 +12,7 @@ hero:
       link: /zh-CN/guide/
     - theme: alt
       text: 打开规格地图
-      link: /zh-CN/spec/
+      link: /zh-CN/spec/README
 features:
   - title: 先找到边界
     details: 从产品意图出发，依次进入架构、运行时、体验、安全、交付和插件主题。
