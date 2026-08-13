@@ -1012,8 +1012,10 @@ Each scenario is documented in this format:
 
 - **Preconditions**: App running with at least one installed extension and one
   available marketplace action; dark and light themes available.
-- **Steps**: 1) Open Extensions in dark theme. 2) Confirm the header and
-  Installed / MCP / Skills / Subagents / Marketplace tabs reach the content
+- **Steps**: 1) Open Extensions in dark theme. 2) On Windows/Linux, confirm
+  the compact two-tier header presents the extension mark/title and contextual
+  action rail below the native window-control band, then confirm the Installed /
+  MCP / Skills / Subagents / Marketplace tabs reach the content
   without a four-card numeric overview band or explanatory header/section
   paragraphs. 3) Confirm installed rows begin
   as a quiet two-line summary, then expand Details on one row and inspect its

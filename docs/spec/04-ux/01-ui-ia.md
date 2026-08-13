@@ -191,10 +191,15 @@ The user must explicitly switch it to Agent before enabling unattended
 execution.
 
 ### 3.5 Extensions
-The Extensions destination uses a compact header and a five-part segmented
-control — Installed / MCP / Skills / Subagents / Marketplace — with relevant tab
-counts; it does not render a separate numeric overview band (D202 amends D196,
-which amends D169).
+The Extensions destination uses a compact, two-tier tool header: a small
+extension mark and page title share the first row with the contextual primary
+action and overflow menu; the five-part segmented control — Installed / MCP /
+Skills / Subagents / Marketplace — with relevant tab counts; it does not render
+a separate numeric overview band (D202 amends D196, which amends D169).
+The title row and segmented row use hairline separators and restrained control
+heights so the Windows frameless titlebar remains visually separate from the
+page controls; the top-right action rail must remain below the native window
+control band and retain its no-drag hit area.
 Installed groups rows by state — Needs attention / Updates available / Active /
 Turned off — inside one hairline-separated panel. Each row stays to a two-line
 summary: plugin glyph, name, optional Local marker, id, and version. The group

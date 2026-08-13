@@ -816,21 +816,27 @@ export function PluginsPage() {
   return (
     <div className="thread-scroll">
       <div className="page-frame plugins-page">
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">{t("plugins.title")}</h1>
+        <div className="page-header plugins-page-header">
+          <div className="plugins-title-block">
+            <span className="plugins-title-icon" aria-hidden>
+              <IconPlug size={14} />
+            </span>
+            <div className="plugins-title-copy">
+              <h1 className="page-title">{t("plugins.title")}</h1>
+            </div>
           </div>
           <div className="plugins-header-actions">
             {tab === "market" ? (
               <Button
                 variant="primary"
+                size="sm"
                 onClick={() => void refreshMarket(query, { refreshRemote: true })}
               >
                 <IconCloudDown size={14} />
                 {t("plugins.refreshMarket")}
               </Button>
             ) : tab === "installed" ? (
-              <Button variant="primary" onClick={() => setTab("market")}>
+              <Button variant="primary" size="sm" onClick={() => setTab("market")}>
                 <IconDownload size={14} />
                 {t("plugins.browseMarket")}
               </Button>
