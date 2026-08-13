@@ -50,6 +50,12 @@ The per-session mutation permit is acquired before the global mutation slot;
 queued `Write`/`Edit` calls therefore do not hold global capacity while waiting
 for an earlier mutation in the same session.
 
+Electron's `HostProcess` treats an explicit `HOST_OVERLOADED` response as
+retryable backpressure for renderer-facing calls. It waits 50, 100, 200, and
+400 ms between at most four retries, then returns the structured error to the
+caller. This retry applies only to an admission rejection; transport failure,
+timeout, and errors from an admitted request are never replayed.
+
 ### Request
 
 ```json

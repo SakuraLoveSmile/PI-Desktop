@@ -7,6 +7,7 @@ import { ErrorCodes, PROTOCOL_VERSION, rpcTimeoutMs } from "@pi-desktop/shared";
 
 const HOST_DISPOSE_GRACE_MS = 3_000;
 const HOST_FORCE_KILL_GRACE_MS = 1_000;
+const HOST_OVERLOAD_RETRY_DELAYS_MS = [50, 100, 200, 400] as const;
 
 export type HostNotificationHandler = (method: string, params: unknown) => void;
 export type ProcessExitHandler = (info: {
@@ -15,6 +16,17 @@ export type ProcessExitHandler = (info: {
   intentional: boolean;
 }) => void;
 export type StderrHandler = (text: string) => void;
+
+function isHostOverloaded(error: unknown): boolean {
+  const candidate = error as {
+    errorCode?: unknown;
+    data?: { errorCode?: unknown };
+  } | null;
+  return (
+    candidate?.errorCode === ErrorCodes.HOST_OVERLOADED ||
+    candidate?.data?.errorCode === ErrorCodes.HOST_OVERLOADED
+  );
+}
 
 function resolveHostBinary(): string {
   if (process.env.PI_DESKTOP_HOST_BIN && existsSync(process.env.PI_DESKTOP_HOST_BIN)) {
@@ -192,9 +204,15 @@ export class HostProcess {
           const err = new Error(msg.error.message) as Error & {
             code?: number;
             data?: unknown;
+            errorCode?: string;
           };
           err.code = msg.error.code;
           err.data = msg.error.data;
+          const errorCode =
+            msg.error.data && typeof msg.error.data.errorCode === "string"
+              ? msg.error.data.errorCode
+              : undefined;
+          if (errorCode) err.errorCode = errorCode;
           pending.reject(err);
         } else {
           pending.resolve(msg.result);
@@ -216,6 +234,29 @@ export class HostProcess {
   async call<T = unknown>(
     method: string,
     params: unknown = {},
+    timeoutOverrideMs?: number,
+  ): Promise<T> {
+    for (const delayMs of [0, ...HOST_OVERLOAD_RETRY_DELAYS_MS]) {
+      if (delayMs > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      }
+      try {
+        return await this.callOnce<T>(method, params, timeoutOverrideMs);
+      } catch (error) {
+        if (
+          !isHostOverloaded(error) ||
+          delayMs === HOST_OVERLOAD_RETRY_DELAYS_MS.at(-1)
+        ) {
+          throw error;
+        }
+      }
+    }
+    throw new Error(`host RPC retry exhausted: ${method}`);
+  }
+
+  private async callOnce<T = unknown>(
+    method: string,
+    params: unknown,
     timeoutOverrideMs?: number,
   ): Promise<T> {
     if (this.closed) throw this.unavailableError("host-core is unavailable");

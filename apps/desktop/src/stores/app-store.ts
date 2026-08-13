@@ -600,6 +600,7 @@ const TOOL_NAME_CACHE_LIMIT = 512;
 const providerModelLoads = new Map<string, Promise<void>>();
 const refreshedProviderModels = new Set<string>();
 let providerModelsGeneration = 0;
+let pluginRefreshInFlight: Promise<void> | null = null;
 
 function decorateSessions(
   sessions: SessionSummary[],
@@ -2389,8 +2390,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   refreshPlugins: async () => {
-    const plugins = await api.listPlugins();
-    set({ plugins: plugins.plugins });
+    // Plugin crash/restart events can arrive in a burst. Share one host request
+    // across the app shell and the Extensions page so a transient event storm
+    // cannot consume every host RPC slot with identical list reads.
+    if (pluginRefreshInFlight) return pluginRefreshInFlight;
+    const load = (async () => {
+      const plugins = await api.listPlugins();
+      set({ plugins: plugins.plugins });
+    })();
+    pluginRefreshInFlight = load;
+    try {
+      await load;
+    } finally {
+      if (pluginRefreshInFlight === load) pluginRefreshInFlight = null;
+    }
   },
 
   refreshPluginThemes: async () => {

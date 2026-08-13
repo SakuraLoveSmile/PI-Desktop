@@ -70,6 +70,10 @@ test("plugins page refreshes installed update metadata when it opens", () => {
     mainSrc,
     /IPC\.invoke\.marketCheckUpdates[\s\S]*refreshRemote: payload\?\.refreshRemote \?\? true/,
   );
+  assert.match(
+    readFileSync(join(desktopRoot, "src/stores/app-store.ts"), "utf8"),
+    /pluginRefreshInFlight[\s\S]*if \(pluginRefreshInFlight\) return pluginRefreshInFlight/,
+  );
 });
 
 test("shared protocol declares marketplace and package install IPC", () => {

@@ -54,17 +54,31 @@ export function SkillsSection({
   const [rowMenu, setRowMenu] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const rowMenuRef = useRef<HTMLDivElement | null>(null);
+  const loadInFlightRef = useRef<Promise<void> | null>(null);
 
-  const load = async () => {
-    try {
-      const res = await api.listUserSkills();
-      setSkills(res.skills ?? []);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+  const load = () => {
+    if (loadInFlightRef.current) return loadInFlightRef.current;
+    const request = (async () => {
+      try {
+        const res = await api.listUserSkills();
+        setSkills(res.skills ?? []);
+        setError(null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+    loadInFlightRef.current = request;
+    void request.then(
+      () => {
+        if (loadInFlightRef.current === request) loadInFlightRef.current = null;
+      },
+      () => {
+        if (loadInFlightRef.current === request) loadInFlightRef.current = null;
+      },
+    );
+    return request;
   };
 
   useEffect(() => {

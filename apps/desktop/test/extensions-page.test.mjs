@@ -167,6 +167,14 @@ test("both new sections receive the project list and the open project", () => {
   assert.match(pageSrc, /api\s*\.\s*listProjects\(\)/);
 });
 
+test("extension registry refreshes coalesce during plugin change bursts", () => {
+  for (const name of ["McpSection.tsx", "SkillsSection.tsx", "SubagentsSection.tsx"]) {
+    const source = components.get(name);
+    assert.match(source, /loadInFlightRef/);
+    assert.match(source, /if \(loadInFlightRef\.current\) return loadInFlightRef\.current/);
+  }
+});
+
 test("plugins, MCP servers, skills and subagents all use the one scope control", () => {
   const users = [
     "PluginsPage.tsx",

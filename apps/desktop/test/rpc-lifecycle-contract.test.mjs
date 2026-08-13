@@ -53,6 +53,14 @@ test("host transport closes pending calls and listeners on process death", () =>
   assert.match(hostSource, /private notifyExit\(/);
 });
 
+test("host transport retries transient RPC overload with a bounded backoff", () => {
+  assert.match(hostSource, /HOST_OVERLOAD_RETRY_DELAYS_MS = \[50, 100, 200, 400\]/);
+  assert.match(hostSource, /typeof msg\.error\.data\.errorCode === "string"/);
+  assert.match(hostSource, /function isHostOverloaded\(/);
+  assert.match(hostSource, /private async callOnce<.*>\(/);
+  assert.match(hostSource, /!isHostOverloaded\(error\)/);
+});
+
 test("host disposal closes stdin, observes exit, and force-kills only after grace", () => {
   const disposeSource = hostSource.slice(hostSource.indexOf("async dispose()"));
   const closeTransportSource = hostSource.slice(
