@@ -146,6 +146,37 @@ Requirements:
 
 Development must not begin before steps 1–3 are complete.
 
+## Marketplace and Update Diagnosis Gate
+
+When a request concerns plugin versions, marketplace updates, or an installed
+plugin showing an unexpected latest version, follow this evidence-first prompt
+flow before changing application code:
+
+1. Record the exact plugin ID, installed version, displayed latest version,
+   expected release version, catalog URL, and the time of observation.
+2. Fetch and parse the live catalog from the configured URL. Inspect the exact
+   plugin entry and its version records; do not infer the source state from the
+   renderer or from a cached response.
+3. Inspect the cached catalog and installed registry separately. Classify the
+   failure as one of: publisher/catalog data, remote fetch/cache fallback,
+   host version comparison, IPC state propagation, or renderer presentation.
+4. Run the catalog preflight before proposing an application fix:
+   `node scripts/check-marketplace-catalog.mjs --url <catalog-url> --plugin <id>`.
+   Missing checksum, package URL, package size, or permissions is a release
+   data failure. Report it as such and do not make incomplete releases
+   installable merely to hide the bad catalog.
+5. Reproduce the exact case with a deterministic fixture, including unsorted
+   versions and an incomplete version record, then add the narrowest regression
+   test for the diagnosed layer.
+6. Only after the source/cache/host/renderer boundary is identified may the
+   implementation be changed. The final report must name the evidence,
+   failure classification, and the validation that distinguishes the fix from
+   a marketplace-data correction.
+
+This gate is mandatory even when the symptom appears to be a simple stale UI
+label. A newly published version with invalid catalog metadata must not be
+treated as proof of a client regression.
+
 ## Commit Format
 
 ```text

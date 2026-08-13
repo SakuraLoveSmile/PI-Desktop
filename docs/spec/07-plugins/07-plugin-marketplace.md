@@ -112,6 +112,22 @@ version. Invalid version strings are lower priority than valid semantic
 versions. A version without `shasum` or `url` remains visible for discovery
 but is not installable until the publisher completes its package metadata.
 
+### Catalog release gate
+
+Before publishing or diagnosing a release, run the repository preflight:
+
+```bash
+pnpm check:marketplace -- \
+  --url https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/catalog.json \
+  --plugin <plugin-id>
+```
+
+The preflight is intentionally stricter than discovery. Every published
+version must have a valid semantic version, a unique version within its
+plugin, a 64-character SHA-256 checksum, a package URL, a positive package
+size, and a permissions array. A catalog that fails this gate must be fixed in
+the marketplace publisher before client update behavior is changed.
+
 ### MarketDownloadInfo
 ```ts
 type MarketDownloadInfo = {
