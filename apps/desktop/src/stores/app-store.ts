@@ -1367,10 +1367,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         sessions: state.sessions.map((session) =>
           session.id === sessionId ? { ...session, ...config } : session,
         ),
-        planningStates: {
-          ...state.planningStates,
-          [sessionId]: config.mode === "plan" ? "planning" : "inactive",
-        },
       }));
       return;
     }
