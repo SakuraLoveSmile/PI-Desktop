@@ -23,6 +23,16 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.5.9",
+    date: "2026-08-13",
+    highlights: [
+      "Make Goal mode use automatic permission handling for a more consistent workflow.",
+      "Prewarm the global plugin launcher so it opens faster, including while another app is focused.",
+      "Give plugin panels native window chrome with reliable minimize, maximize, and close controls.",
+      "Refresh the bilingual documentation site with complete English and Simplified Chinese guides and specifications.",
+    ],
+  },
+  {
     version: "0.5.8",
     date: "2026-08-12",
     highlights: [
@@ -259,6 +269,16 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.5.9",
+    date: "2026-08-13",
+    highlights: [
+      "让 Goal 模式统一使用自动权限处理，工作流更加稳定一致。",
+      "预热全局插件启动器以缩短打开时间，即使当前焦点在其他应用也能快速唤起。",
+      "为插件面板提供原生窗口控制栏，稳定支持最小化、最大化和关闭操作。",
+      "重构双语文档站，补齐英文与简体中文的指南和技术规范。",
+    ],
+  },
   {
     version: "0.5.8",
     date: "2026-08-12",
