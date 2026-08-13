@@ -142,6 +142,7 @@ export default defineConfig({
         sidebar: zhSidebar,
         outline: { level: 'deep', label: '本页目录' },
         docFooter: { prev: '上一页', next: '下一页' },
+        footer: { message: '为本地优先开发而构建。', copyright: 'Copyright © 2026 PI-Desktop 贡献者' },
       },
     },
   },

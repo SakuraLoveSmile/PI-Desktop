@@ -4606,6 +4606,9 @@ This test plan spec is accepted when:
   be opened and closed without shifting or obscuring the page. Code blocks and
   tables remain readable, theme contrast stays clear, and the Chinese entry
   explicitly identifies the English technical pages as the source of truth.
+  Directly refresh `/zh-CN/spec/`, `/zh-CN/adr/`, `/spec/README`, and
+  `/adr/README` on Vercel; each route resolves through the documented
+  `cleanUrls` configuration instead of returning 404.
 - **Specs linked**: `02-architecture/04-documentation-site.md`, ADR 0079
 - **Acceptance**: Quality, documentation discoverability, responsive layout
 - **Milestone**: M6+
