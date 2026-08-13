@@ -4544,6 +4544,16 @@ This test plan spec is accepted when:
 - **Milestone**: M5
 - **Status**: Partially automated (radius token and shared-control source test)
 
+### US-UI-73 Composer mode selector has stable width
+- Open the empty home and a docked thread in both English and zh-CN.
+- Switch the Composer mode chip through Agent/Plan/Goal several times.
+- Expect the mode chip to keep one fixed width sized for the longest built-in
+  label (English "Agent" / zh-CN "智能体"); the adjacent Thinking and
+  permission controls, send button, and composer shell do not move or resize.
+- **Specs linked**: `04-ux/08-component-spec.md` §11.3
+- **Milestone**: M5
+- **Status**: Partially automated (renderer style/source contract)
+
 #### E2E-123: asktool collects multiple answers and returns skipped placeholders
 
 - **Preconditions**: Agent, Plan, or Goal mode; a configured provider; a

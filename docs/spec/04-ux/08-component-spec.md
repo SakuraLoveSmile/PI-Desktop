@@ -1517,6 +1517,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Padding: px-4 py-3 inner textarea
 - Font: text-sm for Agent, Plan, and Goal; mode changes semantics and tool
   controls, not the typography
+- The Agent/Plan/Goal mode chip reserves one fixed 88px width, sized from the
+  longest built-in label in English and zh-CN ("Agent" / "智能体"). Its label
+  stays single-line and ellipsizes if a future locale exceeds that budget, so
+  switching modes never reflows the adjacent Composer controls.
 - Bottom-anchored: fixed at bottom of MainChat area
 
 ### 11.4 States

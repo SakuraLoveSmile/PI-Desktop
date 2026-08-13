@@ -234,6 +234,23 @@
   overflow: visible;
 }
 
+/* Keep the Agent/Plan/Goal control stable while its localized label changes. */
+.composer-mode-chip {
+  width: 88px;
+  min-width: 88px;
+  max-width: 88px;
+  flex: 0 0 88px;
+  justify-content: flex-start;
+}
+
+.composer-mode-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .mode-chip > span,
 .model-chip > span,
 .model-chip-label {

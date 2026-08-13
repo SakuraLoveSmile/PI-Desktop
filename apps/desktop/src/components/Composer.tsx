@@ -745,7 +745,7 @@ export function Composer({
           <div className="composer-toolbar">
             <div className="composer-left">
               <button
-                className="icon-btn mode-chip"
+                className="icon-btn mode-chip composer-mode-chip"
                 title={t("settings.mode")}
                 disabled={controlsBlocked}
                 onClick={async () => {

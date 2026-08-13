@@ -70,7 +70,9 @@ test("Composer owns the mode chip and the top bar keeps only model selection", (
     composerSource.indexOf('<div className="composer-left">'),
     composerSource.indexOf('<div className="composer-right">'),
   );
-  const modeControl = leftToolbar.indexOf('className="icon-btn mode-chip"');
+  const modeControl = leftToolbar.indexOf(
+    'className="icon-btn mode-chip composer-mode-chip"',
+  );
   const thinkingControl = leftToolbar.indexOf('className="composer-thinking"');
   const permissionControl = leftToolbar.indexOf('className="composer-permission"');
 

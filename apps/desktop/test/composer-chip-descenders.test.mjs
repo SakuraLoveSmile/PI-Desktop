@@ -7,6 +7,10 @@ const modelSelectSource = await readFile(
   new URL("../src/components/ModelSelect.tsx", import.meta.url),
   "utf8",
 );
+const composerSource = await readFile(
+  new URL("../src/components/Composer.tsx", import.meta.url),
+  "utf8",
+);
 const styles = await loadStyles();
 
 function ruleBlock(source, selector) {
@@ -47,4 +51,18 @@ test("composer runtime chips keep compact line-height for descenders", () => {
     styles,
     /\.mode-chip > span,\s*\.model-chip > span,\s*\.model-chip-label\s*\{[\s\S]*?line-height:\s*var\(--leading-compact\);/,
   );
+});
+
+test("mode selector reserves the longest localized label width", () => {
+  assert.match(
+    composerSource,
+    /className="icon-btn mode-chip composer-mode-chip"/,
+  );
+
+  const block = styles.match(/\.composer-mode-chip\s*\{[^}]+\}/)?.[0] ?? "";
+  assert.match(block, /width:\s*88px;/);
+  assert.match(block, /min-width:\s*88px;/);
+  assert.match(block, /max-width:\s*88px;/);
+  assert.match(block, /flex:\s*0 0 88px;/);
+  assert.match(styles, /\.composer-mode-chip > span\s*\{[\s\S]*?text-overflow:\s*ellipsis;/);
 });
