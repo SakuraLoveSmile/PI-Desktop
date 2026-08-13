@@ -23,6 +23,15 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.5.10",
+    date: "2026-08-13",
+    highlights: [
+      "Refine plugin panel window chrome and safe areas so plugin content stays clear of native controls.",
+      "Polish the Plugins page hierarchy and reduce overview copy for a clearer extension workflow.",
+      "Use the correct macOS tray template icon for a sharper menu bar appearance.",
+    ],
+  },
+  {
     version: "0.5.9",
     date: "2026-08-13",
     highlights: [
@@ -269,6 +278,15 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.5.10",
+    date: "2026-08-13",
+    highlights: [
+      "优化插件面板窗口控制栏和安全区，避免插件内容被原生控件遮挡。",
+      "优化插件页的信息层级并精简概览文案，让扩展工作流更加清晰。",
+      "使用正确的 macOS 托盘模板图标，让菜单栏显示更加清晰。",
+    ],
+  },
   {
     version: "0.5.9",
     date: "2026-08-13",
