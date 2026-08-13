@@ -6,6 +6,8 @@ node_modules/
 dist/
 out/
 build/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
 !apps/desktop/build/
 apps/desktop/build/icon.iconset/
 target/

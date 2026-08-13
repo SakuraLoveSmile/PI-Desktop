@@ -686,7 +686,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Supported local agent stores contain importable sessions across at least two project paths and two sources, including one session without a project path; the app can be launched once with an English system locale and once with a Simplified Chinese system locale.
 - **Steps**: 1) Launch in English and open Settings → Import. 2) Scan for sessions. 3) Inspect the initial source groups. 4) Expand one group and select a session. 5) Change Group by to Project path. 6) Switch back to Source. 7) Repeat the flow after launching with a Simplified Chinese system locale.
-- **Expected**: Source/来源 is the initial grouping; all groups are collapsed after the scan and after either grouping change; project-path mode shows exact project paths and a final No project/未关联项目 group; expanding one group leaves the others collapsed; the selected session remains selected across grouping changes; counts, dates, selection labels, accessible names, and the import result use the active locale without raw keys or unresolved `{{...}}` placeholders.
+- **Expected**: Source/来源 is the initial grouping; all groups are collapsed after the scan and after either grouping change; project-path mode shows exact project paths and a final No project/未关联项目 group; expanding one group leaves the others collapsed; the selected session remains selected across grouping changes; counts, dates, selection labels, accessible names, and the import result use the active locale without raw keys or unresolved double-brace placeholders.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/02-i18n-english-first.md`, `04-ux/08-component-spec.md`
 - **Acceptance**: F (session import review)
 - **Milestone**: M2
@@ -4590,3 +4590,24 @@ This test plan spec is accepted when:
 - **Milestone**: M6+
 - **Status**: Unit/source-contract covered; native cross-platform tray journey
   Draft (do not run local E2E unless explicitly requested)
+
+#### E2E-125: Bilingual VitePress documentation entry points remain usable
+
+- **Preconditions**: Docs dependencies are installed and the VitePress preview
+  server is running from the repository.
+- **Steps**: 1) Open `/` at desktop width and verify the English landing page,
+  global search, Guide/Specs/ADRs navigation, and language selector. 2) Switch
+  to `/zh-CN/` and verify translated hero copy, Chinese navigation, and links
+  to the curated guide/spec/ADR entries. 3) Search for `Rust host core` and
+  open the matching spec. 4) Repeat at approximately 390px wide in light and
+  dark mode.
+- **Expected**: Both locale entry points render without broken links or
+  horizontal overflow. Search returns local results. The mobile navigation can
+  be opened and closed without shifting or obscuring the page. Code blocks and
+  tables remain readable, theme contrast stays clear, and the Chinese entry
+  explicitly identifies the English technical pages as the source of truth.
+- **Specs linked**: `02-architecture/04-documentation-site.md`, ADR 0079
+- **Acceptance**: Quality, documentation discoverability, responsive layout
+- **Milestone**: M6+
+- **Status**: Draft (browser-rendered verification; do not run local E2E unless
+  explicitly requested)

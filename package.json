@@ -26,6 +26,9 @@
     "test:e2e:boot": "node scripts/e2e-electron-boot.mjs",
     "test:e2e:supervision": "node scripts/e2e-supervision.mjs",
     "test:e2e:subagents": "node scripts/e2e-subagents.mjs",
+    "docs:dev": "pnpm --filter @pi-desktop/docs dev",
+    "docs:build": "pnpm --filter @pi-desktop/docs build",
+    "docs:preview": "pnpm --filter @pi-desktop/docs preview",
     "lint": "pnpm -r --if-present lint",
     "host:dev": "cargo run -p host-core",
     "clean": "pnpm -r --if-present clean && cargo clean"

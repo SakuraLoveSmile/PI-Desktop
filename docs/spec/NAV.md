@@ -11,6 +11,7 @@
 ## 2. Architecture
 - [01-architecture.md](02-architecture/01-architecture.md)
 - [02-tech-stack.md](02-architecture/02-tech-stack.md)
+- [04-documentation-site.md](02-architecture/04-documentation-site.md)
 - [03-repo-structure.md](02-architecture/03-repo-structure.md)
 
 ## 3. Runtime
