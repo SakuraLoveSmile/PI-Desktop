@@ -95,8 +95,10 @@ Blocking steps:
    - Each bullet is one short user-facing idea (not raw PR titles).
 2. Do **not** catalog pre-release-only versions (`x.y.z-rc.*`) unless product
    explicitly ships in-app notes for that channel.
-3. Run `pnpm --filter @pi-desktop/shared test` and confirm catalog alignment
-   (version sets + highlight counts) still passes.
+3. Sync the newest-first version list in
+   `packages/shared/src/changelog.test.ts` (add the new version at the top),
+   then run `pnpm --filter @pi-desktop/shared test` and confirm catalog
+   alignment (version sets + highlight counts) still passes.
 4. Commit the catalog update so the tagged commit contains notes for that
    version (alone or adjacent to the version bump).
 5. GitHub Release bodies may still use `generate_release_notes: true` for the
