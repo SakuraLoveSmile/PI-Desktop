@@ -137,10 +137,11 @@ restarts: the folder is picked once, not once per edit.
   new stops the reload with `PERMISSION_DENIED` and a message to load the plugin
   again so the grant can be reviewed. Removed permissions do take effect
   immediately — grants follow the manifest downwards, never upwards.
-- The Plugins page shows a Reload action on development-plugin rows. After a
-  permission-gated hot reload, clicking it explicitly reloads the registered
-  folder with the current manifest and refreshes the permission ceiling used by
-  later file-watch reloads. The action does not require picking the folder again.
+- The Plugins page offers Reload for `source: "dev"` rows inside the row's More
+  actions menu. After a permission-gated hot reload, choosing it explicitly
+  reloads the registered folder with the current manifest and refreshes the
+  permission ceiling used by later file-watch reloads. The action does not
+  require picking the folder again.
 - A failed reload (syntax error, invalid manifest) leaves the plugin unloaded
   but still watched, so the save that fixes it recovers the plugin. The failure
   is reported as a toast plus a plugin-changed event; the registry row does not
