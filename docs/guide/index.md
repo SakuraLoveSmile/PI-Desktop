@@ -20,6 +20,9 @@ inspectable while still making everyday coding work feel direct.
 | Understand why a decision exists | [ADR index](/adr/README) |
 | Validate a user-visible change | [E2E test plan](/spec/06-delivery/04-e2e-test-plan) |
 
+The Chinese entry follows this same path: [open the bilingual guide](/zh-CN/guide/)
+to read the localized orientation and jump into the matching topic map.
+
 ## The mental model
 
 ```text
@@ -35,9 +38,11 @@ The pi sidecar owns the agent loop and provider-facing model work.
 ## Working with the docs
 
 The documentation is English-first at the source-of-truth level. The [中文入口](/zh-CN/)
-provides a translated orientation, curated topic map, and links to the complete
-technical specs. Use the global search when you know a term, protocol method, or
-decision number; use the sidebar when you are exploring a domain.
+provides the same information architecture with translated orientation pages and
+topic landing pages. Technical contracts, protocol names, and decision records
+remain linked to their English source pages so the two locales cannot silently
+drift. Use the global search when you know a term, protocol method, or decision
+number; use the sidebar when you are exploring a domain.
 
 ## Before you change a boundary
 

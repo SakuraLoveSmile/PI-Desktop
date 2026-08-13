@@ -21,6 +21,7 @@ pnpm docs:preview
 - [ADR index](adr/README.md)
 - [Plugin development](plugin-development.md)
 
-The Chinese entry point translates orientation and navigation while linking to
-the complete English technical specifications, matching the repository's
-English-first documentation policy.
+The Chinese entry point mirrors the English reading paths, translates the
+orientation and eight topic landing pages, and links to the same English
+technical contracts. This keeps the repository's English-first source policy
+without leaving the Chinese site as a partial or disconnected navigation tree.

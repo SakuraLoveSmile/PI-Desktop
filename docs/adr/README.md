@@ -2,6 +2,10 @@
 
 ADRs record decisions that should not silently change.
 
+The [Chinese ADR entry](/zh-CN/adr/) follows the same decision map and points to
+these records. Decision IDs, status, and the English record remain the source of
+truth for both locales.
+
 ## Format
 
 Each ADR includes:

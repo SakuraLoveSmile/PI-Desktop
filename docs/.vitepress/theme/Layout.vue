@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useData } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
+import HomeHeroVisual from './components/HomeHeroVisual.vue'
 import HomeModules from './components/HomeModules.vue'
-import HomeModulesZh from './components/HomeModulesZh.vue'
 
 const { Layout } = DefaultTheme
 const { frontmatter, localeIndex } = useData()
@@ -10,9 +10,11 @@ const { frontmatter, localeIndex } = useData()
 
 <template>
   <Layout>
+    <template #home-hero-image>
+      <HomeHeroVisual :locale="localeIndex" />
+    </template>
     <template #home-features-after>
-      <HomeModules v-if="frontmatter.layout === 'home' && localeIndex !== 'zh-CN'" />
-      <HomeModulesZh v-else-if="frontmatter.layout === 'home' && localeIndex === 'zh-CN'" />
+      <HomeModules :locale="localeIndex" v-if="frontmatter.layout === 'home'" />
     </template>
   </Layout>
 </template>

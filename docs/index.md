@@ -1,23 +1,23 @@
 ---
 layout: home
 title: PI-Desktop
-titleTemplate: Local-first AI coding agent
+titleTemplate: Documentation for a local-first AI coding agent
 hero:
   name: PI-Desktop
-  text: Local-first AI coding agent
-  tagline: A calm, inspectable desktop workspace for building with AI. Read the product decisions, runtime contracts, and extension model in one place.
+  text: Read the product as a system.
+  tagline: A calm, inspectable desktop workspace for building with AI. Follow the boundaries, understand the contracts, and make changes with context.
   actions:
     - theme: brand
-      text: Start with the guide
+      text: Start with context
       link: /guide/
     - theme: alt
-      text: Browse specifications
+      text: Open the spec map
       link: /spec/README
 features:
-  - title: Product clarity
-    details: Understand the shipped shell, operating states, permissions, and the decisions behind them.
-  - title: Runtime contracts
+  - title: Locate the boundary
+    details: Start from product intent, then move through architecture, runtime, UX, security, delivery, and plugins.
+  - title: Read the contract
     details: Follow the Rust host core, pi sidecar, NDJSON RPC, storage ownership, and provider model system.
-  - title: Extension-ready
-    details: Build local plugins with a documented package format, lifecycle, permissions, and developer workflow.
+  - title: Change with evidence
+    details: Connect the relevant spec, ADR, implementation, E2E scenario, and release checklist.
 ---

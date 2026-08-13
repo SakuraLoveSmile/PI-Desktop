@@ -14,8 +14,8 @@ versioned navigation shell.
 The site exposes two locale entry points:
 
 - `/` — English-first complete documentation navigation.
-- `/zh-CN/` — Simplified Chinese orientation, curated topic map, and links to
-  the English technical source of truth.
+- `/zh-CN/` — Simplified Chinese orientation, the same eight-topic map, and
+  localized landing pages that link to the English technical source of truth.
 
 For Vercel deployments whose Root Directory is `docs`, `docs/vercel.json`
 declares the VitePress build output as `.vitepress/dist` and enables Vercel's
@@ -43,9 +43,11 @@ and search index are generated locally by VitePress.
 
 1. English remains the source language for specs, ADRs, code identifiers, and
    protocol terms.
-2. Chinese pages should translate orientation and navigation copy, not fork
-   technical contracts without a maintenance plan.
-3. User-visible or protocol-visible documentation behavior belongs in the E2E
+2. English and Chinese expose the same eight topic domains and the same reading
+   order. Chinese pages translate orientation, summaries, and navigation copy.
+3. Chinese pages link to the English technical contract instead of silently
+   forking protocol details or decision records.
+4. User-visible or protocol-visible documentation behavior belongs in the E2E
    test plan.
-4. Navigation should expose the shortest useful path; deep files remain
+5. Navigation should expose the shortest useful path; deep files remain
    searchable and directly linkable.

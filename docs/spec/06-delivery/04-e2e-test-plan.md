@@ -4596,11 +4596,12 @@ This test plan spec is accepted when:
 - **Preconditions**: Docs dependencies are installed and the VitePress preview
   server is running from the repository.
 - **Steps**: 1) Open `/` at desktop width and verify the English landing page,
-  global search, Guide/Specs/ADRs navigation, and language selector. 2) Switch
-  to `/zh-CN/` and verify translated hero copy, Chinese navigation, and links
-  to the curated guide/spec/ADR entries. 3) Search for `Rust host core` and
-  open the matching spec. 4) Repeat at approximately 390px wide in light and
-  dark mode.
+  system map, read-by-intent journeys, reference shelf, global search,
+  Guide/Specs/ADRs navigation, and language selector. 2) Switch to `/zh-CN/`
+  and verify the translated hero, mirrored topic map, localized landing pages,
+  and links to the same technical source pages. 3) Search for `Rust host core`
+  and open the matching spec. 4) Repeat at approximately 390px wide in light
+  and dark mode.
 - **Expected**: Both locale entry points render without broken links or
   horizontal overflow. Search returns local results. The mobile navigation can
   be opened and closed without shifting or obscuring the page. Code blocks and

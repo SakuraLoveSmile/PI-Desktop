@@ -1,18 +1,27 @@
 ---
 title: 架构决策记录
-description: PI-Desktop 架构决策记录的中文入口。
+description: 与英文 ADR 一一对应的 PI-Desktop 架构决策阅读入口。
 ---
 
 # 架构决策记录
 
-ADR 记录那些不应被静默改变的架构选择。中文入口列出阅读路径；完整记录保留英文，以便与实现、代码审查和提交保持一致。
+ADR 记录那些不应被静默改变的架构选择。中文入口与英文索引保持相同结构；完整记录、状态和决策编号继续以英文页面为源事实。
 
 ## 重点决策
 
-- [使用 Electron 作为桌面壳](/adr/0001-use-electron)
-- [使用 Rust 作为 host core](/adr/0010-rust-backend-host-core)
-- [本地插件系统](/adr/0005-user-installable-plugin-system)
-- [计划模式的 checkpoint artifact](/adr/0053-plan-checkpoint-artifact-and-execution-epoch)
-- [VitePress 文档站](/adr/0079-vitepress-documentation-site)
+| 决策 | 说明 |
+|---|---|
+| [ADR 0001：Electron 桌面壳](/adr/0001-use-electron) | 桌面窗口与平台能力的承载层 |
+| [ADR 0005：本地插件系统](/adr/0005-user-installable-plugin-system) | 用户安装插件的第一阶段边界 |
+| [ADR 0009：English-first 全球化](/adr/0009-english-first-globalization) | 源语言、术语和协作规则 |
+| [ADR 0010：Rust host core](/adr/0010-rust-backend-host-core) | 特权进程、RPC 与持久化的宿主边界 |
+| [ADR 0053：Plan checkpoint](/adr/0053-plan-checkpoint-artifact-and-execution-epoch) | 计划审批、artifact 和执行 epoch |
+| [ADR 0079：VitePress 文档站](/adr/0079-vitepress-documentation-site) | 双语文档站的结构与部署方式 |
 
-前往 [英文 ADR 索引](/adr/README) 查看完整列表，或使用 [决策日志](/spec/08-meta/decisions-log) 按编号检索。
+## 什么时候看 ADR
+
+- 规格告诉你系统应该怎样工作。
+- ADR 告诉你为什么选择这个边界，以及哪些替代方案被放弃。
+- 决策日志记录更细的冻结条款和后续修订。
+
+前往 [英文 ADR 索引](/adr/README) 查看完整记录，或打开 [决策日志](/spec/08-meta/decisions-log) 按编号检索。
