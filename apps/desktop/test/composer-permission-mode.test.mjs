@@ -7,7 +7,7 @@ const composerSource = await readFile(
   "utf8",
 );
 
-test("composer permission menu presents only effective selectable modes", () => {
+test("Agent and Plan permission menus present only effective selectable modes", () => {
   const permissionControlSource = composerSource.slice(
     composerSource.indexOf('<div className="composer-permission"'),
     composerSource.indexOf('<div className="composer-right">'),
@@ -19,7 +19,7 @@ test("composer permission menu presents only effective selectable modes", () => 
   );
   assert.match(
     permissionControlSource,
-    /aria-checked=\{effectivePermissionMode === candidate\}/,
+    /aria-checked=\{composerPermissionMode === candidate\}/,
   );
   assert.match(
     permissionControlSource,
@@ -27,4 +27,19 @@ test("composer permission menu presents only effective selectable modes", () => 
   );
   assert.doesNotMatch(permissionControlSource, /permissionInherit/);
   assert.doesNotMatch(permissionControlSource, /\["inherit",/);
+});
+
+test("Goal keeps the permission chip visible but fixes it to Full auto", () => {
+  const permissionControlSource = composerSource.slice(
+    composerSource.indexOf('<div className="composer-permission"'),
+    composerSource.indexOf('<div className="composer-right">'),
+  );
+
+  assert.match(
+    composerSource,
+    /const composerPermissionMode: Exclude<PermissionMode, "inherit"> =\s*\n\s*mode === "goal" \? "auto" : effectivePermissionMode;/,
+  );
+  assert.match(permissionControlSource, /mode === "goal" \? undefined : "menu"/);
+  assert.match(permissionControlSource, /disabled=\{controlsBlocked \|\| mode === "goal"\}/);
+  assert.match(permissionControlSource, /permissionOpen && mode !== "goal"/);
 });

@@ -262,6 +262,17 @@
   color: var(--ds-text-primary) !important;
 }
 
+/* Goal keeps the same chip geometry while presenting a non-editable Auto state. */
+.composer-permission .mode-chip:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.composer-permission .mode-chip:disabled:hover {
+  background: transparent !important;
+  color: var(--ds-text-secondary) !important;
+}
+
 .composer-right .icon-btn {
   max-width: 220px;
   padding: 0 10px;

@@ -371,6 +371,8 @@ export function Composer({
     sessionPermissionMode === "inherit"
       ? (globalPermissionMode as Exclude<PermissionMode, "inherit">)
       : sessionPermissionMode;
+  const composerPermissionMode: Exclude<PermissionMode, "inherit"> =
+    mode === "goal" ? "auto" : effectivePermissionMode;
   const provider = providers.find(
     (candidate) =>
       candidate.id ===
@@ -845,29 +847,31 @@ export function Composer({
                   ) : null}
                 </div>
               ) : null}
-              {mode === "agent" || mode === "plan" ? (
+              {mode === "agent" || mode === "plan" || mode === "goal" ? (
                 <div className="composer-permission" ref={permissionRef}>
                   <button
                     className={`icon-btn mode-chip ${permissionOpen ? "active" : ""}`}
                     title={
-                      mode === "plan" && effectivePermissionMode === "auto"
-                        ? `${t("chat.permissionMode")} · ${t("plan.autoWarning")}`
-                        : t("chat.permissionMode")
+                      mode === "goal"
+                        ? `${t("chat.permissionMode")} · ${t("goal.autoWarning")}`
+                        : mode === "plan" && composerPermissionMode === "auto"
+                          ? `${t("chat.permissionMode")} · ${t("plan.autoWarning")}`
+                          : t("chat.permissionMode")
                     }
-                    aria-haspopup="menu"
-                    aria-expanded={permissionOpen}
-                    disabled={controlsBlocked}
+                    aria-haspopup={mode === "goal" ? undefined : "menu"}
+                    aria-expanded={mode === "goal" ? false : permissionOpen}
+                    disabled={controlsBlocked || mode === "goal"}
                     onClick={() => {
                       setThinkingOpen(false);
                       setPermissionOpen((open) => !open);
                     }}
                   >
                     <span className="text-sm">
-                      {t(PERMISSION_MODE_I18N_KEYS[effectivePermissionMode])}
+                      {t(PERMISSION_MODE_I18N_KEYS[composerPermissionMode])}
                     </span>
                     <IconChevronDown size={12} />
                   </button>
-                  {permissionOpen && (
+                  {permissionOpen && mode !== "goal" && (
                     <div className="composer-permission-menu" role="menu">
                       {(["ask", "accept-edits", "auto"] as const).map(
                         (candidate) => (
@@ -875,10 +879,10 @@ export function Composer({
                             key={candidate}
                             type="button"
                             role="menuitemradio"
-                            aria-checked={effectivePermissionMode === candidate}
+                            aria-checked={composerPermissionMode === candidate}
                             disabled={controlsBlocked}
                             className={`composer-plus-item ${
-                              effectivePermissionMode === candidate ? "active" : ""
+                              composerPermissionMode === candidate ? "active" : ""
                             }`}
                             onClick={async () => {
                               setPermissionOpen(false);
@@ -901,7 +905,7 @@ export function Composer({
                             <span className="flex-1 text-left">
                               {t(PERMISSION_MODE_I18N_KEYS[candidate])}
                             </span>
-                            {effectivePermissionMode === candidate ? (
+                            {composerPermissionMode === candidate ? (
                               <IconCheck size={13} />
                             ) : null}
                           </button>

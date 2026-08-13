@@ -20,10 +20,14 @@ requested path, and the external result remains absolute in the transcript.
 
 Decision source: **D003/D189/D190/D195 (ADR 0057)**.
 
-Plan and Goal keep this permission-mode control visible. They are contract
-intents, not strict read-only security profiles: a Bash command can mutate
-workspace or scratch state when the user selects Auto. Write/Edit/plugin tools
-are denied by the host before a permission card, regardless of grants or Auto.
+Plan and Goal keep this permission-mode control visible. Plan exposes the
+effective permission choice; Goal shows the same chip geometry with a fixed
+Auto label in the Composer and does not open a menu. Goal's approval card is
+the separate place to choose the execution permission for the approved run.
+They are contract intents, not strict read-only security profiles: a Bash
+command can mutate workspace or scratch state under Auto. Write/Edit/plugin
+tools are denied by the host before a permission card, regardless of grants or
+Auto.
 
 ## 3. Decision types
 

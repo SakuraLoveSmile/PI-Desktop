@@ -4550,6 +4550,9 @@ This test plan spec is accepted when:
 - Expect the mode chip to keep one fixed width sized for the longest built-in
   label (English "Agent" / zh-CN "智能体"); the adjacent Thinking and
   permission controls, send button, and composer shell do not move or resize.
+- In Goal, expect the permission chip to remain visible with the same geometry,
+  show Full auto / 全自动, and stay disabled without opening a permission menu.
+  The Plan/Goal approval card remains the separate execution-policy control.
 - **Specs linked**: `04-ux/08-component-spec.md` §11.3
 - **Milestone**: M5
 - **Status**: Partially automated (renderer style/source contract)

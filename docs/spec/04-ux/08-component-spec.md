@@ -1521,6 +1521,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   longest built-in label in English and zh-CN ("Agent" / "智能体"). Its label
   stays single-line and ellipsizes if a future locale exceeds that budget, so
   switching modes never reflows the adjacent Composer controls.
+- The permission chip remains visible in Agent, Plan, and Goal for a stable
+  toolbar rhythm. Agent and Plan expose the effective selectable permission;
+  Goal displays the localized Auto label as a disabled, non-opening chip while
+  the approval card remains the separate place for choosing execution policy.
 - Bottom-anchored: fixed at bottom of MainChat area
 
 ### 11.4 States
@@ -1605,11 +1609,11 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Switching provider preserves an available level, otherwise uses the nearest
   supported level (upward first, then downward); a non-reasoning provider
   persists `off`.
-- The Plan permission chip remains visible beside the mode selector. It shows
-  the effective Ask / Accept edits / Auto posture. In Plan and Goal, its help text
-  says that Bash is confirmed under Ask or Accept edits and may mutate without a
-  confirmation under Auto; it does not imply that Write/Edit/plugin tools are
-  available.
+- The permission chip remains visible beside the mode selector. Agent and Plan
+  show the effective Ask / Accept edits / Auto posture. Goal keeps the same
+  geometry but is fixed to the localized Auto label and cannot open a menu;
+  its approval card remains the separate place for choosing execution policy.
+  The control does not imply that Write/Edit/plugin tools are available.
 - Goal shares the Plan approval surface (D198). The bar reads its copy from the
   proposal's `kind`, so a goal contract shows the matching approval label and
   artifact opener while the layout and remembered permission split-button stay
