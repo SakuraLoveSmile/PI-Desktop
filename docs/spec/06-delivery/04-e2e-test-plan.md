@@ -948,9 +948,9 @@ Each scenario is documented in this format:
 #### E2E-024D: Isolated plugin panel host bridge
 
 - **Preconditions**: Plugin with `ui.panel` enabled.
-- **Steps**: 1) Open plugin panel. 2) Invoke panel bridge APIs (`ui.showToast`, optional fs/net with grants).
-- **Expected**: Panel runs in sandboxed window/partition; bridge calls are permission-checked; host remains stable on panel close.
-- **Specs linked**: `07-plugins/03-plugin-api.md`, `07-plugins/04-plugin-security.md`
+- **Steps**: 1) Open the plugin panel on macOS. 2) Confirm the 46px custom titlebar, inset traffic lights, title truncation, drag behavior, and content clearance. 3) Repeat on Windows and Linux; exercise minimize, maximize, restore, close, keyboard focus, light/dark system appearance, and reduced motion. 4) Reopen a minimized panel. 5) Invoke panel bridge APIs (`ui.showToast`, optional fs/net with grants).
+- **Expected**: Panel runs in its sandboxed window/partition; macOS uses hidden-inset native traffic lights while Windows/Linux use a frameless host-owned titlebar with working, accessible 112px window controls; plugin content starts below the titlebar without losing its original top padding; reopening restores the existing panel; bridge calls remain permission-checked and the host remains stable on panel close.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`, `04-ux/08-component-spec.md`, `07-plugins/03-plugin-api.md`, `07-plugins/04-plugin-security.md`, ADR 0081
 - **Acceptance**: G (isolated panel)
 - **Status**: Documented
 

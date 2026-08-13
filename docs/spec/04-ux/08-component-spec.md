@@ -131,6 +131,12 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   Shift+F10 remain available to focused content.
 - macOS native commands that create or reload a window wait for the renderer's menu
   subscription acknowledgement instead of relying on a timing delay.
+- Plugin panel windows use the same 46px chrome metrics and platform split.
+  macOS keeps inset traffic lights with a centered, ellipsized plugin title;
+  Windows/Linux use the shared 112px control band with minimize,
+  maximize/restore, and close. The host-owned titlebar reserves space above the
+  plugin document, supports light/dark system appearance and reduced motion,
+  and stays isolated from plugin styles in a closed Shadow DOM.
 
 ---
 

@@ -213,7 +213,13 @@ Still open: capability sandboxing inside the plugin process (raw Node built-ins
 are reachable there) and CPU/memory limits.
 
 ### 6.3 Plugin Panel UI
-- Load the plugin page with an `iframe` or `webview`
+- Load the plugin page in a dedicated sandboxed `BrowserWindow` and isolated
+  per-plugin session partition
+- Reserve a host-owned 46px custom titlebar above plugin content: macOS keeps
+  hidden-inset traffic lights at `{x:16,y:16}`; Windows/Linux use a frameless
+  window with custom minimize, maximize/restore, and close controls
+- Render the host titlebar in a closed preload-owned Shadow DOM so plugin CSS
+  cannot restyle its controls
 - Can only call the safe APIs exposed by the plugin preload
 - Cannot access the host DOM / host store by default
 

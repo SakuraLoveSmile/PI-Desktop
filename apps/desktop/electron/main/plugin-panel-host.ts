@@ -1,6 +1,12 @@
-import { BrowserWindow, ipcMain, session } from "electron";
+import { BrowserWindow, ipcMain, nativeTheme, session } from "electron";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
+import {
+  isPluginPanelWindowControlAction,
+  PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
+  PLUGIN_PANEL_WINDOW_STATE_CHANNEL,
+  type PluginPanelWindowControlAction,
+} from "../shared/plugin-panel-chrome";
 
 export type PluginPanelOpenRequest = {
   pluginId: string;
@@ -70,6 +76,21 @@ export class PluginPanelHost {
         event.returnValue = { ok: true, accepted: true };
       },
     );
+
+    ipcMain.handle(
+      PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
+      async (event, rawAction: unknown) => {
+        const window = this.windowForSender(event.sender.id);
+        if (!window) throw new Error("invalid panel window control invoker");
+        if (!isPluginPanelWindowControlAction(rawAction)) {
+          throw new Error("unsupported panel window control action");
+        }
+        this.applyWindowControl(window, rawAction);
+        return {
+          maximized: !window.isDestroyed() && window.isMaximized(),
+        };
+      },
+    );
   }
 
   private pluginIdForSender(senderId: number): string | null {
@@ -79,9 +100,36 @@ export class PluginPanelHost {
     return null;
   }
 
+  private windowForSender(senderId: number): BrowserWindow | null {
+    const pluginId = this.pluginIdForSender(senderId);
+    return pluginId ? (this.windows.get(pluginId) ?? null) : null;
+  }
+
+  private applyWindowControl(
+    window: BrowserWindow,
+    action: PluginPanelWindowControlAction,
+  ): void {
+    switch (action) {
+      case "getState":
+        break;
+      case "minimize":
+        window.minimize();
+        break;
+      case "toggleMaximize":
+        if (window.isMaximized()) window.unmaximize();
+        else window.maximize();
+        break;
+      case "close":
+        window.close();
+        break;
+    }
+  }
+
   async open(request: PluginPanelOpenRequest): Promise<void> {
     const existing = this.windows.get(request.pluginId);
     if (existing && !existing.isDestroyed()) {
+      if (existing.isMinimized()) existing.restore();
+      existing.show();
       existing.focus();
       return;
     }
@@ -95,6 +143,17 @@ export class PluginPanelHost {
       title: request.title,
       show: false,
       autoHideMenuBar: true,
+      backgroundColor: nativeTheme.shouldUseDarkColors
+        ? "#181818"
+        : "#ffffff",
+      // Match the main application chrome: macOS retains inset traffic lights,
+      // while Windows/Linux use renderer-drawn controls in a frameless window.
+      ...(process.platform === "darwin"
+        ? {
+            titleBarStyle: "hiddenInset" as const,
+            trafficLightPosition: { x: 16, y: 16 },
+          }
+        : { frame: false }),
       webPreferences: {
         session: ses,
         preload: join(__dirname, "../preload/plugin-panel.js"),
@@ -102,8 +161,23 @@ export class PluginPanelHost {
         nodeIntegration: false,
         sandbox: true,
         webviewTag: false,
+        additionalArguments: [
+          `--pi-plugin-panel-title=${encodeURIComponent(request.title)}`,
+        ],
       },
     });
+
+    const sendWindowState = () => {
+      if (win.isDestroyed() || win.webContents.isDestroyed()) return;
+      win.webContents.send(PLUGIN_PANEL_WINDOW_STATE_CHANNEL, {
+        maximized: win.isMaximized(),
+      });
+    };
+    if (process.platform !== "darwin") {
+      win.on("maximize", sendWindowState);
+      win.on("unmaximize", sendWindowState);
+      win.webContents.on("did-finish-load", sendWindowState);
+    }
 
     win.on("closed", () => {
       this.windows.delete(request.pluginId);

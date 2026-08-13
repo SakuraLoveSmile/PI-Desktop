@@ -203,7 +203,10 @@ Current enforcement:
 
 1. Default-deny permission checks in `PluginRuntime`
 2. Workspace path boundary checks for plugin fs APIs
-3. Panel windows use sandboxed preload + isolated session partitions
+3. Panel windows use sandboxed preload + isolated session partitions. Their
+   custom cross-platform titlebar is preload-owned, keeps its controls in a
+   closed Shadow DOM, and routes only a fixed sender-validated window-action
+   tuple without adding window primitives to `window.pluginBridge`
 4. Secrets / host DB remain inaccessible to plugins
 5. Marketplace/package install requires explicit permission acceptance in UI
 6. Auto-update refuses silent permission expansion
