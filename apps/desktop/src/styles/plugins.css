@@ -68,12 +68,6 @@
   font-weight: var(--font-weight-medium-plus);
 }
 
-.plugins-alert-body {
-  color: var(--ds-text-secondary);
-  font-size: var(--text-sm);
-  line-height: var(--leading-body);
-}
-
 /* Toolbar: segmented tabs on the left, count + pill search on the right. */
 .plugins-toolbar {
   display: flex;
@@ -752,14 +746,6 @@
   color: var(--ds-text-primary);
   font-size: var(--text-base-plus);
   font-weight: var(--font-weight-medium-plus);
-}
-
-.plugins-empty-body {
-  margin: 0;
-  max-width: 46ch;
-  color: var(--ds-text-secondary);
-  font-size: var(--text-md);
-  line-height: var(--leading-body);
 }
 
 .plugins-empty-actions {

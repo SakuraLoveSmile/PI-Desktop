@@ -229,7 +229,6 @@ export function SubagentsSection({
       <div className="ext-section-head">
         <div className="ext-section-copy">
           <h2 className="ext-section-title">{t("extensions.subagents.title")}</h2>
-          <p className="ext-section-sub">{t("extensions.subagents.subtitle")}</p>
         </div>
         <div className="ext-section-actions">
           <Button variant="primary" onClick={create}>
@@ -265,7 +264,6 @@ export function SubagentsSection({
                 <IconBot size={18} />
               </span>
               <p className="ext-empty-title">{t("extensions.subagents.empty")}</p>
-              <p className="ext-empty-body">{t("extensions.subagents.emptyBody")}</p>
               <div className="ext-empty-actions">
                 <Button variant="primary" onClick={create}>
                   {t("extensions.subagents.add")}
@@ -431,9 +429,6 @@ export function SubagentsSection({
                   <h3 className="ext-section-title">
                     {t("extensions.subagents.providedTitle")}
                   </h3>
-                  <p className="ext-section-sub">
-                    {t("extensions.subagents.providedSubtitle")}
-                  </p>
                 </div>
               </div>
               <div className="settings-panel ext-list" role="list">

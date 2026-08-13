@@ -165,7 +165,6 @@ export function SkillsSection({
       <div className="ext-section-head">
         <div className="ext-section-copy">
           <h2 className="ext-section-title">{t("extensions.skills.title")}</h2>
-          <p className="ext-section-sub">{t("extensions.skills.subtitle")}</p>
         </div>
         <div className="ext-section-actions">
           <Button variant="secondary" onClick={() => void importSkill()}>
@@ -196,7 +195,6 @@ export function SkillsSection({
             <IconBookOpen size={18} />
           </span>
           <p className="ext-empty-title">{t("extensions.skills.empty")}</p>
-          <p className="ext-empty-body">{t("extensions.skills.emptyBody")}</p>
           <div className="ext-empty-actions">
             <Button variant="primary" onClick={create}>
               {t("extensions.skills.add")}

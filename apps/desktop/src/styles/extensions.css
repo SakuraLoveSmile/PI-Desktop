@@ -40,14 +40,6 @@
   letter-spacing: var(--tracking-tight);
 }
 
-.ext-section-sub {
-  margin: 0;
-  max-width: 68ch;
-  color: var(--ds-text-secondary);
-  font-size: var(--text-md);
-  line-height: var(--leading-body);
-}
-
 .ext-section-actions {
   display: flex;
   align-items: center;

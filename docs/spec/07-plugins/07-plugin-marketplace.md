@@ -200,6 +200,12 @@ The Detail sheet must show:
 - Risk description (safety notes callout)
 - Install button
 
+The Extensions list page keeps its overview copy compact: the page header and
+tab labels identify the surface, while section headers and empty states use
+direct labels and actions without explanatory paragraphs. Explanations remain
+where they help a decision — permission review, detail sheets, editors, and
+error states.
+
 Marketplace cards render a monogram glyph rather than fetching `iconUrl`; the
 renderer performs no remote image loads (D169).
 

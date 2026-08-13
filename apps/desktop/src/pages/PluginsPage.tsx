@@ -819,7 +819,6 @@ export function PluginsPage() {
         <div className="page-header">
           <div>
             <h1 className="page-title">{t("plugins.title")}</h1>
-            <div className="page-subtitle">{t("plugins.subtitle")}</div>
           </div>
           <div className="plugins-header-actions">
             {tab === "market" ? (
@@ -881,7 +880,6 @@ export function PluginsPage() {
               <span className="plugins-alert-title">
                 {t("plugins.updatesReady", { count: stats.updates })}
               </span>
-              <span className="plugins-alert-body">{t("plugins.updatesReadyBody")}</span>
             </div>
             <Button variant="secondary" size="sm" onClick={() => void applyAutoUpdates()}>
               {t("plugins.applyAutoUpdates")}
@@ -1051,7 +1049,6 @@ export function PluginsPage() {
                   <IconPlug size={18} />
                 </span>
                 <p className="plugins-empty-title">{t("plugins.empty")}</p>
-                <p className="plugins-empty-body">{t("plugins.emptyBody")}</p>
                 <div className="plugins-empty-actions">
                   <Button variant="primary" onClick={() => setTab("market")}>
                     {t("plugins.browseMarket")}
@@ -1073,7 +1070,6 @@ export function PluginsPage() {
                   <IconSearch size={18} />
                 </span>
                 <p className="plugins-empty-title">{t("plugins.noMatches")}</p>
-                <p className="plugins-empty-body">{t("plugins.noMatchesBody")}</p>
                 <div className="plugins-empty-actions">
                   <Button variant="secondary" onClick={() => setInstalledQuery("")}>
                     {t("plugins.clearSearch")}
@@ -1342,7 +1338,6 @@ export function PluginsPage() {
                   <IconSearch size={18} />
                 </span>
                 <p className="plugins-empty-title">{t("plugins.marketEmpty")}</p>
-                <p className="plugins-empty-body">{t("plugins.marketEmptyBody")}</p>
                 <div className="plugins-empty-actions">
                   {query || category ? (
                     <Button

@@ -158,7 +158,6 @@ export function McpSection({
       <div className="ext-section-head">
         <div className="ext-section-copy">
           <h2 className="ext-section-title">{t("extensions.mcp.title")}</h2>
-          <p className="ext-section-sub">{t("extensions.mcp.subtitle")}</p>
         </div>
         <div className="ext-section-actions">
           <Button variant="secondary" onClick={() => setImportOpen(true)}>
@@ -195,7 +194,6 @@ export function McpSection({
             <IconServer size={18} />
           </span>
           <p className="ext-empty-title">{t("extensions.mcp.empty")}</p>
-          <p className="ext-empty-body">{t("extensions.mcp.emptyBody")}</p>
           <div className="ext-empty-actions">
             <Button
               variant="primary"

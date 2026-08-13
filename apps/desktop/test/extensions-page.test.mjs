@@ -100,6 +100,19 @@ test("the extensions page uses tabs instead of a four-number overview band", () 
   assert.match(pageSrc, /className="plugins-segment"/);
 });
 
+test("the extensions overview keeps explanatory copy out of list surfaces", () => {
+  for (const source of [
+    pageSrc,
+    components.get("McpSection.tsx"),
+    components.get("SkillsSection.tsx"),
+    components.get("SubagentsSection.tsx"),
+  ]) {
+    assert.doesNotMatch(source, /plugins\.subtitle|plugins\.updatesReadyBody/);
+    assert.doesNotMatch(source, /plugins\.(emptyBody|noMatchesBody|marketEmptyBody)/);
+    assert.doesNotMatch(source, /extensions\.[a-z]+\.(subtitle|emptyBody|providedSubtitle)/);
+  }
+});
+
 test("installed plugin rows keep secondary detail behind a disclosure", () => {
   assert.match(pageSrc, /function PluginRowDetails/);
   assert.match(pageSrc, /<details className="plugins-row-details">/);

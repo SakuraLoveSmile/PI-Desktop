@@ -1014,7 +1014,8 @@ Each scenario is documented in this format:
   available marketplace action; dark and light themes available.
 - **Steps**: 1) Open Extensions in dark theme. 2) Confirm the header and
   Installed / MCP / Skills / Subagents / Marketplace tabs reach the content
-  without a four-card numeric overview band. 3) Confirm installed rows begin
+  without a four-card numeric overview band or explanatory header/section
+  paragraphs. 3) Confirm installed rows begin
   as a quiet two-line summary, then expand Details on one row and inspect its
   capabilities, service status, and permissions. 4) Use the compact scope
   control and its explained scope menu, contextual primary action, and a
@@ -1023,7 +1024,9 @@ Each scenario is documented in this format:
   scope states, and each action.
 - **Expected**: The four numeric overview cards are absent; tab counts,
   installed group counts, and any update alert remain available in their
-  relevant surfaces. Installed rows keep their default height low while the
+  relevant surfaces. The page header, section headers, empty states, and update
+  alert use compact labels and actions; decision-specific explanations remain
+  in disclosures, details, and dialogs. Installed rows keep their default height low while the
   disclosure exposes the complete secondary readout. The scope trigger stays
   aligned with the row action rail, its menu explains each state, and icon
   actions remain visible at rest while showing labels on hover and focus.
