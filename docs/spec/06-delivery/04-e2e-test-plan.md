@@ -943,7 +943,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: App running; official market catalog available.
 - **Steps**: 1) Open Extensions → Marketplace. 2) Install `demo.workspace-notes`. 3) Read the risk-tiered permission dialog. 4) Accept high-risk permissions.
-- **Expected**: Permissions are grouped High / Medium / Low with plain-language explanations before any download; plugin installed from the marketplace package, checksum verified, permissions granted, panel/tools available; the installed tab and risk-grouped rows reflect the new plugin without a separate overview card row.
+- **Expected**: Permissions are grouped High / Medium / Low with plain-language explanations before any download; the host refreshes marketplace metadata immediately before download so a stale UI cache cannot pair an old checksum with a current package; plugin installed from the marketplace package, checksum verified, permissions granted, panel/tools available; the installed tab and risk-grouped rows reflect the new plugin without a separate overview card row.
 - **Specs linked**: `07-plugins/07-plugin-marketplace.md`, `07-plugins/13-plugin-permissions-matrix.md`
 - **Acceptance**: G (marketplace install + permission review)
 - **Status**: Documented / host-core covered by unit tests + protocol methods
@@ -951,8 +951,8 @@ Each scenario is documented in this format:
 #### E2E-024C: Plugin package install and auto-update path
 
 - **Preconditions**: Marketplace catalog has a newer version or local `.piplug`.
-- **Steps**: 1) Install package from the header overflow menu. 2) Enable auto-update from the row overflow menu. 3) Reopen Extensions and confirm the installed list refreshes update metadata. 4) Run Check for updates, then Apply automatic updates.
-- **Expected**: The row moves to Updates available and the update banner reports the count; the highest semantic version is selected even when the catalog version array is not newest-first; the explicit check fetches the current catalog and uses the cached catalog offline; permissions the new version adds are tagged New in the review dialog; auto-update applies only when the permission diff is empty or pre-granted.
+- **Steps**: 1) Install package from the header overflow menu. 2) Enable auto-update from the row overflow menu. 3) Reopen Extensions while the marketplace is slow or unavailable and confirm the Installed surface and Marketplace tab remain usable. 4) Confirm the installed list refreshes update metadata from the local catalog. 5) Run Check for updates, then Apply automatic updates.
+- **Expected**: The Extensions surface does not wait for a remote request during its silent cache-only check; the row moves to Updates available and the update banner reports the count; the highest semantic version is selected even when the catalog version array is not newest-first; the explicit check fetches the current catalog and uses the cached catalog offline; permissions the new version adds are tagged New in the review dialog; auto-update applies only when the permission diff is empty or pre-granted.
 - **Specs linked**: `07-plugins/06-plugin-packaging.md`, `07-plugins/08-plugin-signing-updates.md`
 - **Acceptance**: G (package install + update policy)
 - **Status**: Documented

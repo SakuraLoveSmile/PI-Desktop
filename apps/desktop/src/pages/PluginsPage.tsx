@@ -519,7 +519,7 @@ export function PluginsPage() {
   useEffect(() => {
     void (async () => {
       try {
-        await api.marketCheckUpdates();
+        await api.marketCheckUpdates(false);
         await refreshPlugins();
       } catch {
         // Marketplace availability must not block local plugin management.

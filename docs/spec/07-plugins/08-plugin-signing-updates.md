@@ -26,6 +26,12 @@ After download:
 sha256(file) == downloadInfo.shasum
 ```
 
+Marketplace installation refreshes the catalog immediately before download so
+the URL and checksum are resolved from one current metadata snapshot. A recent
+UI cache is not trusted for an online install; if the refresh fails, the last
+valid catalog may be used for offline operation and the checksum requirement
+still applies.
+
 On failure:
 - Do not install
 - Show "Integrity check failed"

@@ -534,9 +534,10 @@ export const api = {
     grantedPermissions?: string[];
   }) =>
     invoke<{ result: PluginInstallResult }>(IPC.invoke.marketInstall, input),
-  marketCheckUpdates: () =>
+  marketCheckUpdates: (refreshRemote = true) =>
     invoke<{ updates: unknown[]; plugins: PluginSummary[] }>(
       IPC.invoke.marketCheckUpdates,
+      { refreshRemote },
     ),
   marketApplyUpdates: (onlyAuto = true) =>
     invoke<{ results: PluginInstallResult[]; plugins: PluginSummary[] }>(

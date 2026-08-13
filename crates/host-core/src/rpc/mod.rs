@@ -3185,10 +3185,14 @@ async fn handle_request(
             Ok(json!({ "result": result }))
         }
         "market.checkUpdates" => {
+            let refresh_remote = params
+                .get("refreshRemote")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
             let mut st = state.lock().await;
             let updates = st
                 .plugins
-                .check_updates()
+                .check_updates(refresh_remote)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "updates": updates, "plugins": st.plugins.list() }))
         }
