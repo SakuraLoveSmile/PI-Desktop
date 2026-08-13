@@ -188,6 +188,26 @@ manifest are reserved for the planned full lifecycle.
 
 ### `renderer/index.html`
 
+PI-Desktop owns the plugin panel window chrome. On Windows and Linux the panel
+is frameless and the host titlebar is 46 CSS px tall. Normal-flow content is
+automatically offset below it, so do not add a second titlebar or another
+46px top padding to compensate.
+
+If a panel uses `position: fixed` or `position: sticky` for a top toolbar,
+anchor it below the host chrome instead of using `top: 0`:
+
+```css
+.panel-toolbar {
+  position: sticky;
+  top: var(--pi-plugin-titlebar-height, 46px);
+}
+```
+
+The development panel titlebar also shows a `46px safe area` reminder. It is
+host-owned and cannot be styled or removed through plugin CSS. Keep the safe
+area in mind for viewport-height calculations as well:
+`height: calc(100dvh - var(--pi-plugin-titlebar-height, 46px))`.
+
 ```html
 <!doctype html>
 <html lang="en">
