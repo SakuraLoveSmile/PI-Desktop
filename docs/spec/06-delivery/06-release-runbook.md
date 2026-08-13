@@ -33,9 +33,9 @@ and preserve developer workspace defaults despite the branded executable name.
 Packaged lanes use
 `build/icon.icns` through electron-builder, and the renderer imports the same
 PNG through `BrandLogo`. The PNG is canonical;
-`scripts/make-icon.py` derives the 512px Windows/Linux package PNG on every
-platform and the iconset/ICNS when macOS `iconutil` is available, without
-overwriting the canonical source.
+`scripts/make-icon.py` derives the 512px Windows/Linux package PNG, the
+transparent monochrome `build/tray-icon-mac.png` template, and the iconset/ICNS
+when macOS `iconutil` is available, without overwriting the canonical source.
 
 ## 2. Prerequisites (release lane)
 
@@ -67,6 +67,9 @@ overwriting the canonical source.
   `en`/`zh-CN` catalogs remain bundled independently of Chromium locales.
 - App icon `build/icon.icns` (derived from canonical `build/icon_1024.png` by
   `scripts/make-icon.py`).
+- macOS menu bar template `build/tray-icon-mac.png`, derived from the dark PI
+  mark with a transparent background; Windows/Linux use the product PNG tray
+  resource.
 
 ## 4. Release steps
 

@@ -874,12 +874,16 @@ function applyDevelopmentBranding() {
 }
 
 function trayIconPath() {
-  const candidates = app.isPackaged
-    ? [
-        join(process.resourcesPath, "tray-icon.png"),
-        join(app.getAppPath(), "build", "icon.png"),
-      ]
-    : [join(app.getAppPath(), "build", "icon.png")];
+  const resourceRoot = app.isPackaged
+    ? process.resourcesPath
+    : join(app.getAppPath(), "build");
+  const candidates =
+    process.platform === "darwin"
+      ? [
+          join(resourceRoot, "tray-icon-mac.png"),
+          join(resourceRoot, app.isPackaged ? "tray-icon.png" : "icon.png"),
+        ]
+      : [join(resourceRoot, app.isPackaged ? "tray-icon.png" : "icon.png")];
   return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
 

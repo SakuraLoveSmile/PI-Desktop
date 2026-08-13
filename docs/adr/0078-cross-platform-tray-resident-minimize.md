@@ -17,8 +17,10 @@ so a tray integration belongs there rather than in the renderer bridge.
 ## Decision
 
 1. Electron Main creates one tray icon on every supported desktop platform.
-   Packaged builds carry the existing product PNG as an extra resource; macOS
-   uses a resized template image and Windows/Linux use the resized product icon.
+   Packaged builds carry the existing product PNG as an extra resource for
+   Windows/Linux. macOS carries a separate transparent monochrome template
+   asset derived from the PI mark; the light application tile is not part of
+   the menu bar silhouette.
 2. Main intercepts the `minimize` event for the main window and hides it to the
    tray. This applies equally to renderer window controls, macOS traffic lights,
    and native menu roles. Hiding does not close the window or dispose either

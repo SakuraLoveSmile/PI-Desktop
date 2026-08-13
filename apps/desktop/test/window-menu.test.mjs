@@ -225,6 +225,8 @@ test("menu and window IPC reject actions outside their shared allowlists", () =>
 test("minimize is resident in the cross-platform tray", () => {
   assert.match(mainSource, /import \{[\s\S]*Tray[\s\S]*\} from "electron"/);
   assert.match(mainSource, /function createTray\(\)/);
+  assert.match(mainSource, /join\(resourceRoot, "tray-icon-mac\.png"\)/);
+  assert.match(mainSource, /icon\.setTemplateImage\(true\)/);
   assert.match(mainSource, /tray\.on\("click", restoreMainWindow\)/);
   assert.match(mainSource, /tray\.on\("double-click", restoreMainWindow\)/);
   assert.match(mainSource, /window\.on\("minimize", \(\) => \{[\s\S]*window\.hide\(\)/);
@@ -237,6 +239,18 @@ test("minimize is resident in the cross-platform tray", () => {
     from: "build/icon.png",
     to: "tray-icon.png",
   });
+  assert.deepEqual(packageJson.build.mac.extraResources, [
+    {
+      from: "../../target/release/pi-desktop-host-core",
+      to: "bin/pi-desktop-host-core",
+    },
+    {
+      from: "build/tray-icon-mac.png",
+      to: "tray-icon-mac.png",
+    },
+  ]);
+  assert.match(iconScriptSource, /tray-icon-mac\.png/);
+  assert.match(iconScriptSource, /ImageChops\.multiply/);
 });
 
 test("desktop packaging builds the native host before every local target", () => {

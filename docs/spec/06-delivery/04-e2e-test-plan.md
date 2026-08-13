@@ -4597,11 +4597,12 @@ This test plan spec is accepted when:
   tray menu and choose Show, then repeat with Quit. 5) Repeat in zh-CN and
   invoke macOS app activation while the window is hidden.
 - **Expected**: All minimize paths hide to one tray icon instead of quitting or
-  leaving a taskbar-minimized window. Show/click/double-click/app activation
-  restores the existing window; the localized menu contains Show PI-Desktop
-  and Quit PI-Desktop. Quit runs the normal shutdown sequence and leaves no
-  orphan host, sidecar, or tray process. Closing the window remains an explicit
-  quit action.
+  leaving a taskbar-minimized window. On macOS the menu bar icon is a readable
+  transparent monochrome PI mark without the rounded application tile.
+  Show/click/double-click/app activation restores the existing window; the
+  localized menu contains Show PI-Desktop and Quit PI-Desktop. Quit runs the
+  normal shutdown sequence and leaves no orphan host, sidecar, or tray process.
+  Closing the window remains an explicit quit action.
 - **Specs linked**: `03-runtime/07-process-model.md`,
   `04-ux/09-interaction-patterns.md`, `08-meta/decisions-log.md` (D216),
   ADR 0078

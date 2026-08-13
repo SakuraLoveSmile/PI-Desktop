@@ -125,7 +125,9 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 - Minimize is a resident-shell action on every platform: the renderer button
   hides the main window to the PI-Desktop tray, while the macOS native traffic
   light and Window menu role are converted to the same hidden-to-tray state.
-  Tray activation restores and focuses the window; Quit remains explicit.
+  Tray activation restores and focuses the window; Quit remains explicit. On
+  macOS the tray uses a transparent monochrome template of the PI mark rather
+  than the rounded application tile, so it remains readable in the menu bar.
 - Windows/Linux do not render File/Edit/View/Window/Help in the titlebar and
   do not reserve left-side space for an application menubar. F10 and
   Shift+F10 remain available to focused content.

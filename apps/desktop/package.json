@@ -146,6 +146,10 @@
         {
           "from": "../../target/release/pi-desktop-host-core",
           "to": "bin/pi-desktop-host-core"
+        },
+        {
+          "from": "build/tray-icon-mac.png",
+          "to": "tray-icon-mac.png"
         }
       ]
     },
