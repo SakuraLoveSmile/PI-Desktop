@@ -24,7 +24,9 @@ losing their original top padding.
    use a frameless window with renderer-drawn controls.
 2. The existing sandboxed plugin-panel preload installs a host-owned 46px
    titlebar in a closed Shadow DOM. It renders the manifest panel title and
-   offsets the plugin body by 46px in addition to its computed top padding.
+   offsets the plugin body by 46px in addition to its computed top padding. It
+   also publishes `--pi-plugin-titlebar-height: 46px` for fixed/sticky plugin
+   UI that must sit below the host chrome.
 3. Windows/Linux expose minimize, maximize/restore, and close through one
    Electron-local fixed action tuple. Electron Main accepts the action only
    when the sender belongs to a live plugin panel and publishes maximize state
@@ -35,6 +37,8 @@ losing their original top padding.
 5. Controls carry localized accessible names, visible keyboard focus, theme-
    aware light/dark surfaces, and reduced-motion behavior. Reopening an already
    minimized panel restores and focuses the existing window.
+6. Development panels receive a host-only titlebar reminder for the 46px safe
+   area. Installed panels do not show this authoring hint.
 
 ## Consequences
 
@@ -44,7 +48,8 @@ losing their original top padding.
   replace its own document and therefore remove the preload-injected visual
   element. That does not grant a capability or cross the panel sandbox.
 - The host reserves 46px above plugin content. Panels that deliberately pin
-  viewport-fixed content to `top: 0` may need to account for the titlebar.
+  viewport-fixed content to `top: 0` must account for the titlebar, using the
+  injected `--pi-plugin-titlebar-height` variable.
 - The private window-control channel remains outside host-core protocol v9.
 
 ## Alternatives

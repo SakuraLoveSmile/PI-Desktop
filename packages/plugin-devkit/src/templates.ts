@@ -272,6 +272,11 @@ function panelHtml(vars: TemplateVars): string {
         background: #0b1020;
         color: #e8eefc;
       }
+      /*
+       * PI-Desktop adds the host titlebar safe area to normal flow. For a
+       * fixed/sticky top toolbar, use top: var(--pi-plugin-titlebar-height,
+       * 46px) so it does not sit beneath the frameless window chrome.
+       */
       .card {
         border: 1px solid #24304d;
         border-radius: 12px;
@@ -367,5 +372,13 @@ pnpm pi-plugin pack .
 
 Install the resulting \`.piplug\` from the Plugins page to test it the way a
 user would.
+
+### Panel safe area
+
+PI-Desktop owns a 46px frameless titlebar above panel content. Normal-flow
+content is offset automatically. Do not add another top padding or create a
+second titlebar. For \`position: fixed\` or \`position: sticky\` content, use
+\`top: var(--pi-plugin-titlebar-height, 46px)\` and account for the same value
+in viewport-height calculations.
 `;
 }

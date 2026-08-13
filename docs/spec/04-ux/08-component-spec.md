@@ -138,7 +138,9 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   Windows/Linux use the shared 112px control band with minimize,
   maximize/restore, and close. The host-owned titlebar reserves space above the
   plugin document, supports light/dark system appearance and reduced motion,
-  and stays isolated from plugin styles in a closed Shadow DOM.
+  and stays isolated from plugin styles in a closed Shadow DOM. The preload
+  exposes `--pi-plugin-titlebar-height: 46px` for fixed/sticky plugin content;
+  development panels display a compact safe-area reminder in the host chrome.
 
 ---
 
