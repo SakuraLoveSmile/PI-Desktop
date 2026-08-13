@@ -930,8 +930,8 @@ Each scenario is documented in this format:
 #### E2E-024C: Plugin package install and auto-update path
 
 - **Preconditions**: Marketplace catalog has a newer version or local `.piplug`.
-- **Steps**: 1) Install package from the header overflow menu. 2) Enable auto-update from the row overflow menu. 3) Run Check for updates, then Apply automatic updates.
-- **Expected**: The row moves to Updates available and the update banner reports the count; permissions the new version adds are tagged New in the review dialog; auto-update applies only when the permission diff is empty or pre-granted.
+- **Steps**: 1) Install package from the header overflow menu. 2) Enable auto-update from the row overflow menu. 3) Reopen Extensions and confirm the installed list refreshes update metadata. 4) Run Check for updates, then Apply automatic updates.
+- **Expected**: The row moves to Updates available and the update banner reports the count; the highest semantic version is selected even when the catalog version array is not newest-first; the explicit check fetches the current catalog and uses the cached catalog offline; permissions the new version adds are tagged New in the review dialog; auto-update applies only when the permission diff is empty or pre-granted.
 - **Specs linked**: `07-plugins/06-plugin-packaging.md`, `07-plugins/08-plugin-signing-updates.md`
 - **Acceptance**: G (package install + update policy)
 - **Status**: Documented

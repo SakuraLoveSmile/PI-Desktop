@@ -91,14 +91,15 @@ Rules:
 - Show the changelog
 - Upgrade after user confirmation
 
-### Automatic update (do later)
-Configurable:
-- off
-- notify-only
-- auto-for-official
-- auto-all (not recommended as the default)
+### Automatic update
 
-Automatic updates still go through verification and permission-change review.
+The desktop implementation is opt-in per installed plugin. Opening the
+Extensions page silently checks the remote catalog; the explicit Check for
+updates action always fetches a fresh catalog and falls back to the last valid
+cache when offline. Apply automatic updates upgrades only plugins with
+auto-update enabled and no new permissions, and still verifies the package
+checksum before installation. Updates that add permissions remain a manual
+review flow.
 
 ## 8. Permission-change review
 

@@ -513,6 +513,20 @@ export function PluginsPage() {
       .catch(() => setProjects([]));
   }, []);
 
+  // Refresh installed-plugin update metadata whenever this surface opens. The
+  // host keeps the last valid catalog for offline use, so a failed check is
+  // intentionally silent and never hides the installed list.
+  useEffect(() => {
+    void (async () => {
+      try {
+        await api.marketCheckUpdates();
+        await refreshPlugins();
+      } catch {
+        // Marketplace availability must not block local plugin management.
+      }
+    })();
+  }, [refreshPlugins]);
+
   // The marketplace query drives a debounced provider search: typing is the only
   // control, so there is no separate Search button that can fall out of sync.
   useEffect(() => {

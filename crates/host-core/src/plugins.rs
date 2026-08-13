@@ -3,6 +3,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::cmp::Ordering;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
@@ -193,8 +194,14 @@ pub struct MarketVersion {
     pub changelog: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min_pi_desktop: Option<String>,
+    /// Package metadata is optional while a publisher is preparing a release.
+    /// Such a version can be displayed and used for update discovery, but it
+    /// cannot be installed until its checksum and URL are published.
+    #[serde(default)]
     pub shasum: String,
+    #[serde(default)]
     pub url: String,
+    #[serde(default)]
     pub size_bytes: u64,
     pub permissions: Vec<String>,
 }
@@ -895,15 +902,16 @@ impl PluginManager {
 
     pub fn market_get(&self, plugin_id: &str) -> Result<MarketPluginDetail> {
         let catalog = self.load_catalog()?;
-        let entry = catalog
+        let mut entry = catalog
             .plugins
             .into_iter()
             .find(|p| p.id == plugin_id)
             .ok_or_else(|| anyhow!("PLUGIN_NOT_FOUND: {plugin_id}"))?;
-        let summary = self.to_market_summary(&entry);
-        let permissions = entry
+        entry
             .versions
-            .first()
+            .sort_by(|a, b| compare_plugin_versions(&b.version, &a.version));
+        let summary = self.to_market_summary(&entry);
+        let permissions = latest_market_version(&entry.versions)
             .map(|v| v.permissions.clone())
             .unwrap_or_default();
         Ok(MarketPluginDetail {
@@ -931,9 +939,15 @@ impl PluginManager {
                 .find(|v| v.version == version)
                 .cloned()
         } else {
-            detail.versions.first().cloned()
+            latest_market_version(&detail.versions).cloned()
         }
         .ok_or_else(|| anyhow!("PLUGIN_NOT_FOUND: version missing"))?;
+        if selected.shasum.trim().is_empty() || selected.url.trim().is_empty() {
+            bail!(
+                "PLUGIN_MARKET_INVALID: version {} is missing package download metadata",
+                selected.version
+            );
+        }
         Ok(MarketDownloadInfo {
             plugin_id: plugin_id.to_string(),
             version: selected.version,
@@ -949,18 +963,24 @@ impl PluginManager {
     }
 
     pub fn check_updates(&mut self) -> Result<Vec<PluginUpdateInfo>> {
-        let catalog = self.load_catalog()?;
+        // An explicit update check must not reuse the short-lived marketplace
+        // cache: a publisher may have released a plugin since the last search.
+        // Offline checks still use the last valid catalog.
+        let catalog = match self.refresh_catalog_from_remote(true) {
+            Ok(catalog) => catalog,
+            Err(_) => self.load_catalog()?,
+        };
         let mut updates = Vec::new();
         for plugin in self.runtime.iter_mut() {
             let Some(entry) = catalog.plugins.iter().find(|p| p.id == plugin.id) else {
                 plugin.update_available = None;
                 continue;
             };
-            let Some(latest) = entry.versions.first() else {
+            let Some(latest) = latest_market_version(&entry.versions) else {
                 plugin.update_available = None;
                 continue;
             };
-            if latest.version == plugin.version {
+            if compare_plugin_versions(&latest.version, &plugin.version) != Ordering::Greater {
                 plugin.update_available = None;
                 continue;
             }
@@ -1080,9 +1100,8 @@ impl PluginManager {
     }
 
     fn to_market_summary(&self, entry: &MarketCatalogEntry) -> MarketPluginSummary {
-        let latest = entry
-            .versions
-            .first()
+        let latest_version = latest_market_version(&entry.versions);
+        let latest = latest_version
             .map(|v| v.version.clone())
             .unwrap_or_else(|| "0.0.0".into());
         let installed = self.get(&entry.id);
@@ -1094,15 +1113,11 @@ impl PluginManager {
             icon_url: entry.icon_url.clone(),
             latest_version: latest.clone(),
             downloads: entry.downloads,
-            updated_at: entry
-                .versions
-                .first()
+            updated_at: latest_version
                 .map(|v| v.published_at.clone())
                 .unwrap_or_else(|| Utc::now().to_rfc3339()),
             categories: entry.categories.clone(),
-            permission_summary: entry
-                .versions
-                .first()
+            permission_summary: latest_version
                 .map(|v| v.permissions.clone())
                 .unwrap_or_default(),
             verified: entry.verified,
@@ -1113,6 +1128,104 @@ impl PluginManager {
                 .map(|p| p.version != latest)
                 .unwrap_or(false),
         }
+    }
+}
+
+/// Return the highest semantic version in a marketplace entry.
+///
+/// Catalog producers are not required to preserve ordering, and older
+/// catalogs did not consistently put the newest release first. Keep the
+/// ordering rule in the host so search, detail, install, and update checks all
+/// agree on the same release.
+fn latest_market_version<'a>(versions: &'a [MarketVersion]) -> Option<&'a MarketVersion> {
+    versions
+        .iter()
+        .max_by(|a, b| compare_plugin_versions(&a.version, &b.version))
+}
+
+fn compare_plugin_versions(left: &str, right: &str) -> Ordering {
+    let parsed_left = ParsedPluginVersion::parse(left);
+    let parsed_right = ParsedPluginVersion::parse(right);
+    match (parsed_left, parsed_right) {
+        (Some(left), Some(right)) => left.cmp(&right),
+        (Some(_), None) => Ordering::Greater,
+        (None, Some(_)) => Ordering::Less,
+        (None, None) => left.cmp(right),
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct ParsedPluginVersion<'a> {
+    core: Vec<u64>,
+    prerelease: Vec<&'a str>,
+}
+
+impl<'a> ParsedPluginVersion<'a> {
+    fn parse(version: &'a str) -> Option<Self> {
+        let version = version.trim().strip_prefix('v').unwrap_or(version.trim());
+        let version = version.split_once('+').map(|(v, _)| v).unwrap_or(version);
+        let (core, prerelease) = version.split_once('-').unwrap_or((version, ""));
+        let core = core
+            .split('.')
+            .map(|part| part.parse::<u64>().ok())
+            .collect::<Option<Vec<_>>>()?;
+        if core.is_empty()
+            || core.len() > 3
+            || (!prerelease.is_empty() && prerelease.split('.').any(|part| part.is_empty()))
+        {
+            return None;
+        }
+        Some(Self {
+            core,
+            prerelease: if prerelease.is_empty() {
+                Vec::new()
+            } else {
+                prerelease.split('.').collect()
+            },
+        })
+    }
+}
+
+impl Ord for ParsedPluginVersion<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        for (left, right) in self
+            .core
+            .iter()
+            .copied()
+            .chain(std::iter::repeat(0))
+            .zip(other.core.iter().copied().chain(std::iter::repeat(0)))
+            .take(3)
+        {
+            match left.cmp(&right) {
+                Ordering::Equal => continue,
+                order => return order,
+            }
+        }
+        match (self.prerelease.is_empty(), other.prerelease.is_empty()) {
+            (true, true) => Ordering::Equal,
+            (true, false) => Ordering::Greater,
+            (false, true) => Ordering::Less,
+            (false, false) => {
+                for (left, right) in self.prerelease.iter().zip(&other.prerelease) {
+                    let order = match (left.parse::<u64>(), right.parse::<u64>()) {
+                        (Ok(left), Ok(right)) => left.cmp(&right),
+                        (Ok(_), Err(_)) => Ordering::Less,
+                        (Err(_), Ok(_)) => Ordering::Greater,
+                        (Err(_), Err(_)) => left.cmp(right),
+                    };
+                    if order != Ordering::Equal {
+                        return order;
+                    }
+                }
+                self.prerelease.len().cmp(&other.prerelease.len())
+            }
+        }
+    }
+}
+
+impl PartialOrd for ParsedPluginVersion<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -2375,6 +2488,68 @@ mod tests {
             assert_eq!(installed.plugin.source, "marketplace");
             let listed = mgr.list();
             assert_eq!(listed.len(), 1);
+            unsafe {
+                std::env::remove_var("PI_DESKTOP_DATA_DIR");
+            }
+        });
+    }
+
+    #[test]
+    fn marketplace_uses_highest_semver_when_catalog_versions_are_unsorted() {
+        with_local_market(|| {
+            let dir = tempdir().unwrap();
+            unsafe {
+                std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+            }
+            let mgr = PluginManager::new(dir.path());
+            let entry = MarketCatalogEntry {
+                id: "pi.todo".into(),
+                name: "Fresh Todo".into(),
+                description: "Todo plugin".into(),
+                author: "PI-Desktop".into(),
+                icon_url: None,
+                categories: vec![],
+                verified: true,
+                downloads: None,
+                homepage: None,
+                repository: None,
+                readme_markdown: None,
+                safety_notes: None,
+                versions: vec![
+                    MarketVersion {
+                        version: "0.5.0".into(),
+                        published_at: "2026-08-12T00:00:00Z".into(),
+                        changelog: None,
+                        min_pi_desktop: None,
+                        shasum: "old".into(),
+                        url: "old.piplug".into(),
+                        size_bytes: 1,
+                        permissions: vec!["ui.panel".into()],
+                    },
+                    MarketVersion {
+                        version: "0.5.1".into(),
+                        published_at: "2026-08-13T00:00:00Z".into(),
+                        changelog: None,
+                        min_pi_desktop: None,
+                        shasum: "new".into(),
+                        url: "new.piplug".into(),
+                        size_bytes: 1,
+                        permissions: vec!["ui.panel".into(), "notify".into()],
+                    },
+                ],
+            };
+
+            let summary = mgr.to_market_summary(&entry);
+            assert_eq!(summary.latest_version, "0.5.1");
+            assert!(!summary.update_available);
+            assert_eq!(
+                latest_market_version(&entry.versions)
+                    .expect("latest version")
+                    .version,
+                "0.5.1"
+            );
+            assert_eq!(compare_plugin_versions("0.5.1", "0.5.0"), Ordering::Greater);
+            assert_eq!(compare_plugin_versions("0.5.1", "0.5.1-beta.1"), Ordering::Greater);
             unsafe {
                 std::env::remove_var("PI_DESKTOP_DATA_DIR");
             }

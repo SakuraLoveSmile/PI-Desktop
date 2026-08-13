@@ -63,6 +63,10 @@ test("plugins page includes marketplace install and auto-update controls", () =>
   assert.match(pageSrc, /permissionReview|grantedPermissions/);
 });
 
+test("plugins page refreshes installed update metadata when it opens", () => {
+  assert.match(pageSrc, /useEffect\(\(\) => \{[\s\S]*api\.marketCheckUpdates\(\)[\s\S]*refreshPlugins\(\)/);
+});
+
 test("shared protocol declares marketplace and package install IPC", () => {
   for (const channel of [
     "pluginInstallFromPackage",

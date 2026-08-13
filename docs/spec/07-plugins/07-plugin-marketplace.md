@@ -92,6 +92,9 @@ type MarketPluginDetail = MarketPluginSummary & {
  publishedAt: string
  changelog?: string
  minPiDesktop?: string
+ shasum?: string
+ url?: string
+ sizeBytes?: number
  }>
  screenshots?: string[]
  homepage?: string
@@ -100,6 +103,14 @@ type MarketPluginDetail = MarketPluginSummary & {
  safetyNotes?: string
 }
 ```
+
+Version entries are an unordered catalog input. The host parses semantic
+versions and selects the highest valid version as `latestVersion`; it does not
+assume the first array entry is newest. Detail responses order versions newest
+first, and an install without an explicit version targets that same latest
+version. Invalid version strings are lower priority than valid semantic
+versions. A version without `shasum` or `url` remains visible for discovery
+but is not installable until the publisher completes its package metadata.
 
 ### MarketDownloadInfo
 ```ts
@@ -145,14 +156,17 @@ combination.
 
 ## 6. Update path
 
-1. `checkUpdates` after startup or on a schedule
+1. `checkUpdates` when Extensions opens or on a schedule
 2. Compare installed version with latest
 3. UI shows the list of available updates
 4. Download and upgrade after user confirmation
 
 Strategy:
-- First version after MVP: manual update
-- Later: optional auto-update (low-risk plugins or official plugins only)
+- Installed update metadata is checked silently when Extensions opens.
+- An explicit check refreshes the remote catalog and falls back to the last
+  valid cache when offline.
+- Optional auto-update remains per-plugin and never silently accepts a new
+  permission.
 
 ## 7. Marketplace UI information architecture
 
@@ -301,6 +315,11 @@ Maintenance flow:
 3. `python3 scripts/rebuild_catalog.py`
 4. Commit + push to `main`
 5. PI-Desktop refreshes via `market.refresh` / marketplace UI
+
+An explicit update check performs a fresh remote catalog fetch and falls back
+to the last valid local catalog when offline. Opening the Extensions page also
+performs a silent update check so installed rows do not remain stale after a
+marketplace release.
 
 Override catalog URL with env:
 
