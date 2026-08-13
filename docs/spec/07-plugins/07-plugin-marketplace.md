@@ -141,6 +141,13 @@ browse/search
 
 On any validation failure: abort and optionally clean up the cache.
 
+The host refreshes the catalog immediately before a marketplace download so
+the package URL and checksum come from the same current catalog snapshot. This
+prevents a short-lived UI/catalog cache from being paired with a newer package
+at a mutable release URL. If the refresh is unavailable, the host may use the
+last valid catalog for an offline install, but it still verifies the downloaded
+bytes against that catalog checksum.
+
 `.piplug` packages are now producible locally: `pnpm pi-plugin pack <dir>`
 (equally, the `PluginPack` agent tool) writes `dist/<id>-<version>.piplug` and
 prints its sha256, and the plugins page installs that file through the same

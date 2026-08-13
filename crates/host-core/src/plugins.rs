@@ -869,6 +869,18 @@ impl PluginManager {
         }
     }
 
+    /// Resolve install metadata from a fresh catalog snapshot whenever the
+    /// marketplace is reachable. The package URL points at a mutable release
+    /// channel such as `main`, so pairing it with a recently cached checksum
+    /// can reject a valid package after the publisher replaces that release.
+    /// Offline installs still use the last valid catalog through `load_catalog`.
+    fn load_catalog_for_install(&self) -> Result<MarketCatalogFile> {
+        match self.refresh_catalog_from_remote(true) {
+            Ok(catalog) => Ok(catalog),
+            Err(_) => self.load_catalog(),
+        }
+    }
+
     pub fn market_search(
         &self,
         query: Option<&str>,
@@ -931,15 +943,32 @@ impl PluginManager {
         plugin_id: &str,
         version: Option<&str>,
     ) -> Result<MarketDownloadInfo> {
-        let detail = self.market_get(plugin_id)?;
+        // Keep the public download-info seam on the same freshness boundary as
+        // `market.install`; callers must not receive a URL/checksum pair from
+        // an old catalog when the marketplace is reachable.
+        let catalog = self.load_catalog_for_install()?;
+        self.market_download_info_from_catalog(&catalog, plugin_id, version)
+    }
+
+    fn market_download_info_from_catalog(
+        &self,
+        catalog: &MarketCatalogFile,
+        plugin_id: &str,
+        version: Option<&str>,
+    ) -> Result<MarketDownloadInfo> {
+        let entry = catalog
+            .plugins
+            .iter()
+            .find(|p| p.id == plugin_id)
+            .ok_or_else(|| anyhow!("PLUGIN_NOT_FOUND: {plugin_id}"))?;
         let selected = if let Some(version) = version {
-            detail
+            entry
                 .versions
                 .iter()
                 .find(|v| v.version == version)
                 .cloned()
         } else {
-            latest_market_version(&detail.versions).cloned()
+            latest_market_version(&entry.versions).cloned()
         }
         .ok_or_else(|| anyhow!("PLUGIN_NOT_FOUND: version missing"))?;
         if selected.shasum.trim().is_empty() || selected.url.trim().is_empty() {
@@ -2488,6 +2517,65 @@ mod tests {
             assert_eq!(installed.plugin.source, "marketplace");
             let listed = mgr.list();
             assert_eq!(listed.len(), 1);
+            unsafe {
+                std::env::remove_var("PI_DESKTOP_DATA_DIR");
+            }
+        });
+    }
+
+    #[test]
+    fn marketplace_install_refreshes_catalog_before_checksum_verification() {
+        with_local_market(|| {
+            let dir = tempdir().unwrap();
+            unsafe {
+                std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+            }
+            let mut mgr = PluginManager::new(dir.path());
+            let package_bytes = bundled_package_bytes("demo.hello", "0.2.0").unwrap();
+            let package_path = dir.path().join("fresh-demo.hello.piplug");
+            fs::write(&package_path, &package_bytes).unwrap();
+
+            let mut remote = built_in_catalog();
+            let remote_version = &mut remote.plugins[0].versions[0];
+            remote_version.url = format!("file://{}", package_path.to_string_lossy());
+            remote_version.shasum = sha256_hex(&package_bytes);
+            let remote_catalog_path = dir.path().join("remote-catalog.json");
+            fs::write(
+                &remote_catalog_path,
+                serde_json::to_string_pretty(&remote).unwrap(),
+            )
+            .unwrap();
+
+            // Simulate the UI's still-fresh cache from before the publisher
+            // replaced the package at the mutable marketplace URL.
+            let mut cached = remote.clone();
+            cached.plugins[0].versions[0].shasum = "stale-checksum".into();
+            fs::write(
+                mgr.catalog_path(),
+                serde_json::to_string_pretty(&cached).unwrap(),
+            )
+            .unwrap();
+            fs::write(
+                mgr.market_cache_meta_path(),
+                serde_json::to_string(&json!({
+                    "fetchedAt": Utc::now().to_rfc3339()
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+            unsafe {
+                std::env::set_var(
+                    "PI_DESKTOP_PLUGIN_MARKET_URL",
+                    format!("file://{}", remote_catalog_path.to_string_lossy()),
+                );
+            }
+
+            let installed = mgr
+                .install_from_market("demo.hello", None, true, false, None)
+                .expect("install should use the refreshed checksum");
+            assert_eq!(installed.plugin.id, "demo.hello");
+            assert_eq!(installed.plugin.version, "0.2.0");
+
             unsafe {
                 std::env::remove_var("PI_DESKTOP_DATA_DIR");
             }
