@@ -14,6 +14,39 @@ use crate::activation::ActivationScope;
 const MAX_PACKAGE_BYTES: u64 = 50 * 1024 * 1024;
 const MAX_PACKAGE_FILES: usize = 2000;
 
+/// Official marketplace catalog, served from the dedicated GitHub repo.
+pub const OFFICIAL_MARKET_CATALOG_URL: &str =
+    "https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/catalog.json";
+
+/// Mirror for networks that cannot reach `raw.githubusercontent.com`.
+///
+/// The mirror serves a byte-identical catalog and packages, and catalog
+/// package URLs are relative, so `resolve_package_url` keeps downloads on
+/// whichever source the catalog came from and shasum verification is
+/// unaffected by the switch.
+pub const MIRROR_MARKET_CATALOG_URL: &str =
+    "https://cnb.cool/aixk/pi-desktop-plugins/-/git/raw/main/catalog.json";
+
+/// Resolve the catalog URL pinned by persisted app settings.
+///
+/// `pluginMarketSource` selects the provider; `custom` reads the URL from
+/// `pluginMarketCustomUrl`. Returns `None` when settings do not pin a source
+/// (or pin `custom` without a URL), which leaves the official default in
+/// place.
+pub fn market_source_from_settings(settings: Option<&Value>) -> Option<String> {
+    let settings = settings?;
+    match settings.get("pluginMarketSource").and_then(Value::as_str) {
+        Some("mirror") => Some(MIRROR_MARKET_CATALOG_URL.to_string()),
+        Some("custom") => settings
+            .get("pluginMarketCustomUrl")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|url| !url.is_empty())
+            .map(str::to_string),
+        _ => None,
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginSettingOption {
@@ -164,6 +197,11 @@ pub struct MarketPluginSummary {
     pub installed_version: Option<String>,
     #[serde(default)]
     pub update_available: bool,
+    /// Whether `latest_version` carries the package metadata an install needs.
+    /// A publisher can announce a version before uploading its package; the
+    /// row stays visible for discovery but must not offer an install action.
+    #[serde(default)]
+    pub installable: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -302,13 +340,21 @@ pub struct InstallResult {
 pub struct PluginManager {
     data_dir: PathBuf,
     runtime: Vec<PluginSummary>,
+    /// Catalog URL pinned by app settings; `None` keeps the official default.
+    market_source: Option<String>,
 }
 
 impl PluginManager {
-    pub fn new(data_dir: &Path) -> Self {
+    /// Build a manager against a specific catalog source.
+    ///
+    /// The source is applied before the first catalog fetch so a mirror
+    /// configured in settings is honoured on the very first launch, not only
+    /// after an explicit refresh.
+    pub fn new(data_dir: &Path, market_source: Option<String>) -> Self {
         let mut mgr = Self {
             data_dir: data_dir.to_path_buf(),
             runtime: Vec::new(),
+            market_source,
         };
         let _ = mgr.ensure_dirs();
         let _ = mgr.ensure_default_catalog();
@@ -711,11 +757,28 @@ impl PluginManager {
         Ok(None)
     }
 
-    fn market_source_url() -> String {
-        std::env::var("PI_DESKTOP_PLUGIN_MARKET_URL").unwrap_or_else(|_| {
-            "https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/catalog.json"
-                .to_string()
-        })
+    /// Catalog URL in effect, highest precedence first.
+    ///
+    /// The environment override stays on top so dev builds and tests can point
+    /// at a local catalog without touching persisted settings.
+    pub fn market_source_url(&self) -> String {
+        if let Ok(url) = std::env::var("PI_DESKTOP_PLUGIN_MARKET_URL") {
+            if !url.trim().is_empty() {
+                return url;
+            }
+        }
+        self.market_source
+            .clone()
+            .unwrap_or_else(|| OFFICIAL_MARKET_CATALOG_URL.to_string())
+    }
+
+    /// Re-pin the catalog source after the user switches providers.
+    ///
+    /// Cached snapshots are left on disk: they are keyed back to their source
+    /// through `cache-meta.json`, so a snapshot from another provider is
+    /// ignored rather than deleted and switching back keeps working offline.
+    pub fn set_market_source(&mut self, market_source: Option<String>) {
+        self.market_source = market_source;
     }
 
     fn market_cache_meta_path(&self) -> PathBuf {
@@ -793,11 +856,36 @@ impl PluginManager {
         catalog
     }
 
+    /// Source URL the on-disk snapshot was fetched from, when recorded.
+    fn cached_catalog_source(&self) -> Option<String> {
+        let raw = fs::read_to_string(self.market_cache_meta_path()).ok()?;
+        let meta: Value = serde_json::from_str(&raw).ok()?;
+        meta.get("sourceUrl")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    }
+
+    /// Whether the snapshot on disk came from the source currently in effect.
+    ///
+    /// Package URLs are rewritten to absolute form against the catalog they
+    /// arrived with, so a snapshot from another provider would keep installs
+    /// pointed at the source the user just switched away from.
+    fn cached_catalog_matches_source(&self, catalog_url: &str) -> bool {
+        match self.cached_catalog_source() {
+            Some(cached) => cached == catalog_url,
+            // No recorded source means the snapshot was never fetched from a
+            // provider — it is the bundled offline fallback, which carries no
+            // provider-specific URLs. Keep it instead of discarding what may
+            // be the only catalog available.
+            None => true,
+        }
+    }
+
     fn refresh_catalog_from_remote(&self, force: bool) -> Result<MarketCatalogFile> {
-        let catalog_url = Self::market_source_url();
+        let catalog_url = self.market_source_url();
         let cache_path = self.catalog_path();
         let meta_path = self.market_cache_meta_path();
-        if !force && cache_path.exists() {
+        if !force && cache_path.exists() && self.cached_catalog_matches_source(&catalog_url) {
             if let Ok(meta_raw) = fs::read_to_string(&meta_path) {
                 if let Ok(meta) = serde_json::from_str::<Value>(&meta_raw) {
                     let fetched_at = meta.get("fetchedAt").and_then(|v| v.as_str()).unwrap_or("");
@@ -847,7 +935,7 @@ impl PluginManager {
             "homepage": catalog.homepage,
             "updatedAt": catalog.updated_at,
             "pluginCount": catalog.plugins.len(),
-            "sourceUrl": Self::market_source_url(),
+            "sourceUrl": self.market_source_url(),
         }))
     }
 
@@ -863,11 +951,17 @@ impl PluginManager {
     /// Silent checks run while the Extensions surface is opening. They must
     /// never hold the host RPC state lock behind a remote timeout; an explicit
     /// refresh remains responsible for fetching the latest catalog.
+    ///
+    /// A snapshot left by a different source is skipped rather than deleted,
+    /// so switching back to a previously used provider recovers its catalog
+    /// without a round trip.
     fn load_cached_catalog(&self) -> Result<MarketCatalogFile> {
-        if let Ok(raw) = fs::read_to_string(self.catalog_path()) {
-            if let Ok(catalog) = serde_json::from_str::<MarketCatalogFile>(&raw) {
-                if !catalog.plugins.is_empty() {
-                    return Ok(catalog);
+        if self.cached_catalog_matches_source(&self.market_source_url()) {
+            if let Ok(raw) = fs::read_to_string(self.catalog_path()) {
+                if let Ok(catalog) = serde_json::from_str::<MarketCatalogFile>(&raw) {
+                    if !catalog.plugins.is_empty() {
+                        return Ok(catalog);
+                    }
                 }
             }
         }
@@ -979,7 +1073,7 @@ impl PluginManager {
             latest_market_version(&entry.versions).cloned()
         }
         .ok_or_else(|| anyhow!("PLUGIN_NOT_FOUND: version missing"))?;
-        if selected.shasum.trim().is_empty() || selected.url.trim().is_empty() {
+        if !has_package_metadata(&selected) {
             bail!(
                 "PLUGIN_MARKET_INVALID: version {} is missing package download metadata",
                 selected.version
@@ -1077,6 +1171,12 @@ impl PluginManager {
             .iter()
             .filter_map(|p| {
                 let update = p.update_available.clone()?;
+                // An announced-but-unpublished version stays visible as an
+                // update, yet installing it can only fail. Skipping it here
+                // keeps one incomplete catalog entry from aborting the batch.
+                if update.shasum.trim().is_empty() || update.url.trim().is_empty() {
+                    return None;
+                }
                 if only_auto && !p.auto_update.unwrap_or(false) {
                     return None;
                 }
@@ -1169,8 +1269,19 @@ impl PluginManager {
                 .as_ref()
                 .map(|p| p.version != latest)
                 .unwrap_or(false),
+            installable: latest_version.map(has_package_metadata).unwrap_or(false),
         }
     }
+}
+
+/// Whether a catalog version carries everything an install needs.
+///
+/// A publisher can announce a version before its package is uploaded, so the
+/// checksum and URL are optional in the catalog schema. Every surface that
+/// offers an install decides against this predicate rather than assuming the
+/// fields are present.
+fn has_package_metadata(version: &MarketVersion) -> bool {
+    !version.shasum.trim().is_empty() && !version.url.trim().is_empty()
 }
 
 /// Return the highest semantic version in a marketplace entry.
@@ -2496,7 +2607,19 @@ mod tests {
     use crate::activation::ActivationMode;
     use tempfile::tempdir;
 
+    /// Serializes tests that repoint `PI_DESKTOP_PLUGIN_MARKET_URL`.
+    ///
+    /// The marketplace source is process-global, so two tests pointing it at
+    /// different catalogs — or one clearing it while another is mid-fetch —
+    /// read each other's value.
+    static MARKET_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn lock_market_env() -> std::sync::MutexGuard<'static, ()> {
+        MARKET_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     fn with_local_market<T>(f: impl FnOnce() -> T) -> T {
+        let _guard = lock_market_env();
         // Force offline/local fallback path for deterministic unit tests.
         // Safety: test-only process env mutation.
         unsafe {
@@ -2519,7 +2642,7 @@ mod tests {
             unsafe {
                 std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
             }
-            let mut mgr = PluginManager::new(dir.path());
+            let mut mgr = PluginManager::new(dir.path(), None);
             let search = mgr.market_search(Some("hello"), None).unwrap();
             assert!(!search.is_empty());
             let installed = mgr
@@ -2543,7 +2666,7 @@ mod tests {
             unsafe {
                 std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
             }
-            let mut mgr = PluginManager::new(dir.path());
+            let mut mgr = PluginManager::new(dir.path(), None);
             let package_bytes = bundled_package_bytes("demo.hello", "0.2.0").unwrap();
             let package_path = dir.path().join("fresh-demo.hello.piplug");
             fs::write(&package_path, &package_bytes).unwrap();
@@ -2602,7 +2725,7 @@ mod tests {
             unsafe {
                 std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
             }
-            let mgr = PluginManager::new(dir.path());
+            let mgr = PluginManager::new(dir.path(), None);
             let entry = MarketCatalogEntry {
                 id: "pi.todo".into(),
                 name: "Fresh Todo".into(),
@@ -2658,13 +2781,74 @@ mod tests {
     }
 
     #[test]
+    fn announced_version_without_a_package_is_visible_but_not_installable() {
+        with_local_market(|| {
+            let dir = tempdir().unwrap();
+            unsafe {
+                std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+            }
+            let mut mgr = PluginManager::new(dir.path(), None);
+            mgr.install_from_market("demo.hello", None, true, true, None)
+                .unwrap();
+
+            // The publisher announced 0.9.0 but has not uploaded its package.
+            let mut catalog = built_in_catalog();
+            let announced = MarketVersion {
+                version: "0.9.0".into(),
+                published_at: "2026-08-13T00:00:00Z".into(),
+                changelog: None,
+                min_pi_desktop: None,
+                shasum: String::new(),
+                url: String::new(),
+                size_bytes: 0,
+                permissions: catalog.plugins[0].versions[0].permissions.clone(),
+            };
+            catalog.plugins[0].versions.push(announced);
+            fs::write(
+                mgr.catalog_path(),
+                serde_json::to_string_pretty(&catalog).unwrap(),
+            )
+            .unwrap();
+
+            // Discovery still shows the newest version, flagged as unbuyable.
+            let summary = &mgr.market_search(Some("Hello"), None).unwrap()[0];
+            assert_eq!(summary.latest_version, "0.9.0");
+            assert!(!summary.installable);
+            assert!(
+                mgr.market_get("demo.hello")
+                    .unwrap()
+                    .versions
+                    .iter()
+                    .any(|v| v.version == "0.9.0")
+            );
+
+            // The install seam refuses it, and a batch update skips it instead
+            // of failing the whole run.
+            let err = mgr
+                .market_download_info("demo.hello", Some("0.9.0"))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("PLUGIN_MARKET_INVALID"), "{err}");
+            let updates = mgr.check_updates(false).unwrap();
+            assert_eq!(updates.len(), 1);
+            assert_eq!(updates[0].version, "0.9.0");
+            assert!(mgr.apply_updates(false).unwrap().is_empty());
+            assert_eq!(mgr.get("demo.hello").unwrap().version, "0.2.0");
+
+            unsafe {
+                std::env::remove_var("PI_DESKTOP_DATA_DIR");
+            }
+        });
+    }
+
+    #[test]
     fn silent_update_check_uses_cached_catalog_without_refreshing_remote() {
         with_local_market(|| {
             let dir = tempdir().unwrap();
             unsafe {
                 std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
             }
-            let mut mgr = PluginManager::new(dir.path());
+            let mut mgr = PluginManager::new(dir.path(), None);
             mgr.install_from_market("demo.hello", None, true, false, None)
                 .unwrap();
 
@@ -2715,7 +2899,7 @@ mod tests {
         let bad = make_zip(&[("../evil.js", b"alert(1)")]);
         let pkg = dir.path().join("bad.piplug");
         fs::write(&pkg, bad).unwrap();
-        let mut mgr = PluginManager::new(dir.path());
+        let mut mgr = PluginManager::new(dir.path(), None);
         let err = mgr
             .install_from_package(
                 pkg.to_str().unwrap(),
@@ -2748,7 +2932,7 @@ mod tests {
             if packages_dir.exists() {
                 let _ = fs::remove_dir_all(&packages_dir);
             }
-            let mut mgr = PluginManager::new(dir.path());
+            let mut mgr = PluginManager::new(dir.path(), None);
             let installed = mgr
                 .install_from_market("demo.workspace-notes", None, true, false, None)
                 .unwrap();
@@ -2782,6 +2966,7 @@ mod tests {
 
     #[test]
     fn refresh_catalog_from_official_repo_when_network_available() {
+        let _guard = lock_market_env();
         // Skip cleanly if offline / rate-limited.
         let url = "https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/catalog.json";
         if download_url(url).is_err() {
@@ -2792,7 +2977,7 @@ mod tests {
             std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
             std::env::set_var("PI_DESKTOP_PLUGIN_MARKET_URL", url);
         }
-        let mgr = PluginManager::new(dir.path());
+        let mgr = PluginManager::new(dir.path(), None);
         let meta = mgr.refresh_market(true).expect("remote catalog");
         assert_eq!(meta["providerId"], "official");
         assert!(meta["pluginCount"].as_u64().unwrap_or(0) >= 1);
@@ -2806,6 +2991,116 @@ mod tests {
             std::env::remove_var("PI_DESKTOP_DATA_DIR");
             std::env::remove_var("PI_DESKTOP_PLUGIN_MARKET_URL");
         }
+    }
+
+    #[test]
+    fn market_source_from_settings_selects_the_configured_provider() {
+        assert_eq!(market_source_from_settings(None), None);
+        assert_eq!(market_source_from_settings(Some(&json!({}))), None);
+        // `official` stays on the built-in default rather than pinning a URL,
+        // so a later default change reaches users who never switched.
+        assert_eq!(
+            market_source_from_settings(Some(&json!({"pluginMarketSource": "official"}))),
+            None
+        );
+        assert_eq!(
+            market_source_from_settings(Some(&json!({"pluginMarketSource": "mirror"}))).as_deref(),
+            Some(MIRROR_MARKET_CATALOG_URL)
+        );
+        assert_eq!(
+            market_source_from_settings(Some(&json!({
+                "pluginMarketSource": "custom",
+                "pluginMarketCustomUrl": "  https://example.test/catalog.json  ",
+            })))
+            .as_deref(),
+            Some("https://example.test/catalog.json")
+        );
+        // A custom source with no URL must not strand the marketplace on an
+        // empty endpoint.
+        assert_eq!(
+            market_source_from_settings(Some(&json!({
+                "pluginMarketSource": "custom",
+                "pluginMarketCustomUrl": "   ",
+            }))),
+            None
+        );
+    }
+
+    #[test]
+    fn cached_catalog_is_scoped_to_the_source_that_fetched_it() {
+        with_local_market(|| {
+            let dir = tempdir().unwrap();
+            unsafe {
+                std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+            }
+            let mgr = PluginManager::new(dir.path(), None);
+            // A bundled offline snapshot records no source and stays usable
+            // whichever provider is selected.
+            let _ = fs::remove_file(mgr.market_cache_meta_path());
+            assert!(mgr.cached_catalog_matches_source(OFFICIAL_MARKET_CATALOG_URL));
+            assert!(mgr.cached_catalog_matches_source(MIRROR_MARKET_CATALOG_URL));
+
+            fs::create_dir_all(dir.path().join("plugins/market")).unwrap();
+            fs::write(
+                mgr.market_cache_meta_path(),
+                serde_json::to_string(&json!({"sourceUrl": MIRROR_MARKET_CATALOG_URL})).unwrap(),
+            )
+            .unwrap();
+            assert!(mgr.cached_catalog_matches_source(MIRROR_MARKET_CATALOG_URL));
+            assert!(!mgr.cached_catalog_matches_source(OFFICIAL_MARKET_CATALOG_URL));
+            unsafe {
+                std::env::remove_var("PI_DESKTOP_DATA_DIR");
+            }
+        });
+    }
+
+    #[test]
+    fn switching_source_ignores_the_previous_providers_snapshot() {
+        with_local_market(|| {
+            let local_source = std::env::var("PI_DESKTOP_PLUGIN_MARKET_URL").unwrap();
+            let dir = tempdir().unwrap();
+            unsafe {
+                std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
+            }
+            let mgr = PluginManager::new(dir.path(), None);
+
+            // A snapshot carrying a plugin the built-in catalog does not have,
+            // written while a different provider was selected.
+            let mut foreign = built_in_catalog();
+            foreign.provider_id = "mirror".into();
+            foreign.plugins.truncate(1);
+            foreign.plugins[0].id = "mirror.only".into();
+            foreign.plugins[0].name = "Mirror Only".into();
+            fs::create_dir_all(dir.path().join("plugins/market")).unwrap();
+            fs::write(
+                mgr.catalog_path(),
+                serde_json::to_string(&foreign).unwrap(),
+            )
+            .unwrap();
+            fs::write(
+                mgr.market_cache_meta_path(),
+                serde_json::to_string(&json!({"sourceUrl": MIRROR_MARKET_CATALOG_URL})).unwrap(),
+            )
+            .unwrap();
+
+            // Package URLs in that snapshot resolve against the provider that
+            // served it, so search must fall back to the built-in catalog.
+            let results = mgr.market_search(None, None).unwrap();
+            assert!(!results.iter().any(|p| p.id == "mirror.only"));
+            assert!(results.iter().any(|p| p.id == "demo.hello"));
+
+            // Re-record the snapshot against the active source and it is used.
+            fs::write(
+                mgr.market_cache_meta_path(),
+                serde_json::to_string(&json!({"sourceUrl": local_source})).unwrap(),
+            )
+            .unwrap();
+            let results = mgr.market_search(None, None).unwrap();
+            assert!(results.iter().any(|p| p.id == "mirror.only"));
+            unsafe {
+                std::env::remove_var("PI_DESKTOP_DATA_DIR");
+            }
+        });
     }
 
     fn write_plugin(root: &Path, manifest: Value, extra: &[(&str, &str)]) {
@@ -2902,7 +3197,7 @@ mod tests {
         unsafe {
             std::env::set_var("PI_DESKTOP_DATA_DIR", data.path());
         }
-        let mut mgr = PluginManager::new(data.path());
+        let mut mgr = PluginManager::new(data.path(), None);
         let summary = mgr.load_dev(root.to_str().unwrap()).unwrap();
         assert!(summary.capabilities.contains(&"mcp".to_string()));
         assert!(summary.capabilities.contains(&"bus".to_string()));
@@ -3091,7 +3386,7 @@ mod tests {
             &[],
         );
 
-        let mut mgr = PluginManager::new(dir.path());
+        let mut mgr = PluginManager::new(dir.path(), None);
         let installed = mgr
             .install_from_path(
                 source.to_str().unwrap(),
@@ -3123,7 +3418,7 @@ mod tests {
         assert!(!disabled.enabled);
         assert_eq!(disabled.scope.projects, vec!["/work/api".to_string()]);
 
-        let reloaded = PluginManager::new(dir.path());
+        let reloaded = PluginManager::new(dir.path(), None);
         let after = reloaded.get("demo.scoped").expect("plugin missing");
         assert_eq!(after.scope.mode, ActivationMode::Projects);
         assert_eq!(after.scope.projects, vec!["/work/api".to_string()]);
@@ -3131,7 +3426,7 @@ mod tests {
         // Reinstalling over the top is an update, not a reset: widening a
         // project-scoped plugin back to everywhere would hand it reach the user
         // never granted.
-        let mut mgr = PluginManager::new(dir.path());
+        let mut mgr = PluginManager::new(dir.path(), None);
         let again = mgr
             .install_from_path(
                 source.to_str().unwrap(),

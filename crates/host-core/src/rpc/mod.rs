@@ -1005,7 +1005,7 @@ async fn handle_request(
         }
         "settings.set" => {
             validate_settings_value(&params)?;
-            let st = state.lock().await;
+            let mut st = state.lock().await;
             let stored = st
                 .db
                 .get_setting("app")
@@ -1020,6 +1020,11 @@ async fn handle_request(
             st.db
                 .set_setting("app", &settings)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            // Re-pin the marketplace source in memory. Fetching here would hold
+            // the state lock behind a remote timeout, so the renderer triggers
+            // `market.refresh` after switching sources.
+            let market_source = crate::plugins::market_source_from_settings(Some(&settings));
+            st.plugins.set_market_source(market_source);
             Ok(json!({ "ok": true }))
         }
 
@@ -3148,7 +3153,11 @@ async fn handle_request(
                 .plugins
                 .market_search(query, category)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            Ok(json!({ "plugins": plugins, "providerId": "official" }))
+            Ok(json!({
+                "plugins": plugins,
+                "providerId": "official",
+                "sourceUrl": st.plugins.market_source_url(),
+            }))
         }
         "market.getDetail" => {
             let id = params

@@ -38,6 +38,27 @@
 - 包 URL 可以是绝对 `https://` / `http://` / `file://`，或根据目录 URL 解析的相对路径
 - HTTPS 获取在 host-core 中使用 `curl`
 
+### 目录来源选择
+
+「设置 → 扩展」决定目录从哪里获取。host-core 解析 URL 时把环境变量放在最高
+优先级，这样开发构建和测试可以指向本地目录，而不必改动已持久化的设置：
+
+| 优先级 | 来源 | 取值 |
+| --- | --- | --- |
+| 1 | `PI_DESKTOP_PLUGIN_MARKET_URL` | 任意 URL |
+| 2 | `pluginMarketSource: "mirror"` | `https://cnb.cool/aixk/pi-desktop-plugins/-/git/raw/main/catalog.json` |
+| 2 | `pluginMarketSource: "custom"` | `pluginMarketCustomUrl` |
+| 3 | `pluginMarketSource: "official"`（默认） | 上面的默认目录 URL |
+
+镜像用于无法访问 `raw.githubusercontent.com` 的网络环境。镜像提供的目录与官方
+逐字节一致，且目录中的包路径是相对路径，因此 `resolve_package_url` 会让安装包
+下载跟随提供该目录的来源，切换来源不影响 shasum 校验。
+
+缓存目录会通过 `plugins/market/cache-meta.json` 记录其来源。来自其他来源的快照
+只被忽略而不删除——它的包 URL 指向用户刚切走的那个提供商——所以切回去时无需
+重新请求即可恢复该目录。`settings.set` 只在内存中重新指定来源；在那里发起抓取
+会让 host RPC 状态锁卡在市场超时上，因此切换后由渲染进程触发 `market.refresh`。
+
 ### 客户端可见的目录策略
 
 保留稳定 ID 以 `demo.` 开头的仅开发示例条目
@@ -83,6 +104,7 @@ type MarketPluginSummary = {
  categories?: string[]
  permissionSummary: string[]
  verified?: boolean
+ installable?: boolean
 }
 ```
 
@@ -103,6 +125,25 @@ type MarketPluginDetail = MarketPluginSummary & {
  safetyNotes?: string
 }
 ```
+
+`installable` 表示 `latestVersion` 是否带有安装所需的包元数据（`url` 与
+`shasum`）。发布者可以先登记版本、稍后再上传安装包；这样的版本仍然可以被发现，
+但市场列表和详情面板会禁用安装按钮并标注「尚未发布安装包」，而不是发起一个
+host 必然拒绝的下载。批量更新会跳过这类版本，而不是让整批更新失败。
+
+### 目录发布闸门
+
+发布或排查一次发布之前，先在仓库里跑预检：
+
+```bash
+pnpm check:marketplace -- \
+  --url https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/catalog.json \
+  --plugin <plugin-id>
+```
+
+预检刻意比发现流程更严格：每个已发布版本都必须有合法且在该插件内唯一的语义化
+版本号、64 位 SHA-256 校验和、包 URL、正数包大小以及权限数组。目录没过这道闸门
+时，应当先在市场发布方修好，而不是去改客户端的更新行为。
 
 ### 市场下载信息
 ```ts

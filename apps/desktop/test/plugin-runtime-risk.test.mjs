@@ -4,6 +4,9 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { en } from "../../../packages/i18n/src/locales/en/index.ts";
+import { zhCN } from "../../../packages/i18n/src/locales/zh-CN/index.ts";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = join(here, "..");
 const repoRoot = join(desktopRoot, "../..");
@@ -102,4 +105,24 @@ test("marketplace detail pane renders readme changelog and versions", () => {
   assert.match(pageSrc, /marketGetDetail/);
   assert.match(pageSrc, /viewDetails|detailTitle|readmeMarkdown|versions/);
   assert.match(pageSrc, /installVersion|selectedVersion|changelog/);
+});
+
+// A publisher can list a version before uploading its package. The host then
+// refuses the download, so the UI must not offer an install that can only end
+// in PLUGIN_MARKET_INVALID.
+test("marketplace blocks install for a version with no published package", () => {
+  assert.match(pageSrc, /function versionInstallable\(/);
+  assert.match(pageSrc, /const packagePending = item\.installable === false/);
+  assert.match(pageSrc, /disabled=\{busyId === item\.id \|\| packagePending\}/);
+  assert.match(pageSrc, /disabled=\{busyId === detail\.id \|\| detailPackagePending\}/);
+  assert.match(pageSrc, /t\("plugins\.packagePending"\)/);
+  assert.match(pageSrc, /t\("plugins\.packagePendingHint", \{/);
+
+  const hostSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins.rs"), "utf8");
+  assert.match(hostSrc, /fn has_package_metadata\(version: &MarketVersion\) -> bool/);
+  assert.match(hostSrc, /installable: latest_version\.map\(has_package_metadata\)/);
+  for (const catalog of [en, zhCN]) {
+    assert.equal(typeof catalog.plugins.packagePending, "string");
+    assert.equal(typeof catalog.plugins.packagePendingHint, "string");
+  }
 });

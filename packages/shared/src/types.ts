@@ -665,8 +665,18 @@ export type AppSettings = {
   keybindings?: KeybindingOverrides;
   /** Unlocks the devtools console (settings button, F12, macOS View menu). */
   developerMode?: boolean;
+  /**
+   * Extension marketplace provider. `mirror` targets the cnb.cool copy for
+   * networks that cannot reach `raw.githubusercontent.com`; both serve the
+   * same catalog and packages.
+   */
+  pluginMarketSource?: PluginMarketSource;
+  /** Catalog URL used when `pluginMarketSource` is `custom`. */
+  pluginMarketCustomUrl?: string;
   onboardingDismissed: boolean;
 };
+
+export type PluginMarketSource = "official" | "mirror" | "custom";
 
 export type PluginUpdateInfo = {
   version: string;
@@ -939,6 +949,8 @@ export type MarketPluginSummary = {
   installed?: boolean;
   installedVersion?: string;
   updateAvailable?: boolean;
+  /** False when `latestVersion` has no published package to download yet. */
+  installable?: boolean;
 };
 
 export type MarketPluginDetail = MarketPluginSummary & {

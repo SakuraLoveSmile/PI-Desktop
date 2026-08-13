@@ -1554,6 +1554,13 @@
   font-family: var(--font-mono);
 }
 
+/* A version the publisher announced without uploading its package: kept
+   visible for discovery, marked so the missing download reads as a state
+   rather than an empty size and checksum. */
+.plugins-version-pending {
+  color: var(--ds-warning);
+}
+
 .plugins-version-changelog {
   color: var(--ds-text-secondary);
   font-size: var(--text-sm);

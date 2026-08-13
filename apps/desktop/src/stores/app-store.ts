@@ -38,6 +38,7 @@ import {
   PROTOCOL_VERSION,
 } from "@pi-desktop/shared";
 import { api } from "../lib/api";
+import type { SettingsTabId } from "../lib/settings-search";
 import { createNavigationIntentController } from "../lib/navigation-intent";
 import { rememberProject, setProjectPinned } from "../lib/recent-projects";
 import { normalizeProjectPath, sessionMatchesProject } from "../lib/sidebar-session-groups";
@@ -395,15 +396,9 @@ export type AppState = {
   notifications: AppNotification[];
   unreadNotificationCount: number;
   page: "chat" | "pulls" | "scheduled" | "plugins" | "settings";
-  settingsTab:
-    | "general"
-    | "ai"
-    | "shortcuts"
-    | "instructions"
-    | "agent"
-    | "import"
-    | "projects"
-    | "about";
+  /** Tab ids come from the shared settings index so nav, search, and the
+   * page cannot drift apart. */
+  settingsTab: SettingsTabId;
   /** Pending row anchor (i18n key) to flash after landing on a settings tab. */
   settingsAnchor: string | null;
   navStack: Array<{ page: AppState["page"]; sessionId?: string }>;
