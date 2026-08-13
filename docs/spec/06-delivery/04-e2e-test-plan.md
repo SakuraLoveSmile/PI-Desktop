@@ -936,6 +936,28 @@ Each scenario is documented in this format:
 - **Acceptance**: G (package install + update policy)
 - **Status**: Documented
 
+#### E2E-024N: Marketplace update diagnosis and release-data gate
+
+- **Preconditions**: A catalog fixture contains an installed `0.5.0` plugin, a
+  `0.5.1` version, and either unsorted version entries or intentionally missing
+  package metadata.
+- **Steps**: 1) Record the plugin ID, installed version, displayed latest
+  version, catalog URL, and local cache path. 2) Fetch the live/fixture catalog
+  and inspect the exact entry. 3) Inspect the installed registry separately.
+  4) Run `pnpm check:marketplace -- --url <catalog> --plugin <id>`. 5) Run the
+  update check against the fixture.
+- **Expected**: The failure is classified as catalog data, fetch/cache,
+  host comparison, IPC propagation, or renderer presentation before code is
+  changed; the preflight reports every missing checksum, URL, package size, or
+  permissions field; an incomplete release may be shown for discovery but is
+  not installable; a valid `0.5.1` is detected regardless of catalog ordering;
+  the final fix includes a regression test for the diagnosed boundary.
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md`,
+  `07-plugins/08-plugin-signing-updates.md`,
+  `06-delivery/03-ai-development-workflow.md`
+- **Acceptance**: G (marketplace update diagnosis)
+- **Status**: Documented / preflight script
+
 #### E2E-024H: Installed plugins surface state, risk, and failures
 
 - **Preconditions**: At least one enabled plugin, one disabled plugin, and one plugin whose load failed.
