@@ -4794,8 +4794,8 @@ This test plan spec is accepted when:
      confirm the menu opens as a floating layer above the card (not clipped or
      squeezed inside it) and stays readable when the card is near the bottom
      edge of the window; with many installed families, confirm the list opens
-     without an input stall and scrolls immediately (rows outside the viewport
-     render progressively as the list is scrolled).
+     without an input stall and scrolls immediately (only the visible rows
+     are rendered, with an overscan buffer).
   3) Select Geist and confirm the trigger label and the whole UI re-render in
      Geist without a reload, including CJK fallback rendering for Chinese text.
   4) Select an installed system family and confirm the UI switches to it; the
@@ -4813,10 +4813,11 @@ This test plan spec is accepted when:
   excluded); selection persists as a CSS stack in `AppSettings.fontFamily` and
   overrides `--font-sans` live; Chinese text stays readable through the CJK
   fallback tier; the menu is a body-level floating layer that is never clipped
-  by the settings card; rows outside the viewport skip layout, paint, and
-  per-row font loading (`content-visibility: auto`) so opening and scrolling
-  the picker never blocks input; System default clears the override by
-  persisting an empty stack.
+  by the settings card; the option list is windowed with fixed row heights
+  and an overscan buffer so only the visible slice is in the DOM, keeping
+  opening, scrolling, and typing responsive regardless of how many families
+  are installed; System default clears the override by persisting an empty
+  stack.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
   `03-runtime/01-ipc-protocol.md`, ADR 0083
 - **Acceptance**: A (core shell), H (localization)

@@ -14,6 +14,12 @@ import {
   loadSystemFonts,
   readableFontFamily,
 } from "../../lib/fonts";
+import {
+  buildFontListLayout,
+  FONT_GROUP_ROW_HEIGHT,
+  FONT_OPTION_ROW_HEIGHT,
+  visibleRowRange,
+} from "../../lib/font-list";
 import { IconCheck, IconChevronDown, IconSearch } from "../icons";
 
 /**
@@ -45,6 +51,9 @@ export function FontFamilyRow({
   const menuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef(320);
+  const scrollFrameRef = useRef(0);
+  const [scrollTop, setScrollTop] = useState(0);
 
   const closeMenu = useCallback(() => {
     setOpen(false);
@@ -156,6 +165,22 @@ export function FontFamilyRow({
     );
   }, [options, query]);
 
+  const groupLabel = useCallback((group: string) => {
+    if (group === "bundled") return t("settings.fontBundled");
+    if (group === "system") return t("settings.fontSystem");
+    if (group === "custom") return t("settings.fontCustom");
+    return t("settings.fontSystemDefault");
+  }, [t]);
+
+  const layout = useMemo(
+    () => buildFontListLayout(filtered, groupLabel),
+    [filtered, groupLabel],
+  );
+  const { start, end } = useMemo(
+    () => visibleRowRange(layout, scrollTop, viewportRef.current),
+    [layout, scrollTop],
+  );
+
   useLayoutEffect(() => {
     if (!open) return;
     const frame = window.requestAnimationFrame(updateMenuPosition);
@@ -186,11 +211,53 @@ export function FontFamilyRow({
   }, [open, filtered, selectedValue]);
 
   useEffect(() => {
+    if (!open) return;
+    setScrollTop(0);
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [open, filtered]);
+
+  useEffect(() => {
+    if (!open) return;
+    const list = listRef.current;
+    if (list) viewportRef.current = list.clientHeight || 320;
+  }, [open]);
+
+  // Scroll the highlighted option into the rendered window. The window only
+  // holds visible rows, so the old querySelector + scrollIntoView approach
+  // cannot reach off-window rows; offsets make the jump exact instead.
+  useEffect(() => {
     if (!open || highlight < 0) return;
-    listRef.current
-      ?.querySelector(`[data-font-index="${highlight}"]`)
-      ?.scrollIntoView({ block: "nearest" });
-  }, [open, highlight]);
+    const list = listRef.current;
+    if (!list) return;
+    const rowIndex = layout.optionRowIndex[highlight];
+    if (rowIndex === undefined) return;
+    const top = layout.offsets[rowIndex];
+    const height = layout.heights[rowIndex];
+    const viewport = viewportRef.current || list.clientHeight || 320;
+    if (top < list.scrollTop) {
+      list.scrollTop = top;
+    } else if (top + height > list.scrollTop + viewport) {
+      list.scrollTop = top + height - viewport;
+    }
+  }, [open, highlight, layout]);
+
+  useEffect(
+    () => () => {
+      if (scrollFrameRef.current) cancelAnimationFrame(scrollFrameRef.current);
+    },
+    [],
+  );
+
+  const onListScroll = () => {
+    const list = listRef.current;
+    if (!list) return;
+    viewportRef.current = list.clientHeight || 320;
+    if (scrollFrameRef.current) return;
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = 0;
+      setScrollTop(list.scrollTop);
+    });
+  };
 
   const selectOption = async (value: string) => {
     closeMenu();
@@ -222,15 +289,6 @@ export function FontFamilyRow({
       }
     }
   };
-
-  const groupLabel = (group: string) => {
-    if (group === "bundled") return t("settings.fontBundled");
-    if (group === "system") return t("settings.fontSystem");
-    if (group === "custom") return t("settings.fontCustom");
-    return t("settings.fontSystemDefault");
-  };
-
-  let flatIndex = -1;
 
   return (
     <div className="settings-row">
@@ -295,56 +353,73 @@ export function FontFamilyRow({
                     {t("settings.noResults")}
                   </div>
                 ) : (
-                  <div className="settings-font-list" ref={listRef}>
-                    {filtered.map((option) => {
-                      flatIndex += 1;
-                      const index = flatIndex;
-                      const previous = index === 0 ? null : filtered[index - 1];
-                      const showGroup =
-                        !previous || previous.group !== option.group;
-                      return (
-                        <div key={`${option.group}:${option.value}`}>
-                          {showGroup ? (
-                            <div className="settings-font-group-label">
-                              {groupLabel(option.group)}
-                            </div>
-                          ) : null}
-                          <div className="settings-font-row">
-                            <button
-                              type="button"
-                              role="option"
-                              aria-selected={option.value === selectedValue}
-                              data-font-index={index}
-                              className={[
-                                "settings-font-item",
-                                index === highlight && "kb-active",
-                                option.value === selectedValue && "active",
-                              ].join(" ")}
-                              style={{ fontFamily: option.family || undefined }}
-                              onClick={() => void selectOption(option.value)}
-                              onMouseEnter={() => setHighlight(index)}
-                            >
-                              <span className="settings-font-item-label">
-                                {option.group === "default"
-                                  ? t("settings.fontSystemDefault")
-                                  : option.label}
-                              </span>
-                              {option.license ? (
-                                <span className="settings-font-item-license">
-                                  {option.license}
-                                </span>
-                              ) : null}
-                              {option.value === selectedValue ? (
-                                <IconCheck
-                                  size={14}
-                                  className="settings-font-check"
-                                />
-                              ) : null}
-                            </button>
+                  <div
+                    className="settings-font-list"
+                    ref={listRef}
+                    onScroll={onListScroll}
+                  >
+                    <div
+                      className="settings-font-viewport"
+                      style={{ height: layout.totalHeight, position: "relative" }}
+                    >
+                      {layout.rows.slice(start, end).map((row) =>
+                        row.kind === "group" ? (
+                          <div
+                            key={row.id}
+                            className="settings-font-group-label"
+                            style={{
+                              position: "absolute",
+                              top: layout.offsets[row.index],
+                              left: 6,
+                              right: 6,
+                              height: FONT_GROUP_ROW_HEIGHT,
+                            }}
+                          >
+                            {row.label}
                           </div>
-                        </div>
-                      );
-                    })}
+                        ) : (
+                          <button
+                            key={row.id}
+                            type="button"
+                            role="option"
+                            aria-selected={row.option.value === selectedValue}
+                            data-font-index={row.optionIndex}
+                            className={[
+                              "settings-font-item",
+                              row.optionIndex === highlight && "kb-active",
+                              row.option.value === selectedValue && "active",
+                            ].join(" ")}
+                            style={{
+                              position: "absolute",
+                              top: layout.offsets[row.index],
+                              left: 6,
+                              right: 6,
+                              height: FONT_OPTION_ROW_HEIGHT,
+                              fontFamily: row.option.family || undefined,
+                            }}
+                            onClick={() => void selectOption(row.option.value)}
+                            onMouseEnter={() => setHighlight(row.optionIndex)}
+                          >
+                            <span className="settings-font-item-label">
+                              {row.option.group === "default"
+                                ? t("settings.fontSystemDefault")
+                                : row.option.label}
+                            </span>
+                            {row.option.license ? (
+                              <span className="settings-font-item-license">
+                                {row.option.license}
+                              </span>
+                            ) : null}
+                            {row.option.value === selectedValue ? (
+                              <IconCheck
+                                size={14}
+                                className="settings-font-check"
+                              />
+                            ) : null}
+                          </button>
+                        ),
+                      )}
+                    </div>
                   </div>
                 )}
               </div>,

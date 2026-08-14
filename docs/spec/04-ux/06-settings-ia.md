@@ -40,8 +40,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     and installed system families enumerated by Electron main; selection
     persists as `AppSettings.fontFamily` and applies to the global UI stack
     (`--font-sans`) without a reload; System default clears the override;
-    long system lists render progressively (off-screen rows skip layout,
-    paint, and font loading) so opening the picker never blocks input
+    long system lists are windowed so only the visible slice is in the DOM
+    (bounded font loading) and opening the picker never blocks input
   - **Auto language detection** resolves the OS locale through the main process
     (`app.getLocale()`) rather than the renderer's `navigator.language`, and the
     Auto card shows the detected language inline (e.g. "当前：简体中文")
