@@ -46,3 +46,23 @@ export function reduceTranscriptScroll({
     showJump: !pinned,
   };
 }
+
+/**
+ * A real user scroll-up gesture (wheel, trackpad, touch, scrollbar drag,
+ * keyboard) always precedes its scroll events by at most a frame or two, and
+ * keeps firing while the gesture lasts. Programmatic follow scrolling and
+ * layout-driven clamps (e.g. the composer collapsing after send) emit scroll
+ * events with no preceding input.
+ *
+ * `handleScroll` releases follow only for events inside this window, so a
+ * clamp between a follow `scrollTo` and its native event delivery can never
+ * be mistaken for a user scrolling up.
+ */
+export const TRANSCRIPT_SCROLL_GESTURE_WINDOW_MS = 200;
+
+export function isRecentScrollGesture(
+  now: number,
+  lastGestureAt: number,
+): boolean {
+  return now - lastGestureAt <= TRANSCRIPT_SCROLL_GESTURE_WINDOW_MS;
+}

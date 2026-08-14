@@ -488,13 +488,18 @@ Each scenario is documented in this format:
 - **Preconditions**: Chat route active; the selected session contains enough
   history to overflow the transcript viewport; the transcript is at the latest
   message or has been scrolled upward.
-- **Steps**: 1) Send a prompt. 2) Observe the transcript from the first send
-  state through the persisted user-message event and the first streamed row.
-  3) Repeat after manually scrolling upward before sending.
+- **Steps**: 1) Send a prompt from the bottom of the viewport. 2) Observe the
+  transcript from the first send state through the persisted user-message
+  event and the first streamed row. 3) Repeat with a multi-line draft so the
+  composer collapses when the draft clears, and again after manually scrolling
+  upward before sending.
 - **Expected**: Send immediately hides the jump control and re-pins the
   transcript in the layout phase. The historical rows move upward only as the
   new turn is added; the viewport never flashes to the top of the conversation,
   and the new user turn plus streamed response remain visible at the bottom.
+  The composer collapse and indicator layout clamps after send never release
+  follow mode (no "↓ Scroll to bottom" button appears while the turn streams
+  unless the user actually scrolled with an input device).
 - **Specs linked**: `04-ux/08-component-spec.md` (§4.3, §4.4),
   `04-ux/09-interaction-patterns.md` (§9.1, §10.4)
 - **Acceptance**: C (send/UI), Quality

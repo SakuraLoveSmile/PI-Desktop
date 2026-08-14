@@ -48,7 +48,10 @@ import {
   getToolPreviewTarget,
   splitChatText,
 } from "../lib/chat-links";
-import { reduceTranscriptScroll } from "../lib/transcript-scroll";
+import {
+  isRecentScrollGesture,
+  reduceTranscriptScroll,
+} from "../lib/transcript-scroll";
 import {
   assistantTurnContent,
   assistantTurnMessages,
@@ -2046,9 +2049,11 @@ export const ChatTranscript = memo(function ChatTranscript({
     sessionId ? state.sessionCompactions[sessionId] : undefined,
   );
   const scrollRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const pinnedRef = useRef(true);
   const lastScrollTopRef = useRef(0);
+  const lastScrollGestureAtRef = useRef(-Infinity);
   const wasRunningRef = useRef(isRunning);
   const followFrameRef = useRef(0);
   const [showJump, setShowJump] = useState(false);
@@ -2069,6 +2074,57 @@ export const ChatTranscript = memo(function ChatTranscript({
     cancelAnimationFrame(followFrameRef.current);
     followFrameRef.current = 0;
   }, []);
+
+  // A user scroll-up gesture always emits input before its scroll events;
+  // programmatic follow scrolling and layout clamps (composer collapse on
+  // send, indicator mount/unmount) never do. Track the last real input so
+  // `handleScroll` can tell the two apart and never let a clamp between a
+  // follow `scrollTo` and its native event release follow mode.
+  const markScrollGesture = useCallback((event: Event) => {
+    if (
+      event.type === "wheel" ||
+      event.type === "touchstart" ||
+      event.type === "touchmove"
+    ) {
+      lastScrollGestureAtRef.current = performance.now();
+      return;
+    }
+    if (event.type === "pointerdown") {
+      lastScrollGestureAtRef.current = performance.now();
+      return;
+    }
+    if (event.type === "keydown") {
+      const key = (event as KeyboardEvent).key;
+      if (
+        key === "ArrowUp" ||
+        key === "ArrowDown" ||
+        key === "PageUp" ||
+        key === "PageDown" ||
+        key === "Home" ||
+        key === "End" ||
+        key === " "
+      ) {
+        lastScrollGestureAtRef.current = performance.now();
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    el.addEventListener("wheel", markScrollGesture, { passive: true });
+    el.addEventListener("touchstart", markScrollGesture, { passive: true });
+    el.addEventListener("touchmove", markScrollGesture, { passive: true });
+    el.addEventListener("pointerdown", markScrollGesture, { passive: true });
+    el.addEventListener("keydown", markScrollGesture, { passive: true });
+    return () => {
+      el.removeEventListener("wheel", markScrollGesture);
+      el.removeEventListener("touchstart", markScrollGesture);
+      el.removeEventListener("touchmove", markScrollGesture);
+      el.removeEventListener("pointerdown", markScrollGesture);
+      el.removeEventListener("keydown", markScrollGesture);
+    };
+  }, [markScrollGesture]);
 
   // A newly activated session must paint at its latest record. Reset any
   // manual-scroll state inherited from the previous session and position the
@@ -2095,6 +2151,7 @@ export const ChatTranscript = memo(function ChatTranscript({
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
+    const wasPinned = pinnedRef.current;
     const transition = reduceTranscriptScroll({
       previousScrollTop: lastScrollTopRef.current,
       scrollTop: el.scrollTop,
@@ -2104,9 +2161,33 @@ export const ChatTranscript = memo(function ChatTranscript({
     });
     lastScrollTopRef.current = el.scrollTop;
     if (transition.releasedFollow) cancelFollowScroll();
-    pinnedRef.current = transition.pinned;
-    setShowJump(transition.showJump);
-  }, [cancelFollowScroll]);
+    // Only a real gesture (wheel / trackpad / touch / scrollbar / keyboard)
+    // releases follow. When the composer collapses or an indicator row
+    // unmounts right after send, the browser clamps scrollTop and emits a
+    // scroll event that looks like an upward gesture; without this guard it
+    // would cancel follow and leave the transcript stuck above the new turn.
+    const released =
+      transition.releasedFollow &&
+      isRecentScrollGesture(
+        performance.now(),
+        lastScrollGestureAtRef.current,
+      );
+    if (released) {
+      pinnedRef.current = false;
+      setShowJump(true);
+    } else if (transition.releasedFollow) {
+      // Programmatic / layout noise: re-baseline the observed position and
+      // keep the follow state unchanged instead of treating it as a user
+      // gesture. A pinned transcript re-asserts the bottom; an unpinned one
+      // stays unpinned.
+      pinnedRef.current = wasPinned;
+      setShowJump(!wasPinned);
+      scheduleFollowScroll();
+    } else {
+      pinnedRef.current = transition.pinned;
+      setShowJump(transition.showJump);
+    }
+  }, [cancelFollowScroll, scheduleFollowScroll]);
 
   // Send / retry / regenerate always re-pins follow mode so the new prompt and
   // its stream stay in view, even if the user had scrolled up through history.
@@ -2189,7 +2270,7 @@ export const ChatTranscript = memo(function ChatTranscript({
     !askPending;
 
   return (
-    <div className="thread-wrap">
+    <div className="thread-wrap" ref={wrapRef}>
       <ConversationMinimap scrollRef={scrollRef} messages={visible} />
       <div
         className="thread-scroll"

@@ -879,9 +879,14 @@ When drag/drop is implemented, these patterns should apply:
 ### 9.1 Transcript scrolling
 
 - Default: auto-scroll to bottom on new content during stream while pinned
-- The first upward scroll movement pauses auto-scroll and shows the
-  "↓ Scroll to bottom" button; queued stream or resize follow work must not
-  reverse that movement
+- The first upward scroll **gesture** (wheel / trackpad / touch / scrollbar /
+  keyboard) pauses auto-scroll and shows the "↓ Scroll to bottom" button;
+  queued stream or resize follow work must not reverse that movement
+- Programmatic follow scrolling and layout-driven clamps never release follow:
+  a scroll event with no preceding user input (for example a scrollTop clamp
+  when the composer collapses after send or an indicator row unmounts) is
+  treated as layout noise and re-baselined instead of being mistaken for a
+  user scrolling up
 - User send / retry / regenerate: re-pins, hides the jump control, and positions the latest content in the layout phase so the new turn is visible without a top-of-history flash; subsequent persisted and streamed rows continue to follow the bottom
 - Scroll-to-bottom button: position fixed at bottom-right of transcript area, offset 12px
 - Button appears as soon as upward scrolling releases follow mode
@@ -966,6 +971,11 @@ This does not prevent state changes — it makes them instant.
   restore the previous bottom position. Follow remains released across content
   growth until the viewport is scrolled down within 48px of the bottom or an
   explicit turn-start / jump-to-latest action re-pins it.
+- Released-follow detection is gated on a recent user scroll input. Native
+  scroll events from a follow `scrollTo` whose position was later clamped by
+  layout changes (composer height, indicator rows) arrive after the fact and
+  look like an upward gesture; because they have no preceding input they are
+  ignored and follow mode is preserved.
 - Resize observers schedule work and never synchronously measure every
   transcript row from their callback.
 
