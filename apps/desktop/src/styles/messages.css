@@ -141,7 +141,7 @@
 .asktool-question {
   margin: 0;
   color: var(--ds-text-primary);
-  font-size: var(--text-base);
+  font-size: var(--text-md);
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-compact-plus);
 }
@@ -165,7 +165,7 @@
   color: var(--ds-text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: var(--text-base);
+  font-size: var(--text-md);
   text-align: start;
   transition: border-color var(--motion-duration-fast) var(--motion-ease-out),
     background-color var(--motion-duration-fast) var(--motion-ease-out);
@@ -209,7 +209,7 @@
   background: var(--ds-bg-primary);
   color: var(--ds-text-primary);
   font: inherit;
-  font-size: var(--text-base);
+  font-size: var(--text-md);
 }
 
 .asktool-card-actions {
