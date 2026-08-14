@@ -7,6 +7,7 @@ import {
   resolvePluginLocalizedString,
   validateContributions,
   validateManifest,
+  LEGACY_FS_PERMISSIONS,
   PLUGIN_PERMISSIONS,
 } from "./index.js";
 
@@ -141,11 +142,19 @@ describe("PLUGIN_PERMISSIONS", () => {
       "bus.publish",
       "bus.subscribe",
       "agent.prompt.inject",
-      "fs.delete.workspace",
+      "fs.read",
+      "fs.write",
+      "fs.delete",
     ]) {
       expect(PLUGIN_PERMISSIONS).toContain(permission);
     }
     expect(new Set(PLUGIN_PERMISSIONS).size).toBe(PLUGIN_PERMISSIONS.length);
+  });
+
+  it("no longer advertises the unscoped workspace-wide fs names", () => {
+    for (const legacy of Object.keys(LEGACY_FS_PERMISSIONS)) {
+      expect(PLUGIN_PERMISSIONS).not.toContain(legacy);
+    }
   });
 });
 
@@ -168,5 +177,49 @@ describe("validateManifest net.domains", () => {
       expect(result.error).toMatch(/^manifest\.net\.domains/);
     }
     expect(validateManifest({ ...base, net: [] }).ok).toBe(false);
+  });
+});
+
+describe("validateManifest fs scope", () => {
+  it("accepts a scoped policy backed by its permissions", () => {
+    expect(
+      validateManifest({
+        ...base,
+        permissions: ["fs.read", "fs.write", "fs.delete"],
+        fs: {
+          read: { scope: ["**/*"] },
+          write: { scope: ["docs/**"] },
+          delete: { own: true, scope: ["dist/**"] },
+        },
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("rejects a write or delete scope that covers the whole root", () => {
+    const result = validateManifest({
+      ...base,
+      permissions: ["fs.write"],
+      fs: { write: { scope: ["**/*"] } },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/^manifest\.fs\.write\.scope/);
+  });
+
+  it("rejects a scope whose permission was never declared", () => {
+    const result = validateManifest({ ...base, fs: { write: { scope: ["docs/**"] } } });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/needs the fs\.write permission/);
+  });
+
+  it("accepts a legacy permission name as the scope's backing", () => {
+    // The old name still resolves to fs.read, so an author can add scope
+    // before renaming and neither step breaks on its own.
+    expect(
+      validateManifest({
+        ...base,
+        permissions: ["fs.read.workspace"],
+        fs: { read: { scope: ["docs/**"] } },
+      }).ok,
+    ).toBe(true);
   });
 });

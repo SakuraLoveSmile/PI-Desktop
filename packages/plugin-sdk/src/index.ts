@@ -1,4 +1,10 @@
 import { isValidBusTopic, isValidBusTopicPattern } from "./bus-topics.js";
+import {
+  parseFsPolicy,
+  resolveFsAccess,
+  PLUGIN_FS_MODES,
+  type PluginFsPolicy,
+} from "./fs-policy.js";
 import { validateMcpServer } from "./mcp-config.js";
 import { parseNetDomains, type PluginNetDomain } from "./net-policy.js";
 
@@ -39,6 +45,13 @@ export type PluginManifest = {
     bus?: PluginBusContrib;
   };
   permissions?: string[];
+  /**
+   * File scope. The `fs.read` / `fs.write` / `fs.delete` permissions say
+   * whether the plugin may touch files; this says which ones. Anything outside
+   * the declared scope falls to the user at call time, so an omitted block is
+   * safe rather than broad.
+   */
+  fs?: PluginFsPolicy;
   /**
    * Egress allowlist. Every outbound path the host owns — the panel session,
    * `pi.net.fetch`, remote MCP endpoints — is confined to these hostnames.
@@ -233,11 +246,22 @@ export type PluginHostApi = {
   workspace: {
     get: () => Promise<{ path: string; name: string } | null>;
   };
+  /**
+   * Paths are relative to the rule's root: the workspace by default, or the
+   * directory `requestDirectory` obtained for rules declaring
+   * `root: "userSelected"`.
+   */
   fs: {
-    readText: (pathFromWorkspaceRoot: string) => Promise<string>;
-    writeText: (pathFromWorkspaceRoot: string, content: string) => Promise<void>;
+    readText: (pathFromRoot: string) => Promise<string>;
+    writeText: (pathFromRoot: string, content: string) => Promise<void>;
     glob: (pattern: string) => Promise<string[]>;
-    remove: (pathFromWorkspaceRoot: string) => Promise<void>;
+    remove: (pathFromRoot: string) => Promise<void>;
+    /**
+     * Ask the user to point at a directory, which becomes the root for this
+     * run's `userSelected` rules. Nothing is remembered across restarts —
+     * the grant lives exactly as long as the process.
+     */
+    requestDirectory: () => Promise<{ path: string; name: string } | null>;
   };
   agent: {
     registerTool: (tool: PluginTool) => Promise<void>;
@@ -295,9 +319,9 @@ export const PLUGIN_PERMISSIONS = [
   "clipboard.read",
   "clipboard.write",
   "notify",
-  "fs.read.workspace",
-  "fs.write.workspace",
-  "fs.delete.workspace",
+  "fs.read",
+  "fs.write",
+  "fs.delete",
   "agent.tool.register",
   "agent.prompt.inject",
   "net.fetch",
@@ -374,6 +398,21 @@ export function validateManifest(raw: unknown): {
     const domains = parseNetDomains(net.domains);
     if (!domains.ok) {
       return { ok: false, error: `manifest.${domains.error}` };
+    }
+  }
+  const fs = parseFsPolicy((m as { fs?: unknown }).fs);
+  if (!fs.ok) {
+    return { ok: false, error: `manifest.${fs.error}` };
+  }
+  // A scope nobody can use is an authoring slip worth catching at install
+  // rather than at the first silently-refused call.
+  const granted = new Set(resolveFsAccess(m).permissions);
+  for (const mode of PLUGIN_FS_MODES) {
+    if (fs.policy?.[mode] && !granted.has(`fs.${mode}`)) {
+      return {
+        ok: false,
+        error: `manifest.fs.${mode} needs the fs.${mode} permission`,
+      };
     }
   }
   return { ok: true, manifest: m as PluginManifest };
@@ -612,3 +651,21 @@ export {
   parseNetDomains,
   type PluginNetDomain,
 } from "./net-policy.js";
+export {
+  isDeniedFsPath,
+  isFsPathInScope,
+  isWholeTreePattern,
+  matchFsGlob,
+  normalizeFsPath,
+  parseFsPolicy,
+  resolveFsAccess,
+  FS_DENY_DIR_SEGMENTS,
+  FS_DENY_FILE_PATTERNS,
+  LEGACY_FS_PERMISSIONS,
+  PLUGIN_FS_MODES,
+  type PluginFsMode,
+  type PluginFsPolicy,
+  type PluginFsRoot,
+  type PluginFsRule,
+  type ResolvedFsAccess,
+} from "./fs-policy.js";
