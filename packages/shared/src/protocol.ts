@@ -52,6 +52,8 @@ export const IPC = {
     appHealth: "pi-desktop/app/health",
     appGetOnboarding: "pi-desktop/app/getOnboarding",
     appDismissOnboarding: "pi-desktop/app/dismissOnboarding",
+    /** Installed system font families, resolved by Electron main. */
+    systemFontsList: "pi-desktop/app/systemFonts",
     updatesGetState: "pi-desktop/updates/getState",
     updatesCheck: "pi-desktop/updates/check",
     updatesDownload: "pi-desktop/updates/download",

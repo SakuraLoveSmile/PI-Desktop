@@ -3,9 +3,9 @@
 > **翻译说明：** 本页是与 [英文源规格](/spec/00-baseline) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
 
-- 基线版本：`0.4.15`
-- 日期：`2026-08-05`
-- 状态：`Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v9 + schema v10 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release + Extensions page density and theme-readable actions)`
+- 基线版本：`0.4.16`
+- 日期：`2026-08-14`
+- 状态：`Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v9 + schema v10 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release + Extensions page density and theme-readable actions + custom global UI font)`
 - 语言政策：**英语优先**
 - 后端策略：**Rust 主机核心 + pi 代理 sidecar**
 
@@ -65,6 +65,13 @@
 > 删除了四张数字概览带，并共享按钮表面
 > 使用语义主题标记，以便主要和次要操作在
 > 深色和浅色主题。主机协议或存储架构没有更改。
+> `0.4.16` 通过 D219 / ADR 0083 增加了用户可选的全局界面字体：
+> 设置「外观」卡片新增可搜索的字体选择器；选择结果持久化为
+> `AppSettings.fontFamily` 并覆盖 `--font-sans`。四款开源
+> （SIL OFL 1.1）字体——Geist、Inter、Noto Sans SC 和 LXGW WenKai——
+> 随应用本地发布并附带许可证文本，系统已安装字体由 Electron
+> 主进程通过新增的白名单通道 `pi-desktop/app/systemFonts` 枚举。
+> 主机协议或存储架构没有更改。
 
 ## 冻结的决定
 

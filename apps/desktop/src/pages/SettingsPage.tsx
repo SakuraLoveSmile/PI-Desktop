@@ -47,6 +47,7 @@ import {
 } from "../components/icons";
 import { ProvidersSection } from "../components/settings/ProvidersSection";
 import { KeyboardShortcutsSection } from "../components/settings/KeyboardShortcutsSection";
+import { FontFamilyRow } from "../components/settings/FontFamilyRow";
 import { ReleaseNotesDialog } from "../components/ReleaseNotesDialog";
 import { ProjectsPage } from "./ProjectsPage";
 
@@ -1187,6 +1188,8 @@ export function SettingsPage() {
                     );
                   })}
                 </div>
+
+                <FontFamilyRow settings={settings} saveSettings={saveSettings} />
               </SettingsCard>
 
               <SettingsCard title={t("settings.defaultsTitle")}>

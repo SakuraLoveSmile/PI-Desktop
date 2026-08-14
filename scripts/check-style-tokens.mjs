@@ -44,9 +44,17 @@ const violations = [];
 for (const file of walk(srcDir)) {
   const rel = relative(root, file);
   const lines = readFileSync(file, "utf8").split("\n");
+  // `@font-face` descriptors describe the font file (weight ranges, etc.),
+  // not UI typography, so they are exempt from the token scale.
+  let inFontFace = 0;
   lines.forEach((line, i) => {
     if (file.endsWith(".css")) {
       if (/^\s*--/.test(line)) return; // token definition
+      if (/@font-face\s*\{/.test(line)) inFontFace += 1;
+      if (inFontFace > 0) {
+        if (/\}/.test(line)) inFontFace -= 1;
+        return;
+      }
       const m = line.match(CSS_PROPS);
       if (!m) return;
       const rest = stripVars(m[2]).trim();

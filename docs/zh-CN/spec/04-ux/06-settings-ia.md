@@ -37,6 +37,11 @@
   - **语言**：三张可选预览卡（自动/简体中文/英语）
     示例文本预览、每个选项的描述和选定的检查徽章；
     选择更新 `settings.language`
+  - **字体**：可搜索的选择行（触发器以该字体的字样显示当前字体）
+    提供系统默认、内置开源字体（Geist、Inter、Noto Sans SC、
+    LXGW WenKai——SIL OFL 1.1，本地发布）以及由 Electron 主进程枚举的
+    系统已安装字体；选择结果持久化为 `AppSettings.fontFamily`，
+    无需重载即可应用到全局界面字体栈（`--font-sans`）
   - **自动语言检测**通过主进程解析操作系统区域设置
     (`app.getLocale()`) 而不是渲染器的 `navigator.language`，并且
     自动卡片内嵌显示检测到的语言（例如“当前：简体中文”）

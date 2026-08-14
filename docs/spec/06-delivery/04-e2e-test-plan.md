@@ -4747,3 +4747,36 @@ This test plan spec is accepted when:
 - **Milestone**: M6+
 - **Status**: Browser-rendered desktop/mobile verification is authorized for
   this documentation redesign; remote deployment refresh checks remain Draft.
+
+#### E2E-126: Appearance card selects a global UI font
+
+- **Preconditions**: App running on macOS with an installed system font
+  distinct from the bundled families (for example PingFang SC); a clean
+  `~/.pi-desktop` profile.
+- **Steps**:
+  1) Open Settings → Basics and confirm the Appearance card shows a Font row
+     below Theme and Language with a trigger labeled "System default".
+  2) Open the Font picker and confirm it lists System default, the bundled
+     open-licensed families (Geist, Inter, Noto Sans SC, LXGW WenKai) marked
+     with their license, and installed system families; confirm the search
+     input filters families and the current selection shows a check badge.
+  3) Select Geist and confirm the trigger label and the whole UI re-render in
+     Geist without a reload, including CJK fallback rendering for Chinese text.
+  4) Select an installed system family and confirm the UI switches to it; the
+     family stays selected after reopening the picker.
+  5) Restart the app, reopen Settings, and confirm the selected font is still
+     applied (persisted `AppSettings.fontFamily`).
+  6) Select System default, restart, and confirm the UI returns to the built-in
+     token stack.
+- **Expected**: The Font row is a searchable picker whose trigger previews the
+  current family in that face; options are System default, bundled OFL families,
+  and installed system families enumerated by Electron main via
+  `pi-desktop/app/systemFonts` (cached 60 s, hidden `.`-prefixed families
+  excluded); selection persists as a CSS stack in `AppSettings.fontFamily` and
+  overrides `--font-sans` live; Chinese text stays readable through the CJK
+  fallback tier; System default clears the override.
+- **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
+  `03-runtime/01-ipc-protocol.md`, ADR 0083
+- **Acceptance**: A (core shell), H (localization)
+- **Milestone**: M5+
+- **Status**: Documented

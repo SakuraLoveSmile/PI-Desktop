@@ -306,6 +306,13 @@ PI-Desktop 的行为类似于桌面应用程序 shell，因此意外拖动
 | **用户界面（无字体）** | 国际米兰 | `system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` | `font-sans` |
 | **代码（单声道）** | JetBrains Mono | `"Fira Code", ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace` | `font-mono` |
 
+UI 字体栈可从设置 → 基础 → 外观中由用户覆盖（ADR 0083）。字体行
+将 CSS 字体栈持久化为 `AppSettings.fontFamily`；缺失值保持上述令牌栈。
+内置开源字体（Geist、Inter、Noto Sans SC、LXGW WenKai — SIL OFL 1.1）
+在 `apps/desktop/src/assets/fonts/` 下本地发布并附许可证文本，系统已安装
+字体由 Electron 主进程枚举。每个自定义字体栈都会追加 CJK 回退层，
+确保中文文本保持可读。等宽字体栈（`--font-mono`）不可由用户配置。
+
 ### 5. 2 类型规模
 
 所有字体大小均来自 `styles/tokens.css` 的 `@theme` 块中定义的 `--text-*` 渐变（首先由 `styles/globals.css` 导入，现在只是一个导入序列 — 请参阅 D170）。 `font-size`、`font-weight`、`line-height` 和 `letter-spacing` 的原始 px 文字在组件 CSS 和 TSX 任意实用程序（`text-[13px]` 等）中**禁止** — 由 `scripts/check-style-tokens.mjs` 强制执行（在 `pnpm lint` 中运行）。 `-plus` 后缀标记是 Codex 命名大小之间的半步。

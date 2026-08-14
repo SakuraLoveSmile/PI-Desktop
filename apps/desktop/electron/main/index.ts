@@ -16,6 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { listInstalledFonts } from "./system-fonts";
 import {
   APP_ID,
   APP_NAME,
@@ -4169,6 +4170,20 @@ function registerIpc() {
     const settings = await host.call<any>("settings.get");
     await host.call("settings.set", { ...settings, onboardingDismissed: true });
     return { ok: true };
+  });
+
+  // Installed system font families for the Settings font picker. Enumerating
+  // the OS font catalog is comparatively slow (a few hundred ms to seconds),
+  // so the result is cached briefly per process.
+  let systemFontsCache: { at: number; fonts: string[] } | null = null;
+  handle(IPC.invoke.systemFontsList, async () => {
+    const now = Date.now();
+    if (systemFontsCache && now - systemFontsCache.at < 60_000) {
+      return systemFontsCache.fonts;
+    }
+    const families = await listInstalledFonts().catch(() => []);
+    systemFontsCache = { at: now, fonts: families };
+    return families;
   });
 
   const instructionFile = async (

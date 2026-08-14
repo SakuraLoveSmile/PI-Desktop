@@ -309,6 +309,15 @@ Implementation note: Tailwind v4 supports CSS-first configuration. The `@theme` 
 | **UI (sans)** | Inter | `system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` | `font-sans` |
 | **Code (mono)** | JetBrains Mono | `"Fira Code", ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace` | `font-mono` |
 
+The UI stack is user-overridable from Settings → Basics → Appearance
+(ADR 0083). The Font row persists a CSS stack in `AppSettings.fontFamily`;
+an absent value keeps the token stack above. Bundled open-licensed families
+(Geist, Inter, Noto Sans SC, LXGW WenKai — SIL OFL 1.1) ship locally under
+`apps/desktop/src/assets/fonts/` with license texts, and installed system
+families are enumerated by Electron main. Every custom stack appends a CJK
+fallback tier so Chinese text stays readable. The mono stack
+(`--font-mono`) is not user-configurable.
+
 ### 5.2 Type scale
 
 All font sizes come from the `--text-*` ramp defined in the `@theme` block of `styles/tokens.css` (imported first by `styles/globals.css`, which is now only an import sequence — see D170). Raw px literals for `font-size`, `font-weight`, `line-height`, and `letter-spacing` are **forbidden** in component CSS and TSX arbitrary utilities (`text-[13px]` etc.) — enforced by `scripts/check-style-tokens.mjs` (runs in `pnpm lint`). `-plus` suffixed tokens are the Codex half-steps between named sizes.
