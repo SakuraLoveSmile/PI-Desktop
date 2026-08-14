@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { AppSettings } from "@pi-desktop/shared";
 import {
@@ -12,7 +20,8 @@ import { IconCheck, IconChevronDown, IconSearch } from "../icons";
  * Global UI font picker (Settings → Basics → Appearance). Offers the
  * system default, bundled open-licensed families, and installed system
  * families; the selected stack is persisted as `AppSettings.fontFamily`
- * and applied to `--font-sans` by App.
+ * and applied to `--font-sans` by App. Selecting System default persists an
+ * empty stack, which every consumer treats as the built-in token stack.
  */
 export function FontFamilyRow({
   settings,
@@ -27,9 +36,20 @@ export function FontFamilyRow({
   const [systemFonts, setSystemFonts] = useState<string[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [highlight, setHighlight] = useState(-1);
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    setMenuPosition(null);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,10 +68,16 @@ export function FontFamilyRow({
   useEffect(() => {
     if (!open) return;
     const onPointer = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (
+        !rootRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
+        closeMenu();
+      }
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") closeMenu();
     };
     window.addEventListener("mousedown", onPointer);
     window.addEventListener("keydown", onKey);
@@ -59,13 +85,57 @@ export function FontFamilyRow({
       window.removeEventListener("mousedown", onPointer);
       window.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, closeMenu]);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
-    requestAnimationFrame(() => searchRef.current?.focus());
   }, [open]);
+
+  // Focus only once the portaled menu is measured and revealed; a hidden
+  // (visibility: hidden) menu cannot receive focus.
+  useEffect(() => {
+    if (!open || !menuPosition) return;
+    requestAnimationFrame(() => searchRef.current?.focus());
+  }, [open, menuPosition]);
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    const menu = menuRef.current;
+    if (!trigger || !menu) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const triggerVisible =
+      triggerRect.bottom > 0 && triggerRect.top < window.innerHeight;
+    if (!triggerVisible) {
+      closeMenu();
+      return;
+    }
+    const menuRect = menu.getBoundingClientRect();
+    const margin = 8;
+    const gap = 6;
+    const maxLeft = Math.max(
+      margin,
+      window.innerWidth - menuRect.width - margin,
+    );
+    const left = Math.min(Math.max(margin, triggerRect.left), maxLeft);
+    const below = triggerRect.bottom + gap;
+    const above = triggerRect.top - menuRect.height - gap;
+    const maxTop = Math.max(
+      margin,
+      window.innerHeight - menuRect.height - margin,
+    );
+    const top =
+      below <= maxTop
+        ? Math.max(margin, below)
+        : above >= margin
+          ? above
+          : Math.min(below, maxTop);
+    setMenuPosition((previous) =>
+      previous && previous.top === top && previous.left === left
+        ? previous
+        : { top, left },
+    );
+  }, [closeMenu]);
 
   const options = useMemo(
     () => buildFontOptions(systemFonts ?? [], settings.fontFamily),
@@ -86,6 +156,23 @@ export function FontFamilyRow({
     );
   }, [options, query]);
 
+  useLayoutEffect(() => {
+    if (!open) return;
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, filtered, systemFonts, updateMenuPosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onViewportChange = () => updateMenuPosition();
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("scroll", onViewportChange, true);
+    return () => {
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("scroll", onViewportChange, true);
+    };
+  }, [open, updateMenuPosition]);
+
   useEffect(() => {
     if (!open) return;
     const index = filtered.findIndex((option) => option.value === selectedValue);
@@ -100,9 +187,9 @@ export function FontFamilyRow({
   }, [open, highlight]);
 
   const selectOption = async (value: string) => {
-    setOpen(false);
+    closeMenu();
     try {
-      await saveSettings(value ? { fontFamily: value } : { fontFamily: undefined });
+      await saveSettings(value ? { fontFamily: value } : { fontFamily: "" });
     } catch {
       // The generic settings row treats save failures as transient; the
       // store is only updated on success.
@@ -148,6 +235,7 @@ export function FontFamilyRow({
       <div className="settings-row-control">
         <div className="settings-font" ref={rootRef} onKeyDown={onKeyDown}>
           <button
+            ref={triggerRef}
             type="button"
             className="settings-font-trigger"
             aria-haspopup="listbox"
@@ -159,73 +247,101 @@ export function FontFamilyRow({
             </span>
             <IconChevronDown size={14} />
           </button>
-          {open && (
-            <div className="settings-font-menu" role="listbox" aria-label={t("settings.font")}>
-              <div className="settings-font-search">
-                <IconSearch size={13} />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  value={query}
-                  placeholder={t("settings.fontSearchPlaceholder")}
-                  spellCheck={false}
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </div>
-              {loadError && !systemFonts ? (
-                <div className="settings-font-empty">{t("settings.fontLoadError")}</div>
-              ) : filtered.length === 0 ? (
-                <div className="settings-font-empty">{t("settings.noResults")}</div>
-              ) : (
-                <div className="settings-font-list" ref={listRef}>
-                  {filtered.map((option) => {
-                    flatIndex += 1;
-                    const index = flatIndex;
-                    const previous = index === 0 ? null : filtered[index - 1];
-                    const showGroup =
-                      !previous || previous.group !== option.group;
-                    return (
-                      <div key={`${option.group}:${option.value}`}>
-                        {showGroup ? (
-                          <div className="settings-font-group-label">
-                            {groupLabel(option.group)}
-                          </div>
-                        ) : null}
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected={option.value === selectedValue}
-                          data-font-index={index}
-                          className={[
-                            "settings-font-item",
-                            index === highlight && "kb-active",
-                            option.value === selectedValue && "active",
-                          ].join(" ")}
-                          style={{ fontFamily: option.family || undefined }}
-                          onClick={() => void selectOption(option.value)}
-                          onMouseEnter={() => setHighlight(index)}
-                        >
-                          <span className="settings-font-item-label">
-                            {option.group === "default"
-                              ? t("settings.fontSystemDefault")
-                              : option.label}
-                          </span>
-                          {option.license ? (
-                            <span className="settings-font-item-license">{option.license}</span>
-                          ) : null}
-                          {option.value === selectedValue ? (
-                            <IconCheck size={14} className="settings-font-check" />
-                          ) : null}
-                        </button>
-                      </div>
-                    );
-                  })}
+          {open &&
+            typeof document !== "undefined" &&
+            createPortal(
+              <div
+                ref={menuRef}
+                className={`settings-font-menu${
+                  menuPosition ? " is-open" : ""
+                }`}
+                role="listbox"
+                aria-label={t("settings.font")}
+                onKeyDown={onKeyDown}
+                style={
+                  menuPosition
+                    ? {
+                        top: `${menuPosition.top}px`,
+                        left: `${menuPosition.left}px`,
+                      }
+                    : undefined
+                }
+              >
+                <div className="settings-font-search">
+                  <IconSearch size={13} />
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    value={query}
+                    placeholder={t("settings.fontSearchPlaceholder")}
+                    spellCheck={false}
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
                 </div>
-              )}
-            </div>
-          )}
+                {loadError && !systemFonts ? (
+                  <div className="settings-font-empty">
+                    {t("settings.fontLoadError")}
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="settings-font-empty">
+                    {t("settings.noResults")}
+                  </div>
+                ) : (
+                  <div className="settings-font-list" ref={listRef}>
+                    {filtered.map((option) => {
+                      flatIndex += 1;
+                      const index = flatIndex;
+                      const previous = index === 0 ? null : filtered[index - 1];
+                      const showGroup =
+                        !previous || previous.group !== option.group;
+                      return (
+                        <div key={`${option.group}:${option.value}`}>
+                          {showGroup ? (
+                            <div className="settings-font-group-label">
+                              {groupLabel(option.group)}
+                            </div>
+                          ) : null}
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={option.value === selectedValue}
+                            data-font-index={index}
+                            className={[
+                              "settings-font-item",
+                              index === highlight && "kb-active",
+                              option.value === selectedValue && "active",
+                            ].join(" ")}
+                            style={{ fontFamily: option.family || undefined }}
+                            onClick={() => void selectOption(option.value)}
+                            onMouseEnter={() => setHighlight(index)}
+                          >
+                            <span className="settings-font-item-label">
+                              {option.group === "default"
+                                ? t("settings.fontSystemDefault")
+                                : option.label}
+                            </span>
+                            {option.license ? (
+                              <span className="settings-font-item-license">
+                                {option.license}
+                              </span>
+                            ) : null}
+                            {option.value === selectedValue ? (
+                              <IconCheck
+                                size={14}
+                                className="settings-font-check"
+                              />
+                            ) : null}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>,
+              document.body,
+            )}
         </div>
       </div>
     </div>

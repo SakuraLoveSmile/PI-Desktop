@@ -311,11 +311,11 @@ Implementation note: Tailwind v4 supports CSS-first configuration. The `@theme` 
 
 The UI stack is user-overridable from Settings → Basics → Appearance
 (ADR 0083). The Font row persists a CSS stack in `AppSettings.fontFamily`;
-an absent value keeps the token stack above. Bundled open-licensed families
-(Geist, Inter, Noto Sans SC, LXGW WenKai — SIL OFL 1.1) ship locally under
-`apps/desktop/src/assets/fonts/` with license texts, and installed system
-families are enumerated by Electron main. Every custom stack appends a CJK
-fallback tier so Chinese text stays readable. The mono stack
+an absent or empty value keeps the token stack above. Bundled open-licensed
+families (Geist, Inter, Noto Sans SC, LXGW WenKai — SIL OFL 1.1) ship locally
+under `apps/desktop/src/assets/fonts/` with license texts, and installed
+system families are enumerated by Electron main. Every custom stack appends a
+CJK fallback tier so Chinese text stays readable. The mono stack
 (`--font-mono`) is not user-configurable.
 
 ### 5.2 Type scale

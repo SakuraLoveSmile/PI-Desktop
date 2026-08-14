@@ -861,7 +861,8 @@
 }
 
 /* Global UI font picker (Appearance card). Pill trigger mirrors the
-   shared settings select; the menu opens downward inside the row. */
+   shared settings select; the menu portals to document.body as a fixed
+   floating layer so the settings card's overflow cannot clip it. */
 .settings-font {
   position: relative;
 }
@@ -912,10 +913,8 @@
 }
 
 .settings-font-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 40;
+  position: fixed;
+  z-index: 60;
   width: min(320px, calc(100vw - 48px));
   max-height: min(420px, calc(100vh - 160px));
   border-radius: var(--radius-lg);
@@ -923,6 +922,15 @@
   box-shadow: var(--ds-shadow-dialog);
   border: 1px solid var(--ds-border-subtle);
   color: var(--ds-text-primary);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.settings-font-menu.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .settings-font-search {

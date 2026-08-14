@@ -4790,22 +4790,29 @@ This test plan spec is accepted when:
   2) Open the Font picker and confirm it lists System default, the bundled
      open-licensed families (Geist, Inter, Noto Sans SC, LXGW WenKai) marked
      with their license, and installed system families; confirm the search
-     input filters families and the current selection shows a check badge.
+     input filters families and the current selection shows a check badge;
+     confirm the menu opens as a floating layer above the card (not clipped or
+     squeezed inside it) and stays readable when the card is near the bottom
+     edge of the window.
   3) Select Geist and confirm the trigger label and the whole UI re-render in
      Geist without a reload, including CJK fallback rendering for Chinese text.
   4) Select an installed system family and confirm the UI switches to it; the
      family stays selected after reopening the picker.
   5) Restart the app, reopen Settings, and confirm the selected font is still
      applied (persisted `AppSettings.fontFamily`).
-  6) Select System default, restart, and confirm the UI returns to the built-in
-     token stack.
+  6) Select System default and confirm the UI returns to the built-in token
+     stack immediately; restart, reopen Settings, and confirm the default is
+     still applied (the override is cleared, persisting an empty
+     `AppSettings.fontFamily`).
 - **Expected**: The Font row is a searchable picker whose trigger previews the
   current family in that face; options are System default, bundled OFL families,
   and installed system families enumerated by Electron main via
   `pi-desktop/app/systemFonts` (cached 60 s, hidden `.`-prefixed families
   excluded); selection persists as a CSS stack in `AppSettings.fontFamily` and
   overrides `--font-sans` live; Chinese text stays readable through the CJK
-  fallback tier; System default clears the override.
+  fallback tier; the menu is a body-level floating layer that is never clipped
+  by the settings card; System default clears the override by persisting an
+  empty stack.
 - **Specs linked**: `04-ux/06-settings-ia.md`, `04-ux/07-ui-design-system.md`,
   `03-runtime/01-ipc-protocol.md`, ADR 0083
 - **Acceptance**: A (core shell), H (localization)
