@@ -3,12 +3,14 @@
  *
  * Implemented with platform tooling only (no native modules) so the main
  * process bundles cleanly:
- *   - macOS: `system_profiler SPFontsDataType -json` (CoreText families)
+ *   - macOS: `osascript` JXA bridging `CTFontManagerCopyAvailableFontFamilyNames`
+ *     (the same CoreText query font_kit's `all_families()` uses, so it is fast
+ *     and returns canonical CSS family names); `system_profiler` is kept as a
+ *     slow fallback when osascript is unavailable
  *   - Windows: PowerShell `[Windows.Media.Fonts]::SystemFontFamilies`
  *   - Linux: `fc-list` family output
  * The Windows and Linux approaches mirror the MIT-licensed `font-list`
- * package (https://github.com/oldj/font-list). Callers cache the result;
- * enumeration is comparatively slow on macOS.
+ * package (https://github.com/oldj/font-list). Callers cache the result.
  */
 import { exec, execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -17,6 +19,28 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 async function darwinFontFamilies(): Promise<string[]> {
+  // CoreText family enumeration via the JXA ObjC bridge completes in tens of
+  // milliseconds, where system_profiler takes seconds on the same machine.
+  const script = [
+    'ObjC.import("CoreText")',
+    "const cf = $.CTFontManagerCopyAvailableFontFamilyNames()",
+    "const ns = ObjC.castRefToObject(cf)",
+    'ObjC.deepUnwrap(ns).join("\\n")',
+  ].join("; ");
+  try {
+    const { stdout } = await execFileAsync(
+      "osascript",
+      ["-l", "JavaScript", "-e", script],
+      { maxBuffer: 8 * 1024 * 1024, timeout: 15_000 },
+    );
+    const names = stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    if (names.length > 0) return names;
+  } catch {
+    // Fall through to the system_profiler fallback below.
+  }
   const { stdout } = await execFileAsync(
     "system_profiler",
     ["SPFontsDataType", "-json"],
