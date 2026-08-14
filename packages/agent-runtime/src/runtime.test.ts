@@ -2702,29 +2702,33 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
       {
         type: "message",
         id: "old-user",
+        seq: 0,
         parentId: null,
-        timestamp: "2026-07-28T00:00:00Z",
+        timestamp: Date.parse("2026-07-28T00:00:00Z"),
         message: { role: "user", content: "old context", timestamp: 1 },
       },
       {
         type: "message",
         id: "current-user",
+        seq: 1,
         parentId: "old-user",
-        timestamp: "2026-07-28T00:00:01Z",
+        timestamp: Date.parse("2026-07-28T00:00:01Z"),
         message: { role: "user", content: "inspect the log", timestamp: 2 },
       },
       {
         type: "message",
         id: "tool-assistant",
+        seq: 2,
         parentId: "current-user",
-        timestamp: "2026-07-28T00:00:02Z",
+        timestamp: Date.parse("2026-07-28T00:00:02Z"),
         message: toolAssistant,
       },
       {
         type: "message",
         id: "large-tool-call",
+        seq: 3,
         parentId: "tool-assistant",
-        timestamp: "2026-07-28T00:00:03Z",
+        timestamp: Date.parse("2026-07-28T00:00:03Z"),
         message: largeToolResult,
       },
     ];
@@ -2822,15 +2826,17 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
       {
         type: "message",
         id: "anchor-user",
+        seq: 0,
         parentId: null,
-        timestamp: "2026-07-31T00:00:00Z",
+        timestamp: Date.parse("2026-07-31T00:00:00Z"),
         message: { role: "user", content: "anchor ask", timestamp: 1 },
       },
       {
         type: "message",
         id: "later-user",
+        seq: 1,
         parentId: "anchor-user",
-        timestamp: "2026-07-31T00:00:01Z",
+        timestamp: Date.parse("2026-07-31T00:00:01Z"),
         message: { role: "user", content: "later ask", timestamp: 2 },
       },
     ];
@@ -2855,9 +2861,15 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     );
     const preparation = (runtime as any).prepareCompactionInput(entries, budget);
 
+    // "anchor ask" is the message the previous checkpoint was filed against, so
+    // it sits behind the boundary and "First summary." already covers it. pi
+    // 0.84 starts the compactable range at the checkpoint entry (replaying its
+    // retained tail as virtual entries) instead of walking back to the anchor,
+    // so the one-entry overlap 0.82 produced is gone. What matters to this test
+    // still holds: the retained user message survives into the next tail.
     expect(
       preparation.value.retainedTail.map((message: any) => message.content),
-    ).toEqual(["remembered ask", "anchor ask", "later ask"]);
+    ).toEqual(["remembered ask", "later ask"]);
     await runtime.dispose();
   });
 
@@ -2900,25 +2912,28 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
       {
         type: "message",
         id: "old-user",
+        seq: 0,
         parentId: null,
-        timestamp: "2026-07-29T00:00:00Z",
+        timestamp: Date.parse("2026-07-29T00:00:00Z"),
         message: { role: "user", content: "inspect the repository", timestamp: 1 },
       },
       {
         type: "message",
         id: "parallel-carrier",
+        seq: 1,
         parentId: "old-user",
-        timestamp: "2026-07-29T00:00:01Z",
+        timestamp: Date.parse("2026-07-29T00:00:01Z"),
         message: toolCarrier,
       },
       ...largeResults.map((message, index) => ({
         type: "message",
         id: message.toolCallId,
+        seq: index + 2,
         parentId:
           index === 0
             ? "parallel-carrier"
             : largeResults[index - 1].toolCallId,
-        timestamp: `2026-07-29T00:00:0${index + 2}Z`,
+        timestamp: Date.parse(`2026-07-29T00:00:0${index + 2}Z`),
         message,
       })),
     ];
