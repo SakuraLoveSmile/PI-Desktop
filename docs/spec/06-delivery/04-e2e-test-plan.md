@@ -4858,3 +4858,42 @@ This test plan spec is accepted when:
 - **Acceptance**: A (core shell)
 - **Milestone**: M5+
 - **Status**: Documented
+
+#### E2E-128: Revealed work panel with no resource offers the four tools
+
+- **Preconditions**: App running with a project open and an active conversation
+  that has produced no file, command, or preview artifact, so the session's
+  work panel context holds no tabs.
+- **Steps**:
+  1) Press `Cmd/Ctrl + J` and confirm the panel appears with an empty body that
+     shows a tiled icon, the title "No resource open", one line of supporting
+     copy, and four tool rows (Review, Terminal, Browser, Files) — not a blank
+     area below the title bar.
+  2) Tab into the tool rows and confirm each takes a visible focus ring and
+     that hovering a row shows only a background fill.
+  3) Activate Terminal and confirm a Terminal tab is created and selected, the
+     empty body and its tool list disappear, and the header label reads
+     Terminal.
+  4) Open the header context menu, activate Terminal again, and confirm it
+     selects the existing tab rather than creating a second one.
+  5) Close the Terminal tab and confirm the panel hides (last-tab close), then
+     press `Cmd/Ctrl + J` again and confirm the empty body returns.
+  6) Switch to a project with no Git changes, open Review from the empty body,
+     and confirm the Review tab's own empty state uses the same treatment —
+     tiled icon, title, muted supporting line — with no action button.
+  7) Repeat step 1 in Chinese and in both light and dark themes, and at the
+     244px panel minimum, confirming the copy wraps rather than clipping.
+- **Expected**: `Cmd/Ctrl + J` reveals the panel without creating a tab, and the
+  no-resource body explains the panel and lists the same four tools the header
+  menu offers; a row creates or selects that tool's singleton tab exactly as the
+  menu does, and the rows exist only while no tab does. The empty body is not
+  exposed as a `tabpanel`; its rows are buttons in a `role="group"` labelled
+  Tools. Panel empty states — the no-resource body and each tab's own — share
+  the app's empty-state proportions (38px tiled icon, title, muted copy wrapping
+  at 34ch), with no action button in the "open a project" states because opening
+  a project resets the panel context.
+- **Specs linked**: `04-ux/08-component-spec.md` §5.2, §5.2.1, §5.3, §5.4, §5.5,
+  `04-ux/07-ui-design-system.md`
+- **Acceptance**: A (core shell), H (localization)
+- **Milestone**: M5+
+- **Status**: Documented

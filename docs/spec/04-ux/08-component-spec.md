@@ -591,9 +591,26 @@ preview), and Files (workspace browser). Codex-parity surface.
 |  Terminal: xterm host                 |
 |  Browser: URL bar + preview           |
 |  Files: tree + file viewer            |
+|  no resource: empty state + tool list |
 +---------------------------------------+
  ▌ active row edge marker   • open, inactive
 ^ 10px transparent resize hit area on the left edge
+```
+
+With no resource the body is an empty state — tiled icon, title, one line of
+copy — followed by the same four tools the header menu lists, as plain rows:
+
+```text
++---------------------------------------+
+|              ( ◫ )                    |  38px tiled icon
+|         No resource open              |  title
+|   Open a file, command, or link from   |  body
+|   the conversation — or pick a tool.   |
+|        ◫ Review                        |
+|        > Terminal                      |  28px rows, hover fill only
+|        ◎ Browser                       |
+|        ▤ Files                         |
++---------------------------------------+
 ```
 
 ### 5.2.1 Light-theme surface
@@ -619,6 +636,12 @@ preview), and Files (workspace browser). Codex-parity surface.
   fills with `--motion-duration-fast` / `--motion-ease-out`
 - Browser URL and empty-tool chrome share the light inset field treatment used
   by Settings controls (D148)
+- Every empty state in the panel — the no-resource body and each tab's own —
+  uses the proportions the rest of the app already uses (`.ext-empty`,
+  `.projects-empty`): a 38px round tiled icon, a title at
+  `--text-base-plus` / `--font-weight-medium-plus`, and muted `--text-md` copy.
+  Copy wraps at 34ch rather than 48ch because the panel can be 244px wide. No
+  hero art, cards, or marketing framing (design-system §14, D206)
 
 ### 5.3 States
 
@@ -630,6 +653,7 @@ preview), and Files (workspace browser). Codex-parity surface.
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows anchored pointer delta or keyboard input. Pointer changes preview once per animation frame and commit width plus reservation only on release; Escape, pointer cancellation, or lost capture restores both. Native window-edge resize changes MainChat only. |
 | No workspace | Each tab renders its own "open a project" empty state |
+| Open with no resource | `Cmd/Ctrl + J` reveals the panel without creating a tab, so the body renders the no-resource empty state: title, one line of copy, and the four tools as entry rows. Activating a row is equivalent to the same tool in the header menu — it creates or selects that singleton tab (D224). The body is not a `role="tabpanel"` here because no tab labels it. |
 | Constrained work area | The panel stays at its committed width; MainChat reflows to absorb it and may fall below its 360px target on small windows (ADR 0033) |
 
 ### 5.4 Interactions
@@ -672,6 +696,14 @@ preview), and Files (workspace browser). Codex-parity surface.
   and remains available after `Cmd/Ctrl + J` reveals the panel. Artifact
   triggers still create and activate resources atomically; the shortcut only
   reveals the existing context.
+- Empty-body tool list: the four entry rows appear only while the body has no
+  tab at all, and disappear as soon as one exists. Each row calls the same
+  create-or-select path as its header-menu counterpart, so a closed tool gets a
+  new singleton tab and an already-open one is selected rather than duplicated.
+  `Cmd/Ctrl + J` itself still creates nothing — the rows are the user's choice,
+  not the shortcut's side effect. The "open a project" empty states carry no
+  action button: opening a project resets the panel context and hides the panel,
+  so the button would undo the surface that offered it (D224).
 - Resource header: the 46px header shows the active resource icon and
   ellipsized label. Its context chevron opens the bounded unified menu described
   above; the header's trailing close button closes the current resource
@@ -724,7 +756,9 @@ preview), and Files (workspace browser). Codex-parity surface.
   wrappers, so ArrowDown/ArrowUp/Home/End move focus across rows only and never
   through the trailing close buttons; Delete/Backspace closes the focused row.
   Escape and Tab close the menu and return focus to the trigger. Each resource
-  body remains a `role="tabpanel"`
+  body remains a `role="tabpanel"`; the no-resource body is not one, since no
+  tab exists to label it. Its tool rows are ordinary buttons inside a
+  `role="group"` labelled "Tools", reachable by Tab in reading order
 - Resize handle: focusable `role="separator"` with
   `aria-orientation="vertical"`, a localized label, dynamic
   `aria-valuemin` / `aria-valuemax` / `aria-valuenow`, visible focus, and

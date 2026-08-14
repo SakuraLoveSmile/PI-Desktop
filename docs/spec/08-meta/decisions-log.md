@@ -1640,3 +1640,30 @@ D193, and D194.
   restore paths; ADR 0080's warm-up and launcher latency budget stand. See
   ADR 0086, `03-runtime/07-process-model.md` §5, and E2E-127. Protocol v9, host
   RPC, IPC channels, and storage schema v11 are unchanged.
+
+## 2026-08-14 — Revealed work panel with no resource lists its four tools
+
+- `Cmd/Ctrl+J` reveals the panel without creating a tab, which left the body as
+  blank space below the title bar. The body now renders an empty state — tiled
+  icon, title, one line of copy — followed by the same four tools the header
+  menu lists (Review, Terminal, Browser, Files) as plain 28px entry rows.
+- A row calls the same create-or-select path as its menu counterpart, so it
+  cannot produce a duplicate tab. The rows exist only while the body has no tab
+  at all; the shortcut itself still creates nothing, keeping D128's
+  artifact-driven entry model intact — the rows are a user choice, not a side
+  effect of revealing the panel.
+- The empty body is not exposed as a `role="tabpanel"` because no tab labels it;
+  its rows are buttons inside a `role="group"` labelled "Tools".
+- All panel empty states (the no-resource body and each tab's own) now share one
+  `WorkTabEmpty` component on the proportions the rest of the app already uses
+  (`.ext-empty`, `.projects-empty`): 38px round tiled icon, title, muted copy
+  wrapping at 34ch instead of 48ch because the panel can be 244px wide.
+- Entry rows stay restrained — hover fill and a focus ring, no cards, no hero
+  art, no large icons — so this does not reintroduce what D206 removed from the
+  empty home, and it stays inside design-system §14's "no marketing-style empty
+  states".
+- No action button in the "open a project" empty states: `openProject()` resets
+  the panel context and hides the panel, so the button would undo the surface
+  that offered it.
+- Decision D224 is renderer-only. Protocol, host RPC, and storage schema are
+  unchanged.
