@@ -2955,26 +2955,28 @@ Each scenario is documented in this format:
 
 - **Preconditions**: A project-bound Agent session has a writable workspace;
   the provider fixture can emit two same-session `Write`/`Edit` calls in one
-  tool batch; a second edit can be given stale or ambiguous `old_string`
-  context; a Bash command can return a non-zero exit code with diagnostics.
+  tool batch; a second edit can be given a stale `tag`; a Bash command can
+  return a non-zero exit code with diagnostics.
 - **Steps**:
   1. Start a task that emits two mutations for the same session while also
      emitting independent read/search calls.
   2. Inspect tool timing and the transcript while the first mutation runs.
-  3. Force the second `Edit` to use a context that is no longer present, then
-     allow the agent to re-read the file and retry from the current contents.
+  3. Force the second `Edit` to carry a `tag` that no longer hashes the file,
+     with anchors that recovery cannot remap, then allow the agent to re-read
+     the file and retry from the current contents.
   4. Run a Bash command that exits non-zero and inspect its tool result and
      inline state.
-  5. Repeat with an `old_string` that appears in two locations.
+  5. Repeat with an `ops` payload whose ranges overlap.
   6. If the task uses a dedicated worktree outside the advertised workspace,
      verify its guarded Bash edit and resulting `git diff`.
 - **Expected**:
   - Read/search calls may overlap, but only one `Write`/`Edit` executes for a
     session at a time; queued mutations do not consume another global
     mutation slot while waiting.
-  - The stale and ambiguous edits fail without changing the file and return a
-    `TOOL_FAILED` message that directs the agent to re-read and provide a
-    unique current context.
+  - The stale-tag edit fails without changing the file and returns
+    `EDIT_TAG_MISMATCH` carrying the live tag and current content at the
+    anchors; the overlapping-range payload fails with `EDIT_RANGE_INVALID`
+    before any write.
   - The non-zero Bash command is marked failed while retaining its exit code,
     stdout, and stderr for the agent and diagnostics.
   - The retry performs one fresh read and operates on the current file; a
@@ -4957,5 +4959,270 @@ This test plan spec is accepted when:
   Approval cards are unaffected, since they have no head of their own.
 - **Specs linked**: `04-ux/08-component-spec.md` §9.2, §9.3, §9.5, §9.10
 - **Acceptance**: E (tools & permissions), H (localization)
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-130: Read mints a tag that an Edit consumes without re-reading
+
+- **Preconditions**: A project-bound Agent session with a writable workspace and
+  a source file of at least 300 lines. The provider fixture can emit an exact
+  `Edit` payload.
+- **Steps**:
+  1. `Read` the file with no `offset` and record the `[path#TAG]` header, the
+     `tag` field, and the `N:` prefixes on the returned lines.
+  2. Emit `Edit` with that `tag` and a single `PUT N.=M:` whose body replaces two
+     lines inside the read window.
+  3. Confirm the successful result reports a new `tag`, then emit a second `Edit`
+     with the returned tag and a `PUT >$:` append, with no intervening `Read`.
+  4. `Read` a 200-line window at an `offset`, then `Edit` a line inside that
+     window using the tag from the windowed read.
+  5. Reopen the file on disk and compare it to the intended content byte for
+     byte.
+- **Expected**: The header tag is the whole-file tag, not the window's, so a
+  windowed read anchors correctly; line numbers are absolute and unaffected by
+  `offset`. Both edits apply, the second without any re-read, and each success
+  returns the post-write tag. The file on disk matches the intended content
+  exactly, with its original line endings and BOM state preserved.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §3, §4.2, §5,
+  §6, §9, `03-runtime/16-tool-result-limits.md` §5, ADR 0087
+- **Acceptance**: E (tools & permissions)
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-131: An edit on never-displayed lines is rejected and the retry succeeds
+
+- **Preconditions**: A session that has read only lines 1–50 of a 400-line file.
+  A second fixture file has one line longer than 2000 characters.
+- **Steps**:
+  1. Emit `Edit` with the correct `tag` and a `PUT 300.=301:` op.
+  2. Inspect the error code and confirm the message inlines the current content
+     of lines 300 and 301.
+  3. Retry the identical `Edit` payload, unchanged, including the same `tag`.
+  4. Emit `Edit` with the correct tag and a `PUT 5.=60:` op spanning 56 unseen
+     lines, and inspect the reveal.
+  5. Retry that identical payload unchanged.
+  6. `Read` the second fixture, confirm the long line is clipped and counted in
+     `notice`, then `Edit` that clipped line.
+- **Expected**: Step 1 fails with `EDIT_LINES_UNSEEN` and the file is unchanged.
+  Step 3 applies, because the complete reveal merged those lines into the
+  session's provenance. Step 4 fails with a reveal truncated at 40 lines that
+  says to re-read the range, and step 5 fails again — a truncated reveal merges
+  nothing, so the guard cannot be walked past in under-cap slices. Step 6 fails
+  with `EDIT_LINES_UNSEEN`: a clipped line was never displayed.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §4.3, §9.1,
+  §11, §12, `03-runtime/16-tool-result-limits.md` §2, ADR 0087
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-132: Gap inserts, deletes, and multi-op payloads apply against one snapshot
+
+- **Preconditions**: A read file whose content is known line by line.
+- **Steps**:
+  1. Emit one `Edit` combining `PUT <1:`, `PUT >40:`, `CUT 12.=14`, and
+     `PUT 80.=80:` in a single `ops` payload.
+  2. Compare the result against the same four changes computed against the
+     original line numbering.
+  3. Emit `PUT >$:` on the same file and confirm the append lands after the final
+     line with exactly one terminating newline.
+  4. Emit an `ops` payload whose body row starts with a literal `-` written as
+     `+- item`, and one with a literal `+` written as `++ item`.
+  5. Emit an `Edit` whose `PUT` body exactly reproduces the range's current
+     content.
+- **Expected**: Every anchor indexes the tagged snapshot, so no op shifts
+  another and the combined result equals the four independent changes. `+-` and
+  `++` write a single leading `-` and `+`. Step 5 returns `EDIT_NO_CHANGE` rather
+  than reporting a successful write of nothing, and leaves no review record.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §7.2, §7.3,
+  §7.4, §8.1, §9.3, ADR 0087
+- **Acceptance**: E (tools & permissions)
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-133: Block ops resolve, echo their span, and decline instead of guessing
+
+- **Preconditions**: Read fixtures in a supported grammar (a Rust file with a
+  decorated/attributed function), a Markdown file with nested headings, and a
+  file in a language outside the supported grammar list.
+- **Steps**:
+  1. Emit `PUT N*:` anchored on the `fn` line of a function whose declaration
+     carries an `#[attribute]` line above it, and inspect the echoed
+     `{anchorLine, start, end, op}`.
+  2. Repeat anchored on the attribute line and compare the echoed span.
+  3. Emit `PUT >N*:` on the same opener and confirm the insertion lands after the
+     block's last line at sibling indentation.
+  4. Emit `CUT N*` anchored on a lone `}` closer.
+  5. Emit `PUT N*:` on a `##` heading in the Markdown fixture and confirm the
+     span reaches the next same-or-higher heading, not the next deeper one.
+  6. Emit `PUT N*:` in the unsupported-language file.
+  7. Introduce a syntax error into the Rust fixture, re-read, and emit a block
+     op.
+- **Expected**: Step 1's span starts at the `fn` line and excludes the
+  attribute; step 2's includes both — the difference is visible in the echo
+  before the model has to infer it. Steps 4, 6, and 7 fail with
+  `EDIT_BLOCK_UNRESOLVED` and a message naming the plain-range alternative;
+  neither approximates a span. Range and gap ops still work in the unsupported
+  language.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §8.2, §11,
+  §12, ADR 0087 §4
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-134: Registers move code within a call and across calls
+
+- **Preconditions**: Two read files in the same session.
+- **Steps**:
+  1. In one `Edit`, emit `CUT 20.=30` followed by `PUT <5 ` with no register
+     label, and confirm the lines moved within the file.
+  2. In one `Edit`, emit two `CUT` ops with no labels followed by one unlabeled
+     paste.
+  3. Emit `CUT 40* @fn` on the first file, then in a separate `Edit` call emit
+     `PUT <10 @fn` on the second file.
+  4. Emit `PUT <10 @missing` for a register that was never set.
+  5. Emit `PUT 10.=12 @fn` with a body row attached.
+  6. Emit `PUT <1 ` with no label in a fresh `Edit` call that performed no
+     capture.
+  7. Delete the source file, then paste `@fn` again in a later call.
+- **Expected**: Step 1 applies as one move with no duplicated or orphaned lines.
+  Step 2 fails with `EDIT_REGISTER_AMBIGUOUS` instead of using the most recent
+  capture. Step 3 completes the cross-file move across two calls, each with its
+  own permission gate, review record, and artifacts row. Steps 4 and 6 fail with
+  `EDIT_REGISTER_EMPTY` — the anonymous register did not survive the earlier
+  call. Step 5 fails with `EDIT_PARSE_FAILED`. Step 7 still pastes: a register
+  holds captured content, not a live reference.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §7.5, §8.3,
+  §11, §13.2, ADR 0087 §5
+- **Acceptance**: E (tools & permissions)
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-135: A drifted file recovers when remapping is provable and fails when it is not
+
+- **Preconditions**: A read file whose tag is recorded. An external process can
+  modify the file between the read and the edit.
+- **Steps**:
+  1. Insert 10 unrelated lines above the edit target from outside the session,
+     then emit the original `Edit` with the stale `tag`.
+  2. Inspect the warning on the successful result and confirm the change landed
+     at the shifted location, not at the original line numbers.
+  3. Repeat with a change that modifies one of the anchor lines themselves.
+  4. Repeat with a change that inserts lines *between* two anchors of a
+     multi-op payload, so the anchors would move by different offsets.
+  5. Repeat with a `CUT` whose captured interior lines were externally edited.
+  6. Repeat after the session itself has written the file twice, using the tag
+     from the first write.
+  7. Repeat with a duplicated anchor line whose one neighboring context line
+     matches but whose other does not.
+- **Expected**: Step 1 applies with a line-remap plus external-change warning.
+  Steps 3, 4, 5, and 7 fail closed with `EDIT_TAG_MISMATCH` and current content;
+  none of them writes. Step 6 applies with a session-chain warning instead of an
+  external-change warning, because the corrective advice differs. No recovery
+  path ever writes the tagged snapshot's content over the live file.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9, §10, §11,
+  ADR 0087 §6
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-136: A stale tag still applies for head and tail inserts
+
+- **Preconditions**: A read file whose tag is recorded, plus an external writer.
+- **Steps**:
+  1. Modify the middle of the file externally, then emit `PUT >$:` with the stale
+     tag.
+  2. Repeat with `PUT <1:` and the same stale tag.
+  3. Repeat with a payload that mixes `PUT >$:` and an anchored `PUT 50.=50:`.
+  4. Emit an `Edit` whose `tag` is well formed but was never recorded for that
+     path in this session.
+  5. Emit an `Edit` with a `tag` that is not four hex digits.
+- **Expected**: Steps 1 and 2 apply with a drift warning, because neither anchor
+  can be moved by content drift. Step 3 does not take the position-stable path:
+  it goes to recovery and, failing that, to `EDIT_TAG_MISMATCH`. Step 4 returns
+  `EDIT_TAG_UNKNOWN` and step 5 returns `EDIT_TAG_REQUIRED`; neither is reported
+  as a generic `TOOL_FAILED`.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9, §11,
+  `03-runtime/08-error-codes.md` §3.4
+- **Acceptance**: E (tools & permissions)
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-137: Boundary repair fixes an off-by-one edge and refuses a tie
+
+- **Preconditions**: A read source file with nested closing delimiters.
+- **Steps**:
+  1. Emit a `PUT N.=M:` whose range includes one trailing `}` that the body does
+     not restate, and inspect the result and its warning.
+  2. Emit a `PUT N.=M:` whose body restates a line that sits immediately outside
+     the range.
+  3. Emit a payload constructed so that two distinct repaired texts tie at the
+     minimum repair cost.
+  4. Emit a payload against a file that already fails to parse, and confirm the
+     repair does not retain a row on parse-success evidence alone.
+- **Expected**: Steps 1 and 2 apply with a warning naming exactly what was
+  repaired, so a silent structural change is impossible. Step 3 returns
+  `EDIT_REPAIR_AMBIGUOUS` rather than choosing; step 4 does not invent a
+  retention. In every case the file either contains the repaired result described
+  in the warning or is untouched.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §8.4, §11,
+  ADR 0087
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-138: Move, remove, and rollback keep review evidence honest
+
+- **Preconditions**: A project-bound session with Review visible and a read file
+  inside the workspace root.
+- **Steps**:
+  1. Emit `Edit` with a `PUT` op plus `MV DEST` in the same `ops` payload.
+  2. Inspect the review records for the tool call and the Review panel rows.
+  3. Roll the change back and confirm both the source and the destination
+     return to their pre-call state.
+  4. Emit `Edit` with `REM`, then roll it back.
+  5. After a rollback, emit an `Edit` using the tag the session held before the
+     rollback.
+  6. Emit `Edit` on a path that does not exist but whose basename and tag match
+     exactly one file this session recorded, and inspect the warning.
+  7. Repeat step 6 with two recorded candidates sharing that basename and tag.
+- **Expected**: Step 1 records a source deletion and a destination creation under
+  one tool call; step 3 restores both or neither. Step 4's rollback restores the
+  captured bytes, hash-guarded on the full digest rather than the 16-bit tag.
+  Step 5 fails rather than editing against content the rollback replaced. Step 6
+  rebinds to the real file with a warning, and the write-permission gate is
+  evaluated against the rebound path; step 7 declines instead of picking one.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9.2, §13.1,
+  `03-runtime/03-tools-and-permissions.md` §4c, ADR 0043, ADR 0087
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-139: Snapshot provenance is per session and bounded
+
+- **Preconditions**: A subagent-capable session (§5f), a second session on the
+  same workspace, and a fixture with more files than the snapshot store's path
+  bound.
+- **Steps**:
+  1. Read a file in the parent session, then have a delegate `Edit` that file
+     using the parent's tag without reading it first.
+  2. Read a file in session A and emit the same `Edit` payload from session B.
+  3. Read more distinct paths than the store retains, then edit the
+     first-read path with its original tag.
+  4. Read one path five times with changing content between reads, then edit
+     using the tag from the first read.
+  5. Read a file, then read the identical unchanged file twice more at
+     different offsets, and confirm one tag covers all three windows.
+  6. Restart the app, then emit an `Edit` with a tag from before the restart.
+  7. Write a file through a path that a save hook reformats, then `Edit` using
+     the tag the write returned.
+- **Expected**: Steps 1 and 2 fail — provenance is per reader, and no session
+  hands another its tags. Steps 3, 4, and 6 fail with `EDIT_TAG_UNKNOWN` and an
+  instruction to re-read, never with a wrong write. Step 5 applies anywhere in
+  the union of the three windows without a fourth read. Step 7 applies, because
+  the recorded tag describes the bytes that actually landed, and the drift is
+  reported as a one-line warning rather than a whole-file diff.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §4.2, §4.4,
+  §5.4, §13.5, `03-runtime/02-agent-runtime.md` §5f, ADR 0087 §3
+- **Acceptance**: E (tools & permissions), Quality
 - **Milestone**: M5+
 - **Status**: Documented
