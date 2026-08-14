@@ -434,6 +434,17 @@ function AppShell() {
     return () => mq.removeEventListener("change", onChange);
   }, [settings?.theme, pluginThemes]);
 
+  // Global UI font: the Settings picker stores a CSS `font-family` stack in
+  // `AppSettings.fontFamily`; absent means the built-in token stack.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (settings?.fontFamily) {
+      root.style.setProperty("--font-sans", settings.fontFamily);
+    } else {
+      root.style.removeProperty("--font-sans");
+    }
+  }, [settings?.fontFamily]);
+
   useEffect(() => {
     if (bootstrapStartedRef.current) return;
     bootstrapStartedRef.current = true;
