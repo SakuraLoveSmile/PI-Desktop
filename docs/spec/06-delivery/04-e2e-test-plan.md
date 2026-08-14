@@ -2200,14 +2200,17 @@ Each scenario is documented in this format:
   open and the preference unset; Close to tray hides the window, shows the
   tray icon, and the app keeps running (a turn in flight stays live); Quit
   exits the app. 2) Re-run each choice and verify it is remembered across a
-  full restart. 3) With `tray` set, click the tray icon: the window
+  full restart and that no second prompt ever appears once a choice exists.
+  3) With `tray` set, click the tray icon: the window
   restores, shows, and focuses; the tray context menu offers Open and Quit,
-  and Quit exits the app. 4) In Settings → General, switch among Ask every
-  time / Close to tray / Quit app and verify the next close follows the new
-  choice, the tray icon appears only for Close to tray, and search matches
+  and Quit exits the app. 4) In Settings → General, switch between Close to
+  tray / Quit app and verify the next close follows the new
+  choice, the tray icon appears only for Close to tray, an unset preference
+  shows no selection, and search matches
   the row. 5) Minimize from any setting and verify the taskbar entry
   remains and the window does not restore itself. 6) Invoke unknown values
-  on `pi-desktop/window/closeBehavior/set` and verify they fail closed.
+  and `"ask"` on `pi-desktop/window/closeBehavior/set` and verify they fail
+  closed.
 - **Expected**: The first close prompts exactly once per unset state and
   Cancel never persists a choice. Tray mode keeps the app alive with a
   localized tooltip/menu and no data loss; switching to Quit app destroys

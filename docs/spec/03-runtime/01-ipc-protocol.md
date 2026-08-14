@@ -1055,18 +1055,22 @@ window/control({ action: WindowControlAction })
 Windows/Linux close behavior (D210, ADR 0071) is read and written through
 two additive Main-owned channels. `closeBehavior/get` returns the persisted
 preference and whether the platform supports it (macOS keeps the native
-Dock lifecycle and reports `supported: false`); `closeBehavior/set` accepts
-one of the exported `CloseBehavior` values and reconciles the tray icon
-with the choice:
+Dock lifecycle and reports `supported: false`); `closeBehavior/set`
+accepts a settable `CloseBehavior` (`tray` or `quit`) and reconciles the
+tray icon with the choice:
 
 ```ts
 type CloseBehavior = "ask" | "tray" | "quit";
 
 window/closeBehavior/get -> { behavior: CloseBehavior; supported: boolean }
-window/closeBehavior/set({ behavior: CloseBehavior }) -> { behavior: CloseBehavior }
+window/closeBehavior/set({ behavior: "tray" | "quit" })
+  -> { behavior: "tray" | "quit" }
 ```
 
-Unknown values fail with `INVALID_ARGUMENT` rather than being coerced.
+`ask` is the transient unset state reported by `get`; it is never settable
+— the first close prompts once, and once a choice exists it can be switched
+but not reverted to prompting. `ask` and unknown values fail with
+`INVALID_ARGUMENT` rather than being coerced.
 
 Maximize/unmaximize changes also emit
 `window/event/maximized`. Unknown actions fail. These Electron-only channels

@@ -23,15 +23,17 @@ matches the desired behavior.
 ## Decision
 
 1. Windows/Linux close behavior becomes a persisted, user-configurable
-   preference with three values:
-   - `ask` (default when unset): prompt on close until the user picks.
+   preference with three values, of which two are ever settable:
+   - `ask`: the transient unset state — the first close prompts once. After
+     a choice is made it is remembered permanently and cannot be reverted
+     to prompting (`closeBehavior/set` rejects `ask`).
    - `tray`: closing the window hides it and keeps the app running under a
      system-tray icon; the tray menu restores the window or quits the app.
    - `quit`: legacy behavior — closing the window exits the app.
 2. The first close with an unset preference shows a native modal dialog
    (main process) with Cancel / Close to tray / Quit. Picking a non-cancel
-   option persists it; Cancel keeps the window open and leaves the
-   preference unset.
+   option persists it forever; Cancel keeps the window open and leaves the
+   preference unset (so the next close prompts again).
 3. The preference is stored by Electron main in
    `<data>/close-behavior.json` (same ownership pattern as
    `window-state.json`), NOT in host-core settings: it is app-shell
@@ -39,12 +41,13 @@ matches the desired behavior.
    host RPC or schema change.
 4. Two additive IPC channels expose it to the renderer:
    `pi-desktop/window/closeBehavior/get` (returns `{ behavior, supported }`)
-   and `pi-desktop/window/closeBehavior/set`. `supported` is `false` on
-   macOS, where the Settings row is hidden.
-5. Settings (General tab) renders a three-option radio segment — Ask every
-   time / Close to tray / Quit app — for Windows/Linux only. Changing it
-   applies immediately and reconciles the tray icon: switching to `tray`
-   creates the icon, switching away destroys it.
+   and `pi-desktop/window/closeBehavior/set`, which accepts only `tray` and
+   `quit` (`ask` and unknown values fail with `INVALID_ARGUMENT`).
+   `supported` is `false` on macOS, where the Settings row is hidden.
+5. Settings (General tab) renders a two-option radio segment — Close to
+   tray / Quit app — for Windows/Linux only; an unset preference shows no
+   selection. Changing it applies immediately and reconciles the tray icon:
+   switching to `tray` creates the icon, switching away destroys it.
 6. The close handler intercepts `close` only when `tray` exists or the
    preference is `ask`; `before-quit` (`quitting`) and macOS closes always
    fall through, so an explicit quit, the tray Quit item, and the automated
