@@ -257,6 +257,22 @@ test("minimize is resident in the cross-platform tray", () => {
   assert.match(iconScriptSource, /ImageChops\.multiply/);
 });
 
+test("macOS activation resurfaces a tray-hidden window", () => {
+  assert.match(mainSource, /app\.on\("activate", \(\) => \{\s*restoreMainWindow\(\);/);
+  assert.match(
+    mainSource,
+    /app\.on\("did-become-active", \(\) => \{[\s\S]*restoreMainWindow\(\);/,
+  );
+  assert.match(
+    mainSource,
+    /if \(quitting \|\| !applicationBooted \|\| hasVisibleWindow\(\)\) return;/,
+  );
+  assert.match(
+    mainSource,
+    /function hasVisibleWindow\(\): boolean \{[\s\S]*BrowserWindow\.getAllWindows\(\)[\s\S]*window\.isVisible\(\)/,
+  );
+});
+
 test("desktop packaging builds the native host before every local target", () => {
   assert.match(
     packageJson.scripts["build:host-release"],

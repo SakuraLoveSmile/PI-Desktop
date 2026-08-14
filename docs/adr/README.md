@@ -101,3 +101,4 @@ Each ADR includes:
 | 0082 | Localized and page-adaptive plugin panel chrome | Accepted |
 | 0083 | Custom global UI font | Accepted |
 | 0084 | Defer new-task session creation until the first message | Accepted |
+| 0086 | Keep macOS on the regular activation policy | Accepted |

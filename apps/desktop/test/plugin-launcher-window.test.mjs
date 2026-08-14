@@ -37,6 +37,15 @@ test("global plugin launcher is a centered frameless cross-platform utility wind
   assert.match(main, /window\.on\("blur"[\s\S]*window\.hide\(\)/);
 });
 
+test("launcher never turns the app into a macOS accessory process", () => {
+  assert.match(
+    main,
+    /setVisibleOnAllWorkspaces\(true, \{\s*visibleOnFullScreen: true,\s*skipTransformProcessType: true,\s*\}\)/,
+  );
+  assert.doesNotMatch(main, /app\.dock\.hide\(\)/);
+  assert.doesNotMatch(main, /setActivationPolicy/);
+});
+
 test("launcher renderer supports keyboard selection and has no window controls", () => {
   assert.match(renderer, /rendererSurface === "plugin-launcher" \? <PluginLauncher \/>/);
   assert.match(launcher, /event\.nativeEvent\.isComposing/);

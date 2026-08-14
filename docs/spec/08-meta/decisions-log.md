@@ -1575,3 +1575,25 @@ D193, and D194.
   nothing to reuse because no draft session exists until first input. Protocol
   v9, host RPC, and storage schema v11 are unchanged; the change is confined
   to the renderer store, Composer, and Sidebar.
+
+## 2026-08-14 — PI-Desktop stays a regular macOS application
+
+- The plugin launcher window asked Electron for `visibleOnFullScreen` without
+  `skipTransformProcessType`, so Electron ran
+  `TransformProcessType(kProcessTransformToUIElementApplication)` on the whole
+  process and PI-Desktop vanished from the Dock and Cmd+Tab. ADR 0080's boot
+  warm-up made that happen on every launch. The launcher now passes
+  `skipTransformProcessType: true`; the process type is never transformed, and
+  `app.dock.hide()`/`app.setActivationPolicy` remain forbidden in Main.
+- The launcher keeps `canJoinAllSpaces` and `FullScreenAuxiliary`: it still
+  covers every regular Space and PI-Desktop's own fullscreen window. Overlaying
+  another application's fullscreen Space is given up — macOS reserves it for
+  accessory apps — and invoking the launcher from one activates PI-Desktop.
+- macOS activation restores the shell from `did-become-active` as well as
+  `activate`, gated on a booted, non-quitting app with no visible window, so
+  Cmd+Tab and App Exposé resurface a tray-hidden window (D216/ADR 0078) while
+  launcher and plugin-panel activations leave the main window where it is.
+- Decision D223 constrains ADR 0072's launcher window and completes D216's
+  restore paths; ADR 0080's warm-up and launcher latency budget stand. See
+  ADR 0086, `03-runtime/07-process-model.md` §5, and E2E-127. Protocol v9, host
+  RPC, IPC channels, and storage schema v11 are unchanged.

@@ -101,6 +101,15 @@ action. Quit from the tray, the existing close path, or an update install still
 enters the normal shutdown sequence above; destroying the tray happens during
 `before-quit` so shutdown cannot be intercepted by a stale shell affordance.
 
+On macOS the app runs under the regular (foreground) activation policy for its
+whole lifetime, so it is always listed in the Dock and Cmd+Tab: Main never
+transforms the process type, and the always-on-top plugin launcher joins every
+Space with `skipTransformProcessType` rather than by becoming an accessory app.
+Because macOS only emits Electron's `activate` for a Dock reopen, Main also
+restores a tray-hidden window from `did-become-active` when no window is
+visible, which covers Cmd+Tab and App Exposé without pulling the main window in
+front of the launcher or a plugin panel (ADR 0086).
+
 `updates/install` invokes Electron's quit-and-install path only after an update
 reaches `downloaded`. Electron still emits `before-quit`, so the normal
 sidecar/host shutdown sequence runs before the updater replaces the app.

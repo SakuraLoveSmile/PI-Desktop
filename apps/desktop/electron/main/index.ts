@@ -898,6 +898,12 @@ function trayIconPath() {
   return candidates.find((candidate) => existsSync(candidate)) ?? null;
 }
 
+function hasVisibleWindow(): boolean {
+  return BrowserWindow.getAllWindows().some(
+    (window) => !window.isDestroyed() && window.isVisible(),
+  );
+}
+
 function restoreMainWindow() {
   void ensureWindow()
     .then(() => {
@@ -1423,7 +1429,17 @@ function createPluginLauncherWindow(): Promise<BrowserWindow> {
     pluginLauncherWindow = window;
 
     if (process.platform === "darwin") {
-      window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      // Join every Space and float above this app's own fullscreen window, but
+      // never let Electron transform the process type. Without
+      // `skipTransformProcessType`, `visibleOnFullScreen` runs
+      // TransformProcessType(kProcessTransformToUIElementApplication) on the
+      // whole process, which removes PI-Desktop from the Dock and Cmd+Tab for
+      // as long as this window exists — and the launcher is prewarmed during
+      // boot, so that would apply to every session (ADR 0086).
+      window.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true,
+        skipTransformProcessType: true,
+      });
     }
     window.webContents.setWindowOpenHandler(({ url }) => {
       void shell.openExternal(url);
@@ -6636,3 +6652,16 @@ app.on("before-quit", (event) => {
 app.on("activate", () => {
   restoreMainWindow();
 });
+
+// macOS only emits `activate` from `applicationShouldHandleReopen:` — a Dock
+// click or a relaunch. Cmd+Tab, App Exposé, and Spotlight activation do not
+// reach it, and minimize hides the window into the tray (ADR 0078), so the app
+// could be focused with nothing on screen and no way back except the tray.
+// Restore only when no window is visible: activating the plugin launcher or a
+// plugin panel must not drag the main window up with it (ADR 0086).
+if (process.platform === "darwin") {
+  app.on("did-become-active", () => {
+    if (quitting || !applicationBooted || hasVisibleWindow()) return;
+    restoreMainWindow();
+  });
+}

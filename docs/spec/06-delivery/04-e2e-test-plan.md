@@ -4823,3 +4823,36 @@ This test plan spec is accepted when:
 - **Acceptance**: A (core shell), H (localization)
 - **Milestone**: M5+
 - **Status**: Documented
+
+#### E2E-127: macOS keeps the app in the Dock and Cmd+Tab
+
+- **Preconditions**: Built desktop app on macOS; the plugin launcher shortcut
+  (Option+Space) is registered; at least two Spaces and one other application
+  running fullscreen.
+- **Steps**:
+  1) Launch the app without opening the launcher and confirm it appears in the
+     Dock and in the Cmd+Tab switcher (`lsappinfo list` reports
+     `type="Foreground"`, not `type="UIElement"`).
+  2) Press Option+Space, confirm the launcher panel appears focused with a
+     typable input, dismiss it, and confirm the app is still in Cmd+Tab.
+  3) Put the main window in fullscreen, press Option+Space, and confirm the
+     panel floats above it.
+  4) Switch to a second regular Space and confirm Option+Space shows the panel
+     there.
+  5) Minimize the main window into the tray, switch to another app, then Cmd+Tab
+     back to PI-Desktop and confirm the window returns focused; repeat with a
+     Dock click and with the tray Show item.
+  6) With the main window hidden, press Option+Space and confirm only the
+     launcher appears — the main window stays hidden until it is restored.
+- **Expected**: The process never adopts the accessory activation policy, so
+  Dock and Cmd+Tab presence survives launcher warm-up and every launcher
+  invocation; the launcher stays focusable, covers all regular Spaces and the
+  app's own fullscreen window (overlaying another app's fullscreen Space is
+  out of scope and activates PI-Desktop instead); activation from Cmd+Tab, App
+  Exposé, the Dock, or the tray restores a tray-hidden window, while launcher
+  and plugin-panel activation leaves it hidden.
+- **Specs linked**: `03-runtime/07-process-model.md`, ADR 0086, ADR 0078,
+  ADR 0080
+- **Acceptance**: A (core shell)
+- **Milestone**: M5+
+- **Status**: Documented
