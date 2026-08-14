@@ -2124,7 +2124,18 @@ async function createWindow() {
             console.log("COMPOSER_PROBE", composerProbe);
             await shot("pi-final");
             // Work panel scenes are opened by simulated artifacts; production
-            // exposes no empty/manual panel entry point (D119).
+            // exposes no empty/manual panel entry point (D119). The panels need
+            // an active workspace, so switch to a project-scoped session first —
+            // otherwise every panel renders its "open a project" empty state.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const scoped = document.querySelector(
+                  "[data-sidebar-project-group] .thread-item-main, [data-sidebar-project-group] .thread-item",
+                );
+                scoped?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 700));
             const openPanelArtifact = (kind: string, resource?: string) =>
               mainWindow!.webContents.executeJavaScript(
                 `window.__PI_DESKTOP__?.openWorkPanelArtifact(${JSON.stringify(kind)}, ${JSON.stringify(resource)})`,
@@ -2161,17 +2172,6 @@ async function createWindow() {
             );
             await new Promise((r) => setTimeout(r, 300));
             // Open composer + menu for chrome parity proof.
-            await mainWindow!.webContents.executeJavaScript(`
-              (() => {
-                const btn = document.querySelector('.composer-plus button, .composer-plus .icon-btn');
-                if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-              })()
-            `);
-            await new Promise((r) => setTimeout(r, 250));
-            await shot("pi-plus-menu");
-            await mainWindow!.webContents.executeJavaScript(`
-              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-            `);
             await mainWindow!.webContents.executeJavaScript(`
               (() => {
                 const btn = document.querySelector('.composer-model button, .model-chip');
@@ -2335,24 +2335,28 @@ async function createWindow() {
             await setPage("chat");
             await new Promise((r) => setTimeout(r, 250));
             await shot("pi-dark-home");
+            // Destinations are lazy route chunks; the first visit needs long
+            // enough for the chunk to resolve or the shot catches a spinner.
+            await setPage("settings");
             await setSettingsTab("projects");
-            await new Promise((r) => setTimeout(r, 300));
+            await new Promise((r) => setTimeout(r, 800));
             await shot("pi-dark-project-archive");
             await setPage("pulls");
-            await new Promise((r) => setTimeout(r, 300));
+            await new Promise((r) => setTimeout(r, 800));
             await shot("pi-dark-pulls");
             await setPage("settings");
-            await new Promise((r) => setTimeout(r, 350));
+            await setSettingsTab("general");
+            await new Promise((r) => setTimeout(r, 800));
             await shot("pi-dark-settings");
             await setTheme("light");
             await setPage("pulls");
-            await new Promise((r) => setTimeout(r, 450));
+            await new Promise((r) => setTimeout(r, 600));
             await shot("pi-pulls-live");
             await setSettingsTab("projects");
-            await new Promise((r) => setTimeout(r, 350));
+            await new Promise((r) => setTimeout(r, 500));
             await shot("pi-project-archive-live");
             await setPage("scheduled");
-            await new Promise((r) => setTimeout(r, 350));
+            await new Promise((r) => setTimeout(r, 700));
             await shot("pi-scheduled-live");
             await mainWindow!.webContents.executeJavaScript(
               `window.__PI_DESKTOP__?.seedPlugins?.(4);
@@ -2512,11 +2516,18 @@ async function createWindow() {
             // The general tab carries the theme grid, including plugin themes
             // (D175); earlier scenes leave the sidebar on the archive tab.
             await setSettingsTab("general");
+            // Seeding plugin themes activates one of them, which drags the
+            // shell dark; the settings tabs are documented in light.
+            await setTheme("light");
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-settings-live");
             await mainWindow!.webContents.executeJavaScript(
               `window.__PI_DESKTOP__?.seedPluginThemes?.(0)`,
             );
+            // Dropping the seeded plugin themes re-applies the stored theme,
+            // which is still dark from the destination pass; the remaining
+            // settings scenes are light so the tabs read as one sequence.
+            await setTheme("light");
             // Model configuration tab: provider cards, defaults, edit dialog.
             await mainWindow!.webContents.executeJavaScript(`
               [...document.querySelectorAll('.settings-nav-item')][1]?.dispatchEvent(new MouseEvent('click',{bubbles:true}));
@@ -2555,20 +2566,8 @@ async function createWindow() {
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-settings-extensions-custom");
             await setPage("chat");
-            await new Promise((r) => setTimeout(r, 250));
-            await mainWindow!.webContents.executeJavaScript(`
-              document.querySelector('[data-nav="profile"], .footer-profile')?.dispatchEvent(new MouseEvent('click',{bubbles:true}));
-            `);
-            await new Promise((r) => setTimeout(r, 250));
-            await shot("pi-profile-menu");
             await setTheme("light");
-            await setPage("chat");
-            // Global search modal (⌘K): recents view, query view, dark theme.
-            // Close the profile menu left open by the previous scene first.
-            await mainWindow!.webContents.executeJavaScript(`
-              window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-            `);
-            await new Promise((r) => setTimeout(r, 200));
+            await new Promise((r) => setTimeout(r, 250));
             const openSearch = () =>
               mainWindow!.webContents.executeJavaScript(`
                 document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
@@ -2619,7 +2618,38 @@ async function createWindow() {
             await searchKey("Enter");
             await new Promise((r) => setTimeout(r, 400));
             await shot("pi-search-anchor");
+            // The anchor scene leaves the ⌘K dialog open; dismiss it so the
+            // home hero below is unobstructed. The dialog only listens on its
+            // own subtree, so close it the way a user does — click the overlay.
+            await searchKey("Escape");
+            await mainWindow!.webContents.executeJavaScript(`
+              document.querySelector(".search-overlay")?.dispatchEvent(
+                new MouseEvent("click", { bubbles: true }),
+              );
+            `);
+            await new Promise((r) => setTimeout(r, 300));
             await setPage("chat");
+            await new Promise((r) => setTimeout(r, 250));
+            // Empty home hero in both themes — the first surface a new install
+            // shows, and the one the README and docs gallery lead with. Shot
+            // before the toast stack so the hero stays unobstructed.
+            await clickNav("new-task");
+            await new Promise((r) => setTimeout(r, 600));
+            // Seeding the marketplace earlier raised a toast that outlives the
+            // scenes above; clear the viewport so the hero is the only subject.
+            const clearToasts = () =>
+              mainWindow!.webContents.executeJavaScript(`
+                document.querySelectorAll(".toast-dismiss").forEach((button) =>
+                  button.dispatchEvent(new MouseEvent("click", { bubbles: true })),
+                );
+              `);
+            await clearToasts();
+            await new Promise((r) => setTimeout(r, 400));
+            await shot("pi-home-light");
+            await setTheme("dark");
+            await new Promise((r) => setTimeout(r, 350));
+            await shot("pi-home-dark");
+            await setTheme("light");
             await new Promise((r) => setTimeout(r, 250));
             // Toast stack proof (ToastHost variants) in both themes.
             const raiseToasts = () =>

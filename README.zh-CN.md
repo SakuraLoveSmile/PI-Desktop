@@ -12,11 +12,11 @@
 [![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
 ![Platforms](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-4c8dd8)
 
-[下载](#下载) · [快速上手](#快速上手) · [功能亮点](#功能亮点) · [工作原理](#工作原理) · [参与开发](#参与开发) · [English](README.md)
+[下载](#下载) · [快速上手](#快速上手) · [功能亮点](#功能亮点) · [界面截图](docs/zh-CN/guide/screenshots.md) · [工作原理](#工作原理) · [参与开发](#参与开发) · [English](README.md)
 
 <br/>
 
-<img src="docs/image/readme/home.webp" alt="PI-Desktop 主页 — 选择任务开始" width="88%" />
+<img src="docs/image/readme/home.zh.webp" alt="PI-Desktop 主页 — 选择任务开始" width="88%" />
 
 </div>
 
@@ -42,14 +42,24 @@ PI-Desktop 把 AI 编程智能体装进原生桌面应用：打开一个项目�
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/image/readme/config_model.webp" alt="添加模型提供方 — API 风格、接口地址、模型 ID、密钥、思考模式" /></td>
-    <td width="50%"><img src="docs/image/readme/config_base.webp" alt="基础设置 — 语言、主题、默认模式、权限模式" /></td>
+    <td width="50%"><img src="docs/image/readme/conversation.zh.webp" alt="右侧带缩略导航条的对话" /></td>
+    <td width="50%"><img src="docs/image/readme/marketplace.zh.webp" alt="可安装插件的插件市场" /></td>
   </tr>
   <tr>
-    <td align="center"><sub>自带提供方 — 任何 OpenAI 兼容接口，密钥安全存入系统钥匙串</sub></td>
-    <td align="center"><sub>语言、主题、默认模式，以及智能体必须遵守的权限策略</sub></td>
+    <td align="center"><sub>一条对话承载每一回合，长会话可用右侧缩略导航条定位</sub></td>
+    <td align="center"><sub>从官方目录、镜像或你自己配置的地址安装插件</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/image/readme/models.zh.webp" alt="顶栏的模型菜单" /></td>
+    <td width="50%"><img src="docs/image/readme/basics.zh.webp" alt="基础设置 — 语言、主题与外观" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>按会话切换模型 — 任何已配置的提供方，密钥存在系统钥匙串里</sub></td>
+    <td align="center"><sub>语言、主题与外观，包括插件贡献的主题</sub></td>
   </tr>
 </table>
+
+<p align="center"><sub><a href="docs/zh-CN/guide/screenshots.md">查看全部界面 →</a></sub></p>
 
 ## 下载
 
@@ -132,6 +142,7 @@ git push origin main v0.2.0            # Release 工作流自动构建并发布
 ### 文档
 
 - [插件开发：从零到一](docs/plugin-development.md)
+- [界面截图](docs/zh-CN/guide/screenshots.md) — 每个界面，全部取自运行中的应用
 - [规格索引](docs/spec/README.md) — 从这里开始
 - [产品范围](docs/spec/01-product/01-product-scope.md)
 - [基线决策](docs/spec/00-baseline.md)

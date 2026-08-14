@@ -12,7 +12,7 @@ Bring your own models. Keep your code, your keys, and your conversations on your
 [![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
 ![Platforms](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-4c8dd8)
 
-[Download](#download) · [Getting started](#getting-started) · [Highlights](#highlights) · [How it works](#how-it-works) · [Development](#development) · [简体中文](README.zh-CN.md)
+[Download](#download) · [Getting started](#getting-started) · [Highlights](#highlights) · [Screenshots](docs/guide/screenshots.md) · [How it works](#how-it-works) · [Development](#development) · [简体中文](README.zh-CN.md)
 
 <br/>
 
@@ -42,14 +42,24 @@ Plugin APIs and panels are permission-gated and run out-of-process. Plugin code 
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/image/readme/config_model.webp" alt="Add a model provider — API style, base URL, model ID, key, thinking mode" /></td>
-    <td width="50%"><img src="docs/image/readme/config_base.webp" alt="Basics — language, theme, default mode, permission policy" /></td>
+    <td width="50%"><img src="docs/image/readme/conversation.webp" alt="A conversation with the minimap rail on the right" /></td>
+    <td width="50%"><img src="docs/image/readme/marketplace.webp" alt="The plugin marketplace with installable plugins" /></td>
   </tr>
   <tr>
-    <td align="center"><sub>Bring your own provider — any OpenAI-compatible endpoint, keys stored in the OS keychain</sub></td>
-    <td align="center"><sub>Language, theme, default mode, and the permission policy the agent must follow</sub></td>
+    <td align="center"><sub>Every turn in one transcript, with a minimap rail for long conversations</sub></td>
+    <td align="center"><sub>Install from the official catalog, a mirror, or a custom URL you configure</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/image/readme/models.webp" alt="The model menu in the top bar" /></td>
+    <td width="50%"><img src="docs/image/readme/basics.webp" alt="Basics — language, theme, and appearance" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Switch the model per session — any provider you have configured, keys in the OS keychain</sub></td>
+    <td align="center"><sub>Language, theme, and appearance, including themes plugins contribute</sub></td>
   </tr>
 </table>
+
+<p align="center"><sub><a href="docs/guide/screenshots.md">See every screen →</a></sub></p>
 
 ## Download
 
@@ -134,6 +144,7 @@ git push origin main v0.2.0            # Release workflow builds & publishes
 ### Documentation
 
 - [Plugin development: zero to one](docs/plugin-development.md)
+- [Screens](docs/guide/screenshots.md) — every surface, captured from the running app
 - [Spec index](docs/spec/README.md) — start here
 - [Product scope](docs/spec/01-product/01-product-scope.md)
 - [Baseline decisions](docs/spec/00-baseline.md)
