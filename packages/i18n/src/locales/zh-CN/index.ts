@@ -143,6 +143,7 @@ export const zhCN = {
     createBranch: "从此处分支",
     branchTitle: "{{title}}（分支）",
     deleteTask: "删除",
+    copySessionPath: "复制会话路径",
     timeGroupToday: "今天",
     timeGroupYesterday: "昨天",
     timeGroupThisWeek: "近 7 天",

@@ -58,6 +58,7 @@ import {
   IconBranch,
   IconCheck,
   IconChevronDown,
+  IconCopy,
   IconCircleAlert,
   IconNewSession,
   IconFolder,
@@ -198,6 +199,7 @@ export function Sidebar({
   const pendingPermissions = useAppStore((s) => s.pendingPermissions);
   const setPage = useAppStore((s) => s.setPage);
   const page = useAppStore((s) => s.page);
+  const settings = useAppStore((s) => s.settings);
   const prefetchSession = useAppStore((s) => s.prefetchSession);
   const selectSession = useAppStore((s) => s.selectSession);
   const newSession = useAppStore((s) => s.newSession);
@@ -811,6 +813,17 @@ export function Sidebar({
     }
   };
 
+  const copySessionPath = async (session: SessionSummary) => {
+    try {
+      const result = await api.getSessionScratchPath(session.id);
+      await navigator.clipboard.writeText(result.path);
+      showToast(t("chat.copied"));
+    } catch (error) {
+      reportError(error);
+    }
+    closeMenus();
+  };
+
   const toggleProjectPin = (entry: ProjectEntry) => {
     toggleProjectPinned(entry.path);
     closeMenus();
@@ -1241,6 +1254,17 @@ export function Sidebar({
               <IconBranch size={14} />
               {t("nav.createBranch")}
             </button>
+            {settings?.developerMode === true ? (
+              <button
+                type="button"
+                role="menuitem"
+                data-action="copy-session-path"
+                onClick={() => void copySessionPath(session)}
+              >
+                <IconCopy size={14} />
+                {t("nav.copySessionPath")}
+              </button>
+            ) : null}
             <button
               type="button"
               role="menuitem"
