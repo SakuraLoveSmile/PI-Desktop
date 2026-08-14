@@ -57,7 +57,11 @@ readable when the selected family has no CJK glyphs. The mono stack
 Electron main resolves installed system font families using platform tooling
 only (no native modules), so the main bundle stays self-contained:
 
-- macOS: `system_profiler SPFontsDataType -json`, parsing `typefaces[].family`
+- macOS: `osascript` JXA bridging
+  `CTFontManagerCopyAvailableFontFamilyNames` — the same CoreText query
+  `font_kit::all_families()` uses, returning canonical CSS family names in
+  tens of milliseconds — with `system_profiler SPFontsDataType -json` kept as
+  a fallback when osascript is unavailable
 - Windows: PowerShell `[Windows.Media.Fonts]::SystemFontFamilies`
 - Linux: `fc-list -f "%{family[0]}\n"`
 
@@ -77,9 +81,11 @@ up without a reload. `@font-face` rules for the bundled families live in
 - Users pick a global UI font once; it persists across restarts and renders
   offline from the bundled files.
 - CJK coverage stays correct for every option via the appended fallback tier.
-- macOS enumeration is comparatively slow (roughly 2–5 s) but happens once per
-  process and is cached; the picker is usable immediately with System default
-  and bundled options while system families load.
+- macOS enumeration resolves through the fast CoreText path in tens of
+  milliseconds (the previous `system_profiler` path took 2–5 s and is now only
+  a fallback); the result is cached 60 s per process and returns canonical
+  family names such as `PingFang SC` rather than system_profiler's localized
+  aliases such as `苹方-简`.
 - The installer grows by roughly 16 MB from the bundled font files.
 - `@font-face` `font-weight` descriptors are exempted from the style-token
   guard because they describe font files, not UI typography.
@@ -88,7 +94,8 @@ up without a reload. `@font-face` rules for the bundled families live in
 
 - **`font_kit` in host-core** (dbx's approach): fast native enumeration, but
   adds a host RPC method and widens the host protocol surface for a
-  renderer-only preference.
+  renderer-only preference; Electron main reaches the same CoreText family
+  list through an `osascript` JXA bridge without widening the protocol.
 - **`font-list` npm package**: clean API, but its internal directory
   `require("./libs/core")` does not survive electron-vite main bundling, and
   its macOS helper is a prebuilt binary that would need asar unpacking.
