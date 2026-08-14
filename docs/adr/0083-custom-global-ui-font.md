@@ -15,7 +15,7 @@ desktop client, which enumerates system fonts and bundles an OFL family.
 
 The renderer is sandboxed behind the preload IPC allowlist, and the app ships
 a bundled renderer, so the font source must be local (no CDN/CSS font
-services, per [07-ui-design-system §2](04-ux/07-ui-design-system.md)).
+services, per [07-ui-design-system §2](../spec/04-ux/07-ui-design-system.md)).
 
 ## Decision
 
