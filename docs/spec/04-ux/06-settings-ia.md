@@ -39,7 +39,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     (Geist, Inter, Noto Sans SC, LXGW WenKai — SIL OFL 1.1, shipped locally),
     and installed system families enumerated by Electron main; selection
     persists as `AppSettings.fontFamily` and applies to the global UI stack
-    (`--font-sans`) without a reload
+    (`--font-sans`) without a reload; System default clears the override
   - **Auto language detection** resolves the OS locale through the main process
     (`app.getLocale()`) rather than the renderer's `navigator.language`, and the
     Auto card shows the detected language inline (e.g. "当前：简体中文")

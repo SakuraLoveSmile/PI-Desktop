@@ -391,7 +391,9 @@ visually distinct from list content.
   the badge color alone
 - Profile and notification popovers portal to `document.body` with fixed
   positioning so the main chat pane cannot paint over them; work-panel tool
-  context menus use the same body-level floating layer
+  context menus and the Settings font picker menu use the same body-level
+  floating layer (the font menu is measured against its trigger, clamped to
+  the viewport, and flips above the trigger when there is no room below)
 
 
 ### 3.7 Brand and icon contract

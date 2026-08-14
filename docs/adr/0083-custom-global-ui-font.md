@@ -23,8 +23,16 @@ services, per [07-ui-design-system §2](../spec/04-ux/07-ui-design-system.md)).
 
 Settings → Basics → Appearance gains a **Font** row with a searchable picker.
 Selections persist as `AppSettings.fontFamily`, a CSS `font-family` stack
-string. An absent value means the built-in token stack; the picker always
-offers **System default** first.
+string. An absent or empty value means the built-in token stack; the picker
+always offers **System default** first. Selecting System default persists an
+empty stack (`fontFamily: ""`) rather than removing the key: `settings.set`
+merges supplied fields into stored settings and JSON serialization drops
+`undefined`, so an omitted key cannot clear a stored override.
+
+The picker menu portals to `document.body` as a fixed body-level floating
+layer (measured against the trigger and clamped to the viewport), so the
+settings card's `overflow` cannot clip or squeeze it; it follows the body-level
+floating-layer contract in the component spec.
 
 ### 2. Bundled open-licensed families
 

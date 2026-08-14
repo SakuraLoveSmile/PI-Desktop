@@ -44,6 +44,13 @@ test("buildFontOptions keeps a stored selection that is no longer known", () => 
   assert.equal(options[0].label, "Removed Font");
 });
 
+test("buildFontOptions treats an empty stored stack as the system default", () => {
+  const options = buildFontOptions(["PingFang SC"], "");
+  assert.equal(options[0].value, "");
+  assert.equal(options[0].group, "default");
+  assert.ok(options.every((option) => option.group !== "custom"));
+});
+
 test("buildFontOptions matches a bundled selection by its stack", () => {
   const geist = BUNDLED_FONTS.find((font) => font.id === "geist");
   const options = buildFontOptions([], geist.stack);
