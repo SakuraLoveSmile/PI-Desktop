@@ -39,7 +39,7 @@ export function subagentDefinitionDir(workspaceRoot: string): string {
  * a delegation the main agent would otherwise do inline at full context cost:
  * fast codebase navigation, a second opinion on a diff, running a test
  * command, and — for `fixer` — implementing a multi-file change in its own
- * context (ADR 0087).
+ * context (ADR 0089).
  */
 export const BUILTIN_SUBAGENT_DOCUMENTS: readonly string[] = [
   `---

@@ -40,7 +40,7 @@ export type SubagentDefinition = {
   /** Reasoning level for the delegate, clamped against the model in main. */
   thinkingLevel?: ThinkingLevel;
   /**
-   * Permission scope for the delegate's tool calls (ADR 0087). `inherit`
+   * Permission scope for the delegate's tool calls (ADR 0089). `inherit`
    * follows the session's effective mode; the other values override it for the
    * delegate's calls only, with host-core's external-path gate still in force
    * (a delegate never unlocks paths outside the workspace and scratch roots).
@@ -108,7 +108,7 @@ export function isSubagentPermission(value: unknown): value is SubagentPermissio
 /** Caps that keep delegation cheap and predictable (see ADR 0062). */
 export const MAX_SUBAGENT_DEFINITIONS = 16;
 export const MAX_SUBAGENT_PROVIDERS = 8;
-/** Running delegates per session, across batches (see ADR 0087). */
+/** Running delegates per session, across batches (see ADR 0089). */
 export const MAX_SUBAGENT_CONCURRENCY = 10;
 
 const NAME_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;

@@ -3969,7 +3969,7 @@ describe("DesktopAgentRuntime subagents", () => {
     expect(options.thinkingLevel).toBe("off");
     expect(options.systemPrompt).toContain('You are the "reviewer" subagent');
     expect(options.systemPrompt).toContain("Review the change.");
-    // Task is non-blocking (ADR 0087): it returns a started notice, not the
+    // Task is non-blocking (ADR 0089): it returns a started notice, not the
     // report, and the delegate is still running.
     expect(result.content[0].text).toContain("Delegation");
     expect(result.content[0].text).toContain("in the background");

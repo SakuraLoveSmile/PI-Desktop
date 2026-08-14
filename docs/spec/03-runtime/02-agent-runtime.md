@@ -388,41 +388,59 @@ criterion-by-criterion report of what was met and the evidence observed.
   next prompt cannot reuse the source session's runtime/provider cache because
   the session id and remapped transcript identities are independent (D134).
 
-## 5f. Subagent delegation (D201, ADR 0062)
+## 5f. Subagent delegation (D201, ADR 0062, ADR 0089)
 
-The session Agent can hand one self-contained piece of work to a delegate and
-receive a single written report.
+The session Agent can hand separable pieces of work to delegates that run in
+their own context, in the background, and report back on demand.
 
-**Catalog.** Definitions are Markdown documents from three sources: three
+**Catalog.** Definitions are Markdown documents from three sources: four
 builtins shipped inline in `agent-runtime` (`explorer`, `code-reviewer`,
-`test-runner`), the user registry host-core owns under `<data>/agents/` (D202),
-and `<workspace>/.pi/agents/*.md`. Precedence is **project > user registry >
-builtin**, so a committed project document retunes a registry definition or a
-builtin without renaming it. Registry documents are filtered by `enabled` and
-their activation scope before they reach the loader, so a definition scoped to
-another project is not in the catalog at all. Electron main loads the catalog on
-every launch and passes
-`subagents` / `subagentProviders` in the sidecar params, so editing a definition
-takes effect on the next prompt. The catalog is capped at
+`test-runner`, `fixer`), the user registry host-core owns under
+`<data>/agents/` (D202), and `<workspace>/.pi/agents/*.md`. Precedence is
+**project > user registry > builtin**, so a committed project document retunes
+a registry definition or a builtin without renaming it. Registry documents are
+filtered by `enabled` and their activation scope before they reach the loader,
+so a definition scoped to another project is not in the catalog at all.
+Electron main loads the catalog on every launch and passes
+`subagents` / `subagentProviders` in the sidecar params, so editing a
+definition takes effect on the next prompt. The catalog is capped at
 `MAX_SUBAGENT_DEFINITIONS` (16); a malformed or unreadable document becomes a
 launch diagnostic and never fails the launch.
 
-**Tool.** `Task(agent, task, description?)` is built only in Agent mode and only
-when the catalog is non-empty. Its description carries the delegate catalog, and
-its arguments are validated in the tool: an unknown `agent`, an empty `task`, an
-unresolvable model pin and a definition whose tools are all unavailable each
-return a tool error explaining the failure rather than throwing. `Task` belongs
-to the Agent core set rather than the on-demand catalog of §7.1, so a session
-with definitions always sees it.
+Frontmatter adds `permission: inherit | ask | accept-edits | auto` (default
+`inherit`): a scope the delegate's tool calls resolve under instead of the
+session mode (§5f.1). `fixer`, the one write-capable builtin, declares
+`accept-edits` so it can write inside the workspace without prompting while
+Bash and external paths keep asking.
+
+**Tools (ADR 0089).** Delegation is a four-tool lifecycle, built only in Agent
+mode and only when the catalog is non-empty, and all four belong to the Agent
+core set rather than the on-demand catalog of §7.1:
+
+- `Task(agent, task, description?)` — validates its arguments (an unknown
+  `agent`, an empty `task`, an unresolvable model pin and a definition whose
+  tools are all unavailable each return a tool error explaining the failure
+  rather than throwing), starts the delegate **in the background**, and returns
+  immediately with a `delegationId`. Starting fails with a tool error when the
+  session already runs `MAX_SUBAGENT_CONCURRENCY` (10) delegates.
+- `TaskWait(delegationIds?, mode?, minCompleted?, timeoutSeconds?)` — converges
+  on running delegations (defaults to all of them) and returns their reports;
+  `mode: "any"` with `minCompleted` converges as soon as the first N settle.
+  Settled delegations return immediately, so re-reading a report by id is
+  cheap. The joined result is bounded to `MAX_TASKWAIT_RESULT_CHARS` (50k).
+- `TaskList()` — reports every delegation of the session with status.
+- `TaskStop(delegationIds?)` — stops running delegations (defaults to all);
+  stopped delegations read as `stopped`.
 
 **Delegate loop.** A `SubagentRun` is a second pi `Agent` in the same sidecar
 process with the definition's system prompt, its (possibly pinned)
 provider/model, its declared tools, and the same host connection. It runs under
 `maxTurns` (default 24, maximum 80) and the same bounded provider retry policy
-as the parent. Its statuses are `completed`, `truncated`, `failed` and
-`aborted`; all four collapse into the `Task` tool result, whose text is the
-report (bounded to `MAX_SUBAGENT_REPORT_CHARS`, 12k) and whose details carry
-`agent`, `status`, `turns`, `toolCalls`, `usage` and, on failure, `error`.
+as the parent. Its statuses are `completed`, `truncated`, `failed`, `aborted`
+and `stopped`; the four terminal ones surface through `TaskWait`, whose text is
+the report (bounded to `MAX_SUBAGENT_REPORT_CHARS`, 12k) and whose details
+carry `delegationId`, `agent`, `status`, `turns`, `toolCalls` and, on failure,
+`error`.
 
 **Model pins.** `model: <provider>/<model>` in the frontmatter is resolved once
 per launch in Electron main, where credentials and the pi catalog live, against
@@ -436,13 +454,28 @@ nearest-supported rule as §5c.
 **Events and context.** Every event a delegate emits carries
 `parentToolCallId` and `agentName` on its envelope, and Electron main copies both
 onto the persisted row. When the runtime rebuilds model context it skips every
-row with `parentToolCallId`: the parent only ever saw the report, and replaying
-delegate rows would both contradict that and reintroduce the context cost
-delegation exists to avoid.
+row with `parentToolCallId`: the parent only ever saw reports through
+`TaskWait`, and replaying delegate rows would both contradict that and
+reintroduce the context cost delegation exists to avoid.
 
 **Turn ownership.** A delegate's lifecycle never reaches Electron main's turn
-handling. Termination is visible only as the `Task` tool result, so the parent
-turn remains the only thing that can end a turn.
+handling. Delegation is expected to converge inside the turn — the system
+prompt instructs the parent to continue its own work after `Task` and to
+`TaskWait`/`TaskStop` before answering — and the runtime aborts any delegate
+still running when the run ends, when the parent aborts, or when the runtime is
+disposed.
+
+### 5f.1 Delegate permission scope (ADR 0089)
+
+A delegate's tool calls flow through the same host `tools.execute` path as the
+parent's. When the definition declares `permission`, the sidecar attaches the
+scope to the delegate's tool RPCs and host-core resolves the call under that
+mode instead of the session's effective permission mode. Two gates stay above
+the scope, exactly as they stay above the session mode: the contract modes'
+hard deny (delegation only exists in Agent mode) and the external-path gate —
+a scoped delegate still asks before touching anything outside the workspace and
+scratch roots. `accept-edits` therefore means "Write/Edit inside the workspace
+resolve without a prompt; everything else behaves as the session mode says".
 
 The surrounding contracts live in `03-tools-and-permissions.md` §10.2 (what a
 delegate may call), `04-data-storage.md` §4.7a (persisted attribution),
@@ -538,9 +571,10 @@ registered schema into every provider request. Each new user prompt starts with
 the mode's core set:
 
 - Agent: `Read`, `Bash`, `Edit`, and `Write` (matching pi's coding-agent core)
-- Agent: `Task` as well, whenever the subagent catalog is non-empty (§5f) — a
-  capability the model has to go looking for is one it will not use, and
-  delegation is worth one extra schema per request
+- Agent: `Task`, `TaskWait`, `TaskList`, and `TaskStop` as well, whenever the
+  subagent catalog is non-empty (§5f) — a capability the model has to go
+  looking for is one it will not use, and the delegation lifecycle is worth
+  the extra schemas per request
 - Plan: `Read`, `Glob`, `Grep`, `BrowserPreview`, and `Bash`
 - both modes: `ToolSearch` when at least one deferred capability exists
 
@@ -681,7 +715,7 @@ Saves affect the next prompt without restarting the application.
 | same session | single turn serial |
 | different sessions | limited parallel |
 | tools | sequential by default |
-| `Task` calls in one assistant message | parallel, 4 slots (D201) |
+| `Task` calls in one assistant message | parallel; 10 running delegates per session (ADR 0089) |
 
 Tool concurrency is expressed through pi execution modes: every catalog tool is
 `sequential` and `Task` alone is `parallel`, and pi runs a batch sequentially as

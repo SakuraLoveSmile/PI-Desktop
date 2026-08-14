@@ -385,14 +385,14 @@ Goal 批准所承诺的内容与 Plan 批准所承诺的内容完全相同：`mo
   下一个提示无法重用源会话的 runtime/provider 缓存，因为
   会话 ID 和重新映射的转录本身份是独立的 (D134)。
 
-## 5f。子代理委托（D201、ADR 0062）
+## 5f。子代理委托（D201、ADR 0062、ADR 0089）
 
-会话 Agent 可以将一项独立的工作交给委托人，并
-收到一份书面报告。
+会话 Agent 可以把可拆分的工作交给在独立上下文中后台运行的委托，
+并按需取回报告。
 
-**目录。** 定义是来自三个来源的 Markdown 文档：三个
+**目录。** 定义是来自三个来源的 Markdown 文档：四个
 `agent-runtime` 中内嵌的内置函数（`explorer`、`code-reviewer`、
-`test-runner`)，host-core 在 `<data>/agents/` (D202) 下拥有的用户注册表，
+`test-runner`、`fixer`)，host-core 在 `<data>/agents/` (D202) 下拥有的用户注册表，
 和 `<workspace>/.pi/agents/*.md`。优先级是 **项目 > 用户注册表 >
 内置**，因此提交的项目文档会重新调整注册表定义或
 内置而不重命名它。注册表文档通过 `enabled` 进行过滤，
@@ -404,22 +404,37 @@ Goal 批准所承诺的内容与 Plan 批准所承诺的内容完全相同：`mo
 `MAX_SUBAGENT_DEFINITIONS` (16);格式错误或不可读的文档将成为
 启动诊断并且永远不会使启动失败。
 
-**工具。** `Task(agent, task, description?)` 仅在 Agent 模式下构建，并且仅
-当目录非空时。它的描述带有代表目录，并且
-其参数在工具中进行验证：未知的 `agent`、空的 `task`、
-无法解析的模型引脚和其工具均不可用的定义
-返回一个工具错误来解释失败而不是抛出。 `Task` 所属
-到 Agent 核心集而不是第 7.1 节的按需目录，因此会话
-通过定义总是可以看到它。
+Frontmatter 新增 `permission: inherit | ask | accept-edits | auto`（默认
+`inherit`）：委托的工具调用将在此作用域下裁决，而不是使用会话模式
+（§5f.1）。唯一可写的内置 `fixer` 声明 `accept-edits`，因此它可以在工作区内
+免提示写入，而 Bash 和外部路径仍然需要询问。
+
+**工具（ADR 0089）。** 委托是四个工具的生命周期，仅在 Agent 模式下且目录
+非空时构建，四个工具都属于 Agent 核心集而不是第 7.1 节的按需目录：
+
+- `Task(agent, task, description?)` — 验证其参数（未知的 `agent`、空的
+  `task`、无法解析的模型引脚以及工具全部不可用的定义，各自返回一个工具
+  错误解释失败而不是抛出），**在后台**启动委托，并立即返回一个
+  `delegationId`。当会话已经在运行 `MAX_SUBAGENT_CONCURRENCY`（10）个
+  委托时，启动会以工具错误失败。
+- `TaskWait(delegationIds?, mode?, minCompleted?, timeoutSeconds?)` — 收敛
+  正在运行的委托（默认全部）并返回它们的报告；`mode: "any"` 配合
+  `minCompleted` 可以在前 N 个完成时提前收敛。已结算的委托立即返回，
+  因此按 id 重读报告代价很低。合并结果上限为 `MAX_TASKWAIT_RESULT_CHARS`
+  （50k）。
+- `TaskList()` — 报告会话的每个委托及其状态。
+- `TaskStop(delegationIds?)` — 停止正在运行的委托（默认全部）；被停止的
+  委托读作 `stopped`。
 
 **委托循环。** `SubagentRun` 是同一 sidecar 中的第二个 pi `Agent`
 使用定义的系统提示进行处理，其（可能已固定）
 provider/model，其声明的工具，与主机连接相同。它运行在
 `maxTurns`（默认 24，最大 80）和相同的有界提供程序重试策略
-作为家长。其状态为 `completed`、`truncated`、`failed` 和
-`aborted`；所有四个都折叠到 `Task` 工具结果中，其文本是
+作为家长。其状态为 `completed`、`truncated`、`failed`、`aborted` 和
+`stopped`；四个终态通过 `TaskWait` 呈现，其文本是
 报告（绑定到 `MAX_SUBAGENT_REPORT_CHARS`，12k）及其详细信息
-`agent`、`status`、`turns`、`toolCalls`、`usage`，以及失败时的 `error`。
+携带 `delegationId`、`agent`、`status`、`turns`、`toolCalls`，以及失败时的
+`error`。
 
 **模型引脚。** Frontmatter 中的 `model: <provider>/<model>` 已解决一次
 每次在 Electron main 中启动，其中凭证和 pi 目录都存在，针对
@@ -433,13 +448,24 @@ provider/model，其声明的工具，与主机连接相同。它运行在
 **事件和上下文。**委托发出的每个事件都携带
 信封上印有 `parentToolCallId` 和 `agentName`，Electron 主副本均印有
 到持久化的行上。当运行时重建模型上下文时，它会跳过每个
-`parentToolCallId` 行：家长只看过报告，并重播
+`parentToolCallId` 行：父级只通过 `TaskWait` 看到报告，并且重播
 代表行既会与此相矛盾，也会重新引入上下文成本
 委托的存在是为了避免。
 
-**轮到所有权。** 委托的生命周期永远不会轮到 Electron main
-处理。终止仅作为 `Task` 工具结果可见，因此父级
-回合仍然是唯一可以结束回合的事情。
+**回合所有权。** 委托的生命周期永远不会轮到 Electron main
+处理。委托预期在回合内收敛 —— 系统提示词指示父级在 `Task` 之后继续
+自己的主线，并在作答前用 `TaskWait`/`TaskStop` 收敛 —— 运行时会在回合
+结束、父级中止或运行时销毁时中止仍在运行的任何委托。
+
+### 5f.1 委托权限作用域（ADR 0089）
+
+委托的工具调用与父级走同一条 host `tools.execute` 路径。当定义声明了
+`permission` 时，sidecar 把作用域附加到委托的工具 RPC 上，host-core 在
+该模式下裁决调用，而不是使用会话的有效权限模式。两个门禁与对待会话
+模式一样始终高于作用域：契约模式的硬拒绝（委托只存在于 Agent 模式）
+和外部路径门禁 —— 带作用域的委托在触碰工作区与 scratch 根之外的任何
+东西之前仍然会询问。因此 `accept-edits` 意味着"工作区内的
+Write/Edit 免提示裁决；其余一切按会话模式行事"。
 
 周围的合约位于 `03-tools-and-permissions.md` §10.2（什么是
 代表可以致电），`04-data-storage.md` §4.7a（持久归属），
@@ -534,9 +560,9 @@ sidecar 构建了一个完整的工具注册表，但它不会序列化每个工
 该模式的核心集：
 
 - Agent：`Read`、`Bash`、`Edit` 和 `Write`（匹配 pi 的编码代理核心）
-- Agent：当子代理目录非空时，`Task` 也是如此 (§5f) — a
-  模型必须寻找的能力是它不会使用的能力，并且
-  每个请求委托值得一个额外的模式
+- Agent：当子代理目录非空时，`Task`、`TaskWait`、`TaskList` 和
+  `TaskStop` 也是如此 (§5f) — 模型必须寻找的能力是它不会使用的能力，
+  委托生命周期值得每个请求的额外模式
 - Plan：`Read`、`Glob`、`Grep`、`BrowserPreview` 和 `Bash`
 - 两种模式：`ToolSearch`（当至少存在一种延迟功能时）
 
@@ -677,7 +703,7 @@ sidecar 从不直接读取工作区指令。改变的根链
 | 同一会话 | 单圈串联 |
 | 不同的会议 | 有限并行 |
 | 工具 | 默认情况下是顺序的 |
-| `Task` 通过一条助理消息进行呼叫 | 并行，4 个插槽 (D201) |
+| `Task` 通过一条助理消息进行呼叫 | 并行，每会话 10 个运行委托 (ADR 0089) |
 
 工具并发性通过 pi 执行模式来表示：每个目录工具都是
 `sequential` 和 `Task` 单独为 `parallel`，并且 pi 按顺序运行批处理

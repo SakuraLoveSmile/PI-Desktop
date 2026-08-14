@@ -140,7 +140,7 @@ export const TOOL_SEARCH_NAME = "ToolSearch";
 export const ASK_TOOL_NAME = "asktool";
 
 /**
- * Delegation lifecycle (ADR 0087): `Task` starts a subagent in the background
+ * Delegation lifecycle (ADR 0089): `Task` starts a subagent in the background
  * and returns immediately; `TaskWait` converges on running delegations;
  * `TaskList` reports on them; `TaskStop` stops them. Records are kept for the
  * session's lifetime (bounded by pruning below), so a settled delegation can
@@ -979,13 +979,13 @@ export class DesktopAgentRuntime {
   private subagents: SubagentDefinition[];
   private subagentProviders: Record<string, RuntimeProviderConfig>;
   /**
-   * Background delegations of this session (ADR 0087). `Task` starts one and
+   * Background delegations of this session (ADR 0089). `Task` starts one and
    * returns; `TaskWait`/`TaskList`/`TaskStop` drive it afterwards.
    */
   private delegations = new Map<string, DelegationRecord>();
   /**
    * Permission scope of the delegate currently executing one tool call,
-   * keyed by tool call id (ADR 0087). The host reads it on `tools.execute` and
+   * keyed by tool call id (ADR 0089). The host reads it on `tools.execute` and
    * resolves the delegate's permission under it instead of the session mode.
    */
   private delegatePermissionScopes = new Map<string, SubagentPermission>();
@@ -1123,7 +1123,7 @@ export class DesktopAgentRuntime {
       // find out whether anything happened. Every clause below is one of those
       // observed failures stated as a hard rule.
       "Collaboration: answer in the same language the user writes in. Before each batch of tool calls, write one short sentence saying what you are about to do; never leave the user with no new text for more than one tool batch or 60 seconds of work. Whatever the user asked must be answered in your visible text — your reasoning is not shown to them, so a conclusion that lives only there never reached them. Make the final message self-contained: the outcome, what you changed, and anything still open, without asking the user to re-read intermediate updates. Carry the work through end to end; when you hit a blocker, try to clear it yourself and report what you tried, instead of stopping at analysis or a half-finished change.",
-      // Delegation steering (ADR 0087). The trigger patterns below are the
+      // Delegation steering (ADR 0089). The trigger patterns below are the
       // proactive half of the Task tool's own description: models delegate
       // when the system prompt names the situations, and keep doing everything
       // inline when it only says "you may".
@@ -1780,7 +1780,7 @@ Delegation rules:
                   }
                 : {}),
               // A delegate's tool call carries its definition's permission
-              // scope (ADR 0087); the host resolves the call under that scope
+              // scope (ADR 0089); the host resolves the call under that scope
               // instead of the session mode. Parent calls never carry it.
               ...(this.delegatePermissionScopes.has(toolCallId)
                 ? { permissionScope: this.delegatePermissionScopes.get(toolCallId) }
@@ -2029,7 +2029,7 @@ Delegation rules:
     // Delegation is an Agent-mode capability: Plan and Goal are read-only
     // contract negotiations, and a delegate with Bash or Edit would drive
     // straight through that (ADR 0062). The whole lifecycle rides together:
-    // `Task` starts, `TaskWait`/`TaskList`/`TaskStop` converge (ADR 0087).
+    // `Task` starts, `TaskWait`/`TaskList`/`TaskStop` converge (ADR 0089).
     const subagentTools =
       this.mode === "agent" && this.subagents.length
         ? [
@@ -2423,7 +2423,7 @@ Delegation rules:
             `${MAX_SUBAGENT_CONCURRENCY} subagents are already running for this session. Wait for some with TaskWait or stop them with TaskStop before delegating more.`,
           );
         }
-        // The delegate runs in the background (ADR 0087): `Task` returns
+        // The delegate runs in the background (ADR 0089): `Task` returns
         // immediately with a delegation id, and TaskWait converges later.
         const delegationId = randomUUID();
         const controller = new AbortController();
@@ -2523,7 +2523,7 @@ Delegation rules:
   }
 
   /** Wrap a delegate's tools so each call carries the definition's permission
-   * scope to host-core (ADR 0087). Keyed by tool call id, so concurrent
+   * scope to host-core (ADR 0089). Keyed by tool call id, so concurrent
    * delegates with different scopes never cross over. */
   private scopeDelegateTools(
     tools: AgentTool[],
@@ -2596,7 +2596,7 @@ Delegation rules:
     }
   }
 
-  /** `TaskWait`: converge on running delegations (ADR 0087). */
+  /** `TaskWait`: converge on running delegations (ADR 0089). */
   private buildSubagentWaitTool(): AgentTool {
     return {
       name: SUBAGENT_WAIT_TOOL_NAME,
@@ -2746,7 +2746,7 @@ Delegation rules:
     });
   }
 
-  /** `TaskList`: report on the session's delegations (ADR 0087). */
+  /** `TaskList`: report on the session's delegations (ADR 0089). */
   private buildSubagentListTool(): AgentTool {
     return {
       name: SUBAGENT_LIST_TOOL_NAME,
@@ -2776,7 +2776,7 @@ Delegation rules:
     };
   }
 
-  /** `TaskStop`: stop running delegations (ADR 0087). */
+  /** `TaskStop`: stop running delegations (ADR 0089). */
   private buildSubagentStopTool(): AgentTool {
     return {
       name: SUBAGENT_STOP_TOOL_NAME,
@@ -4453,7 +4453,7 @@ Delegation rules:
         )
           break;
         this.reportMutationTermination();
-        // Delegation converges inside the turn (ADR 0087): a delegate still
+        // Delegation converges inside the turn (ADR 0089): a delegate still
         // running when the run ends is a prompt violation, and the safety net
         // is to stop it rather than let it work on without a parent.
         this.abortRunningDelegations();

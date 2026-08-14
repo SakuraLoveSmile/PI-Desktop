@@ -2129,7 +2129,7 @@ async fn handle_request(
                     // Effective permission mode (D115): per-session override
                     // unless it is `inherit`, then the global settings default,
                     // then `ask`. A subagent's tool call carries its own scope
-                    // (ADR 0087), which resolves the call under that mode
+                    // (ADR 0089), which resolves the call under that mode
                     // instead; external-path gating and the contract modes'
                     // hard deny are untouched by the override.
                     let session_pm = sessions::session_permission_mode(&st.db, &p.session_id)
@@ -4999,7 +4999,7 @@ mod tests {
             Some(project.to_string_lossy().into_owned()),
         )
         .unwrap();
-        // Session mode is `ask`: without a scope, Write prompts (ADR 0087).
+        // Session mode is `ask`: without a scope, Write prompts (ADR 0089).
         sessions::configure_session_with_thinking(
             &app_state.db,
             &session.id,

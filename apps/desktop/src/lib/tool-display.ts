@@ -21,7 +21,7 @@ const SUMMARY_KEYS: Record<ToolAction, string[]> = {
   fork: ["prompt", "task", "description", "name"],
   // `description` is the short label the model writes for the delegation; the
   // `task` brief is a paragraph and belongs in the expanded detail. The
-  // lifecycle tools (ADR 0087) summarize by delegation id.
+  // lifecycle tools (ADR 0089) summarize by delegation id.
   delegate: ["description", "agent", "delegationids", "delegationId"],
   use: [
     "command",
@@ -52,7 +52,7 @@ export function formatToolValue(value: unknown): string {
   }
 }
 
-/** The tool that STARTS a subagent (ADR 0062). The lifecycle tools of ADR 0087
+/** The tool that STARTS a subagent (ADR 0062). The lifecycle tools of ADR 0089
  * (TaskWait/TaskList/TaskStop) drive an existing delegation and are not
  * delegation activity items themselves. */
 export function isDelegationStartTool(toolName?: string): boolean {
@@ -70,7 +70,7 @@ export function getToolAction(toolName?: string): ToolAction {
     aliases.some(
       (alias) => normalized === alias || normalized.endsWith(alias),
     );
-  // Delegation (ADR 0062, ADR 0087) is matched on the exact name, minus any
+  // Delegation (ADR 0062, ADR 0089) is matched on the exact name, minus any
   // provider namespace: a plugin tool called "CreateTask" is not a subagent
   // call and keeps its generic presentation.
   const bare = (toolName || "")

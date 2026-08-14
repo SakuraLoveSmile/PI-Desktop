@@ -21,7 +21,7 @@ export function isDelegationActivityItem(
   item: AssistantActivityItem,
 ): item is DelegationActivityItem {
   // Only the tool that STARTS a subagent is a delegation activity item (ADR
-  // 0062): the lifecycle tools (TaskWait/TaskList/TaskStop, ADR 0087) drive an
+  // 0062): the lifecycle tools (TaskWait/TaskList/TaskStop, ADR 0089) drive an
   // existing delegation and must not inflate the topology's subagent counts.
   return (
     item.kind === "tool" &&
