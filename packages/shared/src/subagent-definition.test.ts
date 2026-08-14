@@ -72,6 +72,43 @@ Explain it.`);
     expect(subagentCanMutate(result.definition)).toBe(false);
     expect(result.definition.name).toBe("reviewer");
     expect(result.definition.maxTurns).toBe(DEFAULT_SUBAGENT_MAX_TURNS);
+    expect(result.definition.permission).toBeUndefined();
+  });
+
+  it("parses a declared permission scope and defaults to inherit", () => {
+    const scoped = parse(`---
+description: Writes a feature.
+tools: [Read, Edit, Write]
+permission: accept-edits
+---
+Implement it.`);
+    expect(scoped.ok).toBe(true);
+    if (!scoped.ok) return;
+    expect(scoped.definition.permission).toBe("accept-edits");
+    expect(scoped.warnings).toEqual([]);
+
+    const inherited = parse(`---
+description: Explains a subsystem.
+permission: inherit
+---
+Explain it.`);
+    expect(inherited.ok).toBe(true);
+    if (!inherited.ok) return;
+    expect(inherited.definition.permission).toBeUndefined();
+  });
+
+  it("warns on an unknown permission scope", () => {
+    const result = parse(`---
+description: Explains a subsystem.
+permission: everything
+---
+Explain it.`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.definition.permission).toBeUndefined();
+    expect(result.warnings.join("\n")).toContain(
+      "ignoring unknown permission",
+    );
   });
 
   it("takes mutation rights only when they are declared", () => {
