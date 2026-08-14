@@ -218,6 +218,34 @@ describe("check", () => {
     );
   });
 
+  it("warns that a pre-scope fs permission is downgraded", async () => {
+    const dir = await scaffolded("full-demo");
+    await patchManifest(dir, (m) => {
+      m.permissions = ["ui.panel", "agent.tool.register", "fs.read.workspace"];
+      delete m.fs;
+    });
+    const warnings = (await check(dir)).warnings;
+    expect((await check(dir)).errors).toEqual([]);
+    expect(warnings.map((w) => w.code)).toContain("permission.legacy-fs");
+    expect(warnings.find((w) => w.code === "permission.legacy-fs")?.message).toContain(
+      "fs.read",
+    );
+  });
+
+  it("warns when fs.write or fs.delete carries no scope", async () => {
+    const dir = await scaffolded("full-demo");
+    await patchManifest(dir, (m) => {
+      delete m.fs;
+    });
+    const warnings = (await check(dir)).warnings.filter(
+      (w) => w.code === "permission.fs-no-scope",
+    );
+    expect(warnings.map((w) => w.message.match(/fs\.\w+/)?.[0])).toEqual([
+      "fs.write",
+      "fs.delete",
+    ]);
+  });
+
   it("warns when skills are declared without agent.prompt.inject", async () => {
     const dir = await scaffolded("skill-pack");
     await patchManifest(dir, (m) => {

@@ -119,8 +119,8 @@ Example:
 
 ```text
 + net.fetch
-+ fs.write.workspace
-+ fs.delete.workspace
++ fs.write   (docs/**, *.md)
++ fs.delete  (dist/**)
 ```
 
 ## 9. Rollback

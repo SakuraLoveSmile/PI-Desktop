@@ -12,9 +12,9 @@ rules the installer does, so anything they accept will install.
 1. `PluginScaffold` — create a plugin from a template. It writes the directory and loads the
    plugin immediately, so it is live before you edit anything.
 2. Edit the source. A plugin loaded from a directory hot-reloads on save: no re-picking the
-   folder, no restart. Widening `permissions` in `manifest.json` is the one exception — that
-   needs an explicit re-load, because hot reload must never grant a permission the user did
-   not approve.
+   folder, no restart. Widening `permissions` — or widening a file scope in `manifest.fs` —
+   is the one exception: that needs an explicit re-load, because hot reload must never grant
+   reach the user did not approve.
 3. `PluginCheck` — validate the plugin. Fix every error; treat warnings as review notes.
 4. `PluginPack` — produce `dist/<id>-<version>.piplug`, installable from the plugins page.
 
@@ -86,11 +86,47 @@ Every permission is declared in the manifest and granted at install time; an und
 fails at runtime. Ask for the least you need — the plugins page shows the risk tier to the
 user.
 
-- High risk: `net.fetch`, `fs.write.workspace`, `fs.delete.workspace`, `agent.prompt.inject`,
+- High risk: `net.fetch`, `fs.write`, `fs.delete`, `agent.prompt.inject`,
   `agent.tool.register`, `mcp.server.local`, `mcp.server.remote`
-- Medium: `fs.read.workspace`, `clipboard.read`, `clipboard.write`, `shell.openExternal`,
+- Medium: `fs.read`, `clipboard.read`, `clipboard.write`, `shell.openExternal`,
   `background.service`, `bus.publish`, `bus.subscribe`
 - Low: `ui.panel`, `ui.theme`, `notify` (Toast and best-effort native notifications)
+
+### File and network range
+
+Two permissions carry a declared range as well as a name, because a switch cannot say "read
+broadly but leak nothing". `manifest.fs` says which paths each file mode may touch and
+`manifest.net.domains` lists the hostnames the plugin may reach:
+
+```json
+{
+  "permissions": ["fs.read", "fs.write", "fs.delete", "net.fetch"],
+  "fs": {
+    "read": { "scope": ["**/*"] },
+    "write": { "scope": ["out/**"] },
+    "delete": { "own": true }
+  },
+  "net": { "domains": ["api.example.com", "*.githubusercontent.com"] }
+}
+```
+
+- Globs are relative to the root: `*` covers one segment, `**` crosses separators. `fs.read`
+  may ask for the whole tree; `fs.write` and `fs.delete` may not — a whole-tree pattern fails
+  manifest validation.
+- An absent or empty declaration grants nothing. A file access outside the scope reaches the
+  user as a native confirmation (allow once / allow this session / deny); an empty
+  `net.domains` means no egress at all, whatever `net.fetch` says.
+- Credentials are refused whatever the manifest says: `.env*`, `.ssh/`, `.aws/`, `.git/`,
+  `*.pem`, and the app's own data directory. Symlinks are resolved first, so a link out of the
+  workspace does not get through.
+- `"delete": { "own": true }` reaches the files this plugin wrote and nothing else — the usual
+  right answer for cleaning up your own output. Deletes are never recursive, go to the
+  operating-system trash, and are rate-braked at 50 per minute.
+- `"root": "userSelected"` needs no scope: `pi.fs.requestDirectory()` asks the user to pick a
+  directory, the handle is memory-only, and it dies with the plugin process.
+
+The pre-scope names (`fs.read.workspace` and friends) still load, but the host downgrades
+them — `fs.write.workspace` ends up able to write nothing until the manifest says where.
 
 `pi.ui.notify` shows an in-app Toast. A plugin may call
 `pi.ui.getNotificationPermission()`, then

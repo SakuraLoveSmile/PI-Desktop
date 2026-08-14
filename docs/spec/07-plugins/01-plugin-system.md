@@ -160,10 +160,14 @@ Developer mode can load a local path directly, without copying it into `installe
  "clipboard.read",
  "clipboard.write",
  "notify",
- "fs.read.workspace",
- "fs.delete.workspace",
+ "fs.read",
+ "fs.delete",
  "agent.tool.register"
  ],
+ "fs": {
+ "read": { "scope": ["**/*"] },
+ "delete": { "own": true }
+ },
  "engines": {
  "piDesktop": ">=0.1.0"
  },
@@ -312,9 +316,9 @@ therefore applies only to brokered APIs until runtime sandboxing is delivered.
 | `clipboard.read` | medium | Read clipboard |
 | `clipboard.write` | medium | Write clipboard |
 | `notify` | low | System notification |
-| `fs.read.workspace` | medium | Read workspace |
-| `fs.write.workspace` | high | Write workspace |
-| `fs.delete.workspace` | high | Delete workspace files |
+| `fs.read` | medium | Read the paths `manifest.fs.read` lists |
+| `fs.write` | high | Write the paths `manifest.fs.write` lists |
+| `fs.delete` | high | Delete the paths `manifest.fs.delete` lists, to the OS trash |
 | `agent.tool.register` | high | Register agent tool |
 | `agent.prompt.inject` | high | Inject prompt; activates `contributes.skills` |
 | `net.fetch` | high | Network request |
@@ -328,6 +332,12 @@ therefore applies only to brokered APIs until runtime sandboxing is delivered.
 Themes, MCP servers, services, and bus topics are declared in the manifest, so
 their permission is checked at validation time as well as at runtime — see
 [13-plugin-permissions-matrix.md](13-plugin-permissions-matrix.md).
+
+The three file permissions carry a range as well as a switch: `manifest.fs` says
+which paths each mode may touch, and `manifest.net.domains` does the same for
+egress. A file permission with no declared scope has no standing reach — every
+access asks the user. The pre-scope names (`fs.read.workspace` and friends) still
+load and are downgraded to the minimum safe equivalent (ADR 0087).
 
 ### Authorization timing
 1. Show the declared permission list at install or upgrade review time

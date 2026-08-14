@@ -83,10 +83,19 @@ the banner without changing the durable task notification inbox.
 ```ts
 pi.workspace.get(): Promise<{ path: string; name: string } | null>
 
-pi.fs.readText(pathFromWorkspaceRoot: string): Promise<string>
-pi.fs.writeText(pathFromWorkspaceRoot: string, content: string): Promise<void>
+pi.fs.readText(pathFromRoot: string): Promise<string>
+pi.fs.writeText(pathFromRoot: string, content: string): Promise<void>
 pi.fs.glob(pattern: string): Promise<string[]>
+pi.fs.remove(pathFromRoot: string): Promise<void>
+pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 ```
+
+Paths are relative to the mode's root — the workspace, or the directory the user
+picked through `requestDirectory()` when the mode declares
+`root: "userSelected"`. Which paths each mode may reach comes from `manifest.fs`;
+anything outside it prompts the user, and the credential deny-list overrides both
+(see [04-plugin-security.md](04-plugin-security.md) §6). `remove` is
+non-recursive and moves the path to the OS trash.
 
 ### agent
 ```ts
@@ -232,24 +241,27 @@ The host-owned preload forwards only fixed channels to the plugin runtime:
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`, `workspace.get` | None |
-| `fs.readText`, `fs.glob` | `fs.read.workspace` |
-| `fs.writeText` | `fs.write.workspace` |
+| `fs.readText`, `fs.glob` | `fs.read` |
+| `fs.writeText` | `fs.write` |
 | `clipboard.readText` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |
 | `shell.openExternal` | `shell.openExternal` |
 | `net.fetch` | `net.fetch` |
 
-`plugin.setSettings`, `fs.remove`, arbitrary Electron IPC, and general custom
-panel RPC are not exposed. `onPanelInvoke(channel, payload)` is currently
-reachable only for the host-supported `skill.list`, `skill.read`,
-`skill.create`, `skill.update`, `skill.remove`, and `skill.setEnabled` channels;
-it is not a general-purpose extension point.
+`plugin.setSettings`, `fs.remove`, and arbitrary Electron IPC are not exposed. A
+channel the host does not implement itself is forwarded to the plugin's
+`onPanelInvoke(channel, payload)`, so a plugin may define its own panel ↔ main
+channels; a plugin that exports no `onPanelInvoke` gets `UNSUPPORTED` from its own
+process. The host-supported channels include `skill.list`, `skill.read`,
+`skill.create`, `skill.update`, `skill.remove`, and `skill.setEnabled`.
 
 ## 7. Call auditing
 
 Any of the following calls must be logged for audit:
 
 - fs.writeText
+- fs.remove, fs.requestDirectory, and every refused fs call (with its path and
+  `errorCode`), plus each consent answer and why it was asked (`scope` / `rate`)
 - execute after agent.registerTool (including tools discovered from a plugin's
   MCP servers)
 - net.fetch
@@ -277,7 +289,8 @@ Log fields:
 The desktop plugin runtime now implements the MVP host API surface used by local and marketplace plugins:
 
 - `app.*`, `plugin.*`, `commands.*`, `ui.*`, `workspace.*`
-- `fs.readText` / `fs.writeText` / `fs.glob` (workspace-bound)
+- `fs.readText` / `fs.writeText` / `fs.glob` / `fs.remove` /
+  `fs.requestDirectory`, bounded by `manifest.fs` (ADR 0087)
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
 - `services.register` / `unregister`, `bus.publish` / `subscribe`, `events.on` / `off`

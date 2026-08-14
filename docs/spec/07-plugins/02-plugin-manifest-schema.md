@@ -27,6 +27,8 @@ type PluginManifestV1 = {
  ui?: PluginUiConfig;
  contributes?: PluginContributes;
  permissions?: PluginPermission[];
+ fs?: PluginFsPolicy; // which paths each file permission may touch (§5.2)
+ net?: { domains?: string[] }; // egress allowlist (§5.3)
  engines?: {
  piDesktop?: string; // semver range
  };
@@ -151,9 +153,9 @@ type PluginPermission =
  | "clipboard.read"
  | "clipboard.write"
  | "notify"
- | "fs.read.workspace"
- | "fs.write.workspace"
- | "fs.delete.workspace"
+ | "fs.read"
+ | "fs.write"
+ | "fs.delete"
  | "agent.tool.register"
  | "agent.prompt.inject"
  | "net.fetch"
@@ -166,6 +168,61 @@ type PluginPermission =
 ```
 
 Unknown permission = validation failure.
+
+`fs.read.workspace`, `fs.write.workspace` and `fs.delete.workspace` are the
+pre-scope names. They still validate, and the host rewrites them on load to the
+minimum safe equivalent (§5.2); new manifests must not use them.
+
+## 5.2 fs — which paths a file permission may touch
+
+```ts
+type PluginFsPolicy = {
+ read?: PluginFsRule;
+ write?: PluginFsRule;
+ delete?: PluginFsRule;
+};
+
+type PluginFsRule = {
+ root?: "workspace" | "userSelected"; // default `workspace`
+ scope?: string[]; // globs relative to the root
+ own?: boolean; // delete only: paths this plugin wrote
+};
+```
+
+A permission answers "may this plugin touch files"; this answers "which files".
+Globs use `*` for one segment and `**` across separators, matched
+case-insensitively against the root-relative path.
+
+```json
+{
+ "permissions": ["fs.read", "fs.write", "fs.delete"],
+ "fs": {
+ "read": { "root": "workspace", "scope": ["**/*"] },
+ "write": { "root": "workspace", "scope": ["docs/**", "*.md"] },
+ "delete": { "own": true, "scope": ["dist/**"] }
+ }
+}
+```
+
+- An absent `fs` block, an absent mode, or an empty `scope` is valid and means
+  **no standing reach**: every access falls to a runtime confirmation, so saying
+  nothing grants nothing
+- `root: "userSelected"` needs no scope — the directory the user picks through
+  `pi.fs.requestDirectory()` is the grant, it lives in memory only, and it dies
+  with the plugin process
+- `own` is accepted on `delete` only
+
+## 5.3 net — egress allowlist
+
+```ts
+type PluginNetDomains = string[]; // "api.example.com" or "*.example.com"
+```
+
+Every host-owned outbound path — the panel session, `pi.net.fetch`, and remote
+HTTP MCP endpoints — is confined to these hostnames. An omitted, empty, or
+malformed list means no egress at all, whatever `net.fetch` says. Entries are
+bare hostnames: no scheme, no port, no path, and no bare `*`. A leading `*.`
+covers the domain and its subdomains.
 
 ## 5.1 Bus topic grammar
 
@@ -225,6 +282,13 @@ MVP may implement only:
 13. Settings keys are unique. `shortcut` settings require `command`, may only
     use the `plugin` scope, and are validated as modifier-plus-key or F-key
     bindings. Secrets are rejected until secure plugin-secret storage exists.
+14. `fs.<mode>` requires the matching `fs.<mode>` permission — a scope nobody can
+    use is an authoring slip, not a silent no-op. Scope entries must be relative
+    (no absolute path, drive letter, or `..`), and `fs.write` / `fs.delete` must
+    not use a whole-tree pattern (`**`, `**/*`, `*/**`, `./*`). `own` is accepted
+    on `delete` only, and `root` only on `workspace` / `userSelected`
+15. `net.domains` entries must be bare hostnames, optionally prefixed `*.`; a
+    bare `*` is refused
 
 ## 8. Example: minimal plugin
 

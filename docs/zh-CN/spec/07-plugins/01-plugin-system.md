@@ -163,10 +163,14 @@ my-plugin/
  "clipboard.read",
  "clipboard.write",
  "notify",
- "fs.read.workspace",
- "fs.delete.workspace",
+ "fs.read",
+ "fs.delete",
  "agent.tool.register"
  ],
+ "fs": {
+ "read": { "scope": ["**/*"] },
+ "delete": { "own": true }
+ },
  "engines": {
  "piDesktop": ">=0.1.0"
  },
@@ -298,9 +302,9 @@ Electron 主进程通知 API 并共享清单 `notify`
 | `clipboard.read` | 中等 | 读取剪贴板 |
 | `clipboard.write` | 中等 | 写入剪贴板 |
 | `notify` | 低 | 系统通知 |
-| `fs.read.workspace` | 中等 | 读取工作区 |
-| `fs.write.workspace` | 高 | 写入工作区 |
-| `fs.delete.workspace` | 高 | 删除工作区文件 |
+| `fs.read` | 中等 | 读取 `manifest.fs.read` 列出的路径 |
+| `fs.write` | 高 | 写入 `manifest.fs.write` 列出的路径 |
+| `fs.delete` | 高 | 删除 `manifest.fs.delete` 列出的路径，进系统回收站 |
 | `agent.tool.register` | 高 | 注册代理工具 |
 | `agent.prompt.inject` | 高 | 注入提示；激活 `contributes.skills` |
 | `net.fetch` | 高 | 网络请求 |
@@ -314,6 +318,11 @@ Electron 主进程通知 API 并共享清单 `notify`
 主题、MCP 服务器、服务和总线主题均在清单中声明，因此
 他们的权限在验证时和运行时都会受到检查 - 请参阅
 [13-插件权限-matrix.md](/zh-CN/spec/07-plugins/13-plugin-permissions-matrix)。
+
+三个文件权限除了开关还带一个范围：`manifest.fs` 说明每种模式可以触碰哪些
+路径，`manifest.net.domains` 对出网做同一件事。没有声明范围的文件权限就没有
+常驻可达范围 —— 每次访问都要问用户。文件范围之前的旧权限名
+（`fs.read.workspace` 等）仍然可以加载，并会被降级为最小安全等价物（ADR 0087）。
 
 ### 授权时机
 1.安装或升级审核时显示声明的权限列表

@@ -351,19 +351,20 @@ const dataPath = await pi.plugin.getDataPath();
 
 | 许可 | 插件进程 API | 面板桥通道 |
 |---|---|---|
-| `fs.read.workspace` | `pi.fs.readText`、`pi.fs.glob` | `fs.readText`、`fs.glob` |
-| `fs.write.workspace` | `pi.fs.writeText` | `fs.writeText` |
-| `fs.delete.workspace` | `pi.fs.remove` | 没有暴露 |
+| `fs.read` | `pi.fs.readText`、`pi.fs.glob`、`pi.fs.requestDirectory` | `fs.readText`、`fs.glob` |
+| `fs.write` | `pi.fs.writeText` | `fs.writeText` |
+| `fs.delete` | `pi.fs.remove` | 没有暴露 |
 | `clipboard.read` | `pi.clipboard.readText` | `clipboard.readText` |
 | `clipboard.write` | `pi.clipboard.writeText` | `clipboard.writeText` |
 | `net.fetch` | `pi.net.fetch` | `net.fetch` |
 | `shell.openExternal` | `pi.shell.openExternal` | `shell.openExternal` |
 | `notify` | `pi.ui.notify`、`pi.ui.getNotificationPermission`、`pi.ui.requestNotificationPermission`、`pi.ui.showNativeNotification` | `ui.notify`、`ui.getNotificationPermission`、`ui.requestNotificationPermission`、`ui.showNativeNotification` |
 
-工作空间路径是相对于活动工作空间的。绝对路径和 `..`
-逃跑被拒绝。 `fs.remove` 是非递归的，无法删除
-工作区根目录。 `openExternal` 仅接受 HTTP(S) 和 `mailto:` URL；
-`net.fetch` 接受 HTTP(S)。
+文件权限只是声明的一半：`manifest.fs` 说明每种模式可以触碰哪些路径
+（见 §6.5）。路径相对于该模式的 root。绝对路径、`..` 逃逸，以及离开 root
+的软链都会被拒绝。`fs.remove` 不递归、把路径移进系统回收站，且无法删除
+root 本身。`net.fetch` 接受 HTTP(S)，并且只能到达 `manifest.net.domains`
+里列出的主机；`openExternal` 接受 HTTP(S) 和 `mailto:` URL。
 
 `pi.ui.notify` 显示应用内 Toast。本机通知可选择加入：呼叫
 `pi.ui.requestNotificationPermission()` 之前
@@ -374,11 +375,76 @@ const dataPath = await pi.plugin.getDataPath();
 通知不会添加到 PI-Desktop 的持久任务通知收件箱中。
 
 面板桥还暴露 `ui.showToast`、`ui.closePanel`、
-`plugin.getSettings` 和 `workspace.get`。它不暴露任意自定义
-渠道。 `onPanelInvoke` 当前保留给主机支持的
-`skill.*`面板操作，不是一般面板到插件的RPC机制。
+`plugin.getSettings` 和 `workspace.get`。主机自己没有实现的通道会被转发到
+你的 `onPanelInvoke(channel, payload)`，因此面板可以通过你自定义的通道和自己
+的插件通信；没有导出 `onPanelInvoke` 的插件会收到 `UNSUPPORTED`。
 
-### 6.5 主题
+### 6.5 文件范围
+
+`fs.read` / `fs.write` / `fs.delete` 说明你的插件能不能碰文件，
+`manifest.fs` 说明能碰哪些：
+
+```json
+{
+  "permissions": ["fs.read", "fs.write", "fs.delete"],
+  "fs": {
+    "read": { "scope": ["**/*"] },
+    "write": { "scope": ["docs/**", "*.md"] },
+    "delete": { "own": true, "scope": ["dist/**"] }
+  }
+}
+```
+
+- `scope` 里的 glob 相对 root。`*` 匹配一个路径段，`**` 跨分隔符匹配。
+- **读取**可以声明整棵树，**写入和删除不行** —— 整棵树的模式无法通过校验：
+  让宽松读取变得安全的是出网白名单，而没有任何东西能让宽松写入变得安全。
+- 声明范围之外的访问不是错误：PI-Desktop 会问用户（拒绝 / 允许一次 /
+  本会话允许）。请把需要的范围声明出来，别让插件每次调用都打断用户；
+  同时要预期拒绝会以 `PERMISSION_DENIED` 的形式返回。
+- 有些路径无论你声明什么都会被拒绝：`.env*`、SSH 与云凭证、`*.pem`、
+  `.git/**`，以及 PI-Desktop 自己的数据目录。它们也不会出现在 `fs.glob`
+  的结果里。
+
+**删除。** `own: true` 允许你删除插件自己写过的文件，不需要 scope、不需要
+弹窗 —— 清理自己产物的正确默认值。（如果用户在你写入之后改过这个文件，
+它就不再算你的了。）删别的东西需要 `scope`。每次删除都不递归、进系统回收站，
+并在一分钟内超过 50 次后被打断，所以批量清理应当按节奏进行，
+而不是 `glob` 加一个循环。
+
+**在工作区之外工作。** 在某个模式上设置 `"root": "userSelected"` 并调用
+`pi.fs.requestDirectory()`：用户选一个目录，你在里面拥有完整可达范围，
+不需要声明任何 scope。句柄存在内存里，插件进程退出即消失，所以每个会话都要
+重新问一次。
+
+**旧权限名。** `fs.read.workspace`、`fs.write.workspace`、
+`fs.delete.workspace` 仍然能加载，但会被削减 —— 写入什么都到不了，删除只能
+到自己的产物 —— 直到清单声明 `fs`。插件页面会把这件事告诉用户。
+
+### 6.6 网络访问
+
+`net.fetch` 让插件可以发请求，`manifest.net.domains` 说明能发到哪里：
+
+```json
+{
+  "permissions": ["net.fetch"],
+  "net": { "domains": ["api.example.com", "*.githubusercontent.com"] }
+}
+```
+
+条目是裸主机名 —— 没有 scheme、没有端口、没有路径 —— 前缀 `*.` 同时覆盖
+该域名及其子域名。裸 `*` 在安装时被拒绝。
+
+这份列表是主机掌握的**每一条**出网路径的唯一白名单，不只是 `pi.net.fetch`：
+面板自己的 `fetch`、`<img>`、`<script>` 和样式表加载同样听它的
+（沙箱面板依然有网络栈），你声明的远程 HTTP MCP 服务器也一样。
+面板里的 `window.open` 一律拒绝。
+
+`net.domains` 缺失、为空或非法就意味着**完全不放行出网**，即使 `net.fetch`
+已被授予。重定向由主机手工跟随并重新检查，所以被允许的主机没法把请求弹到
+一个你没声明的主机上。请把资源打进插件包，而不是从一个你还得额外声明的 CDN
+上加载。
+
+### 6.7 主题
 
 声明 CSS 文件和 `ui.theme`：
 
@@ -402,7 +468,7 @@ const dataPath = await pi.plugin.getDataPath();
 CSS，拒绝导入和非数据 URL，每个文件的上限为 256 KiB，并允许
 每个插件有八个主题。用户在“设置”中选择主题。
 
-### 6.6 MCP 服务器
+### 6.8 MCP 服务器
 
 MCP 服务器是声明性的。本地服务器需要 `mcp.server.local`；一个
 远程服务器需要 `mcp.server.remote`：
@@ -441,7 +507,7 @@ stdio 命令必须是 `PATH` 上的裸命令或与插件相关的命令
 环境和提供商秘密永远不会被转发。 MCP 工具遵循
 与手写插件工具相同的仅代理策略和命名空间。
 
-### 6.7 常驻服务和消息总线
+### 6.9 常驻服务和消息总线
 
 声明服务 ID 和允许的主题：
 
@@ -495,12 +561,18 @@ unsubscribe = await pi.bus.subscribe("example.build.*", async (message) => {
 | 风险 | 权限 |
 |---|---|
 | 低 | `ui.panel`、`ui.theme`、`notify` |
-| 中等 | `clipboard.read`、`clipboard.write`、`fs.read.workspace`、`shell.openExternal`、`background.service`、`bus.publish`、`bus.subscribe` |
-| 高 | `fs.write.workspace`、`fs.delete.workspace`、`agent.tool.register`、`agent.prompt.inject`、`net.fetch`、`mcp.server.local`、`mcp.server.remote` |
+| 中等 | `clipboard.read`、`clipboard.write`、`fs.read`、`shell.openExternal`、`background.service`、`bus.publish`、`bus.subscribe` |
+| 高 | `fs.write`、`fs.delete`、`agent.tool.register`、`agent.prompt.inject`、`net.fetch`、`mcp.server.local`、`mcp.server.remote` |
 
-要求尽可能最小的一组。向已加载的开发添加权限
-插件无法通过热重载生效：PI-Desktop 停止重载并
+有两个权限除了名字之外还带一个声明出来的范围，并且两者都会展示给用户：
+文件模式看 `manifest.fs`（§6.5），出网看 `manifest.net.domains`（§6.6）。
+两者都是失败即关闭 —— 缺失或为空的声明什么都不授予，所以对它们一言不发的
+插件什么都到不了。
+
+要求尽可能最小的一组。向已加载的开发插件添加权限
+无法通过热重载生效：PI-Desktop 停止重载并
 要求用户再次加载该文件夹，以便可以查看新的授权。
+放宽 `manifest.fs` 在这件事上等同于添加权限。
 删除权限在重新加载时生效。
 
 完整的映射和策略位于
