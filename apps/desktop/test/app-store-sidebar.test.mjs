@@ -42,6 +42,14 @@ test("project new-session creation uses one store-owned navigation transaction",
   );
 });
 
+test("new-task drafts never render in sidebar history", () => {
+  assert.match(
+    sidebarSource,
+    /candidates\.filter\(\(session\) => !isDefaultSessionTitle\(session\.title\)\)/,
+  );
+  assert.doesNotMatch(sidebarSource, /keptEmptyScopes/);
+});
+
 test("project title toggles its conversation group without forcing it open", () => {
   const projectTitleBlock = sidebarSource.match(
     /className="sidebar-session-group-title project-toggle"[\s\S]*?<IconFolder/,

@@ -16,7 +16,7 @@ builtin.<domain>.<action>
 
 | id | title | keywords | category | risk | behavior |
 |---|---|---|---|---|---|
-| `builtin.session.new` | New Task | new, task, session | Session | low | create session and focus composer |
+| `builtin.session.new` | New Task | new, task, session | Session | low | open an unpersisted draft and focus composer |
 | `builtin.session.delete` | Delete Current Session | delete, session | Session | medium | confirm then delete active session |
 | `builtin.session.rename` | Rename Current Session | rename, session | Session | low | open rename UI |
 | `builtin.mode.plan` | Switch to Plan | mode, plan, planning | Mode | low | set idle session mode=plan |

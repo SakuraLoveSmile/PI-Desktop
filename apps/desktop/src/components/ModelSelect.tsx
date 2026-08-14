@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import type { ThinkingLevel } from "@pi-desktop/shared";
+import { highestSupportedThinkingLevel } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { isActivePlanExecution } from "../lib/plan-mode-state";
 import { thinkingLevelForProvider } from "./Composer";
@@ -45,17 +46,33 @@ export function ModelSelect() {
   const modelListRef = useRef<HTMLDivElement>(null);
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
-  const mode = activeSession?.mode ?? settings?.defaultMode ?? "agent";
+  const draftConfiguration = useAppStore((s) => s.draftConfiguration);
+  const mode =
+    activeSession?.mode ??
+    draftConfiguration?.mode ??
+    settings?.defaultMode ??
+    "agent";
   const provider = providers.find(
     (candidate) =>
       candidate.id ===
-      (activeSession?.providerId ?? settings?.defaultProviderId),
+      (activeSession?.providerId ??
+        (!activeSession ? draftConfiguration?.providerId : undefined) ??
+        settings?.defaultProviderId),
   );
   const modelId =
     activeSession?.modelId ??
+    (!activeSession ? draftConfiguration?.modelId : undefined) ??
     settings?.defaultModelId ??
     provider?.defaultModelId;
-  const sessionThinkingLevel = activeSession?.thinkingLevel;
+  // A draft without a session starts at the strongest level its inherited
+  // default model publishes, matching a freshly created reasoning session.
+  const draftThinkingLevel = provider?.supportsReasoning
+    ? highestSupportedThinkingLevel(provider.supportedThinkingLevels)
+    : "off";
+  const sessionThinkingLevel =
+    activeSession?.thinkingLevel ??
+    (!activeSession ? draftConfiguration?.thinkingLevel : undefined) ??
+    draftThinkingLevel;
   const thinkingLevel: ThinkingLevel = isThinkingLevel(sessionThinkingLevel)
     ? sessionThinkingLevel
     : "off";

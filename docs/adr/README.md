@@ -100,3 +100,4 @@ Each ADR includes:
 | 0081 | Host-owned cross-platform plugin panel chrome | Accepted |
 | 0082 | Localized and page-adaptive plugin panel chrome | Accepted |
 | 0083 | Custom global UI font | Accepted |
+| 0084 | Defer new-task session creation until the first message | Accepted |

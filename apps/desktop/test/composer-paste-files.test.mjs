@@ -34,7 +34,7 @@ test("composer keeps text paste native and materializes clipboard files", () => 
   );
   assert.match(composer, /el\.setSelectionRange\(selectionStart, selectionEnd\)/);
   assert.doesNotMatch(composer, /formatFileInsert\(file\.path, "file"\)/);
-  assert.match(composer, /await newSession\(\)/);
+  assert.match(composer, /await materializeDraftSession\(\)/);
 });
 
 test("paste IPC is a typed renderer-to-main bridge", () => {

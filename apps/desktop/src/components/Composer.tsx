@@ -8,10 +8,11 @@ import type {
 } from "@pi-desktop/shared";
 import {
   fileReferenceLabel,
+  highestSupportedThinkingLevel,
   PERMISSION_MODES,
   serializeComposerFileReferences,
 } from "@pi-desktop/shared";
-import { useAppStore } from "../stores/app-store";
+import { materializeDraftSession, useAppStore } from "../stores/app-store";
 import type { ComposerDraftSnapshot } from "../lib/composer-smart-stop";
 import { api } from "../lib/api";
 import { isActivePlanExecution } from "../lib/plan-mode-state";
@@ -213,7 +214,6 @@ export function Composer({
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const workspacePath = useAppStore((s) => s.workspace?.path ?? "");
-  const newSession = useAppStore((s) => s.newSession);
   const providers = useAppStore((s) => s.providers);
   const configureActiveSession = useAppStore((s) => s.configureActiveSession);
   const showToast = useAppStore((s) => s.showToast);
@@ -402,18 +402,21 @@ export function Composer({
   }, [thinkingOpen]);
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
+  const draftConfiguration = useAppStore((s) => s.draftConfiguration);
   const mode: Mode = activeSession
     ? activeSession.mode
-    : settings?.defaultMode ?? "agent";
+    : (draftConfiguration?.mode ?? settings?.defaultMode ?? "agent");
   // Permission mode (D115/D132): inherited sessions still resolve through the
   // global setting, but the composer presents only the effective mode.
   const globalPermissionMode: PermissionMode =
     settings?.defaultPermissionMode ?? "ask";
-  const sessionPermissionMode: PermissionMode = isPermissionMode(
-    activeSession?.permissionMode,
-  )
-    ? activeSession.permissionMode
-    : "inherit";
+  const sessionPermissionMode: PermissionMode = activeSession
+    ? isPermissionMode(activeSession.permissionMode)
+      ? activeSession.permissionMode
+      : "inherit"
+    : isPermissionMode(draftConfiguration?.permissionMode)
+      ? draftConfiguration.permissionMode
+      : "inherit";
   const effectivePermissionMode: Exclude<PermissionMode, "inherit"> =
     sessionPermissionMode === "inherit"
       ? (globalPermissionMode as Exclude<PermissionMode, "inherit">)
@@ -423,10 +426,13 @@ export function Composer({
   const provider = providers.find(
     (candidate) =>
       candidate.id ===
-      (activeSession?.providerId ?? settings?.defaultProviderId),
+      (activeSession?.providerId ??
+        (!activeSession ? draftConfiguration?.providerId : undefined) ??
+        settings?.defaultProviderId),
   );
   const modelId =
     activeSession?.modelId ??
+    (!activeSession ? draftConfiguration?.modelId : undefined) ??
     settings?.defaultModelId ??
     provider?.defaultModelId;
   const thinkingProvider =
@@ -441,7 +447,15 @@ export function Composer({
             activeSession.supportedThinkingLevels ?? (["off"] as ThinkingLevel[]),
         }
       : provider;
-  const sessionThinkingLevel = activeSession?.thinkingLevel;
+  // A draft without a session starts at the strongest level its inherited
+  // default model publishes, matching a freshly created reasoning session.
+  const draftThinkingLevel = provider?.supportsReasoning
+    ? highestSupportedThinkingLevel(provider.supportedThinkingLevels)
+    : "off";
+  const sessionThinkingLevel =
+    activeSession?.thinkingLevel ??
+    (!activeSession ? draftConfiguration?.thinkingLevel : undefined) ??
+    draftThinkingLevel;
   const configuredThinkingLevel = isThinkingLevel(sessionThinkingLevel)
     ? sessionThinkingLevel
     : "off";
@@ -567,8 +581,9 @@ export function Composer({
       );
       let sessionId = activeSessionId;
       if (!sessionId) {
-        await newSession();
-        sessionId = useAppStore.getState().activeSessionId;
+        // Pasting files counts as real input: persist the draft so the files
+        // have a session to attach to.
+        sessionId = (await materializeDraftSession()) ?? "";
       }
       if (!sessionId) throw new Error("session unavailable");
       if (!activeSessionId) {

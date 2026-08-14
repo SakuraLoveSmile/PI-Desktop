@@ -344,10 +344,12 @@ Each scenario is documented in this format:
 - **Steps**: 1) Click the project group's New session control. 2) Wait for the
   project conversation to load. 3) Type a prompt and inspect the Send control.
   4) Send without clicking New session again.
-- **Expected**: Project activation and session creation commit as one renderer
-  navigation flow. The destination composer becomes editable with the Send
-  control enabled as soon as a valid draft and model are present; an earlier
-  project's background turn cannot leave it disabled. The prompt is accepted
+- **Expected**: Project activation commits as one renderer navigation flow and
+  the destination opens as an unpersisted draft (D220). The composer becomes
+  editable with the Send control enabled as soon as a valid draft and model
+  are present; an earlier project's background turn cannot leave it disabled.
+  The sidebar history shows no new row until the first prompt is sent, after
+  which the session appears titled with the prompt, and the prompt is accepted
   on the first send attempt.
 - **Specs linked**: `04-ux/09-interaction-patterns.md` (§1.6),
   `04-ux/08-component-spec.md` (§11.4)
@@ -376,6 +378,28 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Source-level regression covered
   (`composer-draft-cache.test.mjs`); full UI scenario Draft
+
+#### E2E-011d: New task without input adds no history row
+
+- **Preconditions**: Provider configured; at least one real session exists so
+  the sidebar history is non-empty.
+- **Steps**: 1) Invoke New Task from the sidebar, the top bar, or Cmd/Ctrl+N
+  inside a retained project and in the temporary scope. 2) Inspect the sidebar
+  history and the composer. 3) Type a message and send it. 4) Inspect the
+  sidebar history again. 5) Invoke New Task again, type nothing, and switch to
+  another session before sending.
+- **Expected**: Before any message, the sidebar history shows no new row and
+  no row is highlighted; the home empty state with an editable composer is
+  visible. After the first send, exactly one history row appears titled with
+  the message. A New Task draft abandoned without sending leaves no history
+  row behind.
+- **Specs linked**: `04-ux/08-component-spec.md` (§11),
+  `04-ux/01-ui-ia.md` (§5)
+- **Acceptance**: C (history integrity)
+- **Milestone**: M2
+- **Status**: Source-level regression covered
+  (`app-store-sidebar.test.mjs`, `composer-send-state.test.mjs`); full UI
+  scenario Draft
 
 ### Conversation Top Bar
 
@@ -437,9 +461,11 @@ Each scenario is documented in this format:
   after navigation completes.
 - **Expected**: None of the idle configuration triggers is disabled merely
   because the destination session has not been projected yet. The first
-  configuration action creates or reuses the destination draft, persists the
-  selected value, and does not require a second click. Running turns and
-  pending approvals still disable the controls.
+  configuration action retains the selected value on the unpersisted draft,
+  and the created session reflects it after the first message is sent; no
+  second click is required and no history row is created by the configuration
+  action alone. Running turns and pending approvals still disable the
+  controls.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11),
   `04-ux/09-interaction-patterns.md` (§5A)
 - **Acceptance**: C (new project/session composer)
@@ -2459,8 +2485,8 @@ Each scenario is documented in this format:
   5. Choose the single create item and cancel or complete the project picker.
   6. Right-click empty chrome in the project list (outside any project group).
 - **Expected**:
-  - Sessions context menus create/reuse a path-less temporary session and focus
-    the composer.
+  - Sessions context menus open a path-less unpersisted draft and focus the
+    composer; the draft creates its session on the first message.
   - Projects context menus open the same folder picker as the heading
     folder-plus control.
   - Existing row context menus and heading glyph buttons remain available; the

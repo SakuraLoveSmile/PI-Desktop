@@ -1557,3 +1557,22 @@ D193, and D194.
   degrades to the existing name order without breaking launching.
 - Decision D219 refines D211's presentation. IPC, host RPC, protocol v9, and
   storage schema v11 remain unchanged.
+
+## 2026-08-14 — New task stays out of history until it carries input
+
+- Clicking New Task now opens an unpersisted draft: the renderer no longer
+  calls `session.create` (or reuses an old empty draft) at click time. The
+  first message — or pasted file attachments, which need a session to attach
+  to — materializes the session, which then appears in the sidebar history
+  titled with the prompt.
+- Composer toolbar selections made before the first message (mode, thinking
+  level, permission mode, model) are retained on the draft and applied when
+  the session is created; a toolbar-only interaction creates no history row.
+- The sidebar history filter drops sessions whose title is still a default
+  untitled value, which hides legacy empty drafts created before this change
+  as well as any future accidentally empty sessions.
+- Decision D220 supersedes the empty-draft reuse clause of D088/D093: there is
+  nothing to reuse because no draft session exists until first input. Protocol
+  v9, host RPC, and storage schema v11 are unchanged; the change is confined
+  to the renderer store, Composer, and Sidebar.
+

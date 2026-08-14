@@ -265,8 +265,9 @@ Extensions destination described in §3.5.
 - Selecting a project-scoped thread activates its project before switching to
   `chat`. Selecting a temporary thread clears the visible active workspace
   before loading it.
-- New task reuses an existing empty draft in the same project or temporary
-  scope instead of stacking drafts (D088/D093; US-UI-11).
+- New task opens an unpersisted draft: no session and no sidebar history row
+  exist until the first message creates the session in the current project or
+  temporary scope (D220; amends D088/D093's empty-draft stacking rule).
 
 ## 6. Keyboard map (IA level)
 

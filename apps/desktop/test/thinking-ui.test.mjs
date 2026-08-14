@@ -131,11 +131,20 @@ test("switching to a provider without reasoning resets the session level", () =>
 });
 
 test("new sessions default to the strongest level of a reasoning model", () => {
-  const newSessionSource =
-    storeSource.match(/newSession: async[\s\S]*?\n  forkSession:/)?.[0] ?? "";
-  assert.match(newSessionSource, /defaultProvider\?\.supportsReasoning/);
-  assert.match(newSessionSource, /highestSupportedThinkingLevel\(/);
-  assert.match(newSessionSource, /thinkingLevel:\s*defaultThinkingLevel/);
+  const materializeSource =
+    storeSource.match(
+      /export async function materializeDraftSession[\s\S]*?\n  return sessionId;\n}\n/,
+    )?.[0] ?? "";
+  assert.ok(
+    materializeSource.length > 0,
+    "materializeDraftSession implementation not found",
+  );
+  assert.match(materializeSource, /defaultProvider\?\.supportsReasoning/);
+  assert.match(materializeSource, /highestSupportedThinkingLevel\(/);
+  assert.match(
+    materializeSource,
+    /thinkingLevel:[\s\S]*?defaultThinkingLevel/,
+  );
 });
 
 test("main resolves reasoning from each session's exact selected model", () => {

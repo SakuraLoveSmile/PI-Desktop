@@ -340,6 +340,17 @@ export type SessionView = {
   showArchived?: boolean;
 };
 
+/** Toolbar selections made on the unpersisted new-task draft. They are
+ * applied when the first message materializes the draft into a session
+ * instead of creating a history row for a toolbar-only interaction. */
+export type DraftSessionConfiguration = {
+  mode: Mode;
+  thinkingLevel: ThinkingLevel;
+  providerId?: string;
+  modelId?: string;
+  permissionMode?: PermissionMode;
+};
+
 export type AppState = {
   ready: boolean;
   version?: AppVersionInfo;
@@ -358,6 +369,9 @@ export type AppState = {
   projectCollapsed: Record<string, boolean>;
   projectSort: ProjectSort;
   activeSessionId?: string;
+  /** Composer toolbar choices retained on the draft while it has no session
+   * yet; cleared once the draft is materialized into a session. */
+  draftConfiguration: DraftSessionConfiguration | null;
   /** Latest user-selected session while its transcript/workspace is resolving. */
   selectingSessionId?: string;
   messages: UiMessage[];
@@ -734,6 +748,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   workPanelFileRequest: null,
   projectSort: initialSidebarPreferences.projectSort,
   messages: [],
+  draftConfiguration: null,
   isRunning: false,
   runningSessions: {},
   latestTurnResults: {},
@@ -1144,87 +1159,32 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!navigationIntentIsCurrent(intent)) return;
       if (!workspace) throw new Error("Unable to activate project workspace");
     }
-
-    // Codex reuses an empty draft thread instead of stacking "New task" rows.
-    for (const session of get().sessions) {
-      if (
-        !isDefaultSessionTitle(session.title) ||
-        sessionIsArchived(session.id, get().sessionMeta) ||
-        !sessionMatchesProject(session, requestedProjectPath)
-      ) {
-        continue;
-      }
-      let messages: UiMessage[];
-      try {
-        const detail = await api.getSession(session.id);
-        if (!navigationIntentIsCurrent(intent)) return;
-        messages = detail.session?.messages ?? [];
-      } catch {
-        if (!navigationIntentIsCurrent(intent)) return;
-        // A stale summary must not prevent creating a replacement draft.
-        continue;
-      }
-      if (messages.length === 0) {
-        if (requestedProjectPath === null && get().workspace) {
-          await get().clearProject({ navigationIntent: intent });
-          if (!navigationIntentIsCurrent(intent)) return;
-        }
-        await get().selectSession(session.id, { navigationIntent: intent });
-        return;
-      }
-    }
     if (requestedProjectPath === null && get().workspace) {
       await get().clearProject({ navigationIntent: intent });
       if (!navigationIntentIsCurrent(intent)) return;
     }
-    const settings = get().settings;
-    const defaultProvider = get().providers.find(
-      (provider) => provider.id === settings?.defaultProviderId,
-    );
-    // New reasoning sessions start at the strongest level published by pi.
-    // Missing capability metadata remains the conservative off fallback.
-    const defaultThinkingLevel = defaultProvider?.supportsReasoning
-      ? highestSupportedThinkingLevel(defaultProvider.supportedThinkingLevels)
-      : "off";
-    // No providerId/modelId here: sessions without an explicit pick resolve
-    // them at prompt time, so later default-model changes apply everywhere.
-    // The Composer pins both onto the session when the user chooses a model.
-    const created = await api.createSession({
-      title: untitledTaskTitle(),
-      mode: normalizeMode(settings?.defaultMode),
-      thinkingLevel: defaultThinkingLevel,
-      projectPath: requestedProjectPath ?? undefined,
-    });
-    if (!navigationIntentIsCurrent(intent)) return;
-    await get().refreshSessions();
-    if (!navigationIntentIsCurrent(intent)) return;
-    const detail = await api.getSession(created.session.id);
-    if (!navigationIntentIsCurrent(intent)) return;
-    const entry = { page: "chat" as const, sessionId: created.session.id };
+    // New task starts as an unpersisted draft: no session is created and no
+    // sidebar history row appears until the first message materializes it.
+    // The draft stays within its requested project scope, if any.
     set((s) => {
       const stack = s.navStack.slice(0, s.navIndex + 1);
-      const nextStack = [...stack, entry].slice(-50);
+      const nextStack = [...stack, { page: "chat" as const }].slice(-50);
       return {
-        ...switchWorkPanelSession(s, created.session.id),
-        activeSessionId: created.session.id,
-        messages: detail.session?.messages ?? [],
+        ...switchWorkPanelSession(s, undefined),
+        activeSessionId: undefined,
+        draftConfiguration: null,
+        messages: [],
         page: "chat" as const,
-        planningStates: {
-          ...s.planningStates,
-          [created.session.id]:
-            created.session.mode === "plan" ? "planning" : "inactive",
-        },
         navStack: nextStack,
         navIndex: nextStack.length - 1,
         // The composer follows the visible session's own run state: a turn
         // still streaming in the previously selected session must not leave
-        // the fresh session's send button stuck in the stop/abort state
+        // the fresh draft's send button stuck in the stop/abort state
         // (the old session's agent_end is a cross-session event and never
         // clears the active flag).
-        isRunning: s.runningSessions[created.session.id] ?? false,
+        isRunning: false,
       };
     });
-    void get().restorePendingPlan(created.session.id);
   },
 
   forkSession: async (id) => {
@@ -1343,15 +1303,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   configureActiveSession: async (config) => {
-    let sessionId = get().activeSessionId;
+    const sessionId = get().activeSessionId;
     // The home composer can be visible while project/session navigation has
-    // cleared the active id. Materialize the draft before persisting a
-    // toolbar choice instead of silently dropping the user's click.
+    // cleared the active id. Keep the toolbar choice on the unpersisted
+    // draft and apply it when the first message creates the session instead
+    // of materializing a history row for a toolbar-only interaction.
     if (!sessionId) {
-      await get().newSession();
-      sessionId = get().activeSessionId;
+      set((state) => ({
+        draftConfiguration: {
+          mode: config.mode,
+          thinkingLevel: config.thinkingLevel,
+          providerId:
+            config.providerId ?? state.draftConfiguration?.providerId,
+          modelId: config.modelId ?? state.draftConfiguration?.modelId,
+          permissionMode:
+            config.permissionMode ?? state.draftConfiguration?.permissionMode,
+        },
+      }));
+      return;
     }
-    if (!sessionId) return;
     if (get().pendingPlans[sessionId]?.status === "pending") return;
     if (
       get().runningSessions[sessionId] ||
@@ -1389,8 +1359,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       return false;
     }
     if (!sessionId) {
-      await get().newSession();
-      sessionId = get().activeSessionId;
+      // The new-task draft is unpersisted until its first message: sending
+      // now creates the session and its sidebar history row.
+      const intent = beginNavigationIntent();
+      const createdId = await materializeDraftSession(intent);
+      if (!createdId) return false;
+      sessionId = createdId;
     }
     if (!sessionId) throw new Error("No active session");
     if (get().pendingPlans[sessionId]?.status === "pending") return false;
@@ -3359,4 +3333,73 @@ function flushPendingSessionConfiguration(sessionId: string): Promise<void> {
     }
   });
   return flush;
+}
+
+/**
+ * Persist the unpersisted new-task draft: creates the session (and therefore
+ * its sidebar history row) only when the user submits real input. Toolbar
+ * choices retained on `draftConfiguration` are applied here and cleared once
+ * the draft becomes a session. Returns the new session id, or null when the
+ * owning navigation intent became stale before the session could be shown.
+ */
+export async function materializeDraftSession(
+  intent?: number,
+): Promise<string | null> {
+  const active = intent ?? beginNavigationIntent();
+  const state = useAppStore.getState();
+  const settings = state.settings;
+  const defaultProvider = state.providers.find(
+    (provider) => provider.id === settings?.defaultProviderId,
+  );
+  // New reasoning sessions start at the strongest level published by pi.
+  // Missing capability metadata remains the conservative off fallback.
+  const defaultThinkingLevel = defaultProvider?.supportsReasoning
+    ? highestSupportedThinkingLevel(defaultProvider.supportedThinkingLevels)
+    : "off";
+  // No providerId/modelId here unless the user pinned a pick on the draft:
+  // sessions without an explicit pick resolve them at prompt time, so later
+  // default-model changes apply everywhere. The Composer pins both onto the
+  // session when the user chooses a model.
+  const draftConfig = state.draftConfiguration;
+  const created = await api.createSession({
+    title: untitledTaskTitle(),
+    mode: draftConfig?.mode ?? normalizeMode(settings?.defaultMode),
+    thinkingLevel: draftConfig?.thinkingLevel ?? defaultThinkingLevel,
+    permissionMode: draftConfig?.permissionMode,
+    providerId: draftConfig?.providerId,
+    modelId: draftConfig?.modelId,
+    projectPath: state.workspace?.path ?? undefined,
+  });
+  if (!navigationIntentIsCurrent(active)) return null;
+  await useAppStore.getState().refreshSessions();
+  if (!navigationIntentIsCurrent(active)) return null;
+  const detail = await api.getSession(created.session.id);
+  if (!navigationIntentIsCurrent(active)) return null;
+  const sessionId = created.session.id;
+  useAppStore.setState((s) => {
+    const stack = s.navStack.slice(0, s.navIndex + 1);
+    const entry = { page: "chat" as const, sessionId };
+    const nextStack = [...stack, entry].slice(-50);
+    return {
+      ...switchWorkPanelSession(s, sessionId),
+      activeSessionId: sessionId,
+      draftConfiguration: null,
+      messages: detail.session?.messages ?? [],
+      page: "chat" as const,
+      planningStates: {
+        ...s.planningStates,
+        [sessionId]: created.session.mode === "plan" ? "planning" : "inactive",
+      },
+      navStack: nextStack,
+      navIndex: nextStack.length - 1,
+      // The composer follows the visible session's own run state: a turn
+      // still streaming in the previously selected session must not leave
+      // the fresh session's send button stuck in the stop/abort state
+      // (the old session's agent_end is a cross-session event and never
+      // clears the active flag).
+      isRunning: s.runningSessions[sessionId] ?? false,
+    };
+  });
+  void useAppStore.getState().restorePendingPlan(sessionId);
+  return sessionId;
 }

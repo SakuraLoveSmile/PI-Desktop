@@ -443,32 +443,10 @@ export function Sidebar({
       : sessions.filter(
           (session) => !sessionArchived(session, sessionMeta[session.id]),
         );
-    // Keep at most one empty draft in each project/temporary scope.
-    const keptEmptyScopes = new Set<string>();
-    const cleaned: SessionSummary[] = [];
-    for (const session of candidates) {
-      if (!isDefaultSessionTitle(session.title)) {
-        cleaned.push(session);
-        continue;
-      }
-      const scope = normalizeProjectPath(session.projectPath) ?? "(temporary)";
-      if (session.id === selectedSessionId && page === "chat") {
-        if (!keptEmptyScopes.has(scope)) cleaned.push(session);
-        keptEmptyScopes.add(scope);
-        continue;
-      }
-      if (keptEmptyScopes.has(scope)) continue;
-      cleaned.push(session);
-      keptEmptyScopes.add(scope);
-    }
-    return cleaned;
-  }, [
-    sessions,
-    selectedSessionId,
-    page,
-    showArchived,
-    sessionMeta,
-  ]);
+    // New-task drafts stay out of history until they carry input: sessions
+    // with only a default title (including legacy empty drafts) never render.
+    return candidates.filter((session) => !isDefaultSessionTitle(session.title));
+  }, [sessions, showArchived, sessionMeta]);
 
   const compareSessions = useCallback((a: SessionSummary, b: SessionSummary) => {
     const aMeta = sessionMeta[a.id] ?? {};
