@@ -7,6 +7,7 @@ import {
   getToolDisplayName,
   getToolSummary,
   getToolSummaryKey,
+  getToolSummaryValue,
 } from "../src/lib/tool-display.ts";
 
 test("maps built-in tools to concise Codex-style actions", () => {
@@ -63,6 +64,15 @@ test("reports which argument the row summary already shows", () => {
   assert.equal(getToolSummaryKey("Read", { filePath: "/a/b.ts" }), "filePath");
   assert.equal(getToolSummaryKey("Read", { limit: 20 }), null);
   assert.equal(getToolSummaryKey("Read", "not-a-record"), null);
+});
+
+test("hands back that argument whole, for copying out of the head", () => {
+  // The summary squeezes a command onto one line to fit the row; copying it
+  // has to give back the command as written (D226).
+  const command = "pnpm test \\\n  --filter desktop";
+  assert.equal(getToolSummaryValue("Bash", { command, timeout: 5 }), command);
+  assert.equal(getToolSummaryValue("Bash", { timeout: 5 }), "");
+  assert.equal(getToolSummaryValue("Bash", undefined), "");
 });
 
 test("formats cyclic values without throwing and humanizes plugin names", () => {

@@ -30,6 +30,7 @@ import {
   getToolAction,
   getToolDisplayName,
   getToolSummary,
+  getToolSummaryValue,
   type ToolAction,
 } from "../lib/tool-display";
 import {
@@ -823,6 +824,25 @@ function delegateAgentName(
   return "";
 }
 
+/**
+ * Copies a run row's command from its head. The expanded body holds only the
+ * output, so this is the one place the command can be taken from (D226).
+ */
+function ToolCommandCopy({ command }: { command: string }) {
+  const { t } = useTranslation();
+  const { copied, copy } = useCopy();
+  return (
+    <button
+      className={`tool-row-head-copy${copied ? " copied" : ""}`}
+      aria-label={`${t("chat.copy")} ${t("chat.toolBlockCommand")}`}
+      title={copied ? t("chat.copied") : t("chat.copy")}
+      onClick={() => copy(command)}
+    >
+      {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
+    </button>
+  );
+}
+
 function ToolRow({
   message,
   delegate,
@@ -851,6 +871,13 @@ function ToolRow({
     ? getToolPreviewTarget(message.toolArgs, root)
     : null;
   const terminalArtifact = action === "run" && status === "success";
+  // A run row keeps its command in the head and only its output in the body, so
+  // the head carries the two things the body no longer offers: a copy of the
+  // command, and the outcome (D226).
+  const runHead = action === "run" && variant !== "topology";
+  const command = runHead
+    ? getToolSummaryValue(message.toolName, message.toolArgs)
+    : "";
   // A delegation is always expandable: its brief, report and the delegate's
   // own rows all live in the body.
   const hasDetails = hasToolDetails(message) || Boolean(delegate);
@@ -891,6 +918,16 @@ function ToolRow({
   useEffect(() => {
     if (outcome === "failed") setOpen(true);
   }, [outcome]);
+
+  const statusTone =
+    status === "running"
+      ? "is-running"
+      : status === "error"
+        ? "is-error"
+        : status === "denied"
+          ? "is-denied"
+          : "is-done";
+  const caret = hasDetails ? <IconChevronRight size={12} /> : null;
 
   return (
     <div
@@ -952,71 +989,102 @@ function ToolRow({
           ) : null}
         </button>
       ) : (
-        <button
-          className="tool-row-header"
-          aria-expanded={open}
-          aria-controls={hasDetails ? detailsId : undefined}
-          disabled={!hasDetails}
-          title={summary || rawName}
-          onClick={() => hasDetails && setOpen((value) => !value)}
-        >
-          <span className="tool-row-icon">
-            <ToolActionIcon action={action} />
-          </span>
-          <span className={`tool-row-name ${status === "running" ? "running" : ""}`}>
-            {actionLabel}
-          </span>
-          {agentName ? (
-            <span className="tool-row-agent" title={t("chat.subagentAgent")}>
-              {agentName}
+        <div className={`tool-row-head${runHead ? " is-run" : ""}`}>
+          <button
+            className="tool-row-header"
+            aria-expanded={open}
+            aria-controls={hasDetails ? detailsId : undefined}
+            disabled={!hasDetails}
+            title={summary || rawName}
+            onClick={() => hasDetails && setOpen((value) => !value)}
+          >
+            <span className="tool-row-icon">
+              <ToolActionIcon action={action} />
             </span>
-          ) : null}
-          {summary ? (
             <span
-              className={`tool-row-summary${previewTarget || terminalArtifact ? " linked" : ""}`}
-              title={
-                previewTarget
-                  ? previewTarget.kind === "file"
-                    ? t("chat.previewFile")
-                    : t("chat.previewUrl")
-                  : terminalArtifact
-                    ? t("chat.openTerminal")
-                    : undefined
-              }
-              onClick={
-                previewTarget || terminalArtifact
-                  ? (e) => {
-                      // Open the produced surface instead of toggling details.
-                      e.stopPropagation();
-                      if (previewTarget) openTarget(previewTarget);
-                      else openTerminal();
-                    }
-                  : undefined
-              }
+              className={`tool-row-name ${status === "running" ? "running" : ""}`}
             >
-              {summary}
+              {actionLabel}
             </span>
+            {agentName ? (
+              <span className="tool-row-agent" title={t("chat.subagentAgent")}>
+                {agentName}
+              </span>
+            ) : null}
+            {summary ? (
+              <span
+                className={`tool-row-summary${previewTarget || terminalArtifact ? " linked" : ""}`}
+                title={
+                  previewTarget
+                    ? previewTarget.kind === "file"
+                      ? t("chat.previewFile")
+                      : t("chat.previewUrl")
+                    : terminalArtifact
+                      ? t("chat.openTerminal")
+                      : undefined
+                }
+                onClick={
+                  previewTarget || terminalArtifact
+                    ? (e) => {
+                        // Open the produced surface instead of toggling details.
+                        e.stopPropagation();
+                        if (previewTarget) openTarget(previewTarget);
+                        else openTerminal();
+                      }
+                    : undefined
+                }
+              >
+                {summary}
+              </span>
+            ) : null}
+            <ToolChips chips={chips} />
+            {runHead ? (
+              <span
+                className={`tool-row-state ${statusTone}`}
+                role="status"
+                aria-live="polite"
+              >
+                <span className="tool-row-state-dot" aria-hidden />
+                {statusLabel}
+              </span>
+            ) : status === "running" ? (
+              <span className="tool-spinner" aria-label={t("chat.running")} />
+            ) : status === "error" ? (
+              <span
+                className="tool-row-status error"
+                aria-label={t("chat.toolFailed")}
+              >
+                <IconCircleAlert size={13} />
+                {t("chat.toolFailed")}
+              </span>
+            ) : status === "denied" ? (
+              <span className="tool-row-status">{t("chat.toolDenied")}</span>
+            ) : null}
+            {runHead ? null : (
+              <span className="sr-only" role="status" aria-live="polite">
+                {statusLabel}
+              </span>
+            )}
+            {runHead || !caret ? null : (
+              <span className="tool-row-caret" aria-hidden>
+                {caret}
+              </span>
+            )}
+          </button>
+          {runHead && command ? <ToolCommandCopy command={command} /> : null}
+          {runHead && caret ? (
+            // Redundant for the keyboard — the header itself is the disclosure —
+            // so it is a pointer target only and stays out of the reading order.
+            <button
+              className="tool-row-caret is-toggle"
+              aria-hidden="true"
+              tabIndex={-1}
+              onClick={() => setOpen((value) => !value)}
+            >
+              {caret}
+            </button>
           ) : null}
-          <ToolChips chips={chips} />
-          {status === "running" ? (
-            <span className="tool-spinner" aria-label={t("chat.running")} />
-          ) : status === "error" ? (
-            <span className="tool-row-status error" aria-label={t("chat.toolFailed")}>
-              <IconCircleAlert size={13} />
-              {t("chat.toolFailed")}
-            </span>
-          ) : status === "denied" ? (
-            <span className="tool-row-status">{t("chat.toolDenied")}</span>
-          ) : null}
-          <span className="sr-only" role="status" aria-live="polite">
-            {statusLabel}
-          </span>
-          {hasDetails ? (
-            <span className="tool-row-caret" aria-hidden>
-              <IconChevronRight size={12} />
-            </span>
-          ) : null}
-        </button>
+        </div>
       )}
       {variant === "topology" ? (
         <span className="sr-only" role="status" aria-live="polite">

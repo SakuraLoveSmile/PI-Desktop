@@ -127,7 +127,7 @@ test("Edit diffs the replacement only when no review card owns it", () => {
   assert.equal(byRole(reviewed, "diff"), undefined);
 });
 
-test("Bash keeps command, stdout and stderr apart and badges the exit code", () => {
+test("Bash keeps its channels apart and leaves the command to the head", () => {
   const message = {
     toolName: "Bash",
     toolArgs: { command: "pnpm test" },
@@ -138,15 +138,32 @@ test("Bash keeps command, stdout and stderr apart and badges the exit code", () 
       truncated: true,
     }),
   };
+  // The row's head prints the command and copies it, so the body opens on the
+  // output instead of repeating it (D226).
   const blocks = buildToolPresentation(message, { hideSummaryArg: true });
-  assert.deepEqual(roles(blocks), ["command", "stdout", "stderr"]);
-  assert.equal(byRole(blocks, "command").lang, "bash");
+  assert.deepEqual(roles(blocks), ["stdout", "stderr"]);
   assert.equal(byRole(blocks, "stderr").tone, "error");
   assert.equal(byRole(blocks, "stdout").tone, undefined);
   assert.deepEqual(toolResultChips(message), [
     { role: "exit", count: 1 },
     { role: "truncated" },
   ]);
+  // A permission card has no head of its own, so it still shows the command.
+  const asked = buildToolPresentation(message);
+  assert.deepEqual(roles(asked), ["command", "stdout", "stderr"]);
+  assert.equal(byRole(asked, "command").lang, "bash");
+});
+
+test("a command that prints nothing does not fall back to its arguments", () => {
+  const message = {
+    toolName: "Bash",
+    toolArgs: { command: "true", description: "check the exit code" },
+    toolResult: envelope({ exitCode: 0, stdout: "", stderr: "" }),
+  };
+  // Withholding the command must not hand the body an `input` block that
+  // prints the same command back as an argument.
+  assert.deepEqual(roles(buildToolPresentation(message, { hideSummaryArg: true })), []);
+  assert.deepEqual(roles(buildToolPresentation(message)), ["command"]);
 });
 
 test("a clean run omits empty channels and the exit chip", () => {

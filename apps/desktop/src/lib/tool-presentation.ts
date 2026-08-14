@@ -442,6 +442,12 @@ function resultBlocks(
 ): ToolBlock[] {
   const details = asRecord(payload);
   const blocks: ToolBlock[] = [];
+  /**
+   * Set once a mapping has said everything there is to say about the result, so
+   * an empty body is read as "it printed nothing" rather than as a payload the
+   * generic fallback still has to render (D226).
+   */
+  let mapped = false;
   const error = stringAt(details, "error");
   if (error) {
     const code = stringAt(details, "code");
@@ -485,13 +491,20 @@ function resultBlocks(
     }
     case "run": {
       const command = stringAt(args, "command", "cmd");
-      if (command !== null) blocks.push(codeBlock("command", command, "bash"));
+      // The head already prints the command and copies it, so repeating it here
+      // would open a body that says the same thing twice before reaching the
+      // output the reader expanded for (D226). A permission card has no head of
+      // its own, so it still shows the command it is asking about.
+      if (command !== null && !options.hideSummaryArg) {
+        blocks.push(codeBlock("command", command, "bash"));
+      }
       const stdout = stringAt(details, "stdout");
       if (stdout !== null) blocks.push(codeBlock("stdout", stdout));
       const stderr = stringAt(details, "stderr");
       if (stderr !== null) {
         blocks.push(codeBlock("stderr", stderr, "", { tone: "error" }));
       }
+      mapped = command !== null;
       break;
     }
     case "list": {
@@ -546,7 +559,7 @@ function resultBlocks(
     blocks.push({ kind: "note", role: "notice", text: notice });
   }
 
-  if (blocks.length > 0) return blocks;
+  if (blocks.length > 0 || mapped) return blocks;
   // No per-tool mapping matched: render the payload itself readably.
   if (typeof payload === "string" && payload.trim()) {
     return [codeBlock("output", payload)];
@@ -575,8 +588,16 @@ export function buildToolPresentation(
   // Arguments are worth showing when the result blocks did not already carry
   // them (Read content, Bash command) and for opaque tools whose arguments are
   // the interesting part. A delegation places its own brief, so it opts out.
+  // A run row's command was withheld above because the head shows it, so the
+  // body must not print it back as an argument the moment a command prints
+  // nothing (D226).
+  const headHasCommand =
+    action === "run" &&
+    options.hideSummaryArg === true &&
+    getToolSummaryKey(message.toolName, args) !== null;
   const wantArgs =
     action !== "delegate" &&
+    !headHasCommand &&
     (blocks.length === 0 ||
       blocks.every(
         (block) => block.role === "error" || block.role === "notice",

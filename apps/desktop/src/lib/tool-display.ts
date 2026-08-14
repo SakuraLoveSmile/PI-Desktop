@@ -112,6 +112,20 @@ export function getToolSummaryKey(
   return null;
 }
 
+/**
+ * The whole argument the collapsed row summarizes, unwrapped and untrimmed.
+ * The summary is squeezed onto one line to fit the row; a reader copying a
+ * multi-line command out of the head needs it the way it was written (D226).
+ */
+export function getToolSummaryValue(
+  toolName: string | undefined,
+  args: unknown,
+): string {
+  const key = getToolSummaryKey(toolName, args);
+  if (!key) return "";
+  return (args as Record<string, unknown>)[key] as string;
+}
+
 export function getToolSummary(toolName: string | undefined, args: unknown) {
   const action = getToolAction(toolName);
   if (args && typeof args === "object") {
