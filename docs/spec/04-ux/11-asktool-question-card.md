@@ -6,12 +6,14 @@ immediately above the composer input, so a paused question stays available at
 the active decision point instead of moving into transcript history.
 
 It uses the existing message width, border, background, and button tokens so
-that a paused question remains visually part of the conversation. The question
-text uses the compact card body size (`--text-md`, 13 px) at medium weight —
-the same scale as the permission card's title and prompt in the same dock area
-— so it reads as the card's primary focal point without competing with the
-surrounding transcript. Options and the custom input use the same compact size,
-keeping the card's content in one coordinated tier.
+that a paused question remains visually part of the conversation. The card
+shell stays slim — 14 px × 16 px padding and a 2 px accent rail, matching the
+permission card's compact footprint. The question text uses the compact card
+body size (`--text-md`, 13 px) at medium weight — the same scale as the
+permission card's title and prompt in the same dock area — so it reads as the
+card's primary focal point without competing with the surrounding transcript.
+Options and the custom input use the same compact size, keeping the card's
+content in one coordinated tier.
 
 The header identifies the prompt and shows progress. Small clickable indicators
 encode answered, unanswered, skipped, and current state without competing with
@@ -41,6 +43,9 @@ the card body size — so the question and options stay coordinated:
 | Decline button       | `--text-xs`        | 11 px   | —          | Quiet secondary action      |
 
 ## Control density
+
+The card shell is a slim rail: 14 px × 16 px padding with a 2 px accent rail,
+the same footprint family as the permission and turn-outcome cards.
 
 The option rows follow the app's global menu-row density instead of card-scale
 blocks: 30 px min-height, 4 px × 8 px padding, 6 px row gaps, and the same

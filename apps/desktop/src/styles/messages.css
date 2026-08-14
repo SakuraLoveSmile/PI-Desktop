@@ -51,9 +51,9 @@
 .asktool-card {
   width: min(100%, 720px);
   margin: 10px 0;
-  padding: 18px;
+  padding: 14px 16px;
   border: 1px solid var(--ds-border-default);
-  border-left: 3px solid var(--ds-accent);
+  border-left: 2px solid var(--ds-accent);
   border-radius: var(--radius-sm);
   background: var(--ds-bg-secondary);
 }
@@ -106,7 +106,7 @@
 .asktool-indicators {
   display: flex;
   gap: 6px;
-  margin: 12px 0 14px;
+  margin: 10px 0 12px;
 }
 
 .asktool-indicator {
@@ -149,7 +149,7 @@
 .asktool-options {
   display: grid;
   gap: 6px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .asktool-option {
@@ -215,7 +215,7 @@
 .asktool-card-actions {
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .asktool-card-actions .btn {

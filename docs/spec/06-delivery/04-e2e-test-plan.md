@@ -4730,7 +4730,8 @@ This test plan spec is accepted when:
   same dock position used by Plan and Goal approval. The request has no
   countdown. Question text and options render at the compact card body size
   (`--text-md`, one step below the surrounding chat body), matching the
-  permission card scale in the same dock area. Option rows and action buttons
+  permission card scale in the same dock area. The card shell uses the slim
+  rail (2 px accent, 14 px × 16 px padding). Option rows and action buttons
   use the app's compact control density (30 px rows, 15 px marks, compact
   buttons). The tool output is ordered as
   `question：answer`, uses `、` between multiple answers and `\n---\n`
