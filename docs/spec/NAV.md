@@ -31,6 +31,8 @@
 - [14-secrets-storage.md](03-runtime/14-secrets-storage.md)
 - [15-workspace-ignore-rules.md](03-runtime/15-workspace-ignore-rules.md)
 - [16-tool-result-limits.md](03-runtime/16-tool-result-limits.md)
+- [17-asktool-questions.md](03-runtime/17-asktool-questions.md)
+- [18-line-anchored-edit-contract.md](03-runtime/18-line-anchored-edit-contract.md)
 
 ## 4. UX
 - [01-ui-ia.md](04-ux/01-ui-ia.md)

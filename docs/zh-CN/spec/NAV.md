@@ -34,6 +34,8 @@
 - [14-秘密-存储.md](/zh-CN/spec/03-runtime/14-secrets-storage)
 - [15-workspace-ignore-rules.md](/zh-CN/spec/03-runtime/15-workspace-ignore-rules)
 - [16-tool-result-limits.md](/zh-CN/spec/03-runtime/16-tool-result-limits)
+- [17-asktool-questions.md](/zh-CN/spec/03-runtime/17-asktool-questions)
+- [18-line-anchored-edit-contract.md](/zh-CN/spec/03-runtime/18-line-anchored-edit-contract)
 
 ## 4. 用户体验
 - [01-ui-ia.md](/zh-CN/spec/04-ux/01-ui-ia)
