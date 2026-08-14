@@ -4906,3 +4906,45 @@ This test plan spec is accepted when:
 - **Acceptance**: A (core shell), H (localization)
 - **Milestone**: M5+
 - **Status**: Documented
+
+#### E2E-129: A run row shows its command once and copies it from the head
+
+- **Preconditions**: App running with a project open and a conversation that has
+  produced at least three command rows: one that succeeded with output, one that
+  failed with both output and errors, and one still running.
+- **Steps**:
+  1) Expand the successful row and confirm the body opens on the Output block —
+     the command is not repeated inside the body, and no argument list appears
+     in its place.
+  2) Confirm each row's head states its outcome to the right of the summary:
+     `Done`, `Failed`, `Denied`, or `Working…`, each with a dot in the matching
+     tint, and that the running row shows the pulsing dot instead of the row
+     spinner.
+  3) Hover the successful row and confirm a copy button and the chevron appear
+     between the summary and the row's right edge; move the pointer away and
+     confirm both fade while the status label stays visible.
+  4) Activate the copy button and confirm the clipboard holds the command as it
+     was issued — a multi-line command keeps its line breaks, unlike the
+     single-line summary in the head — and that the button acknowledges the copy
+     before returning to its idle icon.
+  5) Confirm the hover fill covers the whole head, including the copy button and
+     chevron, and that a row with nothing to expand takes no fill at all.
+  6) Tab through the row and confirm the header is the only stop that toggles
+     the body, the copy button is reachable and takes a visible focus ring
+     (revealing itself on focus), and the chevron is never a tab stop.
+  7) With a screen reader, expand and collapse the row and confirm the outcome
+     is announced once, not twice.
+  8) Ask the agent to run a command that requires approval and confirm the
+     permission card still shows the command it is asking about.
+  9) Enable "reduce motion" and confirm the running dot holds still and the copy
+     button appears without a fade.
+  10) Repeat steps 1–3 in Chinese and in both light and dark themes.
+- **Expected**: A command appears exactly once per row, in the head, alongside a
+  copy control that yields it verbatim and a worded outcome that does not rely
+  on the dot's color. The expanded body holds only what the command printed, and
+  a command that printed nothing opens empty rather than falling back to its
+  arguments. Approval cards are unaffected, since they have no head of their own.
+- **Specs linked**: `04-ux/08-component-spec.md` §9.2, §9.3, §9.5, §9.10
+- **Acceptance**: E (tools & permissions), H (localization)
+- **Milestone**: M5+
+- **Status**: Documented

@@ -1687,3 +1687,38 @@ D193, and D194.
   users gain a stable panel instead of one that vanished on blur.
 - Decision D225 amends D184/ADR 0047 and is renderer-only. Protocol, host RPC,
   and storage schema are unchanged.
+
+## 2026-08-14 — A run row's command lives in its head, not in its body
+
+- Expanding a `run` row opened with the command it had just printed in its
+  collapsed head, so the first thing the reader met was the line they already
+  had, and the output they expanded for started below it. The body now carries
+  only the channels the command produced (Output, Errors); the command appears
+  once, in the head.
+- The head therefore grows the two things the body no longer offers. A copy
+  button beside the chevron yields the command as it was written — the head's
+  summary is squeezed onto one line, so it is not what gets copied — and the
+  outcome is stated in words (`Done`, `Failed`, `Denied`, `Working…`) with a
+  dot tinted to match. The dot pulses while the command runs and replaces the
+  row's spinner; the label carries the meaning, so the tint is decoration and
+  `prefers-reduced-motion` stills it.
+- Withholding the command is gated on `hideSummaryArg`, the option that means
+  "the collapsed row already shows this argument". `PermissionCard` builds its
+  presentation without it and so keeps showing the command it is asking about,
+  which is the whole point of that card. The generic argument fallback is
+  suppressed for the same reason: a command withheld because the head shows it
+  must not return as an argument the moment it prints nothing.
+- The head is a flex row holding the disclosure button, the copy button, and a
+  pointer-only chevron, because a button cannot nest inside a button. Hover fill
+  moved from the header to the head so it does not stop short beneath the new
+  controls, and `:has()` keeps a row with nothing to expand unfilled. Copy and
+  chevron are quiet until hover, focus, or expansion; the status label is always
+  visible. The chevron duplicates the header for pointers only
+  (`aria-hidden`, `tabIndex={-1}`), and the visible status doubles as the row's
+  live region, so the outcome is announced once rather than twice.
+- This replaces the withdrawn in-place terminal card: reverted for reproducing
+  panel chrome inside the transcript. The row keeps its standard disclosure
+  shape and gains only what the reader was missing.
+- Decision D226 refines D192's structured tool presentation and is
+  renderer-only. Protocol, host RPC, IPC channels, and storage schema are
+  unchanged. See `04-ux/08-component-spec.md` §9.2/§9.3/§9.5/§9.10 and E2E-129.

@@ -1238,9 +1238,7 @@ agent errors remain owned by the assistant error and TurnOutcomeCard surfaces.
 [sparkle] Processed for 12s  3 steps        [›]
           ├─ [file] Read /src/foo.ts        [›]
           ├─ [search] Searched TODO  24 matches   [›]
-          └─ [terminal] Ran pnpm test  exit 1     [›]
-             ├─ Command      [copy]
-             │  pnpm test
+          └─ [terminal] Ran pnpm test  exit 1  • Failed  [copy] [›]
              ├─ Output       [copy]
              │  3 passing
              └─ Errors       [copy]
@@ -1260,6 +1258,9 @@ agent errors remain owned by the assistant error and TurnOutcomeCard surfaces.
   replacement count, written or read size, `truncated`, `scratch`. A successful
   exit earns no chip — the row status already says so.
 - The disclosure chevron is quiet until hover/focus or expansion.
+- A `run` row's head carries two more controls than the others, because its
+  command lives only there (D226, §9.10): the outcome with a toned dot, and a
+  copy control beside the chevron.
 
 ### 9.3 Expanded blocks
 
@@ -1273,7 +1274,7 @@ twice.
 | Read | `File content` — syntax highlighted from the file extension |
 | Write | `Written content` — highlighted from the target extension |
 | Edit | `Changes` — compact diff, only when no ReviewChangeCard owns one |
-| Bash | `Command` (shell), `Output`, `Errors` (error hue); empty channels omitted |
+| Bash | `Output`, `Errors` (error hue); empty channels omitted. The command stays in the head (§9.10); a PermissionCard, which has no head, still shows it as `Command` (shell) |
 | Glob | `Files` — clickable workspace paths |
 | Grep | `Matches` — grouped by file with a `line` gutter and clickable path headings for `outputMode: content`; a clickable path list for `filesWithMatches`; `path` → hit count fields for `count` |
 | any host `notice` | `Note` — neutral, after the blocks it qualifies (search scoping, clipped long lines, Read window) |
@@ -1283,7 +1284,8 @@ twice.
 - Arguments appear as an `Input` field block only when the result blocks did not
   already carry them, or for opaque tools (`use`, `fork`, `fetch`) whose
   arguments are the interesting part. The argument already shown as the row hint
-  is not repeated.
+  is not repeated, and a command withheld from the body never returns as one:
+  a run that printed nothing opens on an empty body, not on its arguments.
 - Every block exposes a compact copy action that copies the full payload, not
   the visible slice.
 
@@ -1302,8 +1304,8 @@ twice.
 
 | State | Header treatment | Expanded content |
 |---|---|---|
-| Running | Progressive action + shimmer + spinner | Latest partial output |
-| Success | Past-tense action + result chips; no green success badge | Result blocks, then arguments if not already shown |
+| Running | Progressive action + shimmer + spinner; a `run` row pulses a dot beside `Working…` instead | Latest partial output |
+| Success | Past-tense action + result chips; no green success badge, except a `run` row's dot and `Done` | Result blocks, then arguments if not already shown |
 | Error | Past-tense action + compact danger status; auto-expanded | Error note first, then arguments |
 | Denied | Muted `Denied` status | Permission result when available |
 
@@ -1411,6 +1413,42 @@ argument. The row hint is the call's short `description`.
   disclosures with `aria-expanded`/`aria-controls`; status is written in text
   and reinforced visually rather than conveyed by color alone. At narrow chat
   widths the graph becomes a vertical flow without horizontal page overflow.
+
+### 9.10 A run row's command lives in its head (D226)
+
+A `run` row is the one row whose primary argument is the whole point of the
+call. Its head already prints that command, so the body opens on the output
+rather than on a `Command` block repeating what the reader just read. The two
+things the body no longer offers move up into the head.
+
+```text
+└─ [terminal] Ran  pnpm test  exit 1   • Failed  [copy] [›]
+   ├─ Output       [copy]
+   │  desktop test 648 tests
+   └─ Errors       [copy]
+      1 failing: run head keeps its caret
+```
+
+- **The command appears once.** The body of a `run` row holds `Output`, `Errors`
+  and any host `notice` — never the command. A PermissionCard has no head of its
+  own, so it keeps showing the command it is asking about.
+- **Copy sits beside the chevron** and yields the command as it was written,
+  including newlines the one-line head hint had to squeeze out. Output keeps its
+  own per-block copy in the body.
+- **The outcome is stated, success included**: a toned dot plus `Done`,
+  `Failed`, `Denied`, or `Working…`. A `run` row shows no spinner; the running
+  dot pulses instead, and holds still under `prefers-reduced-motion`. The label
+  carries the meaning, so the dot's hue is never the only signal.
+- Both new controls follow the chevron's quiet-until-needed rule: hidden at
+  rest, revealed on row hover, on focus, and while the row is open. The status
+  label is always visible — it is the outcome, not an affordance.
+- The head is a flex row of three controls, so the hover fill belongs to the
+  head rather than to the disclosure button inside it; a row that cannot expand
+  takes no fill at all.
+- The chevron is a pointer target beside the copy control and stays out of the
+  reading order, because the head itself is already the keyboard disclosure. The
+  visible status label doubles as the row's live region, so the outcome is
+  announced once rather than twice.
 
 ---
 
