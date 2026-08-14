@@ -305,7 +305,7 @@ test("native window and work panel resizing have independent owners", () => {
     /baseWindowBounds\([\s\S]*window\.getNormalBounds\(\)[\s\S]*workPanelReservation/,
   );
   assert.match(persistenceBlock, /writeWindowState\(bounds\)/);
-  assert.match(mainSource, /window\.on\("close", \(\) =>/);
+  assert.match(mainSource, /window\.on\("close", \(event\) =>/);
   assert.match(mainSource, /persistNormalWindowState\(\)/);
 });
 

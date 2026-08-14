@@ -23,8 +23,12 @@ export const zhCN = {
     close: "关闭",
   },
   tray: {
-    show: "显示 PI-Desktop",
+    open: "打开 PI-Desktop",
     quit: "退出 PI-Desktop",
+    askTitle: "关闭后继续在后台运行 PI-Desktop？",
+    askBody:
+      "关闭窗口后，PI-Desktop 可以继续在系统托盘中运行，避免丢失任何内容。你随时可以在设置中更改此选项。",
+    closeToTray: "关闭到托盘",
   },
   pluginFsConsent: {
     read: "{name} 想读取声明范围之外的文件",
@@ -46,7 +50,6 @@ export const zhCN = {
     openHint: "回车打开",
     navigateHint: "↑↓ 选择",
     dismissHint: "Esc 关闭",
-  },
   menu: {
     applicationMenu: "应用菜单",
     file: "文件",
@@ -592,6 +595,15 @@ export const zhCN = {
     fullAccessLearnMoreAfter: " 关于风险升高的信息。",
     showMenuBar: "在菜单栏中显示",
     showMenuBarDesc: "主窗口关闭后，仍将 PI-Desktop 保留在 macOS 菜单栏。",
+    closeBehaviorTitle: "关闭行为",
+    closeBehaviorDesc: "关闭主窗口时发生什么。macOS 始终会将应用保留在 Dock 中。",
+    closeBehaviorAsk: "每次都询问",
+    closeBehaviorAskDesc: "每次关闭时询问，直到你做出选择。",
+    closeBehaviorTray: "关闭到托盘",
+    closeBehaviorTrayDesc: "在系统托盘中继续运行 PI-Desktop。",
+    closeBehaviorQuit: "退出应用",
+    closeBehaviorQuitDesc: "完全退出 PI-Desktop。",
+    closeBehaviorSaveError: "无法保存关闭行为设置。",
     defaultsTitle: "默认项",
     defaultModel: "默认模型",
     defaultModelDesc: "尚未单独选择模型的对话会使用它。更改从下一条消息开始生效。",
