@@ -861,6 +861,71 @@ function AppShell() {
         );
         useAppStore.setState({ messages: messages as any });
       },
+      seedRunRows: (count = 3) => {
+        // Capture-only run-row fixture (D226 head scenes). A Bash tool message
+        // per state: a failure that opens itself, a success with output, and one
+        // still running; count 0 restores the empty transcript.
+        if (!(window as any).__PI_CAPTURE__) return;
+        if (count <= 0) {
+          useAppStore.setState({ messages: [] });
+          return;
+        }
+        const base = Date.parse("2026-08-14T09:00:00Z");
+        const samples = [
+          {
+            command: "pnpm test",
+            status: "error" as const,
+            details: {
+              exitCode: 1,
+              stdout: "desktop test 648 tests\n",
+              stderr: "1 failing: run head keeps its caret\n",
+            },
+          },
+          {
+            command: "git log --oneline -6",
+            status: "success" as const,
+            details: {
+              exitCode: 0,
+              stdout: [
+                "78cc1f3 test(desktop): photograph the panel's empty state",
+                "df88040 docs(spec): record the no-resource empty state",
+                "f81fb94 fix(desktop): give the work panel a real empty state",
+                "6c8b2f0 feat(work-panel): toggle work panel visibility",
+                "8f09cf9 refactor(desktop): flatten review change rows",
+                "e408d88 fix(desktop): keep macOS in the Dock and Cmd+Tab",
+              ].join("\n"),
+              stderr: "",
+            },
+          },
+          {
+            command: "pnpm --filter @pi-desktop/desktop build",
+            status: "running" as const,
+            details: undefined,
+          },
+        ];
+        const messages = samples.slice(0, Math.min(count, samples.length)).flatMap(
+          (sample, i) => [
+            {
+              id: `capture-run-user-${i}`,
+              role: "user" as const,
+              content: i === 0 ? "跑一下测试" : `再跑 ${sample.command}`,
+              createdAt: new Date(base + i * 120_000).toISOString(),
+              status: "complete" as const,
+            },
+            {
+              id: `capture-run-${i}`,
+              role: "tool" as const,
+              content: "",
+              createdAt: new Date(base + i * 120_000 + 30_000).toISOString(),
+              toolName: "Bash",
+              toolStatus: sample.status,
+              toolArgs: { command: sample.command },
+              ...(sample.details ? { toolResult: { details: sample.details } } : {}),
+            },
+          ],
+        );
+        useAppStore.setState({ messages: messages as any });
+      },
       seedPlugins: (count = 4) => {
         // Capture-only plugins fixture (plugins index scenes); count 0 clears.
         // One sample per row group so the D169 bands are all exercised, and one

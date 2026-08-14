@@ -2216,6 +2216,47 @@ async function createWindow() {
               `void window.__PI_DESKTOP__?.seedReviewChanges?.(0)`,
             );
             await new Promise((r) => setTimeout(r, 250));
+            // A run row keeps its command in the head and only its output in the
+            // body (D226). Seed one row per state, open the activity groups, and
+            // hover the open row so its copy control and caret are on screen.
+            await mainWindow!.webContents.executeJavaScript(
+              `void window.__PI_DESKTOP__?.seedRunRows?.(3)`,
+            );
+            await new Promise((r) => setTimeout(r, 400));
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                for (const header of document.querySelectorAll(".tool-activity-header")) {
+                  if (header.getAttribute("aria-expanded") !== "true") {
+                    header.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+                  }
+                }
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 400));
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const row = document.querySelector(
+                  ".tool-row.status-success .tool-row-header",
+                );
+                row?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+                row?.scrollIntoView({ block: "center" });
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 450));
+            await shot("pi-run-rows");
+            await mainWindow!.webContents.executeJavaScript(
+              `window.__PI_DESKTOP__?.setThemeAttr("dark")`,
+            );
+            await new Promise((r) => setTimeout(r, 350));
+            await shot("pi-run-rows-dark");
+            await mainWindow!.webContents.executeJavaScript(
+              `window.__PI_DESKTOP__?.setThemeAttr("light")`,
+            );
+            await new Promise((r) => setTimeout(r, 250));
+            await mainWindow!.webContents.executeJavaScript(
+              `void window.__PI_DESKTOP__?.seedRunRows?.(0)`,
+            );
+            await new Promise((r) => setTimeout(r, 250));
             await openPanelArtifact("terminal");
             // The PTY needs a beat for the login shell prompt to settle.
             await new Promise((r) => setTimeout(r, 1200));
