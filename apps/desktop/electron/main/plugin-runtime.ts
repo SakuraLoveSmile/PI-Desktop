@@ -1,4 +1,13 @@
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, statSync, rmSync } from "node:fs";
+import {
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+  rmSync,
+} from "node:fs";
 import { basename, join, dirname, relative, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import {
@@ -45,6 +54,7 @@ import {
 import {
   resolveRealPathForCreateWithinRoot,
   resolveRealPathWithinRoot,
+  resolveWithinRoot,
 } from "./fs-panel";
 import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
@@ -425,6 +435,19 @@ function widenedFsScope(ceiling: PluginFsPolicy, next: PluginFsPolicy): string[]
     }
   }
   return added;
+}
+
+/**
+ * `realpath` with the input as its own fallback, for a path that may not exist
+ * yet. Containment is decided by `fs-panel`'s checks; this only exists so the
+ * relative path we compare scopes against is expressed in the same terms.
+ */
+function realpathOrSelf(path: string): string {
+  try {
+    return realpathSync(resolve(path));
+  } catch {
+    return resolve(path);
+  }
 }
 
 /**
@@ -2093,16 +2116,30 @@ export class PluginRuntime {
       ? await resolveRealPathForCreateWithinRoot(root, requestPath)
       : await resolveRealPathWithinRoot(root, requestPath);
     if (!full) {
-      this.auditFs(loaded, mode, requestPath, "INVALID_ARGUMENT");
-      throw apiError("INVALID_ARGUMENT", `path escapes the plugin's root: ${requestPath}`);
+      // A path that simply is not there gets said so. Only a path that exists
+      // and resolves outside the root is an escape, and telling a plugin author
+      // with a typo that they tried to escape the workspace is a lie that costs
+      // them an afternoon.
+      const lexical = !options.create && resolveWithinRoot(root, requestPath);
+      const missing = Boolean(lexical) && !existsSync(lexical as string);
+      const code = missing ? "NOT_FOUND" : "INVALID_ARGUMENT";
+      this.auditFs(loaded, mode, requestPath, code);
+      throw apiError(
+        code,
+        missing
+          ? `path not found: ${requestPath}`
+          : `path escapes the plugin's root: ${requestPath}`,
+      );
     }
-    const rel = normalizeFsPath(relative(resolve(root), full));
+    // Both sides have to be resolved through links or the relative path comes
+    // out as an escape whenever the root itself sits behind one, which is the
+    // normal shape of a temp directory on macOS.
+    const rootReal = realpathOrSelf(root);
+    const rel = normalizeFsPath(relative(rootReal, full));
 
-    for (const guarded of this.services.protectedPaths?.() ?? []) {
-      if (full === resolve(guarded) || full.startsWith(resolve(guarded) + sep)) {
-        this.auditFs(loaded, mode, requestPath, "PERMISSION_DENIED");
-        throw apiError("PERMISSION_DENIED", "path is reserved by the app");
-      }
+    if (this.isProtectedPath(full)) {
+      this.auditFs(loaded, mode, requestPath, "PERMISSION_DENIED");
+      throw apiError("PERMISSION_DENIED", "path is reserved by the app");
     }
     if (isDeniedFsPath(rel)) {
       this.auditFs(loaded, mode, requestPath, "PERMISSION_DENIED");
@@ -2114,14 +2151,27 @@ export class PluginRuntime {
 
     // A directory the user pointed at is the grant; there is nothing narrower
     // to declare, so no scope is required inside it.
-    if (rule.root === "userSelected") return { full, rel, root };
-    if (isFsPathInScope(rel, rule.scope)) return { full, rel, root };
+    if (rule.root === "userSelected") return { full, rel, root: rootReal };
+    if (isFsPathInScope(rel, rule.scope)) return { full, rel, root: rootReal };
     if (mode === "delete" && rule.own && this.ownsWrite(loaded, full)) {
-      return { full, rel, root };
+      return { full, rel, root: rootReal };
     }
 
     await this.requestFsConsent(loaded, mode, rel, full, "scope");
-    return { full, rel, root };
+    return { full, rel, root: rootReal };
+  }
+
+  /**
+   * Whether the path lies under something the host keeps for itself. Both
+   * sides are resolved through links, or a barrier reached the other way
+   * around simply would not match.
+   */
+  private isProtectedPath(full: string): boolean {
+    for (const guarded of this.services.protectedPaths?.() ?? []) {
+      const barrier = realpathOrSelf(guarded);
+      if (full === barrier || full.startsWith(barrier + sep)) return true;
+    }
+    return false;
   }
 
   /**
@@ -2433,11 +2483,15 @@ export class PluginRuntime {
                 // Skipped rather than filtered: walking a node_modules tree to
                 // discard every hit is the slow way to return nothing.
                 if (GLOB_SKIP_DIRS.has(entry)) continue;
+                if (this.isProtectedPath(full)) continue;
                 visit(full, nextRel);
                 continue;
               }
               if (!matchFsGlob(nextRel, pattern)) continue;
               if (isDeniedFsPath(nextRel)) continue;
+              // A name is a read too: what the plugin may not open, it may not
+              // learn the existence of.
+              if (this.isProtectedPath(full)) continue;
               // A listing is a read: what the plugin may not open, it may not
               // learn the name of either.
               if (rule.root !== "userSelected" && !isFsPathInScope(nextRel, rule.scope)) {
@@ -2446,7 +2500,7 @@ export class PluginRuntime {
               matches.push(nextRel);
             }
           };
-          visit(resolve(root));
+          visit(realpathOrSelf(root));
           this.services.audit?.({
             pluginId,
             api: "fs.glob",
