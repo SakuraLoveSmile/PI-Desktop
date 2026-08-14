@@ -6,10 +6,11 @@ immediately above the composer input, so a paused question stays available at
 the active decision point instead of moving into transcript history.
 
 It uses the existing message width, border, background, and button tokens so
-that a paused question remains visually part of the conversation.  The question
-text is set one half-step above the chat body size (`--text-base-plus`, 15 px)
-so it reads as the card's primary focal point while staying close to the
-surrounding transcript scale.
+that a paused question remains visually part of the conversation. The question
+text matches the chat body size (`--text-base`, 14 px) at medium weight, so it
+reads as the card's primary focal point without out-sizing the surrounding
+transcript. Options and the custom input use the same body size, keeping the
+card's content aligned with the conversation scale.
 
 The header identifies the prompt and shows progress. Small clickable indicators
 encode answered, unanswered, skipped, and current state without competing with
@@ -32,8 +33,8 @@ too many similar sizes:
 | Card title           | `--text-xs`        | 11 px   | medium     | Uppercase, wide tracking    |
 | Question number      | `--text-xs`        | 11 px   | medium     | Wide tracking, eyebrow role |
 | Progress             | `--text-2xs`       | 10.5 px | —          | Faint, most subtle          |
-| Question text        | `--text-base-plus` | 15 px   | medium     | Primary focal point         |
-| Option text          | `--text-sm-plus`   | 12.5 px | —          | Step down from question     |
+| Question text        | `--text-base`      | 14 px   | medium     | Primary focal point         |
+| Option text          | `--text-base`      | 14 px   | —          | Matches chat body           |
 | Option mark          | `--text-xs-plus`   | 11.5 px | —          | Proportional to option text |
-| Custom input text    | `--text-sm-plus`   | 12.5 px | —          | Matches option text         |
+| Custom input text    | `--text-base`      | 14 px   | —          | Matches option text         |
 | Decline button       | `--text-xs`        | 11 px   | —          | Quiet secondary action      |
