@@ -23,6 +23,22 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.6.0",
+    date: "2026-08-14",
+    highlights: [
+      "Open the context usage inspector on click to see token and cache statistics.",
+      "Toggle work panel visibility with a new keyboard shortcut.",
+      "Keep new-task drafts out of history until the first message is sent.",
+      "Add a custom global font picker with bundled OFL fonts for personalized typography.",
+      "Remember recently used plugins in the launcher for faster access.",
+      "Add copy session path to the context menu for developer mode.",
+      "Fix font picker clipping and System default reset issues.",
+      "Keep macOS PI-Desktop in the Dock and Cmd+Tab after window close.",
+      "Keep chat transcript pinned when composer collapses after sending.",
+      "Give the work panel a real empty state with clearer guidance.",
+    ],
+  },
+  {
     version: "0.5.11",
     date: "2026-08-13",
     highlights: [
@@ -289,6 +305,22 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.6.0",
+    date: "2026-08-14",
+    highlights: [
+      "点击即可打开上下文使用情况检查器，查看 token 和缓存统计。",
+      "新增快捷键切换工作面板可见性。",
+      "新任务草稿在发送第一条消息前不会保留在历史记录中。",
+      "添加自定义全局字体选择器，内置 OFL 字体，支持个性化排版。",
+      "在启动器中记住最近使用的插件，加快访问速度。",
+      "为开发者模式添加复制会话路径的上下文菜单。",
+      "修复字体选择器裁剪和系统默认重置问题。",
+      "关闭窗口后保持 macOS PI-Desktop 在 Dock 和 Cmd+Tab 中可见。",
+      "发送消息后收起输入框时保持聊天记录停留在最新位置。",
+      "为工作面板添加真实的空状态界面和更清晰的引导。",
+    ],
+  },
   {
     version: "0.5.11",
     date: "2026-08-13",
