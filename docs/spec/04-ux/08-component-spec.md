@@ -393,7 +393,11 @@ visually distinct from list content.
   positioning so the main chat pane cannot paint over them; work-panel tool
   context menus and the Settings font picker menu use the same body-level
   floating layer (the font menu is measured against its trigger, clamped to
-  the viewport, and flips above the trigger when there is no room below)
+  the viewport, and flips above the trigger when there is no room below);
+  the font list renders each row with `content-visibility: auto` so
+  far-off-screen rows skip layout, paint, and per-row font loading, and the
+  menu reposition handler ignores scrolls inside the list, keeping long
+  system font lists responsive when opened and scrolled
 
 
 ### 3.7 Brand and icon contract

@@ -970,6 +970,14 @@
   padding: 0 6px 6px;
 }
 
+.settings-font-row {
+  /* Long system lists: skip layout/paint and per-row font loading for
+     far-offscreen rows so opening and scrolling the picker stay responsive
+     (same pattern as .message-row in messages.css). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 28px;
+}
+
 .settings-font-group-label {
   position: sticky;
   top: 0;
