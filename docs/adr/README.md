@@ -104,3 +104,4 @@ Each ADR includes:
 | 0085 | Make the work panel shortcut a toggle | Accepted (amends 0068) |
 | 0086 | Keep macOS on the regular activation policy | Accepted |
 | 0087 | Replace textual Edit matching with a line-anchored, tag-verified contract | Accepted for implementation (amends 0043 / 0069) |
+| 0088 | Declared file scope and recoverable deletion for plugins | Accepted (continues 0008 D009) |

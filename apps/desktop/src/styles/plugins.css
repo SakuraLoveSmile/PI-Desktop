@@ -495,6 +495,15 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* A downgraded plugin still works, so the note sits with the detail rather
+   than in the row's error slot. */
+.plugins-row-detail-note {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-relaxed);
+}
+
 .plugins-row-detail > .plugins-cap-chips,
 .plugins-row-detail > .plugins-service-chips,
 .plugins-row-detail > .plugins-perm-chips {

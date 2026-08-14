@@ -94,7 +94,10 @@ import { resolvePluginLocalizedString } from "@pi-desktop/plugin-sdk";
 import { HostProcess } from "./host-process";
 import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
-import { PluginRuntime } from "./plugin-runtime";
+import {
+  MAX_DELETES_PER_WINDOW as PLUGIN_MAX_DELETES_PER_WINDOW,
+  PluginRuntime,
+} from "./plugin-runtime";
 import { UserMcpRuntime } from "./user-mcp";
 import {
   MCP_CALL_TIMEOUT_MS,
@@ -244,8 +247,19 @@ async function requestPluginNotificationPermission(): Promise<PluginNotification
   return result.permission;
 }
 
-const pluginPanels = new PluginPanelHost(async (pluginId, channel, payload) =>
-  plugins.invokePanelBridge(pluginId, channel, payload),
+const pluginPanels = new PluginPanelHost(
+  async (pluginId, channel, payload) =>
+    plugins.invokePanelBridge(pluginId, channel, payload),
+  // A panel reaching for an undeclared host is the shape an exfiltration
+  // attempt takes, so it is logged like a denied API call rather than dropped
+  // silently in the network layer.
+  ({ pluginId, url }) => {
+    logger.app("plugin", "warn", "plugin.api", {
+      pluginId,
+      code: "PERMISSION_DENIED",
+      data: { api: "panel.egress", ok: false, url, ts: Date.now() },
+    });
+  },
 );
 const plugins = new PluginRuntime({
   getWorkspacePath: () => {
@@ -308,6 +322,58 @@ const plugins = new PluginRuntime({
   audit: (entry) => {
     logger.app("plugin", "info", "plugin.api", entry);
   },
+  // A file access the manifest did not cover is decided by the user, natively
+  // and synchronously: the plugin's call is still waiting on the answer, so
+  // there is no window in which the access happens before consent.
+  confirmFsAccess: async (request) => {
+    const strings =
+      resolveLocale(updaterLocale) === "zh-CN" ? zhCN.pluginFsConsent : en.pluginFsConsent;
+    const rate = request.reason === "rate";
+    const buttons = rate
+      ? [strings.deny, strings.allowOnce]
+      : [strings.deny, strings.allowOnce, strings.allowSession];
+    const options = {
+      type: "warning" as const,
+      message: (rate ? strings.rate : strings[request.mode]).replace(
+        "{name}",
+        request.pluginName,
+      ),
+      detail: (rate ? strings.rateDetail : strings.detail)
+        .replace("{limit}", String(PLUGIN_MAX_DELETES_PER_WINDOW))
+        .replace("{path}", request.fullPath),
+      buttons,
+      // Escape and the red-X both land on Deny; a dismissed dialog must never
+      // read as permission.
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    };
+    // Modal to the main window when there is one, so the prompt cannot be lost
+    // behind it; standalone if the plugin acted while no window was up.
+    const result =
+      mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showMessageBox(mainWindow, options)
+        : await dialog.showMessageBox(options);
+    if (result.response === 1) return "once";
+    if (result.response === 2) return "session";
+    return "deny";
+  },
+  // The OS trash is what makes a plugin delete recoverable, and it is the
+  // reason none of the user's data is copied anywhere by us.
+  trashItem: async (fullPath) => {
+    await shell.trashItem(fullPath);
+  },
+  pickDirectory: async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory"],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return result.filePaths[0];
+  },
+  // Refused under every root and grant: the data directory holds provider keys
+  // and the session store, and a plugin reaching it would undo every other
+  // limit on this list.
+  protectedPaths: () => [dataDir],
   // A plugin host process dying is contained: contributions are already
   // deregistered by the runtime, we only have to tell the user and the UI.
   onPluginCrash: ({ pluginId, name, exitCode }) => {

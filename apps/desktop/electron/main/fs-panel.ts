@@ -1,5 +1,5 @@
 import { readdir, readFile, realpath, stat } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { FsEntry, FsReadResult } from "@pi-desktop/shared";
 
 /**
@@ -56,7 +56,7 @@ function pathIsWithin(root: string, target: string): boolean {
 }
 
 /** Resolve an existing path and its root through links before containment. */
-async function resolveRealPathWithinRoot(
+export async function resolveRealPathWithinRoot(
   root: string,
   rel: string,
 ): Promise<string | null> {
@@ -70,6 +70,42 @@ async function resolveRealPathWithinRoot(
     return pathIsWithin(rootReal, targetReal) ? targetReal : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Containment for a path that does not exist yet. `realpath` fails on a
+ * missing target, so walk up to the nearest existing ancestor, resolve *that*
+ * through links, and rebuild the tail — otherwise creating a file would be
+ * indistinguishable from escaping the root, and every write would be refused.
+ */
+export async function resolveRealPathForCreateWithinRoot(
+  root: string,
+  rel: string,
+): Promise<string | null> {
+  const lexical = resolveWithinRoot(root, rel);
+  if (!lexical) return null;
+  let rootReal: string;
+  try {
+    rootReal = await realpath(resolve(root));
+  } catch {
+    return null;
+  }
+  const tail: string[] = [];
+  let cursor = lexical;
+  for (;;) {
+    try {
+      const real = await realpath(cursor);
+      const target = tail.length ? join(real, ...tail) : real;
+      return pathIsWithin(rootReal, target) ? target : null;
+    } catch {
+      const parent = dirname(cursor);
+      // Ran out of ancestors before finding one that exists: the path is not
+      // under anything we can vouch for.
+      if (parent === cursor) return null;
+      tail.unshift(basename(cursor));
+      cursor = parent;
+    }
   }
 }
 

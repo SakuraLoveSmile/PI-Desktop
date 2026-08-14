@@ -19,8 +19,8 @@ const protocolSrc = readFileSync(join(repoRoot, "packages/shared/src/protocol.ts
 
 test("plugin runtime exposes gated high-risk host APIs", () => {
   for (const token of [
-    "fs.write.workspace",
-    "fs.delete.workspace",
+    "fs.write",
+    "fs.delete",
     "net.fetch",
     "shell.openExternal",
     "clipboard.read",
@@ -50,7 +50,34 @@ test("workspace deletion and panel operations stay bounded", () => {
   assert.match(runtimeSrc, /method: "panel.invoke"/);
   assert.match(runtimeSrc, /"fs.remove"/);
   assert.match(runtimeSrc, /recursive: false/);
-  assert.match(runtimeSrc, /cannot remove workspace root/);
+  assert.match(runtimeSrc, /cannot remove the root itself/);
+  // Deleting goes to the OS trash, so a delete this gate got wrong is still
+  // recoverable; `rmSync` survives only as the fallback for a host that has no
+  // trash to offer.
+  assert.match(runtimeSrc, /this\.services\.trashItem\(full\)/);
+  // A single-file remove in a loop empties a workspace as well as `rm -rf`;
+  // the rolling window is what tells the two apart.
+  assert.match(runtimeSrc, /MAX_DELETES_PER_WINDOW/);
+});
+
+test("the plugins page shows the file scope behind a file permission", () => {
+  // A permission name says "may touch files"; only the scope says which ones,
+  // so the row has to carry it or the user is approving a blank cheque.
+  assert.match(pageSrc, /"fs\.write": "high"/);
+  assert.match(pageSrc, /"fs\.read": "medium"/);
+  assert.match(pageSrc, /function FsScopeChips\(/);
+  assert.match(pageSrc, /t\("plugins\.fsAsksEachTime"\)/);
+  assert.match(pageSrc, /t\("plugins\.legacyFsDowngraded"\)/);
+  // The scope reaches the renderer from the registry, not from a second read
+  // of the manifest, so an old record simply has no scope to show.
+  const hostSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins.rs"), "utf8");
+  assert.match(hostSrc, /fs: manifest\.fs\.clone\(\)/);
+  for (const catalog of [en, zhCN]) {
+    assert.equal(typeof catalog.plugins.legacyFsDowngraded, "string");
+    assert.equal(typeof catalog.plugins.fsMode.delete, "string");
+    assert.equal(typeof catalog.plugins.permissions["fs.delete"], "string");
+    assert.equal(typeof catalog.plugins.permissionHelp["fs.delete"], "string");
+  }
 });
 
 test("plugin panels use sandboxed isolated host windows", () => {

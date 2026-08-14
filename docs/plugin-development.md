@@ -371,19 +371,21 @@ These APIs require explicit permissions:
 
 | Permission | Plugin-process API | Panel bridge channel |
 |---|---|---|
-| `fs.read.workspace` | `pi.fs.readText`, `pi.fs.glob` | `fs.readText`, `fs.glob` |
-| `fs.write.workspace` | `pi.fs.writeText` | `fs.writeText` |
-| `fs.delete.workspace` | `pi.fs.remove` | Not exposed |
+| `fs.read` | `pi.fs.readText`, `pi.fs.glob`, `pi.fs.requestDirectory` | `fs.readText`, `fs.glob` |
+| `fs.write` | `pi.fs.writeText` | `fs.writeText` |
+| `fs.delete` | `pi.fs.remove` | Not exposed |
 | `clipboard.read` | `pi.clipboard.readText` | `clipboard.readText` |
 | `clipboard.write` | `pi.clipboard.writeText` | `clipboard.writeText` |
 | `net.fetch` | `pi.net.fetch` | `net.fetch` |
 | `shell.openExternal` | `pi.shell.openExternal` | `shell.openExternal` |
 | `notify` | `pi.ui.notify`, `pi.ui.getNotificationPermission`, `pi.ui.requestNotificationPermission`, `pi.ui.showNativeNotification` | `ui.notify`, `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` |
 
-Workspace paths are relative to the active workspace. Absolute paths and `..`
-escapes are rejected. `fs.remove` is non-recursive and cannot remove the
-workspace root. `openExternal` accepts only HTTP(S) and `mailto:` URLs;
-`net.fetch` accepts HTTP(S).
+A file permission is only half the declaration: `manifest.fs` says which paths
+each mode may touch (see §6.5). Paths are relative to the mode's root. Absolute
+paths and `..` escapes are rejected, as is a symlink that leaves the root.
+`fs.remove` is non-recursive, moves the path to the OS trash, and cannot remove
+the root itself. `net.fetch` accepts HTTP(S) and only reaches hosts listed in
+`manifest.net.domains`; `openExternal` accepts HTTP(S) and `mailto:` URLs.
 
 `pi.ui.notify` shows an in-app Toast. Native notifications are opt-in: call
 `pi.ui.requestNotificationPermission()` before
@@ -394,11 +396,84 @@ because Electron does not expose a cross-platform read-only OS permission API;
 notifications are not added to PI-Desktop's durable task notification inbox.
 
 The panel bridge also exposes `ui.showToast`, `ui.closePanel`,
-`plugin.getSettings`, and `workspace.get`. It does not expose arbitrary custom
-channels. `onPanelInvoke` is currently reserved for the host-supported
-`skill.*` panel operations, not a general panel-to-plugin RPC mechanism.
+`plugin.getSettings`, and `workspace.get`. A channel the host does not implement
+itself is forwarded to your `onPanelInvoke(channel, payload)`, so a panel can
+talk to its own plugin over channels you define; a plugin that exports no
+`onPanelInvoke` gets `UNSUPPORTED` back.
 
-### 6.5 Theme
+### 6.5 File scope
+
+`fs.read` / `fs.write` / `fs.delete` say whether your plugin may touch files.
+`manifest.fs` says which ones:
+
+```json
+{
+  "permissions": ["fs.read", "fs.write", "fs.delete"],
+  "fs": {
+    "read": { "scope": ["**/*"] },
+    "write": { "scope": ["docs/**", "*.md"] },
+    "delete": { "own": true, "scope": ["dist/**"] }
+  }
+}
+```
+
+- `scope` globs are relative to the root. `*` matches one segment, `**` crosses
+  separators.
+- **Reading** may declare the whole tree. **Writing and deleting may not** — a
+  whole-tree pattern fails validation, because the egress allowlist is what makes
+  a broad read safe and nothing makes a broad write safe.
+- An access outside the declared scope is not an error: PI-Desktop asks the user
+  (Deny / Allow once / Allow this session). Declare the scope you need so your
+  plugin does not interrupt them on every call, and expect a refusal to arrive as
+  `PERMISSION_DENIED`.
+- Some paths are refused whatever you declare: `.env*`, SSH and cloud
+  credentials, `*.pem`, `.git/**`, and PI-Desktop's own data directory. They do
+  not appear in `fs.glob` results either.
+
+**Deleting.** `own: true` lets you remove files your plugin wrote itself, with no
+scope and no prompt — the right default for cleaning up your own output. (If the
+user has edited the file since you wrote it, it stops counting as yours.)
+Deleting anything else needs a `scope`. Every delete is non-recursive, goes to the
+OS trash, and is interrupted once past 50 removals a minute, so batch cleanups
+should be paced rather than run as a `glob` plus a loop.
+
+**Working outside the workspace.** Set `"root": "userSelected"` on a mode and call
+`pi.fs.requestDirectory()`: the user picks a directory and you get full reach
+inside it with no scope to declare. The handle lives in memory and is gone when
+the plugin process exits, so ask again each session.
+
+**Legacy names.** `fs.read.workspace`, `fs.write.workspace` and
+`fs.delete.workspace` still load, but are cut back — write reaches nothing and
+delete reaches only your own output — until the manifest declares `fs`. The
+Plugins page tells the user this happened.
+
+### 6.6 Network access
+
+`net.fetch` lets your plugin make a request; `manifest.net.domains` says where to:
+
+```json
+{
+  "permissions": ["net.fetch"],
+  "net": { "domains": ["api.example.com", "*.githubusercontent.com"] }
+}
+```
+
+Entries are bare hostnames — no scheme, no port, no path — and a leading `*.`
+covers the domain and its subdomains. A bare `*` is refused at install.
+
+The list is the single allowlist for **every** outbound path the host owns, not
+only `pi.net.fetch`: your panel's own `fetch`, `<img>`, `<script>` and stylesheet
+loads answer to it too (a sandboxed panel still has a network stack), as do
+remote HTTP MCP servers you declare. `window.open` from a panel is refused
+outright.
+
+An omitted, empty, or malformed `net.domains` means **no egress at all**, even
+with `net.fetch` granted. Redirects are followed by hand and re-checked, so an
+allowed host cannot bounce a request to one you did not declare. Bundle assets
+into the plugin rather than loading them from a CDN you would otherwise have to
+declare.
+
+### 6.7 Theme
 
 Declare a CSS file and `ui.theme`:
 
@@ -422,7 +497,7 @@ Override PI-Desktop design tokens in that CSS. The host sanitizes contributed
 CSS, refuses imports and non-data URLs, caps each file at 256 KiB, and allows up
 to eight themes per plugin. The user selects the theme in Settings.
 
-### 6.6 MCP server
+### 6.8 MCP server
 
 MCP servers are declarative. A local server requires `mcp.server.local`; a
 remote server requires `mcp.server.remote`:
@@ -461,7 +536,7 @@ loopback HTTP. Setting references read only this plugin's settings—the host
 environment and provider secrets are never forwarded. MCP tools follow the
 same Agent-only policy and namespacing as hand-written plugin tools.
 
-### 6.7 Resident service and message bus
+### 6.9 Resident service and message bus
 
 Declare service ids and allowed topics:
 
@@ -515,13 +590,19 @@ Undeclared or ungranted API calls fail with `PERMISSION_DENIED`.
 | Risk | Permissions |
 |---|---|
 | Low | `ui.panel`, `ui.theme`, `notify` |
-| Medium | `clipboard.read`, `clipboard.write`, `fs.read.workspace`, `shell.openExternal`, `background.service`, `bus.publish`, `bus.subscribe` |
-| High | `fs.write.workspace`, `fs.delete.workspace`, `agent.tool.register`, `agent.prompt.inject`, `net.fetch`, `mcp.server.local`, `mcp.server.remote` |
+| Medium | `clipboard.read`, `clipboard.write`, `fs.read`, `shell.openExternal`, `background.service`, `bus.publish`, `bus.subscribe` |
+| High | `fs.write`, `fs.delete`, `agent.tool.register`, `agent.prompt.inject`, `net.fetch`, `mcp.server.local`, `mcp.server.remote` |
+
+Two permissions carry a declared range as well as a name, and the user is shown
+both: `manifest.fs` for the file modes (§6.5) and `manifest.net.domains` for
+egress (§6.6). Both fail closed — an absent or empty declaration grants nothing,
+so a plugin that says nothing about them reaches nothing.
 
 Ask for the smallest set possible. Adding a permission to a loaded development
 plugin does not take effect through hot reload: PI-Desktop stops the reload and
-asks the user to load the folder again so the new grant can be reviewed.
-Removing permissions takes effect on reload.
+asks the user to load the folder again so the new grant can be reviewed. Widening
+`manifest.fs` counts as adding a permission for this purpose. Removing
+permissions takes effect on reload.
 
 The complete mapping and policy are in the
 [permission matrix](spec/07-plugins/13-plugin-permissions-matrix.md).

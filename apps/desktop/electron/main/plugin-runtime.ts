@@ -1,22 +1,41 @@
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, statSync, rmSync } from "node:fs";
-import { join, dirname, resolve, sep } from "node:path";
+import {
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+  rmSync,
+} from "node:fs";
+import { basename, join, dirname, relative, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import {
   busTopicAllowed,
+  isDeniedFsPath,
+  isFsPathInScope,
   isValidBusTopic,
   isValidBusTopicPattern,
+  isNetUrlAllowed,
   matchesBusTopic,
+  matchFsGlob,
+  normalizeFsPath,
+  parseNetDomains,
   parseSkillFrontmatter,
   pluginMcpToolKey,
   pluginSkillId,
   pluginThemeId,
   pluginToolName,
+  resolveFsAccess,
   resolveMcpRefs,
   sanitizeThemeCss,
   skillIdFromPath,
   resolvePluginLocalizedString,
   validateManifest,
   validateMcpServer,
+  type PluginFsMode,
+  type PluginFsPolicy,
+  type PluginFsRule,
   type PluginManifest,
   type PluginNativeNotificationInput,
   type PluginNativeNotificationResult,
@@ -32,6 +51,11 @@ import {
   type PluginServiceStatus,
   type PluginSettingDefinition,
 } from "@pi-desktop/shared";
+import {
+  resolveRealPathForCreateWithinRoot,
+  resolveRealPathWithinRoot,
+  resolveWithinRoot,
+} from "./fs-panel";
 import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
 
@@ -93,6 +117,8 @@ export type PluginPanelRequest = {
   htmlPath: string;
   locale?: string;
   theme?: "light" | "dark";
+  /** The plugin's egress allowlist; the panel session is confined to it. */
+  netDomains?: readonly string[];
   /** Development panels show the host safe-area reminder in their chrome. */
   development?: boolean;
 };
@@ -111,6 +137,25 @@ export type PluginProcessSpawner = (options: {
   entry: string;
   pluginPath: string;
 }) => PluginProcessHandle | Promise<PluginProcessHandle>;
+
+/** One file access the plugin asked for and the manifest does not cover. */
+export type PluginFsConsentRequest = {
+  pluginId: string;
+  pluginName: string;
+  mode: PluginFsMode;
+  /** Root-relative path, as the user would recognize it. */
+  path: string;
+  /** Absolute path, for the dialog's detail line. */
+  fullPath: string;
+  /** Set when the plugin tripped the delete rate brake rather than the scope. */
+  reason?: "scope" | "rate";
+};
+
+/**
+ * `session` grants the containing directory for the rest of the run.
+ * A delete is never offered anything more durable than that.
+ */
+export type PluginFsConsentAnswer = "once" | "session" | "deny";
 
 export type PluginHostServices = {
   getWorkspacePath: () => string | null;
@@ -136,6 +181,31 @@ export type PluginHostServices = {
     timeoutMs?: number;
   }) => Promise<{ status: number; headers: Record<string, string>; bodyText: string }>;
   audit?: (entry: Record<string, unknown>) => void;
+  /**
+   * Blocking, native consent for a file access the manifest did not declare.
+   * Without it every out-of-scope access is refused, which is the safe default
+   * for a headless host.
+   */
+  confirmFsAccess?: (request: PluginFsConsentRequest) => Promise<PluginFsConsentAnswer>;
+  /**
+   * Move a path to the OS trash. Deletion is the one file operation that is
+   * recoverable if we route it here, so the host supplies the trash rather than
+   * the runtime calling `rm` — no quarantine copy of the user's data anywhere.
+   */
+  trashItem?: (fullPath: string) => Promise<void>;
+  /**
+   * Native directory picker backing the `userSelected` root: unlimited reach,
+   * zero standing power, because the user points at the directory themselves.
+   */
+  pickDirectory?: (request: {
+    pluginId: string;
+    pluginName: string;
+  }) => Promise<string | null>;
+  /**
+   * Absolute paths refused under every root, scope and grant — the app's own
+   * data directory above all, which holds provider keys and the session store.
+   */
+  protectedPaths?: () => readonly string[];
   /** Overrides the forked host-process entry; tests point this at the source file. */
   hostEntry?: string;
   /** Overrides how a plugin host process is created; defaults to Electron utilityProcess. */
@@ -177,6 +247,7 @@ const HOST_API_ALLOWLIST = new Set([
   "fs.writeText",
   "fs.glob",
   "fs.remove",
+  "fs.requestDirectory",
   "clipboard.readText",
   "clipboard.writeText",
   "shell.openExternal",
@@ -206,6 +277,8 @@ const PANEL_SKILL_CHANNELS = new Set([
 ]);
 /** A plugin may teach at most this many skills; the rest are ignored. */
 const MAX_SKILLS_PER_PLUGIN = 32;
+/** Redirect hops `pi.net.fetch` follows; each one is re-checked against egress. */
+const NET_FETCH_MAX_REDIRECTS = 5;
 /** Skill documents above this size are refused (prompt budget, not disk). */
 const MAX_SKILL_BYTES = 128 * 1024;
 /** Catalog lines stay short — the body carries the detail. */
@@ -232,6 +305,22 @@ const MAX_BUS_SUBSCRIPTIONS_PER_PLUGIN = 16;
 /** Publish budget per plugin, so a hot loop cannot flood every other plugin. */
 const MAX_BUS_PUBLISH_PER_WINDOW = 100;
 const BUS_RATE_WINDOW_MS = 10_000;
+/**
+ * Delete budget per plugin per window. `recursive: false` does not bound the
+ * blast radius on its own -- a glob followed by a loop of single-file removes
+ * empties a workspace just as well as `rm -rf` does. Past the budget the user
+ * is asked, which is what tells a cleanup routine apart from a wipe.
+ */
+export const MAX_DELETES_PER_WINDOW = 50;
+const DELETE_RATE_WINDOW_MS = 60_000;
+/** Kept from the pre-scope implementation: a listing is not a search index. */
+const MAX_GLOB_MATCHES = 500;
+/** Directories `pi.fs.glob` never walks into; they are noise and are denied anyway. */
+const GLOB_SKIP_DIRS = new Set([".git", "node_modules", ".venv", "__pycache__"]);
+/** Entries in one plugin's write ledger; oldest are dropped past this. */
+const MAX_WRITE_LEDGER_ENTRIES = 2000;
+/** Host-owned file inside the plugin's data dir; the plugin API cannot reach it. */
+const WRITE_LEDGER_FILE = "fs-write-ledger.json";
 
 type PendingCall = {
   resolve: (value: unknown) => void;
@@ -244,6 +333,14 @@ type LoadedPlugin = {
   path: string;
   development: boolean;
   permissions: Set<string>;
+  /** Effective file scope, after legacy permission names are folded in. */
+  fsPolicy: PluginFsPolicy;
+  /** Legacy fs permission names this plugin still declares, for the UI notice. */
+  legacyFs: string[];
+  /** Directory the user picked for this plugin's `userSelected` root, if any. */
+  userRoot?: string;
+  /** Timestamps of recent deletes, backing the rate brake. */
+  deletes: number[];
   child?: PluginProcessHandle;
   pending: Map<string, PendingCall>;
   nextCallId: number;
@@ -291,29 +388,66 @@ function busSubscribeAllowed(declared: string[] | undefined, pattern: string): b
 }
 
 /**
- * Permissions a plugin directory currently declares. Throws on a manifest that
- * is missing or unparseable, which is what a reload wants: nothing is granted
- * against a manifest nobody can read.
+ * Permissions and file scope a plugin directory currently declares, with legacy
+ * fs names already folded in so a hot reload compares like with like. Throws on
+ * a manifest that is missing or unparseable, which is what a reload wants:
+ * nothing is granted against a manifest nobody can read.
  */
-function readDeclaredPermissions(pluginPath: string): string[] {
+function readDeclaredAccess(pluginPath: string): {
+  permissions: string[];
+  fs: PluginFsPolicy;
+} {
   const manifestPath = join(pluginPath, "manifest.json");
   if (!existsSync(manifestPath)) {
     throw new Error("PLUGIN_INVALID: manifest.json missing");
   }
-  const raw = JSON.parse(readFileSync(manifestPath, "utf8"));
-  const declared = (raw as { permissions?: unknown }).permissions;
-  if (!Array.isArray(declared)) return [];
-  return declared.filter((entry): entry is string => typeof entry === "string");
+  const raw = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+    permissions?: unknown;
+    fs?: unknown;
+  };
+  const declared = Array.isArray(raw.permissions)
+    ? raw.permissions.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const access = resolveFsAccess({ permissions: declared, fs: raw.fs });
+  return { permissions: access.permissions, fs: access.policy };
 }
 
-function ensureWithinRoot(root: string, candidate: string): string {
-  const resolvedRoot = resolve(root);
-  const resolved = resolve(resolvedRoot, candidate);
-  const prefix = resolvedRoot.endsWith(sep) ? resolvedRoot : resolvedRoot + sep;
-  if (resolved !== resolvedRoot && !resolved.startsWith(prefix)) {
-    throw apiError("INVALID_ARGUMENT", "path escapes workspace root");
+/**
+ * Scope a reload adds beyond what was approved. Patterns are compared as
+ * written: narrowing a scope is always fine, and a widened one has to go back
+ * through review rather than being reasoned about, because deciding whether one
+ * glob covers another is not something to guess at behind the gateway.
+ */
+function widenedFsScope(ceiling: PluginFsPolicy, next: PluginFsPolicy): string[] {
+  const added: string[] = [];
+  for (const mode of ["read", "write", "delete"] as const) {
+    const before = ceiling[mode];
+    const after = next[mode];
+    if (!after) continue;
+    if (!before) {
+      added.push(`fs.${mode}`);
+      continue;
+    }
+    if (after.root !== before.root) added.push(`fs.${mode}.root=${after.root}`);
+    if (after.own && !before.own) added.push(`fs.${mode}.own`);
+    for (const pattern of after.scope) {
+      if (!before.scope.includes(pattern)) added.push(`fs.${mode}.scope=${pattern}`);
+    }
   }
-  return resolved;
+  return added;
+}
+
+/**
+ * `realpath` with the input as its own fallback, for a path that may not exist
+ * yet. Containment is decided by `fs-panel`'s checks; this only exists so the
+ * relative path we compare scopes against is expressed in the same terms.
+ */
+function realpathOrSelf(path: string): string {
+  try {
+    return realpathSync(resolve(path));
+  } catch {
+    return resolve(path);
+  }
 }
 
 /**
@@ -376,6 +510,14 @@ export class PluginRuntime {
   private restarts = new Map<string, RestartRecord>();
   private busSubscriptions = new Map<string, BusSubscription>();
   private busRate = new Map<string, { windowStart: number; count: number }>();
+  /**
+   * File accesses the user allowed for the rest of the run, keyed
+   * `<mode>:<directory>`. In memory only: a session grant that outlived the
+   * session would be a standing permission nobody reviewed.
+   */
+  private fsConsent = new Map<string, Set<string>>();
+  /** Cached write ledgers, keyed by plugin id. */
+  private writeLedgers = new Map<string, Record<string, number>>();
   private nextBusSubscription = 1;
   /** Plugins being reloaded by the supervisor; their backoff must survive. */
   private restarting = new Set<string>();
@@ -387,7 +529,10 @@ export class PluginRuntime {
    * approved when they picked the folder. Survives a failed reload so the fix
    * that follows a syntax error still gets picked up.
    */
-  private devPlugins = new Map<string, { path: string; permissions: string[] }>();
+  private devPlugins = new Map<
+    string,
+    { path: string; permissions: string[]; fs: PluginFsPolicy }
+  >();
   /** Plugin ids inside `reloadDevPlugin`, whose watch must outlive the unload. */
   private reloading = new Set<string>();
   private watcher: DevPluginWatcher;
@@ -641,14 +786,23 @@ export class PluginRuntime {
       throw new Error("PLUGIN_LOAD_FAILED: main entry missing");
     }
 
-    const declared = new Set(manifest.permissions ?? []);
-    const granted = new Set(grantedPermissions ?? manifest.permissions ?? []);
-    for (const perm of declared) {
-      if (!granted.has(perm)) {
-        // Install-time grants win; undeclared runtime use still fails later.
-        granted.add(perm);
-      }
-    }
+    // Legacy `fs.*.workspace` names resolve to the scoped form, so an install
+    // recorded before scopes existed keeps working -- with the reduced reach
+    // `resolveFsAccess` assigns it, not the whole workspace it used to get.
+    const access = resolveFsAccess(manifest);
+    const declared = new Set(access.permissions);
+    // A grant list is the user's answer and it is final: re-adding everything
+    // the manifest declares would quietly undo `plugins.revokePermissions` on
+    // the next load. Only a load with no recorded answer falls back to the
+    // declaration.
+    const granted =
+      grantedPermissions === undefined
+        ? declared
+        : new Set(
+            resolveFsAccess({ permissions: grantedPermissions }).permissions.filter(
+              (perm) => declared.has(perm),
+            ),
+          );
 
     const entry = this.services.hostEntry ?? join(__dirname, "plugin-host-process.js");
     const spawn = this.services.spawnProcess ?? spawnUtilityProcess;
@@ -659,6 +813,9 @@ export class PluginRuntime {
       path: pluginPath,
       development: options.development ?? this.devPlugins.has(manifest.id),
       permissions: granted,
+      fsPolicy: access.policy,
+      legacyFs: access.legacy,
+      deletes: [],
       child,
       pending: new Map(),
       nextCallId: 1,
@@ -769,6 +926,7 @@ export class PluginRuntime {
     this.devPlugins.set(pluginId, {
       path: loaded.path,
       permissions: [...loaded.permissions],
+      fs: loaded.fsPolicy,
     });
     this.watcher.add(pluginId, loaded.path);
   }
@@ -797,18 +955,24 @@ export class PluginRuntime {
     const name = this.loaded.get(pluginId)?.manifest.name ?? pluginId;
     this.reloading.add(pluginId);
     try {
-      const declared = readDeclaredPermissions(dev.path);
+      const declaredAccess = readDeclaredAccess(dev.path);
+      const declared = declaredAccess.permissions;
       const ceiling = new Set(dev.permissions);
       const added = declared.filter((permission) => !ceiling.has(permission));
-      if (added.length) {
+      const widened = widenedFsScope(dev.fs, declaredAccess.fs);
+      if (added.length || widened.length) {
         throw new Error(
-          `PERMISSION_DENIED: manifest now requests ${added.join(", ")}; load the plugin again to review`,
+          `PERMISSION_DENIED: manifest now requests ${[...added, ...widened].join(", ")}; load the plugin again to review`,
         );
       }
       // Grants follow the manifest downwards, never upwards: a permission the
       // author removed stops being available on the next reload.
       const manifest = await this.loadFromPath(dev.path, declared, { development: true });
-      this.devPlugins.set(pluginId, { path: dev.path, permissions: dev.permissions });
+      this.devPlugins.set(pluginId, {
+        path: dev.path,
+        permissions: dev.permissions,
+        fs: dev.fs,
+      });
       this.services.audit?.({
         pluginId,
         api: "plugin.reload.success",
@@ -879,6 +1043,10 @@ export class PluginRuntime {
         return { ok: true };
       case "fs.glob":
         return api.fs.glob(String(payload?.pattern ?? "*"));
+      // Deleting is not reachable from a panel; choosing a directory is, and
+      // has to be, because a "pick a folder" button is panel UI by nature.
+      case "fs.requestDirectory":
+        return api.fs.requestDirectory();
       case "clipboard.readText":
         return api.clipboard.readText();
       case "clipboard.writeText":
@@ -900,7 +1068,19 @@ export class PluginRuntime {
       case "workspace.get":
         return api.workspace.get();
       default:
-        throw apiError("UNSUPPORTED", `unknown panel channel: ${channel}`);
+        // The panel is the plugin's own UI: any channel the host does not
+        // implement itself is forwarded to the plugin's onPanelInvoke so
+        // plugins can define their own panel↔main-process channels
+        // (e.g. the domain manager's "domain.sync" data bridge).
+        return this.sendToChild(
+          loaded,
+          {
+            t: "call",
+            method: "panel.invoke",
+            payload: { channel, payload: payload ?? {} },
+          },
+          PLUGIN_PANEL_TIMEOUT_MS,
+        );
     }
   }
 
@@ -1460,6 +1640,20 @@ export class PluginRuntime {
         this.skipMcpServer(pluginId, server.id, "PERMISSION_DENIED", `missing ${permission}`);
         continue;
       }
+      // An http MCP endpoint is an outbound channel like any other, so it
+      // answers to the same allowlist rather than to its permission alone.
+      if (server.transport === "http") {
+        const url = String(server.url ?? "");
+        if (!isNetUrlAllowed(url, this.netDomains(loaded))) {
+          this.skipMcpServer(
+            pluginId,
+            server.id,
+            "PERMISSION_DENIED",
+            `endpoint not in manifest.net.domains: ${url}`,
+          );
+          continue;
+        }
+      }
       const refs = resolveMcpRefs(
         server.transport === "stdio" ? server.env : server.headers,
         settings,
@@ -1829,6 +2023,54 @@ export class PluginRuntime {
     });
   }
 
+  /**
+   * The plugin's egress allowlist. A malformed `net.domains` degrades to "no
+   * egress" rather than "all egress": validateManifest already rejects it at
+   * install, so reaching this fallback means the manifest changed underneath us.
+   */
+  private netDomains(loaded: LoadedPlugin): string[] {
+    const parsed = parseNetDomains(loaded.manifest.net?.domains);
+    return parsed.ok ? (parsed.domains ?? []) : [];
+  }
+
+  /**
+   * Confine one outbound URL to the allowlist. Reading a secret only becomes a
+   * leak when it can leave, so every host-owned egress path funnels through
+   * here — and an undeclared `net.domains` means nothing leaves at all.
+   */
+  private assertEgress(loaded: LoadedPlugin, url: string, api: string): void {
+    const domains = this.netDomains(loaded);
+    if (isNetUrlAllowed(url, domains)) return;
+    let host = url;
+    try {
+      host = new URL(url).hostname || url;
+    } catch {
+      // Keep the raw value; the audit entry is more useful than a parse error.
+    }
+    this.services.audit?.({
+      pluginId: loaded.manifest.id,
+      api,
+      ok: false,
+      errorCode: "PERMISSION_DENIED",
+      url,
+      ts: Date.now(),
+    });
+    throw apiError(
+      "PERMISSION_DENIED",
+      domains.length
+        ? `host not in manifest.net.domains: ${host}`
+        : `plugin declares no manifest.net.domains; ${host} is unreachable`,
+    );
+  }
+
+  /** Per-plugin data directory. Host-owned; the fs API cannot reach it. */
+  private pluginDataDir(pluginId: string): string {
+    const root = process.env.PI_DESKTOP_DATA_DIR
+      ? resolve(process.env.PI_DESKTOP_DATA_DIR)
+      : join(homedir(), ".pi-desktop");
+    return join(root, "plugins", "data", pluginId.replace(/[^a-zA-Z0-9._-]/g, "_"));
+  }
+
   private assertPermission(loaded: LoadedPlugin, perm: string): void {
     if (!loaded.permissions.has(perm)) {
       this.services.audit?.({
@@ -1842,16 +2084,246 @@ export class PluginRuntime {
     }
   }
 
+  /**
+   * Resolve one file request and decide whether it may proceed.
+   *
+   * Four gates in a fixed order, because each one is only sound behind the
+   * previous: the permission says the plugin may touch files at all;
+   * containment says the path is really inside its root (through links, not
+   * just lexically); the deny-list refuses credentials under every grant; and
+   * only then does the declared scope -- or the user -- decide.
+   */
+  private async resolveFsRequest(
+    loaded: LoadedPlugin,
+    mode: PluginFsMode,
+    requestPath: string,
+    options: { create?: boolean } = {},
+  ): Promise<{ full: string; rel: string; root: string }> {
+    this.assertPermission(loaded, `fs.${mode}`);
+    const rule: PluginFsRule = loaded.fsPolicy[mode] ?? { root: "workspace", scope: [] };
+    const root =
+      rule.root === "userSelected" ? loaded.userRoot : this.services.getWorkspacePath();
+    if (!root) {
+      throw apiError(
+        "NOT_FOUND",
+        rule.root === "userSelected"
+          ? "no directory has been chosen; call fs.requestDirectory first"
+          : "No workspace is open",
+      );
+    }
+
+    const full = options.create
+      ? await resolveRealPathForCreateWithinRoot(root, requestPath)
+      : await resolveRealPathWithinRoot(root, requestPath);
+    if (!full) {
+      // A path that simply is not there gets said so. Only a path that exists
+      // and resolves outside the root is an escape, and telling a plugin author
+      // with a typo that they tried to escape the workspace is a lie that costs
+      // them an afternoon.
+      const lexical = !options.create && resolveWithinRoot(root, requestPath);
+      const missing = Boolean(lexical) && !existsSync(lexical as string);
+      const code = missing ? "NOT_FOUND" : "INVALID_ARGUMENT";
+      this.auditFs(loaded, mode, requestPath, code);
+      throw apiError(
+        code,
+        missing
+          ? `path not found: ${requestPath}`
+          : `path escapes the plugin's root: ${requestPath}`,
+      );
+    }
+    // Both sides have to be resolved through links or the relative path comes
+    // out as an escape whenever the root itself sits behind one, which is the
+    // normal shape of a temp directory on macOS.
+    const rootReal = realpathOrSelf(root);
+    const rel = normalizeFsPath(relative(rootReal, full));
+
+    if (this.isProtectedPath(full)) {
+      this.auditFs(loaded, mode, requestPath, "PERMISSION_DENIED");
+      throw apiError("PERMISSION_DENIED", "path is reserved by the app");
+    }
+    if (isDeniedFsPath(rel)) {
+      this.auditFs(loaded, mode, requestPath, "PERMISSION_DENIED");
+      throw apiError(
+        "PERMISSION_DENIED",
+        `credentials and repository internals are never readable by plugins: ${rel}`,
+      );
+    }
+
+    // A directory the user pointed at is the grant; there is nothing narrower
+    // to declare, so no scope is required inside it.
+    if (rule.root === "userSelected") return { full, rel, root: rootReal };
+    if (isFsPathInScope(rel, rule.scope)) return { full, rel, root: rootReal };
+    if (mode === "delete" && rule.own && this.ownsWrite(loaded, full)) {
+      return { full, rel, root: rootReal };
+    }
+
+    await this.requestFsConsent(loaded, mode, rel, full, "scope");
+    return { full, rel, root: rootReal };
+  }
+
+  /**
+   * Whether the path lies under something the host keeps for itself. Both
+   * sides are resolved through links, or a barrier reached the other way
+   * around simply would not match.
+   */
+  private isProtectedPath(full: string): boolean {
+    for (const guarded of this.services.protectedPaths?.() ?? []) {
+      const barrier = realpathOrSelf(guarded);
+      if (full === barrier || full.startsWith(barrier + sep)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Ask the user, and remember the answer for the containing directory when
+   * they say so. Without a consent service the access is simply refused: a
+   * host that cannot ask must not assume yes.
+   */
+  private async requestFsConsent(
+    loaded: LoadedPlugin,
+    mode: PluginFsMode,
+    rel: string,
+    full: string,
+    reason: "scope" | "rate",
+  ): Promise<void> {
+    const pluginId = loaded.manifest.id;
+    const key = `${mode}:${reason === "rate" ? "*" : dirname(full)}`;
+    if (this.fsConsent.get(pluginId)?.has(key)) return;
+    const ask = this.services.confirmFsAccess;
+    if (!ask) {
+      this.auditFs(loaded, mode, rel, "PERMISSION_DENIED");
+      throw apiError("PERMISSION_DENIED", `outside manifest.fs.${mode}.scope: ${rel}`);
+    }
+    const answer = await ask({
+      pluginId,
+      pluginName: loaded.manifest.name,
+      mode,
+      path: rel,
+      fullPath: full,
+      reason,
+    });
+    if (answer === "deny") {
+      this.auditFs(loaded, mode, rel, "PERMISSION_DENIED");
+      throw apiError("PERMISSION_DENIED", `the user refused ${mode} on ${rel}`);
+    }
+    if (answer === "session") {
+      const grants = this.fsConsent.get(pluginId) ?? new Set<string>();
+      grants.add(key);
+      this.fsConsent.set(pluginId, grants);
+    }
+    this.services.audit?.({
+      pluginId,
+      api: `fs.${mode}`,
+      ok: true,
+      ts: Date.now(),
+      path: rel,
+      data: { consent: answer, reason },
+    });
+  }
+
+  private auditFs(
+    loaded: LoadedPlugin,
+    mode: PluginFsMode,
+    path: string,
+    errorCode: string,
+  ): void {
+    this.services.audit?.({
+      pluginId: loaded.manifest.id,
+      api: `fs.${mode}`,
+      ok: false,
+      errorCode,
+      ts: Date.now(),
+      path,
+    });
+  }
+
+  /** Absolute path of one plugin's write ledger. */
+  private ledgerPath(loaded: LoadedPlugin): string {
+    return join(this.pluginDataDir(loaded.manifest.id), WRITE_LEDGER_FILE);
+  }
+
+  /**
+   * Paths this plugin wrote, mapped to the mtime it left behind. Kept on disk
+   * so `fs.delete.own` survives a restart, and host-owned so the plugin API
+   * cannot reach it. (A plugin process can still touch the file directly --
+   * that is the same advisory limit every permission has until the plugin
+   * runtime itself is sandboxed, and it grants nothing `node:fs` would not.)
+   */
+  private readLedger(loaded: LoadedPlugin): Record<string, number> {
+    const cached = this.writeLedgers.get(loaded.manifest.id);
+    if (cached) return cached;
+    let ledger: Record<string, number> = {};
+    try {
+      const raw = JSON.parse(readFileSync(this.ledgerPath(loaded), "utf8")) as unknown;
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        for (const [path, mtime] of Object.entries(raw as Record<string, unknown>)) {
+          if (typeof mtime === "number") ledger[path] = mtime;
+        }
+      }
+    } catch {
+      ledger = {};
+    }
+    this.writeLedgers.set(loaded.manifest.id, ledger);
+    return ledger;
+  }
+
+  /** Record a write so the plugin can clean up after itself later. */
+  private recordWrite(loaded: LoadedPlugin, full: string): void {
+    const ledger = this.readLedger(loaded);
+    let mtime = Date.now();
+    try {
+      mtime = statSync(full).mtimeMs;
+    } catch {
+      // Keep the wall clock; the ownership check tolerates a coarse value.
+    }
+    ledger[full] = mtime;
+    const keys = Object.keys(ledger);
+    if (keys.length > MAX_WRITE_LEDGER_ENTRIES) {
+      for (const stale of keys.slice(0, keys.length - MAX_WRITE_LEDGER_ENTRIES)) {
+        delete ledger[stale];
+      }
+    }
+    try {
+      const dir = this.pluginDataDir(loaded.manifest.id);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(this.ledgerPath(loaded), JSON.stringify(ledger), "utf8");
+    } catch {
+      // A ledger we cannot persist only costs the plugin its own-delete
+      // shortcut on the next run; it never widens anything.
+    }
+  }
+
+  /**
+   * Whether the plugin wrote this exact file and nobody has touched it since.
+   * A newer mtime means the user edited it, which makes it the user's file
+   * again and sends the delete to a prompt.
+   */
+  private ownsWrite(loaded: LoadedPlugin, full: string): boolean {
+    const recorded = this.readLedger(loaded)[full];
+    if (recorded === undefined) return false;
+    try {
+      // One second of slack: some filesystems round mtime down.
+      return statSync(full).mtimeMs <= recorded + 1000;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Rolling delete window per plugin, mirroring the bus publish brake. */
+  private deleteRateExceeded(loaded: LoadedPlugin): boolean {
+    const now = Date.now();
+    loaded.deletes = loaded.deletes.filter((at) => now - at < DELETE_RATE_WINDOW_MS);
+    loaded.deletes.push(now);
+    return loaded.deletes.length > MAX_DELETES_PER_WINDOW;
+  }
+
   /** Host-side implementation of the allowlisted APIs; shared with panel bridge. */
   private hostApi(loaded: LoadedPlugin) {
     const pluginId = loaded.manifest.id;
     const pluginPath = loaded.path;
 
     const dataPath = () => {
-      const root = process.env.PI_DESKTOP_DATA_DIR
-        ? resolve(process.env.PI_DESKTOP_DATA_DIR)
-        : join(homedir(), ".pi-desktop");
-      const dir = join(root, "plugins", "data", pluginId.replace(/[^a-zA-Z0-9._-]/g, "_"));
+      const dir = this.pluginDataDir(pluginId);
       mkdirSync(dir, { recursive: true });
       return dir;
     };
@@ -1905,6 +2377,7 @@ export class PluginRuntime {
             width: loaded.manifest.ui?.width ?? 480,
             height: loaded.manifest.ui?.height ?? 360,
             htmlPath,
+            netDomains: this.netDomains(loaded),
             ...(loaded.development ? { development: true } : {}),
           });
           this.services.audit?.({
@@ -1945,74 +2418,162 @@ export class PluginRuntime {
         },
       },
       fs: {
-        readText: async (pathFromWorkspaceRoot: string) => {
-          this.assertPermission(loaded, "fs.read.workspace");
-          const root = this.services.getWorkspacePath();
-          if (!root) throw apiError("NOT_FOUND", "No workspace is open");
-          const full = ensureWithinRoot(root, pathFromWorkspaceRoot);
+        readText: async (pathFromRoot: string) => {
+          const { full, rel } = await this.resolveFsRequest(
+            loaded,
+            "read",
+            pathFromRoot,
+          );
           const content = readFileSync(full, "utf8");
           this.services.audit?.({
             pluginId,
             api: "fs.readText",
             ok: true,
             ts: Date.now(),
-            path: pathFromWorkspaceRoot,
+            path: rel,
           });
           return content;
         },
-        writeText: async (pathFromWorkspaceRoot: string, content: string) => {
-          this.assertPermission(loaded, "fs.write.workspace");
-          const root = this.services.getWorkspacePath();
-          if (!root) throw apiError("NOT_FOUND", "No workspace is open");
-          const full = ensureWithinRoot(root, pathFromWorkspaceRoot);
+        writeText: async (pathFromRoot: string, content: string) => {
+          const { full, rel } = await this.resolveFsRequest(
+            loaded,
+            "write",
+            pathFromRoot,
+            { create: true },
+          );
           mkdirSync(dirname(full), { recursive: true });
           writeFileSync(full, content, "utf8");
+          // Recorded so `fs.delete` with `own` can clean up this file later
+          // without asking: removing your own output surprises nobody.
+          this.recordWrite(loaded, full);
           this.services.audit?.({
             pluginId,
             api: "fs.writeText",
             ok: true,
             ts: Date.now(),
-            path: pathFromWorkspaceRoot,
+            path: rel,
           });
         },
         glob: async (pattern: string) => {
-          this.assertPermission(loaded, "fs.read.workspace");
-          const root = this.services.getWorkspacePath();
+          this.assertPermission(loaded, "fs.read");
+          const rule = loaded.fsPolicy.read ?? { root: "workspace", scope: [] };
+          const root =
+            rule.root === "userSelected" ? loaded.userRoot : this.services.getWorkspacePath();
           if (!root) throw apiError("NOT_FOUND", "No workspace is open");
           const matches: string[] = [];
           const visit = (dir: string, rel = "") => {
-            for (const entry of readdirSync(dir)) {
+            if (matches.length >= MAX_GLOB_MATCHES) return;
+            let entries: string[] = [];
+            try {
+              entries = readdirSync(dir);
+            } catch {
+              return;
+            }
+            for (const entry of entries) {
+              if (matches.length >= MAX_GLOB_MATCHES) return;
               const full = join(dir, entry);
               const nextRel = rel ? `${rel}/${entry}` : entry;
-              const st = statSync(full);
-              if (st.isDirectory()) visit(full, nextRel);
-              else if (matchGlob(nextRel, pattern)) matches.push(nextRel);
+              let st: ReturnType<typeof statSync>;
+              try {
+                st = statSync(full);
+              } catch {
+                continue;
+              }
+              if (st.isDirectory()) {
+                // Skipped rather than filtered: walking a node_modules tree to
+                // discard every hit is the slow way to return nothing.
+                if (GLOB_SKIP_DIRS.has(entry)) continue;
+                if (this.isProtectedPath(full)) continue;
+                visit(full, nextRel);
+                continue;
+              }
+              if (!matchFsGlob(nextRel, pattern)) continue;
+              if (isDeniedFsPath(nextRel)) continue;
+              // A name is a read too: what the plugin may not open, it may not
+              // learn the existence of.
+              if (this.isProtectedPath(full)) continue;
+              // A listing is a read: what the plugin may not open, it may not
+              // learn the name of either.
+              if (rule.root !== "userSelected" && !isFsPathInScope(nextRel, rule.scope)) {
+                continue;
+              }
+              matches.push(nextRel);
             }
           };
-          visit(root);
-          return matches.slice(0, 500);
+          visit(realpathOrSelf(root));
+          this.services.audit?.({
+            pluginId,
+            api: "fs.glob",
+            ok: true,
+            ts: Date.now(),
+            data: { pattern, matches: matches.length },
+          });
+          return matches;
         },
-        remove: async (pathFromWorkspaceRoot: string) => {
-          this.assertPermission(loaded, "fs.delete.workspace");
-          const root = this.services.getWorkspacePath();
-          if (!root) throw apiError("NOT_FOUND", "No workspace is open");
-          const full = ensureWithinRoot(root, pathFromWorkspaceRoot);
+        remove: async (pathFromRoot: string) => {
+          const { full, rel, root } = await this.resolveFsRequest(
+            loaded,
+            "delete",
+            pathFromRoot,
+          );
           if (full === resolve(root)) {
-            throw apiError("INVALID_ARGUMENT", "cannot remove workspace root");
+            throw apiError("INVALID_ARGUMENT", "cannot remove the root itself");
           }
           if (!existsSync(full)) {
-            throw apiError("NOT_FOUND", `workspace path not found: ${pathFromWorkspaceRoot}`);
+            throw apiError("NOT_FOUND", `path not found: ${pathFromRoot}`);
           }
-          // Never recurse: Skill removal may delete a file or an empty directory,
-          // but it must fail closed for a non-empty directory.
-          rmSync(full, { recursive: false, force: false });
+          // Scope answers "may this file go"; the brake answers "this many, this
+          // fast?", which is the only thing that separates a cleanup from a wipe.
+          if (this.deleteRateExceeded(loaded)) {
+            await this.requestFsConsent(loaded, "delete", rel, full, "rate");
+            loaded.deletes = [];
+          }
+          // Never recurse: removing a file or an empty directory is in scope,
+          // but a non-empty directory has to fail closed.
+          if (this.services.trashItem) {
+            // The OS trash is the undo. Nothing of the user's is copied
+            // anywhere, and a delete this gate got wrong stays recoverable.
+            if (statSync(full).isDirectory() && readdirSync(full).length) {
+              throw apiError("INVALID_ARGUMENT", "refusing to remove a non-empty directory");
+            }
+            await this.services.trashItem(full);
+          } else {
+            rmSync(full, { recursive: false, force: false });
+          }
           this.services.audit?.({
             pluginId,
             api: "fs.remove",
             ok: true,
             ts: Date.now(),
-            path: pathFromWorkspaceRoot,
+            path: rel,
           });
+        },
+        requestDirectory: async () => {
+          this.assertPermission(loaded, "fs.read");
+          const picker = this.services.pickDirectory;
+          if (!picker) throw apiError("UNSUPPORTED", "no directory picker is available");
+          const picked = await picker({ pluginId, pluginName: loaded.manifest.name });
+          if (!picked) {
+            this.services.audit?.({
+              pluginId,
+              api: "fs.requestDirectory",
+              ok: false,
+              errorCode: "CANCELLED",
+              ts: Date.now(),
+            });
+            return null;
+          }
+          // Replaces any earlier pick: one root at a time keeps what the plugin
+          // can reach the same thing the user last pointed at.
+          loaded.userRoot = resolve(picked);
+          this.services.audit?.({
+            pluginId,
+            api: "fs.requestDirectory",
+            ok: true,
+            ts: Date.now(),
+            path: loaded.userRoot,
+          });
+          return { path: loaded.userRoot, name: basename(loaded.userRoot) };
         },
       },
       clipboard: {
@@ -2066,6 +2627,7 @@ export class PluginRuntime {
           if (!/^https?:\/\//i.test(input.url)) {
             throw apiError("INVALID_ARGUMENT", "only http(s) URLs allowed");
           }
+          this.assertEgress(loaded, input.url, "net.fetch");
           if (this.services.fetch) {
             const result = await this.services.fetch(input);
             this.services.audit?.({
@@ -2081,12 +2643,27 @@ export class PluginRuntime {
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? 15000);
           try {
-            const res = await fetch(input.url, {
-              method: input.method ?? "GET",
-              headers: input.headers,
-              body: input.body,
-              signal: controller.signal,
-            });
+            // Follow redirects by hand: an allowlisted host that 30x-es to an
+            // undeclared one would otherwise carry the request straight out.
+            let url = input.url;
+            let res: Response;
+            for (let hop = 0; ; hop += 1) {
+              res = await fetch(url, {
+                method: input.method ?? "GET",
+                headers: input.headers,
+                body: input.body,
+                redirect: "manual",
+                signal: controller.signal,
+              });
+              if (res.status < 300 || res.status > 399) break;
+              const location = res.headers.get("location");
+              if (!location) break;
+              if (hop >= NET_FETCH_MAX_REDIRECTS) {
+                throw apiError("UNAVAILABLE", `too many redirects: ${input.url}`);
+              }
+              url = new URL(location, url).toString();
+              this.assertEgress(loaded, url, "net.fetch");
+            }
             const headers: Record<string, string> = {};
             res.headers.forEach((value, key) => {
               headers[key] = value;
@@ -2097,7 +2674,7 @@ export class PluginRuntime {
               api: "net.fetch",
               ok: true,
               ts: Date.now(),
-              url: input.url,
+              url,
               status: res.status,
             });
             return { status: res.status, headers, bodyText };
@@ -2116,14 +2693,3 @@ export class PluginRuntime {
   }
 }
 
-function matchGlob(path: string, pattern: string): boolean {
-  const normalizedPattern = pattern.replace(/\\/g, "/");
-  const normalizedPath = path.replace(/\\/g, "/");
-  if (normalizedPattern === "*" || normalizedPattern === "**/*") return true;
-  const escape = normalizedPattern
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*/g, ".*")
-    .replace(/\*/g, "[^/]*")
-    .replace(/\?/g, ".");
-  return new RegExp(`^${escape}$`, "i").test(normalizedPath);
-}

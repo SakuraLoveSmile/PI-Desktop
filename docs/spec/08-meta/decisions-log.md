@@ -1767,3 +1767,44 @@ D193, and D194.
   `03-runtime/18-line-anchored-edit-contract.md` §9.3,
   `03-runtime/03-tools-and-permissions.md` §4d,
   `03-runtime/08-error-codes.md` §3.3, ADR 0087, and E2E-140/E2E-141.
+
+## 2026-08-15 — A file permission carries a range, and a delete is recoverable
+
+- The three fs permissions were workspace-wide switches: `fs.read.workspace`
+  reached `.env`, and `recursive: false` bounded one `fs.remove` call while a
+  `glob` plus a loop reached the whole tree. A permission now says whether a
+  plugin may touch files at all; `manifest.fs` says which ones, per mode, with
+  globs relative to the mode's root. `fs.read` may ask for the whole tree —
+  egress is confined to `manifest.net.domains`, so a broad read no longer
+  carries anything out — but `fs.write` and `fs.delete` are refused a whole-tree
+  pattern at validation time.
+- Every `pi.fs.*` call passes four gates in a fixed order and a later gate can
+  only refuse: declared ∩ granted, `realpath` containment on both sides (so a
+  symlink out of the workspace fails where a string comparison passed), the
+  unconditional credential deny-list plus the host's own data directory, then the
+  declared scope. Outside the scope the user is asked natively — deny / allow
+  once / allow this session — and a session answer lives in memory and dies with
+  the process. A host with no consent service refuses rather than assumes yes.
+- Deletion is bounded rather than scoped alone, because it is the one operation
+  re-running the plugin cannot undo. `own: true` lets a plugin remove what it
+  wrote itself, tracked by a path+mtime ledger in its own data directory and
+  invalidated the moment the user edits the file; anything else needs a declared
+  scope. Removal goes through `shell.trashItem`, stays non-recursive, and is
+  braked at 50 removals per rolling minute. The host copies none of the user's
+  data to provide the undo — the operating-system trash is the whole mechanism.
+- `root: "userSelected"` trades standing power for reach: `pi.fs.requestDirectory()`
+  asks the user to pick a directory, needs no manifest scope inside it, and the
+  handle is memory-only. This is what keeps whole-disk plugins possible without
+  a permanent grant.
+- The pre-scope names still install and are downgraded on load: `fs.read.workspace`
+  keeps the whole tree, `fs.write.workspace` can write nothing until the manifest
+  says where, `fs.delete.workspace` becomes `own: true`. Capability is reduced
+  rather than a hole left open; the marketplace preflight and `pi-plugin check`
+  both name the downgrade so an author sees it before a user does.
+- Decision D229 continues ADR 0008 D009 and implements the confirmation policy
+  `07-plugins/13-plugin-permissions-matrix.md` promised but never enforced. The
+  manifest gains `fs`, and `pi.fs.remove` / `pi.fs.requestDirectory` join the
+  brokered API; host RPC and storage schema are otherwise unchanged. See
+  ADR 0088, `07-plugins/02-plugin-manifest-schema.md` §5.2,
+  `07-plugins/04-plugin-security.md` §6, and
+  `07-plugins/13-plugin-permissions-matrix.md`.

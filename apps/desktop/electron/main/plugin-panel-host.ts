@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain, session } from "electron";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
+import { isNetUrlAllowed } from "@pi-desktop/plugin-sdk";
 import {
   isPluginPanelWindowControlAction,
   PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
@@ -18,15 +19,37 @@ export type PluginPanelOpenRequest = {
   width: number;
   height: number;
   htmlPath: string;
+  /**
+   * Egress allowlist from `manifest.net.domains`. A panel is a full web page:
+   * `sandbox: true` removes Node, not the network, so without this the panel is
+   * an unmetered outbound channel that bypasses the `net.fetch` permission.
+   */
+  netDomains?: readonly string[];
   /** Adds a non-interactive authoring hint to development panels. */
   development?: boolean;
 };
+
+/** Schemes a panel may always load: its own bundle and devtools plumbing. */
+const PANEL_LOCAL_SCHEMES = new Set([
+  "file:",
+  "data:",
+  "blob:",
+  "devtools:",
+  "chrome-extension:",
+]);
+
 
 type BridgeHandler = (
   pluginId: string,
   channel: string,
   payload?: Record<string, unknown>,
 ) => Promise<unknown>;
+
+/** Reports an egress attempt a panel was not allowed to make. */
+export type PluginPanelBlockedRequest = (input: {
+  pluginId: string;
+  url: string;
+}) => void;
 
 /**
  * Hosts isolated plugin panel windows.
@@ -35,10 +58,12 @@ type BridgeHandler = (
 export class PluginPanelHost {
   private windows = new Map<string, BrowserWindow>();
   private bridge: BridgeHandler;
+  private onBlockedRequest?: PluginPanelBlockedRequest;
   private handlerReady = false;
 
-  constructor(bridge: BridgeHandler) {
+  constructor(bridge: BridgeHandler, onBlockedRequest?: PluginPanelBlockedRequest) {
     this.bridge = bridge;
+    this.onBlockedRequest = onBlockedRequest;
     this.ensureHandlers();
   }
 
@@ -131,6 +156,45 @@ export class PluginPanelHost {
     }
   }
 
+  /**
+   * Confine everything the panel's web contents can reach to the plugin's
+   * declared domains. Registering again on the same persisted partition simply
+   * replaces the previous handlers, so re-opening a panel re-reads the current
+   * allowlist rather than stacking filters.
+   */
+  private applyEgressPolicy(
+    ses: Electron.Session,
+    request: PluginPanelOpenRequest,
+  ): void {
+    const domains = request.netDomains ?? [];
+    ses.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, callback) => {
+      let scheme = "";
+      try {
+        scheme = new URL(details.url).protocol;
+      } catch {
+        // An unparseable URL cannot be matched against the allowlist; drop it.
+        callback({ cancel: true });
+        return;
+      }
+      if (PANEL_LOCAL_SCHEMES.has(scheme)) {
+        callback({ cancel: false });
+        return;
+      }
+      if (isNetUrlAllowed(details.url, domains)) {
+        callback({ cancel: false });
+        return;
+      }
+      this.onBlockedRequest?.({ pluginId: request.pluginId, url: details.url });
+      callback({ cancel: true });
+    });
+    // A panel is a document, not a device. Nothing in this list is reachable
+    // over the bridge either, so denying wholesale costs the plugin nothing.
+    ses.setPermissionRequestHandler((_contents, _permission, callback) => {
+      callback(false);
+    });
+    ses.setPermissionCheckHandler(() => false);
+  }
+
   async open(request: PluginPanelOpenRequest): Promise<void> {
     const existing = this.windows.get(request.pluginId);
     if (existing && !existing.isDestroyed()) {
@@ -142,6 +206,7 @@ export class PluginPanelHost {
 
     const partition = `persist:pi-plugin-${request.pluginId.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
     const ses = session.fromPartition(partition, { cache: true });
+    this.applyEgressPolicy(ses, request);
 
     const win = new BrowserWindow({
       width: Math.max(360, request.width || 480),
@@ -182,6 +247,10 @@ export class PluginPanelHost {
       // user presses Alt; the host titlebar is the only window chrome.
       win.setMenu(null);
     }
+
+    // A panel gets exactly one web contents. `window.open` would otherwise mint
+    // a chromeless window outside the egress policy applied above.
+    win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 
     const sendWindowState = () => {
       if (win.isDestroyed() || win.webContents.isDestroyed()) return;

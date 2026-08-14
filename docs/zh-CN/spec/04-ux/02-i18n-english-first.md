@@ -48,7 +48,7 @@ domain.section.item
 
 - `chat.composer.placeholder`
 - `settings.providers.add`
-- `plugins.permissions.fs.write.workspace`
+- `plugins.permissions.fs.write`
 - `errors.tool.denied`
 - `composer.mode.agent`
 - `composer.mode.plan`

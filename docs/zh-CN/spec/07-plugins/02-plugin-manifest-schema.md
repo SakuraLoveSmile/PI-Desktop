@@ -30,6 +30,8 @@ type PluginManifestV1 = {
  ui?: PluginUiConfig;
  contributes?: PluginContributes;
  permissions?: PluginPermission[];
+ fs?: PluginFsPolicy; // 每个文件权限可以触碰哪些路径（§5.2）
+ net?: { domains?: string[] }; // 出网白名单（§5.3）
  engines?: {
  piDesktop?: string; // semver range
  };
@@ -149,9 +151,9 @@ type PluginPermission =
  | "clipboard.read"
  | "clipboard.write"
  | "notify"
- | "fs.read.workspace"
- | "fs.write.workspace"
- | "fs.delete.workspace"
+ | "fs.read"
+ | "fs.write"
+ | "fs.delete"
  | "agent.tool.register"
  | "agent.prompt.inject"
  | "net.fetch"
@@ -164,6 +166,58 @@ type PluginPermission =
 ```
 
 未知权限=验证失败。
+
+`fs.read.workspace`、`fs.write.workspace`、`fs.delete.workspace` 是文件范围机制
+之前的旧权限名。它们仍然能通过校验，主机会在加载时把它们改写成最小安全等价物
+（§5.2）；新的清单不得再使用。
+
+## 5.2 fs —— 文件权限可以触碰哪些路径
+
+```ts
+type PluginFsPolicy = {
+ read?: PluginFsRule;
+ write?: PluginFsRule;
+ delete?: PluginFsRule;
+};
+
+type PluginFsRule = {
+ root?: "workspace" | "userSelected"; // 默认 `workspace`
+ scope?: string[]; // 相对 root 的 glob
+ own?: boolean; // 仅删除：这个插件写过的路径
+};
+```
+
+权限回答的是「这个插件能不能碰文件」，这里回答的是「能碰哪些文件」。
+glob 里 `*` 匹配一个路径段，`**` 跨分隔符匹配，并以大小写不敏感的方式
+与相对 root 的路径比较。
+
+```json
+{
+ "permissions": ["fs.read", "fs.write", "fs.delete"],
+ "fs": {
+ "read": { "root": "workspace", "scope": ["**/*"] },
+ "write": { "root": "workspace", "scope": ["docs/**", "*.md"] },
+ "delete": { "own": true, "scope": ["dist/**"] }
+ }
+}
+```
+
+- 没有 `fs` 块、缺少某个模式、或 `scope` 为空都是合法的，含义是**没有常驻
+  可达范围**：每次访问都落到运行时确认 —— 什么都不说就什么都不授予
+- `root: "userSelected"` 不需要 scope —— 用户通过 `pi.fs.requestDirectory()`
+  亲手选的目录本身就是授权，它只存在于内存中，并随插件进程一起消失
+- `own` 只在 `delete` 上被接受
+
+## 5.3 net —— 出网白名单
+
+```ts
+type PluginNetDomains = string[]; // "api.example.com" 或 "*.example.com"
+```
+
+主机掌握的每一条出网路径 —— 面板 session、`pi.net.fetch`、远程 HTTP MCP
+端点 —— 都被限定在这些主机名之内。列表缺失、为空或非法就完全不放行出网，
+无论 `net.fetch` 怎么声明。条目是裸主机名：没有 scheme、没有端口、没有路径，
+也不允许裸 `*`。前缀 `*.` 同时覆盖该域名及其子域名。
 
 ## 5. 1 总线主题语法
 
@@ -220,6 +274,15 @@ MVP 只能实现：
 `skills` 是一个例外 - 它早于权限门，因此清单
    没有 `agent.prompt.inject` 仍然有效并且运行时只是跳过
    技能
+13. 设置的 key 必须唯一。`shortcut` 设置必须带 `command`，只能用 `plugin`
+    作用域，并按「修饰键 + 按键」或 F 键校验。在安全的插件密钥存储出现之前，
+    secret 一律拒绝
+14. `fs.<mode>` 需要对应的 `fs.<mode>` 权限 —— 没人能用的范围是作者的笔误，
+    不是静默的空操作。scope 条目必须是相对路径（不得是绝对路径、盘符或 `..`），
+    并且 `fs.write` / `fs.delete` 不得使用整棵树的模式（`**`、`**/*`、`*/**`、
+    `./*`）。`own` 只在 `delete` 上被接受，`root` 只能是 `workspace` /
+    `userSelected`
+15. `net.domains` 条目必须是裸主机名，可选前缀 `*.`；裸 `*` 会被拒绝
 
 ## 8. 示例：最小插件
 

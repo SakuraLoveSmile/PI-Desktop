@@ -986,7 +986,11 @@ function AppShell() {
             enabled: true,
             source: "marketplace",
             status: "ready",
-            permissions: ["fs.read.workspace", "ui.panel", "notify"],
+            permissions: ["fs.read", "fs.write", "ui.panel", "notify"],
+            fs: {
+              read: { root: "workspace", scope: ["**/*"] },
+              write: { root: "workspace", scope: ["docs/**", "*.md"] },
+            },
             capabilities: ["panel", "commands", "skills", "services", "bus"],
             author: "Pi Labs",
             description: "Summarizes repository activity into a review panel.",

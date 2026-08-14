@@ -100,10 +100,70 @@ pattern and hold `bus.subscribe` will see it. Do not put secrets on the bus.
 
 ## 6. Path safety
 
-For `fs.*`:
-- Workspace-relative paths only
-- normalize + root boundary
-- Reject absolute paths and escapes
+`fs.read` / `fs.write` / `fs.delete` say whether a plugin may touch files;
+`manifest.fs` says which ones (see
+[02-plugin-manifest-schema.md](02-plugin-manifest-schema.md) §5.2 and ADR 0088).
+Every `pi.fs.*` call passes four gates in a fixed order, and a later gate can
+only refuse:
+
+1. **Permission** — declared *and* granted. The runtime uses the intersection, so
+   a permission the user revoked stops working even though the manifest still
+   asks for it
+2. **Containment** — `realpath` on both the root and the target, so a symlink
+   inside the workspace pointing at `~/.ssh` fails here rather than passing a
+   string comparison. A path being created resolves through its nearest existing
+   ancestor, so a new file is not indistinguishable from an escape. Absolute
+   paths and `..` are refused; a path that merely does not exist is reported
+   `NOT_FOUND`, not as an escape
+3. **Deny-list**, which overrides every root, scope, and grant:
+   - credentials: `.env*`, `.npmrc`, `.netrc`, `.pypirc`, `.git-credentials`,
+     `id_rsa*` and friends, `*.pem`, `*.p12`, `*.pfx`, `*.keystore`
+   - directories, at any depth: `.git`, `.ssh`, `.aws`, `.gnupg`, `.kube`,
+     `.docker`
+   - the host's own data directory, which holds provider keys and the session
+     store
+   - the root itself, for a delete
+4. **Declared scope**, else a native confirmation (§6.2)
+
+`pi.fs.glob` answers to the same rules — a name is a read, so denied paths and
+reserved trees are omitted from the results, matches are filtered by the read
+scope, and `node_modules` / `.git` / `.venv` / `__pycache__` are never walked.
+
+### 6.1 Deletion
+
+Deletion is the only file operation the user cannot recover by re-running the
+plugin, so it is bounded four ways:
+
+- **Two tiers.** With `own: true` the host keeps a write ledger (path plus mtime)
+  in the plugin's data directory and lets the plugin remove what it wrote itself,
+  no scope and no prompt. If the file's mtime has moved past the recorded one,
+  the user has edited it since and it is no longer the plugin's. Deleting
+  anything else needs a declared `scope`.
+- **The OS trash.** Removal goes through `shell.trashItem`, never `rm`, so a gate
+  that got it wrong costs the user a restore rather than the file. The host
+  copies none of the user's data to provide this.
+- **Never recursive.** A non-empty directory is refused rather than emptied.
+- **A rate brake.** 50 removals per rolling 60s per plugin, because
+  `recursive: false` bounds one call and not a `glob` followed by a loop. Past
+  the brake the user is asked once, with the reason given as rate rather than
+  path.
+
+### 6.2 Runtime consent
+
+An access the manifest does not cover reaches a native `dialog.showMessageBox`:
+**Deny** / **Allow once** / **Allow this session**. A session grant covers the
+containing directory, is held in memory, and dies with the process; nothing is
+persisted, and a rate-brake prompt is offered no session option at all. A host
+with no consent service refuses — a host that cannot ask must never assume yes.
+Both the denial and the grant are audited.
+
+### 6.3 The user-selected root
+
+`pi.fs.requestDirectory()` opens the native directory picker; inside the returned
+directory the plugin needs no manifest scope, because the user just pointed at
+it. Containment and the deny-list still apply there. The handle is memory-only
+and dies with the process, so the plugin holds unlimited reach and zero standing
+power — the model the browser's File System Access API uses.
 
 ## 7. Agent security
 
@@ -147,6 +207,29 @@ Plan is an additional host policy boundary for agent tools:
 - `openExternal` should confirm
 - Plugins are forbidden from silently downloading and executing binaries (not done at all in MVP)
 
+### 8.0 Egress allowlist
+
+A permission cannot express "read broadly but leak nothing", so the range lives
+in the manifest: `net.domains` is a single per-plugin hostname allowlist and every
+outbound path the host owns answers to it.
+
+- **Panel sessions.** `sandbox: true` removes Node, not the network, so a panel
+  was previously a full browser that never consulted `net.fetch`. The session now
+  runs a `webRequest` filter, refuses every device permission, and denies
+  `window.open`, which would otherwise mint a window outside the filtered session
+- **`pi.net.fetch`.** Checks the allowlist and follows redirects by hand, because
+  an allowed host that 30x-es to an undeclared one would carry the request out
+- **Remote MCP endpoints.** Answer to the same list, not to their permission alone
+
+An absent, empty, or malformed list means no egress at all, and a bare `*` is
+refused at install so nobody declares their way out. This is what makes a
+generous `fs.read` scope affordable (§6).
+
+Still open, tracked separately: `agent.prompt.inject` (skill text can ask a
+shell-capable agent to do the carrying), `shell.openExternal`, a `bus.publish`
+relayed to a net-capable plugin, and raw `fetch` inside the plugin process — the
+last one needs the sandboxed plugin runtime from ADR 0008 D009.
+
 ## 8.1 MCP server egress and credentials
 
 An MCP server is a second egress path next to `net.fetch`, so it is declarative
@@ -182,8 +265,10 @@ The host should be able to:
 
 ## 10. Security acceptance
 
-1. Writing a file fails without the `fs.write.workspace` permission
-2. Deleting a file fails without the `fs.delete.workspace` permission and never deletes recursively
+1. Writing a file fails without the `fs.write` permission, and a write outside
+   `manifest.fs.write.scope` prompts the user
+2. Deleting a file fails without the `fs.delete` permission, never recurses, lands
+   in the OS trash, and is interrupted past 50 removals in a rolling minute
 3. After disabling a plugin, its tools are no longer visible
 4. A plugin cannot read API keys
 5. A plugin panel cannot call arbitrary host IPC
@@ -201,8 +286,11 @@ The host should be able to:
 
 Current enforcement:
 
-1. Default-deny permission checks in `PluginRuntime`
-2. Workspace path boundary checks for plugin fs APIs
+1. Default-deny permission checks in `PluginRuntime`, over the intersection of
+   declared and granted, so a revoked permission actually stops working
+2. Symlink-safe containment plus an unconditional deny-list for plugin fs APIs,
+   with the reach of each file mode bounded by `manifest.fs` and anything outside
+   it falling to a native confirmation (§6)
 3. Panel windows use sandboxed preload + isolated session partitions. Their
    custom cross-platform titlebar is preload-owned, keeps its controls in a
    closed Shadow DOM, and routes only a fixed sender-validated window-action
@@ -218,11 +306,20 @@ Current enforcement:
 9. Bus routing is host-owned with declared topics and hard caps (§5.1)
 10. MCP servers are declared, permission-gated, and fed credentials only from
     plugin settings (§8.1)
+11. Egress is confined to `manifest.net.domains` at every chokepoint the host
+    owns (§8.0)
+12. Plugin deletions go to the OS trash, are non-recursive, and are rate-braked
+    (§6.1)
 
 Not enforced yet:
 
 - Capability sandboxing inside the plugin process (Node built-ins are reachable
-  there, so `fs.*` permissions gate the plugin API, not the process)
+  there, so `fs.*` permissions gate the plugin API, not the process). This is the
+  remaining gap that matters: everything in §6 and §8.0 bounds a plugin using the
+  API it is supposed to use, not one that bypasses it (ADR 0008 D009)
 - CPU / memory limits
 - Signature verification (packages are only sha256-checked)
-- Declared manifest permissions are auto-granted at load time
+- Declared manifest permissions are auto-granted at load time, subject to the
+  user unchecking them at install
+- A `userSelected` root does not survive a restart, so a plugin has to ask again
+  each session
