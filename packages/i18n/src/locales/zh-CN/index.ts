@@ -26,6 +26,17 @@ export const zhCN = {
     show: "显示 PI-Desktop",
     quit: "退出 PI-Desktop",
   },
+  pluginFsConsent: {
+    read: "{name} 想读取声明范围之外的文件",
+    write: "{name} 想写入声明范围之外的文件",
+    delete: "{name} 想删除声明范围之外的文件",
+    rate: "{name} 正在批量删除文件",
+    rateDetail: "一分钟内已删除超过 {limit} 个文件。失控的循环就是这个样子，下一个是 {path}。",
+    detail: "{path}\n\n是否允许由你决定。删除会进入系统回收站，可以还原。",
+    allowOnce: "允许一次",
+    allowSession: "本次运行内允许",
+    deny: "拒绝",
+  },
   pluginLauncher: {
     title: "打开插件",
     placeholder: "输入插件名称、拼音或拼音首字母",

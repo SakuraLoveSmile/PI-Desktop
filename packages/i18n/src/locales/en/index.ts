@@ -25,6 +25,23 @@ export const en = {
     show: "Show PI-Desktop",
     quit: "Quit PI-Desktop",
   },
+  /**
+   * Native consent dialog for a file access a plugin's manifest did not
+   * declare. Lives here rather than in the renderer because the dialog is a
+   * main-process `showMessageBox` — it has to block the plugin's call.
+   */
+  pluginFsConsent: {
+    read: "{name} wants to read a file outside what it declared",
+    write: "{name} wants to write a file outside what it declared",
+    delete: "{name} wants to delete a file outside what it declared",
+    rate: "{name} is deleting a lot of files at once",
+    rateDetail:
+      "It has passed {limit} deletions in a minute. This is what a runaway loop looks like; the next one is {path}.",
+    detail: "{path}\n\nGranting this is up to you. Deletions go to the trash and can be restored.",
+    allowOnce: "Allow once",
+    allowSession: "Allow until quit",
+    deny: "Deny",
+  },
   pluginLauncher: {
     title: "Open a plugin",
     placeholder: "Search plugins by name or pinyin",

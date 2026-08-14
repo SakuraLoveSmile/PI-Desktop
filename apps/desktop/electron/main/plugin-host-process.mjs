@@ -138,6 +138,7 @@ function buildApi() {
       writeText: (path, content) => call("fs.writeText", [path, content]),
       glob: (pattern) => call("fs.glob", [pattern]),
       remove: (path) => call("fs.remove", [path]),
+      requestDirectory: () => call("fs.requestDirectory"),
     },
     agent: {
       registerTool: async (tool) => {

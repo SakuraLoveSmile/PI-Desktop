@@ -49,7 +49,7 @@ test("watching degrades instead of failing where recursion is unavailable", () =
 
 test("hot reload can never widen the permissions the user approved", () => {
   const reload = slice(runtimeSrc, "async reloadDevPlugin(", "\n  async invokePanelBridge");
-  assert.match(reload, /readDeclaredPermissions\(dev\.path\)/);
+  assert.match(reload, /readDeclaredAccess\(dev\.path\)/);
   assert.match(reload, /new Set\(dev\.permissions\)/);
   assert.match(reload, /PERMISSION_DENIED: manifest now requests/);
   // The refusal comes before anything is loaded.
@@ -61,8 +61,11 @@ test("hot reload can never widen the permissions the user approved", () => {
   assert.match(reload, /this\.loadFromPath\(dev\.path, declared, \{ development: true \}\)/);
   // The ceiling stays what the user approved, not what the last reload used.
   assert.match(reload, /permissions: dev\.permissions/);
+  // The ceiling covers file scope too, not just permission names: a reload that
+  // adds a glob is asking for more than the user approved.
+  assert.match(reload, /widenedFsScope\(dev\.fs, declaredAccess\.fs\)/);
   // An unreadable manifest grants nothing.
-  const declared = slice(runtimeSrc, "function readDeclaredPermissions(", "\n}");
+  const declared = slice(runtimeSrc, "function readDeclaredAccess(", "\nfunction widenedFsScope");
   assert.match(declared, /PLUGIN_INVALID: manifest\.json missing/);
 });
 
