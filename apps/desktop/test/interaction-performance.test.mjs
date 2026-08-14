@@ -107,6 +107,27 @@ test("send re-pins before paint instead of flashing the old transcript position"
   assert.match(transcript, /const targetTop = Math\.max\(0, el\.scrollHeight - el\.clientHeight\)/);
 });
 
+test("layout clamps after send cannot release transcript follow as a gesture", () => {
+  assert.match(transcript, /const lastScrollGestureAtRef = useRef\(-Infinity\)/);
+  assert.match(transcript, /markScrollGesture = useCallback/);
+  assert.match(
+    transcript,
+    /event\.type === "wheel" \|\|\s*event\.type === "touchstart" \|\|\s*event\.type === "touchmove"/,
+  );
+  assert.match(transcript, /event\.type === "pointerdown"/);
+  assert.match(transcript, /el\.addEventListener\("wheel", markScrollGesture/);
+  assert.match(transcript, /className="thread-wrap" ref=\{wrapRef\}/);
+  assert.match(
+    transcript,
+    /const released =\s*transition\.releasedFollow &&\s*isRecentScrollGesture\(/,
+  );
+  assert.match(
+    transcript,
+    /isRecentScrollGesture\(\s*performance\.now\(\),\s*lastScrollGestureAtRef\.current,\s*\)/,
+  );
+  assert.match(transcript, /if \(transition\.releasedFollow\) cancelFollowScroll\(\)/);
+});
+
 test("session activation pins the latest record before the first paint", () => {
   assert.match(
     chatSurface,

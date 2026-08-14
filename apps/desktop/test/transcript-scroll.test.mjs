@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   TRANSCRIPT_REPIN_THRESHOLD_PX,
+  TRANSCRIPT_SCROLL_GESTURE_WINDOW_MS,
+  isRecentScrollGesture,
   reduceTranscriptScroll,
 } from "../src/lib/transcript-scroll.ts";
 
@@ -83,4 +85,26 @@ test("jump control stays visible while an unpinned transcript is away from botto
 
   assert.equal(result.pinned, false);
   assert.equal(result.showJump, true);
+});
+
+test("a scroll event that follows user input is a gesture", () => {
+  assert.equal(isRecentScrollGesture(100, 99), true);
+  assert.equal(
+    isRecentScrollGesture(
+      TRANSCRIPT_SCROLL_GESTURE_WINDOW_MS,
+      0,
+    ),
+    true,
+  );
+});
+
+test("a scroll event without recent user input is not a gesture", () => {
+  assert.equal(
+    isRecentScrollGesture(
+      TRANSCRIPT_SCROLL_GESTURE_WINDOW_MS + 1,
+      0,
+    ),
+    false,
+  );
+  assert.equal(isRecentScrollGesture(100, -Infinity), false);
 });
