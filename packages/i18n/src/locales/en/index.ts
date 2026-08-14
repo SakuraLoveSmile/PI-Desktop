@@ -604,8 +604,6 @@ export const en = {
     closeBehaviorTitle: "Close behavior",
     closeBehaviorDesc:
       "What happens when you close the main window. macOS always keeps the app in the Dock.",
-    closeBehaviorAsk: "Ask every time",
-    closeBehaviorAskDesc: "Prompt on each close until you pick.",
     closeBehaviorTray: "Close to tray",
     closeBehaviorTrayDesc: "Keep PI-Desktop running in the system tray.",
     closeBehaviorQuit: "Quit app",

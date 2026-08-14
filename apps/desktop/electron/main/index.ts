@@ -5589,7 +5589,9 @@ function registerIpc() {
   );
 
   // Close-behavior preference (Windows/Linux): read/write the choice the
-  // settings UI and the first-close prompt share.
+  // settings UI and the first-close prompt share. Only "tray" and "quit"
+  // are settable — the "ask" state is transient (first close prompts once)
+  // and once a choice is made it cannot be reverted to prompting.
   handle(IPC.invoke.closeBehaviorGet, async () => ({
     behavior: closeBehavior,
     supported: process.platform !== "darwin",
@@ -5597,7 +5599,7 @@ function registerIpc() {
 
   handle(IPC.invoke.closeBehaviorSet, async (input: unknown = {}) => {
     const behavior = (input as { behavior?: unknown })?.behavior;
-    if (behavior !== "ask" && behavior !== "tray" && behavior !== "quit") {
+    if (behavior !== "tray" && behavior !== "quit") {
       throw Object.assign(new Error("invalid close behavior"), {
         errorCode: ErrorCodes.INVALID_ARGUMENT,
       });

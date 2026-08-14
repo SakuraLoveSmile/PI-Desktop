@@ -824,8 +824,8 @@ function ExtensionMarketSection({
       )}
 /**
  * Windows/Linux only: how closing the main window behaves. The first close
- * prompts once (main-process dialog); this surface lets the user revisit
- * the choice, including returning to "ask every time".
+ * prompts once (main-process dialog); the remembered choice can be changed
+ * here between tray and quit, but never reverted to prompting.
  */
 function CloseBehaviorSection() {
   const { t } = useTranslation();
@@ -845,8 +845,10 @@ function CloseBehaviorSection() {
     };
   }, []);
 
+  // The "ask" state (unset) is transient and cannot be re-selected: once a
+  // choice is made it is remembered permanently. An unset preference shows
+  // no active option.
   const options: [CloseBehavior, string, string][] = [
-    ["ask", "settings.closeBehaviorAsk", "settings.closeBehaviorAskDesc"],
     ["tray", "settings.closeBehaviorTray", "settings.closeBehaviorTrayDesc"],
     ["quit", "settings.closeBehaviorQuit", "settings.closeBehaviorQuitDesc"],
   ];

@@ -597,8 +597,6 @@ export const zhCN = {
     showMenuBarDesc: "主窗口关闭后，仍将 PI-Desktop 保留在 macOS 菜单栏。",
     closeBehaviorTitle: "关闭行为",
     closeBehaviorDesc: "关闭主窗口时发生什么。macOS 始终会将应用保留在 Dock 中。",
-    closeBehaviorAsk: "每次都询问",
-    closeBehaviorAskDesc: "每次关闭时询问，直到你做出选择。",
     closeBehaviorTray: "关闭到托盘",
     closeBehaviorTrayDesc: "在系统托盘中继续运行 PI-Desktop。",
     closeBehaviorQuit: "退出应用",
