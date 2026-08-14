@@ -188,9 +188,17 @@ function AppShell() {
   // Keep the exit flag in sync with the collapsed state so collapsing plays
   // the sidebar-out keyframe and expanding cancels it (mirrors the work-panel
   // mount-then-animate-then-unmount machine).
-  useEffect(() => {
+  //
+  // This is adjusted during render, not in an effect. An effect runs after the
+  // commit, so the collapsing render would evaluate `!collapsed || exiting` as
+  // `false || false` and unmount the dock outright; the effect then remounts it
+  // with `is-exiting`. That paints one frame with no dock at all — the whole
+  // sidebar blinks out and back before the collapse keyframe even starts.
+  const prevSidebarCollapsed = useRef(sidebarCollapsed);
+  if (prevSidebarCollapsed.current !== sidebarCollapsed) {
+    prevSidebarCollapsed.current = sidebarCollapsed;
     setSidebarExiting(sidebarCollapsed);
-  }, [sidebarCollapsed]);
+  }
   const handleSidebarAnimationEnd = (event: ReactAnimationEvent<HTMLElement>) => {
     if (event.target !== event.currentTarget) return;
     if (!sidebarExiting) return;

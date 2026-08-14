@@ -228,6 +228,21 @@
   animation-name: sidebar-out-windows;
 }
 
+/*
+ * The keyframes above drive the dock's own box width, so without this the whole
+ * content layer re-lays-out on every frame: section labels wrap to vertical,
+ * every session row re-runs its ellipsis, and the collapse reads as flicker
+ * rather than motion. Hold the content at the dock's full width and let
+ * `overflow: hidden` wipe it — one content layout instead of one per frame.
+ * `min-width` (not `width`) so a wider dock still stretches its children, and
+ * less the hairline `border-right` above so the pin matches the dock's content
+ * box exactly instead of overflowing it by a pixel.
+ */
+.sidebar-header,
+.sidebar-body {
+  min-width: calc(var(--ds-sidebar-width) - 1px);
+}
+
 .sidebar-rail {
   width: 56px;
   flex: 0 0 56px;
@@ -327,8 +342,24 @@
   padding: 0 12px;
   background: var(--ds-bg-primary);
   border-bottom: 1px solid var(--ds-border-subtle);
+  /* Where the returning dock toggle sits; platform rules below override it. */
+  --ct-lead-inset: 12px;
+  /*
+   * The collapsed lead-in (traffic-light inset + dock toggle) must grow at the
+   * same rate as the dock shrinks, or the title snaps ~100px sideways on the
+   * first frame and crawls back. The base timing matches sidebar-in, so it
+   * governs expansion; the .ct-collapsed rule below matches sidebar-out.
+   */
+  transition: padding-left var(--motion-duration-normal) var(--motion-ease-out);
   -webkit-app-region: drag;
   app-region: drag;
+}
+
+.conversation-topbar.ct-collapsed {
+  /* The out-of-flow .ct-lead reserves no space of its own, so the title's
+   * offset is the inset plus the 28px button and .ct-left's 8px gap. */
+  padding-left: calc(var(--ct-lead-inset) + 36px);
+  transition: padding-left var(--motion-duration-fast) var(--motion-ease-in);
 }
 
 .conversation-topbar .ct-left,
@@ -447,13 +478,71 @@
 }
 
 /* macOS traffic lights occupy the top-left ~76px; only reserve that space
- * when the sidebar is collapsed and the main pane reaches the window edge. */
+ * when the sidebar is collapsed and the main pane reaches the window edge.
+ * Only the inset moves per platform — the collapsed padding below derives the
+ * title's offset from it, so the two can never drift apart. */
 :root[data-platform="darwin"] .conversation-topbar.ct-collapsed {
-  padding-left: 76px;
+  --ct-lead-inset: 76px;
 }
 
 :root[data-platform="darwin"][data-fullscreen="true"] .conversation-topbar.ct-collapsed {
-  padding-left: 8px;
+  --ct-lead-inset: 8px;
+}
+
+/*
+ * The dock toggle returns to the top bar while the sidebar is collapsed, and it
+ * stays mounted so it can cross-fade with the dock's own toggle.
+ *
+ * It is deliberately OUT OF FLOW. An in-flow slot has to animate its own width
+ * to keep the title from jumping, and a growing box with `overflow: hidden`
+ * slices the 28px glyph down the middle for the whole transition — the icon
+ * reads as a torn vertical shard rather than a button. Absolute positioning
+ * hands the space back to the top bar's `padding-left`, which already
+ * transitions, so the only thing left to animate here is opacity.
+ */
+.conversation-topbar .ct-lead {
+  position: absolute;
+  /*
+   * The title's edge is `padding-left`; this button must stay exactly 36px to
+   * its left (28px button + .ct-left's 8px gap) at EVERY frame, not just at the
+   * two endpoints. Deriving `left` from the same inset keeps both ranges
+   * identical (100px on darwin, 36px elsewhere), so the pair interpolates in
+   * lockstep. Offsetting instead of transitioning 12px->76px matters: that range
+   * is only 64px against padding's 100px, and the icon drifts onto the title
+   * mid-flight. Expanded it lands off the pane's left edge, where it is
+   * invisible anyway, and slides in rather than materialising over the title.
+   */
+  left: calc(var(--ct-lead-inset) - 36px);
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  /*
+   * Out of flow, so .ct-left's no-drag box no longer covers it: .ct-left starts
+   * at the padding edge (x=112 collapsed) while this sits at x=76. Without its
+   * own carve-out the button falls inside the top bar's drag region, which on
+   * macOS swallows the click and keeps the arrow cursor instead of the pointer.
+   */
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    left var(--motion-duration-normal) var(--motion-ease-out),
+    opacity var(--motion-duration-normal) var(--motion-ease-out);
+}
+
+.conversation-topbar.ct-collapsed .ct-lead {
+  left: var(--ct-lead-inset);
+  opacity: 1;
+  pointer-events: auto;
+  transition:
+    left var(--motion-duration-fast) var(--motion-ease-in),
+    opacity var(--motion-duration-fast) var(--motion-ease-in);
+}
+
+.conversation-topbar .ct-lead > .ct-icon-btn {
+  flex: 0 0 28px;
 }
 
 /* Frameless Windows/Linux controls occupy the top-right 112px band. */
