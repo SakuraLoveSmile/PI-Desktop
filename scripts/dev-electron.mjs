@@ -96,9 +96,12 @@ export function prepareMacDevelopmentBundle({
     setPlistString(plistPath, "CFBundleIconFile", "icon.icns");
 
     if (sign) {
+      // macOS no longer supports `codesign --deep` reliably on Electron
+      // app bundles (returns "bundle format is ambiguous" on frameworks).
+      // The bundled frameworks are already signed by Electron; we only
+      // need to re-sign the top-level app since we changed Info.plist.
       execFileSync("codesign", [
         "--force",
-        "--deep",
         "--sign",
         "-",
         stagingBundle,

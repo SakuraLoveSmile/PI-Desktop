@@ -4512,6 +4512,12 @@ function registerIpc() {
       });
     },
   );
+  handle(IPC.invoke.sessionGetScratchPath, async (input: { sessionId: string }) => {
+    if (!host) throw new Error("host unavailable");
+    return host.call<{ path: string }>("session.getScratchPath", {
+      sessionId: String(input?.sessionId || ""),
+    });
+  });
   handle(
     IPC.invoke.sessionConfigure,
     async (
