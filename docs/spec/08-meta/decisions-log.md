@@ -1403,7 +1403,8 @@ D193, and D194.
   It reveals the active session's retained work-panel context at the committed
   width without creating a resource tab; the context menu remains the place to
   create Review, Terminal, Browser, or Files. No active session and the
-  Settings page are no-op contexts.
+  Settings page are no-op contexts. *(Open-only clause amended by D221: the
+  shortcut also collapses the visible panel.)*
 - Artifact-driven resource creation, session ownership, background-event
   isolation, collapse behavior, and width persistence remain unchanged.
 - Decision D207 supersedes D128's no-global-shortcut clause and amends D142's
@@ -1576,27 +1577,22 @@ D193, and D194.
   v9, host RPC, and storage schema v11 are unchanged; the change is confined
   to the renderer store, Composer, and Sidebar.
 
-## 2026-08-14 — PI-Desktop stays a regular macOS application
+## 2026-08-14 — The work panel shortcut toggles instead of only opening
 
-- The plugin launcher window asked Electron for `visibleOnFullScreen` without
-  `skipTransformProcessType`, so Electron ran
-  `TransformProcessType(kProcessTransformToUIElementApplication)` on the whole
-  process and PI-Desktop vanished from the Dock and Cmd+Tab. ADR 0080's boot
-  warm-up made that happen on every launch. The launcher now passes
-  `skipTransformProcessType: true`; the process type is never transformed, and
-  `app.dock.hide()`/`app.setActivationPolicy` remain forbidden in Main.
-- The launcher keeps `canJoinAllSpaces` and `FullScreenAuxiliary`: it still
-  covers every regular Space and PI-Desktop's own fullscreen window. Overlaying
-  another application's fullscreen Space is given up — macOS reserves it for
-  accessory apps — and invoking the launcher from one activates PI-Desktop.
-- macOS activation restores the shell from `did-become-active` as well as
-  `activate`, gated on a booted, non-quitting app with no visible window, so
-  Cmd+Tab and App Exposé resurface a tray-hidden window (D216/ADR 0078) while
-  launcher and plugin-panel activations leave the main window where it is.
-- Decision D223 constrains ADR 0072's launcher window and completes D216's
-  restore paths; ADR 0080's warm-up and launcher latency budget stand. See
-  ADR 0086, `03-runtime/07-process-model.md` §5, and E2E-127. Protocol v9, host
-  RPC, IPC channels, and storage schema v11 are unchanged.
+- `Cmd/Ctrl + J` (`openWorkPanel`) now collapses the visible work panel as well
+  as revealing a closed one, going through the same store action as the header
+  collapse control. Collapsing retains the session's tabs, active resource,
+  Browser resource, and committed width, so a second press restores the
+  previous surface.
+- The shortcut id stays `openWorkPanel` so existing keybinding overrides keep
+  working; only the Settings → Shortcuts label changes to describe toggling.
+- The no-active-session and Settings no-op contexts, artifact-driven resource
+  creation, session ownership, and background-event isolation are unchanged.
+- Decision D221 amends D207 and reverses ADR 0068's rejected toggle
+  alternative; D128's and D142's remaining clauses stand. See ADR 0085,
+  `04-ux/01-ui-ia.md`, `04-ux/08-component-spec.md`,
+  `04-ux/09-interaction-patterns.md`, and E2E-056. Protocol v9, host RPC, IPC
+  channels, and storage schema v11 are unchanged.
 
 ## 2026-08-14 — A recorded change is a list row, not a card
 
@@ -1622,3 +1618,25 @@ D193, and D194.
   ownership rules stand. Presentation-only: see `04-ux/08-component-spec.md`
   §4.2/§4.4/§4.5 and §5. Protocol v9, host RPC, IPC channels, and storage
   schema v11 are unchanged.
+
+## 2026-08-14 — PI-Desktop stays a regular macOS application
+
+- The plugin launcher window asked Electron for `visibleOnFullScreen` without
+  `skipTransformProcessType`, so Electron ran
+  `TransformProcessType(kProcessTransformToUIElementApplication)` on the whole
+  process and PI-Desktop vanished from the Dock and Cmd+Tab. ADR 0080's boot
+  warm-up made that happen on every launch. The launcher now passes
+  `skipTransformProcessType: true`; the process type is never transformed, and
+  `app.dock.hide()`/`app.setActivationPolicy` remain forbidden in Main.
+- The launcher keeps `canJoinAllSpaces` and `FullScreenAuxiliary`: it still
+  covers every regular Space and PI-Desktop's own fullscreen window. Overlaying
+  another application's fullscreen Space is given up — macOS reserves it for
+  accessory apps — and invoking the launcher from one activates PI-Desktop.
+- macOS activation restores the shell from `did-become-active` as well as
+  `activate`, gated on a booted, non-quitting app with no visible window, so
+  Cmd+Tab and App Exposé resurface a tray-hidden window (D216/ADR 0078) while
+  launcher and plugin-panel activations leave the main window where it is.
+- Decision D223 constrains ADR 0072's launcher window and completes D216's
+  restore paths; ADR 0080's warm-up and launcher latency budget stand. See
+  ADR 0086, `03-runtime/07-process-model.md` §5, and E2E-127. Protocol v9, host
+  RPC, IPC channels, and storage schema v11 are unchanged.

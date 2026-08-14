@@ -1563,8 +1563,9 @@ Each scenario is documented in this format:
 - **Preconditions**: App running with any workspace state.
 - **Steps**: 1) Relaunch and inspect the titlebar and application menu; confirm
   the panel starts closed. Press Cmd/Ctrl+J and inspect the empty panel title
-  and context menu, then press it again to confirm the open state is idempotent
-  and no tab is created. 2) Open two distinct file artifacts, the same first file again,
+  and context menu, then press it again to confirm the shortcut collapses the
+  panel and no tab is created or deleted; a third press must restore the same
+  context. 2) Open two distinct file artifacts, the same first file again,
   a URL preview, and a completed command artifact. 3) Open the header's unified
   context menu: verify the four tools appear once, in a fixed order, with active,
   open-inactive, and closed states, and that transcript-opened resources appear
@@ -1600,7 +1601,8 @@ Each scenario is documented in this format:
   null, fractional, and out-of-range reservation payloads. 15) Relaunch.
 - **Expected**: Startup shows no panel, welcome chooser, fixed tool buttons, or
   titlebar/menu launcher. Cmd/Ctrl+J opens the active session's panel at its
-  committed width without creating a resource tab; repeating it is idempotent,
+  committed width without creating a resource tab and collapses it again on the
+  next press while retaining that context,
   and the shortcut does nothing without an active session or while Settings is
   open. Each artifact atomically opens the docked third column and creates or
   activates one resource; file resources are path-keyed and repeated resources

@@ -77,9 +77,10 @@ destination, chat as the home surface, tools and permissions inline.
   names the
   current resource, closes it directly, and opens a compact switcher for all
   current session resources. File paths stay distinct in that switcher while
-  Review, Terminal, and Browser deduplicate by kind. `Cmd/Ctrl + J` reveals the
-  active session's retained panel context without creating a resource tab; the
-  create trigger remains unavailable while the panel is closed. A
+  Review, Terminal, and Browser deduplicate by kind. `Cmd/Ctrl + J` toggles the
+  active session's retained panel context — revealing it without creating a
+  resource tab and collapsing it without discarding one; the create trigger
+  remains unavailable while the panel is closed. A
   successful active-session workspace Write/Edit artifact opens Review;
   scratch, failed, and background-session writes never steal focus. Width is
   drag-resizable from 244px to 720px and remains at

@@ -478,7 +478,7 @@ export const en = {
       openCommandPalette: "Command palette",
       openPluginLauncher: "Plugin launcher",
       toggleSidebar: "Toggle sidebar",
-      openWorkPanel: "Open work panel",
+      openWorkPanel: "Toggle work panel",
       abort: "Stop active task",
       closeWindow: "Close window",
       resetZoom: "Reset zoom",

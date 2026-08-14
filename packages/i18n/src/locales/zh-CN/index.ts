@@ -479,7 +479,7 @@ export const zhCN = {
       openCommandPalette: "命令面板",
       openPluginLauncher: "插件启动器",
       toggleSidebar: "切换侧边栏",
-      openWorkPanel: "打开工具面板",
+      openWorkPanel: "切换工具面板",
       abort: "停止当前任务",
       closeWindow: "关闭窗口",
       resetZoom: "重置缩放",

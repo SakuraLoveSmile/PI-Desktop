@@ -536,6 +536,8 @@ export type AppState = {
   workPanelFileRequest: { path: string; seq: number } | null;
   /** Reveal the active session's retained work panel without creating a tab. */
   openWorkPanel: () => void;
+  /** Flip the work panel between revealed and collapsed for the active session. */
+  toggleWorkPanel: () => void;
   openWorkPanelTab: (tab: WorkPanelTab) => void;
   openWorkPanelTabForSession: (sessionId: string, tab: WorkPanelTab) => void;
   activateWorkPanelTab: (tabId: string) => void;
@@ -3115,6 +3117,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         [sessionId]: { ...context, open: true },
       },
     });
+  },
+
+  toggleWorkPanel: () => {
+    if (get().workPanelOpen) {
+      get().collapseWorkPanel();
+      return;
+    }
+    get().openWorkPanel();
   },
 
   openWorkPanelTabForSession: (sessionId, tab) => {

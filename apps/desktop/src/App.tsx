@@ -586,7 +586,7 @@ function AppShell() {
             break;
           case "openWorkPanel":
             if (useAppStore.getState().page !== "settings") {
-              useAppStore.getState().openWorkPanel();
+              useAppStore.getState().toggleWorkPanel();
             }
             break;
           case "abort":

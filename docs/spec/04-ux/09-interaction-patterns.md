@@ -18,7 +18,7 @@
 | `Cmd/Ctrl + W` | Close window | Global |
 | `Cmd/Ctrl + ,` | Open settings | Global |
 | `Cmd/Ctrl + B` | Toggle sidebar | Global |
-| `Cmd/Ctrl + J` | Open work panel | Global; active session |
+| `Cmd/Ctrl + J` | Toggle work panel | Global; active session |
 | `Cmd/Ctrl + [` | Previous destination | Global |
 | `Cmd/Ctrl + ]` | Next destination | Global |
 | `Cmd/Ctrl + .` | Abort active turn | Global (same as abort button) |
@@ -308,13 +308,15 @@ may be retained while exactly one workspace supplies the visible shell context.
   presentation boundary from structured fields; persisted rows never contain
   localized prose.
 
-### 1.8 Work panel entry and resources (D128, D142, D154, D173, D179, D207)
+### 1.8 Work panel entry and resources (D128, D142, D154, D173, D179, D207, D221)
 
-- The shell starts without a visible work panel. `Cmd/Ctrl + J` opens the
-  active session's retained panel context without creating a resource tab; it
-  is idempotent while the panel is already open and is a no-op without an
-  active session or while Settings is the active page. The panel's context
-  trigger can then create one of the four tool resources.
+- The shell starts without a visible work panel. `Cmd/Ctrl + J` toggles the
+  active session's panel: it reveals the retained context without creating a
+  resource tab, and collapses the visible panel through the same path as the
+  header collapse control, retaining tabs, active resource, and committed
+  width. It is a no-op without an active session or while Settings is the
+  active page. The panel's context trigger can then create one of the four tool
+  resources.
 - An artifact trigger atomically creates or reuses its resource, activates it,
   and opens the panel. Background artifacts never open the visible panel.
 - File resources use normalized paths as identity. Review, Terminal, and

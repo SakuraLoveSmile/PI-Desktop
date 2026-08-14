@@ -46,10 +46,23 @@ test("work panel replaces the context panel overlay", async () => {
   assert.doesNotMatch(appSource, /ContextPanel/);
   assert.doesNotMatch(appSource, /contextOpen/);
   assert.match(appSource, /case "openWorkPanel"/);
-  assert.match(appSource, /useAppStore\.getState\(\)\.openWorkPanel\(\)/);
+  assert.match(appSource, /useAppStore\.getState\(\)\.toggleWorkPanel\(\)/);
   assert.match(storeSource, /openWorkPanel:\s*\(\) => \{/);
-  assert.doesNotMatch(appSource, /toggleWorkPanel|nav\.toggleWorkPanel/);
+  // The panel is toggled inside the renderer store; the legacy main-process
+  // nav bridge that resized the OS window must stay gone.
+  assert.doesNotMatch(appSource, /nav\.toggleWorkPanel/);
   assert.doesNotMatch(appSource, /key\.toLowerCase\(\) === "j"/);
+});
+
+test("the work panel shortcut closes the panel it opened", () => {
+  assert.match(storeSource, /toggleWorkPanel:\s*\(\) => \{/);
+  const toggleBody = storeSource.slice(
+    storeSource.indexOf("toggleWorkPanel: () => {"),
+    storeSource.indexOf("openWorkPanelTabForSession: (sessionId, tab) => {"),
+  );
+  assert.match(toggleBody, /get\(\)\.workPanelOpen/);
+  assert.match(toggleBody, /collapseWorkPanel\(\)/);
+  assert.match(toggleBody, /openWorkPanel\(\)/);
 });
 
 test("work panel is an internal dock that never expands the OS window", () => {

@@ -4,6 +4,8 @@
 - Date: 2026-08-07
 - Deciders: PI-Desktop core
 - Amends: D128, D142
+- Amended by: [ADR 0085](0085-work-panel-shortcut-toggle.md) (the shortcut is a
+  toggle; the rejected toggle alternative below no longer holds)
 - Related: [01-ui-ia](../spec/04-ux/01-ui-ia.md) ·
   [08-component-spec §5](../spec/04-ux/08-component-spec.md) ·
   [09-interaction-patterns §1](../spec/04-ux/09-interaction-patterns.md) ·
@@ -53,7 +55,8 @@ directly even though its session context remained valid.
 
 ### Make `Cmd/Ctrl + J` a toggle
 
-Rejected. Collapse already has a dedicated panel control, and an explicit open
+*(Amended by ADR 0085: the shortcut now toggles.)* Rejected at the time.
+Collapse already has a dedicated panel control, and an explicit open
 action avoids accidentally hiding the panel while the user is trying to reveal
 its tools.
 
