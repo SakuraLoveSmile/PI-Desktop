@@ -173,7 +173,7 @@ function ContextUsageInspector({
   responseOutputEstimated?: boolean;
 }) {
   const { t } = useTranslation();
-  const tooltipId = useId();
+  const panelId = useId();
   // The transcript shows one row per compaction; the inspector adds what those
   // rows cannot — how much of the model context the newest summary occupies.
   const compaction = useAppStore((state) =>
@@ -183,7 +183,6 @@ function ContextUsageInspector({
   );
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const closeTimerRef = useRef<number | undefined>(undefined);
   const [open, setOpen] = useState(false);
   const [popoverPosition, setPopoverPosition] =
     useState<ContextPopoverPosition | null>(null);
@@ -209,41 +208,20 @@ function ContextUsageInspector({
         ? "warning"
       : "comfortable";
 
-  const cancelClose = useCallback(() => {
-    if (closeTimerRef.current !== undefined) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = undefined;
-    }
-  }, []);
-
-  const openInspector = useCallback(() => {
-    cancelClose();
-    setOpen(true);
-  }, [cancelClose]);
-
   const closeInspector = useCallback(() => {
-    cancelClose();
     setOpen(false);
     setPopoverPosition(null);
-  }, [cancelClose]);
+  }, []);
 
-  const scheduleClose = useCallback(() => {
-    cancelClose();
-    closeTimerRef.current = window.setTimeout(() => {
-      closeTimerRef.current = undefined;
-      const trigger = triggerRef.current;
-      const popover = popoverRef.current;
-      if (
-        trigger?.matches(":focus") ||
-        trigger?.matches(":hover") ||
-        popover?.matches(":hover")
-      ) {
-        return;
-      }
-      setOpen(false);
-      setPopoverPosition(null);
-    }, 140);
-  }, [cancelClose]);
+  // The panel is click-toggled rather than hover-opened: reading the token
+  // breakdown takes long enough that a pointer leaving the trigger should not
+  // dismiss it.
+  const toggleInspector = useCallback(() => {
+    setOpen((previous) => {
+      if (previous) setPopoverPosition(null);
+      return !previous;
+    });
+  }, []);
 
   const updatePopoverPosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -323,21 +301,39 @@ function ContextUsageInspector({
     return () => observer.disconnect();
   }, [open, updatePopoverPosition]);
 
-  useEffect(
-    () => () => {
-      if (closeTimerRef.current !== undefined) {
-        window.clearTimeout(closeTimerRef.current);
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (
+        triggerRef.current?.contains(target) ||
+        popoverRef.current?.contains(target)
+      ) {
+        return;
       }
-    },
-    [],
-  );
+      closeInspector();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      closeInspector();
+      triggerRef.current?.focus();
+    };
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeInspector, open]);
 
   const popover = open ? (
     <div
       ref={popoverRef}
       className={`context-inspector-popover${popoverPosition ? " is-open" : ""}`}
-      id={tooltipId}
-      role="tooltip"
+      id={panelId}
+      role="dialog"
+      aria-label={t("chat.usageContextLabel")}
       style={
         popoverPosition
           ? {
@@ -346,8 +342,6 @@ function ContextUsageInspector({
             }
           : undefined
       }
-      onPointerEnter={cancelClose}
-      onPointerLeave={scheduleClose}
     >
       <div className="context-inspector-heading">
         <div className="context-inspector-heading-copy">
@@ -539,20 +533,14 @@ function ContextUsageInspector({
         ref={triggerRef}
         type="button"
         className="context-inspector-trigger"
-        aria-describedby={open ? tooltipId : undefined}
+        aria-haspopup="dialog"
         aria-expanded={open}
-        aria-controls={open ? tooltipId : undefined}
+        aria-controls={open ? panelId : undefined}
         aria-label={t("chat.usageContextAria", {
           percent: context.remainingPercent,
           remaining: formatTokenCount(context.remainingTokens),
         })}
-        onPointerEnter={openInspector}
-        onPointerLeave={scheduleClose}
-        onFocus={openInspector}
-        onBlur={scheduleClose}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") closeInspector();
-        }}
+        onClick={toggleInspector}
       >
         <svg
           className="context-inspector-ring"

@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-02
+- Amended by: D225 (the panel is click-toggled, not hover-opened)
 - Related: [D103](../spec/08-meta/decisions-log.md) ·
   [D183](../spec/08-meta/decisions-log.md) ·
   [D184](../spec/08-meta/decisions-log.md) ·
@@ -19,7 +20,9 @@ anchor, but providers do not expose exact per-tool allocation.
 ## Decision
 
 1. Replace the standalone ring with a compact Codex-style context inspector
-   trigger. Hover and keyboard focus reveal one scrollable, non-modal panel.
+   trigger. *(Amended by D225: hover and focus no longer open the panel;
+   clicking or keyboard-activating the trigger toggles it.)* Activating the
+   trigger reveals one scrollable, non-modal panel.
 2. Keep provider-reported input/output/cache/reasoning usage authoritative and
    show aggregate output throughput as `outputTokens / responseDurationMs` on
    completed turns only; active streams do not render a live estimate.
@@ -35,7 +38,7 @@ anchor, but providers do not expose exact per-tool allocation.
    overlay. Measure the trigger and panel rectangles, choose the side with
    available space, clamp the result to a viewport margin, and update the
    placement on transcript scroll, window resize, or panel-size changes. Keep
-   hover, focus, and Escape dismissal behavior independent from the transcript
+   the open/close and Escape dismissal behavior independent from the transcript
    scroll container.
 7. Aggregate repeated tool rows by their exact tool name, preserving the
    first-seen order. Each row shows the number of calls and sums argument,

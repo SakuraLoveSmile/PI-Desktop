@@ -1871,7 +1871,8 @@ Each scenario is documented in this format:
 - **Preconditions**: A completed assistant message includes modelId and token
   usage; another completed assistant message has content but no usage.
 - **Steps**: 1) Open the session. 2) Hover the completed assistant turn that has
-  usage, then focus its Context inspector trigger with the keyboard. 3) Inspect
+  usage, confirm the panel stays closed, then click its Context inspector
+  trigger. 3) Inspect
   the panel's remaining-token header, used percentage and meter, the
   pi-ai-resolved model context-window size, exact input/output/cache/reasoning
   breakdown, cache hit rate when cache-read metadata is reported, completed
@@ -1879,13 +1880,18 @@ Each scenario is documented in this format:
   unique tool type's aggregated call count and estimated argument/result token
   allocation. 4)
   Scroll the transcript until the trigger is close to the top, bottom, and
-  right viewport edges, and resize the window while the panel is open. 5) Click
-  Retry on that turn while idle. 6) Confirm a turn without usage still offers
+  right viewport edges, and resize the window while the panel is open. 5) Move
+  the pointer away from the panel, then dismiss it by clicking the trigger
+  again, clicking outside it, and pressing Escape from the keyboard. 6) Click
+  Retry on that turn while idle. 7) Confirm a turn without usage still offers
   Retry and omits the inspector.
 - **Expected**: Model badge and compact Context inspector appear under completed
   assistant answers when data exists; the trigger shows remaining capacity and
-  low-space warning/error states, while hover and keyboard focus expose the
-  same complete token panel. The panel's exact provider and estimated tool
+  low-space warning/error states, and click or keyboard activation toggles the
+  same complete token panel while pointer hover alone never opens or closes it.
+  An open panel survives the pointer leaving it and closes on a second trigger
+  activation, an outside click, or Escape, which returns focus to the trigger.
+  The panel's exact provider and estimated tool
   sources are visibly distinguished, and its cache hit rate uses cached prompt
   tokens divided by all reported prompt tokens (cached plus uncached); when
   cache-read metadata is absent, the rate is omitted rather than inferred. Its
@@ -4533,11 +4539,14 @@ This test plan spec is accepted when:
 ### US-UI-61 Assistant context inspector + retry (D103, D184)
 - Complete an assistant turn that reports usage.
 - Expect a model badge and compact Context inspector under the answer. The
-  trigger shows the remaining context percentage; hover or keyboard focus shows
+  trigger shows the remaining context percentage; clicking it (or activating it
+  from the keyboard) shows
   used/remaining/window tokens, exact input/output/cache/reasoning usage,
   generation tokens/s, and each unique tool type's aggregated call count,
   argument/result footprint, share, and duration. The panel labels provider
   totals as reported and tool rows as estimates.
+- Hovering the trigger changes nothing; the open panel closes on a second
+  activation, an outside click, or Escape.
 - Move the trigger near each viewport edge and scroll or resize while the panel
   is open; expect the body-level overlay to flip, clamp, and remain fully
   visible instead of being clipped by the transcript scroll container.

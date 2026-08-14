@@ -899,7 +899,8 @@ section mirrors only marketplace/catalog items still blocking nothing.
 
 - Replace the oversized context ring with a compact Codex-style trigger that
   combines a remaining-capacity ring, `Context` label, and percentage. Hover
-  and keyboard focus open a non-modal panel with the context window, exact
+  and keyboard focus open a non-modal panel *(superseded by D225: the trigger
+  is click-toggled)* with the context window, exact
   provider input/output/cache/reasoning usage, aggregate generation speed in
   `tokens/s`, and each unique tool type in first-seen execution order.
 - Tool rows aggregate repeated calls and expose call count, argument tokens,
@@ -1667,3 +1668,22 @@ D193, and D194.
   that offered it.
 - Decision D224 is renderer-only. Protocol, host RPC, and storage schema are
   unchanged.
+
+## 2026-08-14 — Context usage inspector opens on click
+
+- The inspector trigger no longer opens on `pointerenter` or focus. A click —
+  or `Enter`/`Space` on the focused button — toggles the panel, and the 140ms
+  hover-grace close timer that kept it alive between trigger and panel is
+  deleted with it. Reading a token breakdown, scrolling the tool list, and
+  selecting text inside the panel all outlast a pointer that wanders off, which
+  the hover model punished.
+- Dismissal is explicit: a second activation, a capture-phase pointerdown
+  outside both trigger and panel, or `Escape`, which also returns focus to the
+  trigger. The existing rule that scrolling the trigger out of view closes the
+  panel stands, as does the body-level collision-aware placement (ADR 0047 §6).
+- The panel stops being a tooltip. It carries `role="dialog"` with the localized
+  `Context` label; the trigger swaps `aria-describedby` for
+  `aria-haspopup="dialog"` and keeps `aria-expanded`/`aria-controls`. Keyboard
+  users gain a stable panel instead of one that vanished on blur.
+- Decision D225 amends D184/ADR 0047 and is renderer-only. Protocol, host RPC,
+  and storage schema are unchanged.

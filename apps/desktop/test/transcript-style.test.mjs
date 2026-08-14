@@ -257,7 +257,7 @@ test("assistant context inspector and retry action are wired", () => {
   assert.match(transcriptSource, /ResizeObserver\(updatePopoverPosition\)/);
   assert.match(transcriptSource, /latestMessageUsage/);
   assert.match(transcriptSource, /resolveContextWindow/);
-  assert.match(transcriptSource, /aria-describedby=\{open \? tooltipId : undefined\}/);
+  assert.match(transcriptSource, /aria-controls=\{open \? panelId : undefined\}/);
   assert.match(transcriptSource, /retryAssistantMessage/);
   assert.match(transcriptSource, /chat\.retry/);
   assert.match(stylesSource, /\.context-inspector-ring-progress/);
@@ -275,6 +275,25 @@ test("context inspector keeps generation speed completion-only", () => {
   assert.doesNotMatch(transcriptSource, /useLiveElapsedMs|usageThroughputLive/);
   assert.doesNotMatch(transcriptSource, /assistantTurnStreamingMessage/);
   assert.doesNotMatch(stylesSource, /message-meta-live-rate|live-rate-pulse/);
+});
+
+test("context inspector panel opens on click, not hover (D225)", () => {
+  // The trigger toggles; pointer enter/leave and focus/blur no longer open or
+  // close the panel, so no hover-grace timer is needed.
+  assert.match(transcriptSource, /onClick=\{toggleInspector\}/);
+  assert.match(transcriptSource, /aria-haspopup="dialog"/);
+  assert.match(transcriptSource, /role="dialog"/);
+  assert.doesNotMatch(transcriptSource, /onPointerEnter=\{(openInspector|cancelClose)\}/);
+  assert.doesNotMatch(transcriptSource, /onPointerLeave=\{scheduleClose\}/);
+  assert.doesNotMatch(transcriptSource, /onFocus=\{openInspector\}/);
+  assert.doesNotMatch(transcriptSource, /closeTimerRef/);
+  // Explicit dismissal: outside pointerdown and Escape, which refocuses.
+  assert.match(
+    transcriptSource,
+    /addEventListener\("pointerdown", handlePointerDown, true\)/,
+  );
+  assert.match(transcriptSource, /event\.key !== "Escape"/);
+  assert.match(transcriptSource, /triggerRef\.current\?\.focus\(\)/);
 });
 
 test("regenerate rewrites the current turn instead of appending", async () => {

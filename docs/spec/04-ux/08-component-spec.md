@@ -1065,7 +1065,8 @@ Single message render — either user (plaintext) or assistant (markdown streami
 - Assistant meta: optional model badge + compact Codex-style context inspector
   under the answer. The inspector keeps a small remaining-capacity ring beside
   the `Context` label and percentage; low capacity changes the semantic color
-  without making color the only signal. Hover or keyboard focus opens a
+  without making color the only signal. Clicking the trigger (or activating it
+  from the keyboard) toggles a
   non-modal, scrollable panel with a clear remaining-token header, used/window
   counts, a used-capacity meter, and compact turn/speed summary cells. Provider
   and tool sections carry explicit reported/estimated source badges. The
@@ -1127,8 +1128,10 @@ message its checkpoint covers.
 - Thinking trigger exposes localized Show/Hide labels, `aria-expanded`, and an
   `aria-controls` relationship to the reasoning panel
 - Context inspector trigger is keyboard focusable, exposes a localized
-  remaining percentage and token count, and reveals the same breakdown on
-  hover or focus
+  remaining percentage and token count, carries `aria-haspopup="dialog"`,
+  `aria-expanded`, and an `aria-controls` relationship to the panel, and opens
+  the same breakdown on click or keyboard activation; Escape or a click outside
+  closes it and returns focus to the trigger
 - Timestamps: `aria-label` with full time string, visual shows relative time
 
 ### 8.6 MVP constraints

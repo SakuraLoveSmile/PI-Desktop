@@ -100,8 +100,9 @@ events.
 
 **Adopted in D103 (tokens-only first cut)**: completed assistant turns show a
 model badge plus a compact Codex-style context inspector under the answer. The
-inspector shows remaining context percentage in a small ring and hover/focus
-reveals a remaining-token header, used-capacity meter, exact provider
+inspector shows remaining context percentage in a small ring and clicking the
+trigger toggles a panel with a remaining-token header, used-capacity meter,
+exact provider
 input/output/cache/reasoning usage, and generation tokens per second. The
 generation rate is a completed-turn snapshot rather than a live streaming
 counter. The context-window total comes from the same `pi-ai` model metadata
