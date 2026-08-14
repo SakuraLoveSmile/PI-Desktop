@@ -1435,6 +1435,16 @@ async fn handle_request(
             .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "messages": messages }))
         }
+        "session.getScratchPath" => {
+            let session_id = params
+                .get("sessionId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| rpc_err(1002, "sessionId required", "INVALID_PARAMS"))?;
+            let st = state.lock().await;
+            let path = scratch::session_dir(&st.data_dir, session_id)
+                .ok_or_else(|| rpc_err(1002, "invalid session id", "INVALID_PARAMS"))?;
+            Ok(json!({ "path": path.to_string_lossy() }))
+        }
 
         "session.import" => {
             let summary: sessions::SessionSummary = serde_json::from_value(

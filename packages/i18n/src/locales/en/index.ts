@@ -142,6 +142,7 @@ export const en = {
     createBranch: "Branch from here",
     branchTitle: "{{title}} (branch)",
     deleteTask: "Delete",
+    copySessionPath: "Copy session path",
     timeGroupToday: "Today",
     timeGroupYesterday: "Yesterday",
     timeGroupThisWeek: "Previous 7 days",

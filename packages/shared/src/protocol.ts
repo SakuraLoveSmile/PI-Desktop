@@ -82,6 +82,7 @@ export const IPC = {
     sessionSaveRevision: "pi-desktop/session/saveRevision",
     sessionListRevisions: "pi-desktop/session/listRevisions",
     sessionActivateRevision: "pi-desktop/session/activateRevision",
+    sessionGetScratchPath: "pi-desktop/session/getScratchPath",
     projectOpenFolder: "pi-desktop/project/openFolder",
     settingsGet: "pi-desktop/settings/get",
     settingsSet: "pi-desktop/settings/set",
