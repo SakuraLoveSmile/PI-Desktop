@@ -445,6 +445,9 @@
   display: none;
 }
 
+/* Empty states borrow the plugin/project page proportions (`.ext-empty`) so the
+   panel reads as part of the same app, just narrower: the panel can be as thin
+   as 244px, so the body wraps at 34ch instead of 48ch. */
 .work-tab-empty {
   display: flex;
   flex: 1;
@@ -452,16 +455,75 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 24px;
+  gap: 6px;
+  padding: 28px 24px;
   color: var(--ds-text-muted);
   text-align: center;
 }
 
-.work-tab-empty p {
+.work-tab-empty-icon {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  color: var(--ds-text-secondary);
+}
+
+.work-tab-empty-title {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: var(--text-base-plus);
+  font-weight: var(--font-weight-medium-plus);
+}
+
+.work-tab-empty-body {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--ds-text-muted);
   font-size: var(--text-md);
   line-height: var(--leading-body);
-  max-width: 240px;
+}
+
+/* Tool entry points shown only when the panel body has no tab at all. Rows
+   match `.work-panel-menu-item` so the same four tools look the same whether
+   they are reached from the header menu or from the empty body. */
+.work-panel-empty-tools {
+  display: flex;
+  width: 100%;
+  max-width: 208px;
+  flex-direction: column;
+  margin-top: 14px;
+}
+
+.work-panel-empty-tool {
+  display: flex;
+  height: 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  color: var(--ds-text-primary);
+  font-size: var(--text-md);
+  text-align: left;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.work-panel-empty-tool > svg {
+  flex: 0 0 auto;
+  color: var(--ds-text-muted);
+}
+
+.work-panel-empty-tool:hover {
+  background: var(--ds-bg-hover);
+}
+
+.work-panel-empty-tool:focus-visible {
+  outline: 2px solid var(--ds-focus);
+  outline-offset: -2px;
 }
 
 /* Work panel — review tab */

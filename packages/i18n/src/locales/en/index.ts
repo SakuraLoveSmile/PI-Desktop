@@ -818,6 +818,10 @@ export const en = {
       browser: "Browser",
       file: "Files",
     },
+    empty: {
+      title: "No resource open",
+      body: "Open a file, command, or link from the conversation — or pick a tool below.",
+    },
     review: {
       noWorkspace: "Open a project to see changes",
       clean: "No uncommitted changes in this project",
@@ -828,6 +832,7 @@ export const en = {
       changes_one: "1 recorded change",
       changes_other: "{{count}} recorded changes",
       noChanges: "No recorded changes in this conversation",
+      noChangesHint: "Edits the agent makes to project files appear here, one card per change.",
       truncated: "Showing the first 100 changed files only",
       binary: "Binary file",
       tooLarge: "Diff is too large to show here",
@@ -848,11 +853,13 @@ export const en = {
     },
     terminal: {
       noWorkspace: "Open a project to start a terminal",
+      noWorkspaceHint: "Terminal sessions run inside the project folder.",
       exited: "Terminal session ended",
       restart: "Restart",
       startFailed: "Couldn't start the terminal",
     },
     browser: {
+      emptyTitle: "Preview a page",
       empty: "Enter a URL to preview a local server, or an HTML file in this project (for example index.html).",
       urlPlaceholder: "localhost:3000, an http(s) URL, or an HTML file path",
       back: "Back",
@@ -863,6 +870,7 @@ export const en = {
     },
     files: {
       noWorkspace: "Open a project to browse files",
+      noWorkspaceHint: "Browsing stays inside the open project folder.",
       empty: "This folder is empty",
       loading: "Loading…",
       error: "Couldn't read this location",

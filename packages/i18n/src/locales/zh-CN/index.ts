@@ -818,6 +818,10 @@ export const zhCN = {
       browser: "浏览器",
       file: "文件",
     },
+    empty: {
+      title: "还没有打开的资源",
+      body: "从对话里的文件、命令或链接打开，也可以直接选择下面的工具。",
+    },
     review: {
       noWorkspace: "打开项目后即可查看改动",
       clean: "当前项目没有未提交的改动",
@@ -828,6 +832,7 @@ export const zhCN = {
       changes_one: "记录了 1 项改动",
       changes_other: "记录了 {{count}} 项改动",
       noChanges: "当前对话没有记录的改动",
+      noChangesHint: "智能体修改项目文件后，改动会逐条出现在这里。",
       truncated: "仅显示前 100 个改动文件",
       binary: "二进制文件",
       tooLarge: "差异过大，无法在此完整显示",
@@ -848,11 +853,13 @@ export const zhCN = {
     },
     terminal: {
       noWorkspace: "打开项目后即可使用终端",
+      noWorkspaceHint: "终端会在项目目录中启动。",
       exited: "终端会话已结束",
       restart: "重新启动",
       startFailed: "无法启动终端",
     },
     browser: {
+      emptyTitle: "预览页面",
       empty: "输入网址预览本地服务，或输入项目中的 HTML 文件（例如 index.html）。",
       urlPlaceholder: "localhost:3000、http(s) 地址或 HTML 文件路径",
       back: "后退",
@@ -863,6 +870,7 @@ export const zhCN = {
     },
     files: {
       noWorkspace: "打开项目后即可浏览文件",
+      noWorkspaceHint: "文件浏览只在打开的项目目录内进行。",
       empty: "此目录为空",
       loading: "加载中…",
       error: "无法读取此位置",

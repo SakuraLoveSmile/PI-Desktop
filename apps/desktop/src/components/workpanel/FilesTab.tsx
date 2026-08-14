@@ -28,6 +28,7 @@ import {
   IconFileText,
   IconFolder,
 } from "../icons";
+import { WorkTabEmpty } from "./WorkTabEmpty";
 
 const VIEWER_LINE_CAP = 5000;
 
@@ -295,10 +296,11 @@ export function FilesTab() {
 
   if (!root) {
     return (
-      <div className="work-tab-empty">
-        <IconFolder size={20} />
-        <p>{t("panel.files.noWorkspace")}</p>
-      </div>
+      <WorkTabEmpty
+        icon={IconFolder}
+        title={t("panel.files.noWorkspace")}
+        body={t("panel.files.noWorkspaceHint")}
+      />
     );
   }
 
@@ -332,10 +334,7 @@ export function FilesTab() {
         </div>
         <div className="file-viewer-body">
           {fileError ? (
-            <div className="work-tab-empty">
-              <IconFileText size={20} />
-              <p>{t("panel.files.error")}</p>
-            </div>
+            <WorkTabEmpty icon={IconFileText} title={t("panel.files.error")} />
           ) : !file ? (
             <div className="file-tree-note">{t("panel.files.loading")}</div>
           ) : file.kind === "text" && isMarkdownPath(selected) ? (
@@ -349,14 +348,14 @@ export function FilesTab() {
               <img src={file.dataUrl} alt={selected} />
             </div>
           ) : (
-            <div className="work-tab-empty">
-              <IconFileText size={20} />
-              <p>
-                {file.kind === "tooLarge"
+            <WorkTabEmpty
+              icon={IconFileText}
+              title={
+                file.kind === "tooLarge"
                   ? t("panel.files.tooLarge")
-                  : t("panel.files.binary")}
-              </p>
-            </div>
+                  : t("panel.files.binary")
+              }
+            />
           )}
         </div>
       </div>

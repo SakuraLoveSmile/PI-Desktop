@@ -84,7 +84,7 @@ import {
   type LucideProps,
 } from "lucide-react";
 
-type IconProps = LucideProps;
+export type IconProps = LucideProps;
 
 /* Defaults (16px, 1.75 stroke) match the app's previous hand-drawn icon set. */
 function icon(Lucide: LucideIcon) {

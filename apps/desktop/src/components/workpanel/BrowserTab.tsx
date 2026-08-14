@@ -13,6 +13,7 @@ import {
   IconGlobe,
   IconSnapshot,
 } from "../icons";
+import { WorkTabEmpty } from "./WorkTabEmpty";
 
 /**
  * The preview surface itself is a main-process WebContentsView (D100);
@@ -171,10 +172,11 @@ export function BrowserTab({
         className={cx("work-browser-surface", !started && "empty")}
       >
         {!started && (
-          <div className="work-tab-empty">
-            <IconGlobe size={20} />
-            <p>{t("panel.browser.empty")}</p>
-          </div>
+          <WorkTabEmpty
+            icon={IconGlobe}
+            title={t("panel.browser.emptyTitle")}
+            body={t("panel.browser.empty")}
+          />
         )}
       </div>
     </div>

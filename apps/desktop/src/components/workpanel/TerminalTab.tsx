@@ -6,6 +6,7 @@ import "@xterm/xterm/css/xterm.css";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import { IconTerminal } from "../icons";
+import { WorkTabEmpty } from "./WorkTabEmpty";
 
 /**
  * Terminal sessions must survive React unmounts (tab switches, panel
@@ -190,10 +191,11 @@ export function TerminalTab({ active }: { active: boolean }) {
 
   if (!cwd) {
     return (
-      <div className="work-tab-empty">
-        <IconTerminal size={20} />
-        <p>{t("panel.terminal.noWorkspace")}</p>
-      </div>
+      <WorkTabEmpty
+        icon={IconTerminal}
+        title={t("panel.terminal.noWorkspace")}
+        body={t("panel.terminal.noWorkspaceHint")}
+      />
     );
   }
 

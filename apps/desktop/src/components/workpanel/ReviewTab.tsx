@@ -4,6 +4,7 @@ import { reviewChangesFromMessages, summarizeReviewChanges } from "../../lib/wor
 import { useAppStore } from "../../stores/app-store";
 import { IconDiff } from "../icons";
 import { ReviewChangeCard } from "../ReviewChangeCard";
+import { WorkTabEmpty } from "./WorkTabEmpty";
 
 export function ReviewTab() {
   const { t } = useTranslation();
@@ -13,10 +14,11 @@ export function ReviewTab() {
 
   if (entries.length === 0) {
     return (
-      <div className="work-tab-empty">
-        <IconDiff size={20} />
-        <p>{t("panel.review.noChanges")}</p>
-      </div>
+      <WorkTabEmpty
+        icon={IconDiff}
+        title={t("panel.review.noChanges")}
+        body={t("panel.review.noChangesHint")}
+      />
     );
   }
 

@@ -439,3 +439,54 @@ test("deleting a session also removes its retained work panel context", () => {
     /delete workPanelContexts\[id\]|withoutRecordKey\([^)]*workPanelContexts,\s*id\)/,
   );
 });
+
+test("revealing the panel with no tab shows the empty body and its tool list", async () => {
+  const emptySource = await readFile(
+    new URL("../src/components/workpanel/WorkTabEmpty.tsx", import.meta.url),
+    "utf8",
+  );
+  // `Cmd/Ctrl+J` reveals the panel without creating a tab, so the body must
+  // still say something and offer a way forward.
+  assert.match(panelSource, /\{!activeTab && \(/);
+  assert.match(panelSource, /data-testid="work-panel-empty"/);
+  assert.match(panelSource, /panel\.empty\.title/);
+  assert.match(panelSource, /panel\.empty\.body/);
+  assert.match(panelSource, /className="work-panel-empty-tools"/);
+  assert.match(panelSource, /HEADER_TOOLS\.map[\s\S]*work-panel-empty-tool/);
+  assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
+  assert.match(panelSource, /onClick=\{\(\) => openTool\(kind\)\}/);
+  // No tab exists to label a tabpanel, so the empty body is a plain group.
+  const emptyBlock = panelSource.match(/\{!activeTab && \([\s\S]*?\n {10}\)\}/)?.[0] ?? "";
+  assert.ok(emptyBlock, "the empty body branch is a single JSX block");
+  assert.doesNotMatch(emptyBlock, /role="tabpanel"/);
+  assert.match(emptyBlock, /role="group"/);
+  // Tab empty states share one component so they keep one visual treatment.
+  assert.match(emptySource, /work-tab-empty-icon/);
+  assert.match(emptySource, /work-tab-empty-title/);
+  assert.match(emptySource, /work-tab-empty-body/);
+});
+
+test("work panel empty states match the app's other empty-state proportions", () => {
+  const icon = globalStyles.match(/\.work-tab-empty-icon \{[^}]*\}/)?.[0] ?? "";
+  assert.match(icon, /width: 38px/);
+  assert.match(icon, /height: 38px/);
+  assert.match(icon, /border-radius: var\(--radius-full\)/);
+  assert.match(icon, /color-mix\(in oklab, var\(--ds-text-primary\) 7%, transparent\)/);
+  const title = globalStyles.match(/\.work-tab-empty-title \{[^}]*\}/)?.[0] ?? "";
+  assert.match(title, /font-size: var\(--text-base-plus\)/);
+  assert.match(title, /color: var\(--ds-text-primary\)/);
+  const body = globalStyles.match(/\.work-tab-empty-body \{[^}]*\}/)?.[0] ?? "";
+  assert.match(body, /font-size: var\(--text-md\)/);
+  assert.match(body, /max-width: 34ch/);
+  // Entry rows stay as restrained as the header menu rows: fill on hover,
+  // a focus ring for keyboard use, and nothing else.
+  const tool = globalStyles.match(/\.work-panel-empty-tool \{[^}]*\}/)?.[0] ?? "";
+  assert.match(tool, /height: 28px/);
+  assert.match(tool, /border-radius: var\(--radius-sm\)/);
+  assert.doesNotMatch(tool, /border: 1px/);
+  assert.match(globalStyles, /\.work-panel-empty-tool:hover \{\s*background: var\(--ds-bg-hover\);/);
+  assert.match(
+    globalStyles,
+    /\.work-panel-empty-tool:focus-visible \{\s*outline: 2px solid var\(--ds-focus\)/,
+  );
+});

@@ -19,12 +19,14 @@ import {
   IconDiff,
   IconFileText,
   IconGlobe,
+  IconPanel,
   IconTerminal,
 } from "../icons";
 import { ReviewTab } from "./ReviewTab";
 import { TerminalTab } from "./TerminalTab";
 import { BrowserTab } from "./BrowserTab";
 import { FilesTab } from "./FilesTab";
+import { WorkTabEmpty } from "./WorkTabEmpty";
 import {
   WORK_PANEL_DEFAULT_WIDTH,
   clampWorkPanelWidth,
@@ -637,6 +639,39 @@ export function WorkPanel({
               aria-labelledby={`work-panel-title-${activeTab.id}`}
             >
               <FilesTab />
+            </div>
+          )}
+          {/* `Cmd/Ctrl+J` reveals the panel without creating a resource, so the
+              body can be empty. No tab exists to label a tabpanel here; the
+              same four tools the header menu offers are listed inline so the
+              revealed panel is not a dead end. An empty tab set also means the
+              terminal cannot be mounted, so this never hides a live PTY. */}
+          {!activeTab && (
+            <div className="work-panel-tabpane" data-testid="work-panel-empty">
+              <WorkTabEmpty
+                icon={IconPanel}
+                title={t("panel.empty.title")}
+                body={t("panel.empty.body")}
+              >
+                <div
+                  className="work-panel-empty-tools"
+                  role="group"
+                  aria-label={t("panel.tools")}
+                >
+                  {HEADER_TOOLS.map(({ kind, Icon }) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      className="work-panel-empty-tool"
+                      data-action={`open-work-panel-${kind}`}
+                      onClick={() => openTool(kind)}
+                    >
+                      <Icon size={15} />
+                      <span>{t(`panel.tabs.${kind}`)}</span>
+                    </button>
+                  ))}
+                </div>
+              </WorkTabEmpty>
             </div>
           )}
         </div>
