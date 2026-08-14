@@ -668,6 +668,15 @@ function AppShell() {
         if (!(window as any).__PI_CAPTURE__) return;
         useAppStore.getState().collapseWorkPanel();
       },
+      /**
+       * Reveals the panel with whatever tabs the session already has — none, in
+       * the capture suite, which is the point: this is how the no-resource
+       * empty body is photographed. Production reaches it via `Cmd/Ctrl+J`.
+       */
+      openWorkPanel: () => {
+        if (!(window as any).__PI_CAPTURE__) return;
+        useAppStore.getState().openWorkPanel();
+      },
       seedTranscript: (count = 12) => {
         // Capture-only transcript fixture (conversation minimap scenes);
         // count 0 restores the empty transcript for later scenes.

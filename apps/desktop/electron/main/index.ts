@@ -2153,6 +2153,20 @@ async function createWindow() {
               })()
             `);
             await new Promise((r) => setTimeout(r, 700));
+            // No artifact has run yet, so this session's panel context is
+            // empty — the one moment in the suite where the no-resource body
+            // and its tool list are on screen (D224). Photograph it in both
+            // themes before the artifact scenes create tabs.
+            await mainWindow!.webContents.executeJavaScript(
+              `window.__PI_DESKTOP__?.openWorkPanel()`,
+            );
+            await new Promise((r) => setTimeout(r, 500));
+            await shot("pi-panel-empty");
+            await setTheme("dark");
+            await new Promise((r) => setTimeout(r, 300));
+            await shot("pi-panel-empty-dark");
+            await setTheme("light");
+            await new Promise((r) => setTimeout(r, 300));
             const openPanelArtifact = (kind: string, resource?: string) =>
               mainWindow!.webContents.executeJavaScript(
                 `window.__PI_DESKTOP__?.openWorkPanelArtifact(${JSON.stringify(kind)}, ${JSON.stringify(resource)})`,
