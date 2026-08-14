@@ -1746,3 +1746,24 @@ D193, and D194.
 - Decision D227 refines D226 and is renderer-only. Protocol, host RPC, IPC
   channels, and storage schema are unchanged. See
   `04-ux/08-component-spec.md` §9.2/§9.3/§9.5/§9.10 and E2E-129.
+
+## 2026-08-15 — A stopped mutation loop says so
+
+- D186's repeat guard counted every same-path `Edit` failure alike, so the two
+  failures it allows could both be spent on errors that already told the model
+  what to do next. `EDIT_TAG_MISMATCH`, `EDIT_TAG_UNKNOWN`, and
+  `EDIT_LINES_UNSEEN` each hand back the live tag or the withheld content, so
+  each now gets one free attempt per path. Every other code still counts on its
+  first occurrence, and a write that lands clears that path's history.
+- The guard stops the loop by terminating the tool batch, which pi-agent-core
+  reads as "no more work". The turn therefore ended with a failed tool card and
+  no final message, indistinguishable from a model that chose to say nothing.
+  The runtime now finalizes the assistant row with
+  `MUTATION_RETRY_BUDGET_EXHAUSTED` — retriable, so the transcript keeps its
+  retry affordance — and emits the matching error event, which also records the
+  turn as `error` rather than `completed`.
+- Decision D228 refines D186 and is runtime-only. Protocol, host RPC, IPC
+  channels, and storage schema are unchanged. See
+  `03-runtime/18-line-anchored-edit-contract.md` §9.3,
+  `03-runtime/03-tools-and-permissions.md` §4d,
+  `03-runtime/08-error-codes.md` §3.3, ADR 0087, and E2E-140/E2E-141.

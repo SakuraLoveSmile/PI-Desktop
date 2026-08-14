@@ -253,9 +253,10 @@ keeps only the ordering and loop-guard rules. The agent mutation workflow is:
 2. If a dedicated worktree is outside that root, perform one guarded edit in
    that worktree with Bash and verify the resulting diff.
 3. After a failed edit or patch check, perform one fresh `Read` of the current
-   target and regenerate the change once. A second failed `Edit` for the same
-   path in the prompt, or a second failed shell patch command (`apply_patch`,
-   `git apply`, or `patch`), returns a terminating tool result, so the agent
+   target and regenerate the change once. Once a path has spent its recovery
+   budget (18-line-anchored-edit-contract §9.3), the next failed `Edit` for that
+   path in the prompt — or a second failed shell patch command (`apply_patch`,
+   `git apply`, or `patch`) — returns a terminating tool result, so the agent
    stops after reporting the exact mismatch. Do not hand-edit old unified-diff
    hunk headers or continue a repair loop.
 4. Keep mutations to one path sequential, even when read/search calls are
@@ -263,8 +264,9 @@ keeps only the ordering and loop-guard rules. The agent mutation workflow is:
 
 An `EDIT_LINES_UNSEEN` rejection whose reveal was complete is exempt from step
 3's re-read: the error already displayed the missing lines and merged them into
-the session's provenance, so the same `tag` retried unchanged applies. It still
-counts toward the two-attempt guard.
+the session's provenance, so the same `tag` retried unchanged applies. That
+retry is also the one grace `EDIT_LINES_UNSEEN` gets on the path, so a second
+one does count toward the guard.
 
 Serialization also protects the snapshot store, which both producers and `Edit`
 mutate: without the per-session permit, a concurrent record could land between a
@@ -272,9 +274,12 @@ validation and its write.
 
 The sidecar's tool timing line includes `mutationFailureKind` and
 `mutationFailureAttempt` for failed same-path `Edit` calls and recognized shell
-patch commands, with `terminate=true` on the second failure. The latter is
-passed through pi-agent-core's runtime-only termination hint; it does not alter
-the durable tool result shape.
+patch commands, `mutationFailureGrace=true` for a failure forgiven under §9.3,
+and `terminate=true` on the failure that exhausts the budget. The last is passed
+through pi-agent-core's runtime-only termination hint; it does not alter the
+durable tool result shape. Because that hint ends the agent loop, the runtime
+also finalizes the assistant row with `MUTATION_RETRY_BUDGET_EXHAUSTED` instead
+of letting the turn complete silently.
 
 ## 5. Bash Rules
 

@@ -447,11 +447,38 @@ warning is emitted. Requirements:
   resolves to its real, writable location instead of failing against a path the
   model never meant.
 
-### 9.3 No-op
+### 9.3 No-op and the repeat guard
 
 An apply that produces text identical to the input is `EDIT_NO_CHANGE`, not
-success. §4d's repeat guard continues to apply: a second failed `Edit` on the
-same path within one prompt terminates rather than looping.
+success.
+
+§4d's repeat guard still stops a prompt that keeps failing on one path, but it
+does not count every failure the same way. The three recoverable codes —
+`EDIT_TAG_MISMATCH`, `EDIT_TAG_UNKNOWN`, `EDIT_LINES_UNSEEN` — each hand back
+what the retry needs: the live tag, or the content of the lines the host refused
+to write blind (§9.1). One honest retry is the designed response to them, so
+each code gets **one free attempt per path** before it counts. Every other code
+— malformed ops, an invalid range, a no-op apply — counts on its first
+occurrence, because repeating one of those means the model is guessing.
+
+| Sequence on one path within one prompt | Outcome |
+|---|---|
+| `EDIT_TAG_MISMATCH`, then `EDIT_LINES_UNSEEN` | Neither counts: two different honest failures, each with its own grace |
+| `EDIT_TAG_MISMATCH` twice | The second counts as attempt 1 |
+| `EDIT_PARSE_FAILED` twice | Attempt 2 — the turn stops |
+| A failure, then a successful `Edit`, then a failure | Attempt 1 — a write that landed clears that path's history |
+
+Counting a grace is per code, not per call, so a stale tag followed by unseen
+lines is two distinct honest failures while the same code twice is not.
+
+When the count does reach the limit the tool result carries `terminate: true`
+and the agent loop stops after that batch. Stopping there must not leave a turn
+that merely ends: the runtime finalizes the assistant row with
+`MUTATION_RETRY_BUDGET_EXHAUSTED` — retriable, `details.kind` of `edit` or
+`patch-command`, plus the last error code — and emits a matching error event, so
+the user sees that the agent stopped on purpose and keeps the continue
+affordance. A terminated turn with no message is indistinguishable from a model
+that chose to say nothing.
 
 ## 10. Drift recovery
 
@@ -504,6 +531,11 @@ All of these are `Edit`-scoped and additive to
 `TOOL_DENIED`, `PATH_OUTSIDE_WORKSPACE`, and `TOOL_FAILED` semantics are
 unchanged; `Edit` no longer reports version or provenance problems as the generic
 `TOOL_FAILED`, because both are recoverable with a specific next action.
+
+`MUTATION_RETRY_BUDGET_EXHAUSTED` is not in this table because it is not an
+`Edit` result: the tool call already failed with one of the codes above, and the
+runtime adds that code to the assistant row it writes when the repeat guard ends
+the turn (§9.3, [08-error-codes](08-error-codes.md) §3.3).
 
 Every error message names one concrete next step. "Re-read and retry" without a
 range is not an acceptable message when the host knows the range.

@@ -1544,3 +1544,19 @@ D193 和 D194。
   批准卡。
 - 决策 D215 和 ADR 0076 修改 D189/ADR 0053。协议和存储版本
   保持不变。
+
+## 2026-08-15 — 被停止的修改循环要把话说出来
+
+- D186 的重复保护对同路径 `Edit` 的每次失败一视同仁，因此它允许的两次失败可能都被花在
+  那些已经告诉模型下一步该做什么的错误上。`EDIT_TAG_MISMATCH`、`EDIT_TAG_UNKNOWN` 与
+  `EDIT_LINES_UNSEEN` 各自交回了实时 tag 或被扣下的内容，因此现在每一个在每条路径上都有
+  一次免费尝试。其余每个代码仍在第一次出现时计数，而一次落盘的写入会清除该路径的历史。
+- 该保护通过终止工具批次来停止循环，而 pi-agent-core 把这读作“没有更多工作”。因此本轮
+  以一张失败的工具卡结束且没有最终消息，与一个选择什么都不说的模型无法区分。runtime
+  现在用 `MUTATION_RETRY_BUDGET_EXHAUSTED` 敲定该 assistant 行——可重试，因此会话记录
+  保留它的重试入口——并发出对应的错误事件，这也让该 turn 被记为 `error` 而不是
+  `completed`。
+- 决策 D228 修订 D186，且仅涉及运行时。协议、主机 RPC、IPC 通道与存储 schema 均未改变。
+  参见 `03-runtime/18-line-anchored-edit-contract.md` §9.3、
+  `03-runtime/03-tools-and-permissions.md` §4d、
+  `03-runtime/08-error-codes.md` §3.3、ADR 0087，以及 E2E-140/E2E-141。

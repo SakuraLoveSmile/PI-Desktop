@@ -2979,10 +2979,11 @@ Each scenario is documented in this format:
     before any write.
   - The non-zero Bash command is marked failed while retaining its exit code,
     stdout, and stderr for the agent and diagnostics.
-  - The retry performs one fresh read and operates on the current file; a
-    second same-path mismatch or failed shell patch command returns a
-    terminating tool result, stops the mutation workflow, and does not
-    repeatedly modify an old patch artifact or its hunk headers.
+  - The retry performs one fresh read and operates on the current file; once
+    that path has spent its recovery graces, the next same-path failure — or a
+    second failed shell patch command — returns a terminating tool result plus a
+    visible `MUTATION_RETRY_BUDGET_EXHAUSTED` row, stops the mutation workflow,
+    and does not repeatedly modify an old patch artifact or its hunk headers.
   - The final file contains exactly the intended change, and diff/review data
     contains no partial or interleaved mutation.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
@@ -5224,5 +5225,51 @@ This test plan spec is accepted when:
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §4.2, §4.4,
   §5.4, §13.5, `03-runtime/02-agent-runtime.md` §5f, ADR 0087 §3
 - **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-140: Recoverable edit failures each get one retry before the guard counts
+
+- **Preconditions**: A session with one file read, and a way to make the file
+  drift on disk between calls.
+- **Steps**:
+  1. Let the file drift, then emit an `Edit` with the now-stale tag whose anchors
+     cannot be remapped, so it fails with `EDIT_TAG_MISMATCH`.
+  2. Re-read, then emit an `Edit` anchored on lines the session never displayed,
+     so it fails with `EDIT_LINES_UNSEEN` and a truncated reveal.
+  3. Emit an `Edit` on that same path with a malformed op header.
+  4. Emit a second `Edit` with a malformed op header.
+- **Expected**: Steps 1 and 2 return their own codes with no `terminate` hint —
+  each recoverable code spends its single grace on that path, and the turn keeps
+  going, so the agent can act on what the error handed it. Step 3 counts as
+  attempt 1 and still does not terminate. Step 4 terminates. A successful `Edit`
+  inserted anywhere before step 4 resets the count, so the following failure is
+  attempt 1 again.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9.3, §11,
+  `03-runtime/03-tools-and-permissions.md` §4d, ADR 0087
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-141: An exhausted retry budget ends the turn with a visible, retriable row
+
+- **Preconditions**: A session where `Edit` on one path fails with a
+  non-recoverable code every time.
+- **Steps**:
+  1. Emit two failing `Edit` calls on the same path within one prompt.
+  2. Observe the transcript after the agent loop stops.
+  3. Send a follow-up prompt in the same session.
+  4. Repeat with two failing `apply_patch` shell commands instead of `Edit`.
+- **Expected**: The second call carries the termination hint and the loop stops,
+  but the turn does not merely complete: the transcript ends on an assistant
+  error row with `MUTATION_RETRY_BUDGET_EXHAUSTED`, marked retriable, naming the
+  path and the next action, and the same code arrives as an error event. The turn
+  is recorded as failed rather than completed with no final message. Step 3
+  proceeds normally — the guard's counters are per prompt. Step 4 produces the
+  same row with `details.kind` of `patch-command`.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9.3,
+  `03-runtime/03-tools-and-permissions.md` §4d,
+  `03-runtime/08-error-codes.md` §3.3, ADR 0087
+- **Acceptance**: E (tools & permissions), C (chat & stream)
 - **Milestone**: M5+
 - **Status**: Documented

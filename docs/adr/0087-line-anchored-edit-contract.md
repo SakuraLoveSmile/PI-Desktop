@@ -128,7 +128,11 @@ instead of failing. A no-op apply is an error.
   cause rather than prescribing a recovery for it.
 - Edits against content the session never displayed become impossible instead of
   being undetectable. §4d's "one re-read, then stop" loop guard stays, but the
-  cases that trigger it shrink to genuine drift.
+  cases that trigger it shrink to genuine drift. It also stops counting the
+  three recoverable codes on their first occurrence: each one hands the retry
+  what it needs, so each gets one grace per path, and the failure that does
+  exhaust the budget ends the turn with a visible `MUTATION_RETRY_BUDGET_EXHAUSTED`
+  row rather than a silently completed turn.
 - `Read` output grows by the width of a line-number prefix, and its `content` is
   no longer byte-faithful. Any consumer that copies `content` verbatim must strip
   prefixes; `Write` already needs the same stripping for pasted headers.

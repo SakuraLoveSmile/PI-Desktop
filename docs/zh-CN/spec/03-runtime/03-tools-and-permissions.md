@@ -254,9 +254,10 @@ type ReviewChange = {
 2. 如果专用工作树位于该根目录之外，请在以下目录中执行一项受保护的编辑
    使用 Bash 构建该工作树并验证结果差异。
 3. 编辑或补丁检查失败后，对当前的文件执行一次新的 `Read`
-   定位并重新生成一次更改。第二次失败的 `Edit` 也同样失败
-   提示符中的路径，或第二个失败的 shell patch 命令（`apply_patch`，
-   `git apply` 或 `patch`) 返回终止工具结果，因此代理
+   定位并重新生成一次更改。一旦某条路径用完它的恢复额度
+   （18-line-anchored-edit-contract §9.3），该提示符中针对该路径的下一次失败
+   `Edit`——或第二个失败的 shell patch 命令（`apply_patch`、
+   `git apply` 或 `patch`）——返回终止工具结果，因此代理
    报告确切的不匹配后停止。不要手动编辑旧的统一差异
    大块标头或继续修复循环。
 4. 保持一条路径的突变是连续的，即使 read/search 调用是
@@ -264,16 +265,19 @@ type ReviewChange = {
 
 其 reveal 完整的 `EDIT_LINES_UNSEEN` 拒绝不受第 3 步重新读取的约束：
 错误本身已经显示了缺失的行并将其并入会话来源集，因此原样重试
-同一个 `tag` 即可应用。它仍然计入两次尝试的保护限额。
+同一个 `tag` 即可应用。那次重试同时也是 `EDIT_LINES_UNSEEN` 在该路径上唯一的
+宽限，因此第二次确实会计入保护限额。
 
 序列化同时保护快照存储，生产者与 `Edit` 都会修改它：没有按会话的
 突变许可，一次并发记录可能落在校验与写入之间。
 
 sidecar 的工具计时线包括 `mutationFailureKind` 和
 `mutationFailureAttempt` 用于失败的同路径 `Edit` 调用和已识别的 shell
-修补命令，在第二次失败时使用 `terminate=true`。后者是
+修补命令，对按 §9.3 被宽限的失败使用 `mutationFailureGrace=true`，并在耗尽额度
+的那次失败上使用 `terminate=true`。最后一项是
 通过 pi-agent-core 的仅运行时终止提示；它不会改变
-耐用的工具结果形状。
+耐用的工具结果形状。由于该提示会结束代理循环，runtime 还会用
+`MUTATION_RETRY_BUDGET_EXHAUSTED` 敲定该 assistant 行，而不是让本轮无声完成。
 
 ## 5. Bash 规则
 

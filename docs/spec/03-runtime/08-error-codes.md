@@ -84,6 +84,7 @@ does not turn temporary thread pressure into a host process exit.
 | `TOOL_DENIED` | no | permission denied / mode forbidden |
 | `TOOL_TIMEOUT` | yes | tool execution timeout |
 | `TOOL_FAILED` | maybe | tool executed but failed |
+| `MUTATION_RETRY_BUDGET_EXHAUSTED` | yes | the repeat guard ended the turn after same-path `Edit` or shell patch failures; carries `details.kind` (`edit` or `patch-command`) and the last tool error code |
 | `PROCESS_RESOURCE_EXHAUSTED` | yes | shell process could not start because the OS temporarily exhausted process resources |
 | `SHELL_NOT_FOUND` | no | no effective platform shell is available after catalog fallback; message carries guidance |
 | `COMMAND_SHELL_CHANGED` | no | pinned shell ID or dialect changed before execution |
@@ -135,6 +136,13 @@ loses that. See
 reports a complete reveal: the revealed lines are merged into the session's
 provenance, so the same `tag` retried unchanged applies. A truncated reveal
 merges nothing and requires the re-read.
+
+`EDIT_TAG_MISMATCH`, `EDIT_TAG_UNKNOWN`, and `EDIT_LINES_UNSEEN` each get one
+free attempt per path before the repeat guard counts them, because each already
+carries what the retry needs. The remaining codes count on first occurrence, and
+the failure that exhausts the budget surfaces as §3.3's
+`MUTATION_RETRY_BUDGET_EXHAUSTED` on the assistant row
+([18-line-anchored-edit-contract](18-line-anchored-edit-contract.md) §9.3).
 
 ### 3.5 Secrets / settings
 
