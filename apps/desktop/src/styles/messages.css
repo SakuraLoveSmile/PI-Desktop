@@ -148,17 +148,17 @@
 
 .asktool-options {
   display: grid;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
+  margin-top: 12px;
 }
 
 .asktool-option {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 9px;
-  min-height: 38px;
-  padding: 8px 10px;
+  gap: 8px;
+  min-height: 30px;
+  padding: 4px 8px;
   border: 1px solid var(--ds-border-default);
   border-radius: var(--radius-sm);
   background: var(--ds-bg-primary);
@@ -180,14 +180,14 @@
 
 .asktool-option-mark {
   display: grid;
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
   flex: none;
   place-items: center;
   border: 1px solid var(--ds-border-strong);
-  border-radius: var(--radius-3xs);
+  border-radius: var(--radius-2xs);
   color: var(--ds-accent);
-  font-size: var(--text-xs-plus);
+  font-size: var(--text-xs);
   line-height: var(--leading-none);
 }
 
@@ -203,7 +203,7 @@
   box-sizing: border-box;
   width: 100%;
   margin-top: 8px;
-  padding: 9px 10px;
+  padding: 6px 8px;
   border: 1px solid var(--ds-border-default);
   border-radius: var(--radius-sm);
   background: var(--ds-bg-primary);
@@ -215,7 +215,12 @@
 .asktool-card-actions {
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 12px;
+}
+
+.asktool-card-actions .btn {
+  padding: 4px 10px;
+  font-size: var(--text-sm);
 }
 
 @media (max-width: 560px) {

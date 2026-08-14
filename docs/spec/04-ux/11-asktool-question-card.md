@@ -36,6 +36,14 @@ the card body size — so the question and options stay coordinated:
 | Progress             | `--text-2xs`       | 10.5 px | —          | Faint, most subtle          |
 | Question text        | `--text-md`        | 13 px   | medium     | Primary focal point, compact|
 | Option text          | `--text-md`        | 13 px   | —          | Matches question scale      |
-| Option mark          | `--text-xs-plus`   | 11.5 px | —          | Proportional to option text |
+| Option mark          | `--text-xs`        | 11 px   | —          | 15 px box, proportional     |
 | Custom input text    | `--text-md`        | 13 px   | —          | Matches option text         |
 | Decline button       | `--text-xs`        | 11 px   | —          | Quiet secondary action      |
+
+## Control density
+
+The option rows follow the app's global menu-row density instead of card-scale
+blocks: 30 px min-height, 4 px × 8 px padding, 6 px row gaps, and the same
+15 px radio/checkbox mark used by the sidebar checkboxes. The Skip / Next /
+Submit buttons use the app's compact button size (4 px × 10 px padding,
+12 px text); Decline remains a quiet text link in the header.
