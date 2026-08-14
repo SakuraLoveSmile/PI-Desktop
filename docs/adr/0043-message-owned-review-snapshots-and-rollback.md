@@ -8,6 +8,9 @@
   [08-component-spec](../spec/04-ux/08-component-spec.md) ·
   [E2E-057](../spec/06-delivery/04-e2e-test-plan.md)
 - Supersedes: ADR 0042's Git-dependent review source, D098, and D179
+- Amended by: [ADR 0087](0087-line-anchored-edit-contract.md) (`Edit` may now
+  record a move as two entries, and a rollback invalidates session edit
+  snapshots for the path)
 
 ## Context
 

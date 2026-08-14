@@ -4,6 +4,8 @@
 - Date: 2026-08-10
 - Deciders: PI-Desktop core
 - Amends: D185, D192
+- Amended by: [ADR 0087](0087-line-anchored-edit-contract.md) (§2's byte-faithful
+  `Read` content is replaced by line-numbered, tagged output)
 - Related: [02-agent-runtime](../spec/03-runtime/02-agent-runtime.md) ·
   [03-tools-and-permissions](../spec/03-runtime/03-tools-and-permissions.md) ·
   [08-component-spec §9](../spec/04-ux/08-component-spec.md) · E2E-019e ·
