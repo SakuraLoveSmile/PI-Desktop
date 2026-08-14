@@ -29,3 +29,10 @@ overrides:
   fast-uri@3: '>=3.1.5 <4' # GHSA via ajv@8
   undici@6: '>=6.28.0 <7' # GHSA via node-gyp@12
   js-yaml@4: '>=4.3.1 <5' # CVE-2026-59870 via app-builder-lib
+  # Docs site only. vitepress 1.6.4 asks for vite ^5.4.14 and no vite 5 is
+  # patched — the fixes for all four advisories (server.fs.deny bypass, esbuild
+  # dev-server CORS, optimized-deps `.map` traversal, launch-editor UNC) land in
+  # 6.4.3. vitepress 2, which uses vite 6 itself, is still alpha, so this crosses
+  # a major its parent has not declared. Verified against `docs:build` and
+  # `docs:dev` (serves 200); drop it for vitepress 2 once that ships stable.
+  vite@5: '>=6.4.3 <7'
