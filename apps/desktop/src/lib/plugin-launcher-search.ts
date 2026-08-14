@@ -31,8 +31,10 @@ export function isLaunchablePlugin(plugin: PluginSummary): boolean {
 export function searchLaunchablePlugins(
   plugins: readonly PluginSummary[],
   query: string,
+  recentIds?: readonly string[],
 ): PluginSummary[] {
   const normalizedQuery = normalizeSearchText(query);
+  const recencyRank = new Map(recentIds?.map((id, index) => [id, index]) ?? []);
   return plugins
     .filter(isLaunchablePlugin)
     .map((plugin, index) => {
@@ -58,12 +60,18 @@ export function searchLaunchablePlugins(
                     : description.includes(normalizedQuery)
                       ? 7
                       : Number.POSITIVE_INFINITY;
-      return { plugin, score, index };
+      return {
+        plugin,
+        score,
+        index,
+        recentRank: recencyRank.get(plugin.id) ?? recencyRank.size,
+      };
     })
     .filter((candidate) => Number.isFinite(candidate.score))
     .sort(
       (left, right) =>
         left.score - right.score ||
+        left.recentRank - right.recentRank ||
         left.plugin.name.localeCompare(right.plugin.name) ||
         left.index - right.index,
     )

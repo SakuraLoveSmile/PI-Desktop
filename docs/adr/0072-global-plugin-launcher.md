@@ -40,7 +40,10 @@ author to add aliases to every manifest.
 4. Only enabled, ready plugins with a panel are candidates. Search normalizes
    name, id, and description and derives tone-free full pinyin and pinyin
    initials from the display name. Up/Down selects, Enter or click opens, Escape
-   dismisses, and IME composition never dispatches.
+   dismisses, and IME composition never dispatches. Successful opens are
+   remembered in renderer-local device storage (D219): an empty query lists the
+   plugins in most-recently-used order, while a typed query ranks relevance
+   first and uses recency only as a tiebreaker.
 
 ## Consequences
 

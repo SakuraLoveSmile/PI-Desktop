@@ -3819,8 +3819,9 @@ Each scenario is documented in this format:
 #### E2E-120: Global plugin launch, next-turn editing, and stopped throughput
 
 - **Preconditions**: Install and enable a panel plugin whose Chinese display
-  name is `无限画布`. Configure a provider that streams slowly enough to stop a
-  partial answer. Run once on macOS and once on Windows.
+  name is `无限画布`, plus a second panel plugin (for example `邮件助手`).
+  Configure a provider that streams slowly enough to stop a partial answer. Run
+  once on macOS and once on Windows.
 - **Steps**:
   1. Immediately after PI-Desktop finishes booting, leave it unfocused and press
      Option+Space on macOS or Alt+Space on Windows while another application
@@ -3832,21 +3833,28 @@ Each scenario is documented in this format:
   2. Search separately for `无限`, `wuxianhuabu`, and `wxhb`. Use Up/Down and
      Enter for one run and click for another; confirm the existing plugin panel
      opens. Confirm Chinese IME candidate Enter does not open a result.
-  3. Start an Agent answer. While it streams, type the next draft and change
+  3. Open the launcher again with an empty query and confirm the plugin opened
+     in step 2 is the first result. Open the other panel plugin, then reopen
+     the launcher and confirm the two plugins appear in reverse opening order.
+     Restart the application and confirm the same most-recently-used order
+     survives the restart.
+  4. Start an Agent answer. While it streams, type the next draft and change
      Thinking, permission mode, and Agent/Plan/Goal. Confirm every selection is
      editable, Stop remains present, and Send cannot dispatch.
-  4. Stop after partial output. Confirm the partial answer remains, the queued
+  5. Stop after partial output. Confirm the partial answer remains, the queued
      configuration becomes durable only after termination, and the next turn
      uses the final selection rather than any intermediate selection.
-  5. Inspect the stopped answer's conversation statistics, reload the session,
+  6. Inspect the stopped answer's conversation statistics, reload the session,
      and inspect again.
 - **Expected**:
   - Early warm-up starts before backend boot completes and removes BrowserWindow
     and renderer loading from the first shortcut's visible path. On macOS the
     panel is activated once without a second app/window-stack hop, so the reveal
     does not visibly stutter. Launcher search returns only enabled, ready panel
-    plugins and every invocation starts with an empty, focused query. Escape and
-    focus loss hide it without closing the main application.
+    plugins and every invocation starts with an empty, focused query ordered by
+    most-recently-used history across restarts; typing a query still ranks
+    relevance first. Escape and focus loss hide it without closing the main
+    application.
   - No running turn observes the staged mode/model/thinking/permission change,
     and a second prompt cannot be sent concurrently.
   - Stopped throughput is present before and after reload. It uses exact output
@@ -3856,7 +3864,8 @@ Each scenario is documented in this format:
   `03-runtime/02-agent-runtime.md` §5b/§9,
   `04-ux/07-ui-design-system.md` §8.2–8.3,
   `04-ux/08-component-spec.md` §11,
-  `04-ux/09-interaction-patterns.md` §1/§3, D211, D212, ADR 0072, ADR 0073
+  `04-ux/09-interaction-patterns.md` §1/§3, D211, D212, D219, ADR 0072,
+  ADR 0073
 - **Acceptance**: C (conversation & stream), F (persistence), G (plugins),
   Quality
 - **Milestone**: M6

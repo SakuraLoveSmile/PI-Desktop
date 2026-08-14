@@ -77,6 +77,11 @@
 | `Enter` | Open selected plugin panel | Launcher focused, not composing IME text |
 | `Escape` | Dismiss launcher | Launcher focused |
 
+The launcher opens with an empty query and shows enabled, ready panel plugins
+in most-recently-used order from renderer-local device history, so the last
+opened plugin stays one Enter away. Typing still ranks search relevance first;
+recency only breaks ties between equally relevant matches.
+
 ### 1.5 Platform application menus
 
 - macOS application-menu accelerators dispatch the same allowlisted shell

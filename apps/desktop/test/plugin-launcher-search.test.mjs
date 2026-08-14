@@ -52,3 +52,40 @@ test("launcher searches ids and excludes plugins that cannot open a panel", () =
     "mail",
   ]);
 });
+
+test("launcher orders an empty query by most recent use", () => {
+  assert.deepEqual(
+    searchLaunchablePlugins(plugins, "", ["mail", "canvas"]).map((item) => item.id),
+    ["mail", "canvas"],
+  );
+  assert.deepEqual(
+    searchLaunchablePlugins(plugins, "", ["mail"]).map((item) => item.id),
+    ["mail", "canvas"],
+  );
+});
+
+test("launcher keeps search relevance ahead of recency", () => {
+  assert.deepEqual(
+    searchLaunchablePlugins(plugins, "wuxianhuabu", ["mail"]).map((item) => item.id),
+    ["canvas"],
+  );
+  assert.deepEqual(
+    searchLaunchablePlugins(plugins, "邮件", ["canvas"]).map((item) => item.id),
+    ["mail"],
+  );
+});
+
+test("launcher uses recency as a tiebreaker between equal matches", () => {
+  const tie = [
+    plugin("alpha", "Alpha Plugin"),
+    plugin("beta", "Beta Plugin"),
+  ];
+  assert.deepEqual(
+    searchLaunchablePlugins(tie, "", ["beta", "alpha"]).map((item) => item.id),
+    ["beta", "alpha"],
+  );
+  assert.deepEqual(
+    searchLaunchablePlugins(tie, "", ["alpha"]).map((item) => item.id),
+    ["alpha", "beta"],
+  );
+});

@@ -3,6 +3,10 @@ import { useTranslation } from "react-i18next";
 import type { PluginSummary } from "@pi-desktop/shared";
 import { api } from "../lib/api";
 import { searchLaunchablePlugins } from "../lib/plugin-launcher-search";
+import {
+  loadPluginLaunchHistory,
+  rememberPluginLaunch,
+} from "../lib/plugin-launcher-history";
 import { IconArrowUpRight, IconPlug, IconSearch } from "./icons";
 
 function monogram(name: string): string {
@@ -18,6 +22,9 @@ export function PluginLauncher() {
   const [loading, setLoading] = useState(true);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recentIds, setRecentIds] = useState<string[]>(() =>
+    loadPluginLaunchHistory().map((record) => record.id),
+  );
   const loadPromiseRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
@@ -54,8 +61,8 @@ export function PluginLauncher() {
   }, []);
 
   const results = useMemo(
-    () => searchLaunchablePlugins(plugins, query).slice(0, 7),
-    [plugins, query],
+    () => searchLaunchablePlugins(plugins, query, recentIds).slice(0, 7),
+    [plugins, query, recentIds],
   );
 
   const load = useCallback(async () => {
@@ -88,6 +95,7 @@ export function PluginLauncher() {
     setHighlighted(0);
     setOpeningId(null);
     setError(null);
+    setRecentIds(loadPluginLaunchHistory().map((record) => record.id));
     // Warm-up may run before the host is ready, so retry the persisted theme
     // when the launcher is actually shown instead of keeping the fallback.
     void api
@@ -125,6 +133,7 @@ export function PluginLauncher() {
     setError(null);
     try {
       await api.openPluginPanel(plugin.id);
+      setRecentIds(rememberPluginLaunch(plugin.id).map((record) => record.id));
       await api.dismissPluginLauncher();
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : String(openError));

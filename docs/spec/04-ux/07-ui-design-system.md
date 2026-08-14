@@ -730,7 +730,10 @@ The focused search field filters enabled, ready plugins that contribute a panel.
 Chinese display names match their original characters, tone-free full pinyin,
 and pinyin initials; plugin IDs, names, and descriptions remain searchable.
 Arrow keys move the active option, Enter or click opens the existing sandboxed
-plugin panel, and IME composition keystrokes never navigate or dispatch.
+plugin panel, and IME composition keystrokes never navigate or dispatch. The
+launcher remembers which plugins were opened most recently in renderer-local
+device storage and shows an empty query in most-recently-used order; a typed
+query still ranks relevance first and uses recency only as a tiebreaker.
 - Local and branch context are non-interactive status labels; the project name
   remains an action because it opens the project picker.
 - Runtime chip labels (Agent/Plan/Goal, Thinking, permission mode, model ID) use
