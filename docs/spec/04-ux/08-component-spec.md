@@ -1239,10 +1239,8 @@ agent errors remain owned by the assistant error and TurnOutcomeCard surfaces.
           ├─ [file] Read /src/foo.ts        [›]
           ├─ [search] Searched TODO  24 matches   [›]
           └─ [terminal] Ran pnpm test  exit 1  • Failed  [copy] [›]
-             ├─ Output       [copy]
-             │  3 passing
-             └─ Errors       [copy]
-                1 failing
+             3 passing
+             1 failing
 ```
 
 - The leading Lucide icon reflects the action type: file, folder, search,
@@ -1260,7 +1258,8 @@ agent errors remain owned by the assistant error and TurnOutcomeCard surfaces.
 - The disclosure chevron is quiet until hover/focus or expansion.
 - A `run` row's head carries two more controls than the others, because its
   command lives only there (D226, §9.10): the outcome with a toned dot, and a
-  copy control beside the chevron.
+  copy control beside the chevron. That outcome comes from the exit code the
+  shell reported, not from the status of the call that carried it (D227).
 
 ### 9.3 Expanded blocks
 
@@ -1274,7 +1273,7 @@ twice.
 | Read | `File content` — syntax highlighted from the file extension |
 | Write | `Written content` — highlighted from the target extension |
 | Edit | `Changes` — compact diff, only when no ReviewChangeCard owns one |
-| Bash | `Output`, `Errors` (error hue); empty channels omitted. The command stays in the head (§9.10); a PermissionCard, which has no head, still shows it as `Command` (shell) |
+| Bash | `Output`, `Errors` (error hue), unframed and unlabelled (D227, §9.10); empty channels omitted. The command stays in the head; a PermissionCard, which has no head, still shows it as `Command` (shell) |
 | Glob | `Files` — clickable workspace paths |
 | Grep | `Matches` — grouped by file with a `line` gutter and clickable path headings for `outputMode: content`; a clickable path list for `filesWithMatches`; `path` → hit count fields for `count` |
 | any host `notice` | `Note` — neutral, after the blocks it qualifies (search scoping, clipped long lines, Read window) |
@@ -1306,7 +1305,7 @@ twice.
 |---|---|---|
 | Running | Progressive action + shimmer + spinner; a `run` row pulses a dot beside `Working…` instead | Latest partial output |
 | Success | Past-tense action + result chips; no green success badge, except a `run` row's dot and `Done` | Result blocks, then arguments if not already shown |
-| Error | Past-tense action + compact danger status; auto-expanded | Error note first, then arguments |
+| Error | Past-tense action + compact danger status; auto-expanded. A `run` row is in this state whenever its command exited non-zero, whatever the call reported (D227) | Error note first, then arguments |
 | Denied | Muted `Denied` status | Permission result when available |
 
 ### 9.6 Interactions
@@ -1423,22 +1422,31 @@ things the body no longer offers move up into the head.
 
 ```text
 └─ [terminal] Ran  pnpm test  exit 1   • Failed  [copy] [›]
-   ├─ Output       [copy]
-   │  desktop test 648 tests
-   └─ Errors       [copy]
-      1 failing: run head keeps its caret
+   desktop test 648 tests
+   1 failing: run head keeps its caret
 ```
 
 - **The command appears once.** The body of a `run` row holds `Output`, `Errors`
   and any host `notice` — never the command. A PermissionCard has no head of its
   own, so it keeps showing the command it is asking about.
 - **Copy sits beside the chevron** and yields the command as it was written,
-  including newlines the one-line head hint had to squeeze out. Output keeps its
-  own per-block copy in the body.
+  including newlines the one-line head hint had to squeeze out.
+- **The body is the output, unframed** (D227). A `run` row's blocks drop their
+  heading and their card — no border, no fill, no per-block copy button — so the
+  expanded row reads like the terminal the text came from. The 260px height cap
+  and its scroll stay: a long build must not bury the transcript. `Errors` keeps
+  its tint, and each channel's name is carried for assistive technology in place
+  of the heading that used to name it.
+- **The outcome is what the command did, not what the call did** (D227). It is
+  read from the exit code the shell reported: non-zero is `Failed` even when the
+  tool call around it came back fine, and a killed shell that reports no code at
+  all is `Failed` too. Tools that report no exit code fall back to the call's
+  status; a row with neither states nothing rather than claiming `Done`.
 - **The outcome is stated, success included**: a toned dot plus `Done`,
   `Failed`, `Denied`, or `Working…`. A `run` row shows no spinner; the running
   dot pulses instead, and holds still under `prefers-reduced-motion`. The label
-  carries the meaning, so the dot's hue is never the only signal.
+  carries the meaning, so the dot's hue is never the only signal. A failing
+  command opens its own row, whichever layer noticed the failure.
 - Both new controls follow the chevron's quiet-until-needed rule: hidden at
   rest, revealed on row hover, on focus, and while the row is open. The status
   label is always visible — it is the outcome, not an affordance.

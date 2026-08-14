@@ -1722,3 +1722,27 @@ D193, and D194.
 - Decision D226 refines D192's structured tool presentation and is
   renderer-only. Protocol, host RPC, IPC channels, and storage schema are
   unchanged. See `04-ux/08-component-spec.md` §9.2/§9.3/§9.5/§9.10 and E2E-129.
+
+## 2026-08-14 — A run row reports what the command did
+
+- The row's outcome was the tool call's status, so a command that exited 1 could
+  read `Done` whenever a layer forgot to flag the call as failed. It is now read
+  from the shell's own report: `exitCode` non-zero is `Failed`, a killed shell
+  that reports no code at all is `Failed`, and only `exitCode: 0` is `Done`. The
+  host already applied that rule when marking Bash results; the row no longer
+  depends on it having been applied upstream.
+- Tools that report no exit code fall back to the call's status. A row with
+  neither — an import, a half-written message — states nothing rather than
+  claiming success, and hands the announcement back to the hidden live region.
+  The auto-open on failure follows the derived outcome, so a failing command
+  opens its own row whichever layer noticed.
+- The expanded body loses its card. A `run` row's blocks drop the heading, the
+  border, the fill and the per-block copy button, leaving the output as plain
+  monospace text that reads like the terminal it came from. The 260px cap and
+  its scroll stay: a long build must not bury the rest of the transcript.
+- Dropping the headings would have left `Errors` distinguished by tint alone, so
+  each channel's name is still rendered for assistive technology — visually
+  hidden, semantically present.
+- Decision D227 refines D226 and is renderer-only. Protocol, host RPC, IPC
+  channels, and storage schema are unchanged. See
+  `04-ux/08-component-spec.md` §9.2/§9.3/§9.5/§9.10 and E2E-129.

@@ -4913,13 +4913,20 @@ This test plan spec is accepted when:
   produced at least three command rows: one that succeeded with output, one that
   failed with both output and errors, and one still running.
 - **Steps**:
-  1) Expand the successful row and confirm the body opens on the Output block —
-     the command is not repeated inside the body, and no argument list appears
-     in its place.
+  1) Expand the successful row and confirm the body shows the command's output
+     as plain text — no `Output` heading, no bordered card, no per-block copy
+     button — and that the command is not repeated inside the body, with no
+     argument list in its place.
   2) Confirm each row's head states its outcome to the right of the summary:
      `Done`, `Failed`, `Denied`, or `Working…`, each with a dot in the matching
      tint, and that the running row shows the pulsing dot instead of the row
      spinner.
+  2a) Run a command that exits non-zero (`pnpm test` on a failing suite, or
+     `false`) and confirm the row reads `Failed` with the error dot and opens
+     itself, even though the tool call completed. Confirm the exit-code chip and
+     the worded outcome agree.
+  2b) Interrupt a long command so the shell is killed with no exit code, and
+     confirm the row reads `Failed` rather than `Done`.
   3) Hover the successful row and confirm a copy button and the chevron appear
      between the summary and the row's right edge; move the pointer away and
      confirm both fade while the status label stays visible.
@@ -4941,9 +4948,12 @@ This test plan spec is accepted when:
   10) Repeat steps 1–3 in Chinese and in both light and dark themes.
 - **Expected**: A command appears exactly once per row, in the head, alongside a
   copy control that yields it verbatim and a worded outcome that does not rely
-  on the dot's color. The expanded body holds only what the command printed, and
-  a command that printed nothing opens empty rather than falling back to its
-  arguments. Approval cards are unaffected, since they have no head of their own.
+  on the dot's color. The outcome reports what the command did — a non-zero or
+  missing exit code reads `Failed` regardless of the tool call's own status — and
+  a row with nothing to report states nothing instead of claiming `Done`. The
+  expanded body holds only what the command printed, as bare text, and a command
+  that printed nothing opens empty rather than falling back to its arguments.
+  Approval cards are unaffected, since they have no head of their own.
 - **Specs linked**: `04-ux/08-component-spec.md` §9.2, §9.3, §9.5, §9.10
 - **Acceptance**: E (tools & permissions), H (localization)
 - **Milestone**: M5+
