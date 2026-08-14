@@ -113,6 +113,16 @@ recency only breaks ties between equally relevant matches.
   drag region. Maximize state is queried on mount and updated from native
   window events, so the restore affordance never depends only on optimistic
   renderer state.
+- Minimize is always a native minimize and keeps the taskbar/dock entry.
+  Windows/Linux close behavior is user-configurable (ADR 0071): an unset
+  preference asks once via a native prompt (Cancel / Close to tray / Quit);
+  `tray` hides the window and keeps the app running under a system-tray
+  icon whose click restores the window; `quit` exits the app. The choice is
+  persisted, revisitable in Settings → General, and applied by both the
+  close button and the close shortcut. macOS keeps the native Dock
+  lifecycle (close keeps the app in the Dock; activating recreates the
+  window). The bounds watchdog never restores a minimized or tray-hidden
+  window.
 
 ### 1.5.1 Tray-resident minimize
 

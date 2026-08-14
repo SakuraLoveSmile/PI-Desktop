@@ -106,3 +106,4 @@ Each ADR includes:
 | 0087 | Replace textual Edit matching with a line-anchored, tag-verified contract | Accepted for implementation (amends 0043 / 0069) |
 | 0088 | Declared file scope and recoverable deletion for plugins | Accepted (continues 0008 D009) |
 | 0089 | Proactive background subagent delegation | Accepted for implementation |
+| 0090 | User-configurable close behavior with close-to-tray | Accepted for implementation |
