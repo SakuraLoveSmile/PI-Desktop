@@ -1,6 +1,6 @@
 import type { UiMessage } from "@pi-desktop/shared";
 import type { AssistantActivityItem } from "./assistant-turns";
-import { getToolAction } from "./tool-display";
+import { getToolAction, isDelegationStartTool } from "./tool-display";
 import { toolResultPayload } from "./tool-presentation";
 
 export type DelegationActivityItem = Extract<
@@ -14,13 +14,19 @@ export type SubagentOutcome =
   | "truncated"
   | "aborted"
   | "failed"
+  | "stopped"
   | "denied";
 
 export function isDelegationActivityItem(
   item: AssistantActivityItem,
 ): item is DelegationActivityItem {
+  // Only the tool that STARTS a subagent is a delegation activity item (ADR
+  // 0062): the lifecycle tools (TaskWait/TaskList/TaskStop, ADR 0087) drive an
+  // existing delegation and must not inflate the topology's subagent counts.
   return (
-    item.kind === "tool" && getToolAction(item.message.toolName) === "delegate"
+    item.kind === "tool" &&
+    isDelegationStartTool(item.message.toolName) &&
+    getToolAction(item.message.toolName) === "delegate"
   );
 }
 
@@ -32,7 +38,8 @@ export function subagentOutcome(message: UiMessage): SubagentOutcome {
       status === "completed" ||
       status === "truncated" ||
       status === "aborted" ||
-      status === "failed"
+      status === "failed" ||
+      status === "stopped"
     ) {
       return status;
     }
@@ -55,7 +62,10 @@ export function summarizeSubagentActivity(
       (outcome) => outcome === "failed" || outcome === "denied",
     ).length,
     warnings: outcomes.filter(
-      (outcome) => outcome === "truncated" || outcome === "aborted",
+      (outcome) =>
+        outcome === "truncated" ||
+        outcome === "aborted" ||
+        outcome === "stopped",
     ).length,
   };
 }
