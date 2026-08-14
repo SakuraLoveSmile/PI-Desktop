@@ -94,10 +94,8 @@ import { resolvePluginLocalizedString } from "@pi-desktop/plugin-sdk";
 import { HostProcess } from "./host-process";
 import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
-import {
-  MAX_DELETES_PER_WINDOW as PLUGIN_MAX_DELETES_PER_WINDOW,
-  PluginRuntime,
-} from "./plugin-runtime";
+import { PluginRuntime } from "./plugin-runtime";
+import { createFsConsentService } from "./plugin-fs-consent";
 import { UserMcpRuntime } from "./user-mcp";
 import {
   MCP_CALL_TIMEOUT_MS,
@@ -325,39 +323,10 @@ const plugins = new PluginRuntime({
   // A file access the manifest did not cover is decided by the user, natively
   // and synchronously: the plugin's call is still waiting on the answer, so
   // there is no window in which the access happens before consent.
-  confirmFsAccess: async (request) => {
-    const strings =
-      resolveLocale(updaterLocale) === "zh-CN" ? zhCN.pluginFsConsent : en.pluginFsConsent;
-    const rate = request.reason === "rate";
-    const buttons = rate
-      ? [strings.deny, strings.allowOnce]
-      : [strings.deny, strings.allowOnce, strings.allowSession];
-    const options = {
-      type: "warning" as const,
-      message: (rate ? strings.rate : strings[request.mode]).replace(
-        "{name}",
-        request.pluginName,
-      ),
-      detail: (rate ? strings.rateDetail : strings.detail)
-        .replace("{limit}", String(PLUGIN_MAX_DELETES_PER_WINDOW))
-        .replace("{path}", request.fullPath),
-      buttons,
-      // Escape and the red-X both land on Deny; a dismissed dialog must never
-      // read as permission.
-      defaultId: 0,
-      cancelId: 0,
-      noLink: true,
-    };
-    // Modal to the main window when there is one, so the prompt cannot be lost
-    // behind it; standalone if the plugin acted while no window was up.
-    const result =
-      mainWindow && !mainWindow.isDestroyed()
-        ? await dialog.showMessageBox(mainWindow, options)
-        : await dialog.showMessageBox(options);
-    if (result.response === 1) return "once";
-    if (result.response === 2) return "session";
-    return "deny";
-  },
+  confirmFsAccess: createFsConsentService({
+    getWindow: () => mainWindow,
+    getLocale: () => updaterLocale,
+  }),
   // The OS trash is what makes a plugin delete recoverable, and it is the
   // reason none of the user's data is copied anywhere by us.
   trashItem: async (fullPath) => {
