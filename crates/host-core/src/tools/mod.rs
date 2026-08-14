@@ -552,6 +552,11 @@ pub struct ToolsExecuteParams {
     pub _mode: String,
     #[serde(default)]
     pub declared_risk: Option<String>,
+    /// Permission scope of a subagent's tool call (ADR 0087): when present,
+    /// the call resolves under this mode instead of the session's effective
+    /// permission mode. `inherit` and absent behave identically.
+    #[serde(default)]
+    pub permission_scope: Option<String>,
     #[serde(default)]
     pub expected_command_shell_id: Option<String>,
     #[serde(default)]

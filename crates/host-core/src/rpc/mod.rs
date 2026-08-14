@@ -2128,7 +2128,10 @@ async fn handle_request(
                     st.permissions.expire_stale();
                     // Effective permission mode (D115): per-session override
                     // unless it is `inherit`, then the global settings default,
-                    // then `ask`.
+                    // then `ask`. A subagent's tool call carries its own scope
+                    // (ADR 0087), which resolves the call under that mode
+                    // instead; external-path gating and the contract modes'
+                    // hard deny are untouched by the override.
                     let session_pm = sessions::session_permission_mode(&st.db, &p.session_id)
                         .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?
                         .filter(|m| m != "inherit");
@@ -2146,6 +2149,15 @@ async fn handle_request(
                             })
                             .filter(|m| sessions::is_valid_permission_mode(m) && m != "inherit")
                             .unwrap_or_else(|| "ask".to_string()),
+                    };
+                    let effective_pm = match p.permission_scope.as_deref() {
+                        Some(scope)
+                            if sessions::is_valid_permission_mode(scope)
+                                && scope != "inherit" =>
+                        {
+                            scope.to_string()
+                        }
+                        _ => effective_pm,
                     };
                     // Resolve the tool root from the persisted session instead of
                     // the mutable global workspace. This keeps background turns
@@ -4967,6 +4979,150 @@ mod tests {
         .unwrap();
         assert_eq!(auto["ok"], true);
         assert_eq!(auto["content"]["root"], "external");
+    }
+
+    #[tokio::test]
+    async fn delegate_permission_scope_overrides_session_mode_without_opening_external_paths() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project = data_dir.path().join("project");
+        let outside = data_dir.path().join("outside");
+        fs::create_dir_all(&project).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Delegate scope".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        // Session mode is `ask`: without a scope, Write prompts (ADR 0087).
+        sessions::configure_session_with_thinking(
+            &app_state.db,
+            &session.id,
+            "agent",
+            None,
+            None,
+            None,
+            Some("ask"),
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let session_id = session.id.clone();
+        let outside_path = outside.join("note.txt").to_string_lossy().into_owned();
+
+        // 1. In-workspace Write under `permissionScope: accept-edits` resolves
+        //    without a permission request, despite the session being in `ask`.
+        let (notify_tx, mut notify_rx) = mpsc::unbounded_channel();
+        let allowed = handle_request(
+            state.clone(),
+            "tools.execute",
+            json!({
+                "sessionId": session_id.clone(),
+                "toolCallId": "delegate-write-scoped",
+                "toolName": "Write",
+                "args": { "path": "file.txt", "content": "delegated" },
+                "mode": "agent",
+                "permissionScope": "accept-edits"
+            }),
+            notify_tx,
+        )
+        .await
+        .unwrap();
+        assert_eq!(allowed["ok"], true);
+        assert_eq!(allowed["content"]["root"], "workspace");
+        // No permission request may arrive: the scope auto-allowed the write.
+        // The channel is dropped with the request, so Ok(None) counts as clean.
+        let stray = tokio::time::timeout(std::time::Duration::from_millis(100), notify_rx.recv())
+            .await;
+        match stray {
+            Err(_) | Ok(None) => {}
+            Ok(Some(text)) => {
+                panic!("scoped in-workspace Write raised an unexpected notification: {text}")
+            }
+        }
+
+        // 2. The same call without a scope prompts under the session's `ask`.
+        let (notify_tx, mut notify_rx) = mpsc::unbounded_channel();
+        let pending_state = state.clone();
+        let pending_session_id = session_id.clone();
+        let pending = tokio::spawn(async move {
+            handle_request(
+                pending_state,
+                "tools.execute",
+                json!({
+                    "sessionId": pending_session_id,
+                    "toolCallId": "delegate-write-unscoped",
+                    "toolName": "Write",
+                    "args": { "path": "file2.txt", "content": "delegated" },
+                    "mode": "agent"
+                }),
+                notify_tx,
+            )
+            .await
+        });
+        let notification = notify_rx.recv().await.unwrap();
+        let notification: Value = serde_json::from_str(&notification).unwrap();
+        assert_eq!(notification["method"], "permissions.request");
+        assert_eq!(
+            notification["params"]["reason"],
+            "Modifies files in your workspace"
+        );
+        let request_id = notification["params"]["requestId"].as_str().unwrap();
+        handle_request(
+            state.clone(),
+            "permissions.resolve",
+            json!({ "requestId": request_id, "decision": "allow-once" }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(pending.await.unwrap().unwrap()["ok"], true);
+
+        // 3. An external-path Write keeps prompting even under the scope: the
+        //    scope only relaxes the session mode, never the path gate.
+        let (notify_tx, mut notify_rx) = mpsc::unbounded_channel();
+        let pending_state = state.clone();
+        let pending_session_id = session_id.clone();
+        let pending_outside_path = outside_path.clone();
+        let pending = tokio::spawn(async move {
+            handle_request(
+                pending_state,
+                "tools.execute",
+                json!({
+                    "sessionId": pending_session_id,
+                    "toolCallId": "delegate-write-external",
+                    "toolName": "Write",
+                    "args": { "path": pending_outside_path, "content": "delegated" },
+                    "mode": "agent",
+                    "permissionScope": "accept-edits"
+                }),
+                notify_tx,
+            )
+            .await
+        });
+        let notification = notify_rx.recv().await.unwrap();
+        let notification: Value = serde_json::from_str(&notification).unwrap();
+        assert_eq!(notification["method"], "permissions.request");
+        assert_eq!(
+            notification["params"]["reason"],
+            "Accesses a path outside the session workspace"
+        );
+        let request_id = notification["params"]["requestId"].as_str().unwrap();
+        handle_request(
+            state.clone(),
+            "permissions.resolve",
+            json!({ "requestId": request_id, "decision": "allow-once" }),
+            mpsc::unbounded_channel().0,
+        )
+        .await
+        .unwrap();
+        let allowed = pending.await.unwrap().unwrap();
+        assert_eq!(allowed["ok"], true);
+        assert_eq!(allowed["content"]["root"], "external");
     }
 
     #[tokio::test]
