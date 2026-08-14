@@ -24,3 +24,22 @@ test("selecting System default persists an empty stack so the override clears", 
   assert.match(rowSource, /saveSettings\(value \? \{ fontFamily: value \} : \{ fontFamily: "" \}\)/);
   assert.doesNotMatch(rowSource, /fontFamily: undefined/);
 });
+
+test("font rows skip off-screen layout and font loading so long lists stay scrollable", () => {
+  assert.match(rowSource, /className="settings-font-row"/);
+  assert.match(
+    styles,
+    /\.settings-font-row\s*\{[^}]*content-visibility:\s*auto;/s,
+  );
+  assert.match(
+    styles,
+    /\.settings-font-row\s*\{[^}]*contain-intrinsic-size:\s*auto 28px;/s,
+  );
+});
+
+test("menu repositioning ignores scrolls inside the font list", () => {
+  assert.match(
+    rowSource,
+    /menuRef\.current\?\.contains\(target\)/,
+  );
+});

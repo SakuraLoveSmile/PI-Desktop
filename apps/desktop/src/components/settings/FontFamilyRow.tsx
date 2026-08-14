@@ -164,7 +164,13 @@ export function FontFamilyRow({
 
   useEffect(() => {
     if (!open) return;
-    const onViewportChange = () => updateMenuPosition();
+    const onViewportChange = (event: Event) => {
+      // Scrolling inside the font list cannot move the fixed menu; skip it
+      // so the handler does not force a layout read on every scroll tick.
+      const target = event.target as Node | null;
+      if (target && menuRef.current?.contains(target)) return;
+      updateMenuPosition();
+    };
     window.addEventListener("resize", onViewportChange);
     window.addEventListener("scroll", onViewportChange, true);
     return () => {
@@ -303,37 +309,39 @@ export function FontFamilyRow({
                               {groupLabel(option.group)}
                             </div>
                           ) : null}
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={option.value === selectedValue}
-                            data-font-index={index}
-                            className={[
-                              "settings-font-item",
-                              index === highlight && "kb-active",
-                              option.value === selectedValue && "active",
-                            ].join(" ")}
-                            style={{ fontFamily: option.family || undefined }}
-                            onClick={() => void selectOption(option.value)}
-                            onMouseEnter={() => setHighlight(index)}
-                          >
-                            <span className="settings-font-item-label">
-                              {option.group === "default"
-                                ? t("settings.fontSystemDefault")
-                                : option.label}
-                            </span>
-                            {option.license ? (
-                              <span className="settings-font-item-license">
-                                {option.license}
+                          <div className="settings-font-row">
+                            <button
+                              type="button"
+                              role="option"
+                              aria-selected={option.value === selectedValue}
+                              data-font-index={index}
+                              className={[
+                                "settings-font-item",
+                                index === highlight && "kb-active",
+                                option.value === selectedValue && "active",
+                              ].join(" ")}
+                              style={{ fontFamily: option.family || undefined }}
+                              onClick={() => void selectOption(option.value)}
+                              onMouseEnter={() => setHighlight(index)}
+                            >
+                              <span className="settings-font-item-label">
+                                {option.group === "default"
+                                  ? t("settings.fontSystemDefault")
+                                  : option.label}
                               </span>
-                            ) : null}
-                            {option.value === selectedValue ? (
-                              <IconCheck
-                                size={14}
-                                className="settings-font-check"
-                              />
-                            ) : null}
-                          </button>
+                              {option.license ? (
+                                <span className="settings-font-item-license">
+                                  {option.license}
+                                </span>
+                              ) : null}
+                              {option.value === selectedValue ? (
+                                <IconCheck
+                                  size={14}
+                                  className="settings-font-check"
+                                />
+                              ) : null}
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
