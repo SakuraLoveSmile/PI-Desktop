@@ -906,7 +906,19 @@ export class PluginRuntime {
       case "workspace.get":
         return api.workspace.get();
       default:
-        throw apiError("UNSUPPORTED", `unknown panel channel: ${channel}`);
+        // The panel is the plugin's own UI: any channel the host does not
+        // implement itself is forwarded to the plugin's onPanelInvoke so
+        // plugins can define their own panel↔main-process channels
+        // (e.g. the domain manager's "domain.sync" data bridge).
+        return this.sendToChild(
+          loaded,
+          {
+            t: "call",
+            method: "panel.invoke",
+            payload: { channel, payload: payload ?? {} },
+          },
+          PLUGIN_PANEL_TIMEOUT_MS,
+        );
     }
   }
 
