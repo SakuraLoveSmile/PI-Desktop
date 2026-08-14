@@ -2381,6 +2381,24 @@
   color: color-mix(in oklab, var(--ds-error) 72%, var(--ds-text-primary));
 }
 
+/*
+ * A run row's body is the output itself (D227): the heading, the frame and the
+ * fill are gone, so what is left reads like the terminal it came from. The
+ * height cap stays — a thousand-line build must not push the rest of the
+ * transcript out of reach — and stderr keeps its tint, with the channel name
+ * carried for screen readers instead of by a visible heading.
+ */
+.tool-block.is-plain + .tool-block.is-plain {
+  margin-top: 6px;
+}
+
+.tool-block.is-plain .tool-row-content {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
 /* Edit diffs: same rails as the review card, inside the tool body. */
 .tool-diff {
   overflow: hidden;

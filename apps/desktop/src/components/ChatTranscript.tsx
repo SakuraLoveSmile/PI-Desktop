@@ -36,6 +36,7 @@ import {
 import {
   buildToolPresentation,
   hasToolDetails,
+  runOutcome,
   toolResultChips,
 } from "../lib/tool-presentation";
 import {
@@ -860,8 +861,13 @@ function ToolRow({
   const openTarget = useOpenPreviewTarget();
   const openTerminal = useAppStore((s) => s.openTerminalInWorkPanel);
   const status = message.toolStatus;
-  const [open, setOpen] = useState(status === "error");
   const action = getToolAction(message.toolName);
+  // A run row states what the command did, not what the call around it did: an
+  // exit code the shell reported outranks a tool call that came back fine
+  // (D227). Property reads only, so a streaming row can afford it every tick.
+  const run = action === "run" ? runOutcome(message) : null;
+  const failed = status === "error" || run === "failed";
+  const [open, setOpen] = useState(failed);
   const actionLabel = t(
     status === "running" ? TOOL_RUNNING_KEYS[action] : TOOL_ACTION_KEYS[action],
   );
@@ -897,34 +903,46 @@ function ToolRow({
         })
       : null;
   const outcome = variant === "topology" ? subagentOutcome(message) : null;
+  const runLabel =
+    run === "running"
+      ? t("chat.running")
+      : run === "failed"
+        ? t("chat.toolFailed")
+        : run === "denied"
+          ? t("chat.toolDenied")
+          : run === "ok"
+            ? t("chat.toolCompleted")
+            : "";
   const statusLabel = outcome
     ? t(`chat.subagentStatus.${outcome}`)
-    : status === "running"
-      ? t("chat.running")
-      : status === "error"
-        ? t("chat.toolFailed")
-        : status === "denied"
-          ? t("chat.toolDenied")
-          : t("chat.toolCompleted");
+    : run
+      ? runLabel
+      : status === "running"
+        ? t("chat.running")
+        : status === "error"
+          ? t("chat.toolFailed")
+          : status === "denied"
+            ? t("chat.toolDenied")
+            : t("chat.toolCompleted");
   const duration =
     typeof message.toolDurationMs === "number" && message.toolDurationMs > 0
       ? formatToolDuration(message.toolDurationMs / 1000)
       : "";
 
   useEffect(() => {
-    if (status === "error") setOpen(true);
-  }, [status]);
+    if (failed) setOpen(true);
+  }, [failed]);
 
   useEffect(() => {
     if (outcome === "failed") setOpen(true);
   }, [outcome]);
 
   const statusTone =
-    status === "running"
+    run === "running" || (!run && status === "running")
       ? "is-running"
-      : status === "error"
+      : failed
         ? "is-error"
-        : status === "denied"
+        : run === "denied" || (!run && status === "denied")
           ? "is-denied"
           : "is-done";
   const caret = hasDetails ? <IconChevronRight size={12} /> : null;
@@ -933,9 +951,9 @@ function ToolRow({
     <div
       className={`tool-row ${variant === "topology" ? "subagent-topology-node" : ""} ${
         open ? "open" : ""
-      } status-${status || "success"}${outcome ? ` outcome-${outcome}` : ""}`}
+      } status-${run === "failed" ? "error" : status || "success"}${outcome ? ` outcome-${outcome}` : ""}`}
       role={variant === "topology" ? "listitem" : "region"}
-      aria-label={`${t("chat.toolCall")}: ${rawName}, ${statusLabel}`}
+      aria-label={`${t("chat.toolCall")}: ${rawName}${statusLabel ? `, ${statusLabel}` : ""}`}
     >
       {variant === "topology" ? (
         <button
@@ -1038,7 +1056,7 @@ function ToolRow({
               </span>
             ) : null}
             <ToolChips chips={chips} />
-            {runHead ? (
+            {runHead && statusLabel ? (
               <span
                 className={`tool-row-state ${statusTone}`}
                 role="status"
@@ -1060,7 +1078,7 @@ function ToolRow({
             ) : status === "denied" ? (
               <span className="tool-row-status">{t("chat.toolDenied")}</span>
             ) : null}
-            {runHead ? null : (
+            {runHead && statusLabel ? null : (
               <span className="sr-only" role="status" aria-live="polite">
                 {statusLabel}
               </span>
@@ -1097,7 +1115,7 @@ function ToolRow({
             label={t("chat.collapseDetails")}
             onCollapse={() => setOpen(false)}
           />
-          <ToolDetailBlocks blocks={blocks} />
+          <ToolDetailBlocks blocks={blocks} plain={runHead} />
         </div>
       ) : null}
       {open && delegate ? (

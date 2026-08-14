@@ -51,7 +51,7 @@ test("tool rows render structured blocks instead of dumping JSON", async () => {
   // Blocks stay behind the open guard so streaming ticks stay cheap.
   assert.match(transcriptSource, /open && hasDetails\s*\?\s*buildToolPresentation/);
   assert.match(transcriptSource, /<ToolChips chips=\{chips\} \/>/);
-  assert.match(transcriptSource, /<ToolDetailBlocks blocks=\{blocks\} \/>/);
+  assert.match(transcriptSource, /<ToolDetailBlocks blocks=\{blocks\} plain=\{runHead\} \/>/);
   assert.match(permissionSource, /<ToolDetailBlocks blocks=\{argBlocks\} \/>/);
   // Code bodies share the transcript highlighter rather than a second cache.
   assert.match(detailsSource, /<HighlightedCode code=\{block\.text\} lang=\{block\.lang\} \/>/);

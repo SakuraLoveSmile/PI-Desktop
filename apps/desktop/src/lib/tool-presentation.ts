@@ -384,6 +384,27 @@ function safeJson(value: unknown): string {
   }
 }
 
+/**
+ * What actually happened to a command, read from what the shell returned rather
+ * than from the status of the call that carried it: a command that exits
+ * non-zero has failed even when the tool call around it succeeded, and a shell
+ * that was killed reports no code at all (D227). `unknown` means the row has
+ * nothing to claim — an imported or half-written message — so it says nothing.
+ */
+export function runOutcome(
+  message: ToolPresentationMessage,
+): "running" | "denied" | "failed" | "ok" | "unknown" {
+  if (message.toolStatus === "running") return "running";
+  if (message.toolStatus === "denied") return "denied";
+  const details = asRecord(toolResultPayload(message));
+  if (details && "exitCode" in details) {
+    return numberAt(details, "exitCode") === 0 ? "ok" : "failed";
+  }
+  if (message.toolStatus === "error") return "failed";
+  if (message.toolStatus === "success") return "ok";
+  return "unknown";
+}
+
 /** Cheap outcome badges for the collapsed row: no stringify, property reads. */
 export function toolResultChips(message: ToolPresentationMessage): ToolChip[] {
   const details = asRecord(toolResultPayload(message));

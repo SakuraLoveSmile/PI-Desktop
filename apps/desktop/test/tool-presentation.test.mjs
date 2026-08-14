@@ -12,6 +12,7 @@ const {
   buildToolPresentation,
   hasToolDetails,
   langForPath,
+  runOutcome,
   toolResultChips,
   toolResultPayload,
 } = await import("../src/lib/tool-presentation.ts");
@@ -152,6 +153,28 @@ test("Bash keeps its channels apart and leaves the command to the head", () => {
   const asked = buildToolPresentation(message);
   assert.deepEqual(roles(asked), ["command", "stdout", "stderr"]);
   assert.equal(byRole(asked, "command").lang, "bash");
+});
+
+test("the run outcome comes from the exit code, not from the call's status", () => {
+  const run = (details, toolStatus) =>
+    runOutcome({
+      toolName: "Bash",
+      toolArgs: { command: "pnpm test" },
+      ...(details === null ? {} : { toolResult: envelope(details) }),
+      ...(toolStatus ? { toolStatus } : {}),
+    });
+  // The row must not read as done just because the call carrying it came back.
+  assert.equal(run({ exitCode: 1, stdout: "", stderr: "boom" }, "success"), "failed");
+  assert.equal(run({ exitCode: 0, stdout: "ok\n" }, "success"), "ok");
+  // A killed shell reports no code at all; the host counts that as a failure.
+  assert.equal(run({ exitCode: null, stdout: "" }, "success"), "failed");
+  assert.equal(run({ exitCode: 0 }, "running"), "running");
+  assert.equal(run({ exitCode: 0 }, "denied"), "denied");
+  // Tools that report no exit code fall back to the call's own status.
+  assert.equal(run({ ok: true }, "success"), "ok");
+  assert.equal(run({ ok: false }, "error"), "failed");
+  // Nothing known: the row says nothing rather than claiming success.
+  assert.equal(run(null), "unknown");
 });
 
 test("a command that prints nothing does not fall back to its arguments", () => {

@@ -81,8 +81,12 @@ test("tool errors stay local to their rows instead of failing the activity group
   assert.doesNotMatch(transcript, /const hasFailure = items\.some/);
   assert.doesNotMatch(transcript, /processingFailedAfter/);
   assert.doesNotMatch(transcript, /tool-activity-group[\s\S]*?failed/);
-  assert.match(transcript, /const \[open, setOpen\] = useState\(status === "error"\)/);
-  assert.match(transcript, /if \(status === "error"\) setOpen\(true\)/);
+  // A failure opens its own row and nothing else. The row reads the failure
+  // from the command's exit code as well as the call's status (D227), so the
+  // auto-open hangs off that derived flag.
+  assert.match(transcript, /const failed = status === "error" \|\| run === "failed"/);
+  assert.match(transcript, /const \[open, setOpen\] = useState\(failed\)/);
+  assert.match(transcript, /if \(failed\) setOpen\(true\)/);
   assert.match(transcript, /status === "error"\s*\? t\("chat\.toolFailed"\)/);
 });
 

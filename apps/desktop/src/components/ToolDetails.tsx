@@ -216,19 +216,35 @@ function BlockBody({ block }: { block: ToolBlock }) {
   }
 }
 
-export function ToolDetailBlocks({ blocks }: { blocks: ToolBlock[] }) {
+export function ToolDetailBlocks({
+  blocks,
+  plain = false,
+}: {
+  blocks: ToolBlock[];
+  plain?: boolean;
+}) {
   const { t } = useTranslation();
   return (
     <>
-      {blocks.map((block, index) => (
-        <section className="tool-block" key={`${block.role}-${block.label ?? index}`}>
-          <BlockHead
-            label={block.label ?? t(BLOCK_LABEL_KEYS[block.role])}
-            copy={blockCopyText(block)}
-          />
-          <BlockBody block={block} />
-        </section>
-      ))}
+      {blocks.map((block, index) => {
+        const label = block.label ?? t(BLOCK_LABEL_KEYS[block.role]);
+        return (
+          <section
+            className={cx("tool-block", plain && "is-plain")}
+            key={`${block.role}-${block.label ?? index}`}
+          >
+            {plain ? (
+              // A run row's body is the output and nothing else (D227), so the
+              // heading and its frame are gone. The channel still needs a name
+              // for anyone who cannot see that stderr is the tinted one.
+              <span className="sr-only">{label}</span>
+            ) : (
+              <BlockHead label={label} copy={blockCopyText(block)} />
+            )}
+            <BlockBody block={block} />
+          </section>
+        );
+      })}
     </>
   );
 }
