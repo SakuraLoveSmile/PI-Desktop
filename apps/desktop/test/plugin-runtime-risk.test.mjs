@@ -60,6 +60,26 @@ test("workspace deletion and panel operations stay bounded", () => {
   assert.match(runtimeSrc, /MAX_DELETES_PER_WINDOW/);
 });
 
+test("the plugins page shows the file scope behind a file permission", () => {
+  // A permission name says "may touch files"; only the scope says which ones,
+  // so the row has to carry it or the user is approving a blank cheque.
+  assert.match(pageSrc, /"fs\.write": "high"/);
+  assert.match(pageSrc, /"fs\.read": "medium"/);
+  assert.match(pageSrc, /function FsScopeChips\(/);
+  assert.match(pageSrc, /t\("plugins\.fsAsksEachTime"\)/);
+  assert.match(pageSrc, /t\("plugins\.legacyFsDowngraded"\)/);
+  // The scope reaches the renderer from the registry, not from a second read
+  // of the manifest, so an old record simply has no scope to show.
+  const hostSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins.rs"), "utf8");
+  assert.match(hostSrc, /fs: manifest\.fs\.clone\(\)/);
+  for (const catalog of [en, zhCN]) {
+    assert.equal(typeof catalog.plugins.legacyFsDowngraded, "string");
+    assert.equal(typeof catalog.plugins.fsMode.delete, "string");
+    assert.equal(typeof catalog.plugins.permissions["fs.delete"], "string");
+    assert.equal(typeof catalog.plugins.permissionHelp["fs.delete"], "string");
+  }
+});
+
 test("plugin panels use sandboxed isolated host windows", () => {
   assert.match(panelSrc, /session\.fromPartition/);
   assert.match(panelSrc, /sandbox:\s*true/);

@@ -52,6 +52,40 @@ function parseSemver(value) {
   };
 }
 
+/**
+ * A published version whose file permissions carry no scope is a plugin that
+ * installs and then cannot write or delete anything: the host reduces an
+ * undeclared scope to nothing rather than to the whole workspace. Catching it
+ * here is cheaper than a bug report from the first user who tries it.
+ */
+function fsScopeErrors(label, version) {
+  const errors = [];
+  const permissions = version.permissions.map(String);
+  const fs = version.fs;
+  if (fs !== undefined && (typeof fs !== "object" || fs === null || Array.isArray(fs))) {
+    return [`${label}: fs must be an object`];
+  }
+  for (const legacy of ["fs.read.workspace", "fs.write.workspace", "fs.delete.workspace"]) {
+    if (permissions.includes(legacy)) {
+      errors.push(`${label}: ${legacy} predates file scopes and is downgraded on install`);
+    }
+  }
+  for (const mode of ["write", "delete"]) {
+    if (!permissions.includes(`fs.${mode}`)) continue;
+    const rule = fs?.[mode];
+    // `own` is a grant of its own: deleting what the plugin wrote needs no
+    // scope, so a delete rule may legitimately carry nothing else.
+    const declared =
+      (Array.isArray(rule?.scope) && rule.scope.length > 0) ||
+      rule?.root === "userSelected" ||
+      (mode === "delete" && rule?.own === true);
+    if (!declared) {
+      errors.push(`${label}: fs.${mode} is declared with no fs.${mode} scope to go with it`);
+    }
+  }
+  return errors;
+}
+
 function validateCatalog(catalog, pluginFilter) {
   const errors = [];
   if (!catalog || !Array.isArray(catalog.plugins) || catalog.plugins.length === 0) {
@@ -80,6 +114,8 @@ function validateCatalog(catalog, pluginFilter) {
       }
       if (!Array.isArray(version.permissions)) {
         errors.push(`${label}: permissions must be an array`);
+      } else {
+        errors.push(...fsScopeErrors(label, version));
       }
     }
   }
