@@ -490,7 +490,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 |   MessageBubble (user/assistant)     |
 |   ToolCallCard                       |
 |   TurnOutcomeCard                    |
-|   InlineReviewCard · modified App.tsx +8 −2 |
+|   InlineReviewCard · M App.tsx +8 −2 |
 |   PermissionCard                     |
 |   ...                                |
 +--------------------------------------+
@@ -533,7 +533,7 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 | Turn outcome | After a failed turn, a session-scoped recovery card summarizes the interruption and tool evidence. Completed turns use the existing transcript and message-scoped InlineReviewCard without an extra success card; failed turns can retry without losing the transcript. |
 | Turn start (send / retry / regenerate) | Re-pins and positions the latest content before paint, even if the user had scrolled up; the later persisted user-message event does not flash the transcript at its top, and the composer collapse / indicator layout clamps during the send never release follow mode |
 | Idle (after stream) | Auto-scroll unlocked; user can scroll freely |
-| Message-scoped review snapshot | Each successful workspace Write/Edit tool row is followed by one compact InlineReviewCard carrying that message's added/modified/deleted status and explicit addition/deletion totals. Its hunks sit behind an expandable disclosure: every review card (inline and in the Review tab) is collapsed by default, and the user expands it on demand. The card remains after a Git commit, never becomes a bottom/global entry, and offers hash-guarded rollback without leaking into another session's transcript. |
+| Message-scoped review snapshot | Each successful workspace Write/Edit tool row is followed by one compact InlineReviewCard carrying that message's added/modified/deleted status and explicit addition/deletion totals. It renders as a single flat list row on the tool-row rhythm — disclosure caret, Git-style status letter (`A`/`M`/`D`), path, addition/deletion counts — with no card border, status rail, icon plate, or status pill; hover fill is the only row chrome, and a rolled-back change is struck through. Its hunks sit behind an expandable disclosure: every review card (inline and in the Review tab) is collapsed by default, and the user expands it on demand. The card remains after a Git commit, never becomes a bottom/global entry, and offers hash-guarded rollback without leaking into another session's transcript. |
 
 ### 4.5 Accessibility
 
@@ -542,8 +542,9 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 - Scroll-to-bottom button appears when user scrolls up during stream
 - InlineReviewCard uses a native button with `aria-expanded` and
   `aria-controls`. Its localized accessible name includes the path, status,
-  addition count, and deletion count; the visible text and color are not the
-  only status signal.
+  addition count, and deletion count — and the rolled-back state, which the row
+  otherwise shows only as a strikethrough; the visible text and color are not
+  the only status signal (the row carries a Git-style status letter).
 - Empty-home task entry starts in the always-visible bottom composer. There is
   no starter-card or contextual quick-action layer between the hero and
   composer.
@@ -652,8 +653,10 @@ preview), and Files (workspace browser). Codex-parity surface.
   the owning transcript message, so status, counts, and hunks describe exactly
   what that row changed and remain available after a commit, restart, or
   workspace switch. The Review tab is the same session's chronological change
-  history, not a current-worktree scan; it reuses the same message-owned cards,
-  each collapsed by default until the user expands it. Its rollback action
+  history, not a current-worktree scan; it reuses the same message-owned cards
+  as flat one-line rows under a borderless summary bar (`recorded N changes`
+  plus the run's `+`/`−` totals), each collapsed by default until the user
+  expands it. Its rollback action
   calls the host; the host compares the current content with the recorded
   post-tool hash and
   returns a conflict without overwriting later work.

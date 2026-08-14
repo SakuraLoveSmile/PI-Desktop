@@ -721,6 +721,137 @@ function AppShell() {
         );
         useAppStore.setState({ messages });
       },
+      seedReviewChanges: (count = 4) => {
+        // Capture-only review fixture (inline change rows + Review tab scenes).
+        // The Review tab reads the session transcript, so the fixture is a set
+        // of successful workspace Write/Edit tool messages carrying
+        // `details.review`; count 0 restores the empty transcript.
+        if (!(window as any).__PI_CAPTURE__) return;
+        if (count <= 0) {
+          useAppStore.setState({ messages: [] });
+          return;
+        }
+        const base = Date.parse("2026-08-14T09:00:00Z");
+        const samples = [
+          {
+            tool: "Edit",
+            path: "apps/desktop/src/components/workpanel/ReviewTab.tsx",
+            operation: "edit",
+            status: "modified",
+            state: "active",
+            additions: 4,
+            deletions: 6,
+            hunks: [
+              {
+                header: "@@ -25,9 +25,7 @@",
+                lines: [
+                  { type: "context", text: '    <div className="review-toolbar">' },
+                  { type: "del", text: '      <span className="review-toolbar-icon">' },
+                  { type: "del", text: "        <IconDiff size={14} />" },
+                  { type: "del", text: "      </span>" },
+                  { type: "add", text: '      <span className="review-summary">' },
+                ],
+              },
+            ],
+          },
+          {
+            tool: "Write",
+            path: "apps/desktop/src/lib/review-row-metrics.ts",
+            operation: "write",
+            status: "added",
+            state: "active",
+            additions: 12,
+            deletions: 0,
+            hunks: [
+              {
+                header: "@@ -0,0 +1,12 @@",
+                lines: [
+                  { type: "add", text: "export const REVIEW_ROW_HEIGHT = 24;" },
+                  { type: "add", text: "export const REVIEW_MARK_WIDTH = 10;" },
+                ],
+              },
+            ],
+          },
+          {
+            tool: "Edit",
+            path: "apps/desktop/src/styles/work-panel.css",
+            operation: "edit",
+            status: "deleted",
+            state: "active",
+            additions: 0,
+            deletions: 9,
+            hunks: [
+              {
+                header: "@@ -528,9 +528,0 @@",
+                lines: [
+                  { type: "del", text: ".diff-file {" },
+                  { type: "del", text: "  border: 1px solid var(--ds-border-subtle);" },
+                  { type: "del", text: "}" },
+                ],
+              },
+            ],
+          },
+          {
+            tool: "Edit",
+            path: "apps/desktop/src/styles/messages.css",
+            operation: "edit",
+            status: "modified",
+            state: "rolledBack",
+            additions: 3,
+            deletions: 2,
+            hunks: [
+              {
+                header: "@@ -269,4 +269,5 @@",
+                lines: [
+                  { type: "context", text: ".review-change-card {" },
+                  { type: "del", text: "  border-radius: var(--radius-md);" },
+                  { type: "add", text: "  margin: 0 0 2px 24px;" },
+                ],
+              },
+            ],
+          },
+        ];
+        const messages = samples.slice(0, Math.min(count, samples.length)).flatMap(
+          (sample, i) => [
+            {
+              id: `capture-review-user-${i}`,
+              role: "user" as const,
+              content:
+                i === 0 ? "把审阅面板里每条改动的样式简化一下" : `继续第 ${i + 1} 处`,
+              createdAt: new Date(base + i * 120_000).toISOString(),
+              status: "complete" as const,
+            },
+            {
+              id: `capture-review-${i}`,
+              role: "tool" as const,
+              content: "",
+              createdAt: new Date(base + i * 120_000 + 30_000).toISOString(),
+              toolName: sample.tool,
+              toolStatus: "success" as const,
+              toolArgs: { path: sample.path },
+              toolResult: {
+                details: {
+                  root: "workspace",
+                  review: {
+                    version: 1,
+                    snapshotId: `capture-snapshot-${i}`,
+                    messageId: `capture-review-${i}`,
+                    path: sample.path,
+                    operation: sample.operation,
+                    status: sample.status,
+                    state: sample.state,
+                    additions: sample.additions,
+                    deletions: sample.deletions,
+                    hunks: sample.hunks,
+                    reversible: true,
+                  },
+                },
+              },
+            },
+          ],
+        );
+        useAppStore.setState({ messages: messages as any });
+      },
       seedPlugins: (count = 4) => {
         // Capture-only plugins fixture (plugins index scenes); count 0 clears.
         // One sample per row group so the D169 bands are all exercised, and one

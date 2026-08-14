@@ -27,7 +27,7 @@ test("work panel uses a quiet light-theme inset surface", () => {
 test("work panel interactive rows ease hover fills with motion tokens", () => {
   for (const selector of [
     ".file-tree-row",
-    ".diff-file-header",
+    ".review-change-card-header",
     ".work-panel-resize",
     ".work-browser-url input",
   ]) {

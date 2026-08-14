@@ -196,3 +196,30 @@ test("review surfaces keep visual state, focus, and motion feedback", () => {
   assert.match(workPanelStylesSource, /\.review-toolbar-counts/);
   assert.match(responsiveStylesSource, /\.review-change-card-body\s*\{[\s\S]*animation: none/);
 });
+
+test("a recorded change is a single flat row, not a card", () => {
+  // Status travels as a git-style letter plus color, never color alone, and
+  // the localized word stays in the accessible name.
+  assert.match(cardSource, /review-change-card-mark/);
+  assert.match(cardSource, /added: "A"[\s\S]*modified: "M"[\s\S]*deleted: "D"/);
+  assert.doesNotMatch(
+    cardSource,
+    /review-change-card-(icon|status|state|main|meta)\b/,
+  );
+  assert.match(cardSource, /rolledBack"\s*\?\s*`\$\{baseLabel\}/);
+  assert.match(
+    messageStylesSource,
+    /\.review-change-card-mark\s*\{[\s\S]*var\(--review-change-rail\)/,
+  );
+  // The row borrows the tool-row rhythm: no card border, rail, or shadow.
+  const cardRule = messageStylesSource.match(/\n\.review-change-card \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(cardRule, "expected a .review-change-card rule");
+  assert.doesNotMatch(cardRule, /^\s*(border|box-shadow|background)\s*:/m);
+  assert.match(
+    messageStylesSource,
+    /\.review-change-card-header \{[\s\S]*min-height: 24px/,
+  );
+  // The Git-diff era file rows are gone; only the +/− counts helper survives.
+  assert.doesNotMatch(workPanelStylesSource, /\.diff-file/);
+  assert.match(workPanelStylesSource, /\.diff-counts \{/);
+});

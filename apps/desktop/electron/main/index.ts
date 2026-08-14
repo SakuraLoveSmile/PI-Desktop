@@ -2158,8 +2158,50 @@ async function createWindow() {
                 `window.__PI_DESKTOP__?.openWorkPanelArtifact(${JSON.stringify(kind)}, ${JSON.stringify(resource)})`,
               );
             await openPanelArtifact("review");
+            // The Review tab reads the session transcript, so without a change
+            // fixture every review scene would shoot the empty state.
+            await mainWindow!.webContents.executeJavaScript(
+              `void window.__PI_DESKTOP__?.seedReviewChanges?.(4)`,
+            );
             await new Promise((r) => setTimeout(r, 500));
             await shot("pi-panel-review");
+            // Same rows in the transcript: tool activity is collapsed by
+            // default, so open every group, then expand one row's diff.
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                for (const header of document.querySelectorAll(".tool-activity-header")) {
+                  if (header.getAttribute("aria-expanded") !== "true") {
+                    header.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+                  }
+                }
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 400));
+            await mainWindow!.webContents.executeJavaScript(`
+              (() => {
+                const rows = document.querySelectorAll(
+                  ".thread-content .review-change-card-header",
+                );
+                const row = rows[Math.max(0, rows.length - 2)];
+                row?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+                row?.scrollIntoView({ block: "center" });
+              })()
+            `);
+            await new Promise((r) => setTimeout(r, 450));
+            await shot("pi-review-rows");
+            await mainWindow!.webContents.executeJavaScript(
+              `window.__PI_DESKTOP__?.setThemeAttr("dark")`,
+            );
+            await new Promise((r) => setTimeout(r, 350));
+            await shot("pi-review-rows-dark");
+            await mainWindow!.webContents.executeJavaScript(
+              `window.__PI_DESKTOP__?.setThemeAttr("light")`,
+            );
+            await new Promise((r) => setTimeout(r, 250));
+            await mainWindow!.webContents.executeJavaScript(
+              `void window.__PI_DESKTOP__?.seedReviewChanges?.(0)`,
+            );
+            await new Promise((r) => setTimeout(r, 250));
             await openPanelArtifact("terminal");
             // The PTY needs a beat for the login shell prompt to settle.
             await new Promise((r) => setTimeout(r, 1200));

@@ -266,22 +266,15 @@
   animation: shimmer 0.9s linear infinite;
 }
 
+/* A recorded change is a list row, not a card: it borrows `.tool-row`'s
+   metrics so a Write/Edit row and its change read as one rhythm. `--review-
+   change-rail` survives as the per-status accent for the mark and focus ring. */
 .review-change-card {
-  --review-change-rail: var(--ds-accent-soft);
+  --review-change-rail: var(--ds-text-muted);
   position: relative;
   box-sizing: border-box;
   width: min(calc(100% - 24px), 720px);
-  margin: 4px 0 8px 24px;
-  overflow: hidden;
-  border: 1px solid var(--ds-border-subtle);
-  border-inline-start: 2px solid var(--review-change-rail);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--ds-bg-secondary) 86%, transparent);
-  box-shadow: 0 1px 0 color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
-  transition:
-    background var(--motion-duration-fast) var(--motion-ease-out),
-    border-color var(--motion-duration-fast) var(--motion-ease-out),
-    box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+  margin: 0 0 2px 24px;
 }
 
 .review-change-card[data-status="added"] {
@@ -293,34 +286,24 @@
 }
 
 .review-change-card[data-state="rolledBack"] {
-  --review-change-rail: var(--ds-success);
-}
-
-.review-change-card.open {
-  border-color: color-mix(in oklab, var(--review-change-rail) 32%, var(--ds-border-subtle));
-  box-shadow: 0 4px 14px color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+  --review-change-rail: var(--ds-text-faint);
 }
 
 .review-change-card.is-compact {
   width: 100%;
-  margin: 0 0 10px;
-  background: var(--ds-bg-primary);
-}
-
-:root[data-theme="light"] .review-change-card {
-  background: #ffffff;
-  border-color: color-mix(in oklab, #1a1c1f 10%, transparent);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  margin: 0;
 }
 
 .review-change-card-header {
   display: flex;
   width: 100%;
   min-width: 0;
-  min-height: 42px;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 10px 8px 8px;
+  min-height: 24px;
+  align-items: center;
+  gap: 6px;
+  margin: 0 -4px;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
   color: var(--ds-text-secondary);
   text-align: left;
   transition:
@@ -329,7 +312,7 @@
 }
 
 .review-change-card-header:hover {
-  background: color-mix(in oklab, var(--review-change-rail) 6%, transparent);
+  background: var(--ds-bg-hover);
   color: var(--ds-text-primary);
 }
 
@@ -340,65 +323,48 @@
   outline-offset: -2px;
 }
 
-.review-change-card-icon {
+/* In the transcript the caret stays out of the way until the row is engaged
+   (as tool rows do); in the panel list it is the row's main affordance. */
+.review-change-card-caret {
   display: inline-flex;
-  width: 24px;
-  height: 24px;
+  width: 12px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  margin-top: 1px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--review-change-rail) 12%, transparent);
-  color: var(--review-change-rail);
-}
-
-.review-change-card-main {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.review-change-card-meta {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
   color: var(--ds-text-muted);
+  opacity: 0;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.review-change-card-status {
+.review-change-card:hover .review-change-card-caret,
+.review-change-card-header:focus-visible .review-change-card-caret,
+.review-change-card.is-compact .review-change-card-caret,
+.review-change-card.open .review-change-card-caret {
+  opacity: 1;
+}
+
+.review-change-card.open .review-change-card-caret {
+  transform: rotate(90deg);
+}
+
+.review-change-card-mark {
+  width: 10px;
   flex: 0 0 auto;
-  padding: 1px 5px;
-  border-radius: var(--radius-full);
-  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
-  color: var(--ds-text-muted);
+  color: var(--review-change-rail);
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: var(--font-weight-medium);
   line-height: var(--leading-compact);
-}
-
-.review-change-card-status.is-added {
-  background: color-mix(in oklab, var(--ds-success) 14%, transparent);
-  color: var(--ds-success);
-}
-
-.review-change-card-status.is-deleted {
-  background: color-mix(in oklab, var(--ds-error) 14%, transparent);
-  color: var(--ds-error);
+  text-align: center;
 }
 
 .review-change-card-path {
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  color: var(--ds-text-primary);
+  color: var(--ds-text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--text-sm-plus);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--text-xs-plus);
   line-height: var(--leading-compact-plus);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -406,33 +372,32 @@
   text-align: left;
 }
 
+.review-change-card-header:hover .review-change-card-path {
+  color: var(--ds-text-primary);
+}
+
 .review-change-card-counts {
+  margin-left: auto;
   gap: 5px;
   font-size: var(--text-2xs);
   line-height: var(--leading-compact);
 }
 
-.review-change-card-caret {
-  display: inline-flex;
-  width: 20px;
-  height: 24px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  margin-top: 1px;
-  color: var(--ds-text-muted);
-  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+.review-change-card[data-state="rolledBack"] .review-change-card-path {
+  color: var(--ds-text-faint);
+  text-decoration: line-through;
 }
 
-.review-change-card.open .review-change-card-caret {
-  transform: rotate(90deg);
+.review-change-card[data-state="rolledBack"] .review-change-card-counts {
+  opacity: 0.55;
 }
 
+/* The expanded diff hangs off a hairline aligned with the path text. */
 .review-change-card-body {
   max-height: min(360px, 42vh);
+  margin: 2px 0 6px 18px;
   overflow: auto;
-  background: color-mix(in oklab, var(--ds-bg-inset) 65%, var(--ds-bg-primary));
-  border-top: 1px solid var(--ds-border-subtle);
+  border-inline-start: 1px solid var(--ds-border-subtle);
   animation: review-change-reveal var(--motion-duration-normal) var(--motion-ease-out) both;
 }
 
@@ -442,54 +407,36 @@
   flex-direction: column;
 }
 
-.review-change-card-state {
-  flex: 0 0 auto;
-  padding: 1px 5px;
-  border-radius: var(--radius-full);
-  background: color-mix(in oklab, var(--ds-success) 10%, transparent);
-  color: var(--ds-success);
-  font-size: var(--text-2xs);
-  line-height: var(--leading-compact);
-  white-space: nowrap;
-}
-
 .review-change-card-actions {
   display: flex;
-  min-height: 34px;
+  min-height: 26px;
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 6px 10px;
-  background: color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
-  border-top: 1px solid var(--ds-border-subtle);
+  padding: 4px 6px 2px;
 }
 
 .review-change-card-actions.is-compact {
-  padding-inline: 8px;
+  padding-inline: 4px;
 }
 
 .review-change-rollback {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 8px;
-  border: 1px solid var(--ds-border-subtle);
+  padding: 2px 5px;
   border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--ds-bg-primary) 65%, transparent);
-  color: var(--ds-text-secondary);
+  color: var(--ds-text-muted);
   font-size: var(--text-xs-plus);
-  font-weight: var(--font-weight-medium);
   white-space: nowrap;
   transition:
     background var(--motion-duration-fast) var(--motion-ease-out),
-    border-color var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .review-change-rollback:hover:not(:disabled) {
-  border-color: color-mix(in oklab, var(--review-change-rail) 38%, var(--ds-border-subtle));
-  background: color-mix(in oklab, var(--review-change-rail) 10%, transparent);
+  background: var(--ds-bg-hover);
   color: var(--ds-text-primary);
 }
 
@@ -519,18 +466,6 @@
   color: var(--ds-warning);
 }
 
-.review-change-diff .diff-hunk {
-  border-bottom: 1px solid var(--ds-border-subtle);
-}
-
-.review-change-diff .diff-hunk:last-child {
-  border-bottom: 0;
-}
-
-.review-change-diff .diff-line {
-  border-inline-start: 2px solid transparent;
-}
-
 .review-change-diff .diff-line-sign {
   width: 24px;
   padding-block: 3px;
@@ -542,27 +477,20 @@
 }
 
 .review-change-diff .diff-line.add {
-  border-inline-start-color: var(--ds-success);
   background: color-mix(in oklab, var(--ds-success) 14%, transparent);
 }
 
 .review-change-diff .diff-line.del {
-  border-inline-start-color: var(--ds-error);
   background: color-mix(in oklab, var(--ds-error) 14%, transparent);
 }
 
 .review-change-diff .diff-line.hunk {
-  padding: 5px 10px;
-  border-inline-start: 0;
-  background: color-mix(in oklab, var(--ds-accent-soft) 8%, transparent);
-  color: var(--ds-accent-soft);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--tracking-normal);
+  padding: 4px 10px;
+  color: var(--ds-text-faint);
 }
 
 .review-change-note {
-  padding: 8px 10px;
-  background: color-mix(in oklab, var(--ds-text-primary) 2%, transparent);
+  padding: 6px 10px;
   color: var(--ds-text-muted);
   font-size: var(--text-sm);
   line-height: var(--leading-body);

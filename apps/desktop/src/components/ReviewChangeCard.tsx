@@ -1,10 +1,22 @@
 import { memo, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ReviewRollbackStatus, UiMessage } from "@pi-desktop/shared";
+import type {
+  ReviewChangeStatus,
+  ReviewRollbackStatus,
+  UiMessage,
+} from "@pi-desktop/shared";
 import { reviewChangeFromMessage } from "../lib/workspace-review";
 import { useAppStore } from "../stores/app-store";
 import { cx } from "./ui";
-import { IconCheck, IconChevronRight, IconDiff, IconSnapshot } from "./icons";
+import { IconCheck, IconChevronRight, IconSnapshot } from "./icons";
+
+/* Git-status letters carry the status without relying on color alone; the
+   localized word stays in the row's accessible name. */
+const STATUS_MARKS: Record<ReviewChangeStatus, string> = {
+  added: "A",
+  modified: "M",
+  deleted: "D",
+};
 
 function DiffBody({ message, compact }: { message: UiMessage; compact: boolean }) {
   const { t } = useTranslation();
@@ -106,15 +118,18 @@ export const ReviewChangeCard = memo(function ReviewChangeCard({
   if (!change) return null;
 
   const statusLabel = t(`panel.review.status.${change.status}`);
-  const accessibleLabel = t(
-    open ? "chat.reviewChangeHide" : "chat.reviewChangeShow",
-    {
-      status: statusLabel,
-      path: change.path,
-      additions: change.additions,
-      deletions: change.deletions,
-    },
-  );
+  const baseLabel = t(open ? "chat.reviewChangeHide" : "chat.reviewChangeShow", {
+    status: statusLabel,
+    path: change.path,
+    additions: change.additions,
+    deletions: change.deletions,
+  });
+  // The collapsed row shows a rolled-back change struck through, so the state
+  // has to reach the accessible name too.
+  const accessibleLabel =
+    change.state === "rolledBack"
+      ? `${baseLabel} · ${t("panel.review.rolledBack")}`
+      : baseLabel;
 
   return (
     <section
@@ -131,37 +146,28 @@ export const ReviewChangeCard = memo(function ReviewChangeCard({
         title={accessibleLabel}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className={cx("review-change-card-icon", `is-${change.status}`)} aria-hidden>
-          <IconDiff size={15} />
-        </span>
-        <span className="review-change-card-main">
-          <span className="review-change-card-path" title={change.path}>
-            {change.path}
-          </span>
-          <span className="review-change-card-meta">
-            <span className={cx("review-change-card-status", `is-${change.status}`)}>
-              {statusLabel}
-            </span>
-            <span
-              className="review-change-card-counts diff-file-counts"
-              aria-label={t("chat.reviewChangeCounts", change)}
-            >
-              {change.additions > 0 && (
-                <span className="diff-count-add">+{change.additions}</span>
-              )}
-              {change.deletions > 0 && (
-                <span className="diff-count-del">−{change.deletions}</span>
-              )}
-            </span>
-            {change.state === "rolledBack" ? (
-              <span className="review-change-card-state">
-                {t("panel.review.rolledBack")}
-              </span>
-            ) : null}
-          </span>
-        </span>
         <span className="review-change-card-caret" aria-hidden>
-          <IconChevronRight size={12} />
+          <IconChevronRight size={11} />
+        </span>
+        <span
+          className={cx("review-change-card-mark", `is-${change.status}`)}
+          aria-hidden
+        >
+          {STATUS_MARKS[change.status]}
+        </span>
+        <span className="review-change-card-path" title={change.path}>
+          {change.path}
+        </span>
+        <span
+          className="review-change-card-counts diff-counts"
+          aria-label={t("chat.reviewChangeCounts", change)}
+        >
+          {change.additions > 0 && (
+            <span className="diff-count-add">+{change.additions}</span>
+          )}
+          {change.deletions > 0 && (
+            <span className="diff-count-del">−{change.deletions}</span>
+          )}
         </span>
       </button>
       {open ? (

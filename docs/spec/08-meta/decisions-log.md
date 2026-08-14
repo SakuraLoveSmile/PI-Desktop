@@ -1597,3 +1597,28 @@ D193, and D194.
   restore paths; ADR 0080's warm-up and launcher latency budget stand. See
   ADR 0086, `03-runtime/07-process-model.md` §5, and E2E-127. Protocol v9, host
   RPC, IPC channels, and storage schema v11 are unchanged.
+
+## 2026-08-14 — A recorded change is a list row, not a card
+
+- The review change card flattens into a single line on the `.tool-row` rhythm
+  (24px row, disclosure caret, mono path, `+`/`−` counts on the right): the 1px
+  border, 2px status rail, icon plate, status pill, second meta line, shadow,
+  and light-theme white fill are all gone, leaving hover fill as the only row
+  chrome. The 280px-default Review panel was spending most of its width on that
+  chrome instead of on the path.
+- Status now travels as a Git-style letter (`A`/`M`/`D`) tinted by the existing
+  per-status accent, so it is never carried by color alone; the localized status
+  word — plus the rolled-back state, which the row shows as a strikethrough —
+  stays in the row's accessible name. The expanded hunks, hash-guarded rollback,
+  `aria-expanded`/`aria-controls` disclosure, and message ownership are
+  unchanged; rollback becomes a borderless text action.
+- The Review tab's summary bar loses its icon, tinted band, and pill border,
+  and the tab body drops its inset fill so the list reads flat. The Git-diff-era
+  `.diff-file*` rules that no surface had rendered since the Review tab became a
+  session change history were deleted (`.diff-file-counts` survives, renamed
+  `.diff-counts`).
+- Decision D222 refines the presentation of D097's Review tab and the
+  message-owned card; the review truth model, rollback semantics, and panel
+  ownership rules stand. Presentation-only: see `04-ux/08-component-spec.md`
+  §4.2/§4.4/§4.5 and §5. Protocol v9, host RPC, IPC channels, and storage
+  schema v11 are unchanged.

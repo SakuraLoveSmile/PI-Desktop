@@ -23,13 +23,10 @@ export function ReviewTab() {
   return (
     <div className="review-tab">
       <div className="review-toolbar">
-        <span className="review-toolbar-icon" aria-hidden>
-          <IconDiff size={14} />
-        </span>
         <span className="review-summary">
           {t("panel.review.changes", { count: summary.changeCount })}
         </span>
-        <span className="review-toolbar-counts diff-file-counts">
+        <span className="review-toolbar-counts diff-counts">
           <span className="diff-count-add">+{summary.additions}</span>
           <span className="diff-count-del">−{summary.deletions}</span>
         </span>
