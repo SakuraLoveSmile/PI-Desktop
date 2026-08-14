@@ -394,10 +394,12 @@ visually distinct from list content.
   context menus and the Settings font picker menu use the same body-level
   floating layer (the font menu is measured against its trigger, clamped to
   the viewport, and flips above the trigger when there is no room below);
-  the font list renders each row with `content-visibility: auto` so
-  far-off-screen rows skip layout, paint, and per-row font loading, and the
-  menu reposition handler ignores scrolls inside the list, keeping long
-  system font lists responsive when opened and scrolled
+  the font list is windowed (fixed row heights with absolute positioning,
+  overscan buffer, and an exact-offset scroll-into-view, mirroring the
+  virtual-scroller pattern DBX uses for its data grid) so only the visible
+  slice of a long system list is ever in the DOM, and the menu reposition
+  handler ignores scrolls inside the list, keeping the picker responsive when
+  opened and scrolled
 
 
 ### 3.7 Brand and icon contract

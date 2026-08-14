@@ -25,16 +25,19 @@ test("selecting System default persists an empty stack so the override clears", 
   assert.doesNotMatch(rowSource, /fontFamily: undefined/);
 });
 
-test("font rows skip off-screen layout and font loading so long lists stay scrollable", () => {
-  assert.match(rowSource, /className="settings-font-row"/);
-  assert.match(
-    styles,
-    /\.settings-font-row\s*\{[^}]*content-visibility:\s*auto;/s,
-  );
-  assert.match(
-    styles,
-    /\.settings-font-row\s*\{[^}]*contain-intrinsic-size:\s*auto 28px;/s,
-  );
+test("font list windows the rows so only the visible slice is in the DOM", () => {
+  assert.match(rowSource, /visibleRowRange\(layout, scrollTop/);
+  assert.match(rowSource, /layout\.rows\.slice\(start, end\)/);
+  assert.match(rowSource, /position: "absolute"/);
+  assert.match(rowSource, /height: FONT_OPTION_ROW_HEIGHT/);
+  assert.match(styles, /\.settings-font-list\s*\{[^}]*position:\s*relative;/s);
+  assert.match(styles, /\.settings-font-list\s*\{[^}]*overflow-y:\s*auto;/s);
+});
+
+test("highlight scrolling uses the layout offsets instead of scrollIntoView", () => {
+  assert.match(rowSource, /layout\.offsets\[rowIndex\]/);
+  assert.match(rowSource, /list\.scrollTop = top \+ height - viewport/);
+  assert.doesNotMatch(rowSource, /listRef\.current\?\.querySelector/);
 });
 
 test("menu repositioning ignores scrolls inside the font list", () => {
