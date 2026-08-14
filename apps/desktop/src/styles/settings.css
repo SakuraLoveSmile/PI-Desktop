@@ -968,6 +968,10 @@
   position: relative;
   max-height: 320px;
   overflow-y: auto;
+  /* Rows ellipsize, so nothing needs horizontal scrolling; without this the
+     `auto` computed from overflow-y would surface a scrollbar on any subpixel
+     overflow. */
+  overflow-x: hidden;
 }
 
 .settings-font-group-label {
@@ -984,7 +988,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  /* Windowed rows are absolutely positioned with inline left/right insets; a
+     width here would over-constrain the box, drop `right`, and push the row
+     past the list's right edge. */
+  width: auto;
   min-height: 28px;
   padding: 4px 8px;
   border-radius: var(--radius-sm);

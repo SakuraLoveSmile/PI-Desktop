@@ -34,6 +34,14 @@ test("font list windows the rows so only the visible slice is in the DOM", () =>
   assert.match(styles, /\.settings-font-list\s*\{[^}]*overflow-y:\s*auto;/s);
 });
 
+test("font list never scrolls horizontally", () => {
+  assert.match(styles, /\.settings-font-list\s*\{[^}]*overflow-x:\s*hidden;/s);
+  // Rows are absolutely positioned with inline left/right insets; a width on
+  // them would over-constrain the box, drop `right`, and overflow the list.
+  assert.doesNotMatch(styles, /\.settings-font-item\s*\{[^}]*width:\s*100%;/s);
+  assert.match(rowSource, /left: 6,\s*right: 6,/s);
+});
+
 test("highlight scrolling uses the layout offsets instead of scrollIntoView", () => {
   assert.match(rowSource, /layout\.offsets\[rowIndex\]/);
   assert.match(rowSource, /list\.scrollTop = top \+ height - viewport/);
