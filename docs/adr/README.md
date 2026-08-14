@@ -99,3 +99,4 @@ Each ADR includes:
 | 0080 | Prewarm the global plugin launcher after boot | Accepted |
 | 0081 | Host-owned cross-platform plugin panel chrome | Accepted |
 | 0082 | Localized and page-adaptive plugin panel chrome | Accepted |
+| 0083 | Custom global UI font | Accepted |

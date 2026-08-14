@@ -34,6 +34,12 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - **Language**: three selectable preview cards (Auto / 简体中文 / English) with
     a sample-text preview, a per-option description, and a selected check badge;
     selection updates `settings.language`
+  - **Font**: a searchable picker row (trigger shows the current family rendered
+    in that face) offering the System default, bundled open-licensed families
+    (Geist, Inter, Noto Sans SC, LXGW WenKai — SIL OFL 1.1, shipped locally),
+    and installed system families enumerated by Electron main; selection
+    persists as `AppSettings.fontFamily` and applies to the global UI stack
+    (`--font-sans`) without a reload
   - **Auto language detection** resolves the OS locale through the main process
     (`app.getLocale()`) rather than the renderer's `navigator.language`, and the
     Auto card shows the detected language inline (e.g. "当前：简体中文")

@@ -573,6 +573,15 @@ Electron 主要丰富了会话 list/get/create/fork/configure 结果
 元数据保留在消息元数据中，因此协议 v9 和存储架构 v11
 保持不变。
 
+设置字体选择器（ADR 0083）通过一个仅 Electron 的允许通道读取
+系统已安装字体：
+
+- `pi-desktop/app/systemFonts` 返回 `string[]`，即系统已安装字体的
+  字体系列名称（Electron 主进程使用平台工具——macOS 用
+  `system_profiler`、Windows 用 PowerShell、Linux 用 `fc-list`），
+  去重、排序并排除隐藏的 `.` 前缀字体系列。主进程将结果缓存
+  60 秒；失败时解析为 `[]`。主机 RPC 与协议版本不变。
+
 最小接口：
 
 - `session/list`

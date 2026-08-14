@@ -1,8 +1,8 @@
 # PI-Desktop Baseline Freeze
 
-- Baseline Version: `0.4.15`
-- Date: `2026-08-05`
-- Status: `Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v9 + schema v10 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release + Extensions page density and theme-readable actions)`
+- Baseline Version: `0.4.16`
+- Date: `2026-08-14`
+- Status: `Frozen for implementation details (Plan checkpoint artifact + approval/execution startup fence + protocol v9 + schema v10 + selectable shell catalog + icon-free composer prompt row + turn-boundary context checkpoint compaction + session-scoped work panel + pi-owned model metadata + provider/runtime safety + M5 hardening + settings IA + project archive + sidebar organization + app update delivery + three-platform release + Extensions page density and theme-readable actions + custom global UI font)`
 - Language policy: **English-first**
 - Backend policy: **Rust host core + pi agent sidecar**
 
@@ -62,6 +62,14 @@
 > the four-card numeric overview band is removed, and shared button surfaces
 > use semantic theme tokens so primary and secondary actions remain visible in
 > dark and light themes. No host protocol or storage schema changes.
+> `0.4.16` adds a user-selectable global UI font through D219 / ADR 0083: the
+> Settings Appearance card gains a searchable Font picker; the selection
+> persists as `AppSettings.fontFamily` and overrides `--font-sans`. Four
+> open-licensed (SIL OFL 1.1) families — Geist, Inter, Noto Sans SC, and
+> LXGW WenKai — ship locally with license texts, and installed system
+> families are enumerated by Electron main through the additive allowlisted
+> channel `pi-desktop/app/systemFonts`. No host protocol or storage schema
+> changes.
 
 ## Frozen Decisions
 

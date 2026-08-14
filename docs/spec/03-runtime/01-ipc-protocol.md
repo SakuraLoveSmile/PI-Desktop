@@ -570,6 +570,16 @@ no-op. `responseDurationMs` and `responseOutputTokens` are optional transcript
 metadata persisted in message metadata, so protocol v9 and storage schema v11
 remain unchanged.
 
+The Settings font picker (ADR 0083) reads installed system font families
+through one Electron-only allowlisted channel:
+
+- `pi-desktop/app/systemFonts` returns `string[]` of installed system font
+  family names (platform tooling in Electron main — `system_profiler` on
+  macOS, PowerShell on Windows, `fc-list` on Linux), deduplicated, sorted,
+  with hidden `.`-prefixed families excluded. The main process caches the
+  result for 60 seconds; failures resolve to `[]`. The host RPC and protocol
+  version are unchanged.
+
 Minimal interface:
 
 - `session/list`
