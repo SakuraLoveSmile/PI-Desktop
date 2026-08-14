@@ -47,8 +47,14 @@ the card body size — so the question and options stay coordinated:
 The card shell is a slim rail: 14 px × 16 px padding with a 2 px accent rail,
 the same footprint family as the permission and turn-outcome cards.
 
+The internal rhythm stays airy rather than packed: the status indicators keep
+12 px above and 14 px below breathing room, the question renders at
+`--leading-normal` (1.4) with 8 px under the eyebrow label, and each content
+section (indicators → question → options → custom input → actions) is
+separated by 12 px.
+
 The option rows follow the app's global menu-row density instead of card-scale
-blocks: 30 px min-height, 4 px × 8 px padding, 6 px row gaps, and the same
+blocks: 30 px min-height, 4 px × 8 px padding, 8 px row gaps, and the same
 15 px radio/checkbox mark used by the sidebar checkboxes. The Skip / Next /
 Submit buttons use the app's compact button size (4 px × 10 px padding,
 12 px text); Decline remains a quiet text link in the header.

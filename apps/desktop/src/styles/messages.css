@@ -106,7 +106,7 @@
 .asktool-indicators {
   display: flex;
   gap: 6px;
-  margin: 10px 0 12px;
+  margin: 12px 0 14px;
 }
 
 .asktool-indicator {
@@ -135,7 +135,7 @@
 }
 
 .asktool-question-number {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .asktool-question {
@@ -143,13 +143,13 @@
   color: var(--ds-text-primary);
   font-size: var(--text-md);
   font-weight: var(--font-weight-medium);
-  line-height: var(--leading-compact-plus);
+  line-height: var(--leading-normal);
 }
 
 .asktool-options {
   display: grid;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .asktool-option {
@@ -202,7 +202,7 @@
 .asktool-custom-input {
   box-sizing: border-box;
   width: 100%;
-  margin-top: 8px;
+  margin-top: 10px;
   padding: 6px 8px;
   border: 1px solid var(--ds-border-default);
   border-radius: var(--radius-sm);
@@ -215,7 +215,7 @@
 .asktool-card-actions {
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .asktool-card-actions .btn {

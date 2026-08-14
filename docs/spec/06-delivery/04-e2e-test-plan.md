@@ -4732,8 +4732,10 @@ This test plan spec is accepted when:
   (`--text-md`, one step below the surrounding chat body), matching the
   permission card scale in the same dock area. The card shell uses the slim
   rail (2 px accent, 14 px × 16 px padding). Option rows and action buttons
-  use the app's compact control density (30 px rows, 15 px marks, compact
-  buttons). The tool output is ordered as
+  use the app's compact control density (30 px rows, 15 px marks, 8 px row
+  gaps, compact buttons), and the card keeps a relaxed internal rhythm
+  (12/14 px indicator margins, `--leading-normal` question line-height). The
+  tool output is ordered as
   `question：answer`, uses `、` between multiple answers and `\n---\n`
   between questions, and
   keeps `question：` for the skipped question. Decline all produces empty
