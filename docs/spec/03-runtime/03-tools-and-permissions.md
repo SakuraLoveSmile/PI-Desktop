@@ -1,7 +1,7 @@
 # 03. Tools and Permissions
 
 > Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115, D181, D186,
-> D189, D190, D195 (ADR 0057)
+> D189, D190, D195 (ADR 0057), ADR 0087
 
 ## 0. Frozen policy summary
 
@@ -15,6 +15,7 @@
 | Permission timeout | 120s → deny |
 | allow-session scope | toolName |
 | Bash style | non-interactive; selected host catalog shell with streamed output |
+| Edit contract | line-anchored ops + whole-file `tag`; no `old_string`/`new_string` (ADR 0087) |
 | asktool | interactive multi-question tool; no validity deadline; skipped answers become empty output fields |
 
 ## 1. Goal
@@ -25,17 +26,17 @@ Let the agent get things done, but stay under control by default.
 
 | Tool | Risk | Description |
 |---|---|---|
-| `Read` | low | Read files within the workspace |
+| `Read` | low | Read files within the workspace; returns line-numbered content and a `[path#TAG]` header |
 | `new_context` | low | Start a new context window at the next turn boundary; takes no parameters and changes no environment state |
 | `Glob` | low | List files by pattern |
-| `Grep` | low | Content search |
+| `Grep` | low | Content search; mints a per-file `tag` |
 | `BrowserPreview` | low | Open a workspace-relative preview in the user-driven Browser panel |
 | `EnterPlanMode` | low | Move the same Agent from Agent to Plan after host validation |
 | `SubmitPlan` | low | Preserve exact Markdown bytes in a new `.pi/plan/*.md` artifact and request approval |
 | `EnterGoalMode` | low | Move the same Agent from Agent to Goal after host validation |
 | `SubmitGoal` | low | Preserve exact Markdown bytes in a new `.pi/goal/*.md` artifact and request approval |
-| `Write` | high | Create/overwrite files |
-| `Edit` | high | Modify files |
+| `Write` | high | Create/overwrite files; returns the post-write `tag` |
+| `Edit` | high | Modify files through line-anchored ops against a verified `tag` ([18](18-line-anchored-edit-contract.md)) |
 | `Bash` | high | Execute commands |
 | `asktool` | low | Ask one or more user questions and return the submitted answers as tool output |
 
@@ -220,7 +221,13 @@ type ReviewChange = {
 - Rollback is host-owned and hash-guarded. It restores the captured previous
   bytes, or removes a newly-created file, only when the current content still
   equals the post-tool hash. A later edit returns `conflict` without touching
-  the file.
+  the file. A completed rollback invalidates the session's snapshot entries for
+  that path, so the model cannot keep editing against a tag the rollback
+  replaced.
+- An `Edit` carrying `MV DEST` records two entries under one tool call — a
+  source deletion and a destination creation — and rollback restores both or
+  neither. `REM` records a deletion whose rollback restores the captured bytes.
+  The hash guard uses the full digest, not the 16-bit `tag`.
 - Review snapshot files live outside the workspace and are removed with their
   session; orphaned session directories are swept on host startup.
 
@@ -232,10 +239,14 @@ concurrently, but a session never has two in-flight mutations. The host holds
 the per-session mutation permit before consuming a global mutation slot, so a
 queued mutation cannot reserve capacity while it waits for an earlier edit.
 
-`Edit` requires `old_string` to match exactly one location in the current file.
-When the context is missing or ambiguous, the tool returns `TOOL_FAILED` with a
-re-read instruction instead of guessing a replacement. The agent mutation
-workflow is:
+`Edit` names positions and supplies new content only; it never matches existing
+text. Every call carries the whole-file `tag` minted by whichever tool last
+displayed the content, and the host rejects a call whose tag does not hash the
+live file or whose anchors reference lines this session never displayed. The full
+contract — tag computation, the session snapshot store, the op grammar, block
+resolution, registers, and drift recovery — is
+[18-line-anchored-edit-contract](18-line-anchored-edit-contract.md); this section
+keeps only the ordering and loop-guard rules. The agent mutation workflow is:
 
 1. Edit the deliverable directly with `Edit` or `Write` when it is inside the
    advertised workspace.
@@ -249,6 +260,15 @@ workflow is:
    hunk headers or continue a repair loop.
 4. Keep mutations to one path sequential, even when read/search calls are
    issued in parallel.
+
+An `EDIT_LINES_UNSEEN` rejection whose reveal was complete is exempt from step
+3's re-read: the error already displayed the missing lines and merged them into
+the session's provenance, so the same `tag` retried unchanged applies. It still
+counts toward the two-attempt guard.
+
+Serialization also protects the snapshot store, which both producers and `Edit`
+mutate: without the per-session permit, a concurrent record could land between a
+validation and its write.
 
 The sidecar's tool timing line includes `mutationFailureKind` and
 `mutationFailureAttempt` for failed same-path `Edit` calls and recognized shell

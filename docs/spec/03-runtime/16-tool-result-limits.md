@@ -33,6 +33,14 @@ copy could never be fuller than the excerpt it exists to back.
 | spilled full output (`SPILL_MAX_BYTES`) | 512 KB | stop retaining; marker still names the file |
 | Bash output stream | per-stream sequence | preserve stdout/stderr separation |
 | Bash timeout | 60s default; 1–300s override | kill process tree + error |
+| `Edit.ops` payload | 256 KB, 200 ops | `INVALID_ARGUMENT`; further Edit caps in [18](18-line-anchored-edit-contract.md) §12 |
+
+A clipped line is not a displayed line. `Read` excludes every line it cut at
+`MAX_LINE_CHARS` from the provenance set the `Edit` contract validates against
+([18-line-anchored-edit-contract](18-line-anchored-edit-contract.md) §4.3), so a
+minified or generated line must be narrowed into view before it can be edited.
+Clipping therefore bounds context *and* blocks blind edits on the part that was
+cut, instead of only the first.
 
 Limits are host-enforced. Tool descriptions in `builtin_tool_defs()` carry the
 numbers and the scoping parameters verbatim: a tool that looks incapable of the
@@ -58,10 +66,13 @@ A marker always states which end survived, how much was kept out of the total,
 the limit that applied, and where to get the rest. The spill sentence appears
 only when a full copy was actually written.
 
-Read/Glob/Grep do not embed a marker in their payload: `content` stays
-byte-faithful so text copied out of it still matches for `Edit`, and the window
-metadata (`offset`, `lineCount`, `totalLines`, `truncated`) plus a `notice`
-string carry the same information as sibling fields.
+Read/Glob/Grep do not embed a marker in their payload: the window metadata
+(`offset`, `lineCount`, `totalLines`, `truncated`) plus a `notice` string carry
+the same information as sibling fields, which keeps the payload itself
+mechanically parseable. `Read` content is line-numbered and headed by
+`[path#TAG]` (ADR 0087); it is no longer byte-faithful, so a consumer copying it
+into `Write` must strip the header and the `N:` prefixes, which `Write` also does
+defensively.
 
 Checkpoint-only aggregate truncation uses the distinct model-context marker in
 §4 so diagnostics can distinguish where information was shortened.
@@ -114,7 +125,8 @@ report what was bounded and how to continue:
 ```ts
 type ReadResult = {
   path: string; root: "workspace" | "scratch" | "external"
-  content: string          // byte-faithful window, no markers or line numbers
+  content: string          // "[path#TAG]" header + "N:"-prefixed window
+  tag: string              // 4 hex, whole-file; the Edit anchor
   offset: number; lineCount: number
   totalLines?: number      // present only once end of file was reached
   fileBytes: number
@@ -123,12 +135,15 @@ type ReadResult = {
 }
 
 type GrepResult =
-  | { matches: { path: string; line: number; text: string }[]; count: number; files: number; truncated: boolean; notice?: string }
+  | { matches: { path: string; line: number; text: string }[]; tags: Record<string, string>; count: number; files: number; truncated: boolean; notice?: string }
   | { files: string[]; count: number; truncated: boolean; notice?: string }        // outputMode: filesWithMatches
   | { counts: { path: string; count: number }[]; count: number; truncated: boolean; notice?: string }  // outputMode: count
 
 type GlobResult = { matches: string[]; count: number; truncated: boolean; notice?: string }
 ```
+
+`tags` is present only in `content` mode, because only that mode displays lines.
+The other two modes are searchable but not editable anchors.
 
 For an approved external path, `path` is absolute; `Read` also reports
 `root: "external"`. `Glob` and `Grep` use absolute paths for their external
@@ -163,7 +178,8 @@ and the counts are the stable signals.
 - [x] oversize Bash output truncates with marker and spills the fuller copy
 - [x] Bash stderr retains its final lines when truncated
 - [x] Grep stops at `headLimit` with `truncated: true`
-- [x] Grep and Read clip lines at 2000 chars
+- [x] Grep and Read clip lines at 2000 chars, and a clipped line is excluded
+  from the `Edit` provenance set
 - [x] Read paginates a multi-megabyte file instead of refusing it, and reports
   the next offset
 - [x] Read refuses binary content with `TOOL_BINARY_CONTENT`

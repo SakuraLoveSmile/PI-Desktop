@@ -522,6 +522,15 @@ bounded command in the active shell only when native tools are insufficient.
 `rg` is optional rather than assumed, and the agent must not repeat a search
 whose answer is already in context.
 
+The edit-discipline block carries the line-anchored `Edit` contract of
+[18-line-anchored-edit-contract](18-line-anchored-edit-contract.md): the op
+table, the `+`-only body rule, "ranges name changed lines only", "re-ground on
+the tag returned by every successful write", and the worked anti-patterns. The
+sidecar's `Edit` schema is `{ path, tag, ops }`; `old_string` and `new_string` no
+longer exist, and the sidecar's tool description must stay byte-identical in
+substance to host-core's `builtin_tool_defs()` entry, because a model taught one
+grammar and validated against another fails every call.
+
 ### 7.1 Active tool context and on-demand loading (D185, ADR 0048)
 
 The sidecar builds one complete tool registry, but it does not serialize every

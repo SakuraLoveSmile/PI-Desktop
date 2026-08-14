@@ -519,6 +519,14 @@ MVP UI 始终至少包括：
 `rg` 是可选的而不是假定的，并且代理不得重复搜索
 他的答案已经在上下文中了。
 
+编辑规范块携带
+[18-line-anchored-edit-contract](/zh-CN/spec/03-runtime/18-line-anchored-edit-contract)
+的行锚定 `Edit` 契约：操作表、仅 `+` 正文规则、“范围只命名被改动的行”、
+“在每次成功写入后依据返回的 tag 重新定位”，以及成文的反模式。sidecar 的
+`Edit` schema 是 `{ path, tag, ops }`；`old_string` 与 `new_string` 不再存在，
+并且 sidecar 的工具描述必须在实质上与 host-core 的 `builtin_tool_defs()` 条目
+逐字一致，因为按一种语法教出来、却用另一种语法校验的模型每次调用都会失败。
+
 ### 7. 1 活动工具上下文和按需加载（D185、ADR 0048）
 
 sidecar 构建了一个完整的工具注册表，但它不会序列化每个工具
