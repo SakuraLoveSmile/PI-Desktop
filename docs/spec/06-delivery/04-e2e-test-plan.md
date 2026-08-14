@@ -4725,9 +4725,10 @@ This test plan spec is accepted when:
 - **Expected**: One question is visible at a time; the small indicators show
   answered, current, and skipped states in the composer approval area, at the
   same dock position used by Plan and Goal approval. The request has no
-  countdown. The tool output is ordered as `question：answer`, uses `、`
-  between multiple answers and `\n---\n` between questions, and keeps
-  `question：` for the skipped question. Decline all produces empty
+  countdown. Question text and options render at the same font size as the
+  surrounding chat body. The tool output is ordered as `question：answer`,
+  uses `、` between multiple answers and `\n---\n` between questions, and
+  keeps `question：` for the skipped question. Decline all produces empty
   placeholders for every question and still completes the tool call.
 - **Specs linked**: `03-runtime/17-asktool-questions.md`,
   `04-ux/11-asktool-question-card.md`, ADR 0077

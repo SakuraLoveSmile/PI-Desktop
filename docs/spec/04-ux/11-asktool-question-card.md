@@ -7,6 +7,8 @@ the active decision point instead of moving into transcript history.
 
 It uses the existing message width, border, background, typography, and button
 tokens so that a paused question remains visually part of the conversation.
+The question text uses the chat body type size so the card reads at the same
+scale as the surrounding transcript instead of standing out as a heading.
 
 The header identifies the prompt and shows progress. Small clickable indicators
 encode answered, unanswered, skipped, and current state without competing with
