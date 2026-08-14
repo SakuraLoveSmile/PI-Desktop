@@ -244,8 +244,19 @@ async function requestPluginNotificationPermission(): Promise<PluginNotification
   return result.permission;
 }
 
-const pluginPanels = new PluginPanelHost(async (pluginId, channel, payload) =>
-  plugins.invokePanelBridge(pluginId, channel, payload),
+const pluginPanels = new PluginPanelHost(
+  async (pluginId, channel, payload) =>
+    plugins.invokePanelBridge(pluginId, channel, payload),
+  // A panel reaching for an undeclared host is the shape an exfiltration
+  // attempt takes, so it is logged like a denied API call rather than dropped
+  // silently in the network layer.
+  ({ pluginId, url }) => {
+    logger.app("plugin", "warn", "plugin.api", {
+      pluginId,
+      code: "PERMISSION_DENIED",
+      data: { api: "panel.egress", ok: false, url, ts: Date.now() },
+    });
+  },
 );
 const plugins = new PluginRuntime({
   getWorkspacePath: () => {

@@ -1,5 +1,6 @@
 import { isValidBusTopic, isValidBusTopicPattern } from "./bus-topics.js";
 import { validateMcpServer } from "./mcp-config.js";
+import { parseNetDomains, type PluginNetDomain } from "./net-policy.js";
 
 export type PluginManifest = {
   schemaVersion: number;
@@ -38,6 +39,12 @@ export type PluginManifest = {
     bus?: PluginBusContrib;
   };
   permissions?: string[];
+  /**
+   * Egress allowlist. Every outbound path the host owns — the panel session,
+   * `pi.net.fetch`, remote MCP endpoints — is confined to these hostnames.
+   * Omitted or empty means no egress, whatever `net.fetch` says.
+   */
+  net?: { domains?: PluginNetDomain[] };
   engines?: { piDesktop?: string };
   activationEvents?: string[];
 };
@@ -359,6 +366,16 @@ export function validateManifest(raw: unknown): {
   if (contributesError) {
     return { ok: false, error: contributesError };
   }
+  const net = m.net as { domains?: unknown } | null | undefined;
+  if (net !== undefined) {
+    if (!net || typeof net !== "object" || Array.isArray(net)) {
+      return { ok: false, error: "manifest.net must be an object" };
+    }
+    const domains = parseNetDomains(net.domains);
+    if (!domains.ok) {
+      return { ok: false, error: `manifest.${domains.error}` };
+    }
+  }
   return { ok: true, manifest: m as PluginManifest };
 }
 
@@ -589,3 +606,9 @@ export {
   type McpRefResolution,
   type McpValidationResult,
 } from "./mcp-config.js";
+export {
+  isNetHostAllowed,
+  isNetUrlAllowed,
+  parseNetDomains,
+  type PluginNetDomain,
+} from "./net-policy.js";

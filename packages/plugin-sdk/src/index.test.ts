@@ -148,3 +148,25 @@ describe("PLUGIN_PERMISSIONS", () => {
     expect(new Set(PLUGIN_PERMISSIONS).size).toBe(PLUGIN_PERMISSIONS.length);
   });
 });
+
+describe("validateManifest net.domains", () => {
+  it("accepts an omitted or well-formed allowlist", () => {
+    expect(validateManifest(base).ok).toBe(true);
+    expect(
+      validateManifest({ ...base, net: { domains: ["api.github.com", "*.example.com"] } }).ok,
+    ).toBe(true);
+  });
+
+  it("rejects a malformed allowlist at install instead of at call time", () => {
+    for (const net of [
+      { domains: "api.github.com" },
+      { domains: ["*"] },
+      { domains: ["https://api.github.com"] },
+    ]) {
+      const result = validateManifest({ ...base, net });
+      expect(result.ok, JSON.stringify(net)).toBe(false);
+      expect(result.error).toMatch(/^manifest\.net\.domains/);
+    }
+    expect(validateManifest({ ...base, net: [] }).ok).toBe(false);
+  });
+});

@@ -5,7 +5,9 @@ import {
   busTopicAllowed,
   isValidBusTopic,
   isValidBusTopicPattern,
+  isNetUrlAllowed,
   matchesBusTopic,
+  parseNetDomains,
   parseSkillFrontmatter,
   pluginMcpToolKey,
   pluginSkillId,
@@ -93,6 +95,8 @@ export type PluginPanelRequest = {
   htmlPath: string;
   locale?: string;
   theme?: "light" | "dark";
+  /** The plugin's egress allowlist; the panel session is confined to it. */
+  netDomains?: readonly string[];
   /** Development panels show the host safe-area reminder in their chrome. */
   development?: boolean;
 };
@@ -206,6 +210,8 @@ const PANEL_SKILL_CHANNELS = new Set([
 ]);
 /** A plugin may teach at most this many skills; the rest are ignored. */
 const MAX_SKILLS_PER_PLUGIN = 32;
+/** Redirect hops `pi.net.fetch` follows; each one is re-checked against egress. */
+const NET_FETCH_MAX_REDIRECTS = 5;
 /** Skill documents above this size are refused (prompt budget, not disk). */
 const MAX_SKILL_BYTES = 128 * 1024;
 /** Catalog lines stay short — the body carries the detail. */
@@ -1460,6 +1466,20 @@ export class PluginRuntime {
         this.skipMcpServer(pluginId, server.id, "PERMISSION_DENIED", `missing ${permission}`);
         continue;
       }
+      // An http MCP endpoint is an outbound channel like any other, so it
+      // answers to the same allowlist rather than to its permission alone.
+      if (server.transport === "http") {
+        const url = String(server.url ?? "");
+        if (!isNetUrlAllowed(url, this.netDomains(loaded))) {
+          this.skipMcpServer(
+            pluginId,
+            server.id,
+            "PERMISSION_DENIED",
+            `endpoint not in manifest.net.domains: ${url}`,
+          );
+          continue;
+        }
+      }
       const refs = resolveMcpRefs(
         server.transport === "stdio" ? server.env : server.headers,
         settings,
@@ -1829,6 +1849,46 @@ export class PluginRuntime {
     });
   }
 
+  /**
+   * The plugin's egress allowlist. A malformed `net.domains` degrades to "no
+   * egress" rather than "all egress": validateManifest already rejects it at
+   * install, so reaching this fallback means the manifest changed underneath us.
+   */
+  private netDomains(loaded: LoadedPlugin): string[] {
+    const parsed = parseNetDomains(loaded.manifest.net?.domains);
+    return parsed.ok ? (parsed.domains ?? []) : [];
+  }
+
+  /**
+   * Confine one outbound URL to the allowlist. Reading a secret only becomes a
+   * leak when it can leave, so every host-owned egress path funnels through
+   * here — and an undeclared `net.domains` means nothing leaves at all.
+   */
+  private assertEgress(loaded: LoadedPlugin, url: string, api: string): void {
+    const domains = this.netDomains(loaded);
+    if (isNetUrlAllowed(url, domains)) return;
+    let host = url;
+    try {
+      host = new URL(url).hostname || url;
+    } catch {
+      // Keep the raw value; the audit entry is more useful than a parse error.
+    }
+    this.services.audit?.({
+      pluginId: loaded.manifest.id,
+      api,
+      ok: false,
+      errorCode: "PERMISSION_DENIED",
+      url,
+      ts: Date.now(),
+    });
+    throw apiError(
+      "PERMISSION_DENIED",
+      domains.length
+        ? `host not in manifest.net.domains: ${host}`
+        : `plugin declares no manifest.net.domains; ${host} is unreachable`,
+    );
+  }
+
   private assertPermission(loaded: LoadedPlugin, perm: string): void {
     if (!loaded.permissions.has(perm)) {
       this.services.audit?.({
@@ -1905,6 +1965,7 @@ export class PluginRuntime {
             width: loaded.manifest.ui?.width ?? 480,
             height: loaded.manifest.ui?.height ?? 360,
             htmlPath,
+            netDomains: this.netDomains(loaded),
             ...(loaded.development ? { development: true } : {}),
           });
           this.services.audit?.({
@@ -2066,6 +2127,7 @@ export class PluginRuntime {
           if (!/^https?:\/\//i.test(input.url)) {
             throw apiError("INVALID_ARGUMENT", "only http(s) URLs allowed");
           }
+          this.assertEgress(loaded, input.url, "net.fetch");
           if (this.services.fetch) {
             const result = await this.services.fetch(input);
             this.services.audit?.({
@@ -2081,12 +2143,27 @@ export class PluginRuntime {
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? 15000);
           try {
-            const res = await fetch(input.url, {
-              method: input.method ?? "GET",
-              headers: input.headers,
-              body: input.body,
-              signal: controller.signal,
-            });
+            // Follow redirects by hand: an allowlisted host that 30x-es to an
+            // undeclared one would otherwise carry the request straight out.
+            let url = input.url;
+            let res: Response;
+            for (let hop = 0; ; hop += 1) {
+              res = await fetch(url, {
+                method: input.method ?? "GET",
+                headers: input.headers,
+                body: input.body,
+                redirect: "manual",
+                signal: controller.signal,
+              });
+              if (res.status < 300 || res.status > 399) break;
+              const location = res.headers.get("location");
+              if (!location) break;
+              if (hop >= NET_FETCH_MAX_REDIRECTS) {
+                throw apiError("UNAVAILABLE", `too many redirects: ${input.url}`);
+              }
+              url = new URL(location, url).toString();
+              this.assertEgress(loaded, url, "net.fetch");
+            }
             const headers: Record<string, string> = {};
             res.headers.forEach((value, key) => {
               headers[key] = value;
@@ -2097,7 +2174,7 @@ export class PluginRuntime {
               api: "net.fetch",
               ok: true,
               ts: Date.now(),
-              url: input.url,
+              url,
               status: res.status,
             });
             return { status: res.status, headers, bodyText };
