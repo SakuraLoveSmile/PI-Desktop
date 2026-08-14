@@ -103,3 +103,4 @@ Each ADR includes:
 | 0084 | Defer new-task session creation until the first message | Accepted |
 | 0085 | Make the work panel shortcut a toggle | Accepted (amends 0068) |
 | 0086 | Keep macOS on the regular activation policy | Accepted |
+| 0087 | Route mid-stream rate limits through the bounded retry | Accepted (amends 0050) |

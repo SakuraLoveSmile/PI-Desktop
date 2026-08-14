@@ -3017,6 +3017,8 @@ Each scenario is documented in this format:
     lifecycle event. Available details include phase, stream timing, provider
     status, and `retryAttempt`, without credentials or an unrestricted provider
     body.
+  - A mid-stream HTTP 429 is classified as `PROVIDER_RATE_LIMITED` and follows
+    the same bounded path (E2E-130).
   - Authentication, model-selection, context, and malformed-request failures
     do not enter this same-turn stream replay path.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
@@ -3026,6 +3028,37 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`agent-errors.test.ts`, `runtime.test.ts`); full
   provider/UI journey Draft
+
+#### E2E-130: Recover one mid-stream rate-limit (429) in place
+
+- **Preconditions**: A project-bound Agent session uses a deterministic
+  provider fixture that emits a partial assistant stream, then fails the
+  stream with HTTP 429 once and succeeds on the next request; a second fixture
+  run fails with 429 twice; timing logs are enabled.
+- **Steps**:
+  1. Start an Agent turn with the one-429 fixture and observe the partial
+     assistant response.
+  2. Wait for the bounded retry and inspect the transcript, session state, and
+     model timing log after recovery.
+  3. Repeat with the two-429 fixture and inspect the terminal error
+     message/event and its diagnostic details.
+- **Expected**:
+  - The 429 is classified as retryable `PROVIDER_RATE_LIMITED` with
+    `providerStatus: 429`.
+  - The first mid-stream 429 waits for one abortable bounded backoff, removes
+    the failed assistant from model context, and retries once without a
+    duplicate assistant bubble or terminal error notification.
+  - The recovered turn emits one terminal lifecycle and keeps the same visible
+    assistant message id. The timing log records `outcome=retry` with
+    `errorCode=PROVIDER_RATE_LIMITED` and `retryAttempt=1`.
+  - A second 429 emits one terminal `PROVIDER_RATE_LIMITED` assistant error and
+    lifecycle event with `retryAttempt: 1` in the details; no further
+    automatic retry occurs.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` (D186 amended),
+  `03-runtime/08-error-codes.md`, `08-meta/decisions-log.md` (D228), ADR 0087
+- **Acceptance**: C (chat & stream), H (diagnostics), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`runtime.test.ts`); full provider/UI journey Draft
 ## 7A. M6 Plan and shell scenarios
 
 #### E2E-104: Legacy contract values migrate to schema v11

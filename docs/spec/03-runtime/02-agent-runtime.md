@@ -93,15 +93,16 @@ it does not make the whole agent turn an unbounded retry loop.
 
 When a provider terminates or closes an incomplete stream after the assistant
 has started, the runtime classifies the event as retryable `STREAM_FAILED`.
-`NETWORK_ERROR` and `TIMEOUT` have the same bounded path when they occur during
-stream delivery. The runtime waits 750 ms with an abortable backoff, removes
-the failed assistant from the next model context, and calls `continue()` once.
-The existing assistant message id is reused, so the partial response is
-replaced in one visible bubble. The first attempt's `turn_end` and `agent_end`
-are suppressed; the retry emits the single terminal lifecycle. A second
-failure is terminal and emits the normal assistant error plus lifecycle
-`error` event. Authentication, model-selection, rate-limit, malformed-request,
-and context errors do not use this same-turn replay path.
+`NETWORK_ERROR`, `TIMEOUT`, and `PROVIDER_RATE_LIMITED` (a mid-stream HTTP 429)
+have the same bounded path when they occur during stream delivery. The runtime
+waits 750 ms with an abortable backoff, removes the failed assistant from the
+next model context, and calls `continue()` once. The existing assistant
+message id is reused, so the partial response is replaced in one visible
+bubble. The first attempt's `turn_end` and `agent_end` are suppressed; the
+retry emits the single terminal lifecycle. A second failure is terminal and
+emits the normal assistant error plus lifecycle `error` event.
+Authentication, model-selection, malformed-request, and context errors do not
+use this same-turn replay path.
 
 Provider failures carry bounded diagnostics in `AppError.details` when
 available: `phase` (`request` or `stream`), `providerStatus`, `providerCode`,
