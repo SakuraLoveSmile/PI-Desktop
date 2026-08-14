@@ -13,9 +13,6 @@ allowBuilds:
   node-pty: true
   protobufjs: true
   electron-winstaller: true
-minimumReleaseAgeExclude:
-  - '@earendil-works/pi-agent-core@0.82.0'
-  - '@earendil-works/pi-ai@0.82.0'
 # Advisory fixes for transitives whose parents still resolve the vulnerable
 # version. Drop each one once its parent ships a release that resolves the
 # patched version on its own.

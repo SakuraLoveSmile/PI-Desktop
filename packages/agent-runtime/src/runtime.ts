@@ -20,9 +20,9 @@ import {
   type CompactionSettings,
   type BeforeToolCallContext,
   type BeforeToolCallResult,
+  type Entry,
   type MessageEntry,
   type PrepareNextTurnContext,
-  type SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import {
   isContextOverflow,
@@ -76,7 +76,7 @@ import {
   assistantContent,
   isRecord,
   nowIso,
-  timestampIso,
+  timestampMs,
   usageFromPi,
   usageToPi,
 } from "./agent-messages.js";
@@ -498,19 +498,33 @@ function delayWithAbort(ms: number, signal: AbortSignal): Promise<void> {
 
 type CheckpointPersistResult = "persisted" | "oversized" | "failed";
 
+/**
+ * A pi preparation plus the anchor the checkpoint is filed against.
+ *
+ * pi 0.84 dropped `firstKeptEntryId` from `CompactionPreparation`: the
+ * compaction entry it writes *is* the boundary, so nothing needs to name the
+ * first kept entry. We still record ours — it becomes
+ * `ContextCompactionRecord.firstKeptMessageId`, which is persisted and reported
+ * on `compaction_end` — so the Codex-shaped reshape below carries it alongside
+ * pi's fields.
+ */
+type ShapedPreparation = CompactionPreparation & {
+  firstKeptEntryId?: string;
+};
+
 type CheckpointBuildSuccess = {
   ok: true;
   checkpoint: ContextCompactionRecord;
-  entries: SessionTreeEntry[];
+  entries: Entry[];
   budget: ContextBudget;
-  preparation: CompactionPreparation;
+  preparation: ShapedPreparation;
 };
 
 type CheckpointBuildFailure = {
   ok: false;
-  entries: SessionTreeEntry[];
+  entries: Entry[];
   budget: ContextBudget;
-  preparation?: CompactionPreparation;
+  preparation?: ShapedPreparation;
   message: string;
   tokensBefore?: number;
   /**
@@ -1234,8 +1248,9 @@ export class DesktopAgentRuntime {
       const entry: MessageEntry = {
         type: "message",
         id,
+        seq: entries.length,
         parentId: entries.at(-1)?.id ?? null,
-        timestamp: timestampIso(message.timestamp),
+        timestamp: timestampMs(message.timestamp),
         message,
       };
       entries.push(entry);
@@ -1320,8 +1335,8 @@ export class DesktopAgentRuntime {
 
   private entriesWithCompaction(
     checkpoint: ContextCompactionRecord | undefined = this.activeCompaction,
-  ): SessionTreeEntry[] {
-    const entries: SessionTreeEntry[] = [...this.fullEntries];
+  ): Entry[] {
+    const entries: Entry[] = [...this.fullEntries];
     if (!checkpoint) return entries;
     const throughIndex = entries.findIndex(
       (entry) => entry.id === checkpoint.throughMessageId,
@@ -1330,17 +1345,25 @@ export class DesktopAgentRuntime {
     const compactionEntry: CompactionEntry = {
       type: "compaction",
       id: checkpoint.id,
+      seq: throughIndex + 1,
       parentId: checkpoint.throughMessageId,
-      timestamp: checkpoint.createdAt,
+      timestamp: timestampMs(checkpoint.createdAt),
       summary: checkpoint.summary,
-      firstKeptEntryId: checkpoint.firstKeptMessageId,
       tokensBefore: checkpoint.tokensBefore,
-      retainedTail: retainedTailForContext(checkpoint.retainedTail),
+      // pi 0.84 dereferences `retainedTail` unconditionally when it finds a
+      // previous compaction entry, so a checkpoint restored without a usable
+      // tail has to read as empty rather than absent.
+      retainedTail: retainedTailForContext(checkpoint.retainedTail) ?? [],
       details: checkpoint.details,
       usage: checkpoint.usage as Usage | undefined,
     };
     entries.splice(throughIndex + 1, 0, compactionEntry);
-    return entries;
+    // Inserting mid-path breaks the seq/position correspondence the rest of
+    // this file maintains. Renumber into fresh objects: `this.fullEntries`
+    // holds the live entries and must not be mutated through the copy.
+    return entries.map((entry, seq) =>
+      entry.seq === seq ? entry : { ...entry, seq },
+    );
   }
 
   private appendLiveEntry(id: string, message: AgentMessage): void {
@@ -1348,8 +1371,9 @@ export class DesktopAgentRuntime {
     this.fullEntries.push({
       type: "message",
       id,
+      seq: this.fullEntries.length,
       parentId: this.fullEntries.at(-1)?.id ?? null,
-      timestamp: timestampIso(message.timestamp),
+      timestamp: timestampMs(message.timestamp),
       message,
     });
   }
@@ -2787,7 +2811,7 @@ export class DesktopAgentRuntime {
    * which messages pi attributes file operations to.
    */
   private prepareCompactionInput(
-    entries: SessionTreeEntry[],
+    entries: Entry[],
     budget: ContextBudget,
     retainedUserTokens = this.retainedUserMessageBudget(budget),
   ) {
@@ -2799,11 +2823,7 @@ export class DesktopAgentRuntime {
     if (!prepared.ok || !prepared.value) return prepared;
     return {
       ok: true as const,
-      value: this.codexShapedPreparation(
-        prepared.value,
-        entries,
-        retainedUserTokens,
-      ),
+      value: this.codexShapedPreparation(prepared.value, retainedUserTokens),
     };
   }
 
@@ -2818,37 +2838,30 @@ export class DesktopAgentRuntime {
    * - The retained tail is rebuilt from user messages alone. Dropping assistant
    *   messages also drops their `toolCall` blocks, and their results go with
    *   them in the same pass, so no orphaned tool call can reach a provider.
-   * - `firstKeptEntryId` points at the anchor the checkpoint is filed against,
-   *   so the next boundary starts there. The anchor itself is summarized twice
-   *   as a result; a one-entry overlap is the safe direction to err in.
+   * - `firstKeptEntryId` points at the anchor the checkpoint is filed against.
+   *   It is ours, not pi's (see `ShapedPreparation`): pi 0.84 takes its own
+   *   boundary from the compaction entry, so this only feeds the persisted
+   *   record and the `compaction_end` event.
    */
   private codexShapedPreparation(
     preparation: CompactionPreparation,
-    entries: SessionTreeEntry[],
     retainedUserTokens: number,
-  ): CompactionPreparation {
+  ): ShapedPreparation {
+    // pi 0.84 replays a previous checkpoint's `retainedTail` as virtual entries
+    // at the head of the compactable range, so those messages already arrive in
+    // `preparation` — prepending them again (which is what this had to do while
+    // pi walked back to `firstKeptEntryId` instead) would duplicate every one.
     const messagesToSummarize = [
       ...preparation.messagesToSummarize,
       ...preparation.turnPrefixMessages,
       ...preparation.retainedTail,
     ];
-    // User messages the previous checkpoint retained are older than this
-    // boundary but still in the model context, which is where Codex reads its
-    // own candidates from.
-    const previousCompaction = [...entries]
-      .reverse()
-      .find((entry) => entry.type === "compaction");
-    const carriedForward =
-      previousCompaction?.type === "compaction"
-        ? (previousCompaction.retainedTail ?? [])
-        : [];
-    const candidates = [...carriedForward, ...messagesToSummarize].filter(
+    const candidates = messagesToSummarize.filter(
       (message): message is UserMessage => message.role === "user",
     );
     return {
       ...preparation,
-      firstKeptEntryId:
-        this.fullEntries.at(-1)?.id ?? preparation.firstKeptEntryId,
+      firstKeptEntryId: this.fullEntries.at(-1)?.id,
       messagesToSummarize,
       turnPrefixMessages: [],
       isSplitTurn: false,
@@ -2982,7 +2995,7 @@ export class DesktopAgentRuntime {
     });
   }
 
-  private checkpointDetails(preparation: CompactionPreparation) {
+  private checkpointDetails(preparation: ShapedPreparation) {
     return {
       readFiles: [...preparation.fileOps.read].sort(),
       modifiedFiles: [
@@ -2995,7 +3008,7 @@ export class DesktopAgentRuntime {
   }
 
   private createCheckpoint(
-    preparation: CompactionPreparation,
+    preparation: ShapedPreparation,
     throughMessageId: string,
     summary: string,
     usage?: Usage,
@@ -3037,7 +3050,7 @@ export class DesktopAgentRuntime {
   }
 
   private createFallbackCheckpoint(
-    preparation: CompactionPreparation,
+    preparation: ShapedPreparation,
     throughMessageId: string,
     maxSummaryChars: number,
   ): ContextCompactionRecord {
@@ -3072,7 +3085,7 @@ export class DesktopAgentRuntime {
    * the only thing that has to fit.
    */
   private prepareFallbackCompactionInput(
-    entries: SessionTreeEntry[],
+    entries: Entry[],
     budget: ContextBudget,
   ) {
     return this.prepareCompactionInput(
@@ -3089,7 +3102,7 @@ export class DesktopAgentRuntime {
   }
 
   private compactionSummaryWouldExceedBudget(
-    preparation: CompactionPreparation,
+    preparation: ShapedPreparation,
     budget: { hardLimit: number; requestHeadroom: number },
   ): boolean {
     const contextWindow = budget.hardLimit + budget.requestHeadroom;
@@ -3166,10 +3179,10 @@ export class DesktopAgentRuntime {
   }
 
   private fallbackPreparation(
-    entries: SessionTreeEntry[],
+    entries: Entry[],
     budget: ContextBudget,
-    preparation?: CompactionPreparation,
-  ): CompactionPreparation | undefined {
+    preparation?: ShapedPreparation,
+  ): ShapedPreparation | undefined {
     const fallbackInput = this.prepareFallbackCompactionInput(entries, budget);
     if (fallbackInput.ok && fallbackInput.value) return fallbackInput.value;
 
@@ -3191,11 +3204,11 @@ export class DesktopAgentRuntime {
   }
 
   private async recoverCompactionFailure(
-    entries: SessionTreeEntry[],
+    entries: Entry[],
     budget: ContextBudget,
     reason: ContextCompactionReason,
     willRetry: boolean,
-    preparation: CompactionPreparation | undefined,
+    preparation: ShapedPreparation | undefined,
     failureMessage: string,
   ): Promise<boolean> {
     if (reason === "manual") {
@@ -3256,7 +3269,7 @@ export class DesktopAgentRuntime {
   }
 
   private async generateCompaction(
-    preparation: CompactionPreparation,
+    preparation: ShapedPreparation,
     signal: AbortSignal,
   ): Promise<Awaited<ReturnType<typeof compact>>> {
     return compact(
@@ -3372,9 +3385,9 @@ export class DesktopAgentRuntime {
    * checkpoint, a `compaction_end`, and everything the user sees.
    */
   private buildRolloverCheckpoint(
-    entries: SessionTreeEntry[],
+    entries: Entry[],
     budget: ContextBudget,
-    preparation: CompactionPreparation,
+    preparation: ShapedPreparation,
   ): CheckpointBuild {
     const throughMessageId = this.fullEntries.at(-1)?.id;
     if (!throughMessageId) {
@@ -3390,7 +3403,7 @@ export class DesktopAgentRuntime {
     }
     // Codex clears history outright. Retaining nothing is the point of this
     // family: it buys the whole window back instead of a summary's worth.
-    const rollover: CompactionPreparation = { ...preparation, retainedTail: [] };
+    const rollover: ShapedPreparation = { ...preparation, retainedTail: [] };
     return {
       ok: true,
       entries,

@@ -12,10 +12,18 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
-export function timestampIso(timestamp: unknown): string {
-  return typeof timestamp === "number" && Number.isFinite(timestamp)
-    ? new Date(timestamp).toISOString()
-    : nowIso();
+/** Epoch milliseconds for a pi session entry. pi 0.84 changed `Entry.timestamp`
+ * from an ISO string to a number, so entries we synthesize from stored history
+ * need the numeric form. */
+export function timestampMs(timestamp: unknown): number {
+  if (typeof timestamp === "number" && Number.isFinite(timestamp)) {
+    return timestamp;
+  }
+  if (typeof timestamp === "string") {
+    const parsed = Date.parse(timestamp);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return Date.now();
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
