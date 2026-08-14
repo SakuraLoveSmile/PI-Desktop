@@ -2600,7 +2600,8 @@ export class DesktopAgentRuntime {
       error.retriable === true &&
       (error.code === "STREAM_FAILED" ||
         error.code === "NETWORK_ERROR" ||
-        error.code === "TIMEOUT")
+        error.code === "TIMEOUT" ||
+        error.code === "PROVIDER_RATE_LIMITED")
     );
   }
 
