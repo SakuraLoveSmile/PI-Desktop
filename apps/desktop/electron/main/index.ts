@@ -2239,7 +2239,11 @@ async function createWindow() {
                   ".tool-row.status-success .tool-row-header",
                 );
                 row?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-                row?.scrollIntoView({ block: "center" });
+                // The failed row sits above it and opens itself, so framing from
+                // there catches every outcome the head can state (D227).
+                document
+                  .querySelector(".tool-row.status-error")
+                  ?.scrollIntoView({ block: "start" });
               })()
             `);
             await new Promise((r) => setTimeout(r, 450));

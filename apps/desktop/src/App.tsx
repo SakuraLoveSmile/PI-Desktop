@@ -862,9 +862,11 @@ function AppShell() {
         useAppStore.setState({ messages: messages as any });
       },
       seedRunRows: (count = 3) => {
-        // Capture-only run-row fixture (D226 head scenes). A Bash tool message
-        // per state: a failure that opens itself, a success with output, and one
-        // still running; count 0 restores the empty transcript.
+        // Capture-only run-row fixture (D226/D227 head scenes). A Bash tool
+        // message per state: a command that exits 1 while its call reports
+        // success — the case the head must not read as done (D227) — a success
+        // with output, and one still running; count 0 restores the empty
+        // transcript.
         if (!(window as any).__PI_CAPTURE__) return;
         if (count <= 0) {
           useAppStore.setState({ messages: [] });
@@ -874,7 +876,7 @@ function AppShell() {
         const samples = [
           {
             command: "pnpm test",
-            status: "error" as const,
+            status: "success" as const,
             details: {
               exitCode: 1,
               stdout: "desktop test 648 tests\n",
