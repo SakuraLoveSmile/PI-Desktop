@@ -5,10 +5,11 @@ dialog. It is mounted in the same dock area as the Plan and Goal approval card,
 immediately above the composer input, so a paused question stays available at
 the active decision point instead of moving into transcript history.
 
-It uses the existing message width, border, background, typography, and button
-tokens so that a paused question remains visually part of the conversation.
-The question text uses the chat body type size so the card reads at the same
-scale as the surrounding transcript instead of standing out as a heading.
+It uses the existing message width, border, background, and button tokens so
+that a paused question remains visually part of the conversation.  The question
+text is set one half-step above the chat body size (`--text-base-plus`, 15 px)
+so it reads as the card's primary focal point while staying close to the
+surrounding transcript scale.
 
 The header identifies the prompt and shows progress. Small clickable indicators
 encode answered, unanswered, skipped, and current state without competing with
@@ -20,3 +21,19 @@ a quiet secondary action in the header.
 The card has no countdown or expiration copy. On narrow screens options remain
 full-width and actions may share the row; question text and custom input may
 wrap naturally without clipping.
+
+## Typography hierarchy
+
+The card uses a clear four-level type ramp to avoid the visual noise of
+too many similar sizes:
+
+| Element              | Token              | Size    | Weight     | Notes                       |
+|----------------------|--------------------|---------|------------|-----------------------------|
+| Card title           | `--text-xs`        | 11 px   | medium     | Uppercase, wide tracking    |
+| Question number      | `--text-xs`        | 11 px   | medium     | Wide tracking, eyebrow role |
+| Progress             | `--text-2xs`       | 10.5 px | —          | Faint, most subtle          |
+| Question text        | `--text-base-plus` | 15 px   | medium     | Primary focal point         |
+| Option text          | `--text-sm-plus`   | 12.5 px | —          | Step down from question     |
+| Option mark          | `--text-xs-plus`   | 11.5 px | —          | Proportional to option text |
+| Custom input text    | `--text-sm-plus`   | 12.5 px | —          | Matches option text         |
+| Decline button       | `--text-xs`        | 11 px   | —          | Quiet secondary action      |
