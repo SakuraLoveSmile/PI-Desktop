@@ -118,6 +118,19 @@ const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;
 const PROVIDER_STREAM_RETRY_BACKOFF_MS = 750;
 const MAX_MUTATION_RECOVERY_FAILURES = 2;
 const BASH_PATCH_FAILURE_KEY = "__bash_patch_command__";
+/**
+ * Edit failures the line-anchored contract expects and already answers: each
+ * one hands back the live tag, or the content of the lines it refused to write
+ * blind (spec 18-line-anchored-edit-contract §9.3). One honest retry is the designed response, so each of
+ * these codes gets a single free attempt per path before it counts toward the
+ * recovery guard. Everything else — malformed ops, bad ranges, a no-op apply —
+ * counts immediately, because a second one is the model guessing.
+ */
+const RECOVERABLE_MUTATION_ERROR_CODES = new Set([
+  "EDIT_TAG_MISMATCH",
+  "EDIT_TAG_UNKNOWN",
+  "EDIT_LINES_UNSEEN",
+]);
 export const TOOL_SEARCH_NAME = "ToolSearch";
 export const ASK_TOOL_NAME = "asktool";
 /**
@@ -933,6 +946,14 @@ export class DesktopAgentRuntime {
   private failedHostToolCalls = new Set<string>();
   /** Per-prompt mutation failures provide one recovery attempt, then stop. */
   private mutationFailureCounts = new Map<string, number>();
+  /** `<failure key> <error code>` pairs that already spent their free retry. */
+  private mutationRecoveryGraces = new Set<string>();
+  /** Why the recovery guard ended the turn, pending its visible error row. */
+  private pendingMutationTermination?: {
+    kind: "edit" | "patch-command";
+    target: string;
+    lastErrorCode?: string;
+  };
   private terminatingToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
   private activeCompaction?: ContextCompactionRecord;
@@ -1667,13 +1688,29 @@ export class DesktopAgentRuntime {
           : failedPatchCommand
             ? BASH_PATCH_FAILURE_KEY
             : undefined;
-        const mutationFailureAttempt = failureKey
-          ? (this.mutationFailureCounts.get(failureKey) ?? 0) + 1
-          : undefined;
         const mutationFailureKind = failedEditPath
           ? "edit"
           : failedPatchCommand
             ? "patch-command"
+            : undefined;
+        // A recoverable code is forgiven once per path, not once per call: a
+        // stale tag followed by unseen lines is two different honest failures,
+        // while the same code twice on the same path is a model that ignored
+        // what the first error told it.
+        const graceKey =
+          failureKey !== undefined &&
+          typeof result.errorCode === "string" &&
+          RECOVERABLE_MUTATION_ERROR_CODES.has(result.errorCode)
+            ? `${failureKey} ${result.errorCode}`
+            : undefined;
+        const grantedRecoveryGrace =
+          graceKey !== undefined && !this.mutationRecoveryGraces.has(graceKey);
+        if (graceKey !== undefined && grantedRecoveryGrace) {
+          this.mutationRecoveryGraces.add(graceKey);
+        }
+        const mutationFailureAttempt =
+          failureKey && !grantedRecoveryGrace
+            ? (this.mutationFailureCounts.get(failureKey) ?? 0) + 1
             : undefined;
         const terminateAfterMutationFailure =
           mutationFailureAttempt !== undefined &&
@@ -1681,8 +1718,37 @@ export class DesktopAgentRuntime {
         if (failureKey && mutationFailureAttempt !== undefined) {
           this.mutationFailureCounts.set(failureKey, mutationFailureAttempt);
         }
+        // The guard counts consecutive failures. A write that landed is
+        // progress, so it clears that path's history instead of leaving one
+        // stale strike to terminate the next unrelated failure.
+        if (!failureKey && result.ok) {
+          const succeededKey =
+            PATH_MUTATING_TOOLS.has(toolName) && typeof recordParams?.path === "string"
+              ? mutationFailureKey(recordParams.path)
+              : toolName === "Bash" && isPatchCommand(recordParams?.command)
+                ? BASH_PATCH_FAILURE_KEY
+                : undefined;
+          if (succeededKey !== undefined) {
+            this.mutationFailureCounts.delete(succeededKey);
+            for (const key of this.mutationRecoveryGraces) {
+              if (key.startsWith(`${succeededKey} `)) {
+                this.mutationRecoveryGraces.delete(key);
+              }
+            }
+          }
+        }
         if (terminateAfterMutationFailure) {
           this.terminatingToolCalls.add(toolCallId);
+          // The loop stops after this batch, so nothing downstream would
+          // explain why. Hold the reason for agent_end to turn into a visible
+          // row instead of a turn that just ends.
+          this.pendingMutationTermination = {
+            kind: mutationFailureKind ?? "edit",
+            target: failedEditPath ?? "the patch command",
+            ...(typeof result.errorCode === "string"
+              ? { lastErrorCode: result.errorCode }
+              : {}),
+          };
         }
         logTiming("tool", {
           tool: toolName,
@@ -1699,6 +1765,7 @@ export class DesktopAgentRuntime {
           ...(mutationFailureAttempt !== undefined
             ? { mutationFailureAttempt }
             : {}),
+          ...(grantedRecoveryGrace ? { mutationFailureGrace: true } : {}),
           ...(terminateAfterMutationFailure ? { terminate: true } : {}),
         });
         const text =
@@ -3901,6 +3968,7 @@ export class DesktopAgentRuntime {
           this.suppressSilentTurnRunEnd
         )
           break;
+        this.reportMutationTermination();
         this.emit({
           type: "agent_end",
           messageIds: [],
@@ -3909,6 +3977,37 @@ export class DesktopAgentRuntime {
       default:
         break;
     }
+  }
+
+  /**
+   * The recovery guard stops the agent loop by terminating the tool batch, so
+   * the turn would otherwise end on a failed tool card with nothing said. Give
+   * it the same visible, retriable error row an empty response gets: the user
+   * learns the agent stopped on purpose, and the UI keeps its continue
+   * affordance (spec 18-line-anchored-edit-contract §9.3).
+   */
+  private reportMutationTermination(): void {
+    const termination = this.pendingMutationTermination;
+    if (!termination) return;
+    this.pendingMutationTermination = undefined;
+    const message =
+      termination.kind === "edit"
+        ? `Stopped after ${MAX_MUTATION_RECOVERY_FAILURES} failed Edit attempts on ${termination.target}. Re-read the file and edit a narrower range instead of retrying blind.`
+        : `Stopped after ${MAX_MUTATION_RECOVERY_FAILURES} failed patch commands. Use Edit on the specific lines instead of a patch pipeline.`;
+    const error = {
+      code: "MUTATION_RETRY_BUDGET_EXHAUSTED",
+      message,
+      retriable: true,
+      details: {
+        kind: termination.kind,
+        ...(termination.lastErrorCode
+          ? { lastErrorCode: termination.lastErrorCode }
+          : {}),
+      },
+    };
+    this.turnHadError = true;
+    this.finalizeCurrentAssistant("error", error);
+    this.emit({ type: "error", error });
   }
 
   /** Resolve a bubble left in "streaming" when the run dies without a
@@ -4027,6 +4126,8 @@ export class DesktopAgentRuntime {
     this.providerRetryAbort?.abort();
     this.providerRetryAbort = undefined;
     this.mutationFailureCounts.clear();
+    this.mutationRecoveryGraces.clear();
+    this.pendingMutationTermination = undefined;
     this.terminatingToolCalls.clear();
     this.turnHadError = false;
     this.currentAssistant = undefined;
@@ -4103,6 +4204,8 @@ export class DesktopAgentRuntime {
     this.providerRetryAbort?.abort();
     this.providerRetryAbort = undefined;
     this.mutationFailureCounts.clear();
+    this.mutationRecoveryGraces.clear();
+    this.pendingMutationTermination = undefined;
     this.terminatingToolCalls.clear();
     this.turnHadError = false;
     this.requestStartedAt = Date.now();
@@ -4221,6 +4324,8 @@ export class DesktopAgentRuntime {
     this.pathInstructionClaims.clear();
     this.failedHostToolCalls.clear();
     this.mutationFailureCounts.clear();
+    this.mutationRecoveryGraces.clear();
+    this.pendingMutationTermination = undefined;
     this.terminatingToolCalls.clear();
     this.hostCloseUnsubscribe?.();
     this.hostCloseUnsubscribe = undefined;
