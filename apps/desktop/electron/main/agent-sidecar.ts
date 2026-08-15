@@ -6,6 +6,10 @@ import { existsSync } from "node:fs";
 import type { HostProcess, ProcessExitHandler, StderrHandler } from "./host-process";
 import { DEFAULT_RPC_TIMEOUT_MS, rpcTimeoutMs } from "@pi-desktop/shared";
 
+// stderr lines kept per sidecar so an unexpected exit can be reported with the
+// process's last words instead of a bare "agent sidecar exited".
+const SIDECAR_STDERR_TAIL_LINES = 40;
+
 export type SidecarNotificationHandler = (method: string, params: unknown) => void;
 
 /** Result shape the sidecar's tool executor expects from tools.execute. */
@@ -76,6 +80,7 @@ export class AgentSidecar {
   private disposed = false;
   private closed = false;
   private exitNotified = false;
+  private stderrTail: string[] = [];
   private host: HostProcess | null = null;
   private unsubscribeHost: (() => void) | null = null;
   private unsubscribeHostExit: (() => void) | null = null;
@@ -103,6 +108,7 @@ export class AgentSidecar {
     this.child.stderr.setEncoding("utf8");
     this.child.stderr.on("data", (text: string) => {
       if (!text) return;
+      this.recordStderr(text);
       if (onStderr) onStderr(text);
       else console.error(`[agent-sidecar] ${text.trimEnd()}`);
     });
@@ -119,6 +125,16 @@ export class AgentSidecar {
     const rl = createInterface({ input: this.child.stdout });
     this.readline = rl;
     rl.on("line", (line) => void this.onLine(line));
+  }
+
+  private recordStderr(text: string) {
+    for (const line of text.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      this.stderrTail.push(line);
+      if (this.stderrTail.length > SIDECAR_STDERR_TAIL_LINES) {
+        this.stderrTail.shift();
+      }
+    }
   }
 
   private closeTransport(error: Error) {
@@ -151,7 +167,10 @@ export class AgentSidecar {
   }) {
     if (this.exitNotified) return;
     this.exitNotified = true;
-    for (const h of this.exitHandlers) h(info);
+    // Snapshot the sidecar's last stderr lines: the dying process emits no
+    // stdout, so they are the only context a crash report gets.
+    const stderrTail = this.stderrTail.slice();
+    for (const h of this.exitHandlers) h({ ...info, stderrTail });
     this.exitHandlers.clear();
   }
 

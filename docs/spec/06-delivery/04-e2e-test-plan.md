@@ -1235,7 +1235,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: App running; host-core and sidecar healthy.
 - **Steps**: 1) Kill the host-core (or sidecar) process externally. 2) Observe app behavior.
-- **Expected**: In-flight RPCs fail fast (no long hang); `hostStatus` shows degraded then restored; child restarts with backoff; after 3 failed restarts in 2 minutes the app stays degraded with a visible fatal status.
+- **Expected**: In-flight RPCs fail fast (no long hang); `hostStatus` shows degraded then restored; child restarts with backoff; after 3 failed restarts in 2 minutes the app stays degraded with a visible fatal status. Repeat the kill with the main window closed: the crash is still logged (with the child's last stderr lines), the child still restarts, and no unhandled renderer-send error appears — supervision is independent of a live window.
 - **Specs linked**: `03-runtime/07-process-model.md`
 - **Acceptance**: Quality (main path no crash)
 - **Milestone**: M5

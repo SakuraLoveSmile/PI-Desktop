@@ -14,6 +14,8 @@ export type ProcessExitHandler = (info: {
   code: number | null;
   signal: NodeJS.Signals | null;
   intentional: boolean;
+  /** Last child stderr lines before exit; only the agent sidecar fills it. */
+  stderrTail?: string[];
 }) => void;
 export type StderrHandler = (text: string) => void;
 

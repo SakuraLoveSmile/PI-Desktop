@@ -155,3 +155,39 @@ test("settings writes validate without applying read defaults", () => {
   assert.doesNotMatch(mainSource, /planApprovalPermissionMode/);
   assert.doesNotMatch(apiSource, /planApprovalPermissionMode/);
 });
+
+test("renderer notification drops silently when the render frame is disposed", () => {
+  const sendStart = mainSource.indexOf("function sendToRenderer(");
+  const sendEnd = mainSource.indexOf(
+    "function resetMenuRendererReady",
+    sendStart,
+  );
+  const sendSource = mainSource.slice(sendStart, sendEnd);
+  assert.ok(sendSource.includes("window.webContents.send(channel, payload)"));
+  assert.ok(sendSource.includes("try {"));
+  assert.ok(sendSource.includes("} catch {"));
+  // A disposed frame during teardown is routine; logging it as an error would
+  // spam the same line on every sidecar crash while the window is closed.
+  assert.ok(
+    !sendSource.includes("console.error") && !sendSource.includes("console.warn"),
+    "disposed-frame sends are dropped silently",
+  );
+});
+
+test("sidecar crash reports carry the last stderr lines", () => {
+  assert.match(sidecarSource, /SIDECAR_STDERR_TAIL_LINES/);
+  assert.match(sidecarSource, /private stderrTail/);
+  assert.ok(
+    sidecarSource.includes("h({ ...info, stderrTail })"),
+    "exit handlers receive the stderr tail",
+  );
+  assert.ok(
+    sidecarSource.includes("this.stderrTail.slice()"),
+    "stderr tail is snapshotted at exit",
+  );
+  assert.match(mainSource, /agent sidecar exited unexpectedly/);
+  assert.ok(
+    mainSource.includes("data: { exitCode: code, signal, stderrTail }"),
+    "crash log carries the tail",
+  );
+});
