@@ -107,6 +107,7 @@ import {
 import { builtinSkills, loadBuiltinSkillBody } from "./builtin-skills";
 import { registerPluginDevTools } from "./plugin-dev-tools";
 import { PluginPanelHost } from "./plugin-panel-host";
+import type { PluginAppearance } from "../shared/plugin-panel-chrome";
 import { Logger } from "./logger";
 import { collectWorkspaceDiff } from "./git-diff";
 import { PtyManager } from "./terminal";
@@ -185,12 +186,15 @@ let sidecar: AgentSidecar | null = null;
 let quitting = false;
 let shutdownComplete = false;
 let shutdownPromise: Promise<void> | null = null;
-// Windows/Linux system-tray presence. When set, closing the main window
-// hides it to the tray instead of quitting the app (close-to-tray).
 // User-chosen close behavior on Windows/Linux; "ask" prompts on first close.
+// The tray itself is owned by D216 (always present on every platform), so
+// close behavior only decides whether a close hides the window to it.
 let closeBehavior: CloseBehavior = "ask";
 let closePromptOpen = false;
-let allowWindowClose = false;
+// Windows whose close handler has already decided to let the close through.
+// Per-window rather than a module-level latch, so a real close never leaks
+// permission to close into the next window `ensureWindow()` creates.
+const windowsAllowedToClose = new WeakSet<BrowserWindow>();
 
 let pluginNotificationPermission: PluginNotificationPermission = "unknown";
 const pluginNativeNotifications = new Set<SystemNotification>();
@@ -294,6 +298,7 @@ const plugins = new PluginRuntime({
     clipboard.writeText(value);
   },
   getLocale: () => updaterLocale,
+  getAppearance: () => resolveAppearance(),
   openPanel: async (request) => {
     await pluginPanels.open({
       ...request,
@@ -447,6 +452,10 @@ type PluginPanelTheme = "light" | "dark";
 let pluginPanelTheme: PluginPanelTheme = nativeTheme.shouldUseDarkColors
   ? "dark"
   : "light";
+/** Raw theme preference from AppSettings.theme, surfaced by `app.getAppearance`. */
+let appThemePreference: string = "system";
+/** Last appearance broadcast to plugin panels; avoids redundant pushes. */
+let broadcastAppearanceSignature = "";
 
 const updater = new AppUpdaterController({
   logger,
@@ -977,44 +986,6 @@ function updateTrayMenu(locale = app.getLocale()) {
   );
 }
 
-/** Restores a tray-hidden or minimized main window, or recreates it. */
-function revealMainWindow() {
-  const window = mainWindow;
-  if (!window || window.isDestroyed()) {
-    void ensureWindow();
-    return;
-  }
-  if (window.isMinimized()) window.restore();
-  window.show();
-  window.focus();
-}
-
-/**
- * Windows/Linux tray icon for close-to-tray: closing the main window hides
- * it to the tray (the app keeps running in the background) and the tray
- * restores it. macOS keeps the native Dock lifecycle and gets no tray.
- */
-function createTrayIcon() {
-  if (process.platform === "darwin" || tray) return;
-  const iconPath = join(app.getAppPath(), "build", "icon.png");
-  const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
-  if (icon.isEmpty()) {
-    logger.app("lifecycle", "warn", "tray icon missing", { data: { iconPath } });
-    return;
-  }
-  const labels = resolveLocale(app.getLocale()) === "zh-CN" ? zhCN : en;
-  tray = new Tray(icon);
-  tray.setToolTip(APP_NAME);
-  tray.on("click", revealMainWindow);
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: labels.tray.open, click: revealMainWindow },
-      { type: "separator" },
-      { label: labels.tray.quit, click: () => app.quit() },
-    ]),
-  );
-}
-
 function createTray() {
   if (tray) return;
   const iconPath = trayIconPath();
@@ -1182,6 +1153,12 @@ function applyApplicationMenuSettings(settings?: {
     updater.refreshReleaseNotes();
   }
   const preference = settings?.theme;
+  appThemePreference =
+    preference === "light" || preference === "dark"
+      ? preference
+      : typeof preference === "string" && preference.startsWith("plugin:")
+        ? preference
+        : "system";
   if (preference === "light" || preference === "dark") {
     pluginPanelTheme = preference;
   } else if (typeof preference === "string" && preference.startsWith("plugin:")) {
@@ -1191,6 +1168,8 @@ function applyApplicationMenuSettings(settings?: {
   } else {
     pluginPanelTheme = nativeTheme.shouldUseDarkColors ? "dark" : "light";
   }
+  // Panels mirror the app's palette/language live; push any change now.
+  broadcastAppearance();
   const keybindings =
     settings?.keybindings && typeof settings.keybindings === "object"
       ? (settings.keybindings as KeybindingOverrides)
@@ -1207,6 +1186,39 @@ function applyApplicationMenuSettings(settings?: {
     dispatch: dispatchApplicationMenuCommand,
   });
   updateTrayMenu(locale);
+}
+
+/**
+ * The appearance the host is currently showing, served to plugin panels and
+ * plugin processes through `app.getAppearance`.
+ *
+ * The resolved `base` mirrors the window-chrome logic in `applyApplicationMenuSettings`:
+ * an explicit light/dark preference wins, a `plugin:` preference resolves through
+ * the contributed theme registry (falling back to `system` when the theme is gone),
+ * and anything else follows the OS.
+ */
+function resolveAppearance(): PluginAppearance {
+  let base: PluginAppearance["base"] = pluginPanelTheme;
+  let pluginTheme: PluginAppearance["pluginTheme"] = null;
+  if (appThemePreference.startsWith("plugin:")) {
+    const theme = plugins.getThemes().find((item) => item.id === appThemePreference);
+    if (theme) {
+      base = theme.base;
+      pluginTheme = { id: theme.id, base: theme.base, css: theme.css };
+    } else {
+      base = "system";
+    }
+  }
+  return { theme: appThemePreference, base, locale: updaterLocale, pluginTheme };
+}
+
+/** Push the current appearance to every open plugin panel, when it changed. */
+function broadcastAppearance(): void {
+  const appearance = resolveAppearance();
+  const signature = JSON.stringify(appearance);
+  if (signature === broadcastAppearanceSignature) return;
+  broadcastAppearanceSignature = signature;
+  pluginPanels.broadcast("appearance:changed", appearance);
 }
 
 function flushPendingApplicationMenuCommands() {
@@ -1424,15 +1436,15 @@ function writeCloseBehavior(behavior: CloseBehavior) {
   }
 }
 
-/** Applies a close-behavior choice and reconciles the tray icon with it. */
+/**
+ * Applies a close-behavior choice. The tray icon is owned by D216 and stays
+ * resident on every platform, so switching to "quit" must not destroy it —
+ * minimize-to-tray still needs it to bring the window back.
+ */
 function applyCloseBehavior(next: CloseBehavior) {
   closeBehavior = next;
   writeCloseBehavior(next);
-  if (next === "tray") createTrayIcon();
-  else if (tray) {
-    tray.destroy();
-    tray = null;
-  }
+  if (next === "tray") createTray();
 }
 
 /**
@@ -1776,9 +1788,11 @@ async function createWindow() {
     !window.webContents.isDestroyed();
 
   // Keep the process resident and make every platform's minimize affordance
-  // consistent: minimizing hides the window into the application tray.
+  // consistent: minimizing hides the window into the application tray. The
+  // tray is the only way back, so a window whose tray icon could not be
+  // created stays a plain native minimize.
   window.on("minimize", () => {
-    if (quitting) return;
+    if (quitting || !tray) return;
     window.hide();
   });
   let workPanelReconcileTimer: NodeJS.Timeout | null = null;
@@ -2085,7 +2099,13 @@ async function createWindow() {
     // app running under the tray icon, "ask" prompts on the first close,
     // and "quit" (plus macOS and explicit-quit closes) falls through to the
     // default close.
-    if (process.platform === "darwin" || quitting || allowWindowClose) return;
+    if (
+      process.platform === "darwin" ||
+      quitting ||
+      windowsAllowedToClose.has(window)
+    ) {
+      return;
+    }
     event.preventDefault();
     void (async () => {
       if (closeBehavior === "ask") {
@@ -2100,19 +2120,20 @@ async function createWindow() {
         }
       }
       if (closeBehavior === "tray") {
-        createTrayIcon();
+        createTray();
         // The tray is the only way back to a hidden window; if the icon
-        // could not be created, fall back to a real close instead of
+        // could not be created, fall back to a real quit instead of
         // leaving the app invisible.
-        if (tray) window.hide();
-        else {
-          allowWindowClose = true;
-          window.close();
+        if (tray) {
+          window.hide();
+          return;
         }
-      } else {
-        allowWindowClose = true;
-        window.close();
       }
+      // "quit" means quit: go through the ordered `before-quit` shutdown
+      // rather than relying on `window-all-closed`, which stays silent while
+      // the D216 tray is resident.
+      windowsAllowedToClose.add(window);
+      app.quit();
     })();
   });
 
@@ -5602,6 +5623,12 @@ function registerIpc() {
   }));
 
   handle(IPC.invoke.closeBehaviorSet, async (input: unknown = {}) => {
+    // macOS keeps the native Dock lifecycle and has no close behavior to set.
+    if (process.platform === "darwin") {
+      throw Object.assign(new Error("close behavior is not configurable"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
     const behavior = (input as { behavior?: unknown })?.behavior;
     if (behavior !== "tray" && behavior !== "quit") {
       throw Object.assign(new Error("invalid close behavior"), {
@@ -6782,6 +6809,12 @@ function registerIpc() {
 
 app.whenReady().then(async () => {
   applyDevelopmentBranding();
+  // Load the close-behavior preference before the first window exists: the
+  // close handler reads `closeBehavior` synchronously, and a window created
+  // while it still held the "ask" default would prompt a user who already
+  // chose.
+  const storedBehavior = readCloseBehavior();
+  if (storedBehavior) closeBehavior = storedBehavior;
   createTray();
   app.setAboutPanelOptions({
     applicationName: APP_NAME,
@@ -6824,9 +6857,6 @@ app.whenReady().then(async () => {
     }
   }
   await ensureWindow();
-  const storedBehavior = readCloseBehavior();
-  if (storedBehavior) closeBehavior = storedBehavior;
-  if (closeBehavior === "tray") createTrayIcon();
   // createWindow awaits the initial load (loadFile resolves on
   // did-finish-load), so the page is up; give React a beat to mount its
   // event subscriptions before pushing the boot outcome.
@@ -6922,11 +6952,14 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", () => {
-  // With a tray present the app owns a background surface: a window closed
-  // or destroyed for any reason must not take the whole app down — the
-  // tray click recreates it. Without a tray, closing the last window
-  // (Windows/Linux) exits the app as before.
-  if (process.platform !== "darwin" && !tray) app.quit();
+  // The D216 tray is resident on every platform, so its presence says nothing
+  // about whether the app should survive a closed window — the user's close
+  // behavior does. Under "tray" a window destroyed for any reason must not
+  // take the app down (the tray click recreates it); otherwise closing the
+  // last window on Windows/Linux exits the app as before.
+  if (process.platform === "darwin") return;
+  if (closeBehavior === "tray" && tray) return;
+  app.quit();
 });
 
 app.on("before-quit", (event) => {

@@ -58,6 +58,7 @@ import {
 } from "./fs-panel";
 import { McpServerClient, type McpServerClientOptions } from "./plugin-mcp";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
+import type { PluginAppearance } from "../shared/plugin-panel-chrome";
 
 export type RegisteredCommand = {
   id: string;
@@ -161,6 +162,12 @@ export type PluginHostServices = {
   getWorkspacePath: () => string | null;
   getLocale?: () => string;
   getAppVersion?: () => string;
+  /**
+   * The appearance the host is currently showing (palette, language, active
+   * plugin theme). Panels and plugin processes read it through `app.getAppearance`;
+   * the host broadcasts `appearance:changed` to open panels when it changes.
+   */
+  getAppearance?: () => PluginAppearance;
   showToast: (message: string, level?: "info" | "warn" | "error") => void;
   notify: (input: { title: string; body?: string }) => void;
   getNotificationPermission: () => PluginNotificationPermission | Promise<PluginNotificationPermission>;
@@ -232,6 +239,7 @@ export type PluginHostServices = {
 const HOST_API_ALLOWLIST = new Set([
   "app.getVersion",
   "app.getLocale",
+  "app.getAppearance",
   "plugin.getSettings",
   "plugin.setSettings",
   "plugin.getDataPath",
@@ -1065,6 +1073,8 @@ export class PluginRuntime {
         });
       case "plugin.getSettings":
         return api.plugin.getSettings();
+      case "app.getAppearance":
+        return api.app.getAppearance();
       case "workspace.get":
         return api.workspace.get();
       default:
@@ -2332,6 +2342,13 @@ export class PluginRuntime {
       app: {
         getVersion: async () => this.services.getAppVersion?.() ?? "0.2.1",
         getLocale: async () => this.services.getLocale?.() ?? "en",
+        getAppearance: async () =>
+          this.services.getAppearance?.() ?? {
+            theme: "system",
+            base: "system",
+            locale: this.services.getLocale?.() ?? "en",
+            pluginTheme: null,
+          },
       },
       plugin: {
         getId: () => pluginId,

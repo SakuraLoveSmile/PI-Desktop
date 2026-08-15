@@ -288,4 +288,18 @@ export class PluginPanelHost {
       await this.close(pluginId);
     }
   }
+
+  /**
+   * Push a one-way event to every open plugin panel. The preload maps
+   * `pluginBridge.on(event, handler)` to `pi-plugin-panel-event:<event>`, so
+   * the host sends on that channel. Panels that do not subscribe are inert
+   * receivers; the event names are fixed by the host (e.g. `appearance:changed`).
+   */
+  broadcast(event: string, payload: unknown): void {
+    const channel = `pi-plugin-panel-event:${event}`;
+    for (const win of this.windows.values()) {
+      if (win.isDestroyed() || win.webContents.isDestroyed()) continue;
+      win.webContents.send(channel, payload);
+    }
+  }
 }

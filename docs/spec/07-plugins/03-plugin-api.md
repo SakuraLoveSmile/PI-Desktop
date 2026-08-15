@@ -22,7 +22,25 @@ declare const pi: PiPluginHostApi;
 ```ts
 pi.app.getVersion(): Promise<string>
 pi.app.getLocale(): Promise<string>
+pi.app.getAppearance(): Promise<PluginAppearance>
 ```
+
+`app.getAppearance` returns the appearance the host is currently showing so a
+plugin (or its panel) can mirror the app's language and color mode exactly:
+
+```ts
+type PluginAppearance = {
+  theme: string        // raw preference: "light" | "dark" | "system" | "plugin:<pluginId>:<themeId>"
+  base: "light" | "dark" | "system"  // palette the preference resolves to
+  locale: string       // active language tag (e.g. "en", "zh-CN")
+  pluginTheme: { id: string; base: "light" | "dark"; css: string } | null
+}
+```
+
+Panels read the same value through the bridge channel `app.getAppearance` and
+receive live updates on the `appearance:changed` event (below). On hosts older
+than the channel, the call rejects with `UNSUPPORTED`; panels should fall back
+to the OS preference and their own in-panel choice.
 
 ### plugin
 ```ts
@@ -222,7 +240,8 @@ Planned events:
 - `session:activated`
 - `plugin:settingsChanged` is delivered after edits from the generated Plugins
   settings UI.
-- `app:themeChanged`
+- `app:themeChanged` — for now, panels follow the palette live through the
+  panel event `appearance:changed`; the plugin-process event remains planned.
 
 ## 6. Panel bridge API
 
@@ -240,7 +259,7 @@ The host-owned preload forwards only fixed channels to the plugin runtime:
 | `ui.showToast`, `ui.closePanel` | None beyond the loaded panel |
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | `notify` |
-| `plugin.getSettings`, `workspace.get` | None |
+| `plugin.getSettings`, `workspace.get`, `app.getAppearance` | None |
 | `fs.readText`, `fs.glob` | `fs.read` |
 | `fs.writeText` | `fs.write` |
 | `clipboard.readText` | `clipboard.read` |
@@ -254,6 +273,14 @@ channel the host does not implement itself is forwarded to the plugin's
 channels; a plugin that exports no `onPanelInvoke` gets `UNSUPPORTED` from its own
 process. The host-supported channels include `skill.list`, `skill.read`,
 `skill.create`, `skill.update`, `skill.remove`, and `skill.setEnabled`.
+
+### Panel events (host -> panel)
+
+`window.pluginBridge.on(event, handler)` receives host-pushed events. Delivered
+today:
+
+- `appearance:changed` — payload is the `PluginAppearance` above, sent whenever
+  the app's palette or language changes, so a panel can restyle and relabel live.
 
 ## 7. Call auditing
 
