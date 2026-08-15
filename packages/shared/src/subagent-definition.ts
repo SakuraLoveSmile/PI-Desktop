@@ -105,6 +105,17 @@ export function isSubagentPermission(value: unknown): value is SubagentPermissio
   );
 }
 
+/**
+ * Sources whose documents may declare a `permission` scope. Builtins ship with
+ * the app and user documents live in the user's own config directory, so both
+ * express a choice the user already made. Project documents arrive with the
+ * repository — cloning a repo must not hand it a permission upgrade — so their
+ * delegates always resolve under the session's effective mode (ADR 0089).
+ */
+export const PERMISSION_DECLARING_SOURCES: ReadonlySet<SubagentSource> = new Set(
+  ["builtin", "user"] as const,
+);
+
 /** Caps that keep delegation cheap and predictable (see ADR 0062). */
 export const MAX_SUBAGENT_DEFINITIONS = 16;
 export const MAX_SUBAGENT_PROVIDERS = 8;
@@ -295,14 +306,24 @@ export function parseSubagentDefinition(
   let permission: SubagentPermission | undefined;
   if (declaredPermission) {
     const candidate = declaredPermission.toLowerCase();
-    if (isSubagentPermission(candidate)) {
-      if (candidate !== DEFAULT_SUBAGENT_PERMISSION) {
-        permission = candidate;
-      }
-    } else {
+    if (!isSubagentPermission(candidate)) {
       warnings.push(
         `ignoring unknown permission "${declaredPermission}" (use inherit, ask, accept-edits or auto)`,
       );
+    } else if (
+      candidate !== DEFAULT_SUBAGENT_PERMISSION &&
+      !PERMISSION_DECLARING_SOURCES.has(options.source)
+    ) {
+      // A project definition arrives with the repository, so honoring its
+      // declared scope would let cloned code grant itself `auto` and write
+      // without a prompt. Project definitions always run under the session's
+      // effective mode; a user who wants the scope copies the document into
+      // their own agents directory, where declaring it is their own choice.
+      warnings.push(
+        `ignoring permission "${declaredPermission}": project definitions run under the session's permission mode`,
+      );
+    } else if (candidate !== DEFAULT_SUBAGENT_PERMISSION) {
+      permission = candidate;
     }
   }
 
