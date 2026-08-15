@@ -30,6 +30,8 @@ notifications or taskbar groups. The Windows package additionally pins the
 `PI-Desktop` executable and Start menu shortcut names. The launcher sets
 `PI_DESKTOP_DEV=1` so runtime packaging checks keep update delivery disabled
 and preserve developer workspace defaults despite the branded executable name.
+The first `pnpm dev` on Electron 43+ downloads the Electron binary on demand
+(the package no longer installs it during `pnpm install`).
 Packaged lanes use
 `build/icon.icns` through electron-builder, and the renderer imports the same
 PNG through `BrandLogo`. The PNG is canonical;

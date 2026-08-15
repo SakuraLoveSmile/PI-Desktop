@@ -33,6 +33,8 @@ Electron 准备就绪，防止库存主机身份拥有本机
 `PI-Desktop` 可执行文件和“开始”菜单快捷方式名称。启动器设置
 `PI_DESKTOP_DEV=1` 因此运行时打包检查会禁用更新传送
 并保留开发人员工作区默认值，尽管有品牌可执行文件名称。
+Electron 43+ 上的首次 `pnpm dev` 会按需下载 Electron 二进制文件
+（该包不再在 `pnpm install` 期间安装它）。
 打包车道使用
 `build/icon.icns`通过电子构建器，渲染器导入相同的
 PNG 通过 `BrandLogo`。 PNG 是规范的；
