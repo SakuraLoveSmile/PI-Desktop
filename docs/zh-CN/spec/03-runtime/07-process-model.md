@@ -118,6 +118,9 @@ sidecar/host 关闭序列在更新程序替换应用程序之前运行。
   （`shared`、`i18n`、`plugin-sdk` 和 `agent-runtime`）在 host-core 之前和
   Electron 启动； Electron 绝不能编译或忽略加载过时的内容
   来自早期源版本的软件包工件
+- Electron 43+ 不再在 `pnpm install` 期间安装其二进制文件；
+  `scripts/dev-electron.mjs` 通过 `electron` 包入口解析开发主机，
+  该入口在首次开发启动时按需下载并解压二进制文件
 
 ### 发布
 - Electron 应用程序包

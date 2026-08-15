@@ -29,11 +29,11 @@ function resolvePackagePath(packageName) {
 
 function resolveElectronInstallation() {
   const packagePath = resolvePackagePath("electron");
-  const packageRoot = dirname(packagePath);
-  const executable = readFileSync(join(packageRoot, "path.txt"), "utf8").trim();
   const version = JSON.parse(readFileSync(packagePath, "utf8")).version;
+  const require = createRequire(join(DESKTOP_ROOT, "package.json"));
+  const executable = require("electron");
   return {
-    executablePath: join(packageRoot, "dist", executable),
+    executablePath: executable,
     version,
   };
 }

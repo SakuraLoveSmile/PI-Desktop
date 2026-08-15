@@ -131,6 +131,10 @@ sidecar/host shutdown sequence runs before the updater replaces the app.
   (`shared`, `i18n`, `plugin-sdk`, and `agent-runtime`) before host-core and
   Electron startup; Electron must never compile against or load stale ignored
   package artifacts from an earlier source revision
+- Electron 43+ no longer installs its binary during `pnpm install`;
+  `scripts/dev-electron.mjs` resolves the development host through the
+  `electron` package entry, which downloads and extracts the binary on demand
+  at first dev boot
 
 ### Release
 - package Electron app
