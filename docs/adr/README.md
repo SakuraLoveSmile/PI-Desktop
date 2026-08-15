@@ -103,4 +103,8 @@ Each ADR includes:
 | 0084 | Defer new-task session creation until the first message | Accepted |
 | 0085 | Make the work panel shortcut a toggle | Accepted (amends 0068) |
 | 0086 | Keep macOS on the regular activation policy | Accepted |
-| 0087 | Route mid-stream rate limits through the bounded retry | Accepted (amends 0050) |
+| 0087 | Replace textual Edit matching with a line-anchored, tag-verified contract | Accepted for implementation (amends 0043 / 0069) |
+| 0088 | Declared file scope and recoverable deletion for plugins | Accepted (continues 0008 D009) |
+| 0089 | Proactive background subagent delegation | Accepted for implementation |
+| 0090 | User-configurable close behavior with close-to-tray | Accepted for implementation |
+| 0091 | Route mid-stream rate limits through the bounded retry | Accepted (amends 0050) |

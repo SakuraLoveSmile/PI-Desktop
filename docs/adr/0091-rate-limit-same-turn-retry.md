@@ -1,9 +1,9 @@
-# ADR 0087: Route mid-stream rate limits through the bounded retry
+# ADR 0091: Route mid-stream rate limits through the bounded retry
 
 - Status: Accepted
 - Date: 2026-08-14
 - Deciders: PI-Desktop core
-- Related: D228, E2E-130, ADR 0050, D186
+- Related: D233, E2E-149, ADR 0050, D186
 
 ## Context
 
@@ -56,6 +56,6 @@ was exclusively post-stream, where pi-ai's request wrapper can no longer act.
 
 - `docs/spec/03-runtime/02-agent-runtime.md` §5d
 - `docs/spec/03-runtime/08-error-codes.md`
-- `docs/spec/06-delivery/04-e2e-test-plan.md` E2E-130
+- `docs/spec/06-delivery/04-e2e-test-plan.md` E2E-149
 - `packages/agent-runtime/src/runtime.ts`
-- Decision D228, ADR 0050, D186
+- Decision D233, ADR 0050, D186

@@ -68,17 +68,23 @@ export function ConversationTopbar({
       aria-label={t("nav.conversation")}
     >
       <div className="ct-left">
-        {sidebarCollapsed ? (
+        {/*
+          Always mounted: the slot animates from 0 to 28px with the dock, so
+          unmounting it would reintroduce the first-frame title jump. While the
+          sidebar is open the slot is zero-width and hidden from AT.
+        */}
+        <div className="ct-lead" aria-hidden={!sidebarCollapsed}>
           <button
             type="button"
             className="ct-icon-btn"
             title={t("nav.toggleSidebar")}
             aria-label={t("nav.toggleSidebar")}
+            tabIndex={sidebarCollapsed ? undefined : -1}
             onClick={onToggleSidebar}
           >
             <IconSidebar size={15} />
           </button>
-        ) : null}
+        </div>
         <div
           className="ct-title-wrap"
           title={project ? `${project} · ${fullTaskTitle}` : fullTaskTitle}

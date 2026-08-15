@@ -1,7 +1,7 @@
 # 08. Error Codes
 
 > Source of truth: `packages/shared/src/errors.ts` (`ErrorCodes`). Codes in
-> §3.6 are reserved (documented ahead of emission); everything else is live.
+> §3.7 are reserved (documented ahead of emission); everything else is live.
 
 ## 1. Goal
 
@@ -84,6 +84,7 @@ does not turn temporary thread pressure into a host process exit.
 | `TOOL_DENIED` | no | permission denied / mode forbidden |
 | `TOOL_TIMEOUT` | yes | tool execution timeout |
 | `TOOL_FAILED` | maybe | tool executed but failed |
+| `MUTATION_RETRY_BUDGET_EXHAUSTED` | yes | the repeat guard ended the turn after same-path `Edit` or shell patch failures; carries `details.kind` (`edit` or `patch-command`) and the last tool error code |
 | `PROCESS_RESOURCE_EXHAUSTED` | yes | shell process could not start because the OS temporarily exhausted process resources |
 | `SHELL_NOT_FOUND` | no | no effective platform shell is available after catalog fallback; message carries guidance |
 | `COMMAND_SHELL_CHANGED` | no | pinned shell ID or dialect changed before execution |
@@ -109,7 +110,41 @@ The `_IN_PLAN` suffix and the `PLAN_` prefix are historical: both contract modes
 (**D198**). The renderer picks its wording from the proposal's `kind`, so one
 code can surface as either "Plan" or "Goal" copy.
 
-### 3.4 Secrets / settings
+### 3.4 Edit contract (ADR 0087)
+
+Emitted only by `Edit`. Version and provenance failures have their own codes
+because each names a different next action; reporting them as `TOOL_FAILED`
+loses that. See
+[18-line-anchored-edit-contract](18-line-anchored-edit-contract.md) §11.
+
+| code | retriable | meaning |
+|---|---|---|
+| `EDIT_TAG_REQUIRED` | no | `tag` missing or not 4 hex digits |
+| `EDIT_TAG_MISMATCH` | yes after a `Read` | tag does not hash the live file and drift recovery declined; carries the live tag and current content at the anchors |
+| `EDIT_TAG_UNKNOWN` | yes after a `Read` | tag is well-formed but the session recorded no such content for the path |
+| `EDIT_LINES_UNSEEN` | yes | anchors reference lines the session never displayed; carries the revealed content |
+| `EDIT_PARSE_FAILED` | no | malformed op header, body row under a colonless header, missing body, or a `-`/context row |
+| `EDIT_RANGE_INVALID` | no | reversed range, out-of-bounds line, overlapping ops, or duplicate anchor |
+| `EDIT_BLOCK_UNRESOLVED` | no | a `N*` locator did not resolve; message names the plain-range alternative |
+| `EDIT_REGISTER_EMPTY` | no | paste from an unset register |
+| `EDIT_REGISTER_AMBIGUOUS` | no | anonymous paste with more than one pending anonymous capture |
+| `EDIT_REPAIR_AMBIGUOUS` | no | boundary-repair candidates tied at minimum cost |
+| `EDIT_NO_CHANGE` | no | the apply produced text identical to the input |
+| `EDIT_AMPLIFICATION_LIMIT` | no | lowering exceeded the expansion cap |
+
+`EDIT_LINES_UNSEEN` is retriable **without** a further `Read` when its message
+reports a complete reveal: the revealed lines are merged into the session's
+provenance, so the same `tag` retried unchanged applies. A truncated reveal
+merges nothing and requires the re-read.
+
+`EDIT_TAG_MISMATCH`, `EDIT_TAG_UNKNOWN`, and `EDIT_LINES_UNSEEN` each get one
+free attempt per path before the repeat guard counts them, because each already
+carries what the retry needs. The remaining codes count on first occurrence, and
+the failure that exhausts the budget surfaces as §3.3's
+`MUTATION_RETRY_BUDGET_EXHAUSTED` on the assistant row
+([18-line-anchored-edit-contract](18-line-anchored-edit-contract.md) §9.3).
+
+### 3.5 Secrets / settings
 
 | code | retriable | meaning |
 |---|---|---|
@@ -117,7 +152,7 @@ code can surface as either "Plan" or "Goal" copy.
 | `SECRET_STORE_UNAVAILABLE` | maybe | OS secure storage unavailable (reserved) |
 | `SETTINGS_INVALID` | no | settings payload invalid (reserved) |
 
-### 3.5 Plugins
+### 3.6 Plugins
 
 | code | retriable | meaning |
 |---|---|---|
@@ -130,7 +165,7 @@ code can surface as either "Plan" or "Goal" copy.
 | `PLUGIN_CRASHED` | yes | plugin runtime crashed (reserved) |
 | `PLUGIN_CONTRACT_MISMATCH` | no | unsupported manifest/api version (reserved) |
 
-### 3.6 Reserved detail codes (not yet emitted)
+### 3.7 Reserved detail codes (not yet emitted)
 
 Finer-grained provider/tool distinctions documented for future mapping.
 Until emitted, implementations use the canonical parent code shown.

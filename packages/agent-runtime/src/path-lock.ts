@@ -71,28 +71,3 @@ export class PathMutex {
     return this.queues.size > 0;
   }
 }
-
-/**
- * Bound how many delegates run at once. The model can emit any number of
- * parallel `Task` calls in one assistant message; each running delegate costs
- * a provider stream and its own tool traffic.
- */
-export class Semaphore {
-  private active = 0;
-  private waiting: Array<() => void> = [];
-
-  constructor(private readonly limit: number) {}
-
-  async run<T>(task: () => Promise<T>): Promise<T> {
-    if (this.active >= this.limit) {
-      await new Promise<void>((resolve) => this.waiting.push(resolve));
-    }
-    this.active += 1;
-    try {
-      return await task();
-    } finally {
-      this.active -= 1;
-      this.waiting.shift()?.();
-    }
-  }
-}

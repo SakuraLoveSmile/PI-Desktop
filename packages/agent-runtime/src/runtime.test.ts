@@ -18,29 +18,66 @@ import type { ProjectInstructions } from "./project-instructions.js";
 const subagentRuns = vi.hoisted(() => ({
   calls: [] as any[],
   result: undefined as any,
+  /** When true, run() waits for resolveRun() so tests control settlement. */
+  deferred: false,
+  instances: [] as Array<{ resolve: (r: unknown) => void; settled: boolean }>,
+  /** Settles the oldest unresolved deferred run (tests control order). */
+  resolveRun: undefined as ((result: unknown) => void) | undefined,
 }));
 vi.mock("./subagent.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./subagent.js")>();
   return {
     ...actual,
     SubagentRun: class {
+      private signal?: AbortSignal;
       constructor(options: unknown) {
         subagentRuns.calls.push(options);
+        // Per-instance: concurrent delegates must abort on their own signal.
+        this.signal = (options as { signal?: AbortSignal }).signal;
       }
-      async run() {
-        return (
+      run() {
+        if (subagentRuns.deferred) {
+          return new Promise((resolve) => {
+            const instance = { resolve, settled: false };
+            subagentRuns.instances.push(instance);
+            subagentRuns.resolveRun = (result: unknown) => {
+              const next = subagentRuns.instances.find((entry) => !entry.settled);
+              if (next) {
+                next.settled = true;
+                next.resolve(result);
+              }
+            };
+            this.signal?.addEventListener(
+              "abort",
+              () => {
+                if (instance.settled) return;
+                instance.settled = true;
+                resolve({
+                  agentName: "explorer",
+                  status: "aborted",
+                  report: "The delegated task was aborted.",
+                  turns: 0,
+                  toolCalls: 0,
+                });
+              },
+              { once: true },
+            );
+          });
+        }
+        return Promise.resolve(
           subagentRuns.result ?? {
             agentName: "explorer",
             status: "completed",
             report: "done",
             turns: 1,
             toolCalls: 0,
-          }
+          },
         );
       }
     },
   };
 });
+import { MAX_SUBAGENT_CONCURRENCY } from "@pi-desktop/shared";
 import type {
   ContextCompactionRecord,
   ContextCompactionSettings,
@@ -401,6 +438,142 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await expect(
       agent.afterToolCall({ toolCall: { id: "patch-2" } }),
     ).resolves.toEqual({ isError: true, terminate: true });
+
+    await runtime.dispose();
+  });
+
+  it("spends one grace per recoverable Edit code before counting failures", async () => {
+    const errorCodes = [
+      "EDIT_TAG_MISMATCH",
+      "EDIT_LINES_UNSEEN",
+      "EDIT_TAG_MISMATCH",
+      "EDIT_TAG_MISMATCH",
+    ];
+    let editCall = 0;
+    const host = {
+      call: vi.fn(async (method: string) => {
+        if (method !== "tools.execute") return undefined;
+        return {
+          ok: false,
+          isError: true,
+          errorCode: errorCodes[editCall++],
+          content: { error: "stale tag" },
+        };
+      }),
+    };
+    const runtime = createRuntime({ host });
+    const agent = (runtime as any).agent;
+    const edit = agent.state.tools.find((tool: any) => tool.name === "Edit");
+    const args = { path: "src/example.ts", tag: "A1B2", ops: "PUT 1.=1:\n+fresh" };
+
+    // Each recoverable code answers itself: the error carries the live tag or
+    // the unseen content, so one honest retry per code is the designed path.
+    const mismatch = await edit.execute("edit-1", args);
+    expect(mismatch.terminate).toBeUndefined();
+    const unseen = await edit.execute("edit-2", args);
+    expect(unseen.terminate).toBeUndefined();
+
+    // The same code twice is the model ignoring what the first error said.
+    const repeat = await edit.execute("edit-3", args);
+    expect(repeat.terminate).toBeUndefined();
+    const exhausted = await edit.execute("edit-4", args);
+    expect(exhausted.terminate).toBe(true);
+
+    await runtime.dispose();
+  });
+
+  it("clears the mutation strike once an edit on that path lands", async () => {
+    const results = [
+      { ok: false, isError: true, errorCode: "EDIT_PARSE_FAILED", content: {} },
+      { ok: true, isError: false, content: { tag: "C3D4" } },
+      { ok: false, isError: true, errorCode: "EDIT_PARSE_FAILED", content: {} },
+    ];
+    let editCall = 0;
+    const host = {
+      call: vi.fn(async (method: string) => {
+        if (method !== "tools.execute") return undefined;
+        return results[editCall++];
+      }),
+    };
+    const runtime = createRuntime({ host });
+    const agent = (runtime as any).agent;
+    const edit = agent.state.tools.find((tool: any) => tool.name === "Edit");
+    const args = { path: "src/example.ts", tag: "A1B2", ops: "PUT 1.=1:\n+fresh" };
+
+    const failed = await edit.execute("edit-1", args);
+    expect(failed.terminate).toBeUndefined();
+    const landed = await edit.execute("edit-2", args);
+    expect(landed.isError).toBe(false);
+
+    // Without the reset this failure would be strike two and end the turn.
+    const afterSuccess = await edit.execute("edit-3", args);
+    expect(afterSuccess.terminate).toBeUndefined();
+    expect((runtime as any).mutationFailureCounts.get("src/example.ts")).toBe(1);
+
+    await runtime.dispose();
+  });
+
+  it("reports a visible error row when the mutation guard ends the turn", async () => {
+    const onEvent = vi.fn();
+    const host = {
+      call: vi.fn(async (method: string) => {
+        if (method !== "tools.execute") return undefined;
+        return {
+          ok: false,
+          isError: true,
+          errorCode: "EDIT_PARSE_FAILED",
+          content: { error: "missing body row" },
+        };
+      }),
+    };
+    const runtime = createRuntime({ host, onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    const edit = agent.state.tools.find((tool: any) => tool.name === "Edit");
+    const args = { path: "src/example.ts", tag: "A1B2", ops: "PUT 1.=1:" };
+
+    await edit.execute("edit-1", args);
+    const second = await edit.execute("edit-2", args);
+    expect(second.terminate).toBe(true);
+
+    // pi-agent-core stops the loop on a terminating batch, so agent_end is the
+    // last chance to say why instead of completing the turn in silence.
+    await handleAgentEvent({ type: "agent_end", messages: [] });
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({
+          status: "error",
+          isError: true,
+          error: expect.objectContaining({
+            code: "MUTATION_RETRY_BUDGET_EXHAUSTED",
+            retriable: true,
+            details: expect.objectContaining({
+              kind: "edit",
+              lastErrorCode: "EDIT_PARSE_FAILED",
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "error",
+        error: expect.objectContaining({
+          code: "MUTATION_RETRY_BUDGET_EXHAUSTED",
+        }),
+      }),
+    );
+    expect((runtime as any).turnHadError).toBe(true);
+    // One row per termination: a second agent_end must not repeat it.
+    onEvent.mockClear();
+    await handleAgentEvent({ type: "agent_end", messages: [] });
+    const repeated = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(
+      repeated.filter((event: any) => event.type === "error"),
+    ).toHaveLength(0);
 
     await runtime.dispose();
   });
@@ -1396,6 +1569,136 @@ describe("DesktopAgentRuntime plan transitions", () => {
         ([envelope]) => (envelope as any).event?.message?.role === "user",
       ),
     ).toBe(false);
+
+    await runtime.dispose();
+  });
+
+  it("re-runs a silent turn during approved plan execution", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    // The shape that ended a real plan execution: a conclusion written into
+    // reasoning, empty visible text, no tool call. Recovery is armed inside
+    // `message_end`, so an entry point that never acts on it leaves the run
+    // with no `turn_end`, no `agent_end`, and nothing for the user to retry.
+    const silentMessage = assistantMessage({
+      content: [{ type: "thinking", thinking: "the plan is already done" }],
+    });
+    const recoveredMessage = assistantMessage({
+      content: [{ type: "text", text: "Implemented the approved plan." }],
+    });
+
+    let attempts = 0;
+    agent.waitForIdle = vi.fn(async () => undefined);
+    agent.continue = vi.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        agent.state.messages = [
+          { role: "user", content: "execute the approved plan", timestamp: 1 },
+          silentMessage,
+        ];
+      } else {
+        // The silent assistant is popped before the re-run, and the nudge is
+        // on the prompt that re-run actually sends.
+        expect(agent.state.messages).toHaveLength(1);
+        expect(agent.state.systemPrompt).toContain("<no_output_recovery>");
+      }
+      await handleAgentEvent({ type: "agent_start" });
+      await handleAgentEvent({ type: "turn_start" });
+      await handleAgentEvent({
+        type: "message_start",
+        message: { role: "assistant", content: [] },
+      });
+      await handleAgentEvent({
+        type: "message_end",
+        message: attempts === 1 ? silentMessage : recoveredMessage,
+      });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+
+    const execution: PlanExecution = {
+      id: "execution-silent",
+      proposalId: "proposal-silent",
+      sessionId: "session-1",
+      kind: "plan",
+      plan: "# Approved\n\nDo the work.",
+      title: "Approved plan",
+      question: "Proceed?",
+      artifact: {
+        relativePath: ".pi/plan/proposal-silent.md",
+        sha256: "abc123",
+        sizeBytes: 24,
+      },
+      targetPermissionMode: "auto",
+      state: "running",
+    };
+
+    await runtime.executeApprovedPlan(execution, "execution-turn-silent");
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(agent.continue).toHaveBeenCalledTimes(2);
+    // The run closes exactly once, carrying the recovered text; the empty turn
+    // leaves neither a bubble nor an error row behind.
+    expect(events.filter((event) => event.type === "turn_end")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "agent_end")).toHaveLength(1);
+    expect(events.at(-1)?.type).toBe("agent_end");
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(
+      events.filter(
+        (event) =>
+          event.type === "message_end" && event.message?.status === "complete",
+      ),
+    ).toHaveLength(1);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({
+          status: "complete",
+          content: "Implemented the approved plan.",
+        }),
+      }),
+    );
+    // One-shot: the nudge does not ride along on later turns.
+    expect(agent.state.systemPrompt).not.toContain("<no_output_recovery>");
+
+    await runtime.dispose();
+  });
+
+  it("starts each approved plan execution from clean recovery state", async () => {
+    const runtime = createRuntime();
+    const agent = (runtime as any).agent;
+    // A run-end suppression left over from a previous turn would swallow this
+    // execution's own `turn_end` and `agent_end`, ending it invisibly.
+    (runtime as any).suppressSilentTurnRunEnd = true;
+    (runtime as any).silentTurnRerunAttempted = true;
+    (runtime as any).pendingSilentTurnRerun = true;
+    agent.continue = vi.fn(async () => undefined);
+    agent.waitForIdle = vi.fn(async () => undefined);
+
+    const execution: PlanExecution = {
+      id: "execution-clean",
+      proposalId: "proposal-clean",
+      sessionId: "session-1",
+      kind: "plan",
+      plan: "# Approved\n\nDo the work.",
+      title: "Approved plan",
+      question: "Proceed?",
+      artifact: {
+        relativePath: ".pi/plan/proposal-clean.md",
+        sha256: "abc123",
+        sizeBytes: 24,
+      },
+      targetPermissionMode: "auto",
+      state: "running",
+    };
+
+    await runtime.executeApprovedPlan(execution, "execution-turn-clean");
+
+    expect((runtime as any).suppressSilentTurnRunEnd).toBe(false);
+    expect((runtime as any).silentTurnRerunAttempted).toBe(false);
+    expect((runtime as any).pendingSilentTurnRerun).toBe(false);
 
     await runtime.dispose();
   });
@@ -2868,29 +3171,33 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
       {
         type: "message",
         id: "old-user",
+        seq: 0,
         parentId: null,
-        timestamp: "2026-07-28T00:00:00Z",
+        timestamp: Date.parse("2026-07-28T00:00:00Z"),
         message: { role: "user", content: "old context", timestamp: 1 },
       },
       {
         type: "message",
         id: "current-user",
+        seq: 1,
         parentId: "old-user",
-        timestamp: "2026-07-28T00:00:01Z",
+        timestamp: Date.parse("2026-07-28T00:00:01Z"),
         message: { role: "user", content: "inspect the log", timestamp: 2 },
       },
       {
         type: "message",
         id: "tool-assistant",
+        seq: 2,
         parentId: "current-user",
-        timestamp: "2026-07-28T00:00:02Z",
+        timestamp: Date.parse("2026-07-28T00:00:02Z"),
         message: toolAssistant,
       },
       {
         type: "message",
         id: "large-tool-call",
+        seq: 3,
         parentId: "tool-assistant",
-        timestamp: "2026-07-28T00:00:03Z",
+        timestamp: Date.parse("2026-07-28T00:00:03Z"),
         message: largeToolResult,
       },
     ];
@@ -2988,15 +3295,17 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
       {
         type: "message",
         id: "anchor-user",
+        seq: 0,
         parentId: null,
-        timestamp: "2026-07-31T00:00:00Z",
+        timestamp: Date.parse("2026-07-31T00:00:00Z"),
         message: { role: "user", content: "anchor ask", timestamp: 1 },
       },
       {
         type: "message",
         id: "later-user",
+        seq: 1,
         parentId: "anchor-user",
-        timestamp: "2026-07-31T00:00:01Z",
+        timestamp: Date.parse("2026-07-31T00:00:01Z"),
         message: { role: "user", content: "later ask", timestamp: 2 },
       },
     ];
@@ -3021,9 +3330,15 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
     );
     const preparation = (runtime as any).prepareCompactionInput(entries, budget);
 
+    // "anchor ask" is the message the previous checkpoint was filed against, so
+    // it sits behind the boundary and "First summary." already covers it. pi
+    // 0.84 starts the compactable range at the checkpoint entry (replaying its
+    // retained tail as virtual entries) instead of walking back to the anchor,
+    // so the one-entry overlap 0.82 produced is gone. What matters to this test
+    // still holds: the retained user message survives into the next tail.
     expect(
       preparation.value.retainedTail.map((message: any) => message.content),
-    ).toEqual(["remembered ask", "anchor ask", "later ask"]);
+    ).toEqual(["remembered ask", "later ask"]);
     await runtime.dispose();
   });
 
@@ -3066,25 +3381,28 @@ describe("DesktopAgentRuntime per-turn context protection", () => {
       {
         type: "message",
         id: "old-user",
+        seq: 0,
         parentId: null,
-        timestamp: "2026-07-29T00:00:00Z",
+        timestamp: Date.parse("2026-07-29T00:00:00Z"),
         message: { role: "user", content: "inspect the repository", timestamp: 1 },
       },
       {
         type: "message",
         id: "parallel-carrier",
+        seq: 1,
         parentId: "old-user",
-        timestamp: "2026-07-29T00:00:01Z",
+        timestamp: Date.parse("2026-07-29T00:00:01Z"),
         message: toolCarrier,
       },
       ...largeResults.map((message, index) => ({
         type: "message",
         id: message.toolCallId,
+        seq: index + 2,
         parentId:
           index === 0
             ? "parallel-carrier"
             : largeResults[index - 1].toolCallId,
-        timestamp: `2026-07-29T00:00:0${index + 2}Z`,
+        timestamp: Date.parse(`2026-07-29T00:00:0${index + 2}Z`),
         message,
       })),
     ];
@@ -3906,7 +4224,7 @@ describe("DesktopAgentRuntime subagents", () => {
     await runtime.dispose();
   });
 
-  it("runs the delegate with only its declared tools and returns its report", async () => {
+  it("starts the delegate in the background and returns a delegation id", async () => {
     const remote: RuntimeProviderConfig = {
       ...provider,
       id: "remote",
@@ -3922,18 +4240,9 @@ describe("DesktopAgentRuntime subagents", () => {
       thinkingLevel: "high",
     });
     subagentRuns.calls.length = 0;
-    subagentRuns.result = {
-      agentName: "reviewer",
-      status: "completed",
-      report: "src/app.ts:12 misses the null check.",
-      turns: 2,
-      toolCalls: 3,
-      usage: {
-        inputTokens: 10,
-        outputTokens: 4,
-        totalTokens: 14,
-      },
-    };
+    subagentRuns.instances.length = 0;
+    subagentRuns.deferred = true;
+    subagentRuns.resolveRun = undefined;
     const tool = taskTool(runtime);
 
     const result = await tool.execute("task-1", {
@@ -3956,28 +4265,50 @@ describe("DesktopAgentRuntime subagents", () => {
     expect(options.thinkingLevel).toBe("off");
     expect(options.systemPrompt).toContain('You are the "reviewer" subagent');
     expect(options.systemPrompt).toContain("Review the change.");
-    expect(result.content).toEqual([
-      { type: "text", text: "src/app.ts:12 misses the null check." },
-    ]);
+    // Task is non-blocking (ADR 0089): it returns a started notice, not the
+    // report, and the delegate is still running.
+    expect(result.content[0].text).toContain("Delegation");
+    expect(result.content[0].text).toContain("in the background");
     expect(result.details).toMatchObject({
       agent: "reviewer",
-      status: "completed",
-      turns: 2,
-      toolCalls: 3,
+      status: "running",
     });
-    // A completed delegate is not a tool error.
+    const delegationId = (result.details as any).delegationId as string;
+    expect(delegationId.length).toBeGreaterThan(0);
+    expect((runtime as any).delegations.get(delegationId).status).toBe(
+      "running",
+    );
+    // A started delegation is not a tool error.
     await expect(
       (runtime as any).agent.afterToolCall({ toolCall: { id: "task-1" } }),
     ).resolves.toBeUndefined();
 
+    // Settle the delegate; the registry records the outcome for TaskWait.
+    subagentRuns.resolveRun!({
+      agentName: "reviewer",
+      status: "completed",
+      report: "src/app.ts:12 misses the null check.",
+      turns: 2,
+      toolCalls: 3,
+      usage: {
+        inputTokens: 10,
+        outputTokens: 4,
+        totalTokens: 14,
+      },
+    });
+    await vi.waitFor(() => {
+      expect((runtime as any).delegations.get(delegationId).status).toBe(
+        "completed",
+      );
+    });
+    subagentRuns.deferred = false;
+
     await runtime.dispose();
   });
 
-  it("marks a failed delegate as a failed tool call and a truncated one as usable", async () => {
+  it("converges through TaskWait with reports and statuses", async () => {
     const runtime = createRuntime({ subagents: [explorer] });
-    const agent = (runtime as any).agent;
-    const tool = taskTool(runtime);
-
+    subagentRuns.calls.length = 0;
     subagentRuns.result = {
       agentName: "explorer",
       status: "failed",
@@ -3986,10 +4317,42 @@ describe("DesktopAgentRuntime subagents", () => {
       toolCalls: 0,
       error: { code: "NETWORK_ERROR", message: "no route" },
     };
-    await tool.execute("task-1", { agent: "explorer", task: "Find it." });
+    const task = taskTool(runtime);
+    const wait = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "TaskWait",
+    );
+    expect(wait).toBeDefined();
+    expect((runtime as any).deferredToolNames.has("TaskWait")).toBe(false);
+
+    const started = await task.execute("task-1", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    const delegationId = (started.details as any).delegationId as string;
+    // A failed delegate is no longer a failed Task call: the failure is
+    // reported through TaskWait, which also carries the partial report.
     await expect(
-      agent.afterToolCall({ toolCall: { id: "task-1" } }),
-    ).resolves.toEqual({ isError: true });
+      (runtime as any).agent.afterToolCall({ toolCall: { id: "task-1" } }),
+    ).resolves.toBeUndefined();
+
+    const converged = await wait.execute("wait-1", {
+      delegationIds: [delegationId],
+    });
+    expect(converged.content[0].text).toContain("explorer");
+    expect(converged.content[0].text).toContain("failed");
+    expect(converged.content[0].text).toContain(
+      "The explorer subagent failed after 1 turn(s): no route.",
+    );
+    expect(converged.details).toMatchObject({
+      status: "completed",
+      delegations: [
+        {
+          delegationId,
+          agent: "explorer",
+          status: "failed",
+        },
+      ],
+    });
 
     subagentRuns.result = {
       agentName: "explorer",
@@ -3998,16 +4361,211 @@ describe("DesktopAgentRuntime subagents", () => {
       turns: 6,
       toolCalls: 6,
     };
-    const truncated = await tool.execute("task-2", {
+    const second = await task.execute("task-2", {
       agent: "explorer",
       task: "Find it.",
     });
-    expect(truncated.details).toMatchObject({ status: "truncated" });
-    await expect(
-      agent.afterToolCall({ toolCall: { id: "task-2" } }),
-    ).resolves.toBeUndefined();
+    const secondId = (second.details as any).delegationId as string;
+    const truncated = await wait.execute("wait-2", {
+      delegationIds: [secondId],
+    });
+    expect(truncated.details).toMatchObject({
+      delegations: [{ delegationId: secondId, status: "truncated" }],
+    });
 
     await runtime.dispose();
+  });
+
+  it("waits for running delegates with mode all/any and stops them with TaskStop", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    subagentRuns.calls.length = 0;
+    subagentRuns.instances.length = 0;
+    subagentRuns.deferred = true;
+    subagentRuns.resolveRun = undefined;
+    const task = taskTool(runtime);
+    const wait = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "TaskWait",
+    );
+    const stop = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "TaskStop",
+    );
+    expect(stop).toBeDefined();
+
+    const first = await task.execute("task-1", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    const second = await task.execute("task-2", {
+      agent: "explorer",
+      task: "Find it too.",
+    });
+    const firstId = (first.details as any).delegationId as string;
+    const secondId = (second.details as any).delegationId as string;
+
+    // mode "any" with minCompleted 1 converges as soon as one settles.
+    const waiting = wait.execute("wait-1", {
+      mode: "any",
+      minCompleted: 1,
+      timeoutSeconds: 5,
+    });
+    subagentRuns.resolveRun!({
+      agentName: "explorer",
+      status: "completed",
+      report: "Found it in src/app.ts:12.",
+      turns: 1,
+      toolCalls: 2,
+    });
+    const converged = await waiting;
+    expect(converged.details.status).toBe("completed");
+    expect(converged.content[0].text).toContain("src/app.ts:12");
+
+    // TaskStop stops the still-running second delegate and reports "stopped".
+    const stopped = await stop.execute("stop-1", { delegationIds: [secondId] });
+    expect(stopped.details.stopped).toHaveLength(1);
+    await vi.waitFor(() => {
+      expect((runtime as any).delegations.get(secondId).status).toBe("stopped");
+    });
+    const afterStop = await wait.execute("wait-2", {
+      delegationIds: [secondId],
+    });
+    expect(afterStop.content[0].text).toContain("stopped");
+    expect(firstId).not.toBe(secondId);
+    subagentRuns.deferred = false;
+
+    await runtime.dispose();
+  });
+
+  it("caps running delegates per session at MAX_SUBAGENT_CONCURRENCY", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    subagentRuns.calls.length = 0;
+    subagentRuns.instances.length = 0;
+    subagentRuns.deferred = true;
+    subagentRuns.resolveRun = undefined;
+    const tool = taskTool(runtime);
+    const MAX = MAX_SUBAGENT_CONCURRENCY;
+
+    const ids: string[] = [];
+    for (let index = 0; index < MAX; index += 1) {
+      const result = await tool.execute(`task-${index}`, {
+        agent: "explorer",
+        task: "Find it.",
+      });
+      ids.push((result.details as any).delegationId as string);
+    }
+    const over = await tool.execute("task-over", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    expect(over.content[0].text).toContain(
+      `${MAX} subagents are already running`,
+    );
+    await expect(
+      (runtime as any).agent.afterToolCall({ toolCall: { id: "task-over" } }),
+    ).resolves.toEqual({ isError: true });
+    expect((runtime as any).runningDelegations()).toHaveLength(MAX);
+
+    // Freeing one slot (via stop) makes room again.
+    const stop = (runtime as any).agent.state.tools.find(
+      (tool: any) => tool.name === "TaskStop",
+    );
+    await stop.execute("stop-1", { delegationIds: [ids[0]] });
+    await vi.waitFor(() => {
+      expect((runtime as any).runningDelegations()).toHaveLength(MAX - 1);
+    });
+    const again = await tool.execute("task-again", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    expect((again.details as any).delegationId).toBeDefined();
+    subagentRuns.deferred = false;
+
+    await runtime.dispose();
+  });
+
+  it("aborts running delegates when the run ends or the runtime is disposed", async () => {
+    const runtime = createRuntime({ subagents: [explorer] });
+    subagentRuns.calls.length = 0;
+    subagentRuns.instances.length = 0;
+    subagentRuns.deferred = true;
+    subagentRuns.resolveRun = undefined;
+    const tool = taskTool(runtime);
+
+    const started = await tool.execute("task-1", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    const delegationId = (started.details as any).delegationId as string;
+    expect((runtime as any).runningDelegations()).toHaveLength(1);
+
+    // agent_end (the run finishing) is the safety net: leftover delegates are
+    // stopped rather than left to work without a parent.
+    await (runtime as any).handleAgentEvent({ type: "agent_end" });
+    await vi.waitFor(() => {
+      expect((runtime as any).delegations.get(delegationId).status).toBe(
+        "aborted",
+      );
+    });
+    expect((runtime as any).runningDelegations()).toHaveLength(0);
+
+    subagentRuns.deferred = false;
+    await runtime.dispose();
+  });
+
+  it("scopes a mutating delegate's tool calls with its permission", async () => {
+    const mutator: SubagentDefinition = {
+      name: "fixer",
+      description: "Implement a multi-file change.",
+      tools: ["Read", "Edit", "Write"],
+      permission: "accept-edits",
+      maxTurns: 6,
+      prompt: "Implement it.",
+      source: "builtin",
+    };
+    const host = {
+      call: vi.fn((method: string) => {
+        if (method === "project.instructions.resolve") {
+          return Promise.resolve(undefined);
+        }
+        if (method === "tools.execute") {
+          return Promise.resolve({ ok: true, content: {} });
+        }
+        return Promise.resolve({ ok: true, content: {} });
+      }),
+    };
+    const runtime = createRuntime({
+      subagents: [mutator],
+      host: host as never,
+    });
+    subagentRuns.calls.length = 0;
+    const tool = taskTool(runtime);
+
+    await tool.execute("task-1", { agent: "fixer", task: "Do it." });
+    const options = subagentRuns.calls[0];
+    // The delegate's tools are wrapped; the wrapper forwards the permission
+    // scope into the host RPC while the call runs, then clears it.
+    const wrappedRead = options.tools.find((entry: any) => entry.name === "Read");
+    await wrappedRead.execute("read-1", { path: "src/app.ts" }, undefined, undefined);
+    expect(host.call).toHaveBeenCalledWith(
+      "tools.execute",
+      expect.objectContaining({ permissionScope: "accept-edits" }),
+    );
+    expect((runtime as any).delegatePermissionScopes.has("read-1")).toBe(false);
+
+    // Definitions without a permission stay unwrapped: the delegate's tools
+    // are the catalog's own tools, so their RPC carries no scope.
+    const plainRuntime = createRuntime({ subagents: [explorer] });
+    subagentRuns.calls.length = 0;
+    await taskTool(plainRuntime).execute("task-2", {
+      agent: "explorer",
+      task: "Find it.",
+    });
+    const plainOptions = subagentRuns.calls[0];
+    expect(
+      plainOptions.tools.some((entry: any) => entry.name === "Read"),
+    ).toBe(true);
+
+    await runtime.dispose();
+    await plainRuntime.dispose();
   });
 
   it("keeps subagent rows out of the parent model context", async () => {

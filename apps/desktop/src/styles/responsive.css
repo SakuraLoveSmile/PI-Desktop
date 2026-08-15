@@ -39,9 +39,19 @@
   .jump-latest-btn,
   .chat-error-notice,
   .work-panel,
-  .work-panel.is-exiting {
+  .work-panel.is-exiting,
+  .sidebar,
+  .sidebar.is-exiting {
     /* Near-zero (not none): exit unmount listens for animationend. */
     animation-duration: 0.01ms !important;
+  }
+
+  /* The top bar's lead-in only exists to track the dock's motion. */
+  .conversation-topbar,
+  .conversation-topbar.ct-collapsed,
+  .conversation-topbar .ct-lead,
+  .conversation-topbar.ct-collapsed .ct-lead {
+    transition-duration: 0.01ms !important;
   }
 
   .route-pending-indicator {

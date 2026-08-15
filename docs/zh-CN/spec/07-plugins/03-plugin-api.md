@@ -25,7 +25,24 @@ declare const pi: PiPluginHostApi;
 ```ts
 pi.app.getVersion(): Promise<string>
 pi.app.getLocale(): Promise<string>
+pi.app.getAppearance(): Promise<PluginAppearance>
 ```
+
+`app.getAppearance` 返回宿主当前正在呈现的外观，让插件（或它的面板）可以
+完全跟随应用的语言与配色：
+
+```ts
+type PluginAppearance = {
+  theme: string        // 原始偏好："light" | "dark" | "system" | "plugin:<pluginId>:<themeId>"
+  base: "light" | "dark" | "system"  // 该偏好解析出的调色板
+  locale: string       // 当前语言标签（例如 "en"、"zh-CN"）
+  pluginTheme: { id: string; base: "light" | "dark"; css: string } | null
+}
+```
+
+面板通过桥通道 `app.getAppearance` 读取同一个值，并在 `appearance:changed`
+事件（见下文）上收到实时更新。在没有该通道的旧宿主上，调用以
+`UNSUPPORTED` 拒绝；面板应回退到操作系统偏好和它自己的面板内选择。
 
 ### 插件
 ```ts
@@ -82,10 +99,19 @@ type PluginNotificationPermission = "granted" | "denied" | "unknown" | "unsuppor
 ```ts
 pi.workspace.get(): Promise<{ path: string; name: string } | null>
 
-pi.fs.readText(pathFromWorkspaceRoot: string): Promise<string>
-pi.fs.writeText(pathFromWorkspaceRoot: string, content: string): Promise<void>
+pi.fs.readText(pathFromRoot: string): Promise<string>
+pi.fs.writeText(pathFromRoot: string, content: string): Promise<void>
 pi.fs.glob(pattern: string): Promise<string[]>
+pi.fs.remove(pathFromRoot: string): Promise<void>
+pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 ```
+
+路径相对于该模式的 root —— 工作区，或者当该模式声明
+`root: "userSelected"` 时，用户通过 `requestDirectory()` 选中的目录。
+每种模式能到哪些路径由 `manifest.fs` 决定；范围之外会问用户，
+而凭证 deny-list 压过两者（参见
+[04-plugin-security.md](/zh-CN/spec/07-plugins/04-plugin-security) §6）。
+`remove` 不递归，并且把路径移进系统回收站。
 
 ###代理
 ```ts
@@ -211,7 +237,8 @@ pi.events.off(event, handler)
 - `workspace:changed`
 - `session:activated`
 - `plugin:settingsChanged`（由插件设置页面编辑触发）
-- `app:themeChanged`
+- `app:themeChanged` —— 目前面板通过面板事件 `appearance:changed` 实时跟随
+  配色；插件进程侧的这个事件仍在规划中。
 
 ## 6. 面板桥 API
 
@@ -229,25 +256,36 @@ window.pluginBridge.on(event, handler)
 | `ui.showToast`、`ui.closePanel` | 没有超出加载的面板 |
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`、`ui.requestNotificationPermission`、`ui.showNativeNotification` | `notify` |
-| `plugin.getSettings`、`workspace.get` | 无 |
-| `fs.readText`、`fs.glob` | `fs.read.workspace` |
-| `fs.writeText` | `fs.write.workspace` |
+| `plugin.getSettings`、`workspace.get`、`app.getAppearance` | 无 |
+| `fs.readText`、`fs.glob` | `fs.read` |
+| `fs.writeText` | `fs.write` |
 | `clipboard.readText` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |
 | `shell.openExternal` | `shell.openExternal` |
 | `net.fetch` | `net.fetch` |
 
-`plugin.setSettings`、`fs.remove`、任意 Electron IPC 以及一般自定义
-面板 RPC 未暴露。 `onPanelInvoke(channel, payload)` 目前是
-仅适用于主机支持的 `skill.list`、`skill.read`、
-`skill.create`、`skill.update`、`skill.remove` 和 `skill.setEnabled` 通道；
-它不是通用扩展点。
+`plugin.setSettings`、`fs.remove` 和任意 Electron IPC 未暴露。主机自己
+没有实现的通道会被转发到插件的 `onPanelInvoke(channel, payload)`，
+因此插件可以自定义面板 ↔ 主进程通道；没有导出 `onPanelInvoke` 的插件
+会从自己的进程收到 `UNSUPPORTED`。主机支持的通道包括
+`skill.list`、`skill.read`、`skill.create`、`skill.update`、`skill.remove`
+和 `skill.setEnabled`。
+
+### 面板事件（主机 -> 面板）
+
+`window.pluginBridge.on(event, handler)` 接收主机推送的事件。今天已投递的
+事件：
+
+- `appearance:changed` —— 载荷是上面的 `PluginAppearance`，在应用的配色或
+  语言发生变化时发送，因此面板可以实时重新着色和重新标注文案。
 
 ## 7. 通话审计
 
 必须记录以下任何调用以供审核：
 
 - fs.writeText
+- fs.remove、fs.requestDirectory，以及每一次被拒绝的 fs 调用（连同路径与
+  `errorCode`），还有每一次同意的答复及其被问的原因（`scope` / `rate`）
 - 在agent.registerTool之后执行（包括从插件发现的工具）
   MCP 服务器）
 - 网络获取
@@ -275,7 +313,8 @@ window.pluginBridge.on(event, handler)
 桌面插件运行时现在实现本地和市场插件使用的 MVP 主机 API 表面：
 
 - `app.*`、`plugin.*`、`commands.*`、`ui.*`、`workspace.*`
-- `fs.readText` / `fs.writeText` / `fs.glob`（工作区绑定）
+- `fs.readText` / `fs.writeText` / `fs.glob` / `fs.remove` /
+  `fs.requestDirectory`，范围由 `manifest.fs` 限定（ADR 0088）
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`、`shell.openExternal`、`net.fetch`
 - `services.register` / `unregister`、`bus.publish` / `subscribe`、`events.on` / `off`

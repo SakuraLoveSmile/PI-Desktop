@@ -79,7 +79,7 @@ Tools should return stable errors:
   reaches the resolver
 - `TOOL_DENIED` — outside-path permission was denied, timed out, or cancelled
 - `WORKSPACE_PATH_DENIED` — reserved detail code for ignore/denylist blocks
-  (maps to `PATH_OUTSIDE_WORKSPACE` today; see [08-error-codes §3.6](08-error-codes.md))
+  (maps to `PATH_OUTSIDE_WORKSPACE` today; see [08-error-codes §3.7](08-error-codes.md))
 
 UI can show “hidden by ignore rules” counts for Glob/Grep optionally later.
 

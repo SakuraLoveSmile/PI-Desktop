@@ -1,6 +1,8 @@
 import { readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
+  LEGACY_FS_PERMISSIONS,
+  PLUGIN_FS_MODES,
   PLUGIN_PERMISSIONS,
   validateManifest,
   type PluginManifest,
@@ -13,8 +15,8 @@ import { MAX_PACKAGE_BYTES, MAX_PACKAGE_FILES, walkPluginDir } from "./walk.js";
  */
 export const HIGH_RISK_PERMISSIONS = [
   "net.fetch",
-  "fs.write.workspace",
-  "fs.delete.workspace",
+  "fs.write",
+  "fs.delete",
   "agent.prompt.inject",
   "agent.tool.register",
 ] as const;
@@ -30,9 +32,9 @@ const PERMISSION_API_HINTS: Record<string, string[]> = {
   ],
   "clipboard.read": ["clipboard.readText"],
   "clipboard.write": ["clipboard.writeText"],
-  "fs.read.workspace": ["fs.readText", "fs.glob"],
-  "fs.write.workspace": ["fs.writeText"],
-  "fs.delete.workspace": ["fs.remove"],
+  "fs.read": ["fs.readText", "fs.glob", "fs.requestDirectory"],
+  "fs.write": ["fs.writeText"],
+  "fs.delete": ["fs.remove"],
   "agent.tool.register": ["agent.registerTool"],
   "net.fetch": ["net.fetch"],
   "shell.openExternal": ["shell.openExternal"],
@@ -161,10 +163,44 @@ export async function check(dirInput: string): Promise<CheckResult> {
   const permissions = manifest.permissions ?? [];
   const known = new Set<string>(PLUGIN_PERMISSIONS);
   for (const permission of permissions) {
-    if (!known.has(permission)) {
-      errors.push({
-        code: "permission.unknown",
-        message: `permission "${permission}" is not a known PI-Desktop permission`,
+    if (known.has(permission)) continue;
+    // The pre-scope names still install, so they are advice rather than a
+    // blocker — but they are downgraded, and an author who does not read that
+    // here reads it as a mysteriously refused call later.
+    if (permission in LEGACY_FS_PERMISSIONS) {
+      warnings.push({
+        code: "permission.legacy-fs",
+        message: `permission "${permission}" predates file scopes: the host rewrites it to "fs.${LEGACY_FS_PERMISSIONS[permission]}" and grants ${
+          permission === "fs.read.workspace"
+            ? "the whole workspace for reading"
+            : permission === "fs.delete.workspace"
+              ? "only the files this plugin wrote"
+              : "nothing until manifest.fs says where"
+        }`,
+      });
+      continue;
+    }
+    errors.push({
+      code: "permission.unknown",
+      message: `permission "${permission}" is not a known PI-Desktop permission`,
+    });
+  }
+  // A write or delete permission with no declared range installs and then
+  // cannot touch anything: an undeclared scope reduces to nothing, not to the
+  // workspace. Same rule as the marketplace catalog preflight.
+  for (const mode of PLUGIN_FS_MODES) {
+    if (mode === "read" || !permissions.includes(`fs.${mode}`)) continue;
+    const rule = manifest.fs?.[mode];
+    const declared =
+      (rule?.scope?.length ?? 0) > 0 ||
+      rule?.root === "userSelected" ||
+      (mode === "delete" && rule?.own === true);
+    if (!declared) {
+      warnings.push({
+        code: "permission.fs-no-scope",
+        message: `"fs.${mode}" is declared without a manifest.fs.${mode} scope, so every ${mode} asks the user${
+          mode === "delete" ? ' (add a scope, or "own": true to reach what this plugin wrote)' : ""
+        }`,
       });
     }
   }

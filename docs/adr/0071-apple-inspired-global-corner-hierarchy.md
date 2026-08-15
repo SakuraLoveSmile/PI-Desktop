@@ -72,3 +72,16 @@ verification and shipped behavior diverge.
 
 Rejected because the request is global, and retaining closely spaced 5/6/7/8px
 steps would continue to make the hierarchy hard to perceive and maintain.
+
+## Addendum (2026-08-14): the `corner-shape` blocker is gone
+
+The Context and Alternatives above are left as recorded. Their runtime premise
+no longer holds: the shell moved to Electron 43, which bundles Chromium 150, and
+`CSS.supports("corner-shape", "squircle")` returns `true` in the packaged
+renderer. The deferral in Consequences and the "Add `corner-shape: squircle`
+now" rejection were both about availability alone, so nothing stands in the way
+of revisiting them.
+
+This addendum does not change the decision. The fixed-radius ladder stays as
+specified; adopting continuous corners is a design change that needs its own
+decision, not a side effect of a dependency bump.

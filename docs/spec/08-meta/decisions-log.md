@@ -210,7 +210,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D201 | Bounded subagents behind a `Task` tool | **Agent mode gains one delegation tool, `Task(agent, task, description?)`, built only when a session has a non-empty subagent catalog. Definitions are Markdown documents — three builtins shipped inline in `agent-runtime` (`explorer`, `code-reviewer`, `test-runner`) plus `<workspace>/.pi/agents/*.md`, project documents shadowing builtins by name, capped at 16 — loaded by Electron main on every launch, so editing one takes effect on the next prompt. A definition declares its own tools from `Read`, `Glob`, `Grep`, `BrowserPreview`, `Bash`, `Edit`, `Write` (default `Read`, `Glob`, `Grep`) and may pin `model: <provider>/<model>`, resolved once per launch against up to 8 providers with no fallback to the session model. A delegate is a second pi `Agent` in the same sidecar with the same host connection, bounded by `maxTurns` (default 24, max 80) and the parent's retry policy; its report is the tool result, capped at 12k characters, with `status` (`completed` / `truncated` / `failed` / `aborted`), `turns`, `toolCalls` and `usage` in the details. Only `Task` is `executionMode: "parallel"`, so one assistant message of `Task` calls fans out under `MAX_SUBAGENT_CONCURRENCY` (4) while any other batch stays sequential; a `PathMutex` orders same-path mutations. Delegate events carry `parentToolCallId` and `agentName`, which persist in message `meta` with no schema change, nest the rows under their `Task` call in the transcript, and are excluded when the runtime rebuilds model context — the parent only ever sees the report. Permission requests keep session semantics but queue per session, head-rendered and answered by `requestId`. `Task` stays in the Agent core set rather than the on-demand catalog (ADR 0062).** | Long searches and reviews cost the parent its whole context even when only the conclusion matters, and a session-level fan-out would have meant a second orchestrator, a second permission owner and a second turn owner. Keeping delegation a tool makes it one tool result the parent pays for, leaves permissions and containment on the session that owns the workspace, and makes read-only-by-default definitions the thing that bounds a delegate rather than trust in its prompt. |
 | D202 | Managed subagent definitions with a user-level registry | **Subagent definitions gain a third source and a management UI. host-core owns a user registry (`<data>/agents/registry.json` plus flat `<data>/agents/<id>.md` documents, `id == name`, duplicate names refused, capped at 16 to match `MAX_SUBAGENT_DEFINITIONS`) whose records carry `enabled` and the D192 activation scope beside the frontmatter the UI edits (`tools`, `model`, `thinkingLevel`, `maxTurns`). Shadowing order becomes project > user registry > builtin, so a committed `.pi/agents/<name>.md` still wins. host-core is the only writer and `parseSubagentDefinition` stays the only reader; Electron main reads the scope-matching documents on every prompt and passes them to `loadSubagentDefinitions(projectPath, { userDocuments })`, so an edit takes effect on the next turn with no restart. Nine IPC channels (`subagent/list`, `catalog`, `create`, `update`, `read`, `remove`, `setEnabled`, `setScope`, `reveal`) mirror the D194 skill API and every mutation emits `pluginChanged`. The extensions page gains a fifth segment, Subagents (amending D196), with a writable registry list (scope control, editor sheet, reveal, delete) above a read-only list of the effective catalog computed by `subagent/catalog` in main rather than merged in the renderer. Builtins and project documents are read-only — no enable switch, no scope — and offer “copy as my definition”, which pre-fills the sheet so a registry entry of the same name outranks the builtin it came from. A registry row reports when a project document owns its name and when it is not active in the current project (ADR 0063).** | ADR 0062 shipped delegation with no surface: a definition could only be hand-written into a tracked project file, the shipped builtins were invisible outside the source, and a definition that silently lost to shadowing, an off switch or another project's scope was unreportable. Writing into `.pi/agents/` from the UI would create uncommitted diffs and force a personal delegate to be re-created per repository, so the writable layer is user-level while the project source keeps its precedence; answering the read-only list from the real loader keeps “what `Task` offers right now” from becoming a second precedence implementation that can disagree with the one that matters. |
 | D203 | Codex-parity context compaction | **Compaction is rebuilt to match Codex's mechanism, reversing four D200 clauses and keeping the rest. All background pre-computation and the incremental trigger scope are deleted: `prepareNextTurn()` compacts synchronously when the total context crosses `hardLimit` or the model asked for a new window. A checkpoint carries the summary plus recent **user** messages only — pi's cut point still marks the boundary, but its split-turn prefix and recent tail are folded back into the summary input so the summary covers the whole range, and the retained tail is rebuilt newest-first from user messages up to 20,000 tokens (capped at half the hard budget) with the crossing message truncated rather than dropped, then restored to chronological order. Two families run the identical lifecycle: `summary`, and a `fresh_window` rollover that requests no summary and stores a fixed marker text, selected by construction option or `PI_DESKTOP_COMPACTION_STRATEGY` and exposed in neither settings nor i18n. The model-facing `new_context` tool returns (parameterless, Codex's description verbatim, on the host no-confirmation allowlist, never assignable to a subagent) together with two per-window budget reminders appended to the current turn's system prompt — one at `clamp(hardLimit * 0.15, 8k, 32k)` remaining, one at 2,000 — each claimed once and reset on install. host-core persists the whole checkpoint chain (`read_compactions`, `write_transcript_with_compactions`, per-record fork validation, `SessionDetail.compactions`) with `compaction` kept as its newest element. `compaction_start`/`compaction_end` drop `phase`, and `compaction_end` replaces `status` with `mark { id, throughMessageId, generation, summaryTokens, summarized }`; the transcript draws one divider row per compaction after the message it covers, ending the assistant turn it lands inside and dropping a mark whose anchor is gone, and every successful compaction raises one warning toast on top of the fallback/overflow/manual toasts. Deliberate deviations from Codex: the summary precedes the retained users because `buildSessionContext` fixes that order, `hardLimit` stays "window − output reserve" instead of 90% of the window, the tool is registered in both families, and the reminders are system-prompt appends with our own thresholds and wording (ADR 0064).** | The previous round cited Codex while implementing its opposite on four counts, and its Context section claimed Codex has no model-side compaction tool when `new_context` exists. The user asked for Codex's mechanism specifically, after being told it reverses the imperceptibility goal. Parity also buys three things on its own merits: a checkpoint that keeps only user messages is far cheaper and cannot strand a tool call without its result, a visible row makes a lossy operation auditable from the transcript again, and a warning puts the "start a fresh session instead" decision where it belongs. The cost is accepted: the user waits for compaction again. |
-| D186 | Bounded provider stream recovery and diagnostics *(replay list amended by D228)* | **Provider request setup uses one bounded pi-ai retry. A transient `STREAM_FAILED`, `NETWORK_ERROR`, `TIMEOUT`, or (per D228) `PROVIDER_RATE_LIMITED` after streaming starts is replayed once in the same turn after abortable backoff; the failed assistant is removed from model context and its visible message id is reused. A second failure is terminal. Provider `AppError.details` carries only bounded phase, timing, provider status/code, and retry-attempt diagnostics. Mutation guidance uses one fresh read/regeneration after an `Edit` mismatch; a second failed `Edit` for the same path or a second failed shell patch command returns a terminating tool hint instead of repairing old patch artifacts.** | Unbounded or regenerate-driven recovery made transient stream termination expensive and made patch loops consume turns without new information; finite runtime budgets preserve context and user control while keeping failures diagnosable (ADR 0050, amended by ADR 0087). |
+| D186 | Bounded provider stream recovery and diagnostics *(replay list amended by D233)* | **Provider request setup uses one bounded pi-ai retry. A transient `STREAM_FAILED`, `NETWORK_ERROR`, `TIMEOUT`, or (per D233) `PROVIDER_RATE_LIMITED` after streaming starts is replayed once in the same turn after abortable backoff; the failed assistant is removed from model context and its visible message id is reused. A second failure is terminal. Provider `AppError.details` carries only bounded phase, timing, provider status/code, and retry-attempt diagnostics. Mutation guidance uses one fresh read/regeneration after an `Edit` mismatch; a second failed `Edit` for the same path or a second failed shell patch command returns a terminating tool hint instead of repairing old patch artifacts.** | Unbounded or regenerate-driven recovery made transient stream termination expensive and made patch loops consume turns without new information; finite runtime budgets preserve context and user control while keeping failures diagnosable (ADR 0050, amended by ADR 0091). |
 
 | D187 | Resource-isolated host RPC stdio | **host-core reads stdin and serializes stdout through one dedicated named OS thread per direction, never through Tokio's dynamic blocking pool. The threads retry interrupted and transient `EAGAIN`/`EWOULDBLOCK` errors while preserving NDJSON framing; inability to create a control thread is a structured startup failure. The login-shell PATH probe also treats helper-thread creation as best effort and falls back to the inherited PATH. RPC/tool admission limits remain unchanged.** | Tokio stdio can panic when OS thread creation returns `Resource temporarily unavailable` (errno 35 on macOS), turning temporary resource pressure into `HOST_UNAVAILABLE`; isolating the control pipe removes that process-level crash path while retaining bounded overload behavior (ADR 0051). |
 | D191 | Agent-only mode; Chat renamed to read-only | *(superseded by D188/D189: the mode selector returned as `Agent | Plan`, and `chat` migrates to `plan`)* **`agent` is the only session mode the product exposes. The former `chat` profile is renamed `read-only` and keeps its `Read`/`Glob`/`Grep` hard deny in host-core, but it has no UI surface: no top-bar toggle, no composer chip, no Settings row, no palette command or slash alias, and no localized labels. The host normalizes `chat` to `read-only` on every write path (`session.create`, `session.configure`, `session.import`) and the permission gate is negative — anything that is not `agent` gets the read-only surface — so an unknown or legacy value can never widen the tool set. Error codes become `BASH_DISABLED_IN_READ_ONLY` / `WRITE_DISABLED_IN_READ_ONLY`. A boot fix-up rewrites existing `sessions.mode = 'chat'` rows and a stored `defaultMode` of `chat` to `agent`.** | A mode switch the product never intends users to reach is a footgun and dead UI weight: sessions could be stranded on a read-only profile with no way back, and two toolsets doubled the surface every tool, prompt, and permission change had to be reasoned about. Keeping the narrow profile enforced host-side preserves the security boundary for imported and legacy rows without shipping a control for it (ADR 0055). |
@@ -237,7 +237,8 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D208 | Recoverable native-tool path contracts | **Keep D185's deferred Glob/Grep boundary, but make every prompt and schema explicit that Read accepts an existing regular file, Glob accepts a directory, and Grep accepts a file or directory. A directory Read returns `INVALID_ARGUMENT` plus structured Glob recovery args; an explicit-file Grep searches only that file and applies `include` to its basename. Tool errors remain visible on their ToolCallRows, while activity groups report processing duration only and never infer terminal turn failure from a child row; terminal agent events and the dedicated outcome surfaces remain authoritative (ADR 0069).** | Durable sessions showed directory Read and file-as-directory Grep mistakes repeatedly, then displayed recovered work as terminally failed. Compatibility at the narrow host boundary plus one outcome owner removes retries and false failure UI without restoring every search schema to the Agent core. |
 | D216 | Cross-platform tray-resident minimize | **Electron Main creates one packaged-resource tray icon on macOS, Windows, and Linux. Every main-window minimize path is intercepted and hides the window without disposing the host or sidecar; tray click/double-click, Show, and macOS app activation restore and focus the existing window (or create one if it was closed). The localized tray menu exposes Show PI-Desktop and an explicit Quit PI-Desktop action. Closing the window remains a quit action, and tray destruction plus Quit use the existing ordered `before-quit` shutdown path.** | Users need background work to continue without losing the app window, while minimizing must mean the same thing across the native macOS controls and the custom Windows/Linux shell. Main-owned tray lifecycle avoids renderer privilege expansion and keeps explicit exit observable. |
 | D218 | Host-owned cross-platform plugin panel chrome | **Plugin panel windows adopt the main window's 46px platform chrome: macOS uses `hiddenInset` with traffic lights at `{x:16,y:16}`, while Windows/Linux are frameless with a 112px custom minimize/maximize-or-restore/close band. The sandboxed plugin preload renders the manifest title and controls in a closed Shadow DOM, offsets content by the titlebar height in addition to existing top padding, and consumes a private sender-validated fixed window-action channel; `window.pluginBridge`, the per-plugin partition, and host protocol v9 do not expand. Reopening a minimized panel restores and focuses it.** | Default Electron frames made plugin tools look detached from PI-Desktop and varied by platform. Preload-owned chrome provides parity without moving untrusted plugin HTML into the host renderer or exposing general Electron window authority (ADR 0081). |
-| D219 | Custom global UI font | **Settings → Basics → Appearance gains a searchable Font picker (trigger previews the current family). Selections persist as `AppSettings.fontFamily`, a CSS stack; absent means the built-in `--font-sans` token stack, and the renderer applies the stack by overriding `--font-sans` on the root element without a reload. Four bundled families — Geist, Inter, Noto Sans SC, LXGW WenKai — ship locally as woff2 under the SIL OFL 1.1 with license texts; every custom stack appends a CJK fallback tier and the mono stack is unchanged. Installed system families are enumerated by Electron main using platform tooling only (macOS: `osascript` JXA bridging the CoreText query `CTFontManagerCopyAvailableFontFamilyNames` — the same API dbx's `font_kit::all_families()` calls — with `system_profiler` as a slow fallback; Windows: PowerShell; Linux: `fc-list`), deduplicated/sorted/filtered and cached 60 s, exposed through the additive allowlisted channel `pi-desktop/app/systemFonts`; host protocol v9 and storage schema v10 are unchanged.** | Users want a Codex/dbx-style global font preference, but the sandboxed renderer cannot enumerate OS fonts and the host RPC should stay unchanged for a renderer-only preference. Bundling OFL-licensed families keeps every offered font commercially safe and offline, while the fast CoreText path returns the canonical CSS family names (e.g. PingFang SC) in tens of milliseconds and the 60 s cache bounds repeated enumeration (ADR 0083). |
+| D232 | Custom global UI font | **Settings → Basics → Appearance gains a searchable Font picker (trigger previews the current family). Selections persist as `AppSettings.fontFamily`, a CSS stack; absent means the built-in `--font-sans` token stack, and the renderer applies the stack by overriding `--font-sans` on the root element without a reload. Four bundled families — Geist, Inter, Noto Sans SC, LXGW WenKai — ship locally as woff2 under the SIL OFL 1.1 with license texts; every custom stack appends a CJK fallback tier and the mono stack is unchanged. Installed system families are enumerated by Electron main using platform tooling only (macOS: `osascript` JXA bridging the CoreText query `CTFontManagerCopyAvailableFontFamilyNames` — the same API dbx's `font_kit::all_families()` calls — with `system_profiler` as a slow fallback; Windows: PowerShell; Linux: `fc-list`), deduplicated/sorted/filtered and cached 60 s, exposed through the additive allowlisted channel `pi-desktop/app/systemFonts`; host protocol v9 and storage schema v10 are unchanged.** | Users want a Codex/dbx-style global font preference, but the sandboxed renderer cannot enumerate OS fonts and the host RPC should stay unchanged for a renderer-only preference. Bundling OFL-licensed families keeps every offered font commercially safe and offline, while the fast CoreText path returns the canonical CSS family names (e.g. PingFang SC) in tens of milliseconds and the 60 s cache bounds repeated enumeration (ADR 0083). |
+| D230 | User-configurable close behavior with close-to-tray | **Windows/Linux close behavior is a persisted preference stored by Electron main in `<data>/close-behavior.json`. `ask` is the transient unset state: the first close shows a native modal (Cancel / Close to tray / Quit); picking one persists it forever, Cancel keeps the window open and unset. Only `tray` and `quit` are ever settable — Settings -> General renders a two-option radio segment (Close to tray / Quit app) for Windows/Linux only, and `pi-desktop/window/closeBehavior/set` rejects `ask`, so a choice can be switched but never reverted to prompting. `tray` hides the window under the resident D216 tray icon (click restores, menu shows or quits); switching to `quit` leaves that icon in place, because minimize-to-tray still needs it. Close interception runs for every non-macOS close that is not already an approved quit; `quitting` and macOS closes fall through, a `quit` close calls `app.quit()` itself, and `window-all-closed` stays silent only under `tray`, so the boot probe and explicit quits are unaffected and a resident tray never keeps a `quit` session alive. `closeBehavior/set` also fails with `INVALID_ARGUMENT` on macOS. The bounds watchdog skips minimized and hidden windows so a tray-hidden window is never force-restored. macOS keeps the native Dock lifecycle (D216, ADR 0078, ADR 0090).** | Minimizing already hides the window into the D216 tray; the gap was close: it quit outright on Windows/Linux. A fixed close-to-tray would surprise users who expect exit, so the choice is asked once, remembered, and revisitable in Settings — matching how Codex-style shells keep long-running sessions alive without taking over the close button. |
 
 ## P. Transcript storage decisions
 
@@ -1046,7 +1047,7 @@ D193, and D194.
 - Blocks are built on expansion only and highlighting is skipped above 100 KB or
   800 lines; lists and diffs are capped and report the hidden remainder.
 - Decision D192; renderer-only presentation, so no ADR. See
-  `04-ux/08-component-spec.md` §9 and E2E-097.
+  `04-ux/08-component-spec.md` §9 and E2E-145.
 
 ## 2026-08-05 — A silent assistant turn re-runs once before it is an error
 
@@ -1068,7 +1069,7 @@ D193, and D194.
   prompt, so overflow recovery in the same prompt cannot multiply attempts.
 - Decision D193; recovery inside the existing loop contract, so no ADR. See
   `03-runtime/02-agent-runtime.md` §5e, `03-runtime/08-error-codes.md` §3.2,
-  and E2E-098.
+  and E2E-146.
 
 ## 2026-08-05 — Per-tool output budgets, scoped search, and stated collaboration rules
 
@@ -1097,7 +1098,7 @@ D193, and D194.
   model executed it as saying nothing.
 - Decision D194; tool schemas widen without breaking callers and prompt text is
   not an interface, so no ADR. See `03-runtime/16-tool-result-limits.md`,
-  `03-runtime/02-agent-runtime.md` §7, and E2E-099.
+  `03-runtime/02-agent-runtime.md` §7, and E2E-147.
 
 ## 2026-08-05 — MCP servers and skills the user owns, scoped per project
 
@@ -1761,7 +1762,108 @@ D193, and D194.
 - Request-setup 429s were already covered by pi-ai's one bounded retry that
   honors `Retry-After` up to the 8-second cap; this closes the post-stream gap
   where that wrapper can no longer act.
-- Decision D228 refines D186 and is runtime-only. Protocol, host RPC, IPC
+- Decision D233 refines D186 and is runtime-only. Protocol, host RPC, IPC
   channels, and storage schema are unchanged. See
   `03-runtime/02-agent-runtime.md` §5d, `03-runtime/08-error-codes.md`, ADR
-  0087, and E2E-130.
+  0091, and E2E-149.
+
+## 2026-08-15 — A stopped mutation loop says so
+
+- D186's repeat guard counted every same-path `Edit` failure alike, so the two
+  failures it allows could both be spent on errors that already told the model
+  what to do next. `EDIT_TAG_MISMATCH`, `EDIT_TAG_UNKNOWN`, and
+  `EDIT_LINES_UNSEEN` each hand back the live tag or the withheld content, so
+  each now gets one free attempt per path. Every other code still counts on its
+  first occurrence, and a write that lands clears that path's history.
+- The guard stops the loop by terminating the tool batch, which pi-agent-core
+  reads as "no more work". The turn therefore ended with a failed tool card and
+  no final message, indistinguishable from a model that chose to say nothing.
+  The runtime now finalizes the assistant row with
+  `MUTATION_RETRY_BUDGET_EXHAUSTED` — retriable, so the transcript keeps its
+  retry affordance — and emits the matching error event, which also records the
+  turn as `error` rather than `completed`.
+- Decision D228 refines D186 and is runtime-only. Protocol, host RPC, IPC
+  channels, and storage schema are unchanged. See
+  `03-runtime/18-line-anchored-edit-contract.md` §9.3,
+  `03-runtime/03-tools-and-permissions.md` §4d,
+  `03-runtime/08-error-codes.md` §3.3, ADR 0089, and E2E-140/E2E-141.
+
+## 2026-08-15 — A file permission carries a range, and a delete is recoverable
+
+- The three fs permissions were workspace-wide switches: `fs.read.workspace`
+  reached `.env`, and `recursive: false` bounded one `fs.remove` call while a
+  `glob` plus a loop reached the whole tree. A permission now says whether a
+  plugin may touch files at all; `manifest.fs` says which ones, per mode, with
+  globs relative to the mode's root. `fs.read` may ask for the whole tree —
+  egress is confined to `manifest.net.domains`, so a broad read no longer
+  carries anything out — but `fs.write` and `fs.delete` are refused a whole-tree
+  pattern at validation time.
+- Every `pi.fs.*` call passes four gates in a fixed order and a later gate can
+  only refuse: declared ∩ granted, `realpath` containment on both sides (so a
+  symlink out of the workspace fails where a string comparison passed), the
+  unconditional credential deny-list plus the host's own data directory, then the
+  declared scope. Outside the scope the user is asked natively — deny / allow
+  once / allow this session — and a session answer lives in memory and dies with
+  the process. A host with no consent service refuses rather than assumes yes.
+- Deletion is bounded rather than scoped alone, because it is the one operation
+  re-running the plugin cannot undo. `own: true` lets a plugin remove what it
+  wrote itself, tracked by a path+mtime ledger in its own data directory and
+  invalidated the moment the user edits the file; anything else needs a declared
+  scope. Removal goes through `shell.trashItem`, stays non-recursive, and is
+  braked at 50 removals per rolling minute. The host copies none of the user's
+  data to provide the undo — the operating-system trash is the whole mechanism.
+- `root: "userSelected"` trades standing power for reach: `pi.fs.requestDirectory()`
+  asks the user to pick a directory, needs no manifest scope inside it, and the
+  handle is memory-only. This is what keeps whole-disk plugins possible without
+  a permanent grant.
+- The pre-scope names still install and are downgraded on load: `fs.read.workspace`
+  keeps the whole tree, `fs.write.workspace` can write nothing until the manifest
+  says where, `fs.delete.workspace` becomes `own: true`. Capability is reduced
+  rather than a hole left open; the marketplace preflight and `pi-plugin check`
+  both name the downgrade so an author sees it before a user does.
+- Decision D229 continues ADR 0008 D009 and implements the confirmation policy
+  `07-plugins/13-plugin-permissions-matrix.md` promised but never enforced. The
+  manifest gains `fs`, and `pi.fs.remove` / `pi.fs.requestDirectory` join the
+  brokered API; host RPC and storage schema are otherwise unchanged. See
+  ADR 0088, `07-plugins/02-plugin-manifest-schema.md` §5.2,
+  `07-plugins/04-plugin-security.md` §6, and
+  `07-plugins/13-plugin-permissions-matrix.md`.
+
+## 2026-08-16 — Proactive background subagent delegation
+
+- `Task` stops blocking: it starts a delegate in the background and returns a
+  `delegationId` immediately. Three new Agent-mode core tools drive the
+  lifecycle — `TaskWait` (converge on running delegations, `mode: "any"` +
+  `minCompleted` for early convergence, settled delegations re-readable by id),
+  `TaskList` (status report) and `TaskStop` (stop running delegations). The
+  runtime owns a per-session delegation registry; delegates still running at
+  run end, on parent abort, or on dispose are stopped.
+- The base system prompt gains a `## Delegation` section (when the catalog is
+  non-empty) with positive trigger patterns — parallel exploration, adversarial
+  review, multi-file implementation, context-economy searches, batch sharding —
+  and convergence rules; the `Task` description is rewritten to lead with those
+  triggers.
+- Builtins grow to four: `explorer` is rewritten in the omo-slim style
+  (tool-choice guidance, parallel searches, `<files>`/`<answer>` report shape),
+  and a new write-capable `fixer` implements multi-file changes from a complete
+  spec (`tools: [Read, Glob, Grep, Edit, Write, Bash]`, `maxTurns: 40`,
+  `<summary>`/`<changes>`/`<verification>` report shape).
+- Builtin and user definitions may declare `permission: inherit | ask |
+  accept-edits | auto` (default `inherit`). The sidecar attaches the scope to
+  the delegate's `tools.execute` calls; host-core resolves the call under that
+  mode instead of the session's effective permission mode, with the contract
+  modes' hard deny and the external-path gate still in force. A project
+  definition may not declare a scope: it arrives with the repository, so the
+  declaration is dropped at parse time with a warning and its delegates run
+  under the session's effective mode. `fixer` ships with `accept-edits`, so it
+  writes inside the workspace without prompting while Bash and external paths
+  keep the session's behavior.
+- `TaskWait` blocks the turn, so its `timeoutSeconds` defaults to 600 and is
+  clamped to 900. A timeout returns the finished reports plus a note to call
+  again, so the ceiling costs one round-trip and keeps Stop responsive.
+- `MAX_SUBAGENT_CONCURRENCY` becomes a per-session running cap of 10; `Task`
+  fails with a tool error when the session already runs 10 delegates.
+- Decision D231 amends D201/ADR 0062 and touches the sidecar, host-core's
+  `tools.execute` permission resolution, the builtin definitions, the system
+  prompt, and the renderer's tool presentation mapping. See ADR 0089 and
+  `03-runtime/02-agent-runtime.md` §5f/§5f.1.

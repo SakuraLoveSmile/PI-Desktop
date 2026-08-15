@@ -36,6 +36,13 @@ Bash 输出通过了两个独立的上限。 **捕获**层限制了什么
 | 溢出的完整输出（`SPILL_MAX_BYTES`） | 512 KB | 停止保留；标记仍然命名该文件 |
 | Bash 输出流 | 每个流序列 | 保留 stdout/stderr 分离 |
 | 重击超时 | 默认60秒； 1–300 秒覆盖 | 杀死进程树+错误 |
+| `Edit.ops` 负载 | 256 KB，200 个操作 | `INVALID_ARGUMENT`；更多 Edit 上限见 [18](/zh-CN/spec/03-runtime/18-line-anchored-edit-contract) §12 |
+
+被剪辑的行不是已显示的行。`Read` 会把每一条在 `MAX_LINE_CHARS` 处剪断的行
+从 `Edit` 契约校验所用的来源集中排除
+（[18-line-anchored-edit-contract](/zh-CN/spec/03-runtime/18-line-anchored-edit-contract) §4.3），
+因此压缩或生成的行必须先被收窄到可见范围内才能编辑。剪辑因此同时限制
+上下文**并**阻止对被剪断部分的盲写，而不是只做到前者。
 
 限制由主机强制执行。 `builtin_tool_defs()` 中的工具描述包含
 逐字数字和范围参数：这个工具看起来无法
@@ -61,10 +68,11 @@ Goal/`Read` 管道，其输出不受限制。
 适用的限制，以及从哪里获得其余的。出现溢出语句
 仅当实际编写完整副本时。
 
-Read/Glob/Grep 不在其有效负载中嵌入标记：`content` 保留
-字节忠实，因此从中复制出来的文本仍然与 `Edit` 匹配，并且窗口
-元数据（`offset`、`lineCount`、`totalLines`、`truncated`）加上 `notice`
-字符串携带与兄弟字段相同的信息。
+Read/Glob/Grep 不在其有效负载中嵌入标记：窗口元数据
+（`offset`、`lineCount`、`totalLines`、`truncated`）加上 `notice` 字符串携带与
+兄弟字段相同的信息，这让负载本身保持可机械解析。`Read` 的内容带行号并以
+`[path#TAG]` 开头（ADR 0087）；它不再是字节忠实的，因此把它复制进 `Write` 的
+消费者必须去掉头部和 `N:` 前缀，`Write` 也会防御性地去掉它们。
 
 仅检查点聚合截断使用不同的模型上下文标记
 §4 因此诊断可以区分信息被缩短的位置。
@@ -117,7 +125,8 @@ Grep 可以读取溢出文件，因为显式 `path` 参数会停止父级
 ```ts
 type ReadResult = {
   path: string; root: "workspace" | "scratch" | "external"
-  content: string          // byte-faithful window, no markers or line numbers
+  content: string          // "[path#TAG]" header + "N:"-prefixed window
+  tag: string              // 4 hex, whole-file; the Edit anchor
   offset: number; lineCount: number
   totalLines?: number      // present only once end of file was reached
   fileBytes: number
@@ -126,12 +135,15 @@ type ReadResult = {
 }
 
 type GrepResult =
-  | { matches: { path: string; line: number; text: string }[]; count: number; files: number; truncated: boolean; notice?: string }
+  | { matches: { path: string; line: number; text: string }[]; tags: Record<string, string>; count: number; files: number; truncated: boolean; notice?: string }
   | { files: string[]; count: number; truncated: boolean; notice?: string }        // outputMode: filesWithMatches
   | { counts: { path: string; count: number }[]; count: number; truncated: boolean; notice?: string }  // outputMode: count
 
 type GlobResult = { matches: string[]; count: number; truncated: boolean; notice?: string }
 ```
+
+`tags` 只在 `content` 模式下出现，因为只有该模式会显示行。另外两种模式可搜索，
+但不是可编辑的锚点。
 
 对于批准的外部路径，`path` 是绝对路径； `Read` 还报道
 `root: "external"`。 `Glob` 和 `Grep` 使用绝对路径作为其外部
@@ -166,7 +178,7 @@ type GlobResult = { matches: string[]; count: number; truncated: boolean; notice
 - [x] 超大 Bash 输出用标记截断并溢出更完整的副本
 - [x] Bash stderr 在截断时保留其最后几行
 - [x] Grep 在 `headLimit` 和 `truncated: true` 处停止
-- [x] Grep 和 Read 2000 个字符的剪辑行
+- [x] Grep 和 Read 在 2000 个字符处剪辑行，且被剪辑的行被排除在 `Edit` 来源集之外
 - [x] Read 对多兆字节文件进行分页而不是拒绝它，并报告
 下一个偏移量
 - [x] 读取拒绝带有 `TOOL_BINARY_CONTENT` 的二进制内容

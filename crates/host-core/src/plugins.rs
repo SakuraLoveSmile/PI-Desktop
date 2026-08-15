@@ -114,6 +114,12 @@ pub struct PluginSummary {
     pub update_available: Option<PluginUpdateInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ui: Option<PluginUiMeta>,
+    /// `manifest.fs`, passed through verbatim: which files each mode may touch.
+    /// The desktop host enforces it; the registry carries it so the Plugins
+    /// page can show the user what they granted. Absent in records written
+    /// before scopes existed, which the host reads as the legacy minimum.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fs: Option<Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub settings: Vec<PluginSettingDefinition>,
 }
@@ -171,6 +177,8 @@ pub struct PluginManifest {
     pub contributes: Option<Value>,
     #[serde(default)]
     pub ui: Option<PluginUiMeta>,
+    #[serde(default)]
+    pub fs: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -498,6 +506,7 @@ impl PluginManager {
             auto_update: Some(false),
             update_available: None,
             ui: manifest.ui.clone(),
+            fs: manifest.fs.clone(),
             settings: derive_settings(&manifest),
         };
         self.upsert_summary(summary)
@@ -633,6 +642,7 @@ impl PluginManager {
                 ),
                 update_available: None,
                 ui: manifest.ui.clone(),
+                fs: manifest.fs.clone(),
                 settings: derive_settings(&manifest),
             };
             let plugin = self.upsert_summary(summary)?;

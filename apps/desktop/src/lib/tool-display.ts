@@ -20,8 +20,9 @@ const SUMMARY_KEYS: Record<ToolAction, string[]> = {
   fetch: ["url", "query"],
   fork: ["prompt", "task", "description", "name"],
   // `description` is the short label the model writes for the delegation; the
-  // `task` brief is a paragraph and belongs in the expanded detail.
-  delegate: ["description", "agent"],
+  // `task` brief is a paragraph and belongs in the expanded detail. The
+  // lifecycle tools (ADR 0089) summarize by delegation id.
+  delegate: ["description", "agent", "delegationIds"],
   use: [
     "command",
     "cmd",
@@ -51,21 +52,40 @@ export function formatToolValue(value: unknown): string {
   }
 }
 
+/** The tool that STARTS a subagent (ADR 0062). The lifecycle tools of ADR 0089
+ * (TaskWait/TaskList/TaskStop) drive an existing delegation and are not
+ * delegation activity items themselves. */
+export function isDelegationStartTool(toolName?: string): boolean {
+  const bare = (toolName || "")
+    .split(".")
+    .pop()!
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  return bare === "task" || bare === "subagent";
+}
+
 export function getToolAction(toolName?: string): ToolAction {
   const normalized = (toolName || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
   const matches = (aliases: string[]) =>
     aliases.some(
       (alias) => normalized === alias || normalized.endsWith(alias),
     );
-  // Delegation (ADR 0062) is matched on the exact name, minus any provider
-  // namespace: a plugin tool called "CreateTask" is not a subagent call and
-  // keeps its generic presentation.
+  // Delegation (ADR 0062, ADR 0089) is matched on the exact name, minus any
+  // provider namespace: a plugin tool called "CreateTask" is not a subagent
+  // call and keeps its generic presentation.
   const bare = (toolName || "")
     .split(".")
     .pop()!
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "");
-  if (bare === "task" || bare === "subagent") return "delegate";
+  if (
+    isDelegationStartTool(toolName) ||
+    bare === "taskwait" ||
+    bare === "tasklist" ||
+    bare === "taskstop"
+  ) {
+    return "delegate";
+  }
   if (matches(["websearch", "searchquery", "fetch", "http", "browser"])) {
     return "fetch";
   }
@@ -96,6 +116,19 @@ export function getToolDisplayName(toolName?: string) {
 }
 
 /**
+ * Renders a summarizable argument. A plain string is itself; a list of strings
+ * is joined, because `TaskWait`/`TaskStop` summarize by their `delegationIds`
+ * list (ADR 0089) and everything else summarizes by a scalar.
+ */
+function summaryText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+    return value.join(", ");
+  }
+  return "";
+}
+
+/**
  * Which argument the collapsed row summary is showing, so expanded detail
  * blocks can skip repeating it.
  */
@@ -106,8 +139,7 @@ export function getToolSummaryKey(
   if (!args || typeof args !== "object") return null;
   const record = args as Record<string, unknown>;
   for (const key of SUMMARY_KEYS[getToolAction(toolName)]) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return key;
+    if (summaryText(record[key]).trim()) return key;
   }
   return null;
 }
@@ -123,7 +155,7 @@ export function getToolSummaryValue(
 ): string {
   const key = getToolSummaryKey(toolName, args);
   if (!key) return "";
-  return (args as Record<string, unknown>)[key] as string;
+  return summaryText((args as Record<string, unknown>)[key]);
 }
 
 export function getToolSummary(toolName: string | undefined, args: unknown) {
@@ -131,7 +163,7 @@ export function getToolSummary(toolName: string | undefined, args: unknown) {
   if (args && typeof args === "object") {
     const record = args as Record<string, unknown>;
     const key = getToolSummaryKey(toolName, args);
-    if (key) return compact(record[key] as string);
+    if (key) return compact(summaryText(record[key]));
     const fallback = formatToolValue(record);
     if (fallback && fallback !== "{}") return compact(fallback);
   }

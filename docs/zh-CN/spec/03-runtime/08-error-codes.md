@@ -4,7 +4,7 @@
 
 
 > 事实来源：`packages/shared/src/errors.ts` (`ErrorCodes`)。代码在
-> §3.6 被保留（在发布之前记录）；其他一切都是实时的。
+> §3.7 被保留（在发布之前记录）；其他一切都是实时的。
 
 ## 1. Goal
 
@@ -87,6 +87,7 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 | `TOOL_DENIED` | 不 | 权限被拒绝/模式被禁止 |
 | `TOOL_TIMEOUT` | 是的 | 工具执行超时 |
 | `TOOL_FAILED` | 也许 | 工具已执行但失败 |
+| `MUTATION_RETRY_BUDGET_EXHAUSTED` | 是 | 重复保护在同路径 `Edit` 或 shell patch 反复失败后终止了本轮；携带 `details.kind`（`edit` 或 `patch-command`）与最后一个工具错误代码 |
 | `PROCESS_RESOURCE_EXHAUSTED` | 是的 | shell 进程无法启动，因为操作系统暂时耗尽了进程资源 |
 | `SHELL_NOT_FOUND` | 不 | 目录回退后没有有效的平台 shell 可用；消息承载指引 |
 | `COMMAND_SHELL_CHANGED` | 不 | 固定的 shell ID 或方言在执行前已更改 |
@@ -112,7 +113,38 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 (**D198**)。渲染器从提案的 `kind` 中选择其措辞，因此
 代码可以显示为“Plan”或“Goal”副本。
 
-### 3. 4 秘密/设置
+### 3. 4 Edit 契约（ADR 0087）
+
+仅由 `Edit` 发出。版本与来源失败拥有各自的代码，因为每一个都指向不同的
+下一步动作；把它们报告为 `TOOL_FAILED` 会丢失这一信息。见
+[18-line-anchored-edit-contract](18-line-anchored-edit-contract.md) §11。
+
+| 代码 | 可重试 | 含义 |
+|---|---|---|
+| `EDIT_TAG_REQUIRED` | 否 | `tag` 缺失或不是 4 位十六进制 |
+| `EDIT_TAG_MISMATCH` | `Read` 之后可以 | tag 无法哈希出实时文件且漂移恢复拒绝；携带实时 tag 与锚点处的当前内容 |
+| `EDIT_TAG_UNKNOWN` | `Read` 之后可以 | tag 格式正确，但本会话没有为该路径记录过对应内容 |
+| `EDIT_LINES_UNSEEN` | 是 | 锚点引用了会话从未显示过的行；携带被揭示的内容 |
+| `EDIT_PARSE_FAILED` | 否 | 操作头格式错误、无冒号头下出现正文行、缺少正文，或出现 `-`/上下文行 |
+| `EDIT_RANGE_INVALID` | 否 | 范围反向、行号越界、操作重叠，或锚点重复 |
+| `EDIT_BLOCK_UNRESOLVED` | 否 | `N*` 定位符无法解析；消息给出纯范围替代方案 |
+| `EDIT_REGISTER_EMPTY` | 否 | 从未设置的寄存器粘贴 |
+| `EDIT_REGISTER_AMBIGUOUS` | 否 | 存在多个待粘贴的匿名捕获时进行匿名粘贴 |
+| `EDIT_REPAIR_AMBIGUOUS` | 否 | 边界修复候选在最小代价上并列 |
+| `EDIT_NO_CHANGE` | 否 | 应用产生了与输入完全相同的文本 |
+| `EDIT_AMPLIFICATION_LIMIT` | 否 | 下降展开超过膨胀上限 |
+
+当消息报告 reveal 完整时，`EDIT_LINES_UNSEEN` **无需**再次 `Read` 即可重试：
+被揭示的行已并入会话来源集，因此原样重试同一个 `tag` 即可应用。被截断的
+reveal 不并入任何行，必须重新读取。
+
+`EDIT_TAG_MISMATCH`、`EDIT_TAG_UNKNOWN` 与 `EDIT_LINES_UNSEEN` 在重复保护开始计数
+之前，各自在每条路径上有一次免费尝试，因为每一个都已经携带了重试所需的东西。其余代码
+在第一次出现时就计数，而耗尽额度的那次失败会以 §3.3 的
+`MUTATION_RETRY_BUDGET_EXHAUSTED` 出现在 assistant 行上
+（[18-line-anchored-edit-contract](/zh-CN/spec/03-runtime/18-line-anchored-edit-contract) §9.3）。
+
+### 3. 5 秘密/设置
 
 | 代码 | 可重审的 | 意义 |
 |---|---|---|
@@ -120,7 +152,7 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 | `SECRET_STORE_UNAVAILABLE` | 也许 | 操作系统安全存储不可用（保留） |
 | `SETTINGS_INVALID` | 不 | 设置有效负载无效（保留） |
 
-### 3. 5 插件
+### 3. 6 插件
 
 | 代码 | 可重审的 | 意义 |
 |---|---|---|
@@ -133,7 +165,7 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 | `PLUGIN_CRASHED` | 是的 | 插件运行时崩溃（保留） |
 | `PLUGIN_CONTRACT_MISMATCH` | 不 | 不支持的 manifest/api 版本（保留） |
 
-### 3. 6 保留的详细代码（尚未发布）
+### 3. 7 保留的详细代码（尚未发布）
 
 记录了更细粒度的 provider/tool 区别，以供将来映射。
 在发布之前，实现使用所示的规范父代码。

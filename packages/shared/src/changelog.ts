@@ -23,6 +23,20 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.7.0",
+    date: "2026-08-15",
+    highlights: [
+      "Restrict plugin file access to each plugin's declared file scope, and send deleted files to the trash for easy recovery.",
+      "Show each plugin's declared file scope next to its permissions.",
+      "Confine plugin network requests to each plugin's declared domain allowlist.",
+      "Forward unknown plugin panel channels to the plugin so deeper integrations keep working.",
+      "Stop the sidebar collapse from flickering when toggled.",
+      "Make agent edits line-anchored so an interrupted edit recovers gracefully instead of ending the turn silently.",
+      "Harmonize card typography hierarchy for a more consistent interface.",
+      "Upgrade the desktop shell and agent runtime to the latest Electron and pi releases.",
+    ],
+  },
+  {
     version: "0.6.0",
     date: "2026-08-14",
     highlights: [
@@ -305,6 +319,20 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.7.0",
+    date: "2026-08-15",
+    highlights: [
+      "将插件文件访问限制在其声明的作用域内，删除的文件会移入废纸篓以便恢复。",
+      "在插件权限展示处显示其声明的文件作用域。",
+      "将插件网络请求限制在其声明的域名白名单内。",
+      "将未知的插件面板通道转发给插件，让更深度的集成保持可用。",
+      "修复侧边栏折叠时的闪烁问题。",
+      "让代理的编辑操作锚定在明确的行范围内，被中断时能优雅恢复，不再静默结束回合。",
+      "统一卡片排版字体层级，界面更加一致。",
+      "将桌面壳与代理运行时升级到最新的 Electron 和 pi 版本。",
+    ],
+  },
   {
     version: "0.6.0",
     date: "2026-08-14",

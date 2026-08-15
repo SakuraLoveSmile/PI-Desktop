@@ -22,7 +22,25 @@ declare const pi: PiPluginHostApi;
 ```ts
 pi.app.getVersion(): Promise<string>
 pi.app.getLocale(): Promise<string>
+pi.app.getAppearance(): Promise<PluginAppearance>
 ```
+
+`app.getAppearance` returns the appearance the host is currently showing so a
+plugin (or its panel) can mirror the app's language and color mode exactly:
+
+```ts
+type PluginAppearance = {
+  theme: string        // raw preference: "light" | "dark" | "system" | "plugin:<pluginId>:<themeId>"
+  base: "light" | "dark" | "system"  // palette the preference resolves to
+  locale: string       // active language tag (e.g. "en", "zh-CN")
+  pluginTheme: { id: string; base: "light" | "dark"; css: string } | null
+}
+```
+
+Panels read the same value through the bridge channel `app.getAppearance` and
+receive live updates on the `appearance:changed` event (below). On hosts older
+than the channel, the call rejects with `UNSUPPORTED`; panels should fall back
+to the OS preference and their own in-panel choice.
 
 ### plugin
 ```ts
@@ -83,10 +101,19 @@ the banner without changing the durable task notification inbox.
 ```ts
 pi.workspace.get(): Promise<{ path: string; name: string } | null>
 
-pi.fs.readText(pathFromWorkspaceRoot: string): Promise<string>
-pi.fs.writeText(pathFromWorkspaceRoot: string, content: string): Promise<void>
+pi.fs.readText(pathFromRoot: string): Promise<string>
+pi.fs.writeText(pathFromRoot: string, content: string): Promise<void>
 pi.fs.glob(pattern: string): Promise<string[]>
+pi.fs.remove(pathFromRoot: string): Promise<void>
+pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 ```
+
+Paths are relative to the mode's root — the workspace, or the directory the user
+picked through `requestDirectory()` when the mode declares
+`root: "userSelected"`. Which paths each mode may reach comes from `manifest.fs`;
+anything outside it prompts the user, and the credential deny-list overrides both
+(see [04-plugin-security.md](04-plugin-security.md) §6). `remove` is
+non-recursive and moves the path to the OS trash.
 
 ### agent
 ```ts
@@ -213,7 +240,8 @@ Planned events:
 - `session:activated`
 - `plugin:settingsChanged` is delivered after edits from the generated Plugins
   settings UI.
-- `app:themeChanged`
+- `app:themeChanged` — for now, panels follow the palette live through the
+  panel event `appearance:changed`; the plugin-process event remains planned.
 
 ## 6. Panel bridge API
 
@@ -231,25 +259,36 @@ The host-owned preload forwards only fixed channels to the plugin runtime:
 | `ui.showToast`, `ui.closePanel` | None beyond the loaded panel |
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | `notify` |
-| `plugin.getSettings`, `workspace.get` | None |
-| `fs.readText`, `fs.glob` | `fs.read.workspace` |
-| `fs.writeText` | `fs.write.workspace` |
+| `plugin.getSettings`, `workspace.get`, `app.getAppearance` | None |
+| `fs.readText`, `fs.glob` | `fs.read` |
+| `fs.writeText` | `fs.write` |
 | `clipboard.readText` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |
 | `shell.openExternal` | `shell.openExternal` |
 | `net.fetch` | `net.fetch` |
 
-`plugin.setSettings`, `fs.remove`, arbitrary Electron IPC, and general custom
-panel RPC are not exposed. `onPanelInvoke(channel, payload)` is currently
-reachable only for the host-supported `skill.list`, `skill.read`,
-`skill.create`, `skill.update`, `skill.remove`, and `skill.setEnabled` channels;
-it is not a general-purpose extension point.
+`plugin.setSettings`, `fs.remove`, and arbitrary Electron IPC are not exposed. A
+channel the host does not implement itself is forwarded to the plugin's
+`onPanelInvoke(channel, payload)`, so a plugin may define its own panel ↔ main
+channels; a plugin that exports no `onPanelInvoke` gets `UNSUPPORTED` from its own
+process. The host-supported channels include `skill.list`, `skill.read`,
+`skill.create`, `skill.update`, `skill.remove`, and `skill.setEnabled`.
+
+### Panel events (host -> panel)
+
+`window.pluginBridge.on(event, handler)` receives host-pushed events. Delivered
+today:
+
+- `appearance:changed` — payload is the `PluginAppearance` above, sent whenever
+  the app's palette or language changes, so a panel can restyle and relabel live.
 
 ## 7. Call auditing
 
 Any of the following calls must be logged for audit:
 
 - fs.writeText
+- fs.remove, fs.requestDirectory, and every refused fs call (with its path and
+  `errorCode`), plus each consent answer and why it was asked (`scope` / `rate`)
 - execute after agent.registerTool (including tools discovered from a plugin's
   MCP servers)
 - net.fetch
@@ -277,7 +316,8 @@ Log fields:
 The desktop plugin runtime now implements the MVP host API surface used by local and marketplace plugins:
 
 - `app.*`, `plugin.*`, `commands.*`, `ui.*`, `workspace.*`
-- `fs.readText` / `fs.writeText` / `fs.glob` (workspace-bound)
+- `fs.readText` / `fs.writeText` / `fs.glob` / `fs.remove` /
+  `fs.requestDirectory`, bounded by `manifest.fs` (ADR 0088)
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
 - `services.register` / `unregister`, `bus.publish` / `subscribe`, `events.on` / `off`

@@ -12,7 +12,7 @@ import {
 } from "./subagent-definitions.js";
 
 describe("builtin subagent documents", () => {
-  it("parse into read-only delegates plus one shell delegate", async () => {
+  it("parse into read-only delegates plus a write-capable fixer", async () => {
     const { definitions, diagnostics } = await loadSubagentDefinitions(null);
 
     expect(diagnostics).toEqual([]);
@@ -20,17 +20,23 @@ describe("builtin subagent documents", () => {
       "explorer",
       "code-reviewer",
       "test-runner",
+      "fixer",
     ]);
     expect(definitions).toHaveLength(BUILTIN_SUBAGENT_DOCUMENTS.length);
     for (const definition of definitions) {
       expect(definition.source).toBe("builtin");
       expect(definition.description.length).toBeGreaterThan(20);
       expect(definition.prompt.length).toBeGreaterThan(50);
-      // Nothing bundled may write to the workspace; the shell delegate reads
-      // and runs commands, which is a permission prompt, not an edit.
-      expect(definition.tools).not.toContain("Write");
-      expect(definition.tools).not.toContain("Edit");
     }
+    // Only `fixer` may write to the workspace, and only under its declared
+    // permission scope; every other builtin is read-only (the shell delegate
+    // reads and runs commands, which is a permission prompt, not an edit).
+    const mutating = definitions.filter(
+      (definition) =>
+        definition.tools.includes("Write") || definition.tools.includes("Edit"),
+    );
+    expect(mutating.map((d) => d.name)).toEqual(["fixer"]);
+    expect(mutating[0]?.permission).toBe("accept-edits");
     expect(definitions[2].tools).toContain("Bash");
   });
 });

@@ -14,6 +14,46 @@ const messagesCss = await readFile(
   new URL("../src/styles/messages.css", import.meta.url),
   "utf8",
 );
+const topologySource = await readFile(
+  new URL("../src/lib/subagent-topology.ts", import.meta.url),
+  "utf8",
+);
+const toolDisplaySource = await readFile(
+  new URL("../src/lib/tool-display.ts", import.meta.url),
+  "utf8",
+);
+
+test("a delegation card reads its outcome from the lifecycle rows", () => {
+  // `Task` returns as soon as the delegate starts, so its own payload says
+  // `running` forever. Treating that as "no status" made every card claim
+  // `completed` the moment the fan-out began.
+  assert.match(topologySource, /const DELEGATION_STATUSES = new Set<SubagentOutcome>\(\[\s*\n\s*"running",/);
+  assert.match(topologySource, /export function collectDelegationStatuses\(/);
+  // TaskWait/TaskList/TaskStop all report `details.delegations[]`; later rows
+  // settle what earlier ones reported as running.
+  assert.match(topologySource, /const delegations = payload\?\.delegations;/);
+  assert.match(topologySource, /statuses\.set\(id, status\)/);
+  assert.match(
+    topologySource,
+    /const settled = statuses\?\.get\(delegationId\);\s*\n\s*if \(settled\) return settled;/,
+  );
+  // The lifecycle rows are still excluded from the topology's node count.
+  assert.match(topologySource, /if \(isDelegationActivityItem\(item\)\) continue;/);
+  assert.match(
+    transcriptSource,
+    /const delegationStatuses = collectDelegationStatuses\(items\);/,
+  );
+});
+
+test("a lifecycle row summarizes by the delegation ids it was given", () => {
+  // `delegationIds` is a string array, and the summary lookup only accepted
+  // string values, so both spellings the keys carried were unreachable.
+  assert.match(toolDisplaySource, /delegate: \["description", "agent", "delegationIds"\]/);
+  assert.doesNotMatch(toolDisplaySource, /"delegationids"/);
+  assert.match(toolDisplaySource, /function summaryText\(value: unknown\): string/);
+  assert.match(toolDisplaySource, /Array\.isArray\(value\) && value\.every\(/);
+  assert.doesNotMatch(toolDisplaySource, /record\[key\] as string/);
+});
 
 test("a live delegate row keeps the attribution its stream carried", () => {
   // Without these the row would render as a top-level tool call until the
@@ -88,7 +128,7 @@ test("parallel Task rows render as one accessible delegation topology", () => {
   );
   assert.match(
     transcriptSource,
-    /<SubagentTopology key="subagent-topology" items=\{delegateItems\} \/>/,
+    /<SubagentTopology\s+key="subagent-topology"\s+items=\{delegateItems\}\s+delegationStatuses=\{delegationStatuses\}\s*\/>/,
   );
   assert.match(transcriptSource, /className="subagent-topology" aria-labelledby=/);
   assert.match(transcriptSource, /className="subagent-topology-agents"/);

@@ -22,8 +22,29 @@ export const en = {
     close: "Close",
   },
   tray: {
-    show: "Show PI-Desktop",
+    open: "Open PI-Desktop",
     quit: "Quit PI-Desktop",
+    askTitle: "Keep PI-Desktop running in the background?",
+    askBody:
+      "When you close the window, PI-Desktop can keep running in the system tray so nothing is lost. You can change this any time in Settings.",
+    closeToTray: "Close to tray",
+  },
+  /**
+   * Native consent dialog for a file access a plugin's manifest did not
+   * declare. Lives here rather than in the renderer because the dialog is a
+   * main-process `showMessageBox` — it has to block the plugin's call.
+   */
+  pluginFsConsent: {
+    read: "{name} wants to read a file outside what it declared",
+    write: "{name} wants to write a file outside what it declared",
+    delete: "{name} wants to delete a file outside what it declared",
+    rate: "{name} is deleting a lot of files at once",
+    rateDetail:
+      "It has passed {limit} deletions in a minute. This is what a runaway loop looks like; the next one is {path}.",
+    detail: "{path}\n\nGranting this is up to you. Deletions go to the trash and can be restored.",
+    allowOnce: "Allow once",
+    allowSession: "Allow until quit",
+    deny: "Deny",
   },
   pluginLauncher: {
     title: "Open a plugin",
@@ -320,6 +341,7 @@ export const en = {
       completed: "Completed",
       truncated: "Turn limit reached",
       aborted: "Stopped",
+      stopped: "Stopped by request",
       failed: "Failed",
       denied: "Denied",
     },
@@ -580,6 +602,14 @@ export const en = {
     fullAccessLearnMoreAfter: " about elevated risks.",
     showMenuBar: "Show in menu bar",
     showMenuBarDesc: "Keep PI-Desktop in the macOS menu bar when the main window is closed.",
+    closeBehaviorTitle: "Close behavior",
+    closeBehaviorDesc:
+      "What happens when you close the main window. macOS always keeps the app in the Dock.",
+    closeBehaviorTray: "Close to tray",
+    closeBehaviorTrayDesc: "Keep PI-Desktop running in the system tray.",
+    closeBehaviorQuit: "Quit app",
+    closeBehaviorQuitDesc: "Exit PI-Desktop completely.",
+    closeBehaviorSaveError: "Couldn't save the close behavior.",
     defaultsTitle: "Defaults",
     defaultModel: "Default model",
     defaultModelDesc: "Used by chats that haven't chosen their own model. Changes apply from the next message.",
@@ -1040,14 +1070,27 @@ export const en = {
       failed: "Failed",
     },
     serviceRestarts: "restarted {{count}}x",
+    fileAccessTitle: "Files",
+    fsMode: { read: "Read", write: "Write", delete: "Delete" },
+    /** Shown in place of globs when the reach is a directory the user picks. */
+    fsRootPicked: "a folder you choose",
+    fsOwnFiles: "files it created",
+    fsAsksEachTime: "asks you each time",
+    legacyFsDowngraded:
+      "This plugin declares file permissions from before scopes existed, so its reach has been reduced. Update it to restore full function.",
     permissions: {
       "ui.panel": "Show a plugin panel",
       "clipboard.read": "Read the clipboard",
       "clipboard.write": "Write to the clipboard",
       notify: "Show in-app and native notifications",
-      "fs.read.workspace": "Read project files",
-      "fs.write.workspace": "Edit project files",
-      "fs.delete.workspace": "Delete project files",
+      "fs.read": "Read files",
+      "fs.write": "Edit files",
+      "fs.delete": "Delete files",
+      // Kept for plugins installed before scopes existed; the host reduces what
+      // these are worth, and `legacyFsDowngraded` explains it in the row.
+      "fs.read.workspace": "Read project files (legacy)",
+      "fs.write.workspace": "Edit project files (legacy)",
+      "fs.delete.workspace": "Delete project files (legacy)",
       "agent.tool.register": "Add tools for the agent",
       "agent.prompt.inject": "Adjust agent instructions",
       "net.fetch": "Use the network",
@@ -1064,9 +1107,17 @@ export const en = {
       "clipboard.read": "May read whatever is currently on your clipboard.",
       "clipboard.write": "May replace whatever is currently on your clipboard.",
       notify: "Can show in-app Toasts and best-effort native notifications.",
+      "fs.read":
+        "Read-only access, limited to the paths the plugin declares. Credentials and repository internals are never included.",
+      "fs.write":
+        "Can create or change files, limited to the paths the plugin declares. Anything else asks you first.",
+      "fs.delete":
+        "Can delete files it declares or wrote itself. Deletions go to the trash, and anything else asks you first.",
       "fs.read.workspace": "Read-only access inside the current project.",
-      "fs.write.workspace": "Can create or change files in the current project.",
-      "fs.delete.workspace": "Can delete files in the current project.",
+      "fs.write.workspace":
+        "Declared before file scopes existed, so it can no longer write anywhere until the plugin is updated.",
+      "fs.delete.workspace":
+        "Declared before file scopes existed, so it can now only delete files it wrote itself.",
       "agent.tool.register": "Lets the AI call extra tools provided by this plugin.",
       "agent.prompt.inject": "Can change instructions sent to the AI agent.",
       "net.fetch": "Can make outbound network requests.",
@@ -1337,6 +1388,8 @@ export const en = {
     STREAM_FAILED: "The reply was interrupted.",
     EMPTY_MODEL_RESPONSE:
       "The model finished its turn without saying anything, twice in a row. Try again, or rephrase your request.",
+    MUTATION_RETRY_BUDGET_EXHAUSTED:
+      "The same edit failed twice, so this turn stopped instead of retrying blind. Ask again to continue.",
     CONTEXT_TOO_LARGE: "This chat is still too long after context recovery. Shorten your message or start a new chat.",
     CONTEXT_COMPACTION_FAILED: "Couldn't compact this conversation's model context.",
     AGENT_BUSY: "This chat is already working. Wait for it to finish, or stop it first.",

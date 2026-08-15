@@ -509,7 +509,7 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
-#### E2E-091: Sending a prompt keeps the transcript at the latest turn
+#### E2E-144: Sending a prompt keeps the transcript at the latest turn
 
 - **Preconditions**: Chat route active; the selected session contains enough
   history to overflow the transcript viewport; the transcript is at the latest
@@ -997,7 +997,7 @@ Each scenario is documented in this format:
 - **Acceptance**: G (package install + update policy)
 - **Status**: Documented
 
-#### E2E-024N: Marketplace update diagnosis and release-data gate
+#### E2E-024Q: Marketplace update diagnosis and release-data gate
 
 - **Preconditions**: A catalog fixture contains an installed `0.5.0` plugin, a
   `0.5.1` version, and either unsorted version entries or intentionally missing
@@ -1235,7 +1235,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: App running; host-core and sidecar healthy.
 - **Steps**: 1) Kill the host-core (or sidecar) process externally. 2) Observe app behavior.
-- **Expected**: In-flight RPCs fail fast (no long hang); `hostStatus` shows degraded then restored; child restarts with backoff; after 3 failed restarts in 2 minutes the app stays degraded with a visible fatal status.
+- **Expected**: In-flight RPCs fail fast (no long hang); `hostStatus` shows degraded then restored; child restarts with backoff; after 3 failed restarts in 2 minutes the app stays degraded with a visible fatal status. Repeat the kill with the main window closed: the crash is still logged (with the child's last stderr lines), the child still restarts, and no unhandled renderer-send error appears — supervision is independent of a live window.
 - **Specs linked**: `03-runtime/07-process-model.md`
 - **Acceptance**: Quality (main path no crash)
 - **Milestone**: M5
@@ -2190,6 +2190,47 @@ Each scenario is documented in this format:
   platform bridge, native menu installation, and the pre-render maximize
   fixture on Windows/Linux; native visual scenario Draft
 
+#### E2E-143: Close behavior is asked once and stays configurable (D230)
+
+- **Preconditions**: Windows/Linux run with a clean data dir (no
+  `close-behavior.json`); the main window is visible; Settings → General is
+  reachable. macOS is excluded: it keeps the native Dock lifecycle.
+- **Steps**: 1) With the preference unset, click the close button (or press
+  the close-window shortcut) and answer the prompt: Cancel keeps the window
+  open and the preference unset; Close to tray hides the window, shows the
+  tray icon, and the app keeps running (a turn in flight stays live); Quit
+  exits the app. 2) Re-run each choice and verify it is remembered across a
+  full restart and that no second prompt ever appears once a choice exists.
+  3) With `tray` set, click the tray icon: the window
+  restores, shows, and focuses; the tray context menu offers Open and Quit,
+  and Quit exits the app. 4) In Settings → General, switch between Close to
+  tray / Quit app and verify the next close follows the new
+  choice, that the D216 tray icon stays resident either way, that an unset
+  preference shows no selection, and that search matches
+  the row. 5) With `quit` stored, restart and close the window: the app
+  exits even though the tray icon is present. 6) Minimize from any setting
+  and verify the window hides into the tray (D216) and that the tray click
+  brings it back. 7) Invoke unknown values and `"ask"` on
+  `pi-desktop/window/closeBehavior/set` and verify they fail closed, and
+  verify the channel is rejected outright on macOS.
+- **Expected**: The first close prompts exactly once per unset state and
+  Cancel never persists a choice. Tray mode keeps the app alive with a
+  localized tooltip/menu and no data loss; switching to Quit app leaves the
+  tray icon in place, because minimize-to-tray still needs it as the only
+  way back to a hidden window. The preference survives restarts and is
+  honored by both the window-control close button and the close shortcut,
+  and a stored `quit` exits through the ordered `before-quit` shutdown
+  rather than depending on `window-all-closed`. Minimize hides to the tray
+  in every mode, and the bounds watchdog never force-restores a minimized
+  or tray-hidden window. The automated boot probe (`app.quit`) exits
+  without prompting.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `04-ux/01-ui-ia.md`, `04-ux/09-interaction-patterns.md`,
+  `08-meta/decisions-log.md` (D216, D230), ADR 0078, ADR 0090
+- **Acceptance**: A (app startup), Quality
+- **Milestone**: M5 on Windows/Linux (release qualification)
+- **Status**: Draft
+
 #### E2E-067A: Prerelease install discovers newer stable release (D120)
 
 - **Preconditions**: Packaged build whose embedded version is a prerelease such
@@ -2955,32 +2996,35 @@ Each scenario is documented in this format:
 
 - **Preconditions**: A project-bound Agent session has a writable workspace;
   the provider fixture can emit two same-session `Write`/`Edit` calls in one
-  tool batch; a second edit can be given stale or ambiguous `old_string`
-  context; a Bash command can return a non-zero exit code with diagnostics.
+  tool batch; a second edit can be given a stale `tag`; a Bash command can
+  return a non-zero exit code with diagnostics.
 - **Steps**:
   1. Start a task that emits two mutations for the same session while also
      emitting independent read/search calls.
   2. Inspect tool timing and the transcript while the first mutation runs.
-  3. Force the second `Edit` to use a context that is no longer present, then
-     allow the agent to re-read the file and retry from the current contents.
+  3. Force the second `Edit` to carry a `tag` that no longer hashes the file,
+     with anchors that recovery cannot remap, then allow the agent to re-read
+     the file and retry from the current contents.
   4. Run a Bash command that exits non-zero and inspect its tool result and
      inline state.
-  5. Repeat with an `old_string` that appears in two locations.
+  5. Repeat with an `ops` payload whose ranges overlap.
   6. If the task uses a dedicated worktree outside the advertised workspace,
      verify its guarded Bash edit and resulting `git diff`.
 - **Expected**:
   - Read/search calls may overlap, but only one `Write`/`Edit` executes for a
     session at a time; queued mutations do not consume another global
     mutation slot while waiting.
-  - The stale and ambiguous edits fail without changing the file and return a
-    `TOOL_FAILED` message that directs the agent to re-read and provide a
-    unique current context.
+  - The stale-tag edit fails without changing the file and returns
+    `EDIT_TAG_MISMATCH` carrying the live tag and current content at the
+    anchors; the overlapping-range payload fails with `EDIT_RANGE_INVALID`
+    before any write.
   - The non-zero Bash command is marked failed while retaining its exit code,
     stdout, and stderr for the agent and diagnostics.
-  - The retry performs one fresh read and operates on the current file; a
-    second same-path mismatch or failed shell patch command returns a
-    terminating tool result, stops the mutation workflow, and does not
-    repeatedly modify an old patch artifact or its hunk headers.
+  - The retry performs one fresh read and operates on the current file; once
+    that path has spent its recovery graces, the next same-path failure — or a
+    second failed shell patch command — returns a terminating tool result plus a
+    visible `MUTATION_RETRY_BUDGET_EXHAUSTED` row, stops the mutation workflow,
+    and does not repeatedly modify an old patch artifact or its hunk headers.
   - The final file contains exactly the intended change, and diff/review data
     contains no partial or interleaved mutation.
 - **Specs linked**: `03-runtime/03-tools-and-permissions.md`,
@@ -3018,7 +3062,7 @@ Each scenario is documented in this format:
     status, and `retryAttempt`, without credentials or an unrestricted provider
     body.
   - A mid-stream HTTP 429 is classified as `PROVIDER_RATE_LIMITED` and follows
-    the same bounded path (E2E-130).
+    the same bounded path (E2E-149).
   - Authentication, model-selection, context, and malformed-request failures
     do not enter this same-turn stream replay path.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
@@ -3029,7 +3073,7 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`agent-errors.test.ts`, `runtime.test.ts`); full
   provider/UI journey Draft
 
-#### E2E-130: Recover one mid-stream rate-limit (429) in place
+#### E2E-149: Recover one mid-stream rate-limit (429) in place
 
 - **Preconditions**: A project-bound Agent session uses a deterministic
   provider fixture that emits a partial assistant stream, then fails the
@@ -3055,7 +3099,7 @@ Each scenario is documented in this format:
     lifecycle event with `retryAttempt: 1` in the details; no further
     automatic retry occurs.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` (D186 amended),
-  `03-runtime/08-error-codes.md`, `08-meta/decisions-log.md` (D228), ADR 0087
+  `03-runtime/08-error-codes.md`, `08-meta/decisions-log.md` (D233), ADR 0091
 - **Acceptance**: C (chat & stream), H (diagnostics), Quality
 - **Milestone**: M5
 - **Status**: Unit-covered (`runtime.test.ts`); full provider/UI journey Draft
@@ -3540,7 +3584,7 @@ Each scenario is documented in this format:
   (delegate detection, structured outcomes and aggregate counts). Full
   multi-provider fan-out and rendered topology interaction remain manual.
 
-#### E2E-097: Tool results read as structured blocks, never JSON
+#### E2E-145: Tool results read as structured blocks, never JSON
 
 - **Preconditions**: A project-bound Agent session with permissions allowed for
   the turn; a plugin tool whose result is an arbitrary record is installed; the
@@ -3578,7 +3622,7 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`tool-presentation.test.mjs`,
   `transcript-style.test.mjs`); full UI journey Draft
 
-#### E2E-098: A turn that produces no visible text re-runs once
+#### E2E-146: A turn that produces no visible text re-runs once
 
 - **Preconditions**: A project-bound Agent session uses a deterministic provider
   fixture that ends one turn with no tool call and no text — once with reasoning
@@ -3615,7 +3659,7 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`runtime.test.ts`); full provider/UI journey Draft
 
-#### E2E-099: Scoped search stays inside its budget and the agent narrates
+#### E2E-147: Scoped search stays inside its budget and the agent narrates
 
 - **Preconditions**: A project-bound Agent session; the workspace contains a
   multi-megabyte source file, a minified bundle with a `.map` sibling (one line,
@@ -3998,7 +4042,7 @@ Each scenario is documented in this format:
 - **Status**: Unit/source-contract covered; full cross-platform OS permission
   journey Draft (do not run E2E locally unless explicitly requested)
 
-#### E2E-123: Plugin settings and local shortcuts are editable
+#### E2E-148: Plugin settings and local shortcuts are editable
 
 - **Preconditions**: An enabled plugin declares string, boolean, JSON, and
   `shortcut` settings; the shortcut points to a declared plugin command.
@@ -4027,26 +4071,26 @@ Each scenario is documented in this format:
 
 | Acceptance | Scenarios |
 |---|---|
-| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097 |
+| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
-| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001 |
+| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-147 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123 |
-| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121 |
-| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123 |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-148 |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148 |
+| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146 |
+| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148 |
 
 | Milestone | Scenarios |
 |---|---|
 | M1 | E2E-001, E2E-002, E2E-003, E2E-028, E2E-029 |
-| M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-089, E2E-090 |
+| M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-089, E2E-090, E2E-144 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095 |
+| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-147 |
 | M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103 |
-| M6+ | E2E-121, E2E-122 |
+| M6+ | E2E-121, E2E-122, E2E-148 |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
@@ -4758,9 +4802,16 @@ This test plan spec is accepted when:
 - **Expected**: One question is visible at a time; the small indicators show
   answered, current, and skipped states in the composer approval area, at the
   same dock position used by Plan and Goal approval. The request has no
-  countdown. Question text and options render at the same font size as the
-  surrounding chat body. The tool output is ordered as `question：answer`,
-  uses `、` between multiple answers and `\n---\n` between questions, and
+  countdown. Question text and options render at the compact card body size
+  (`--text-md`, one step below the surrounding chat body), matching the
+  permission card scale in the same dock area. The card shell uses the slim
+  rail (2 px accent, 14 px × 16 px padding). Option rows and action buttons
+  use the app's compact control density (30 px rows, 15 px marks, 8 px row
+  gaps, compact buttons), and the card keeps a relaxed internal rhythm
+  (12/14 px indicator margins, `--leading-normal` question line-height). The
+  tool output is ordered as
+  `question：answer`, uses `、` between multiple answers and `\n---\n`
+  between questions, and
   keeps `question：` for the skipped question. Decline all produces empty
   placeholders for every question and still completes the tool call.
 - **Specs linked**: `03-runtime/17-asktool-questions.md`,
@@ -4992,3 +5043,367 @@ This test plan spec is accepted when:
 - **Acceptance**: E (tools & permissions), H (localization)
 - **Milestone**: M5+
 - **Status**: Documented
+
+#### E2E-130: Read mints a tag that an Edit consumes without re-reading
+
+- **Preconditions**: A project-bound Agent session with a writable workspace and
+  a source file of at least 300 lines. The provider fixture can emit an exact
+  `Edit` payload.
+- **Steps**:
+  1. `Read` the file with no `offset` and record the `[path#TAG]` header, the
+     `tag` field, and the `N:` prefixes on the returned lines.
+  2. Emit `Edit` with that `tag` and a single `PUT N.=M:` whose body replaces two
+     lines inside the read window.
+  3. Confirm the successful result reports a new `tag`, then emit a second `Edit`
+     with the returned tag and a `PUT >$:` append, with no intervening `Read`.
+  4. `Read` a 200-line window at an `offset`, then `Edit` a line inside that
+     window using the tag from the windowed read.
+  5. Reopen the file on disk and compare it to the intended content byte for
+     byte.
+- **Expected**: The header tag is the whole-file tag, not the window's, so a
+  windowed read anchors correctly; line numbers are absolute and unaffected by
+  `offset`. Both edits apply, the second without any re-read, and each success
+  returns the post-write tag. The file on disk matches the intended content
+  exactly, with its original line endings and BOM state preserved.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §3, §4.2, §5,
+  §6, §9, `03-runtime/16-tool-result-limits.md` §5, ADR 0087
+- **Acceptance**: E (tools & permissions)
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-131: An edit on never-displayed lines is rejected and the retry succeeds
+
+- **Preconditions**: A session that has read only lines 1–50 of a 400-line file.
+  A second fixture file has one line longer than 2000 characters.
+- **Steps**:
+  1. Emit `Edit` with the correct `tag` and a `PUT 300.=301:` op.
+  2. Inspect the error code and confirm the message inlines the current content
+     of lines 300 and 301.
+  3. Retry the identical `Edit` payload, unchanged, including the same `tag`.
+  4. Emit `Edit` with the correct tag and a `PUT 5.=60:` op spanning 56 unseen
+     lines, and inspect the reveal.
+  5. Retry that identical payload unchanged.
+  6. `Read` the second fixture, confirm the long line is clipped and counted in
+     `notice`, then `Edit` that clipped line.
+- **Expected**: Step 1 fails with `EDIT_LINES_UNSEEN` and the file is unchanged.
+  Step 3 applies, because the complete reveal merged those lines into the
+  session's provenance. Step 4 fails with a reveal truncated at 40 lines that
+  says to re-read the range, and step 5 fails again — a truncated reveal merges
+  nothing, so the guard cannot be walked past in under-cap slices. Step 6 fails
+  with `EDIT_LINES_UNSEEN`: a clipped line was never displayed.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §4.3, §9.1,
+  §11, §12, `03-runtime/16-tool-result-limits.md` §2, ADR 0087
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-132: Gap inserts, deletes, and multi-op payloads apply against one snapshot
+
+- **Preconditions**: A read file whose content is known line by line.
+- **Steps**:
+  1. Emit one `Edit` combining `PUT <1:`, `PUT >40:`, `CUT 12.=14`, and
+     `PUT 80.=80:` in a single `ops` payload.
+  2. Compare the result against the same four changes computed against the
+     original line numbering.
+  3. Emit `PUT >$:` on the same file and confirm the append lands after the final
+     line with exactly one terminating newline.
+  4. Emit an `ops` payload whose body row starts with a literal `-` written as
+     `+- item`, and one with a literal `+` written as `++ item`.
+  5. Emit an `Edit` whose `PUT` body exactly reproduces the range's current
+     content.
+- **Expected**: Every anchor indexes the tagged snapshot, so no op shifts
+  another and the combined result equals the four independent changes. `+-` and
+  `++` write a single leading `-` and `+`. Step 5 returns `EDIT_NO_CHANGE` rather
+  than reporting a successful write of nothing, and leaves no review record.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §7.2, §7.3,
+  §7.4, §8.1, §9.3, ADR 0087
+- **Acceptance**: E (tools & permissions)
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-133: Block ops resolve, echo their span, and decline instead of guessing
+
+- **Preconditions**: Read fixtures in a supported grammar (a Rust file with a
+  decorated/attributed function), a Markdown file with nested headings, and a
+  file in a language outside the supported grammar list.
+- **Steps**:
+  1. Emit `PUT N*:` anchored on the `fn` line of a function whose declaration
+     carries an `#[attribute]` line above it, and inspect the echoed
+     `{anchorLine, start, end, op}`.
+  2. Repeat anchored on the attribute line and compare the echoed span.
+  3. Emit `PUT >N*:` on the same opener and confirm the insertion lands after the
+     block's last line at sibling indentation.
+  4. Emit `CUT N*` anchored on a lone `}` closer.
+  5. Emit `PUT N*:` on a `##` heading in the Markdown fixture and confirm the
+     span reaches the next same-or-higher heading, not the next deeper one.
+  6. Emit `PUT N*:` in the unsupported-language file.
+  7. Introduce a syntax error into the Rust fixture, re-read, and emit a block
+     op.
+- **Expected**: Step 1's span starts at the `fn` line and excludes the
+  attribute; step 2's includes both — the difference is visible in the echo
+  before the model has to infer it. Steps 4, 6, and 7 fail with
+  `EDIT_BLOCK_UNRESOLVED` and a message naming the plain-range alternative;
+  neither approximates a span. Range and gap ops still work in the unsupported
+  language.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §8.2, §11,
+  §12, ADR 0087 §4
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-134: Registers move code within a call and across calls
+
+- **Preconditions**: Two read files in the same session.
+- **Steps**:
+  1. In one `Edit`, emit `CUT 20.=30` followed by `PUT <5 ` with no register
+     label, and confirm the lines moved within the file.
+  2. In one `Edit`, emit two `CUT` ops with no labels followed by one unlabeled
+     paste.
+  3. Emit `CUT 40* @fn` on the first file, then in a separate `Edit` call emit
+     `PUT <10 @fn` on the second file.
+  4. Emit `PUT <10 @missing` for a register that was never set.
+  5. Emit `PUT 10.=12 @fn` with a body row attached.
+  6. Emit `PUT <1 ` with no label in a fresh `Edit` call that performed no
+     capture.
+  7. Delete the source file, then paste `@fn` again in a later call.
+- **Expected**: Step 1 applies as one move with no duplicated or orphaned lines.
+  Step 2 fails with `EDIT_REGISTER_AMBIGUOUS` instead of using the most recent
+  capture. Step 3 completes the cross-file move across two calls, each with its
+  own permission gate, review record, and artifacts row. Steps 4 and 6 fail with
+  `EDIT_REGISTER_EMPTY` — the anonymous register did not survive the earlier
+  call. Step 5 fails with `EDIT_PARSE_FAILED`. Step 7 still pastes: a register
+  holds captured content, not a live reference.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §7.5, §8.3,
+  §11, §13.2, ADR 0087 §5
+- **Acceptance**: E (tools & permissions)
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-135: A drifted file recovers when remapping is provable and fails when it is not
+
+- **Preconditions**: A read file whose tag is recorded. An external process can
+  modify the file between the read and the edit.
+- **Steps**:
+  1. Insert 10 unrelated lines above the edit target from outside the session,
+     then emit the original `Edit` with the stale `tag`.
+  2. Inspect the warning on the successful result and confirm the change landed
+     at the shifted location, not at the original line numbers.
+  3. Repeat with a change that modifies one of the anchor lines themselves.
+  4. Repeat with a change that inserts lines *between* two anchors of a
+     multi-op payload, so the anchors would move by different offsets.
+  5. Repeat with a `CUT` whose captured interior lines were externally edited.
+  6. Repeat after the session itself has written the file twice, using the tag
+     from the first write.
+  7. Repeat with a duplicated anchor line whose one neighboring context line
+     matches but whose other does not.
+- **Expected**: Step 1 applies with a line-remap plus external-change warning.
+  Steps 3, 4, 5, and 7 fail closed with `EDIT_TAG_MISMATCH` and current content;
+  none of them writes. Step 6 applies with a session-chain warning instead of an
+  external-change warning, because the corrective advice differs. No recovery
+  path ever writes the tagged snapshot's content over the live file.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9, §10, §11,
+  ADR 0087 §6
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-136: A stale tag still applies for head and tail inserts
+
+- **Preconditions**: A read file whose tag is recorded, plus an external writer.
+- **Steps**:
+  1. Modify the middle of the file externally, then emit `PUT >$:` with the stale
+     tag.
+  2. Repeat with `PUT <1:` and the same stale tag.
+  3. Repeat with a payload that mixes `PUT >$:` and an anchored `PUT 50.=50:`.
+  4. Emit an `Edit` whose `tag` is well formed but was never recorded for that
+     path in this session.
+  5. Emit an `Edit` with a `tag` that is not four hex digits.
+- **Expected**: Steps 1 and 2 apply with a drift warning, because neither anchor
+  can be moved by content drift. Step 3 does not take the position-stable path:
+  it goes to recovery and, failing that, to `EDIT_TAG_MISMATCH`. Step 4 returns
+  `EDIT_TAG_UNKNOWN` and step 5 returns `EDIT_TAG_REQUIRED`; neither is reported
+  as a generic `TOOL_FAILED`.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9, §11,
+  `03-runtime/08-error-codes.md` §3.4
+- **Acceptance**: E (tools & permissions)
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-137: Boundary repair fixes an off-by-one edge and refuses a tie
+
+- **Preconditions**: A read source file with nested closing delimiters.
+- **Steps**:
+  1. Emit a `PUT N.=M:` whose range includes one trailing `}` that the body does
+     not restate, and inspect the result and its warning.
+  2. Emit a `PUT N.=M:` whose body restates a line that sits immediately outside
+     the range.
+  3. Emit a payload constructed so that two distinct repaired texts tie at the
+     minimum repair cost.
+  4. Emit a payload against a file that already fails to parse, and confirm the
+     repair does not retain a row on parse-success evidence alone.
+- **Expected**: Steps 1 and 2 apply with a warning naming exactly what was
+  repaired, so a silent structural change is impossible. Step 3 returns
+  `EDIT_REPAIR_AMBIGUOUS` rather than choosing; step 4 does not invent a
+  retention. In every case the file either contains the repaired result described
+  in the warning or is untouched.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §8.4, §11,
+  ADR 0087
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-138: Move, remove, and rollback keep review evidence honest
+
+- **Preconditions**: A project-bound session with Review visible and a read file
+  inside the workspace root.
+- **Steps**:
+  1. Emit `Edit` with a `PUT` op plus `MV DEST` in the same `ops` payload.
+  2. Inspect the review records for the tool call and the Review panel rows.
+  3. Roll the change back and confirm both the source and the destination
+     return to their pre-call state.
+  4. Emit `Edit` with `REM`, then roll it back.
+  5. After a rollback, emit an `Edit` using the tag the session held before the
+     rollback.
+  6. Emit `Edit` on a path that does not exist but whose basename and tag match
+     exactly one file this session recorded, and inspect the warning.
+  7. Repeat step 6 with two recorded candidates sharing that basename and tag.
+- **Expected**: Step 1 records a source deletion and a destination creation under
+  one tool call; step 3 restores both or neither. Step 4's rollback restores the
+  captured bytes, hash-guarded on the full digest rather than the 16-bit tag.
+  Step 5 fails rather than editing against content the rollback replaced. Step 6
+  rebinds to the real file with a warning, and the write-permission gate is
+  evaluated against the rebound path; step 7 declines instead of picking one.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9.2, §13.1,
+  `03-runtime/03-tools-and-permissions.md` §4c, ADR 0043, ADR 0087
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-139: Snapshot provenance is per session and bounded
+
+- **Preconditions**: A subagent-capable session (§5f), a second session on the
+  same workspace, and a fixture with more files than the snapshot store's path
+  bound.
+- **Steps**:
+  1. Read a file in the parent session, then have a delegate `Edit` that file
+     using the parent's tag without reading it first.
+  2. Read a file in session A and emit the same `Edit` payload from session B.
+  3. Read more distinct paths than the store retains, then edit the
+     first-read path with its original tag.
+  4. Read one path five times with changing content between reads, then edit
+     using the tag from the first read.
+  5. Read a file, then read the identical unchanged file twice more at
+     different offsets, and confirm one tag covers all three windows.
+  6. Restart the app, then emit an `Edit` with a tag from before the restart.
+  7. Write a file through a path that a save hook reformats, then `Edit` using
+     the tag the write returned.
+- **Expected**: Steps 1 and 2 fail — provenance is per reader, and no session
+  hands another its tags. Steps 3, 4, and 6 fail with `EDIT_TAG_UNKNOWN` and an
+  instruction to re-read, never with a wrong write. Step 5 applies anywhere in
+  the union of the three windows without a fourth read. Step 7 applies, because
+  the recorded tag describes the bytes that actually landed, and the drift is
+  reported as a one-line warning rather than a whole-file diff.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §4.2, §4.4,
+  §5.4, §13.5, `03-runtime/02-agent-runtime.md` §5f, ADR 0087 §3
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-140: Recoverable edit failures each get one retry before the guard counts
+
+- **Preconditions**: A session with one file read, and a way to make the file
+  drift on disk between calls.
+- **Steps**:
+  1. Let the file drift, then emit an `Edit` with the now-stale tag whose anchors
+     cannot be remapped, so it fails with `EDIT_TAG_MISMATCH`.
+  2. Re-read, then emit an `Edit` anchored on lines the session never displayed,
+     so it fails with `EDIT_LINES_UNSEEN` and a truncated reveal.
+  3. Emit an `Edit` on that same path with a malformed op header.
+  4. Emit a second `Edit` with a malformed op header.
+- **Expected**: Steps 1 and 2 return their own codes with no `terminate` hint —
+  each recoverable code spends its single grace on that path, and the turn keeps
+  going, so the agent can act on what the error handed it. Step 3 counts as
+  attempt 1 and still does not terminate. Step 4 terminates. A successful `Edit`
+  inserted anywhere before step 4 resets the count, so the following failure is
+  attempt 1 again.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9.3, §11,
+  `03-runtime/03-tools-and-permissions.md` §4d, ADR 0087
+- **Acceptance**: E (tools & permissions), Quality
+- **Milestone**: M5+
+- **Status**: Documented
+
+#### E2E-141: An exhausted retry budget ends the turn with a visible, retriable row
+
+- **Preconditions**: A session where `Edit` on one path fails with a
+  non-recoverable code every time.
+- **Steps**:
+  1. Emit two failing `Edit` calls on the same path within one prompt.
+  2. Observe the transcript after the agent loop stops.
+  3. Send a follow-up prompt in the same session.
+  4. Repeat with two failing `apply_patch` shell commands instead of `Edit`.
+- **Expected**: The second call carries the termination hint and the loop stops,
+  but the turn does not merely complete: the transcript ends on an assistant
+  error row with `MUTATION_RETRY_BUDGET_EXHAUSTED`, marked retriable, naming the
+  path and the next action, and the same code arrives as an error event. The turn
+  is recorded as failed rather than completed with no final message. Step 3
+  proceeds normally — the guard's counters are per prompt. Step 4 produces the
+  same row with `details.kind` of `patch-command`.
+- **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9.3,
+  `03-runtime/03-tools-and-permissions.md` §4d,
+  `03-runtime/08-error-codes.md` §3.3, ADR 0087
+- **Acceptance**: E (tools & permissions), C (chat & stream)
+- **Milestone**: M5+
+- **Status**: Documented
+#### E2E-142: Background delegation converges through TaskWait and honors permission scopes
+
+- **Preconditions**: A project-bound Agent session in permission mode `ask`,
+  with a provider whose stream can be driven; the four builtin subagents
+  (`explorer`, `code-reviewer`, `test-runner`, `fixer`) and a project
+  `.pi/agents/readonly.md` definition; `fixer` declares
+  `permission: accept-edits`.
+- **Steps**:
+  1. Prompt a turn in which the assistant emits two `Task` calls — `explorer`
+     on one direction and a second `explorer` on another — in one assistant
+     message, then, without ending the turn, continues its own tool calls and
+     converges with `TaskWait`.
+  2. Confirm the parent's visible text keeps streaming between `Task` and
+     `TaskWait` (no dead turn), that the two `Task` rows form one delegation
+     card that opens once, and that `TaskWait`'s row shows both reports.
+  3. Prompt a turn that delegates to `fixer` with a multi-file spec. Confirm
+     the delegate's `Write`/`Edit` calls inside the workspace resolve **without
+     a permission card**, while a `Bash` call from the same delegate still
+     renders a card naming `fixer`, and a `Write` outside the workspace still
+     prompts.
+  4. Prompt a turn that starts three delegates and then calls `TaskWait` with
+     `mode: "any"`, `minCompleted: 1`; confirm it returns as soon as the first
+     settles and that the still-running delegates keep running.
+  5. Prompt a turn that starts a delegate and then ends the turn without
+     `TaskWait`/`TaskStop`; confirm the delegate is stopped at run end and its
+     node reads `aborted`, and that the next turn's model context contains no
+     delegate rows.
+  6. Prompt ten `Task` calls in one turn and one more; confirm the eleventh
+     fails as a tool error naming the 10-delegate cap, and that `TaskStop`
+     frees a slot so an eleventh delegation can start.
+  7. Reload the session; confirm the delegation card, its nodes, and the
+     `TaskWait` rows persist and re-render collapsed, and that `TaskWait`
+     re-reads a settled delegation's report by id without re-running it.
+  8. Edit `.pi/agents/readonly.md` to declare `permission: auto` and reload the
+     catalog; confirm the definition still loads but carries a warning, and
+     that its delegate still resolves under the session's effective mode (a
+     `Write` inside the workspace still raises a permission card).
+- **Expected**: `Task` returns immediately with a `delegationId` and the parent
+  keeps working; `TaskWait` converges with per-delegation reports and statuses;
+  `TaskList`/`TaskStop` drive the lifecycle; `fixer` writes inside the
+  workspace without prompting under its declared scope while Bash and external
+  paths keep the session's permission behavior; a project definition's declared
+  scope is dropped; the per-session running cap of 10 is enforced; no delegate outlives its turn; reloaded transcripts keep
+  their delegation topology.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` §5f/§5f.1/§7.1,
+  `03-runtime/03-tools-and-permissions.md` §10.2, `08-meta/decisions-log.md`
+  (D231), ADR 0089
+- **Acceptance**: C (conversation), E (tools & permissions), F (persistence),
+  Security, Quality
+- **Milestone**: M6+
+- **Status**: Draft (unit coverage in `packages/agent-runtime`
+  `runtime.test.ts` subagent suite and host-core `rpc/mod.rs` delegate-scope
+  tests; desktop journey pending)

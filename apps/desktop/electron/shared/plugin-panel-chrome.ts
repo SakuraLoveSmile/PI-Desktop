@@ -2,6 +2,27 @@ export const PLUGIN_PANEL_TITLEBAR_HEIGHT = 46;
 
 export type PluginPanelTheme = "light" | "dark";
 
+/**
+ * The appearance the host is currently showing, handed to plugin panels.
+ *
+ * `theme` is the user's raw preference (`light` | `dark` | `system`, or
+ * `plugin:<pluginId>:<themeId>` when a plugin theme is active). `base` is the
+ * palette that preference resolves to — `"system"` only when the host could
+ * not resolve it, which the panel renderer treats as "follow the OS".
+ * `pluginTheme` carries the active contributed theme's sanitized CSS so a
+ * panel can mirror the app's custom palette exactly.
+ */
+export type PluginAppearance = {
+  /** Raw preference stored in AppSettings.theme. */
+  theme: string;
+  /** Resolved palette: "light" | "dark", or "system" when unresolved. */
+  base: "light" | "dark" | "system";
+  /** Active app language tag (e.g. "en", "zh-CN"). */
+  locale: string;
+  /** The active contributed theme, when the preference selects one. */
+  pluginTheme: { id: string; base: "light" | "dark"; css: string } | null;
+};
+
 export const PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX = "--pi-plugin-panel-locale=";
 
 export const PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL =

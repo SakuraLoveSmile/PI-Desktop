@@ -72,6 +72,75 @@ Explain it.`);
     expect(subagentCanMutate(result.definition)).toBe(false);
     expect(result.definition.name).toBe("reviewer");
     expect(result.definition.maxTurns).toBe(DEFAULT_SUBAGENT_MAX_TURNS);
+    expect(result.definition.permission).toBeUndefined();
+  });
+
+  it("parses a declared permission scope and defaults to inherit", () => {
+    const scoped = parseSubagentDefinition(
+      `---
+description: Writes a feature.
+tools: [Read, Edit, Write]
+permission: accept-edits
+---
+Implement it.`,
+      { source: "user", fallbackName: "fixer" },
+    );
+    expect(scoped.ok).toBe(true);
+    if (!scoped.ok) return;
+    expect(scoped.definition.permission).toBe("accept-edits");
+    expect(scoped.warnings).toEqual([]);
+
+    const inherited = parse(`---
+description: Explains a subsystem.
+permission: inherit
+---
+Explain it.`);
+    expect(inherited.ok).toBe(true);
+    if (!inherited.ok) return;
+    expect(inherited.definition.permission).toBeUndefined();
+  });
+
+  it("refuses a permission scope declared by a project document", () => {
+    // A project document ships with the repository, so honoring its scope
+    // would let cloned code grant itself unprompted writes.
+    for (const declared of ["auto", "accept-edits", "ask"]) {
+      const result = parse(`---
+description: Writes a feature.
+tools: [Read, Edit, Write]
+permission: ${declared}
+---
+Implement it.`);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.definition.permission).toBeUndefined();
+      expect(result.warnings.join("\n")).toContain(
+        "project definitions run under the session's permission mode",
+      );
+    }
+
+    // `inherit` is what a project document gets anyway, so it stays silent.
+    const explicit = parse(`---
+description: Explains a subsystem.
+permission: inherit
+---
+Explain it.`);
+    expect(explicit.ok).toBe(true);
+    if (!explicit.ok) return;
+    expect(explicit.warnings).toEqual([]);
+  });
+
+  it("warns on an unknown permission scope", () => {
+    const result = parse(`---
+description: Explains a subsystem.
+permission: everything
+---
+Explain it.`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.definition.permission).toBeUndefined();
+    expect(result.warnings.join("\n")).toContain(
+      "ignoring unknown permission",
+    );
   });
 
   it("takes mutation rights only when they are declared", () => {

@@ -38,6 +38,18 @@ test("detects exact delegation activities without absorbing ordinary tools", () 
     }),
     false,
   );
+  // The lifecycle tools of ADR 0087 drive an existing delegation and must not
+  // inflate the topology's subagent counts.
+  for (const toolName of ["TaskWait", "TaskList", "TaskStop"]) {
+    assert.equal(
+      isDelegationActivityItem({
+        kind: "tool",
+        message: { ...task("lifecycle", "success").message, toolName },
+      }),
+      false,
+      `${toolName} is not a delegation activity item`,
+    );
+  }
   assert.equal(
     isDelegationActivityItem({
       kind: "thinking",
@@ -62,6 +74,10 @@ test("prefers the structured delegate outcome over the transport status", () => 
     "aborted",
   );
   assert.equal(
+    subagentOutcome(task("stopped", "success", "stopped").message),
+    "stopped",
+  );
+  assert.equal(
     subagentOutcome(task("fail", "success", "failed").message),
     "failed",
   );
@@ -75,15 +91,16 @@ test("summarizes partial fan-out without deduplicating repeated agent names", ()
       task("two", "success", "completed"),
       task("three", "success", "truncated"),
       task("four", "success", "aborted"),
-      task("five", "error", "failed"),
-      task("six", "denied"),
+      task("five", "success", "stopped"),
+      task("six", "error", "failed"),
+      task("seven", "denied"),
     ]),
     {
-      total: 6,
-      finished: 5,
+      total: 7,
+      finished: 6,
       running: 1,
       issues: 2,
-      warnings: 2,
+      warnings: 3,
     },
   );
   assert.deepEqual(summarizeSubagentActivity([]), {

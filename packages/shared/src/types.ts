@@ -643,6 +643,16 @@ export type ModelInfo = {
  */
 export type ThemePreference = "system" | "light" | "dark" | `plugin:${string}`;
 
+/**
+ * What closing the main window does on Windows/Linux. macOS keeps the native
+ * Dock lifecycle and never consults this preference.
+ * - `ask`: transient unset state — the first close prompts once; after a
+ *   choice is made it is remembered permanently and cannot be reverted
+ * - `tray`: hide to the system tray; the app keeps running in the background
+ * - `quit`: close the window and exit the app (legacy behavior)
+ */
+export type CloseBehavior = "ask" | "tray" | "quit";
+
 export type AppSettings = {
   defaultProviderId?: string;
   defaultModelId?: string;
@@ -703,6 +713,27 @@ export type PluginUiMeta = {
   width?: number;
   height?: number;
   title?: string | PluginLocalizedString;
+};
+
+/**
+ * Which files one file mode may touch, straight from `manifest.fs`. Declared
+ * here rather than imported from the plugin SDK because this package sits under
+ * it: the SDK owns the matching and the host owns the enforcement, while this is
+ * only the shape that reaches the UI so a user can see what they granted.
+ */
+export type PluginFsRule = {
+  /** `workspace` unless the plugin asks the user to point at a directory. */
+  root?: "workspace" | "userSelected";
+  /** Globs relative to the root. Empty means "nothing without confirmation". */
+  scope?: string[];
+  /** Delete only: files the plugin wrote itself, which need no scope. */
+  own?: boolean;
+};
+
+export type PluginFsPolicy = {
+  read?: PluginFsRule;
+  write?: PluginFsRule;
+  delete?: PluginFsRule;
 };
 
 /** Localized plugin labels match the desktop shell's supported locales. */
@@ -799,6 +830,8 @@ export type PluginSummary = {
   autoUpdate?: boolean;
   updateAvailable?: PluginUpdateInfo;
   ui?: PluginUiMeta;
+  /** Declared file scope, so the page can show it next to the permissions. */
+  fs?: PluginFsPolicy;
   settings?: PluginSettingDefinition[];
 };
 

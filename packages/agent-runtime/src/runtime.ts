@@ -20,9 +20,9 @@ import {
   type CompactionSettings,
   type BeforeToolCallContext,
   type BeforeToolCallResult,
+  type Entry,
   type MessageEntry,
   type PrepareNextTurnContext,
-  type SessionTreeEntry,
 } from "@earendil-works/pi-agent-core";
 import {
   isContextOverflow,
@@ -61,6 +61,7 @@ import type {
 import {
   checkpointGeneration,
   contextCompactionMark,
+  DEFAULT_SUBAGENT_PERMISSION,
   formatAskToolOutput,
   isCommandShellOption,
   isToolsOutputParams,
@@ -69,6 +70,7 @@ import {
   proposalKindForMode,
   subagentModelKey,
   type ProposalKind,
+  type SubagentPermission,
 } from "@pi-desktop/shared";
 import type { HostClient } from "./host-client.js";
 import { classifyAgentError } from "./agent-errors.js";
@@ -76,7 +78,7 @@ import {
   assistantContent,
   isRecord,
   nowIso,
-  timestampIso,
+  timestampMs,
   usageFromPi,
   usageToPi,
 } from "./agent-messages.js";
@@ -89,11 +91,14 @@ import {
   providerRequestKey,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
-import { PathMutex, Semaphore } from "./path-lock.js";
+import { PathMutex } from "./path-lock.js";
 import {
   composeSubagentSystemPrompt,
   SubagentRun,
+  SUBAGENT_LIST_TOOL_NAME,
+  SUBAGENT_STOP_TOOL_NAME,
   SUBAGENT_TOOL_NAME,
+  SUBAGENT_WAIT_TOOL_NAME,
   type SubagentRunResult,
 } from "./subagent.js";
 import {
@@ -118,8 +123,113 @@ const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;
 const PROVIDER_STREAM_RETRY_BACKOFF_MS = 750;
 const MAX_MUTATION_RECOVERY_FAILURES = 2;
 const BASH_PATCH_FAILURE_KEY = "__bash_patch_command__";
+/**
+ * Edit failures the line-anchored contract expects and already answers: each
+ * one hands back the live tag, or the content of the lines it refused to write
+ * blind (spec 18-line-anchored-edit-contract §9.3). One honest retry is the designed response, so each of
+ * these codes gets a single free attempt per path before it counts toward the
+ * recovery guard. Everything else — malformed ops, bad ranges, a no-op apply —
+ * counts immediately, because a second one is the model guessing.
+ */
+const RECOVERABLE_MUTATION_ERROR_CODES = new Set([
+  "EDIT_TAG_MISMATCH",
+  "EDIT_TAG_UNKNOWN",
+  "EDIT_LINES_UNSEEN",
+]);
 export const TOOL_SEARCH_NAME = "ToolSearch";
 export const ASK_TOOL_NAME = "asktool";
+
+/**
+ * Delegation lifecycle (ADR 0089): `Task` starts a subagent in the background
+ * and returns immediately; `TaskWait` converges on running delegations;
+ * `TaskList` reports on them; `TaskStop` stops them. Records are kept for the
+ * session's lifetime (bounded by pruning below), so a settled delegation can
+ * be re-read by id without re-running it.
+ */
+const MAX_RETAINED_DELEGATIONS = 100;
+/**
+ * `TaskWait` blocks the turn, and the model picks the timeout, so the ceiling
+ * is what bounds how long a session can look hung with no way to intervene.
+ * A timeout is not a failure — it returns the finished reports plus a note to
+ * call again — so a shorter ceiling costs one cheap round-trip and buys the
+ * user a responsive Stop.
+ */
+const TASKWAIT_DEFAULT_TIMEOUT_SECONDS = 600;
+const TASKWAIT_MAX_TIMEOUT_SECONDS = 900;
+/**
+ * A `TaskWait` result is the parent's context; like a delegate's report, it
+ * must not become the context problem delegation exists to avoid.
+ */
+const MAX_TASKWAIT_RESULT_CHARS = 50_000;
+
+export type DelegationStatus =
+  | "running"
+  | "completed"
+  | "truncated"
+  | "failed"
+  | "aborted"
+  | "stopped";
+
+/**
+ * One background delegation owned by the session runtime. `completion`
+ * resolves when the delegate settles; `abort` stops the delegate's agent.
+ */
+export type DelegationRecord = {
+  delegationId: string;
+  agentName: string;
+  status: DelegationStatus;
+  startedAt: number;
+  completedAt?: number;
+  result?: SubagentRunResult;
+  completion: Promise<void>;
+  resolveCompletion: () => void;
+  abort: () => void;
+  /** True when `TaskStop` asked for this stop, so an aborted run reads as
+   * `stopped` rather than `aborted`. */
+  stopRequested: boolean;
+};
+
+function delegationSummary(record: DelegationRecord): Record<string, unknown> {
+  return {
+    delegationId: record.delegationId,
+    agent: record.agentName,
+    status: record.status,
+    startedAt: record.startedAt,
+    ...(record.completedAt ? { completedAt: record.completedAt } : {}),
+    ...(record.result
+      ? {
+          turns: record.result.turns,
+          toolCalls: record.result.toolCalls,
+          ...(record.result.error ? { error: record.result.error } : {}),
+        }
+      : {}),
+  };
+}
+
+/** Join delegation results into one bounded text block for the model. */
+function formatDelegationResults(
+  results: Array<{ delegationId: string; agent: string; status: string; report: string }>,
+  note?: string,
+): string {
+  const parts: string[] = [];
+  let total = 0;
+  let omitted = 0;
+  for (const result of results) {
+    const block = `## ${result.agent} (${result.delegationId}) — ${result.status}\n${result.report}`;
+    if (total + block.length > MAX_TASKWAIT_RESULT_CHARS) {
+      omitted += 1;
+      continue;
+    }
+    parts.push(block);
+    total += block.length + 2;
+  }
+  if (omitted > 0) {
+    parts.push(
+      `[${omitted} more result${omitted === 1 ? "" : "s"} omitted to protect this context; call TaskWait with their delegationIds to re-read one.]`,
+    );
+  }
+  return [note, ...parts].filter((part) => part?.trim()).join("\n\n");
+}
 /**
  * Tokens held back from the context window for the summary prompt and the
  * model's own output. Compaction thresholds are derived from the active model's
@@ -498,19 +608,33 @@ function delayWithAbort(ms: number, signal: AbortSignal): Promise<void> {
 
 type CheckpointPersistResult = "persisted" | "oversized" | "failed";
 
+/**
+ * A pi preparation plus the anchor the checkpoint is filed against.
+ *
+ * pi 0.84 dropped `firstKeptEntryId` from `CompactionPreparation`: the
+ * compaction entry it writes *is* the boundary, so nothing needs to name the
+ * first kept entry. We still record ours — it becomes
+ * `ContextCompactionRecord.firstKeptMessageId`, which is persisted and reported
+ * on `compaction_end` — so the Codex-shaped reshape below carries it alongside
+ * pi's fields.
+ */
+type ShapedPreparation = CompactionPreparation & {
+  firstKeptEntryId?: string;
+};
+
 type CheckpointBuildSuccess = {
   ok: true;
   checkpoint: ContextCompactionRecord;
-  entries: SessionTreeEntry[];
+  entries: Entry[];
   budget: ContextBudget;
-  preparation: CompactionPreparation;
+  preparation: ShapedPreparation;
 };
 
 type CheckpointBuildFailure = {
   ok: false;
-  entries: SessionTreeEntry[];
+  entries: Entry[];
   budget: ContextBudget;
-  preparation?: CompactionPreparation;
+  preparation?: ShapedPreparation;
   message: string;
   tokensBefore?: number;
   /**
@@ -861,8 +985,17 @@ export class DesktopAgentRuntime {
   /** Subagent definitions offered through the `Task` tool (ADR 0062). */
   private subagents: SubagentDefinition[];
   private subagentProviders: Record<string, RuntimeProviderConfig>;
-  /** Caps concurrent delegates across every `Task` batch in this session. */
-  private subagentSlots = new Semaphore(MAX_SUBAGENT_CONCURRENCY);
+  /**
+   * Background delegations of this session (ADR 0089). `Task` starts one and
+   * returns; `TaskWait`/`TaskList`/`TaskStop` drive it afterwards.
+   */
+  private delegations = new Map<string, DelegationRecord>();
+  /**
+   * Permission scope of the delegate currently executing one tool call,
+   * keyed by tool call id (ADR 0089). The host reads it on `tools.execute` and
+   * resolves the delegate's permission under it instead of the session mode.
+   */
+  private delegatePermissionScopes = new Map<string, SubagentPermission>();
   /** Serializes same-path mutations across the parent and its delegates. */
   private writeLocks = new PathMutex();
   /** Complete tool registry; only the active subset is sent to the provider. */
@@ -919,6 +1052,14 @@ export class DesktopAgentRuntime {
   private failedHostToolCalls = new Set<string>();
   /** Per-prompt mutation failures provide one recovery attempt, then stop. */
   private mutationFailureCounts = new Map<string, number>();
+  /** `<failure key> <error code>` pairs that already spent their free retry. */
+  private mutationRecoveryGraces = new Set<string>();
+  /** Why the recovery guard ended the turn, pending its visible error row. */
+  private pendingMutationTermination?: {
+    kind: "edit" | "patch-command";
+    target: string;
+    lastErrorCode?: string;
+  };
   private terminatingToolCalls = new Set<string>();
   private fullEntries: MessageEntry[];
   private activeCompaction?: ContextCompactionRecord;
@@ -989,6 +1130,29 @@ export class DesktopAgentRuntime {
       // find out whether anything happened. Every clause below is one of those
       // observed failures stated as a hard rule.
       "Collaboration: answer in the same language the user writes in. Before each batch of tool calls, write one short sentence saying what you are about to do; never leave the user with no new text for more than one tool batch or 60 seconds of work. Whatever the user asked must be answered in your visible text — your reasoning is not shown to them, so a conclusion that lives only there never reached them. Make the final message self-contained: the outcome, what you changed, and anything still open, without asking the user to re-read intermediate updates. Carry the work through end to end; when you hit a blocker, try to clear it yourself and report what you tried, instead of stopping at analysis or a half-finished change.",
+      // Delegation steering (ADR 0089). The trigger patterns below are the
+      // proactive half of the Task tool's own description: models delegate
+      // when the system prompt names the situations, and keep doing everything
+      // inline when it only says "you may".
+      ...(this.subagents.length
+        ? [
+            `## Delegation
+Work splits into independent pieces — delegate, and keep your context for the synthesis. Subagents run in their own context and report back through TaskWait.
+
+Use the Task tool when:
+- Parallel exploration: two or more independent directions (for example one subagent per subsystem, or backend + frontend + tests). Start one Task per direction in the same assistant message.
+- Adversarial review: after implementing a non-trivial change, delegate a read-only review of it to code-reviewer before you commit.
+- Implementation: a multi-file change with a complete, self-contained spec — delegate to fixer, which may write inside the workspace.
+- Context economy: wide searches, long logs, multi-file surveys whose intermediate output you do not need — explorer / test-runner.
+- Batch sharding: the same bounded job repeated over many independent targets.
+
+Delegation rules:
+- Task returns immediately with a delegation id. Do not sit idle: keep working on your own independent line, then converge with TaskWait (mode="any" + minCompleted to converge early) when you need results, TaskList to check progress, TaskStop to stop.
+- Always fill Task's \`description\` so the user sees what each subagent is doing. Integrate findings and say which subagent produced what.
+- Never end the turn with subagents still running: wait for or stop them.
+- Never delegate what you can finish in a couple of tool calls, and never delegate anything that needs the user.`,
+          ]
+        : []),
       // Search-tool steering. Read/Grep/Glob are host-bounded and scopeable;
       // hand-rolled shell pipelines are not, and unbounded shell output is
       // what exhausted context and forced repeated re-searching.
@@ -1234,8 +1398,9 @@ export class DesktopAgentRuntime {
       const entry: MessageEntry = {
         type: "message",
         id,
+        seq: entries.length,
         parentId: entries.at(-1)?.id ?? null,
-        timestamp: timestampIso(message.timestamp),
+        timestamp: timestampMs(message.timestamp),
         message,
       };
       entries.push(entry);
@@ -1320,8 +1485,8 @@ export class DesktopAgentRuntime {
 
   private entriesWithCompaction(
     checkpoint: ContextCompactionRecord | undefined = this.activeCompaction,
-  ): SessionTreeEntry[] {
-    const entries: SessionTreeEntry[] = [...this.fullEntries];
+  ): Entry[] {
+    const entries: Entry[] = [...this.fullEntries];
     if (!checkpoint) return entries;
     const throughIndex = entries.findIndex(
       (entry) => entry.id === checkpoint.throughMessageId,
@@ -1330,17 +1495,25 @@ export class DesktopAgentRuntime {
     const compactionEntry: CompactionEntry = {
       type: "compaction",
       id: checkpoint.id,
+      seq: throughIndex + 1,
       parentId: checkpoint.throughMessageId,
-      timestamp: checkpoint.createdAt,
+      timestamp: timestampMs(checkpoint.createdAt),
       summary: checkpoint.summary,
-      firstKeptEntryId: checkpoint.firstKeptMessageId,
       tokensBefore: checkpoint.tokensBefore,
-      retainedTail: retainedTailForContext(checkpoint.retainedTail),
+      // pi 0.84 dereferences `retainedTail` unconditionally when it finds a
+      // previous compaction entry, so a checkpoint restored without a usable
+      // tail has to read as empty rather than absent.
+      retainedTail: retainedTailForContext(checkpoint.retainedTail) ?? [],
       details: checkpoint.details,
       usage: checkpoint.usage as Usage | undefined,
     };
     entries.splice(throughIndex + 1, 0, compactionEntry);
-    return entries;
+    // Inserting mid-path breaks the seq/position correspondence the rest of
+    // this file maintains. Renumber into fresh objects: `this.fullEntries`
+    // holds the live entries and must not be mutated through the copy.
+    return entries.map((entry, seq) =>
+      entry.seq === seq ? entry : { ...entry, seq },
+    );
   }
 
   private appendLiveEntry(id: string, message: AgentMessage): void {
@@ -1348,8 +1521,9 @@ export class DesktopAgentRuntime {
     this.fullEntries.push({
       type: "message",
       id,
+      seq: this.fullEntries.length,
       parentId: this.fullEntries.at(-1)?.id ?? null,
-      timestamp: timestampIso(message.timestamp),
+      timestamp: timestampMs(message.timestamp),
       message,
     });
   }
@@ -1612,11 +1786,18 @@ export class DesktopAgentRuntime {
                       ?.risk,
                   }
                 : {}),
+              // A delegate's tool call carries its definition's permission
+              // scope (ADR 0089); the host resolves the call under that scope
+              // instead of the session mode. Parent calls never carry it.
+              ...(this.delegatePermissionScopes.has(toolCallId)
+                ? { permissionScope: this.delegatePermissionScopes.get(toolCallId) }
+                : {}),
             });
         } catch (error) {
           executionFailed = true;
           executionError = error;
         } finally {
+          this.delegatePermissionScopes.delete(toolCallId);
           cleanup(true);
         }
         if (abortPromise) await abortPromise;
@@ -1643,13 +1824,29 @@ export class DesktopAgentRuntime {
           : failedPatchCommand
             ? BASH_PATCH_FAILURE_KEY
             : undefined;
-        const mutationFailureAttempt = failureKey
-          ? (this.mutationFailureCounts.get(failureKey) ?? 0) + 1
-          : undefined;
         const mutationFailureKind = failedEditPath
           ? "edit"
           : failedPatchCommand
             ? "patch-command"
+            : undefined;
+        // A recoverable code is forgiven once per path, not once per call: a
+        // stale tag followed by unseen lines is two different honest failures,
+        // while the same code twice on the same path is a model that ignored
+        // what the first error told it.
+        const graceKey =
+          failureKey !== undefined &&
+          typeof result.errorCode === "string" &&
+          RECOVERABLE_MUTATION_ERROR_CODES.has(result.errorCode)
+            ? `${failureKey} ${result.errorCode}`
+            : undefined;
+        const grantedRecoveryGrace =
+          graceKey !== undefined && !this.mutationRecoveryGraces.has(graceKey);
+        if (graceKey !== undefined && grantedRecoveryGrace) {
+          this.mutationRecoveryGraces.add(graceKey);
+        }
+        const mutationFailureAttempt =
+          failureKey && !grantedRecoveryGrace
+            ? (this.mutationFailureCounts.get(failureKey) ?? 0) + 1
             : undefined;
         const terminateAfterMutationFailure =
           mutationFailureAttempt !== undefined &&
@@ -1657,8 +1854,37 @@ export class DesktopAgentRuntime {
         if (failureKey && mutationFailureAttempt !== undefined) {
           this.mutationFailureCounts.set(failureKey, mutationFailureAttempt);
         }
+        // The guard counts consecutive failures. A write that landed is
+        // progress, so it clears that path's history instead of leaving one
+        // stale strike to terminate the next unrelated failure.
+        if (!failureKey && result.ok) {
+          const succeededKey =
+            PATH_MUTATING_TOOLS.has(toolName) && typeof recordParams?.path === "string"
+              ? mutationFailureKey(recordParams.path)
+              : toolName === "Bash" && isPatchCommand(recordParams?.command)
+                ? BASH_PATCH_FAILURE_KEY
+                : undefined;
+          if (succeededKey !== undefined) {
+            this.mutationFailureCounts.delete(succeededKey);
+            for (const key of this.mutationRecoveryGraces) {
+              if (key.startsWith(`${succeededKey} `)) {
+                this.mutationRecoveryGraces.delete(key);
+              }
+            }
+          }
+        }
         if (terminateAfterMutationFailure) {
           this.terminatingToolCalls.add(toolCallId);
+          // The loop stops after this batch, so nothing downstream would
+          // explain why. Hold the reason for agent_end to turn into a visible
+          // row instead of a turn that just ends.
+          this.pendingMutationTermination = {
+            kind: mutationFailureKind ?? "edit",
+            target: failedEditPath ?? "the patch command",
+            ...(typeof result.errorCode === "string"
+              ? { lastErrorCode: result.errorCode }
+              : {}),
+          };
         }
         logTiming("tool", {
           tool: toolName,
@@ -1675,6 +1901,7 @@ export class DesktopAgentRuntime {
           ...(mutationFailureAttempt !== undefined
             ? { mutationFailureAttempt }
             : {}),
+          ...(grantedRecoveryGrace ? { mutationFailureGrace: true } : {}),
           ...(terminateAfterMutationFailure ? { terminate: true } : {}),
         });
         const text =
@@ -1808,10 +2035,16 @@ export class DesktopAgentRuntime {
         : [this.buildSubmitTool(this.mode)];
     // Delegation is an Agent-mode capability: Plan and Goal are read-only
     // contract negotiations, and a delegate with Bash or Edit would drive
-    // straight through that (ADR 0062).
+    // straight through that (ADR 0062). The whole lifecycle rides together:
+    // `Task` starts, `TaskWait`/`TaskList`/`TaskStop` converge (ADR 0089).
     const subagentTools =
       this.mode === "agent" && this.subagents.length
-        ? [this.buildSubagentTool()]
+        ? [
+            this.buildSubagentTool(),
+            this.buildSubagentWaitTool(),
+            this.buildSubagentListTool(),
+            this.buildSubagentStopTool(),
+          ]
         : [];
     const contextTools = this.compactionEnabled
       ? [this.buildContextCompactionTool()]
@@ -1886,10 +2119,13 @@ export class DesktopAgentRuntime {
     return (
       name === CONTEXT_COMPACTION_TOOL_NAME ||
       MODE_TRANSITION_TOOL_NAMES.has(name) ||
-      // `Task` stays in the core set rather than the on-demand catalog: a
-      // capability the model has to go looking for is one it will not use, and
-      // delegation is worth the one extra schema per request.
+      // The whole delegation lifecycle stays in the core set rather than the
+      // on-demand catalog: a capability the model has to go looking for is one
+      // it will not use, and delegation is worth the extra schemas per request.
       name === SUBAGENT_TOOL_NAME ||
+      name === SUBAGENT_WAIT_TOOL_NAME ||
+      name === SUBAGENT_LIST_TOOL_NAME ||
+      name === SUBAGENT_STOP_TOOL_NAME ||
       (this.mode === "agent"
         ? AGENT_CORE_TOOL_NAMES.has(name)
         : proposalKindForMode(this.mode)
@@ -2121,11 +2357,11 @@ export class DesktopAgentRuntime {
       name: SUBAGENT_TOOL_NAME,
       label: "Task",
       description: [
-        "Delegate one self-contained piece of work to a subagent with its own context window, and get back a single written report.",
-        "Delegate when the work is separable and its intermediate output would otherwise fill this context: a wide search, a long log, a survey of many files. Do not delegate what you can finish in a couple of tool calls, and do not delegate anything that needs the user — a subagent cannot ask a question or propose a plan on your behalf.",
+        "Start one subagent in the background and return immediately; you keep working while it runs, then converge with TaskWait when you need its report.",
+        "Use it when the work is separable: parallel exploration of independent directions (one Task per direction in the same assistant message), a multi-file implementation with a complete spec (fixer), an adversarial read-only review of a change you just made (code-reviewer), or a wide search / long log / multi-file survey whose intermediate output would otherwise fill this context (explorer, test-runner).",
+        "Do not delegate what you can finish in a couple of tool calls, and do not delegate anything that needs the user — a subagent cannot ask a question or propose a plan on your behalf.",
         "`task` is the delegate's only instruction. It cannot see this conversation, and you cannot correct it while it runs, so state the goal, the paths and facts it cannot infer, and exactly what to report back.",
-        "Its final message is all you receive; everything it read or ran stays out of your context. Check anything you are about to rely on for an irreversible change.",
-        "To run delegates concurrently, emit several Task calls in one assistant message. A message that mixes Task with any other tool runs one call at a time.",
+        "To run delegates concurrently, emit several Task calls in one assistant message. A message that mixes Task with any other tool runs one call at a time. Never end the turn with subagents still running: wait for them with TaskWait or stop them with TaskStop.",
         `Available subagents:\n${catalog}`,
       ].join("\n\n"),
       parameters: Type.Object({
@@ -2187,57 +2423,403 @@ export class DesktopAgentRuntime {
           );
         }
         const startedAt = Date.now();
-        const result = await this.subagentSlots.run(() =>
-          new SubagentRun({
-            definition,
-            sessionId: this.sessionId,
-            turnId: this.turnId,
-            parentToolCallId: toolCallId,
-            task,
-            provider,
-            thinkingLevel: clampThinkingLevel(
-              provider,
-              definition.thinkingLevel ?? this.thinkingLevel,
-            ),
-            systemPrompt: composeSubagentSystemPrompt({
-              definition,
-              guidance: this.subagentGuidance(definition),
-            }),
-            tools,
-            onEvent: this.onEvent,
-            // A host failure inside a delegate reaches its tool-error channel
-            // through the same bookkeeping the parent uses.
-            resolveToolOutcome: (context) => this.afterToolCall(context),
-            signal,
-          }).run(),
-        );
-        logTiming("subagent", {
-          agent: result.agentName,
-          toolCallId,
+        const running = this.runningDelegations().length;
+        if (running >= MAX_SUBAGENT_CONCURRENCY) {
+          return this.subagentToolError(
+            toolCallId,
+            `${MAX_SUBAGENT_CONCURRENCY} subagents are already running for this session. Wait for some with TaskWait or stop them with TaskStop before delegating more.`,
+          );
+        }
+        // The delegate runs in the background (ADR 0089): `Task` returns
+        // immediately with a delegation id, and TaskWait converges later.
+        const delegationId = randomUUID();
+        const controller = new AbortController();
+        // Aborts when the parent run aborts OR when TaskStop asks for it.
+        const abortSignal = signal
+          ? AbortSignal.any([signal, controller.signal])
+          : controller.signal;
+        let resolveCompletion: () => void = () => {};
+        const completion = new Promise<void>((resolve) => {
+          resolveCompletion = resolve;
+        });
+        const record: DelegationRecord = {
+          delegationId,
+          agentName: definition.name,
+          status: "running",
+          startedAt,
+          completion,
+          resolveCompletion,
+          abort: () => controller.abort(),
+          stopRequested: false,
+        };
+        this.delegations.set(delegationId, record);
+
+        const scopedTools = this.scopeDelegateTools(tools, definition);
+        new SubagentRun({
+          definition,
           sessionId: this.sessionId,
           turnId: this.turnId,
-          provider: provider.id,
-          model: provider.modelId,
-          status: result.status,
-          turns: result.turns,
-          toolCalls: result.toolCalls,
-          durationMs: Date.now() - startedAt,
-          errorCode: result.error?.code,
-        });
-        // A failed delegate is a failed tool call. A truncated or aborted one
-        // still carries a partial report that says so in its own text, so the
-        // parent can work with what there is.
-        if (result.status === "failed") this.failedHostToolCalls.add(toolCallId);
+          parentToolCallId: toolCallId,
+          task,
+          provider,
+          thinkingLevel: clampThinkingLevel(
+            provider,
+            definition.thinkingLevel ?? this.thinkingLevel,
+          ),
+          systemPrompt: composeSubagentSystemPrompt({
+            definition,
+            guidance: this.subagentGuidance(definition),
+          }),
+          tools: scopedTools,
+          onEvent: this.onEvent,
+          // A host failure inside a delegate reaches its tool-error channel
+          // through the same bookkeeping the parent uses.
+          resolveToolOutcome: (context) => this.afterToolCall(context),
+          signal: abortSignal,
+        })
+          .run()
+          .then(
+            (result) => this.settleDelegation(record, result),
+            // SubagentRun.run() settles its own errors into results; this
+            // guard only keeps an unexpected rejection from leaving the
+            // delegation stuck in "running" forever.
+            (error: unknown) => {
+              logTiming("subagent", {
+                agent: definition.name,
+                toolCallId,
+                sessionId: this.sessionId,
+                turnId: this.turnId,
+                status: "failed",
+                errorCode: "UNEXPECTED_DELEGATION_REJECTION",
+              });
+              this.settleDelegation(record, {
+                agentName: definition.name,
+                status: "failed",
+                report: "",
+                turns: 0,
+                toolCalls: 0,
+                error: {
+                  code: "UNEXPECTED_DELEGATION_REJECTION",
+                  message:
+                    error instanceof Error ? error.message : "unknown error",
+                },
+              });
+            },
+          );
+
+        const label =
+          isRecord(params) && typeof params.description === "string"
+            ? params.description.trim()
+            : "";
         return {
-          content: [{ type: "text", text: result.report }],
+          content: [
+            {
+              type: "text",
+              text: `Delegation ${delegationId} started: the ${definition.name} subagent is working in the background${label ? ` (${label})` : ""}. Continue your own independent work, then call TaskWait with this delegationId to converge, or TaskStop to stop it.`,
+            },
+          ],
           details: {
-            agent: result.agentName,
-            status: result.status,
-            turns: result.turns,
-            toolCalls: result.toolCalls,
-            ...(result.usage ? { usage: result.usage } : {}),
-            ...(result.error ? { error: result.error } : {}),
+            delegationId,
+            agent: definition.name,
+            status: "running",
+            startedAt,
           },
+        };
+      },
+    };
+  }
+
+  /** Wrap a delegate's tools so each call carries the definition's permission
+   * scope to host-core (ADR 0089). Keyed by tool call id, so concurrent
+   * delegates with different scopes never cross over. */
+  private scopeDelegateTools(
+    tools: AgentTool[],
+    definition: SubagentDefinition,
+  ): AgentTool[] {
+    const scope = definition.permission ?? DEFAULT_SUBAGENT_PERMISSION;
+    if (scope === DEFAULT_SUBAGENT_PERMISSION) return tools;
+    return tools.map((tool) => ({
+      ...tool,
+      execute: async (toolCallId, args, signal, onUpdate) => {
+        this.delegatePermissionScopes.set(toolCallId, scope);
+        try {
+          return await tool.execute(toolCallId, args, signal, onUpdate);
+        } finally {
+          this.delegatePermissionScopes.delete(toolCallId);
+        }
+      },
+    }));
+  }
+
+  /** Records a settled run and wakes every TaskWait waiting on it. */
+  private settleDelegation(
+    record: DelegationRecord,
+    result: SubagentRunResult,
+  ): void {
+    if (record.status !== "running") return;
+    record.status =
+      record.stopRequested && result.status === "aborted"
+        ? "stopped"
+        : result.status;
+    record.result = result;
+    record.completedAt = Date.now();
+    logTiming("subagent", {
+      agent: result.agentName,
+      delegationId: record.delegationId,
+      sessionId: this.sessionId,
+      turnId: this.turnId,
+      status: result.status,
+      turns: result.turns,
+      toolCalls: result.toolCalls,
+      durationMs: record.completedAt - record.startedAt,
+      errorCode: result.error?.code,
+    });
+    record.resolveCompletion();
+    this.pruneFinishedDelegations();
+  }
+
+  /** Cap retained history so a long session cannot grow the registry forever.
+   * Finished records are dropped oldest-first; running ones never are. */
+  private pruneFinishedDelegations(): void {
+    const finished = [...this.delegations.values()]
+      .filter((record) => record.status !== "running")
+      .sort((left, right) => (left.completedAt ?? 0) - (right.completedAt ?? 0));
+    const excess = finished.length - MAX_RETAINED_DELEGATIONS;
+    for (const record of finished.slice(0, Math.max(0, excess))) {
+      this.delegations.delete(record.delegationId);
+    }
+  }
+
+  private runningDelegations(): DelegationRecord[] {
+    return [...this.delegations.values()].filter(
+      (record) => record.status === "running",
+    );
+  }
+
+  /** Abort every running delegation (turn end, parent abort, dispose). */
+  private abortRunningDelegations(): void {
+    for (const record of this.runningDelegations()) {
+      record.abort();
+    }
+  }
+
+  /** `TaskWait`: converge on running delegations (ADR 0089). */
+  private buildSubagentWaitTool(): AgentTool {
+    return {
+      name: SUBAGENT_WAIT_TOOL_NAME,
+      label: "Task Wait",
+      description:
+        "Wait for one or more subagents started by Task and return their reports. `delegationIds` defaults to every running subagent; use mode \"any\" with `minCompleted` to converge as soon as the first (or first N) finish. Settled delegations return immediately, so re-reading a report by id is cheap. Never end the turn with subagents still running: wait for or stop them.",
+      parameters: Type.Object({
+        delegationIds: Type.Optional(
+          Type.Array(
+            Type.String({ description: "Delegation ids returned by Task." }),
+            { description: "Defaults to all running subagents." },
+          ),
+        ),
+        mode: Type.Optional(
+          Type.Union([Type.Literal("all"), Type.Literal("any")], {
+            description: "Wait for every target (all) or the first to finish (any).",
+          }),
+        ),
+        minCompleted: Type.Optional(
+          Type.Number({
+            minimum: 1,
+            description: "With mode \"any\": wait until at least this many finished.",
+          }),
+        ),
+        timeoutSeconds: Type.Optional(
+          Type.Number({
+            minimum: 1,
+            maximum: TASKWAIT_MAX_TIMEOUT_SECONDS,
+            description: `Max seconds to wait; defaults to ${TASKWAIT_DEFAULT_TIMEOUT_SECONDS}.`,
+          }),
+        ),
+      }),
+      executionMode: "sequential",
+      execute: async (toolCallId, params, signal) => {
+        const ids =
+          isRecord(params) && Array.isArray(params.delegationIds)
+            ? params.delegationIds.map(String)
+            : [];
+        const mode = isRecord(params) && params.mode === "any" ? "any" : "all";
+        const minCompleted =
+          isRecord(params) && typeof params.minCompleted === "number"
+            ? Math.max(1, Math.floor(params.minCompleted))
+            : 1;
+        const timeoutSeconds =
+          isRecord(params) && typeof params.timeoutSeconds === "number"
+            ? Math.min(
+                Math.max(1, Math.floor(params.timeoutSeconds)),
+                TASKWAIT_MAX_TIMEOUT_SECONDS,
+              )
+            : TASKWAIT_DEFAULT_TIMEOUT_SECONDS;
+
+        const targets = ids.length
+          ? ids
+              .map((id) => this.delegations.get(id))
+              .filter((record): record is DelegationRecord => record !== undefined)
+          : this.runningDelegations();
+        if (targets.length === 0) {
+          const text = ids.length
+            ? "None of the requested delegation ids exist in this session. Call TaskList to see them."
+            : "No subagents are currently running.";
+          return {
+            content: [{ type: "text", text }],
+            details: { delegations: [] },
+          };
+        }
+        const unknownIds = ids.filter((id) => !this.delegations.has(id));
+        const targetCompleted =
+          mode === "all"
+            ? targets.length
+            : Math.min(Math.max(minCompleted, 1), targets.length);
+        const deadline = Date.now() + timeoutSeconds * 1000;
+        const timedOut = await this.waitForDelegations(
+          targets,
+          targetCompleted,
+          deadline,
+          signal,
+        );
+        const results = targets.map((record) => ({
+          delegationId: record.delegationId,
+          agent: record.agentName,
+          status: record.status,
+          report:
+            record.result?.report ?? `(${record.status} without a report)`,
+        }));
+        const note = timedOut
+          ? `Timed out after ${timeoutSeconds}s with ${results.filter((r) => r.status !== "running").length}/${targets.length} finished. Call TaskWait again with the remaining delegationIds, or TaskList to see progress.`
+          : mode === "any"
+            ? `Converged after ${results.filter((r) => r.status !== "running").length} of ${targets.length} finished.`
+            : undefined;
+        const unknownNote =
+          unknownIds.length > 0
+            ? `Unknown delegation ids (not found in this session): ${unknownIds.join(", ")}.`
+            : undefined;
+        return {
+          content: [
+            {
+              type: "text",
+              text: formatDelegationResults(results, [note, unknownNote].filter(Boolean).join("\n") || undefined),
+            },
+          ],
+          details: {
+            status: timedOut ? "timeout" : "completed",
+            ...(unknownIds.length ? { unknownIds } : {}),
+            delegations: results,
+          },
+        };
+      },
+    };
+  }
+
+  /**
+   * Resolve once `targetCompleted` of the targets are settled, or the deadline
+   * passes, or the calling run aborts. Returns true on timeout/abort.
+   */
+  private waitForDelegations(
+    targets: DelegationRecord[],
+    targetCompleted: number,
+    deadline: number,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    const settledCount = () =>
+      targets.filter((record) => record.status !== "running").length;
+    if (settledCount() >= targetCompleted) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      let done = false;
+      const finish = (timedOut: boolean) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        resolve(timedOut);
+      };
+      const check = () => {
+        if (settledCount() >= targetCompleted) finish(false);
+      };
+      for (const record of targets) {
+        if (record.status === "running") {
+          record.completion.then(check);
+        }
+      }
+      const onAbort = () => finish(true);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      const timer = setTimeout(
+        () => finish(true),
+        Math.max(0, deadline - Date.now()),
+      );
+    });
+  }
+
+  /** `TaskList`: report on the session's delegations (ADR 0089). */
+  private buildSubagentListTool(): AgentTool {
+    return {
+      name: SUBAGENT_LIST_TOOL_NAME,
+      label: "Task List",
+      description:
+        "List the subagents started by Task in this session with their status. Use it to check progress without waiting, or before TaskStop to choose what to stop.",
+      parameters: Type.Object({}),
+      executionMode: "sequential",
+      execute: async () => {
+        const delegations = [...this.delegations.values()].sort(
+          (left, right) => left.startedAt - right.startedAt,
+        );
+        const text =
+          delegations.length === 0
+            ? "No subagents have been started in this session."
+            : delegations
+                .map(
+                  (record) =>
+                    `- ${record.delegationId} ${record.agentName}: ${record.status}${record.completedAt ? ` (${Math.round((record.completedAt - record.startedAt) / 1000)}s)` : ""}`,
+                )
+                .join("\n");
+        return {
+          content: [{ type: "text", text }],
+          details: { delegations: delegations.map(delegationSummary) },
+        };
+      },
+    };
+  }
+
+  /** `TaskStop`: stop running delegations (ADR 0089). */
+  private buildSubagentStopTool(): AgentTool {
+    return {
+      name: SUBAGENT_STOP_TOOL_NAME,
+      label: "Task Stop",
+      description:
+        "Stop one or more running subagents. `delegationIds` defaults to every running subagent. Stopped subagents report as stopped; their partial work is lost.",
+      parameters: Type.Object({
+        delegationIds: Type.Optional(
+          Type.Array(
+            Type.String({ description: "Delegation ids returned by Task." }),
+            { description: "Defaults to all running subagents." },
+          ),
+        ),
+      }),
+      executionMode: "sequential",
+      execute: async (_toolCallId, params) => {
+        const ids =
+          isRecord(params) && Array.isArray(params.delegationIds)
+            ? params.delegationIds.map(String)
+            : [];
+        const targets = ids.length
+          ? ids
+              .map((id) => this.delegations.get(id))
+              .filter((record): record is DelegationRecord => record !== undefined)
+          : this.runningDelegations();
+        for (const record of targets) {
+          record.stopRequested = true;
+          record.abort();
+        }
+        const text =
+          targets.length === 0
+            ? "No matching running subagents to stop."
+            : `Stopped ${targets.length} subagent${targets.length === 1 ? "" : "s"}.`;
+        return {
+          content: [{ type: "text", text }],
+          details: { stopped: targets.map(delegationSummary) },
         };
       },
     };
@@ -2630,6 +3212,35 @@ export class DesktopAgentRuntime {
     };
   }
 
+  /**
+   * Clear the per-run recovery state that every entry point driving the agent
+   * loop must start from. Each recovery arms itself mid-run by setting a
+   * `pending*` flag and suppressing that run's end events; a flag left behind
+   * suppresses the *next* run's `turn_end` and `agent_end` instead, so the
+   * following turn ends invisibly even though nothing went wrong in it.
+   */
+  private resetRunRecoveryState(): void {
+    this.pendingOverflow = false;
+    this.overflowRecoveryAttempted = false;
+    this.suppressOverflowRunEnd = false;
+    this.pendingProviderRetry = undefined;
+    this.providerRetryAttempted = false;
+    this.activeProviderRetryAttempt = 0;
+    this.providerRetryInProgress = false;
+    this.suppressProviderRetryRunEnd = false;
+    this.pendingSilentTurnRerun = false;
+    this.silentTurnRerunAttempted = false;
+    this.silentTurnRerunInProgress = false;
+    this.suppressSilentTurnRunEnd = false;
+    this.providerRetryAbort?.abort();
+    this.providerRetryAbort = undefined;
+    this.mutationFailureCounts.clear();
+    this.mutationRecoveryGraces.clear();
+    this.pendingMutationTermination = undefined;
+    this.terminatingToolCalls.clear();
+    this.turnHadError = false;
+  }
+
   private async retryPendingProviderFailure(): Promise<void> {
     if (!this.pendingProviderRetry) return;
     this.pendingProviderRetry = undefined;
@@ -2699,6 +3310,56 @@ export class DesktopAgentRuntime {
       this.silentTurnRerunInProgress = false;
       this.suppressSilentTurnRunEnd = false;
     }
+  }
+
+  /**
+   * Run whatever recovery the finished loop armed for itself. Overflow, a
+   * retriable provider stream failure, and a silent turn all suppress their
+   * run's `turn_end` / `agent_end` inside `message_end` and leave a `pending*`
+   * flag for the caller to act on once the loop is idle. An entry point that
+   * skips this leaves the run with no end events, no error, and no recovery —
+   * the turn simply stops, which is exactly how an approved plan execution
+   * used to die on a silent turn.
+   *
+   * Returns false when overflow recovery could not create a checkpoint and the
+   * caller must stop; the error event is already emitted.
+   */
+  private async runPendingRecoveries(): Promise<boolean> {
+    if (this.pendingProviderRetry) {
+      await this.retryPendingProviderFailure();
+    }
+
+    if (this.pendingOverflow) {
+      this.pendingOverflow = false;
+      this.suppressOverflowRunEnd = false;
+      this.overflowRecoveryAttempted = true;
+      const messages = [...this.agent.state.messages];
+      if (messages.at(-1)?.role === "assistant") messages.pop();
+      this.agent.state.messages = messages;
+      const compacted = await this.runCompaction("overflow", true);
+      if (!compacted) {
+        this.emit({
+          type: "error",
+          error: {
+            code: "CONTEXT_COMPACTION_FAILED",
+            message: "Context overflow recovery could not create a checkpoint",
+            retriable: false,
+          },
+        });
+        return false;
+      }
+      this.turnHadError = false;
+      this.requestStartedAt = Date.now();
+      await this.agent.continue();
+      await this.agent.waitForIdle();
+    }
+
+    // Last, so a turn that went silent after overflow recovery still gets
+    // its one re-run, and a re-run that goes silent again is not re-run.
+    if (this.pendingSilentTurnRerun) {
+      await this.rerunSilentTurn();
+    }
+    return true;
   }
 
   private cleanupActiveToolProgress(): void {
@@ -2788,7 +3449,7 @@ export class DesktopAgentRuntime {
    * which messages pi attributes file operations to.
    */
   private prepareCompactionInput(
-    entries: SessionTreeEntry[],
+    entries: Entry[],
     budget: ContextBudget,
     retainedUserTokens = this.retainedUserMessageBudget(budget),
   ) {
@@ -2800,11 +3461,7 @@ export class DesktopAgentRuntime {
     if (!prepared.ok || !prepared.value) return prepared;
     return {
       ok: true as const,
-      value: this.codexShapedPreparation(
-        prepared.value,
-        entries,
-        retainedUserTokens,
-      ),
+      value: this.codexShapedPreparation(prepared.value, retainedUserTokens),
     };
   }
 
@@ -2819,37 +3476,30 @@ export class DesktopAgentRuntime {
    * - The retained tail is rebuilt from user messages alone. Dropping assistant
    *   messages also drops their `toolCall` blocks, and their results go with
    *   them in the same pass, so no orphaned tool call can reach a provider.
-   * - `firstKeptEntryId` points at the anchor the checkpoint is filed against,
-   *   so the next boundary starts there. The anchor itself is summarized twice
-   *   as a result; a one-entry overlap is the safe direction to err in.
+   * - `firstKeptEntryId` points at the anchor the checkpoint is filed against.
+   *   It is ours, not pi's (see `ShapedPreparation`): pi 0.84 takes its own
+   *   boundary from the compaction entry, so this only feeds the persisted
+   *   record and the `compaction_end` event.
    */
   private codexShapedPreparation(
     preparation: CompactionPreparation,
-    entries: SessionTreeEntry[],
     retainedUserTokens: number,
-  ): CompactionPreparation {
+  ): ShapedPreparation {
+    // pi 0.84 replays a previous checkpoint's `retainedTail` as virtual entries
+    // at the head of the compactable range, so those messages already arrive in
+    // `preparation` — prepending them again (which is what this had to do while
+    // pi walked back to `firstKeptEntryId` instead) would duplicate every one.
     const messagesToSummarize = [
       ...preparation.messagesToSummarize,
       ...preparation.turnPrefixMessages,
       ...preparation.retainedTail,
     ];
-    // User messages the previous checkpoint retained are older than this
-    // boundary but still in the model context, which is where Codex reads its
-    // own candidates from.
-    const previousCompaction = [...entries]
-      .reverse()
-      .find((entry) => entry.type === "compaction");
-    const carriedForward =
-      previousCompaction?.type === "compaction"
-        ? (previousCompaction.retainedTail ?? [])
-        : [];
-    const candidates = [...carriedForward, ...messagesToSummarize].filter(
+    const candidates = messagesToSummarize.filter(
       (message): message is UserMessage => message.role === "user",
     );
     return {
       ...preparation,
-      firstKeptEntryId:
-        this.fullEntries.at(-1)?.id ?? preparation.firstKeptEntryId,
+      firstKeptEntryId: this.fullEntries.at(-1)?.id,
       messagesToSummarize,
       turnPrefixMessages: [],
       isSplitTurn: false,
@@ -2983,7 +3633,7 @@ export class DesktopAgentRuntime {
     });
   }
 
-  private checkpointDetails(preparation: CompactionPreparation) {
+  private checkpointDetails(preparation: ShapedPreparation) {
     return {
       readFiles: [...preparation.fileOps.read].sort(),
       modifiedFiles: [
@@ -2996,7 +3646,7 @@ export class DesktopAgentRuntime {
   }
 
   private createCheckpoint(
-    preparation: CompactionPreparation,
+    preparation: ShapedPreparation,
     throughMessageId: string,
     summary: string,
     usage?: Usage,
@@ -3038,7 +3688,7 @@ export class DesktopAgentRuntime {
   }
 
   private createFallbackCheckpoint(
-    preparation: CompactionPreparation,
+    preparation: ShapedPreparation,
     throughMessageId: string,
     maxSummaryChars: number,
   ): ContextCompactionRecord {
@@ -3073,7 +3723,7 @@ export class DesktopAgentRuntime {
    * the only thing that has to fit.
    */
   private prepareFallbackCompactionInput(
-    entries: SessionTreeEntry[],
+    entries: Entry[],
     budget: ContextBudget,
   ) {
     return this.prepareCompactionInput(
@@ -3090,7 +3740,7 @@ export class DesktopAgentRuntime {
   }
 
   private compactionSummaryWouldExceedBudget(
-    preparation: CompactionPreparation,
+    preparation: ShapedPreparation,
     budget: { hardLimit: number; requestHeadroom: number },
   ): boolean {
     const contextWindow = budget.hardLimit + budget.requestHeadroom;
@@ -3167,10 +3817,10 @@ export class DesktopAgentRuntime {
   }
 
   private fallbackPreparation(
-    entries: SessionTreeEntry[],
+    entries: Entry[],
     budget: ContextBudget,
-    preparation?: CompactionPreparation,
-  ): CompactionPreparation | undefined {
+    preparation?: ShapedPreparation,
+  ): ShapedPreparation | undefined {
     const fallbackInput = this.prepareFallbackCompactionInput(entries, budget);
     if (fallbackInput.ok && fallbackInput.value) return fallbackInput.value;
 
@@ -3192,11 +3842,11 @@ export class DesktopAgentRuntime {
   }
 
   private async recoverCompactionFailure(
-    entries: SessionTreeEntry[],
+    entries: Entry[],
     budget: ContextBudget,
     reason: ContextCompactionReason,
     willRetry: boolean,
-    preparation: CompactionPreparation | undefined,
+    preparation: ShapedPreparation | undefined,
     failureMessage: string,
   ): Promise<boolean> {
     if (reason === "manual") {
@@ -3257,7 +3907,7 @@ export class DesktopAgentRuntime {
   }
 
   private async generateCompaction(
-    preparation: CompactionPreparation,
+    preparation: ShapedPreparation,
     signal: AbortSignal,
   ): Promise<Awaited<ReturnType<typeof compact>>> {
     return compact(
@@ -3373,9 +4023,9 @@ export class DesktopAgentRuntime {
    * checkpoint, a `compaction_end`, and everything the user sees.
    */
   private buildRolloverCheckpoint(
-    entries: SessionTreeEntry[],
+    entries: Entry[],
     budget: ContextBudget,
-    preparation: CompactionPreparation,
+    preparation: ShapedPreparation,
   ): CheckpointBuild {
     const throughMessageId = this.fullEntries.at(-1)?.id;
     if (!throughMessageId) {
@@ -3391,7 +4041,7 @@ export class DesktopAgentRuntime {
     }
     // Codex clears history outright. Retaining nothing is the point of this
     // family: it buys the whole window back instead of a summary's worth.
-    const rollover: CompactionPreparation = { ...preparation, retainedTail: [] };
+    const rollover: ShapedPreparation = { ...preparation, retainedTail: [] };
     return {
       ok: true,
       entries,
@@ -3889,6 +4539,11 @@ export class DesktopAgentRuntime {
           this.suppressSilentTurnRunEnd
         )
           break;
+        this.reportMutationTermination();
+        // Delegation converges inside the turn (ADR 0089): a delegate still
+        // running when the run ends is a prompt violation, and the safety net
+        // is to stop it rather than let it work on without a parent.
+        this.abortRunningDelegations();
         this.emit({
           type: "agent_end",
           messageIds: [],
@@ -3897,6 +4552,37 @@ export class DesktopAgentRuntime {
       default:
         break;
     }
+  }
+
+  /**
+   * The recovery guard stops the agent loop by terminating the tool batch, so
+   * the turn would otherwise end on a failed tool card with nothing said. Give
+   * it the same visible, retriable error row an empty response gets: the user
+   * learns the agent stopped on purpose, and the UI keeps its continue
+   * affordance (spec 18-line-anchored-edit-contract §9.3).
+   */
+  private reportMutationTermination(): void {
+    const termination = this.pendingMutationTermination;
+    if (!termination) return;
+    this.pendingMutationTermination = undefined;
+    const message =
+      termination.kind === "edit"
+        ? `Stopped after ${MAX_MUTATION_RECOVERY_FAILURES} failed Edit attempts on ${termination.target}. Re-read the file and edit a narrower range instead of retrying blind.`
+        : `Stopped after ${MAX_MUTATION_RECOVERY_FAILURES} failed patch commands. Use Edit on the specific lines instead of a patch pipeline.`;
+    const error = {
+      code: "MUTATION_RETRY_BUDGET_EXHAUSTED",
+      message,
+      retriable: true,
+      details: {
+        kind: termination.kind,
+        ...(termination.lastErrorCode
+          ? { lastErrorCode: termination.lastErrorCode }
+          : {}),
+      },
+    };
+    this.turnHadError = true;
+    this.finalizeCurrentAssistant("error", error);
+    this.emit({ type: "error", error });
   }
 
   /** Resolve a bubble left in "streaming" when the run dies without a
@@ -4004,19 +4690,7 @@ export class DesktopAgentRuntime {
     this.hostTurnId = durableTurnId;
     this.turnId = durableTurnId;
     this.pendingUserMessageId = undefined;
-    this.pendingOverflow = false;
-    this.overflowRecoveryAttempted = false;
-    this.suppressOverflowRunEnd = false;
-    this.pendingProviderRetry = undefined;
-    this.providerRetryAttempted = false;
-    this.activeProviderRetryAttempt = 0;
-    this.providerRetryInProgress = false;
-    this.suppressProviderRetryRunEnd = false;
-    this.providerRetryAbort?.abort();
-    this.providerRetryAbort = undefined;
-    this.mutationFailureCounts.clear();
-    this.terminatingToolCalls.clear();
-    this.turnHadError = false;
+    this.resetRunRecoveryState();
     this.currentAssistant = undefined;
     this.requestStartedAt = Date.now();
     this.setMode("agent");
@@ -4060,6 +4734,10 @@ export class DesktopAgentRuntime {
     ).messages;
     await this.agent.continue();
     await this.agent.waitForIdle();
+    // Same recovery contract as a user prompt: a plan execution that overflows,
+    // hits a retriable stream failure, or comes back silent must not end as a
+    // run with no end events at all.
+    await this.runPendingRecoveries();
     return { turnId: this.turnId };
   }
 
@@ -4076,23 +4754,7 @@ export class DesktopAgentRuntime {
     this.resetDeferredToolsForPrompt();
     this.pathInstructionClaims.clear();
     this.pendingUserMessageId = userMessageId;
-    this.pendingOverflow = false;
-    this.overflowRecoveryAttempted = false;
-    this.suppressOverflowRunEnd = false;
-    this.pendingProviderRetry = undefined;
-    this.providerRetryAttempted = false;
-    this.activeProviderRetryAttempt = 0;
-    this.providerRetryInProgress = false;
-    this.suppressProviderRetryRunEnd = false;
-    this.pendingSilentTurnRerun = false;
-    this.silentTurnRerunAttempted = false;
-    this.silentTurnRerunInProgress = false;
-    this.suppressSilentTurnRunEnd = false;
-    this.providerRetryAbort?.abort();
-    this.providerRetryAbort = undefined;
-    this.mutationFailureCounts.clear();
-    this.terminatingToolCalls.clear();
-    this.turnHadError = false;
+    this.resetRunRecoveryState();
     this.requestStartedAt = Date.now();
     this.emit({
       type: "status",
@@ -4127,41 +4789,7 @@ export class DesktopAgentRuntime {
       await this.agent.prompt(content);
       await this.agent.waitForIdle();
 
-      if (this.pendingProviderRetry) {
-        await this.retryPendingProviderFailure();
-      }
-
-      if (this.pendingOverflow) {
-        this.pendingOverflow = false;
-        this.suppressOverflowRunEnd = false;
-        this.overflowRecoveryAttempted = true;
-        const messages = [...this.agent.state.messages];
-        if (messages.at(-1)?.role === "assistant") messages.pop();
-        this.agent.state.messages = messages;
-        const compacted = await this.runCompaction("overflow", true);
-        if (!compacted) {
-          this.emit({
-            type: "error",
-            error: {
-              code: "CONTEXT_COMPACTION_FAILED",
-              message: "Context overflow recovery could not create a checkpoint",
-              retriable: false,
-            },
-          });
-          return { turnId: this.turnId };
-        }
-        this.turnHadError = false;
-        this.requestStartedAt = Date.now();
-        await this.agent.continue();
-        await this.agent.waitForIdle();
-      }
-
-      // Last, so a turn that went silent after overflow recovery still gets
-      // its one re-run, and a re-run that goes silent again is not re-run.
-      if (this.pendingSilentTurnRerun) {
-        await this.rerunSilentTurn();
-      }
-
+      if (!(await this.runPendingRecoveries())) return { turnId: this.turnId };
     } catch (err) {
       const classifiedError = classifyAgentError(err);
       const diagnosticError =
@@ -4186,6 +4814,7 @@ export class DesktopAgentRuntime {
 
   async abort(): Promise<void> {
     this.resolvePendingAskTools();
+    this.abortRunningDelegations();
     this.agent.abort();
     this.providerRetryAbort?.abort();
     this.compactionAbort?.abort();
@@ -4206,9 +4835,12 @@ export class DesktopAgentRuntime {
   async dispose(): Promise<void> {
     this.disposed = true;
     this.resolvePendingAskTools();
+    this.abortRunningDelegations();
     this.pathInstructionClaims.clear();
     this.failedHostToolCalls.clear();
     this.mutationFailureCounts.clear();
+    this.mutationRecoveryGraces.clear();
+    this.pendingMutationTermination = undefined;
     this.terminatingToolCalls.clear();
     this.hostCloseUnsubscribe?.();
     this.hostCloseUnsubscribe = undefined;

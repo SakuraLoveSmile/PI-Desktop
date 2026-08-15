@@ -11,6 +11,9 @@ export const TEMPLATE_NAMES = [
 
 export type TemplateName = (typeof TEMPLATE_NAMES)[number];
 
+/** Where the `full-demo` template is allowed to write, and all it may write. */
+const OUT_DIR = "out";
+
 export type ScaffoldInput = {
   /** Absolute directory the plugin is written into. Created when missing. */
   dir: string;
@@ -161,6 +164,29 @@ function manifestJson(template: TemplateName, vars: TemplateVars): string {
     permissions.push("agent.prompt.inject");
   }
   if (template === "full-demo") {
+    contributes.commands = [
+      ...((contributes.commands as unknown[]) ?? []),
+      {
+        id: `${vars.slug}.write-note`,
+        title: `${vars.name}: Write demo note`,
+        keywords: [vars.slug, "note"],
+      },
+      {
+        id: `${vars.slug}.clean-note`,
+        title: `${vars.name}: Delete demo note`,
+        keywords: [vars.slug, "clean"],
+      },
+    ];
+    // A file permission is a switch; `fs` is the range it covers. Writing is
+    // confined to `out/`, and deleting reaches only what this plugin wrote —
+    // the two narrowest shapes that still do something useful.
+    permissions.push("fs.write", "fs.delete");
+    activationEvents.splice(
+      activationEvents.indexOf("onStartup"),
+      0,
+      `onCommand:${vars.slug}.write-note`,
+      `onCommand:${vars.slug}.clean-note`,
+    );
     contributes.settings = [
       { key: "greeting", type: "string", default: `Hello from ${vars.name}`, title: "Greeting" },
       {
@@ -183,6 +209,14 @@ function manifestJson(template: TemplateName, vars: TemplateVars): string {
     ...(panel ? { ui: { panel: "renderer/index.html", title: vars.name } } : {}),
     contributes,
     permissions,
+    ...(template === "full-demo"
+      ? {
+          fs: {
+            write: { root: "workspace", scope: [`${OUT_DIR}/**`] },
+            delete: { own: true },
+          },
+        }
+      : {}),
     engines: { piDesktop: ">=0.1.0" },
     activationEvents,
   };
@@ -237,6 +271,37 @@ function mainJs(template: TemplateName, vars: TemplateVars): string {
       "  });",
     );
     unload.push('  await pi.agent.unregisterTool("echo_text");');
+  }
+  if (template === "full-demo") {
+    const notePath = `${OUT_DIR}/${vars.slug}-note.md`;
+    load.push(
+      "  await pi.commands.register({",
+      `    id: "${vars.slug}.write-note",`,
+      `    title: "${vars.name}: Write demo note",`,
+      `    keywords: ["${vars.slug}", "note"],`,
+      "    run: async () => {",
+      // Inside manifest.fs.write.scope, so this writes without asking. A path
+      // outside it would reach the user as a native confirmation instead.
+      `      await pi.fs.writeText("${notePath}", "# ${vars.name}\\n\\nWritten by the plugin.\\n");`,
+      `      await pi.ui.showToast("Wrote ${notePath}");`,
+      "    },",
+      "  });",
+      "  await pi.commands.register({",
+      `    id: "${vars.slug}.clean-note",`,
+      `    title: "${vars.name}: Delete demo note",`,
+      `    keywords: ["${vars.slug}", "clean"],`,
+      "    run: async () => {",
+      // `fs.delete` with `own: true` reaches what this plugin wrote and nothing
+      // else, and the file goes to the OS trash rather than away.
+      `      await pi.fs.remove("${notePath}");`,
+      `      await pi.ui.showToast("Moved ${notePath} to the trash");`,
+      "    },",
+      "  });",
+    );
+    unload.push(
+      `  await pi.commands.unregister("${vars.slug}.write-note");`,
+      `  await pi.commands.unregister("${vars.slug}.clean-note");`,
+    );
   }
   if (!load.length) {
     // skill-pack contributes prompt text only; the entry still has to exist
@@ -354,6 +419,9 @@ function readme(
     parts.tool ? "- Agent tool `echo_text`" : "",
     parts.skill ? `- Skill \`skills/${vars.slug}.md\`` : "",
     template === "full-demo" ? "- Setting `greeting`" : "",
+    template === "full-demo"
+      ? `- Commands \`${vars.slug}.write-note\` / \`${vars.slug}.clean-note\`, writing \`${OUT_DIR}/${vars.slug}-note.md\` and moving it to the trash`
+      : "",
   ].filter(Boolean);
 
   return `# ${vars.name}
@@ -379,7 +447,30 @@ pnpm pi-plugin pack .
 
 Install the resulting \`.piplug\` from the Plugins page to test it the way a
 user would.
+${
+  template === "full-demo"
+    ? `
+### File scope
 
+\`permissions\` says this plugin may write and delete; \`fs\` says where:
+
+\`\`\`json
+"fs": {
+  "write": { "root": "workspace", "scope": ["${OUT_DIR}/**"] },
+  "delete": { "own": true }
+}
+\`\`\`
+
+Writing inside \`${OUT_DIR}/\` is silent. A path outside the scope reaches the
+user as a native confirmation, and a credential file (\`.env\`, \`.ssh/\`, a
+\`*.pem\`) is refused whatever the manifest says. \`"own": true\` lets the plugin
+delete the files it wrote itself and nothing else; every delete is
+non-recursive and goes to the operating-system trash. Widen the scope only to
+what your plugin actually touches — the globs are shown to the user verbatim at
+install time.
+`
+    : ""
+}
 ### Panel safe area
 
 PI-Desktop owns a 46px frameless titlebar above panel content. Normal-flow

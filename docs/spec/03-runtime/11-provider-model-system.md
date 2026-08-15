@@ -328,7 +328,7 @@ Requirements:
 ## 15. Failure taxonomy (provider domain)
 
 Canonical codes live in [08-error-codes](08-error-codes.md); reserved detail
-codes map to a canonical parent until emitted (§3.6 there).
+codes map to a canonical parent until emitted (§3.7 there).
 
 | code | status | meaning | user-facing guidance |
 |---|---|---|---|

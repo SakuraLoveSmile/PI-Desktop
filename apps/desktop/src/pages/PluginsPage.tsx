@@ -33,6 +33,7 @@ import type {
   MarketPluginDetail,
   MarketPluginSummary,
   PluginCapability,
+  PluginFsPolicy,
   PluginServiceStatus,
   PluginSummary,
   ProjectRecord,
@@ -84,10 +85,15 @@ type RiskTier = "high" | "medium" | "low";
 /** Mirrors the risk column of docs/spec/07-plugins/13-plugin-permissions-matrix.md. */
 const PERMISSION_RISK: Record<string, RiskTier> = {
   "net.fetch": "high",
+  "fs.write": "high",
+  "fs.delete": "high",
   "fs.write.workspace": "high",
   "fs.delete.workspace": "high",
   "agent.prompt.inject": "high",
   "agent.tool.register": "high",
+  // Reading is a tier below writing because what makes a read dangerous is
+  // where the data can go, and outbound requests are declared separately.
+  "fs.read": "medium",
   "fs.read.workspace": "medium",
   "clipboard.read": "medium",
   "clipboard.write": "medium",
@@ -112,6 +118,16 @@ const CAPABILITY_ORDER: PluginCapability[] = [
   "mcp",
   "services",
   "bus",
+];
+
+/** File modes in escalating order, so a row reads read → write → delete. */
+const FS_MODES = ["read", "write", "delete"] as const;
+
+/** Permission names that predate scopes; the host cuts these back on load. */
+const LEGACY_FS_PERMISSIONS = [
+  "fs.read.workspace",
+  "fs.write.workspace",
+  "fs.delete.workspace",
 ];
 
 const RISK_TIERS: RiskTier[] = ["high", "medium", "low"];
@@ -248,6 +264,40 @@ function PermissionChips({
   );
 }
 
+/**
+ * `manifest.fs` read back to the user. A permission says the plugin may touch
+ * files; this says which ones, and it is the only place that distinction is
+ * visible outside the manifest.
+ */
+function FsScopeChips({ policy }: { policy: PluginFsPolicy | undefined }) {
+  const { t } = useTranslation();
+  const chips = FS_MODES.flatMap((mode) => {
+    const rule = policy?.[mode];
+    if (!rule) return [];
+    const parts: string[] = [];
+    if (rule.root === "userSelected") parts.push(t("plugins.fsRootPicked"));
+    if (rule.scope?.length) parts.push(rule.scope.join(" · "));
+    if (rule.own) parts.push(t("plugins.fsOwnFiles"));
+    // No standing reach at all: every access stops at a confirmation.
+    if (!parts.length) parts.push(t("plugins.fsAsksEachTime"));
+    return [{ mode, text: `${t(`plugins.fsMode.${mode}`)} · ${parts.join(" · ")}` }];
+  });
+  if (!chips.length) return null;
+  return (
+    <span className="plugins-perm-chips">
+      {chips.map((chip) => (
+        <span
+          key={chip.mode}
+          className={cx("plugins-perm-chip", `risk-${permissionRisk(`fs.${chip.mode}`)}`)}
+          title={chip.text}
+        >
+          {chip.text}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** What the plugin contributes, in a fixed order so rows stay comparable. */
 function CapabilityChips({ capabilities }: { capabilities: readonly PluginCapability[] | undefined }) {
   const { t } = useTranslation();
@@ -308,6 +358,10 @@ function PluginRowDetails({
   const hasCapabilities = (plugin.capabilities?.length ?? 0) > 0;
   const hasServices = (services?.length ?? 0) > 0;
   const hasPermissions = (plugin.permissions?.length ?? 0) > 0;
+  const hasFsScope = FS_MODES.some((mode) => plugin.fs?.[mode]);
+  const legacyFs = (plugin.permissions ?? []).filter((permission) =>
+    LEGACY_FS_PERMISSIONS.includes(permission),
+  );
 
   if (!hasCapabilities && !hasServices && !hasPermissions) return null;
 
@@ -342,6 +396,17 @@ function PluginRowDetails({
             </span>
             <PermissionChips permissions={plugin.permissions} />
           </div>
+        ) : null}
+        {hasFsScope ? (
+          <div className="plugins-row-detail">
+            <span className="plugins-row-detail-label">{t("plugins.fileAccessTitle")}</span>
+            <FsScopeChips policy={plugin.fs} />
+          </div>
+        ) : null}
+        {legacyFs.length ? (
+          // The plugin still loads, with less reach than its author expected.
+          // Saying so is the difference between "broken" and "needs an update".
+          <p className="plugins-row-detail-note">{t("plugins.legacyFsDowngraded")}</p>
         ) : null}
       </div>
     </details>

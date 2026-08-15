@@ -40,10 +40,12 @@ import {
   toolResultChips,
 } from "../lib/tool-presentation";
 import {
+  collectDelegationStatuses,
   isDelegationActivityItem,
   subagentOutcome,
   summarizeSubagentActivity,
   type DelegationActivityItem,
+  type SubagentOutcome,
 } from "../lib/subagent-topology";
 import { useOpenPreviewTarget } from "../lib/use-preview-target";
 import {
@@ -848,12 +850,15 @@ function ToolRow({
   message,
   delegate,
   variant = "default",
+  delegationStatuses,
 }: {
   message: UiMessage;
   /** Rows the delegate produced, when this row is a `Task` call (ADR 0062). */
   delegate?: SubagentRun;
   /** Card treatment used when several Task calls form a delegation topology. */
   variant?: "default" | "topology";
+  /** Live delegation statuses read from the turn's lifecycle-tool rows. */
+  delegationStatuses?: ReadonlyMap<string, SubagentOutcome>;
 }) {
   const { t } = useTranslation();
   const detailsId = useId();
@@ -902,7 +907,8 @@ function ToolRow({
           ...(nestedReport ? { hideDelegateReport: true } : {}),
         })
       : null;
-  const outcome = variant === "topology" ? subagentOutcome(message) : null;
+  const outcome =
+    variant === "topology" ? subagentOutcome(message, delegationStatuses) : null;
   const runLabel =
     run === "running"
       ? t("chat.running")
@@ -1199,10 +1205,16 @@ function SubagentRunRows({
  * The runtime has no delegate-to-delegate edges, so this deliberately stops at
  * main agent -> Task nodes instead of implying dependencies that do not exist.
  */
-function SubagentTopology({ items }: { items: DelegationActivityItem[] }) {
+function SubagentTopology({
+  items,
+  delegationStatuses,
+}: {
+  items: DelegationActivityItem[];
+  delegationStatuses?: ReadonlyMap<string, SubagentOutcome>;
+}) {
   const { t } = useTranslation();
   const labelId = useId();
-  const summary = summarizeSubagentActivity(items);
+  const summary = summarizeSubagentActivity(items, delegationStatuses);
 
   return (
     <section className="subagent-topology" aria-labelledby={labelId}>
@@ -1229,6 +1241,7 @@ function SubagentTopology({ items }: { items: DelegationActivityItem[] }) {
             message={item.message}
             {...(item.delegate ? { delegate: item.delegate } : {})}
             variant="topology"
+            {...(delegationStatuses ? { delegationStatuses } : {})}
           />
         ))}
       </div>
@@ -1378,7 +1391,13 @@ const ActivityGroup = memo(function ActivityGroup({
   const detailsId = useId();
   const delegateItems = items.filter(isDelegationActivityItem);
   const hasSubagentTopology = delegateItems.length > 1;
-  const subagentSummary = summarizeSubagentActivity(delegateItems);
+  // `Task` rows only ever say "running"; the turn's TaskWait/TaskList/TaskStop
+  // rows carry how each delegate actually ended (ADR 0089).
+  const delegationStatuses = collectDelegationStatuses(items);
+  const subagentSummary = summarizeSubagentActivity(
+    delegateItems,
+    delegationStatuses,
+  );
   const [open, setOpen] = useState(isActive && hasSubagentTopology);
   const [now, setNow] = useState(Date.now);
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
@@ -1454,7 +1473,13 @@ const ActivityGroup = memo(function ActivityGroup({
       if (hasSubagentTopology && isDelegationActivityItem(item)) {
         if (renderedTopology) return null;
         renderedTopology = true;
-        return <SubagentTopology key="subagent-topology" items={delegateItems} />;
+        return (
+          <SubagentTopology
+            key="subagent-topology"
+            items={delegateItems}
+            delegationStatuses={delegationStatuses}
+          />
+        );
       }
       return item.kind === "tool" ? (
         <Fragment key={item.message.id}>
