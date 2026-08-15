@@ -22,8 +22,12 @@ export const en = {
     close: "Close",
   },
   tray: {
-    show: "Show PI-Desktop",
+    open: "Open PI-Desktop",
     quit: "Quit PI-Desktop",
+    askTitle: "Keep PI-Desktop running in the background?",
+    askBody:
+      "When you close the window, PI-Desktop can keep running in the system tray so nothing is lost. You can change this any time in Settings.",
+    closeToTray: "Close to tray",
   },
   /**
    * Native consent dialog for a file access a plugin's manifest did not
@@ -598,6 +602,14 @@ export const en = {
     fullAccessLearnMoreAfter: " about elevated risks.",
     showMenuBar: "Show in menu bar",
     showMenuBarDesc: "Keep PI-Desktop in the macOS menu bar when the main window is closed.",
+    closeBehaviorTitle: "Close behavior",
+    closeBehaviorDesc:
+      "What happens when you close the main window. macOS always keeps the app in the Dock.",
+    closeBehaviorTray: "Close to tray",
+    closeBehaviorTrayDesc: "Keep PI-Desktop running in the system tray.",
+    closeBehaviorQuit: "Quit app",
+    closeBehaviorQuitDesc: "Exit PI-Desktop completely.",
+    closeBehaviorSaveError: "Couldn't save the close behavior.",
     defaultsTitle: "Defaults",
     defaultModel: "Default model",
     defaultModelDesc: "Used by chats that haven't chosen their own model. Changes apply from the next message.",

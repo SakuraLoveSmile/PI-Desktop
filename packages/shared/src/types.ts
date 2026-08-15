@@ -643,6 +643,16 @@ export type ModelInfo = {
  */
 export type ThemePreference = "system" | "light" | "dark" | `plugin:${string}`;
 
+/**
+ * What closing the main window does on Windows/Linux. macOS keeps the native
+ * Dock lifecycle and never consults this preference.
+ * - `ask`: transient unset state — the first close prompts once; after a
+ *   choice is made it is remembered permanently and cannot be reverted
+ * - `tray`: hide to the system tray; the app keeps running in the background
+ * - `quit`: close the window and exit the app (legacy behavior)
+ */
+export type CloseBehavior = "ask" | "tray" | "quit";
+
 export type AppSettings = {
   defaultProviderId?: string;
   defaultModelId?: string;

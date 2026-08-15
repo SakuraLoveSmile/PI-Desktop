@@ -2190,6 +2190,42 @@ Each scenario is documented in this format:
   platform bridge, native menu installation, and the pre-render maximize
   fixture on Windows/Linux; native visual scenario Draft
 
+#### E2E-120: Close behavior is asked once and stays configurable (D210)
+
+- **Preconditions**: Windows/Linux run with a clean data dir (no
+  `close-behavior.json`); the main window is visible; Settings → General is
+  reachable. macOS is excluded: it keeps the native Dock lifecycle.
+- **Steps**: 1) With the preference unset, click the close button (or press
+  the close-window shortcut) and answer the prompt: Cancel keeps the window
+  open and the preference unset; Close to tray hides the window, shows the
+  tray icon, and the app keeps running (a turn in flight stays live); Quit
+  exits the app. 2) Re-run each choice and verify it is remembered across a
+  full restart and that no second prompt ever appears once a choice exists.
+  3) With `tray` set, click the tray icon: the window
+  restores, shows, and focuses; the tray context menu offers Open and Quit,
+  and Quit exits the app. 4) In Settings → General, switch between Close to
+  tray / Quit app and verify the next close follows the new
+  choice, the tray icon appears only for Close to tray, an unset preference
+  shows no selection, and search matches
+  the row. 5) Minimize from any setting and verify the taskbar entry
+  remains and the window does not restore itself. 6) Invoke unknown values
+  and `"ask"` on `pi-desktop/window/closeBehavior/set` and verify they fail
+  closed.
+- **Expected**: The first close prompts exactly once per unset state and
+  Cancel never persists a choice. Tray mode keeps the app alive with a
+  localized tooltip/menu and no data loss; switching to Quit app destroys
+  the tray icon; the preference survives restarts and is honored by both
+  the window-control close button and the close shortcut. Minimize keeps
+  the native taskbar entry in every mode, and the bounds watchdog never
+  force-restores a minimized or tray-hidden window. The automated boot
+  probe (`app.quit`) exits without prompting.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `04-ux/01-ui-ia.md`, `04-ux/09-interaction-patterns.md`,
+  `08-meta/decisions-log.md` (D210), ADR 0090
+- **Acceptance**: A (app startup), Quality
+- **Milestone**: M5 on Windows/Linux (release qualification)
+- **Status**: Draft
+
 #### E2E-067A: Prerelease install discovers newer stable release (D120)
 
 - **Preconditions**: Packaged build whose embedded version is a prerelease such

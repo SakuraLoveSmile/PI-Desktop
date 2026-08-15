@@ -189,6 +189,8 @@ export const IPC = {
     windowSetWorkPanelReservation:
       "pi-desktop/window/setWorkPanelReservation",
     windowControl: "pi-desktop/window/control",
+    closeBehaviorGet: "pi-desktop/window/closeBehavior/get",
+    closeBehaviorSet: "pi-desktop/window/closeBehavior/set",
     menuRendererReady: "pi-desktop/menu/rendererReady",
     nativeMenuAction: "pi-desktop/menu/nativeAction",
   },

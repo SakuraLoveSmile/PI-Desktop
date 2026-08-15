@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type {
   AppSettings,
   AgentInstructionFile,
+  CloseBehavior,
   CommandShellCatalog,
   CommandShellId,
   GlobalPermissionMode,
@@ -825,6 +826,85 @@ function ExtensionMarketSection({
   );
 }
 
+/**
+ * Windows/Linux only: how closing the main window behaves. The first close
+ * prompts once (main-process dialog); the remembered choice can be changed
+ * here between tray and quit, but never reverted to prompting.
+ */
+function CloseBehaviorSection() {
+  const { t } = useTranslation();
+  const [behavior, setBehavior] = useState<CloseBehavior | null>(null);
+  const [saveError, setSaveError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getCloseBehavior()
+      .then(({ behavior: next }) => {
+        if (!cancelled) setBehavior(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // The "ask" state (unset) is transient and cannot be re-selected: once a
+  // choice is made it is remembered permanently. An unset preference shows
+  // no active option.
+  const options: [CloseBehavior, string, string][] = [
+    ["tray", "settings.closeBehaviorTray", "settings.closeBehaviorTrayDesc"],
+    ["quit", "settings.closeBehaviorQuit", "settings.closeBehaviorQuitDesc"],
+  ];
+
+  const choose = async (next: CloseBehavior) => {
+    setSaveError(false);
+    try {
+      await api.setCloseBehavior(next);
+      setBehavior(next);
+    } catch {
+      setSaveError(true);
+    }
+  };
+
+  return (
+    <SettingsCard title={t("settings.closeBehaviorTitle")}>
+      <SettingsRow
+        title={t("settings.closeBehaviorTitle")}
+        description={t("settings.closeBehaviorDesc")}
+      >
+        <div
+          className="settings-segment"
+          role="radiogroup"
+          aria-label={t("settings.closeBehaviorTitle")}
+        >
+          {options.map(([value, labelKey, descKey]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={behavior === value}
+              title={t(descKey)}
+              className={cx(
+                "settings-segment-item",
+                behavior === value && "active",
+              )}
+              onClick={() => void choose(value)}
+            >
+              {t(labelKey)}
+            </button>
+          ))}
+        </div>
+      </SettingsRow>
+      {saveError ? (
+        <span className="settings-command-shell-state error" role="status">
+          {t("settings.closeBehaviorSaveError")}
+        </span>
+      ) : null}
+    </SettingsCard>
+  );
+}
+
 export function SettingsPage() {
   const { t } = useTranslation();
   const tab = useAppStore((s) => s.settingsTab);
@@ -1191,6 +1271,8 @@ export function SettingsPage() {
 
                 <FontFamilyRow settings={settings} saveSettings={saveSettings} />
               </SettingsCard>
+
+              {platform !== "darwin" && <CloseBehaviorSection />}
 
               <SettingsCard title={t("settings.defaultsTitle")}>
                 <SettingsRow title={t("settings.mode")} description={t("settings.modeDesc")}>
