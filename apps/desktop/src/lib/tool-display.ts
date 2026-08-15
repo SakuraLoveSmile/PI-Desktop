@@ -22,7 +22,7 @@ const SUMMARY_KEYS: Record<ToolAction, string[]> = {
   // `description` is the short label the model writes for the delegation; the
   // `task` brief is a paragraph and belongs in the expanded detail. The
   // lifecycle tools (ADR 0089) summarize by delegation id.
-  delegate: ["description", "agent", "delegationids", "delegationId"],
+  delegate: ["description", "agent", "delegationIds"],
   use: [
     "command",
     "cmd",
@@ -116,6 +116,19 @@ export function getToolDisplayName(toolName?: string) {
 }
 
 /**
+ * Renders a summarizable argument. A plain string is itself; a list of strings
+ * is joined, because `TaskWait`/`TaskStop` summarize by their `delegationIds`
+ * list (ADR 0089) and everything else summarizes by a scalar.
+ */
+function summaryText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+    return value.join(", ");
+  }
+  return "";
+}
+
+/**
  * Which argument the collapsed row summary is showing, so expanded detail
  * blocks can skip repeating it.
  */
@@ -126,8 +139,7 @@ export function getToolSummaryKey(
   if (!args || typeof args !== "object") return null;
   const record = args as Record<string, unknown>;
   for (const key of SUMMARY_KEYS[getToolAction(toolName)]) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim()) return key;
+    if (summaryText(record[key]).trim()) return key;
   }
   return null;
 }
@@ -143,7 +155,7 @@ export function getToolSummaryValue(
 ): string {
   const key = getToolSummaryKey(toolName, args);
   if (!key) return "";
-  return (args as Record<string, unknown>)[key] as string;
+  return summaryText((args as Record<string, unknown>)[key]);
 }
 
 export function getToolSummary(toolName: string | undefined, args: unknown) {
@@ -151,7 +163,7 @@ export function getToolSummary(toolName: string | undefined, args: unknown) {
   if (args && typeof args === "object") {
     const record = args as Record<string, unknown>;
     const key = getToolSummaryKey(toolName, args);
-    if (key) return compact(record[key] as string);
+    if (key) return compact(summaryText(record[key]));
     const fallback = formatToolValue(record);
     if (fallback && fallback !== "{}") return compact(fallback);
   }
