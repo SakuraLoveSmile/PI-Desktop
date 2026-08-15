@@ -93,8 +93,6 @@ import type {
 } from "@pi-desktop/plugin-sdk";
 import { resolvePluginLocalizedString } from "@pi-desktop/plugin-sdk";
 
-import { en, zhCN, resolveLocale } from "@pi-desktop/i18n";
-
 import { HostProcess } from "./host-process";
 import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
@@ -975,7 +973,6 @@ function updateTrayMenu(locale = app.getLocale()) {
       { label: labels.open, click: restoreMainWindow },
       { type: "separator" },
       { label: labels.quit, click: () => app.quit() },
-
     ]),
   );
 }
@@ -1014,7 +1011,6 @@ function createTrayIcon() {
       { label: labels.tray.open, click: revealMainWindow },
       { type: "separator" },
       { label: labels.tray.quit, click: () => app.quit() },
-
     ]),
   );
 }
@@ -6938,8 +6934,6 @@ app.on("before-quit", (event) => {
     pluginLauncherAccelerator = null;
   }
   shutdownPromise = (async () => {
-    tray?.destroy();
-    tray = null;
     const hostShutdown = host?.dispose();
     const pluginPanelShutdown = pluginPanels.closeAll();
     updater.dispose();

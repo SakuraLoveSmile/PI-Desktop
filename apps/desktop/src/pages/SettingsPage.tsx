@@ -822,6 +822,10 @@ function ExtensionMarketSection({
           />
         </SettingsRow>
       )}
+    </SettingsCard>
+  );
+}
+
 /**
  * Windows/Linux only: how closing the main window behaves. The first close
  * prompts once (main-process dialog); the remembered choice can be changed

@@ -55,6 +55,7 @@ export const en = {
     openHint: "Enter to open",
     navigateHint: "↑↓ to choose",
     dismissHint: "Esc to dismiss",
+  },
   menu: {
     applicationMenu: "Application menu",
     file: "File",

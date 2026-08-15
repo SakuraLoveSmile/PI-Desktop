@@ -50,6 +50,7 @@ export const zhCN = {
     openHint: "回车打开",
     navigateHint: "↑↓ 选择",
     dismissHint: "Esc 关闭",
+  },
   menu: {
     applicationMenu: "应用菜单",
     file: "文件",
