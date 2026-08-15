@@ -66,6 +66,13 @@ Supervision parameters (implemented in Electron main):
   its helper thread cannot be created.
 - Renderer is notified on every transition via the `hostStatus` event:
   `{ ok, component?: "host" | "sidecar", restarting?, restarted?, fatal?, message? }`.
+- Renderer notifications are best-effort. A disposed render frame — window
+  closed while the app keeps running in the tray/Dock, or a teardown race where
+  the frame dies before `webContents.isDestroyed()` flips — is dropped, never
+  raised: supervision and restart proceed with no window attached.
+- An unexpected sidecar exit is logged together with the sidecar's last stderr
+  lines (ring-buffered in main), so a crash without a stack trace still leaves
+  its final output in the report.
 - Every rejection that only reports a gone transport — refused before it was
   sent, or in flight when the transport closed — carries
   `errorCode: HOST_UNAVAILABLE`, so a caller classifies routine teardown by code

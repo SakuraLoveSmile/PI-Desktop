@@ -1056,7 +1056,15 @@ function sendToRenderer(channel: string, payload: unknown) {
   ) {
     return;
   }
-  window.webContents.send(channel, payload);
+  try {
+    window.webContents.send(channel, payload);
+  } catch {
+    // The renderer's main frame can be disposed — the window closed while the
+    // app keeps running (macOS dock, resident tray) or a teardown race where
+    // webContents.isDestroyed() has not flipped yet — before the send reaches
+    // it. Notifying a gone frame is routine teardown, never an error:
+    // supervision must keep running with no window attached.
+  }
 }
 
 function resetMenuRendererReady(window: BrowserWindow) {
@@ -3542,7 +3550,7 @@ function wireSidecar(s: AgentSidecar) {
     // permissions.request reaches the renderer once, via wireHost; the
     // sidecar no longer relays it (agent-sidecar.setHost filters it out).
   });
-  s.onExit(({ code, signal, intentional }) => {
+  s.onExit(({ code, signal, intentional, stderrTail }) => {
     if (sidecar !== s) return;
     logger.flushChild("agent");
     sidecar = null;
@@ -3574,7 +3582,7 @@ function wireSidecar(s: AgentSidecar) {
       );
     }
     logger.app("runtime", "error", "agent sidecar exited unexpectedly", {
-      data: { exitCode: code, signal },
+      data: { exitCode: code, signal, stderrTail },
     });
     sendToRenderer(IPC.event.hostStatus, {
       ok: false,
