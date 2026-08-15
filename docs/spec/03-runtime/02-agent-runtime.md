@@ -121,13 +121,23 @@ abort, the message requested no tools (no `toolCall` content part), and the
 visible text is blank after trimming. Reasoning content does not exempt a turn
 — a thinking-only turn is exactly the case that needs recovery.
 
-Recovery mirrors §5d and is bounded the same way: at most one re-run per user
-prompt. The silent assistant is dropped from the model context (`continue()`
+Recovery mirrors §5d and is bounded the same way: at most one re-run per run.
+The silent assistant is dropped from the model context (`continue()`
 refuses a transcript ending in an assistant message, and an empty one is not
 worth resending), a short no-output instruction is appended to the system
 prompt for that one continuation, and the bubble id is reused so a recovered
 turn leaves no empty row behind. The silent attempt's `turn_end` and
 `agent_end` are suppressed; the re-run emits the single terminal lifecycle.
+
+Recovery is armed inside `message_end` and carried out once the loop is idle,
+so it belongs to every entry point that drives the loop — a user prompt and an
+approved plan or goal execution alike. Each entry point clears the recovery
+state before it starts and runs the pending recovery after `waitForIdle`,
+through one shared implementation of each half. Skipping either half ends the
+run with its lifecycle still suppressed and no recovery attempted, which
+reaches the user as a session that stopped mid-work with no error and no retry
+action. §5d overflow and provider-stream retry ride the same contract, and a
+suppression flag left behind would swallow the *next* run's terminal events.
 
 The one-shot instruction rides on the agent's system prompt rather than the
 `prepareNextTurn` hook, because that hook only shapes turns inside a live run

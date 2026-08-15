@@ -3204,6 +3204,35 @@ Delegation rules:
     };
   }
 
+  /**
+   * Clear the per-run recovery state that every entry point driving the agent
+   * loop must start from. Each recovery arms itself mid-run by setting a
+   * `pending*` flag and suppressing that run's end events; a flag left behind
+   * suppresses the *next* run's `turn_end` and `agent_end` instead, so the
+   * following turn ends invisibly even though nothing went wrong in it.
+   */
+  private resetRunRecoveryState(): void {
+    this.pendingOverflow = false;
+    this.overflowRecoveryAttempted = false;
+    this.suppressOverflowRunEnd = false;
+    this.pendingProviderRetry = undefined;
+    this.providerRetryAttempted = false;
+    this.activeProviderRetryAttempt = 0;
+    this.providerRetryInProgress = false;
+    this.suppressProviderRetryRunEnd = false;
+    this.pendingSilentTurnRerun = false;
+    this.silentTurnRerunAttempted = false;
+    this.silentTurnRerunInProgress = false;
+    this.suppressSilentTurnRunEnd = false;
+    this.providerRetryAbort?.abort();
+    this.providerRetryAbort = undefined;
+    this.mutationFailureCounts.clear();
+    this.mutationRecoveryGraces.clear();
+    this.pendingMutationTermination = undefined;
+    this.terminatingToolCalls.clear();
+    this.turnHadError = false;
+  }
+
   private async retryPendingProviderFailure(): Promise<void> {
     if (!this.pendingProviderRetry) return;
     this.pendingProviderRetry = undefined;
@@ -3273,6 +3302,56 @@ Delegation rules:
       this.silentTurnRerunInProgress = false;
       this.suppressSilentTurnRunEnd = false;
     }
+  }
+
+  /**
+   * Run whatever recovery the finished loop armed for itself. Overflow, a
+   * retriable provider stream failure, and a silent turn all suppress their
+   * run's `turn_end` / `agent_end` inside `message_end` and leave a `pending*`
+   * flag for the caller to act on once the loop is idle. An entry point that
+   * skips this leaves the run with no end events, no error, and no recovery —
+   * the turn simply stops, which is exactly how an approved plan execution
+   * used to die on a silent turn.
+   *
+   * Returns false when overflow recovery could not create a checkpoint and the
+   * caller must stop; the error event is already emitted.
+   */
+  private async runPendingRecoveries(): Promise<boolean> {
+    if (this.pendingProviderRetry) {
+      await this.retryPendingProviderFailure();
+    }
+
+    if (this.pendingOverflow) {
+      this.pendingOverflow = false;
+      this.suppressOverflowRunEnd = false;
+      this.overflowRecoveryAttempted = true;
+      const messages = [...this.agent.state.messages];
+      if (messages.at(-1)?.role === "assistant") messages.pop();
+      this.agent.state.messages = messages;
+      const compacted = await this.runCompaction("overflow", true);
+      if (!compacted) {
+        this.emit({
+          type: "error",
+          error: {
+            code: "CONTEXT_COMPACTION_FAILED",
+            message: "Context overflow recovery could not create a checkpoint",
+            retriable: false,
+          },
+        });
+        return false;
+      }
+      this.turnHadError = false;
+      this.requestStartedAt = Date.now();
+      await this.agent.continue();
+      await this.agent.waitForIdle();
+    }
+
+    // Last, so a turn that went silent after overflow recovery still gets
+    // its one re-run, and a re-run that goes silent again is not re-run.
+    if (this.pendingSilentTurnRerun) {
+      await this.rerunSilentTurn();
+    }
+    return true;
   }
 
   private cleanupActiveToolProgress(): void {
@@ -4603,21 +4682,7 @@ Delegation rules:
     this.hostTurnId = durableTurnId;
     this.turnId = durableTurnId;
     this.pendingUserMessageId = undefined;
-    this.pendingOverflow = false;
-    this.overflowRecoveryAttempted = false;
-    this.suppressOverflowRunEnd = false;
-    this.pendingProviderRetry = undefined;
-    this.providerRetryAttempted = false;
-    this.activeProviderRetryAttempt = 0;
-    this.providerRetryInProgress = false;
-    this.suppressProviderRetryRunEnd = false;
-    this.providerRetryAbort?.abort();
-    this.providerRetryAbort = undefined;
-    this.mutationFailureCounts.clear();
-    this.mutationRecoveryGraces.clear();
-    this.pendingMutationTermination = undefined;
-    this.terminatingToolCalls.clear();
-    this.turnHadError = false;
+    this.resetRunRecoveryState();
     this.currentAssistant = undefined;
     this.requestStartedAt = Date.now();
     this.setMode("agent");
@@ -4661,6 +4726,10 @@ Delegation rules:
     ).messages;
     await this.agent.continue();
     await this.agent.waitForIdle();
+    // Same recovery contract as a user prompt: a plan execution that overflows,
+    // hits a retriable stream failure, or comes back silent must not end as a
+    // run with no end events at all.
+    await this.runPendingRecoveries();
     return { turnId: this.turnId };
   }
 
@@ -4677,25 +4746,7 @@ Delegation rules:
     this.resetDeferredToolsForPrompt();
     this.pathInstructionClaims.clear();
     this.pendingUserMessageId = userMessageId;
-    this.pendingOverflow = false;
-    this.overflowRecoveryAttempted = false;
-    this.suppressOverflowRunEnd = false;
-    this.pendingProviderRetry = undefined;
-    this.providerRetryAttempted = false;
-    this.activeProviderRetryAttempt = 0;
-    this.providerRetryInProgress = false;
-    this.suppressProviderRetryRunEnd = false;
-    this.pendingSilentTurnRerun = false;
-    this.silentTurnRerunAttempted = false;
-    this.silentTurnRerunInProgress = false;
-    this.suppressSilentTurnRunEnd = false;
-    this.providerRetryAbort?.abort();
-    this.providerRetryAbort = undefined;
-    this.mutationFailureCounts.clear();
-    this.mutationRecoveryGraces.clear();
-    this.pendingMutationTermination = undefined;
-    this.terminatingToolCalls.clear();
-    this.turnHadError = false;
+    this.resetRunRecoveryState();
     this.requestStartedAt = Date.now();
     this.emit({
       type: "status",
@@ -4730,41 +4781,7 @@ Delegation rules:
       await this.agent.prompt(content);
       await this.agent.waitForIdle();
 
-      if (this.pendingProviderRetry) {
-        await this.retryPendingProviderFailure();
-      }
-
-      if (this.pendingOverflow) {
-        this.pendingOverflow = false;
-        this.suppressOverflowRunEnd = false;
-        this.overflowRecoveryAttempted = true;
-        const messages = [...this.agent.state.messages];
-        if (messages.at(-1)?.role === "assistant") messages.pop();
-        this.agent.state.messages = messages;
-        const compacted = await this.runCompaction("overflow", true);
-        if (!compacted) {
-          this.emit({
-            type: "error",
-            error: {
-              code: "CONTEXT_COMPACTION_FAILED",
-              message: "Context overflow recovery could not create a checkpoint",
-              retriable: false,
-            },
-          });
-          return { turnId: this.turnId };
-        }
-        this.turnHadError = false;
-        this.requestStartedAt = Date.now();
-        await this.agent.continue();
-        await this.agent.waitForIdle();
-      }
-
-      // Last, so a turn that went silent after overflow recovery still gets
-      // its one re-run, and a re-run that goes silent again is not re-run.
-      if (this.pendingSilentTurnRerun) {
-        await this.rerunSilentTurn();
-      }
-
+      if (!(await this.runPendingRecoveries())) return { turnId: this.turnId };
     } catch (err) {
       const classifiedError = classifyAgentError(err);
       const diagnosticError =

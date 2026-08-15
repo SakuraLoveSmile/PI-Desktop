@@ -1573,6 +1573,136 @@ describe("DesktopAgentRuntime plan transitions", () => {
     await runtime.dispose();
   });
 
+  it("re-runs a silent turn during approved plan execution", async () => {
+    const onEvent = vi.fn();
+    const runtime = createRuntime({ onEvent });
+    const agent = (runtime as any).agent;
+    const handleAgentEvent = (runtime as any).handleAgentEvent.bind(runtime);
+    // The shape that ended a real plan execution: a conclusion written into
+    // reasoning, empty visible text, no tool call. Recovery is armed inside
+    // `message_end`, so an entry point that never acts on it leaves the run
+    // with no `turn_end`, no `agent_end`, and nothing for the user to retry.
+    const silentMessage = assistantMessage({
+      content: [{ type: "thinking", thinking: "the plan is already done" }],
+    });
+    const recoveredMessage = assistantMessage({
+      content: [{ type: "text", text: "Implemented the approved plan." }],
+    });
+
+    let attempts = 0;
+    agent.waitForIdle = vi.fn(async () => undefined);
+    agent.continue = vi.fn(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        agent.state.messages = [
+          { role: "user", content: "execute the approved plan", timestamp: 1 },
+          silentMessage,
+        ];
+      } else {
+        // The silent assistant is popped before the re-run, and the nudge is
+        // on the prompt that re-run actually sends.
+        expect(agent.state.messages).toHaveLength(1);
+        expect(agent.state.systemPrompt).toContain("<no_output_recovery>");
+      }
+      await handleAgentEvent({ type: "agent_start" });
+      await handleAgentEvent({ type: "turn_start" });
+      await handleAgentEvent({
+        type: "message_start",
+        message: { role: "assistant", content: [] },
+      });
+      await handleAgentEvent({
+        type: "message_end",
+        message: attempts === 1 ? silentMessage : recoveredMessage,
+      });
+      await handleAgentEvent({ type: "turn_end" });
+      await handleAgentEvent({ type: "agent_end", messages: [] });
+    });
+
+    const execution: PlanExecution = {
+      id: "execution-silent",
+      proposalId: "proposal-silent",
+      sessionId: "session-1",
+      kind: "plan",
+      plan: "# Approved\n\nDo the work.",
+      title: "Approved plan",
+      question: "Proceed?",
+      artifact: {
+        relativePath: ".pi/plan/proposal-silent.md",
+        sha256: "abc123",
+        sizeBytes: 24,
+      },
+      targetPermissionMode: "auto",
+      state: "running",
+    };
+
+    await runtime.executeApprovedPlan(execution, "execution-turn-silent");
+
+    const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
+    expect(agent.continue).toHaveBeenCalledTimes(2);
+    // The run closes exactly once, carrying the recovered text; the empty turn
+    // leaves neither a bubble nor an error row behind.
+    expect(events.filter((event) => event.type === "turn_end")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "agent_end")).toHaveLength(1);
+    expect(events.at(-1)?.type).toBe("agent_end");
+    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(
+      events.filter(
+        (event) =>
+          event.type === "message_end" && event.message?.status === "complete",
+      ),
+    ).toHaveLength(1);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "message_end",
+        message: expect.objectContaining({
+          status: "complete",
+          content: "Implemented the approved plan.",
+        }),
+      }),
+    );
+    // One-shot: the nudge does not ride along on later turns.
+    expect(agent.state.systemPrompt).not.toContain("<no_output_recovery>");
+
+    await runtime.dispose();
+  });
+
+  it("starts each approved plan execution from clean recovery state", async () => {
+    const runtime = createRuntime();
+    const agent = (runtime as any).agent;
+    // A run-end suppression left over from a previous turn would swallow this
+    // execution's own `turn_end` and `agent_end`, ending it invisibly.
+    (runtime as any).suppressSilentTurnRunEnd = true;
+    (runtime as any).silentTurnRerunAttempted = true;
+    (runtime as any).pendingSilentTurnRerun = true;
+    agent.continue = vi.fn(async () => undefined);
+    agent.waitForIdle = vi.fn(async () => undefined);
+
+    const execution: PlanExecution = {
+      id: "execution-clean",
+      proposalId: "proposal-clean",
+      sessionId: "session-1",
+      kind: "plan",
+      plan: "# Approved\n\nDo the work.",
+      title: "Approved plan",
+      question: "Proceed?",
+      artifact: {
+        relativePath: ".pi/plan/proposal-clean.md",
+        sha256: "abc123",
+        sizeBytes: 24,
+      },
+      targetPermissionMode: "auto",
+      state: "running",
+    };
+
+    await runtime.executeApprovedPlan(execution, "execution-turn-clean");
+
+    expect((runtime as any).suppressSilentTurnRunEnd).toBe(false);
+    expect((runtime as any).silentTurnRerunAttempted).toBe(false);
+    expect((runtime as any).pendingSilentTurnRerun).toBe(false);
+
+    await runtime.dispose();
+  });
+
   it("tells an approved goal execution to verify every acceptance criterion", async () => {
     const runtime = createRuntime({ mode: "goal" });
     const agent = (runtime as any).agent;
