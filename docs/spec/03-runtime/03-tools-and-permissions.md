@@ -1,7 +1,7 @@
 # 03. Tools and Permissions
 
 > Decisions applied: D003, D004, D005, D006, D013, D015, D093, D114, D115, D181, D186,
-> D189, D190, D195 (ADR 0057), ADR 0089
+> D189, D190, D195 (ADR 0057), ADR 0087
 
 ## 0. Frozen policy summary
 
@@ -15,7 +15,7 @@
 | Permission timeout | 120s → deny |
 | allow-session scope | toolName |
 | Bash style | non-interactive; selected host catalog shell with streamed output |
-| Edit contract | line-anchored ops + whole-file `tag`; no `old_string`/`new_string` (ADR 0089) |
+| Edit contract | line-anchored ops + whole-file `tag`; no `old_string`/`new_string` (ADR 0087) |
 | asktool | interactive multi-question tool; no validity deadline; skipped answers become empty output fields |
 
 ## 1. Goal
@@ -496,9 +496,12 @@ permission modes (§6), the operating-mode matrix (§10) and auditing (§9) appl
 unchanged — evaluated against the session, because the session is what owns the
 workspace and the permission mode.
 
-A definition may additionally declare `permission: inherit | ask |
-accept-edits | auto` (ADR 0089, default `inherit`). When declared, the
-sidecar attaches the scope to the delegate's `tools.execute` calls and
+A **builtin or user** definition may additionally declare `permission: inherit
+| ask | accept-edits | auto` (ADR 0089, default `inherit`). A project
+definition may not: it arrives with the repository, so its declared scope is
+dropped at parse time with a warning and its delegates resolve under the
+session's effective mode — cloning a repository never grants it a permission
+upgrade. When declared by an eligible source, the sidecar attaches the scope to the delegate's `tools.execute` calls and
 host-core resolves each call under that mode instead of the session's effective
 permission mode. The scope is a permission-mode override only: the contract
 modes' hard deny and the external-path gate (§4.1) stay in force, so

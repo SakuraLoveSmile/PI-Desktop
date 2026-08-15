@@ -3,19 +3,19 @@
 - Status: Accepted for implementation
 - Date: 2026-08-12
 - Deciders: PI-Desktop core
-- Related: D210, ADR 0021, ADR 0025
+- Related: D230, ADR 0021, ADR 0025, ADR 0078
 
 ## Context
 
 On Windows/Linux, closing the main window calls `app.quit()`
 (`window-all-closed`), so the app exits and its taskbar entry disappears.
-Minimizing is a plain native minimize and keeps the taskbar entry, but users
-with long-running chats expect closing the window to keep the app available —
-either minimized in the taskbar or resident in the system tray. Different
-users want different defaults, and a fixed close-to-tray behavior would
-surprise users who expect close to quit.
+Minimizing already hides the window into the tray that D216 (ADR 0078) keeps
+resident on every platform, but users with long-running chats expect closing
+the window to keep the app available too. Different users want different
+defaults, and a fixed close-to-tray behavior would surprise users who expect
+close to quit.
 
-The app has no tray, no close interception, and no user-facing choice for
+The app has no close interception and no user-facing choice for
 this lifecycle decision. macOS is out of scope: the native Dock lifecycle
 (close keeps the app in the Dock, `activate` recreates the window) already
 matches the desired behavior.
@@ -27,8 +27,9 @@ matches the desired behavior.
    - `ask`: the transient unset state — the first close prompts once. After
      a choice is made it is remembered permanently and cannot be reverted
      to prompting (`closeBehavior/set` rejects `ask`).
-   - `tray`: closing the window hides it and keeps the app running under a
-     system-tray icon; the tray menu restores the window or quits the app.
+   - `tray`: closing the window hides it under the resident D216 system-tray
+     icon and keeps the app running; the tray menu restores the window or
+     quits the app.
    - `quit`: legacy behavior — closing the window exits the app.
 2. The first close with an unset preference shows a native modal dialog
    (main process) with Cancel / Close to tray / Quit. Picking a non-cancel
@@ -43,17 +44,24 @@ matches the desired behavior.
    `pi-desktop/window/closeBehavior/get` (returns `{ behavior, supported }`)
    and `pi-desktop/window/closeBehavior/set`, which accepts only `tray` and
    `quit` (`ask` and unknown values fail with `INVALID_ARGUMENT`).
-   `supported` is `false` on macOS, where the Settings row is hidden.
+   `supported` is `false` on macOS, where the Settings row is hidden and
+   `set` itself fails with `INVALID_ARGUMENT` — the renderer is not the only
+   caller, so the guard lives in main.
 5. Settings (General tab) renders a two-option radio segment — Close to
    tray / Quit app — for Windows/Linux only; an unset preference shows no
-   selection. Changing it applies immediately and reconciles the tray icon:
-   switching to `tray` creates the icon, switching away destroys it.
-6. The close handler intercepts `close` only when `tray` exists or the
-   preference is `ask`; `before-quit` (`quitting`) and macOS closes always
+   selection. Changing it applies immediately. The tray icon is not
+   reconciled: D216 owns it and it stays resident under either choice,
+   because minimize-to-tray needs it whatever close does.
+6. The close handler intercepts every non-macOS `close` that is not already
+   an approved quit; `before-quit` (`quitting`) and macOS closes always
    fall through, so an explicit quit, the tray Quit item, and the automated
-   boot probe are unaffected. `window-all-closed` quits only when no tray
-   exists, keeping the app alive when the window is tray-hidden or
-   destroyed unexpectedly.
+   boot probe are unaffected. Under `quit` the handler calls `app.quit()`
+   itself rather than leaning on `window-all-closed`, and
+   `window-all-closed` keys off the preference — it stays silent only under
+   `tray`, keeping the app alive when the window is tray-hidden or
+   destroyed unexpectedly, and quits otherwise even though the D216 tray is
+   present. A `tray` close whose tray icon does not exist falls back to a
+   real quit rather than hiding the window with no way back.
 7. The bounds watchdog (`ensureStableBounds`) skips minimized and hidden
    windows, so minimize always stays minimized and a tray-hidden window is
    never force-restored by the Stage-Manager shelf recovery.
@@ -72,12 +80,15 @@ matches the desired behavior.
   close lifecycle and works before the renderer has mounted.
 - **Always close-to-tray without a choice:** rejected — it changes the
   meaning of the close button for users who expect exit.
-- **Tray icon always present:** rejected; without tray behavior the icon is
-  dead weight, so it is created lazily and reconciled with the preference.
+- **Tray icon reconciled with the preference:** rejected; D216 keeps one
+  tray icon resident on every platform for minimize-to-tray, so destroying
+  it when close behavior is `quit` would break an unrelated feature. Close
+  behavior decides what a close does, not whether the tray exists.
 
 ## Consequences
 
-- Minimize always keeps the taskbar/dock entry (native minimize).
+- Minimize keeps hiding the window into the D216 tray, unchanged by this
+  decision.
 - Close on Windows/Linux either hides to tray or quits, per user choice,
   remembered across launches and changeable in Settings.
 - The tray menu and the first-close dialog reuse the existing

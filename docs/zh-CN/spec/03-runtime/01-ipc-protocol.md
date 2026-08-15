@@ -1052,6 +1052,27 @@ window/control({ action: WindowControlAction })
   -> { maximized: boolean }
 ```
 
+Windows/Linux 的关闭行为（D230、ADR 0090）通过两个附加的、由主进程拥有的
+通道读写。`closeBehavior/get` 返回持久化的偏好以及该平台是否支持它
+（macOS 保持原生 Dock 生命周期，报告 `supported: false`）；
+`closeBehavior/set` 接受一个可设置的 `CloseBehavior`（`tray` 或 `quit`）
+并将其持久化：
+
+```ts
+type CloseBehavior = "ask" | "tray" | "quit";
+
+window/closeBehavior/get -> { behavior: CloseBehavior; supported: boolean }
+window/closeBehavior/set({ behavior: "tray" | "quit" })
+  -> { behavior: "tray" | "quit" }
+```
+
+`ask` 是 `get` 报告的、尚未设置的过渡态，它永远不可设置 —— 首次关闭只问
+一次，一旦存在选择就只能切换，不能退回到每次询问。`ask` 和未知值以
+`INVALID_ARGUMENT` 失败而不是被强制转换；在 macOS 上 `set` 同样如此失败，
+因为那里没有可配置的关闭行为。设置行为不会触碰托盘图标：D216（ADR 0078）
+在每个平台上启动时都会创建一个，而无论存的是哪种关闭行为，最小化到托盘都
+需要它。
+
 Maximize/unmaximize 变化也会发出
 `window/event/maximized`。未知的操作失败。这些仅限电子的通道
 不要跨入 host-core，也不要更改主机 RPC 协议版本。

@@ -1052,12 +1052,11 @@ window/control({ action: WindowControlAction })
   -> { maximized: boolean }
 ```
 
-Windows/Linux close behavior (D210, ADR 0090) is read and written through
+Windows/Linux close behavior (D230, ADR 0090) is read and written through
 two additive Main-owned channels. `closeBehavior/get` returns the persisted
 preference and whether the platform supports it (macOS keeps the native
 Dock lifecycle and reports `supported: false`); `closeBehavior/set`
-accepts a settable `CloseBehavior` (`tray` or `quit`) and reconciles the
-tray icon with the choice:
+accepts a settable `CloseBehavior` (`tray` or `quit`) and persists it:
 
 ```ts
 type CloseBehavior = "ask" | "tray" | "quit";
@@ -1070,7 +1069,10 @@ window/closeBehavior/set({ behavior: "tray" | "quit" })
 `ask` is the transient unset state reported by `get`; it is never settable
 — the first close prompts once, and once a choice exists it can be switched
 but not reverted to prompting. `ask` and unknown values fail with
-`INVALID_ARGUMENT` rather than being coerced.
+`INVALID_ARGUMENT` rather than being coerced, and `set` fails the same way on
+macOS, where there is no close behavior to configure. Setting a behavior does
+not touch the tray icon: D216 (ADR 0078) creates one at startup on every
+platform, and minimize-to-tray needs it whichever close behavior is stored.
 
 Maximize/unmaximize changes also emit
 `window/event/maximized`. Unknown actions fail. These Electron-only channels

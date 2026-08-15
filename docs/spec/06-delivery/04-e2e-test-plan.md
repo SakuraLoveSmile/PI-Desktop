@@ -509,7 +509,7 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
-#### E2E-091: Sending a prompt keeps the transcript at the latest turn
+#### E2E-144: Sending a prompt keeps the transcript at the latest turn
 
 - **Preconditions**: Chat route active; the selected session contains enough
   history to overflow the transcript viewport; the transcript is at the latest
@@ -997,7 +997,7 @@ Each scenario is documented in this format:
 - **Acceptance**: G (package install + update policy)
 - **Status**: Documented
 
-#### E2E-024N: Marketplace update diagnosis and release-data gate
+#### E2E-024Q: Marketplace update diagnosis and release-data gate
 
 - **Preconditions**: A catalog fixture contains an installed `0.5.0` plugin, a
   `0.5.1` version, and either unsorted version entries or intentionally missing
@@ -2190,7 +2190,7 @@ Each scenario is documented in this format:
   platform bridge, native menu installation, and the pre-render maximize
   fixture on Windows/Linux; native visual scenario Draft
 
-#### E2E-120: Close behavior is asked once and stays configurable (D210)
+#### E2E-143: Close behavior is asked once and stays configurable (D230)
 
 - **Preconditions**: Windows/Linux run with a clean data dir (no
   `close-behavior.json`); the main window is visible; Settings → General is
@@ -2205,23 +2205,28 @@ Each scenario is documented in this format:
   restores, shows, and focuses; the tray context menu offers Open and Quit,
   and Quit exits the app. 4) In Settings → General, switch between Close to
   tray / Quit app and verify the next close follows the new
-  choice, the tray icon appears only for Close to tray, an unset preference
-  shows no selection, and search matches
-  the row. 5) Minimize from any setting and verify the taskbar entry
-  remains and the window does not restore itself. 6) Invoke unknown values
-  and `"ask"` on `pi-desktop/window/closeBehavior/set` and verify they fail
-  closed.
+  choice, that the D216 tray icon stays resident either way, that an unset
+  preference shows no selection, and that search matches
+  the row. 5) With `quit` stored, restart and close the window: the app
+  exits even though the tray icon is present. 6) Minimize from any setting
+  and verify the window hides into the tray (D216) and that the tray click
+  brings it back. 7) Invoke unknown values and `"ask"` on
+  `pi-desktop/window/closeBehavior/set` and verify they fail closed, and
+  verify the channel is rejected outright on macOS.
 - **Expected**: The first close prompts exactly once per unset state and
   Cancel never persists a choice. Tray mode keeps the app alive with a
-  localized tooltip/menu and no data loss; switching to Quit app destroys
-  the tray icon; the preference survives restarts and is honored by both
-  the window-control close button and the close shortcut. Minimize keeps
-  the native taskbar entry in every mode, and the bounds watchdog never
-  force-restores a minimized or tray-hidden window. The automated boot
-  probe (`app.quit`) exits without prompting.
+  localized tooltip/menu and no data loss; switching to Quit app leaves the
+  tray icon in place, because minimize-to-tray still needs it as the only
+  way back to a hidden window. The preference survives restarts and is
+  honored by both the window-control close button and the close shortcut,
+  and a stored `quit` exits through the ordered `before-quit` shutdown
+  rather than depending on `window-all-closed`. Minimize hides to the tray
+  in every mode, and the bounds watchdog never force-restores a minimized
+  or tray-hidden window. The automated boot probe (`app.quit`) exits
+  without prompting.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `04-ux/01-ui-ia.md`, `04-ux/09-interaction-patterns.md`,
-  `08-meta/decisions-log.md` (D210), ADR 0090
+  `08-meta/decisions-log.md` (D216, D230), ADR 0078, ADR 0090
 - **Acceptance**: A (app startup), Quality
 - **Milestone**: M5 on Windows/Linux (release qualification)
 - **Status**: Draft
@@ -3546,7 +3551,7 @@ Each scenario is documented in this format:
   (delegate detection, structured outcomes and aggregate counts). Full
   multi-provider fan-out and rendered topology interaction remain manual.
 
-#### E2E-097: Tool results read as structured blocks, never JSON
+#### E2E-145: Tool results read as structured blocks, never JSON
 
 - **Preconditions**: A project-bound Agent session with permissions allowed for
   the turn; a plugin tool whose result is an arbitrary record is installed; the
@@ -3584,7 +3589,7 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`tool-presentation.test.mjs`,
   `transcript-style.test.mjs`); full UI journey Draft
 
-#### E2E-098: A turn that produces no visible text re-runs once
+#### E2E-146: A turn that produces no visible text re-runs once
 
 - **Preconditions**: A project-bound Agent session uses a deterministic provider
   fixture that ends one turn with no tool call and no text — once with reasoning
@@ -3621,7 +3626,7 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`runtime.test.ts`); full provider/UI journey Draft
 
-#### E2E-099: Scoped search stays inside its budget and the agent narrates
+#### E2E-147: Scoped search stays inside its budget and the agent narrates
 
 - **Preconditions**: A project-bound Agent session; the workspace contains a
   multi-megabyte source file, a minified bundle with a `.map` sibling (one line,
@@ -4004,7 +4009,7 @@ Each scenario is documented in this format:
 - **Status**: Unit/source-contract covered; full cross-platform OS permission
   journey Draft (do not run E2E locally unless explicitly requested)
 
-#### E2E-123: Plugin settings and local shortcuts are editable
+#### E2E-148: Plugin settings and local shortcuts are editable
 
 - **Preconditions**: An enabled plugin declares string, boolean, JSON, and
   `shortcut` settings; the shortcut points to a declared plugin command.
@@ -4033,26 +4038,26 @@ Each scenario is documented in this format:
 
 | Acceptance | Scenarios |
 |---|---|
-| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097 |
+| A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082 |
-| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001, E2E-142 |
+| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-147 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123 |
-| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121 |
-| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142 |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-148 |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148 |
+| H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146 |
+| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148 |
 
 | Milestone | Scenarios |
 |---|---|
 | M1 | E2E-001, E2E-002, E2E-003, E2E-028, E2E-029 |
-| M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-089, E2E-090 |
+| M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-089, E2E-090, E2E-144 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095 |
+| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-147 |
 | M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103 |
-| M6+ | E2E-121, E2E-122 |
+| M6+ | E2E-121, E2E-122, E2E-148 |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
@@ -5028,7 +5033,7 @@ This test plan spec is accepted when:
   returns the post-write tag. The file on disk matches the intended content
   exactly, with its original line endings and BOM state preserved.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §3, §4.2, §5,
-  §6, §9, `03-runtime/16-tool-result-limits.md` §5, ADR 0089
+  §6, §9, `03-runtime/16-tool-result-limits.md` §5, ADR 0087
 - **Acceptance**: E (tools & permissions)
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5054,7 +5059,7 @@ This test plan spec is accepted when:
   nothing, so the guard cannot be walked past in under-cap slices. Step 6 fails
   with `EDIT_LINES_UNSEEN`: a clipped line was never displayed.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §4.3, §9.1,
-  §11, §12, `03-runtime/16-tool-result-limits.md` §2, ADR 0089
+  §11, §12, `03-runtime/16-tool-result-limits.md` §2, ADR 0087
 - **Acceptance**: E (tools & permissions), Quality
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5078,7 +5083,7 @@ This test plan spec is accepted when:
   `++` write a single leading `-` and `+`. Step 5 returns `EDIT_NO_CHANGE` rather
   than reporting a successful write of nothing, and leaves no review record.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §7.2, §7.3,
-  §7.4, §8.1, §9.3, ADR 0089
+  §7.4, §8.1, §9.3, ADR 0087
 - **Acceptance**: E (tools & permissions)
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5108,7 +5113,7 @@ This test plan spec is accepted when:
   neither approximates a span. Range and gap ops still work in the unsupported
   language.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §8.2, §11,
-  §12, ADR 0089 §4
+  §12, ADR 0087 §4
 - **Acceptance**: E (tools & permissions), Quality
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5136,7 +5141,7 @@ This test plan spec is accepted when:
   call. Step 5 fails with `EDIT_PARSE_FAILED`. Step 7 still pastes: a register
   holds captured content, not a live reference.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §7.5, §8.3,
-  §11, §13.2, ADR 0089 §5
+  §11, §13.2, ADR 0087 §5
 - **Acceptance**: E (tools & permissions)
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5164,7 +5169,7 @@ This test plan spec is accepted when:
   external-change warning, because the corrective advice differs. No recovery
   path ever writes the tagged snapshot's content over the live file.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9, §10, §11,
-  ADR 0089 §6
+  ADR 0087 §6
 - **Acceptance**: E (tools & permissions), Quality
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5209,7 +5214,7 @@ This test plan spec is accepted when:
   retention. In every case the file either contains the repaired result described
   in the warning or is untouched.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §8.4, §11,
-  ADR 0089
+  ADR 0087
 - **Acceptance**: E (tools & permissions), Quality
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5236,7 +5241,7 @@ This test plan spec is accepted when:
   rebinds to the real file with a warning, and the write-permission gate is
   evaluated against the rebound path; step 7 declines instead of picking one.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9.2, §13.1,
-  `03-runtime/03-tools-and-permissions.md` §4c, ADR 0043, ADR 0089
+  `03-runtime/03-tools-and-permissions.md` §4c, ADR 0043, ADR 0087
 - **Acceptance**: E (tools & permissions), Quality
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5266,7 +5271,7 @@ This test plan spec is accepted when:
   the recorded tag describes the bytes that actually landed, and the drift is
   reported as a one-line warning rather than a whole-file diff.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §4.2, §4.4,
-  §5.4, §13.5, `03-runtime/02-agent-runtime.md` §5f, ADR 0089 §3
+  §5.4, §13.5, `03-runtime/02-agent-runtime.md` §5f, ADR 0087 §3
 - **Acceptance**: E (tools & permissions), Quality
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5289,7 +5294,7 @@ This test plan spec is accepted when:
   inserted anywhere before step 4 resets the count, so the following failure is
   attempt 1 again.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9.3, §11,
-  `03-runtime/03-tools-and-permissions.md` §4d, ADR 0089
+  `03-runtime/03-tools-and-permissions.md` §4d, ADR 0087
 - **Acceptance**: E (tools & permissions), Quality
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5312,7 +5317,7 @@ This test plan spec is accepted when:
   same row with `details.kind` of `patch-command`.
 - **Specs linked**: `03-runtime/18-line-anchored-edit-contract.md` §9.3,
   `03-runtime/03-tools-and-permissions.md` §4d,
-  `03-runtime/08-error-codes.md` §3.3, ADR 0089
+  `03-runtime/08-error-codes.md` §3.3, ADR 0087
 - **Acceptance**: E (tools & permissions), C (chat & stream)
 - **Milestone**: M5+
 - **Status**: Documented
@@ -5349,16 +5354,20 @@ This test plan spec is accepted when:
   7. Reload the session; confirm the delegation card, its nodes, and the
      `TaskWait` rows persist and re-render collapsed, and that `TaskWait`
      re-reads a settled delegation's report by id without re-running it.
+  8. Edit `.pi/agents/readonly.md` to declare `permission: auto` and reload the
+     catalog; confirm the definition still loads but carries a warning, and
+     that its delegate still resolves under the session's effective mode (a
+     `Write` inside the workspace still raises a permission card).
 - **Expected**: `Task` returns immediately with a `delegationId` and the parent
   keeps working; `TaskWait` converges with per-delegation reports and statuses;
   `TaskList`/`TaskStop` drive the lifecycle; `fixer` writes inside the
   workspace without prompting under its declared scope while Bash and external
-  paths keep the session's permission behavior; the per-session running cap of
-  10 is enforced; no delegate outlives its turn; reloaded transcripts keep
+  paths keep the session's permission behavior; a project definition's declared
+  scope is dropped; the per-session running cap of 10 is enforced; no delegate outlives its turn; reloaded transcripts keep
   their delegation topology.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5f/§5f.1/§7.1,
   `03-runtime/03-tools-and-permissions.md` §10.2, `08-meta/decisions-log.md`
-  (D228), ADR 0089
+  (D231), ADR 0089
 - **Acceptance**: C (conversation), E (tools & permissions), F (persistence),
   Security, Quality
 - **Milestone**: M6+

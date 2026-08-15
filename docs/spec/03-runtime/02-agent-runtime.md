@@ -149,7 +149,7 @@ If the re-run is silent too, the turn ends as a visible assistant error with
 retriable `EMPTY_MODEL_RESPONSE`, which gives the transcript its normal retry
 action. No empty assistant message is persisted in either case.
 
-Decision D193; see E2E-098.
+Decision D193; see E2E-146.
 
 ### 5.1 Context checkpoint protection (D158/D203, ADR 0030/0049/0061/0064)
 
@@ -419,9 +419,15 @@ launch diagnostic and never fails the launch.
 
 Frontmatter adds `permission: inherit | ask | accept-edits | auto` (default
 `inherit`): a scope the delegate's tool calls resolve under instead of the
-session mode (§5f.1). `fixer`, the one write-capable builtin, declares
-`accept-edits` so it can write inside the workspace without prompting while
-Bash and external paths keep asking.
+session mode (§5f.1). Only builtin and user definitions may declare one —
+both express a choice the user already made, whereas a project definition
+arrives with the repository, so honoring its scope would let cloned code grant
+itself `auto`. A project document that declares a non-`inherit` scope keeps
+loading with a warning and its delegates run under the session's effective
+mode; a user who wants the scope copies the document into their own agents
+directory. `fixer`, the one write-capable builtin, declares `accept-edits` so
+it can write inside the workspace without prompting while Bash and external
+paths keep asking.
 
 **Tools (ADR 0089).** Delegation is a four-tool lifecycle, built only in Agent
 mode and only when the catalog is non-empty, and all four belong to the Agent
@@ -438,6 +444,10 @@ core set rather than the on-demand catalog of §7.1:
   `mode: "any"` with `minCompleted` converges as soon as the first N settle.
   Settled delegations return immediately, so re-reading a report by id is
   cheap. The joined result is bounded to `MAX_TASKWAIT_RESULT_CHARS` (50k).
+  `timeoutSeconds` defaults to 600 and is clamped to 900: the wait blocks the
+  turn, so the ceiling is what bounds how long a session can look hung. A
+  timeout is not a failure — it returns the finished reports plus a note to
+  call again — so a low ceiling costs one round-trip and keeps Stop responsive.
 - `TaskList()` — reports every delegation of the session with status.
 - `TaskStop(delegationIds?)` — stops running delegations (defaults to all);
   stopped delegations read as `stopped`.
@@ -478,9 +488,12 @@ disposed.
 ### 5f.1 Delegate permission scope (ADR 0089)
 
 A delegate's tool calls flow through the same host `tools.execute` path as the
-parent's. When the definition declares `permission`, the sidecar attaches the
-scope to the delegate's tool RPCs and host-core resolves the call under that
-mode instead of the session's effective permission mode. Two gates stay above
+parent's. When the definition declares `permission` **and its source is
+`builtin` or `user`**, the sidecar attaches the scope to the delegate's tool
+RPCs and host-core resolves the call under that mode instead of the session's
+effective permission mode. A `project` definition's declared scope is dropped
+at parse time with a warning, so opening an untrusted repository cannot
+escalate its own delegates past the session mode. Two gates stay above
 the scope, exactly as they stay above the session mode: the contract modes'
 hard deny (delegation only exists in Agent mode) and the external-path gate —
 a scoped delegate still asks before touching anything outside the workspace and

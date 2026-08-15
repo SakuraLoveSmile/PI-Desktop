@@ -113,16 +113,17 @@ recency only breaks ties between equally relevant matches.
   drag region. Maximize state is queried on mount and updated from native
   window events, so the restore affordance never depends only on optimistic
   renderer state.
-- Minimize is always a native minimize and keeps the taskbar/dock entry.
-  Windows/Linux close behavior is user-configurable (ADR 0090): an unset
-  preference asks once via a native prompt (Cancel / Close to tray / Quit);
-  `tray` hides the window and keeps the app running under a system-tray
-  icon whose click restores the window; `quit` exits the app. The choice is
-  persisted, revisitable in Settings → General, and applied by both the
-  close button and the close shortcut. macOS keeps the native Dock
-  lifecycle (close keeps the app in the Dock; activating recreates the
-  window). The bounds watchdog never restores a minimized or tray-hidden
-  window.
+- Minimize hides the window into the resident tray on every platform (D216,
+  §1.5.1). Windows/Linux close behavior is user-configurable (ADR 0090): an
+  unset preference asks once via a native prompt (Cancel / Close to tray /
+  Quit); `tray` hides the window under that same tray icon, whose click
+  restores the window; `quit` exits the app. Close behavior never creates or
+  destroys the tray — D216 owns it, so the icon is resident under either
+  choice. The choice is persisted, revisitable in Settings → General, and
+  applied by both the close button and the close shortcut. macOS keeps the
+  native Dock lifecycle (close keeps the app in the Dock; activating
+  recreates the window). The bounds watchdog never restores a minimized or
+  tray-hidden window.
 
 ### 1.5.1 Tray-resident minimize
 
@@ -138,8 +139,9 @@ recency only breaks ties between equally relevant matches.
   window.
 - The tray menu is localized with the active English/zh-CN shell locale and
   exposes Show PI-Desktop plus an explicit Quit PI-Desktop action. Quit uses
-  the existing ordered shutdown path; closing the window remains a quit action
-  rather than an implicit tray hide.
+  the existing ordered shutdown path. What closing the window does is the
+  user's own choice on Windows/Linux (ADR 0090) and a Dock-lifecycle close on
+  macOS; the tray icon itself is created once at startup either way.
 
 ### 1.6 Sidebar project and conversation organization
 

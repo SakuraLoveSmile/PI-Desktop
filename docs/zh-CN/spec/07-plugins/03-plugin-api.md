@@ -25,7 +25,24 @@ declare const pi: PiPluginHostApi;
 ```ts
 pi.app.getVersion(): Promise<string>
 pi.app.getLocale(): Promise<string>
+pi.app.getAppearance(): Promise<PluginAppearance>
 ```
+
+`app.getAppearance` 返回宿主当前正在呈现的外观，让插件（或它的面板）可以
+完全跟随应用的语言与配色：
+
+```ts
+type PluginAppearance = {
+  theme: string        // 原始偏好："light" | "dark" | "system" | "plugin:<pluginId>:<themeId>"
+  base: "light" | "dark" | "system"  // 该偏好解析出的调色板
+  locale: string       // 当前语言标签（例如 "en"、"zh-CN"）
+  pluginTheme: { id: string; base: "light" | "dark"; css: string } | null
+}
+```
+
+面板通过桥通道 `app.getAppearance` 读取同一个值，并在 `appearance:changed`
+事件（见下文）上收到实时更新。在没有该通道的旧宿主上，调用以
+`UNSUPPORTED` 拒绝；面板应回退到操作系统偏好和它自己的面板内选择。
 
 ### 插件
 ```ts
@@ -220,7 +237,8 @@ pi.events.off(event, handler)
 - `workspace:changed`
 - `session:activated`
 - `plugin:settingsChanged`（由插件设置页面编辑触发）
-- `app:themeChanged`
+- `app:themeChanged` —— 目前面板通过面板事件 `appearance:changed` 实时跟随
+  配色；插件进程侧的这个事件仍在规划中。
 
 ## 6. 面板桥 API
 
@@ -238,7 +256,7 @@ window.pluginBridge.on(event, handler)
 | `ui.showToast`、`ui.closePanel` | 没有超出加载的面板 |
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`、`ui.requestNotificationPermission`、`ui.showNativeNotification` | `notify` |
-| `plugin.getSettings`、`workspace.get` | 无 |
+| `plugin.getSettings`、`workspace.get`、`app.getAppearance` | 无 |
 | `fs.readText`、`fs.glob` | `fs.read` |
 | `fs.writeText` | `fs.write` |
 | `clipboard.readText` | `clipboard.read` |
@@ -252,6 +270,14 @@ window.pluginBridge.on(event, handler)
 会从自己的进程收到 `UNSUPPORTED`。主机支持的通道包括
 `skill.list`、`skill.read`、`skill.create`、`skill.update`、`skill.remove`
 和 `skill.setEnabled`。
+
+### 面板事件（主机 -> 面板）
+
+`window.pluginBridge.on(event, handler)` 接收主机推送的事件。今天已投递的
+事件：
+
+- `appearance:changed` —— 载荷是上面的 `PluginAppearance`，在应用的配色或
+  语言发生变化时发送，因此面板可以实时重新着色和重新标注文案。
 
 ## 7. 通话审计
 

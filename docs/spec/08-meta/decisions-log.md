@@ -235,7 +235,10 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D205 | ChatGPT-inspired empty-home guidance | *(superseded by D206)* **The empty chat home adds a compact four-card developer starter grid between the hero and optional checklist: Explore a codebase, Build a feature, Fix a bug, and Review a change. Each localized card only prefills and focuses the bottom composer; it never sends a prompt or creates a turn. The bottom-reserved composer and single scrollable home flow from D204 remain unchanged.** | The previous hero-only middle left too much unused space and offered no starting cues. ChatGPT's clear empty-state hierarchy improves first-task discoverability while developer-specific prompts keep the surface purposeful rather than promotional. |
 | D206 | Remove empty-home developer starter cards | **The empty chat home does not render developer starter cards, starter glyphs, or a contextual quick-action row. It keeps the restrained hero, short supporting line, optional onboarding checklist, and D204's bottom-reserved composer; task entry starts directly in the composer. This supersedes D205 without changing D204's scroll and bottom-reservation layout.** | Review confirmed that the direct composer is the preferred task-entry surface and that the cards add an unnecessary decision layer to the empty home. |
 | D208 | Recoverable native-tool path contracts | **Keep D185's deferred Glob/Grep boundary, but make every prompt and schema explicit that Read accepts an existing regular file, Glob accepts a directory, and Grep accepts a file or directory. A directory Read returns `INVALID_ARGUMENT` plus structured Glob recovery args; an explicit-file Grep searches only that file and applies `include` to its basename. Tool errors remain visible on their ToolCallRows, while activity groups report processing duration only and never infer terminal turn failure from a child row; terminal agent events and the dedicated outcome surfaces remain authoritative (ADR 0069).** | Durable sessions showed directory Read and file-as-directory Grep mistakes repeatedly, then displayed recovered work as terminally failed. Compatibility at the narrow host boundary plus one outcome owner removes retries and false failure UI without restoring every search schema to the Agent core. |
-| D210 | User-configurable close behavior with close-to-tray | **Windows/Linux close behavior is a persisted preference stored by Electron main in `<data>/close-behavior.json`. `ask` is the transient unset state: the first close shows a native modal (Cancel / Close to tray / Quit); picking one persists it forever, Cancel keeps the window open and unset. Only `tray` and `quit` are ever settable — Settings -> General renders a two-option radio segment (Close to tray / Quit app) for Windows/Linux only, and `pi-desktop/window/closeBehavior/set` rejects `ask`, so a choice can be switched but never reverted to prompting. `tray` hides the window and keeps the app running under a lazily created system-tray icon (click restores, menu shows or quits); switching away destroys the icon. Close interception only runs for `ask`/`tray` while `quitting` and macOS closes always fall through, and `window-all-closed` quits only when no tray exists, so the boot probe and explicit quits are unaffected. The bounds watchdog skips minimized and hidden windows so minimize keeps its native taskbar entry and a tray-hidden window is never force-restored. macOS keeps the native Dock lifecycle (ADR 0090).** | Minimizing already keeps the taskbar entry; the gap was close: it quit outright on Windows/Linux. A fixed close-to-tray would surprise users who expect exit, so the choice is asked once, remembered, and revisitable in Settings — matching how Codex-style shells keep long-running sessions alive without taking over the close button. |
+| D216 | Cross-platform tray-resident minimize | **Electron Main creates one packaged-resource tray icon on macOS, Windows, and Linux. Every main-window minimize path is intercepted and hides the window without disposing the host or sidecar; tray click/double-click, Show, and macOS app activation restore and focus the existing window (or create one if it was closed). The localized tray menu exposes Show PI-Desktop and an explicit Quit PI-Desktop action. Closing the window remains a quit action, and tray destruction plus Quit use the existing ordered `before-quit` shutdown path.** | Users need background work to continue without losing the app window, while minimizing must mean the same thing across the native macOS controls and the custom Windows/Linux shell. Main-owned tray lifecycle avoids renderer privilege expansion and keeps explicit exit observable. |
+| D218 | Host-owned cross-platform plugin panel chrome | **Plugin panel windows adopt the main window's 46px platform chrome: macOS uses `hiddenInset` with traffic lights at `{x:16,y:16}`, while Windows/Linux are frameless with a 112px custom minimize/maximize-or-restore/close band. The sandboxed plugin preload renders the manifest title and controls in a closed Shadow DOM, offsets content by the titlebar height in addition to existing top padding, and consumes a private sender-validated fixed window-action channel; `window.pluginBridge`, the per-plugin partition, and host protocol v9 do not expand. Reopening a minimized panel restores and focuses it.** | Default Electron frames made plugin tools look detached from PI-Desktop and varied by platform. Preload-owned chrome provides parity without moving untrusted plugin HTML into the host renderer or exposing general Electron window authority (ADR 0081). |
+| D232 | Custom global UI font | **Settings → Basics → Appearance gains a searchable Font picker (trigger previews the current family). Selections persist as `AppSettings.fontFamily`, a CSS stack; absent means the built-in `--font-sans` token stack, and the renderer applies the stack by overriding `--font-sans` on the root element without a reload. Four bundled families — Geist, Inter, Noto Sans SC, LXGW WenKai — ship locally as woff2 under the SIL OFL 1.1 with license texts; every custom stack appends a CJK fallback tier and the mono stack is unchanged. Installed system families are enumerated by Electron main using platform tooling only (macOS: `osascript` JXA bridging the CoreText query `CTFontManagerCopyAvailableFontFamilyNames` — the same API dbx's `font_kit::all_families()` calls — with `system_profiler` as a slow fallback; Windows: PowerShell; Linux: `fc-list`), deduplicated/sorted/filtered and cached 60 s, exposed through the additive allowlisted channel `pi-desktop/app/systemFonts`; host protocol v9 and storage schema v10 are unchanged.** | Users want a Codex/dbx-style global font preference, but the sandboxed renderer cannot enumerate OS fonts and the host RPC should stay unchanged for a renderer-only preference. Bundling OFL-licensed families keeps every offered font commercially safe and offline, while the fast CoreText path returns the canonical CSS family names (e.g. PingFang SC) in tens of milliseconds and the 60 s cache bounds repeated enumeration (ADR 0083). |
+| D230 | User-configurable close behavior with close-to-tray | **Windows/Linux close behavior is a persisted preference stored by Electron main in `<data>/close-behavior.json`. `ask` is the transient unset state: the first close shows a native modal (Cancel / Close to tray / Quit); picking one persists it forever, Cancel keeps the window open and unset. Only `tray` and `quit` are ever settable — Settings -> General renders a two-option radio segment (Close to tray / Quit app) for Windows/Linux only, and `pi-desktop/window/closeBehavior/set` rejects `ask`, so a choice can be switched but never reverted to prompting. `tray` hides the window under the resident D216 tray icon (click restores, menu shows or quits); switching to `quit` leaves that icon in place, because minimize-to-tray still needs it. Close interception runs for every non-macOS close that is not already an approved quit; `quitting` and macOS closes fall through, a `quit` close calls `app.quit()` itself, and `window-all-closed` stays silent only under `tray`, so the boot probe and explicit quits are unaffected and a resident tray never keeps a `quit` session alive. `closeBehavior/set` also fails with `INVALID_ARGUMENT` on macOS. The bounds watchdog skips minimized and hidden windows so a tray-hidden window is never force-restored. macOS keeps the native Dock lifecycle (D216, ADR 0078, ADR 0090).** | Minimizing already hides the window into the D216 tray; the gap was close: it quit outright on Windows/Linux. A fixed close-to-tray would surprise users who expect exit, so the choice is asked once, remembered, and revisitable in Settings — matching how Codex-style shells keep long-running sessions alive without taking over the close button. |
 
 ## P. Transcript storage decisions
 
@@ -1044,7 +1047,7 @@ D193, and D194.
 - Blocks are built on expansion only and highlighting is skipped above 100 KB or
   800 lines; lists and diffs are capped and report the hidden remainder.
 - Decision D192; renderer-only presentation, so no ADR. See
-  `04-ux/08-component-spec.md` §9 and E2E-097.
+  `04-ux/08-component-spec.md` §9 and E2E-145.
 
 ## 2026-08-05 — A silent assistant turn re-runs once before it is an error
 
@@ -1066,7 +1069,7 @@ D193, and D194.
   prompt, so overflow recovery in the same prompt cannot multiply attempts.
 - Decision D193; recovery inside the existing loop contract, so no ADR. See
   `03-runtime/02-agent-runtime.md` §5e, `03-runtime/08-error-codes.md` §3.2,
-  and E2E-098.
+  and E2E-146.
 
 ## 2026-08-05 — Per-tool output budgets, scoped search, and stated collaboration rules
 
@@ -1095,7 +1098,7 @@ D193, and D194.
   model executed it as saying nothing.
 - Decision D194; tool schemas widen without breaking callers and prompt text is
   not an interface, so no ADR. See `03-runtime/16-tool-result-limits.md`,
-  `03-runtime/02-agent-runtime.md` §7, and E2E-099.
+  `03-runtime/02-agent-runtime.md` §7, and E2E-147.
 
 ## 2026-08-05 — MCP servers and skills the user owns, scoped per project
 
@@ -1806,6 +1809,7 @@ D193, and D194.
   ADR 0088, `07-plugins/02-plugin-manifest-schema.md` §5.2,
   `07-plugins/04-plugin-security.md` §6, and
   `07-plugins/13-plugin-permissions-matrix.md`.
+
 ## 2026-08-16 — Proactive background subagent delegation
 
 - `Task` stops blocking: it starts a delegate in the background and returns a
@@ -1825,16 +1829,22 @@ D193, and D194.
   and a new write-capable `fixer` implements multi-file changes from a complete
   spec (`tools: [Read, Glob, Grep, Edit, Write, Bash]`, `maxTurns: 40`,
   `<summary>`/`<changes>`/`<verification>` report shape).
-- Definitions may declare `permission: inherit | ask | accept-edits | auto`
-  (default `inherit`). The sidecar attaches the scope to the delegate's
-  `tools.execute` calls; host-core resolves the call under that mode instead of
-  the session's effective permission mode, with the contract modes' hard deny
-  and the external-path gate still in force. `fixer` ships with
-  `accept-edits`, so it writes inside the workspace without prompting while
-  Bash and external paths keep the session's behavior.
+- Builtin and user definitions may declare `permission: inherit | ask |
+  accept-edits | auto` (default `inherit`). The sidecar attaches the scope to
+  the delegate's `tools.execute` calls; host-core resolves the call under that
+  mode instead of the session's effective permission mode, with the contract
+  modes' hard deny and the external-path gate still in force. A project
+  definition may not declare a scope: it arrives with the repository, so the
+  declaration is dropped at parse time with a warning and its delegates run
+  under the session's effective mode. `fixer` ships with `accept-edits`, so it
+  writes inside the workspace without prompting while Bash and external paths
+  keep the session's behavior.
+- `TaskWait` blocks the turn, so its `timeoutSeconds` defaults to 600 and is
+  clamped to 900. A timeout returns the finished reports plus a note to call
+  again, so the ceiling costs one round-trip and keeps Stop responsive.
 - `MAX_SUBAGENT_CONCURRENCY` becomes a per-session running cap of 10; `Task`
   fails with a tool error when the session already runs 10 delegates.
-- Decision D228 amends D201/ADR 0062 and touches the sidecar, host-core's
+- Decision D231 amends D201/ADR 0062 and touches the sidecar, host-core's
   `tools.execute` permission resolution, the builtin definitions, the system
   prompt, and the renderer's tool presentation mapping. See ADR 0089 and
   `03-runtime/02-agent-runtime.md` §5f/§5f.1.
