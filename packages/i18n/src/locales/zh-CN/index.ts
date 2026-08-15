@@ -332,6 +332,7 @@ export const zhCN = {
       completed: "已完成",
       truncated: "达到轮次上限",
       aborted: "已停止",
+      stopped: "已按请求停止",
       failed: "失败",
       denied: "已拒绝",
     },

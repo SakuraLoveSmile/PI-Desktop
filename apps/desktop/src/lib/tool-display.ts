@@ -20,8 +20,9 @@ const SUMMARY_KEYS: Record<ToolAction, string[]> = {
   fetch: ["url", "query"],
   fork: ["prompt", "task", "description", "name"],
   // `description` is the short label the model writes for the delegation; the
-  // `task` brief is a paragraph and belongs in the expanded detail.
-  delegate: ["description", "agent"],
+  // `task` brief is a paragraph and belongs in the expanded detail. The
+  // lifecycle tools (ADR 0089) summarize by delegation id.
+  delegate: ["description", "agent", "delegationids", "delegationId"],
   use: [
     "command",
     "cmd",
@@ -51,21 +52,40 @@ export function formatToolValue(value: unknown): string {
   }
 }
 
+/** The tool that STARTS a subagent (ADR 0062). The lifecycle tools of ADR 0089
+ * (TaskWait/TaskList/TaskStop) drive an existing delegation and are not
+ * delegation activity items themselves. */
+export function isDelegationStartTool(toolName?: string): boolean {
+  const bare = (toolName || "")
+    .split(".")
+    .pop()!
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  return bare === "task" || bare === "subagent";
+}
+
 export function getToolAction(toolName?: string): ToolAction {
   const normalized = (toolName || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
   const matches = (aliases: string[]) =>
     aliases.some(
       (alias) => normalized === alias || normalized.endsWith(alias),
     );
-  // Delegation (ADR 0062) is matched on the exact name, minus any provider
-  // namespace: a plugin tool called "CreateTask" is not a subagent call and
-  // keeps its generic presentation.
+  // Delegation (ADR 0062, ADR 0089) is matched on the exact name, minus any
+  // provider namespace: a plugin tool called "CreateTask" is not a subagent
+  // call and keeps its generic presentation.
   const bare = (toolName || "")
     .split(".")
     .pop()!
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "");
-  if (bare === "task" || bare === "subagent") return "delegate";
+  if (
+    isDelegationStartTool(toolName) ||
+    bare === "taskwait" ||
+    bare === "tasklist" ||
+    bare === "taskstop"
+  ) {
+    return "delegate";
+  }
   if (matches(["websearch", "searchquery", "fetch", "http", "browser"])) {
     return "fetch";
   }

@@ -12,9 +12,11 @@
  *   Child messages and tool rows are emitted for the transcript and persisted
  *   for review, but the session runtime filters them out when it rebuilds
  *   model context.
- * - A delegate's lifecycle never reaches Electron main's turn handling. Its
- *   termination — success, failure, cap, abort — collapses into the `Task`
- *   tool result, so the parent turn stays the only thing that can end a turn.
+ * - A delegate's lifecycle never reaches Electron main's turn handling. It
+ *   runs in the background under the session runtime (ADR 0089): `Task`
+ *   starts it and returns, `TaskWait` converges on it, and its termination —
+ *   success, failure, cap, abort — collapses into the `TaskWait` result, so
+ *   the parent turn stays the only thing that can end a turn.
  */
 
 import { randomUUID } from "node:crypto";
@@ -51,6 +53,12 @@ import {
 } from "./provider-binding.js";
 
 export const SUBAGENT_TOOL_NAME = "Task";
+/** Converge on running delegations and read their reports (ADR 0089). */
+export const SUBAGENT_WAIT_TOOL_NAME = "TaskWait";
+/** Report on the session's delegations without waiting (ADR 0089). */
+export const SUBAGENT_LIST_TOOL_NAME = "TaskList";
+/** Stop running delegations (ADR 0089). */
+export const SUBAGENT_STOP_TOOL_NAME = "TaskStop";
 
 const PROVIDER_REQUEST_MAX_RETRIES = 1;
 const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;

@@ -8,6 +8,7 @@ import {
   getToolSummary,
   getToolSummaryKey,
   getToolSummaryValue,
+  isDelegationStartTool,
 } from "../src/lib/tool-display.ts";
 
 test("maps built-in tools to concise Codex-style actions", () => {
@@ -25,6 +26,15 @@ test("maps built-in tools to concise Codex-style actions", () => {
 test("delegation is its own action, matched exactly", () => {
   assert.equal(getToolAction("Task"), "delegate");
   assert.equal(getToolAction("functions.subagent"), "delegate");
+  // The lifecycle tools of ADR 0087 share the delegation presentation...
+  assert.equal(getToolAction("TaskWait"), "delegate");
+  assert.equal(getToolAction("TaskList"), "delegate");
+  assert.equal(getToolAction("TaskStop"), "delegate");
+  // ...but only the start tool is a delegation activity item.
+  assert.equal(isDelegationStartTool("Task"), true);
+  assert.equal(isDelegationStartTool("functions.subagent"), true);
+  assert.equal(isDelegationStartTool("TaskWait"), false);
+  assert.equal(isDelegationStartTool("TaskStop"), false);
   // A plugin tool that merely mentions tasks keeps its generic presentation.
   assert.equal(getToolAction("CreateTask"), "use");
   assert.equal(getToolAction("plugin_tasks_list"), "list");

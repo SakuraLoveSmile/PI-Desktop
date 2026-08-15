@@ -1766,7 +1766,7 @@ D193, and D194.
   channels, and storage schema are unchanged. See
   `03-runtime/18-line-anchored-edit-contract.md` §9.3,
   `03-runtime/03-tools-and-permissions.md` §4d,
-  `03-runtime/08-error-codes.md` §3.3, ADR 0087, and E2E-140/E2E-141.
+  `03-runtime/08-error-codes.md` §3.3, ADR 0089, and E2E-140/E2E-141.
 
 ## 2026-08-15 — A file permission carries a range, and a delete is recoverable
 
@@ -1808,3 +1808,35 @@ D193, and D194.
   ADR 0088, `07-plugins/02-plugin-manifest-schema.md` §5.2,
   `07-plugins/04-plugin-security.md` §6, and
   `07-plugins/13-plugin-permissions-matrix.md`.
+## 2026-08-16 — Proactive background subagent delegation
+
+- `Task` stops blocking: it starts a delegate in the background and returns a
+  `delegationId` immediately. Three new Agent-mode core tools drive the
+  lifecycle — `TaskWait` (converge on running delegations, `mode: "any"` +
+  `minCompleted` for early convergence, settled delegations re-readable by id),
+  `TaskList` (status report) and `TaskStop` (stop running delegations). The
+  runtime owns a per-session delegation registry; delegates still running at
+  run end, on parent abort, or on dispose are stopped.
+- The base system prompt gains a `## Delegation` section (when the catalog is
+  non-empty) with positive trigger patterns — parallel exploration, adversarial
+  review, multi-file implementation, context-economy searches, batch sharding —
+  and convergence rules; the `Task` description is rewritten to lead with those
+  triggers.
+- Builtins grow to four: `explorer` is rewritten in the omo-slim style
+  (tool-choice guidance, parallel searches, `<files>`/`<answer>` report shape),
+  and a new write-capable `fixer` implements multi-file changes from a complete
+  spec (`tools: [Read, Glob, Grep, Edit, Write, Bash]`, `maxTurns: 40`,
+  `<summary>`/`<changes>`/`<verification>` report shape).
+- Definitions may declare `permission: inherit | ask | accept-edits | auto`
+  (default `inherit`). The sidecar attaches the scope to the delegate's
+  `tools.execute` calls; host-core resolves the call under that mode instead of
+  the session's effective permission mode, with the contract modes' hard deny
+  and the external-path gate still in force. `fixer` ships with
+  `accept-edits`, so it writes inside the workspace without prompting while
+  Bash and external paths keep the session's behavior.
+- `MAX_SUBAGENT_CONCURRENCY` becomes a per-session running cap of 10; `Task`
+  fails with a tool error when the session already runs 10 delegates.
+- Decision D228 amends D201/ADR 0062 and touches the sidecar, host-core's
+  `tools.execute` permission resolution, the builtin definitions, the system
+  prompt, and the renderer's tool presentation mapping. See ADR 0089 and
+  `03-runtime/02-agent-runtime.md` §5f/§5f.1.

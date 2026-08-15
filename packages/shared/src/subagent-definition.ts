@@ -39,6 +39,13 @@ export type SubagentDefinition = {
   model?: SubagentModelPin;
   /** Reasoning level for the delegate, clamped against the model in main. */
   thinkingLevel?: ThinkingLevel;
+  /**
+   * Permission scope for the delegate's tool calls (ADR 0089). `inherit`
+   * follows the session's effective mode; the other values override it for the
+   * delegate's calls only, with host-core's external-path gate still in force
+   * (a delegate never unlocks paths outside the workspace and scratch roots).
+   */
+  permission?: SubagentPermission;
   /** Hard cap on delegate turns; keeps a runaway delegate bounded. */
   maxTurns: number;
   /** Markdown body used as the delegate's system prompt. */
@@ -77,10 +84,32 @@ export const DEFAULT_SUBAGENT_TOOLS: readonly SubagentAssignableTool[] = [
 export const DEFAULT_SUBAGENT_MAX_TURNS = 24;
 export const MAX_SUBAGENT_MAX_TURNS = 80;
 
+/**
+ * Permission scope a delegate's tool calls resolve under, when its definition
+ * overrides the session mode. Mirrors the session permission modes; `inherit`
+ * is the default and means "use the session's effective mode as today".
+ */
+export const SUBAGENT_PERMISSIONS = [
+  "inherit",
+  "ask",
+  "accept-edits",
+  "auto",
+] as const;
+export type SubagentPermission = (typeof SUBAGENT_PERMISSIONS)[number];
+export const DEFAULT_SUBAGENT_PERMISSION: SubagentPermission = "inherit";
+
+export function isSubagentPermission(value: unknown): value is SubagentPermission {
+  return (
+    typeof value === "string" &&
+    (SUBAGENT_PERMISSIONS as readonly string[]).includes(value)
+  );
+}
+
 /** Caps that keep delegation cheap and predictable (see ADR 0062). */
 export const MAX_SUBAGENT_DEFINITIONS = 16;
 export const MAX_SUBAGENT_PROVIDERS = 8;
-export const MAX_SUBAGENT_CONCURRENCY = 4;
+/** Running delegates per session, across batches (see ADR 0089). */
+export const MAX_SUBAGENT_CONCURRENCY = 10;
 
 const NAME_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
@@ -262,6 +291,21 @@ export function parseSubagentDefinition(
     }
   }
 
+  const declaredPermission = asScalar(frontmatter.get("permission"))?.trim();
+  let permission: SubagentPermission | undefined;
+  if (declaredPermission) {
+    const candidate = declaredPermission.toLowerCase();
+    if (isSubagentPermission(candidate)) {
+      if (candidate !== DEFAULT_SUBAGENT_PERMISSION) {
+        permission = candidate;
+      }
+    } else {
+      warnings.push(
+        `ignoring unknown permission "${declaredPermission}" (use inherit, ask, accept-edits or auto)`,
+      );
+    }
+  }
+
   const maxTurns = parseMaxTurns(asScalar(frontmatter.get("maxturns")), warnings);
 
   const prompt = body.trim();
@@ -276,6 +320,7 @@ export function parseSubagentDefinition(
       tools,
       ...(model ? { model } : {}),
       ...(thinkingLevel ? { thinkingLevel } : {}),
+      ...(permission ? { permission } : {}),
       maxTurns,
       prompt,
       source: options.source,

@@ -1727,7 +1727,7 @@ D193 和 D194。
 - 决策 D228 修订 D186，且仅涉及运行时。协议、主机 RPC、IPC 通道与存储 schema 均未改变。
   参见 `03-runtime/18-line-anchored-edit-contract.md` §9.3、
   `03-runtime/03-tools-and-permissions.md` §4d、
-  `03-runtime/08-error-codes.md` §3.3、ADR 0087，以及 E2E-140/E2E-141。
+  `03-runtime/08-error-codes.md` §3.3、ADR 0089，以及 E2E-140/E2E-141。
 
 ## 2026-08-15 — 文件权限带着范围，删除可以恢复
 
@@ -1763,3 +1763,27 @@ D193 和 D194。
   `07-plugins/02-plugin-manifest-schema.md` §5.2、
   `07-plugins/04-plugin-security.md` §6 以及
   `07-plugins/13-plugin-permissions-matrix.md`。
+## 2026-08-16 — 主动后台子代理委托
+
+- `Task` 不再阻塞：它在后台启动一个委托并立即返回 `delegationId`。三个
+  新的 Agent 模式核心工具驱动生命周期 —— `TaskWait`（收敛运行中的委托，
+  `mode: "any"` + `minCompleted` 提前收敛，已结算的委托可按 id 重读）、
+  `TaskList`（状态报告）和 `TaskStop`（停止运行中的委托）。运行时持有
+  每会话委托注册表；回合结束、父级中止或销毁时仍在运行的委托会被停止。
+- 基础系统提示词新增 `## Delegation` 章节（目录非空时），列出积极触发
+  模式 —— 并行探索、对抗审查、多文件实现、省上下文的搜索、批量分片 ——
+  以及收敛规则；`Task` 描述重写为以这些触发模式开头。
+- 内置增长为四个：`explorer` 按 omo-slim 风格重写（工具选择指引、并行
+  搜索、`<files>`/`<answer>` 报告格式）；新增可写的 `fixer`，从完整规格
+  实现多文件改动（`tools: [Read, Glob, Grep, Edit, Write, Bash]`、
+  `maxTurns: 40`、`<summary>`/`<changes>`/`<verification>` 报告格式）。
+- 定义可声明 `permission: inherit | ask | accept-edits | auto`（默认
+  `inherit`）。sidecar 将作用域附加到委托的 `tools.execute` 调用；
+  host-core 在该模式下裁决调用，而不是使用会话的有效权限模式，契约模式
+  的硬拒绝和外部路径门禁仍然生效。`fixer` 随 `accept-edits` 发布，因此它
+  在工作区内免提示写入，而 Bash 和外部路径保持会话行为。
+- `MAX_SUBAGENT_CONCURRENCY` 变为每会话 10 个运行委托的上限；会话已有
+  10 个委托在运行时 `Task` 以工具错误失败。
+- 决策 D228 修订 D201/ADR 0062，触及 sidecar、host-core 的
+  `tools.execute` 权限裁决、内置定义、系统提示词和渲染器的工具呈现映射。
+  参见 ADR 0089 与 `03-runtime/02-agent-runtime.md` §5f/§5f.1。

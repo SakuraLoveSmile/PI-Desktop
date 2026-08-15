@@ -337,6 +337,7 @@ export const en = {
       completed: "Completed",
       truncated: "Turn limit reached",
       aborted: "Stopped",
+      stopped: "Stopped by request",
       failed: "Failed",
       denied: "Denied",
     },
