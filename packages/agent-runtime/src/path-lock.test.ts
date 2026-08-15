@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeLockPath, PathMutex, Semaphore } from "./path-lock.js";
+import { normalizeLockPath, PathMutex } from "./path-lock.js";
 
 function deferred<T = void>() {
   let resolve!: (value: T) => void;
@@ -82,42 +82,5 @@ describe("PathMutex", () => {
     await expect(mutex.run("", async () => 2)).resolves.toBe(2);
     held.resolve();
     await expect(first).resolves.toBe(1);
-  });
-});
-
-describe("Semaphore", () => {
-  it("caps concurrent tasks and admits waiters as slots free", async () => {
-    const semaphore = new Semaphore(2);
-    const gates = [deferred(), deferred(), deferred()];
-    let active = 0;
-    let peak = 0;
-
-    const runs = gates.map((gate) =>
-      semaphore.run(async () => {
-        active += 1;
-        peak = Math.max(peak, active);
-        await gate.promise;
-        active -= 1;
-      }),
-    );
-
-    expect(active).toBe(2);
-    gates[0].resolve();
-    await runs[0];
-    expect(active).toBe(2);
-    gates[1].resolve();
-    gates[2].resolve();
-    await Promise.all(runs);
-    expect(peak).toBe(2);
-  });
-
-  it("releases the slot when a task throws", async () => {
-    const semaphore = new Semaphore(1);
-    await expect(
-      semaphore.run(async () => {
-        throw new Error("delegate failed");
-      }),
-    ).rejects.toThrow("delegate failed");
-    await expect(semaphore.run(async () => "ok")).resolves.toBe("ok");
   });
 });

@@ -147,8 +147,15 @@ export const ASK_TOOL_NAME = "asktool";
  * be re-read by id without re-running it.
  */
 const MAX_RETAINED_DELEGATIONS = 100;
+/**
+ * `TaskWait` blocks the turn, and the model picks the timeout, so the ceiling
+ * is what bounds how long a session can look hung with no way to intervene.
+ * A timeout is not a failure — it returns the finished reports plus a note to
+ * call again — so a shorter ceiling costs one cheap round-trip and buys the
+ * user a responsive Stop.
+ */
 const TASKWAIT_DEFAULT_TIMEOUT_SECONDS = 600;
-const TASKWAIT_MAX_TIMEOUT_SECONDS = 3_600;
+const TASKWAIT_MAX_TIMEOUT_SECONDS = 900;
 /**
  * A `TaskWait` result is the parent's context; like a delegate's report, it
  * must not become the context problem delegation exists to avoid.
