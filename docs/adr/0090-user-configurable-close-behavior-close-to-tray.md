@@ -1,4 +1,4 @@
-# ADR 0071: User-Configurable Close Behavior with Close-to-Tray
+# ADR 0090: User-Configurable Close Behavior with Close-to-Tray
 
 - Status: Accepted for implementation
 - Date: 2026-08-12

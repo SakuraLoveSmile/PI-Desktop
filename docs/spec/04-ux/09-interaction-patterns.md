@@ -114,7 +114,7 @@ recency only breaks ties between equally relevant matches.
   window events, so the restore affordance never depends only on optimistic
   renderer state.
 - Minimize is always a native minimize and keeps the taskbar/dock entry.
-  Windows/Linux close behavior is user-configurable (ADR 0071): an unset
+  Windows/Linux close behavior is user-configurable (ADR 0090): an unset
   preference asks once via a native prompt (Cancel / Close to tray / Quit);
   `tray` hides the window and keeps the app running under a system-tray
   icon whose click restores the window; `quit` exits the app. The choice is

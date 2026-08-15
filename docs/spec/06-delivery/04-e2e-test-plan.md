@@ -2221,7 +2221,7 @@ Each scenario is documented in this format:
   probe (`app.quit`) exits without prompting.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `04-ux/01-ui-ia.md`, `04-ux/09-interaction-patterns.md`,
-  `08-meta/decisions-log.md` (D210), ADR 0071
+  `08-meta/decisions-log.md` (D210), ADR 0090
 - **Acceptance**: A (app startup), Quality
 - **Milestone**: M5 on Windows/Linux (release qualification)
 - **Status**: Draft

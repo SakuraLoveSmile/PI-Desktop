@@ -1052,7 +1052,7 @@ window/control({ action: WindowControlAction })
   -> { maximized: boolean }
 ```
 
-Windows/Linux close behavior (D210, ADR 0071) is read and written through
+Windows/Linux close behavior (D210, ADR 0090) is read and written through
 two additive Main-owned channels. `closeBehavior/get` returns the persisted
 preference and whether the platform supports it (macOS keeps the native
 Dock lifecycle and reports `supported: false`); `closeBehavior/set`
