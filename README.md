@@ -154,6 +154,37 @@ git push origin main v0.2.0            # Release workflow builds & publishes
 - [Plugin system](docs/spec/07-plugins/01-plugin-system.md)
 - [ADRs](docs/adr/) · [Milestones](docs/spec/06-delivery/01-mvp-milestones.md) · [Agent guide](AGENTS.md)
 
+## Open-source acknowledgements
+
+PI-Desktop is built with and informed by these open-source projects:
+
+- **Agent runtime:** [pi-mono](https://github.com/badlogic/pi-mono), whose
+  `pi-ai` and `pi-agent-core` packages provide the agent loop and provider
+  abstractions.
+- **Desktop and UI foundation:** [Electron](https://github.com/electron/electron),
+  [React](https://github.com/facebook/react),
+  [Vite](https://github.com/vitejs/vite),
+  [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss),
+  [Lucide](https://github.com/lucide-icons/lucide),
+  [xterm.js](https://github.com/xtermjs/xterm.js),
+  [Shiki](https://github.com/shikijs/shiki),
+  [Mermaid](https://github.com/mermaid-js/mermaid),
+  [KaTeX](https://github.com/KaTeX/KaTeX),
+  [TypeBox](https://github.com/sinclairzx81/typebox), and
+  [i18next](https://github.com/i18next/i18next).
+- **Behavioral and visual references:**
+  [OpenAI Codex](https://github.com/openai/codex) informs parts of the shell
+  and context-management UX. [OpenCode DCP](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning)
+  was studied as a behavioral reference for context compaction; it is not a
+  PI-Desktop dependency, and no code is copied from it.
+- **Bundled fonts:** [Geist](https://github.com/vercel/geist-font),
+  [Inter](https://github.com/rsms/inter),
+  [Noto Sans SC](https://github.com/google/fonts) (Source Han Sans lineage),
+  and [LXGW WenKai](https://github.com/lxgw/LxgwWenKai), which includes work
+  from [Klee](https://github.com/fontworks-fonts/Klee). Their SIL Open Font
+  License texts are included under
+  [`apps/desktop/src/assets/fonts/licenses/`](apps/desktop/src/assets/fonts/licenses/).
+
 ## License
 
 TBD — a license will be finalized before the first stable release.

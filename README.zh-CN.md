@@ -152,6 +152,35 @@ git push origin main v0.2.0            # Release 工作流自动构建并发布
 - [插件系统](docs/spec/07-plugins/01-plugin-system.md)
 - [ADR](docs/adr/) · [里程碑](docs/spec/06-delivery/01-mvp-milestones.md) · [智能体指南](AGENTS.md)
 
+## 开源项目致谢
+
+PI-Desktop 的构建和设计参考了以下开源项目：
+
+- **智能体运行时：** [pi-mono](https://github.com/badlogic/pi-mono)。其中的
+  `pi-ai` 和 `pi-agent-core` 提供了智能体循环与模型供应商抽象。
+- **桌面与界面基础：** [Electron](https://github.com/electron/electron)、
+  [React](https://github.com/facebook/react)、
+  [Vite](https://github.com/vitejs/vite)、
+  [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss)、
+  [Lucide](https://github.com/lucide-icons/lucide)、
+  [xterm.js](https://github.com/xtermjs/xterm.js)、
+  [Shiki](https://github.com/shikijs/shiki)、
+  [Mermaid](https://github.com/mermaid-js/mermaid)、
+  [KaTeX](https://github.com/KaTeX/KaTeX)、
+  [TypeBox](https://github.com/sinclairzx81/typebox) 和
+  [i18next](https://github.com/i18next/i18next)。
+- **行为与视觉参考：** [OpenAI Codex](https://github.com/openai/codex) 为
+  部分外壳和上下文管理交互提供参考。[OpenCode DCP](https://github.com/Opencode-DCP/opencode-dynamic-context-pruning)
+  曾作为上下文压缩的行为参考；它不是 PI-Desktop 的依赖，项目也没有复制
+  其中的代码。
+- **随应用打包的字体：** [Geist](https://github.com/vercel/geist-font)、
+  [Inter](https://github.com/rsms/inter)、
+  [Noto Sans SC](https://github.com/google/fonts)（Source Han Sans 系列）和
+  [LXGW WenKai](https://github.com/lxgw/LxgwWenKai)，后者包含
+  [Klee](https://github.com/fontworks-fonts/Klee) 项目的工作。它们的 SIL
+  Open Font License 文本位于
+  [`apps/desktop/src/assets/fonts/licenses/`](apps/desktop/src/assets/fonts/licenses/)。
+
 ## 许可证
 
 待定 — 将在首个正式版本发布前确定。
