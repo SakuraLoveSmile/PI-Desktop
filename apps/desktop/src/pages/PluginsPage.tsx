@@ -943,7 +943,7 @@ export function PluginsPage() {
             >
               <button
                 type="button"
-                className="plugins-icon-btn is-bordered"
+                className="plugins-icon-btn plugins-header-menu"
                 aria-label={t("plugins.moreActions")}
                 title={t("plugins.moreActions")}
                 aria-haspopup="menu"

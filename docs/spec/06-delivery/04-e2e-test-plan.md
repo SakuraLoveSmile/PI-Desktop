@@ -1107,7 +1107,9 @@ Each scenario is documented in this format:
   secondary update/action button. 5)
   Switch to light theme and repeat. 6) Keyboard-focus the Details disclosure,
   scope states, and each action.
-- **Expected**: The four numeric overview cards are absent; tab counts,
+- **Expected**: The four numeric overview cards are absent; the header uses a
+  quiet 24px extension mark, 18px title, restrained 30px action controls, and
+  a visible keyboard focus ring; tab counts,
   installed group counts, and any update alert remain available in their
   relevant surfaces. The page header, section headers, empty states, and update
   alert use compact labels and actions; decision-specific explanations remain

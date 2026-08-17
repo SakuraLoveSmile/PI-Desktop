@@ -15,19 +15,19 @@
   gap: 10px;
 }
 
-/* The page header and segmented row form one compact tool surface. */
+/* The page header and segmented row form one quiet tool surface. */
 .plugins-page > .page-header.plugins-page-header {
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   margin: 0;
-  padding: 0 0 10px;
+  padding: 0 0 12px;
   border-bottom: 1px solid var(--ds-border-subtle);
 }
 
 .plugins-title-block {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
 }
 
@@ -35,14 +35,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   flex: 0 0 auto;
-  border: 1px solid var(--ds-border-default);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-sm);
   color: var(--ds-text-secondary);
-  background: var(--ds-bg-secondary);
-  box-shadow: inset 0 0 0 0.5px var(--ds-border-subtle);
+  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
 }
 
 .plugins-title-copy {
@@ -50,19 +49,48 @@
 }
 
 .plugins-title-copy .page-title {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium-plus);
+  line-height: var(--leading-tighter);
   letter-spacing: var(--tracking-tight);
 }
 
 .plugins-header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex: 0 0 auto;
   /* The page sits under the absolute titlebar band, which is a native drag
      rectangle: without this the window moves instead of the button reacting. */
   -webkit-app-region: no-drag;
   app-region: no-drag;
+}
+
+.plugins-header-actions > .btn {
+  min-height: 30px;
+  border-radius: var(--radius-2xs);
+  padding: 5px 10px;
+  font-size: var(--text-xs-plus);
+}
+
+.plugins-header-menu {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-2xs);
+  color: var(--ds-text-muted);
+  background: transparent;
+  box-shadow: none;
+}
+
+.plugins-header-menu:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.plugins-header-menu:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 35%, transparent);
 }
 
 /* Pending-update banner: shown only while updates exist. */
