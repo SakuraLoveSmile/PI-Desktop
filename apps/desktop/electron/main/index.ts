@@ -58,6 +58,7 @@ import {
   type McpServerRecord,
   type Mode,
   type NativeMenuAction,
+  type OAuthRespondInput,
   type PlanExecution,
   type PlanExecutionFinishStatus,
   type PlanResolutionResult,
@@ -113,6 +114,7 @@ import { collectWorkspaceDiff } from "./git-diff";
 import { PtyManager } from "./terminal";
 import { BrowserPane, resolveLocalFile } from "./browser-view";
 import { discoverProviderModels } from "./model-discovery";
+import { OAUTH_AUTH_KIND, VendorOAuth } from "./oauth";
 import { listDir, readWorkspaceFile, resolveWithinRoot } from "./fs-panel";
 import { getWorkspaceFileIndex } from "./fs-index";
 import { saveComposerPasteFiles } from "./composer-paste";
@@ -465,6 +467,21 @@ const updater = new AppUpdaterController({
   getLocale: () => updaterLocale,
 });
 
+/**
+ * Vendor-account logins. Holds the pi-ai credential plumbing so tokens stay in
+ * this process; the renderer sees progress events and the sidecar sees only
+ * resolved request auth.
+ */
+const vendorOAuth = new VendorOAuth({
+  call: <T,>(method: string, params?: unknown): Promise<T> => {
+    if (!host) throw new Error("host unavailable");
+    return host.call<T>(method, params);
+  },
+  emit: (event) => sendToRenderer(IPC.event.providersOauth, event),
+  openExternal: (url) => shell.openExternal(url),
+  log: (level, message, data) => logger.app("provider", level, message, { data }),
+});
+
 type RuntimeProvider = {
   id: string;
   name: string;
@@ -476,6 +493,8 @@ type RuntimeProvider = {
   authKind?: string;
   apiStyle?: string;
   hasSecret?: boolean;
+  hasOauth?: boolean;
+  oauthAccountLabel?: string;
   enabled?: boolean;
 };
 
@@ -4990,10 +5009,26 @@ function registerIpc() {
       { id },
     );
     if (!local.ok) return { ...local, network: "skipped" };
-    const detail = await host.call<{ provider?: { baseUrl?: string; authKind?: string } }>(
-      "providers.get",
-      { id },
-    );
+    const detail = await host.call<{
+      provider?: { baseUrl?: string; authKind?: string; vendorKey?: string };
+    }>("providers.get", { id });
+    // A vendor account proves itself by resolving auth — refreshing the token
+    // if it has expired — not by probing /models with a key it does not have.
+    if (detail.provider?.authKind === OAUTH_AUTH_KIND) {
+      const vendorKey = detail.provider.vendorKey;
+      if (!vendorKey) return { ...local, network: "skipped" };
+      try {
+        await vendorOAuth.resolveAuth(vendorKey);
+        return { ok: true, network: "ok" };
+      } catch (e) {
+        return {
+          ok: false,
+          network: "failed",
+          errorCode: ErrorCodes.PROVIDER_UNAUTHORIZED,
+          message: e instanceof Error ? e.message : String(e),
+        };
+      }
+    }
     const baseUrl = detail.provider?.baseUrl;
     if (!baseUrl) return { ...local, network: "skipped" };
     const secret = await host.call<{ value?: string }>("providers.getSecret", { id });
@@ -5032,6 +5067,34 @@ function registerIpc() {
       clearTimeout(timer);
     }
   });
+  // Vendor-account login. The renderer drives the conversation but never sees
+  // credential material: it gets progress events and a provider row id.
+  handle(IPC.invoke.providersOauthVendors, async () => {
+    return { vendors: await vendorOAuth.listVendors() };
+  });
+  handle(IPC.invoke.providersOauthStart, async (vendorId: unknown) => {
+    if (typeof vendorId !== "string" || !vendorId) {
+      throw new Error("vendorId required");
+    }
+    return vendorOAuth.start(vendorId);
+  });
+  handle(IPC.invoke.providersOauthRespond, async (input: unknown) => {
+    const request = (input ?? {}) as OAuthRespondInput;
+    if (!request.loginId || !request.promptId) {
+      throw new Error("loginId and promptId required");
+    }
+    return { ok: vendorOAuth.respond(request) };
+  });
+  handle(IPC.invoke.providersOauthCancel, async (loginId: unknown) => {
+    return { ok: typeof loginId === "string" && vendorOAuth.cancel(loginId) };
+  });
+  handle(IPC.invoke.providersOauthLogout, async (vendorId: unknown) => {
+    if (typeof vendorId !== "string" || !vendorId) {
+      throw new Error("vendorId required");
+    }
+    await vendorOAuth.logout(vendorId);
+    return { ok: true };
+  });
   handle(
     IPC.invoke.providersListModels,
     async (
@@ -5053,19 +5116,24 @@ function registerIpc() {
         : undefined;
       const baseUrl = (req.baseUrl ?? provider?.baseUrl ?? "").trim();
       const apiStyle = req.apiStyle ?? provider?.apiStyle ?? "chat_completions";
-      const decorate = (model: {
-        modelId: string;
-        displayName: string;
-        capabilities?: string[];
-        contextWindow?: number;
-        source?: "bundled" | "discovered" | "user";
-      }) => {
+      const decorate = (
+        model: {
+          modelId: string;
+          displayName: string;
+          capabilities?: string[];
+          contextWindow?: number;
+          source?: "bundled" | "discovered" | "user";
+        },
+        // Vendor accounts can span wire APIs, so a model may need a style of
+        // its own rather than the row's.
+        modelApiStyle: string = apiStyle,
+      ) => {
         const capabilities = new Set(model.capabilities ?? ["text"]);
         capabilities.add("text");
         const modelRef = {
           vendorKey: provider?.vendorKey || "custom",
           modelId: model.modelId,
-          apiStyle,
+          apiStyle: modelApiStyle,
         };
         const piModel = resolvePiModelConfig(modelRef);
         const thinking = resolveThinkingCapabilities(modelRef);
@@ -5085,6 +5153,33 @@ function registerIpc() {
         };
       };
 
+      // A signed-in vendor account has no key to probe /models with, and pi-ai
+      // already knows which models the account may use (Copilot narrows the
+      // list to the subscription).
+      if (provider?.authKind === OAUTH_AUTH_KIND && provider.vendorKey) {
+        try {
+          const options = await vendorOAuth.listModels(provider.vendorKey);
+          if (options.length > 0) {
+            return {
+              models: options.map((option) =>
+                decorate(
+                  { modelId: option.modelId, displayName: option.displayName },
+                  option.apiStyle,
+                ),
+              ),
+              source: "remote" as const,
+            };
+          }
+        } catch (e) {
+          logger.app("provider", "warn", "vendor account model list failed", {
+            data: {
+              providerId: provider.id,
+              error: e instanceof Error ? e.message : String(e),
+            },
+          });
+        }
+      }
+
       if (req.source === "cache" && provider) {
         const cached = await host.call<{
           models: Array<{
@@ -5096,7 +5191,10 @@ function registerIpc() {
           }>;
         }>("providers.listModels", { providerId: provider.id });
         if (cached.models.length > 0) {
-          return { models: cached.models.map(decorate), source: "cache" as const };
+          return {
+            models: cached.models.map((model) => decorate(model)),
+            source: "cache" as const,
+          };
         }
         const fallback = provider.defaultModelId
           ? [decorate({
@@ -5122,7 +5220,7 @@ function registerIpc() {
         try {
           const discovered = await discoverProviderModels({ baseUrl, apiKey, apiStyle });
           if (discovered.length > 0) {
-            const models = discovered.map(decorate);
+            const models = discovered.map((model) => decorate(model));
             const savedBaseUrl = (provider?.baseUrl ?? "").trim().replace(/\/+$/, "");
             const requestBaseUrl = baseUrl.replace(/\/+$/, "");
             const usesSavedEndpoint =

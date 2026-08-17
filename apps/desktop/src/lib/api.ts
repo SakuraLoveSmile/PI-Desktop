@@ -29,6 +29,10 @@ import type {
   McpServerRecord,
   McpServerStatus,
   OnboardingState,
+  OAuthLoginEvent,
+  OAuthRespondInput,
+  OAuthStartResult,
+  OAuthVendor,
   PluginSummary,
   PluginSettingDefinition,
   PluginServiceStatus,
@@ -313,6 +317,19 @@ export const api = {
       source: "cache" | "remote" | "fallback";
       error?: string;
     }>(IPC.invoke.providersListModels, input),
+  /** Vendor accounts pi-ai can sign in to, with the local row when one exists. */
+  listOauthVendors: () =>
+    invoke<{ vendors: OAuthVendor[] }>(IPC.invoke.providersOauthVendors),
+  /** Begin a login; progress arrives through `onOauthLogin`. */
+  startOauthLogin: (vendorId: string) =>
+    invoke<OAuthStartResult>(IPC.invoke.providersOauthStart, vendorId),
+  /** Answer a prompt; omitting the value cancels the login. */
+  respondOauthLogin: (input: OAuthRespondInput) =>
+    invoke<{ ok: boolean }>(IPC.invoke.providersOauthRespond, input),
+  cancelOauthLogin: (loginId: string) =>
+    invoke<{ ok: boolean }>(IPC.invoke.providersOauthCancel, loginId),
+  logoutOauthVendor: (vendorId: string) =>
+    invoke<{ ok: boolean }>(IPC.invoke.providersOauthLogout, vendorId),
   getProject: () =>
     invoke<{ workspace: ProjectWorkspace | null }>(IPC.invoke.projectGet),
   listProjects: () =>
@@ -672,6 +689,12 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.plansChanged, (payload) =>
       listener(normalizePlansChangedEvent(payload)),
+    );
+  },
+  onOauthLogin: (listener: (event: OAuthLoginEvent) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.providersOauth, (payload) =>
+      listener(payload as OAuthLoginEvent),
     );
   },
   onToast: (listener: (message: string) => void) => {

@@ -309,6 +309,25 @@ export class VendorOAuth {
     };
   }
 
+  /**
+   * The api style one model needs. A vendor row stores a single style, but
+   * GitHub Copilot serves Anthropic, Chat Completions and Responses models
+   * under one account, so the selected model — not the row — decides.
+   */
+  async apiStyleFor(
+    vendorId: string,
+    modelId: string,
+  ): Promise<string | undefined> {
+    const models = await this.ensureModels();
+    let model = models.getModel(vendorId, modelId);
+    if (!model) {
+      // Dynamic catalogs are empty until the first refresh.
+      await models.refresh({ providers: [vendorId] });
+      model = models.getModel(vendorId, modelId);
+    }
+    return model ? apiStyleForWireApi(model.api) : undefined;
+  }
+
   private async run(session: LoginSession, provider: Provider): Promise<void> {
     try {
       await (
