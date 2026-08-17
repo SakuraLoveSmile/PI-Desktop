@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::db::{ms_to_ts, now_ms, Database};
-use crate::secrets::{secret_ref_for_provider, SecretStore};
+use crate::secrets::{secret_ref_for_provider, secret_ref_for_provider_oauth, SecretStore};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +18,17 @@ pub struct ProviderPublic {
     pub enabled: bool,
     pub base_url: Option<String>,
     pub auth_kind: String,
+    /// True when the provider holds any usable credential — a stored API key
+    /// **or** a vendor-account OAuth credential. Readiness checks across the
+    /// app key off this, so both auth channels light up the same way.
     pub has_secret: bool,
+    /// True when a vendor-account OAuth credential is stored. Distinguishes the
+    /// two channels for UI that must hide the API key field or badge the row.
+    pub has_oauth: bool,
+    /// Non-secret label for the signed-in vendor account (e.g. an email or plan
+    /// name). Never carries a token.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oauth_account_label: Option<String>,
     pub default_model_id: Option<String>,
     pub api_style: Option<String>,
     /// Explicit provider-level reasoning override.  `None` means the model
@@ -55,6 +65,7 @@ pub struct ProviderCreateInput {
     pub default_model_id: Option<String>,
     pub secret_value: Option<String>,
     pub api_style: Option<String>,
+    pub oauth_account_label: Option<String>,
     pub supports_reasoning: Option<bool>,
     pub supported_thinking_levels: Option<Vec<String>>,
     /// Zero (or negative temperature) clears a stored override.
@@ -80,6 +91,7 @@ pub struct ProviderUpdateInput {
     pub default_model_id: Option<String>,
     pub secret_value: Option<String>,
     pub api_style: Option<String>,
+    pub oauth_account_label: Option<String>,
     pub supports_reasoning: Option<bool>,
     pub supported_thinking_levels: Option<Vec<String>>,
     /// Zero (or negative temperature) clears a stored override.
@@ -130,6 +142,12 @@ fn config_value(raw: &str) -> Option<serde_json::Value> {
 
 fn config_reasoning_override(raw: &str) -> Option<bool> {
     config_value(raw).and_then(|v| v.get("compatibility")?.get("supportsReasoning")?.as_bool())
+}
+
+fn config_oauth_account_label(raw: &str) -> Option<String> {
+    config_value(raw)
+        .and_then(|v| Some(v.get("oauth")?.get("accountLabel")?.as_str()?.to_string()))
+        .filter(|label| !label.is_empty())
 }
 
 fn normalize_thinking_levels(levels: &[String]) -> Vec<String> {
@@ -196,6 +214,33 @@ fn compatibility_object(
     compatibility
         .as_object_mut()
         .ok_or_else(|| anyhow::anyhow!("provider config_json.compatibility must be a JSON object"))
+}
+
+fn oauth_object(
+    config: &mut serde_json::Value,
+) -> Result<&mut serde_json::Map<String, serde_json::Value>> {
+    let object = config
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("provider config_json must be a JSON object"))?;
+    let oauth = object
+        .entry("oauth")
+        .or_insert_with(|| serde_json::json!({}));
+    oauth
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("provider config_json.oauth must be a JSON object"))
+}
+
+/// Set or clear the non-secret signed-in account label. An empty string clears
+/// it, which is what logout writes.
+fn config_with_oauth_account_label(raw: &str, label: &str) -> Result<String> {
+    let mut config = ensure_config_object(raw)?;
+    let oauth = oauth_object(&mut config)?;
+    if label.is_empty() {
+        oauth.remove("accountLabel");
+    } else {
+        oauth.insert("accountLabel".into(), serde_json::json!(label));
+    }
+    Ok(config.to_string())
 }
 
 fn limits_object(
@@ -341,8 +386,11 @@ fn provider_from_row(
     secrets: &SecretStore,
 ) -> rusqlite::Result<ProviderPublic> {
     let secret_ref: Option<String> = row.get(8)?;
+    let id: String = row.get(0)?;
+    let has_api_key = secret_ref.as_ref().map(|r| secrets.has(r)).unwrap_or(false);
+    let has_oauth = secrets.has(&secret_ref_for_provider_oauth(&id));
     Ok(ProviderPublic {
-        id: row.get(0)?,
+        id,
         name: row.get(1)?,
         vendor_key: row.get(2)?,
         provider_type: row.get(3)?,
@@ -350,7 +398,12 @@ fn provider_from_row(
         enabled: row.get::<_, i64>(5)? != 0,
         base_url: row.get(6)?,
         auth_kind: row.get(7)?,
-        has_secret: secret_ref.as_ref().map(|r| secrets.has(r)).unwrap_or(false),
+        has_secret: has_api_key || has_oauth,
+        has_oauth,
+        oauth_account_label: row
+            .get::<_, String>(11)
+            .ok()
+            .and_then(|raw| config_oauth_account_label(&raw)),
         default_model_id: row.get(9)?,
         api_style: row.get(10)?,
         supports_reasoning: row
@@ -531,6 +584,10 @@ pub fn create_provider(
             temperature: input.temperature,
         },
     )?;
+    let config_json = match input.oauth_account_label.as_deref() {
+        Some(label) => config_with_oauth_account_label(&config_json, label)?,
+        None => config_json,
+    };
 
     db.conn()
         .prepare_cached(
@@ -567,18 +624,19 @@ pub fn update_provider(
     input: ProviderUpdateInput,
 ) -> Result<Option<ProviderPublic>> {
     let existing = get_provider(db, secrets, &input.id)?;
-    let Some(existing) = existing else {
+    if existing.is_none() {
         return Ok(None);
-    };
-    let mut secret_ref = existing
-        .has_secret
-        .then(|| secret_ref_for_provider(&input.id));
+    }
+    // Derive from the API key ref directly: `has_secret` now also covers an
+    // OAuth credential, so reusing it here would stamp an api_key ref onto a
+    // provider that only ever signed in with a vendor account.
+    let api_key_ref = secret_ref_for_provider(&input.id);
+    let mut secret_ref = secrets.has(&api_key_ref).then(|| api_key_ref.clone());
 
     if let Some(secret) = input.secret_value.as_ref().filter(|s| !s.is_empty()) {
-        let sref = secret_ref_for_provider(&input.id);
-        let backend = secrets.set(&sref, secret)?;
-        upsert_secret_meta(db, &sref, &input.id, &backend)?;
-        secret_ref = Some(sref);
+        let backend = secrets.set(&api_key_ref, secret)?;
+        upsert_secret_meta(db, &api_key_ref, &input.id, &backend)?;
+        secret_ref = Some(api_key_ref);
     }
     let raw_config: String = db.conn().query_row(
         "SELECT config_json FROM providers WHERE id = ?1",
@@ -601,6 +659,14 @@ pub fn update_provider(
             temperature: input.temperature,
         },
     )?;
+    // An empty label clears the badge, which is what logout sends.
+    let config_json = match input.oauth_account_label.as_deref() {
+        Some(label) => Some(config_with_oauth_account_label(
+            config_json.as_deref().unwrap_or(&raw_config),
+            label,
+        )?),
+        None => config_json,
+    };
 
     db.conn()
         .prepare_cached(
@@ -638,11 +704,18 @@ pub fn update_provider(
 }
 
 pub fn delete_provider(db: &Database, secrets: &SecretStore, id: &str) -> Result<bool> {
-    let sref = secret_ref_for_provider(id);
-    let _ = secrets.delete(&sref);
-    db.conn()
-        .prepare_cached("DELETE FROM secrets_meta WHERE secret_ref = ?1")?
-        .execute(params![sref])?;
+    // Both credential channels are provider-scoped, so deleting the row must
+    // take the OAuth credential with it or a re-created provider could inherit
+    // a stranger's refresh token.
+    for sref in [
+        secret_ref_for_provider(id),
+        secret_ref_for_provider_oauth(id),
+    ] {
+        let _ = secrets.delete(&sref);
+        db.conn()
+            .prepare_cached("DELETE FROM secrets_meta WHERE secret_ref = ?1")?
+            .execute(params![sref])?;
+    }
     let n = db
         .conn()
         .prepare_cached("DELETE FROM providers WHERE id = ?1")?
@@ -709,6 +782,7 @@ mod tests {
                 default_model_id: Some("model-1".into()),
                 secret_value: None,
                 api_style: None,
+                oauth_account_label: None,
                 context_window: None,
                 max_output_tokens: None,
                 temperature: None,
@@ -754,6 +828,7 @@ mod tests {
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
+                oauth_account_label: None,
                 context_window: None,
                 max_output_tokens: None,
                 temperature: None,
@@ -803,6 +878,7 @@ mod tests {
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
+                oauth_account_label: None,
                 context_window: None,
                 max_output_tokens: None,
                 temperature: None,
@@ -836,6 +912,7 @@ mod tests {
                 default_model_id: Some("model-1".into()),
                 secret_value: None,
                 api_style: None,
+                oauth_account_label: None,
                 context_window: Some(200_000),
                 max_output_tokens: Some(32_000),
                 temperature: Some(0.7),
@@ -863,6 +940,7 @@ mod tests {
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
+                oauth_account_label: None,
                 context_window: Some(131_072),
                 max_output_tokens: None,
                 temperature: Some(0.0),
@@ -894,6 +972,7 @@ mod tests {
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
+                oauth_account_label: None,
                 context_window: None,
                 max_output_tokens: None,
                 temperature: None,
@@ -925,6 +1004,7 @@ mod tests {
                 default_model_id: Some("mimo-v2.5".into()),
                 secret_value: None,
                 api_style: None,
+                oauth_account_label: None,
                 context_window: None,
                 max_output_tokens: None,
                 temperature: None,
@@ -958,6 +1038,7 @@ mod tests {
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
+                oauth_account_label: None,
                 context_window: None,
                 max_output_tokens: None,
                 temperature: None,
@@ -1000,6 +1081,7 @@ mod tests {
                 default_model_id: Some("model-a".into()),
                 secret_value: None,
                 api_style: Some("chat_completions".into()),
+                oauth_account_label: None,
                 context_window: None,
                 max_output_tokens: None,
                 temperature: None,
@@ -1076,5 +1158,141 @@ mod tests {
         assert_eq!(custom.display_name, "Custom label");
         assert_eq!(custom.source, "user");
         assert_eq!(custom.capabilities, vec!["tools"]);
+    }
+
+    #[test]
+    fn an_oauth_credential_alone_makes_the_provider_ready() {
+        let (_dir, db, secrets) = test_context();
+        let provider = create_provider(
+            &db,
+            &secrets,
+            ProviderCreateInput {
+                name: "Claude".into(),
+                vendor_key: Some("anthropic".into()),
+                provider_type: None,
+                protocol: None,
+                base_url: None,
+                auth_kind: Some("oauth".into()),
+                default_model_id: Some("claude-sonnet-4-5".into()),
+                secret_value: None,
+                api_style: Some("anthropic_messages".into()),
+                oauth_account_label: Some("dev@example.com".into()),
+                context_window: None,
+                max_output_tokens: None,
+                temperature: None,
+                supports_reasoning: None,
+                supported_thinking_levels: None,
+            },
+        )
+        .unwrap();
+        // No API key was ever pasted, so the row is not ready yet.
+        assert!(!provider.has_secret);
+        assert!(!provider.has_oauth);
+        assert_eq!(
+            provider.oauth_account_label.as_deref(),
+            Some("dev@example.com")
+        );
+
+        let oauth_ref = secret_ref_for_provider_oauth(&provider.id);
+        secrets.set(&oauth_ref, "{\"type\":\"oauth\"}").unwrap();
+
+        // Every readiness check in the app keys off `has_secret`, so a vendor
+        // account must light it up exactly like a pasted key would.
+        let stored = get_provider(&db, &secrets, &provider.id).unwrap().unwrap();
+        assert!(stored.has_secret);
+        assert!(stored.has_oauth);
+
+        // Updating an OAuth-only row must not stamp an api_key ref onto it.
+        let renamed = update_provider(
+            &db,
+            &secrets,
+            ProviderUpdateInput {
+                id: provider.id.clone(),
+                name: Some("Claude Max".into()),
+                vendor_key: None,
+                provider_type: None,
+                protocol: None,
+                base_url: None,
+                auth_kind: None,
+                default_model_id: None,
+                secret_value: None,
+                api_style: None,
+                oauth_account_label: Some(String::new()),
+                context_window: None,
+                max_output_tokens: None,
+                temperature: None,
+                supports_reasoning: None,
+                supported_thinking_levels: None,
+                enabled: None,
+            },
+        )
+        .unwrap()
+        .unwrap();
+        // An empty label clears the badge, which is what logout sends.
+        assert_eq!(renamed.oauth_account_label, None);
+        assert!(renamed.has_oauth);
+        let stored_ref: Option<String> = db
+            .conn()
+            .query_row(
+                "SELECT secret_ref FROM providers WHERE id = ?1",
+                params![provider.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored_ref, None);
+
+        // Deleting the row takes the OAuth credential with it, or a re-created
+        // provider could inherit the previous account's refresh token.
+        assert!(delete_provider(&db, &secrets, &provider.id).unwrap());
+        assert!(!secrets.has(&oauth_ref));
+        let meta: i64 = db
+            .conn()
+            .query_row(
+                "SELECT COUNT(*) FROM secrets_meta WHERE secret_ref = ?1",
+                params![oauth_ref],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(meta, 0);
+    }
+
+    #[test]
+    fn a_provider_can_hold_both_an_api_key_and_a_vendor_account() {
+        let (_dir, db, secrets) = test_context();
+        let provider = create_provider(
+            &db,
+            &secrets,
+            ProviderCreateInput {
+                name: "Both".into(),
+                vendor_key: Some("anthropic".into()),
+                provider_type: None,
+                protocol: None,
+                base_url: None,
+                auth_kind: Some("api_key_and_base_url".into()),
+                default_model_id: None,
+                secret_value: Some("sk-ant-api".into()),
+                api_style: None,
+                oauth_account_label: None,
+                context_window: None,
+                max_output_tokens: None,
+                temperature: None,
+                supports_reasoning: None,
+                supported_thinking_levels: None,
+            },
+        )
+        .unwrap();
+        assert!(provider.has_secret);
+        assert!(!provider.has_oauth);
+
+        secrets
+            .set(&secret_ref_for_provider_oauth(&provider.id), "{}")
+            .unwrap();
+        let stored = get_provider(&db, &secrets, &provider.id).unwrap().unwrap();
+        assert!(stored.has_oauth);
+        // The API key read path must keep returning the key, never the OAuth blob.
+        assert_eq!(
+            get_secret_for_provider(&db, &secrets, &provider.id).unwrap(),
+            Some("sk-ant-api".to_string())
+        );
     }
 }
