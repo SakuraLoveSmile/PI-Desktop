@@ -21,6 +21,7 @@ import {
   parseSubagentDefinition,
   subagentModelKey,
   subagentPinnedProviders,
+  OAUTH_AUTH_KIND,
   type SubagentDefinition,
 } from "@pi-desktop/shared";
 import {
@@ -28,6 +29,19 @@ import {
   resolveThinkingCapabilities,
 } from "./model-capabilities.js";
 import type { RuntimeProviderConfig } from "./provider-binding.js";
+import type { PiModelConfig, ThinkingCapabilitySet } from "./thinking-level.js";
+
+/**
+ * What a signed-in vendor account says about one of its models. Resolved by
+ * Electron main against the authenticated pi-ai collection, because the
+ * builtin catalog knows neither a gateway's dynamic model list nor which wire
+ * API a given account serves a model over.
+ */
+export type VendorModelBinding = ThinkingCapabilitySet & {
+  apiStyle: string;
+  baseUrl: string;
+  modelConfig: PiModelConfig;
+};
 
 /** Directory a workspace keeps its own definitions in. */
 export function subagentDefinitionDir(workspaceRoot: string): string {
@@ -314,6 +328,11 @@ export async function resolveSubagentProviders(input: {
   definitions: readonly SubagentDefinition[];
   providers: readonly SubagentProviderSource[];
   getSecret: (providerId: string) => Promise<string | undefined>;
+  /** Per-model binding for a vendor-account row, resolved by Electron main. */
+  resolveVendorBinding?: (
+    provider: SubagentProviderSource,
+    modelId: string,
+  ) => Promise<VendorModelBinding | undefined>;
 }): Promise<{
   providers: Record<string, RuntimeProviderConfig>;
   diagnostics: string[];
@@ -341,7 +360,8 @@ export async function resolveSubagentProviders(input: {
       );
       continue;
     }
-    if (!secrets.has(provider.id)) {
+    const isVendorAccount = provider.authKind === OAUTH_AUTH_KIND;
+    if (!isVendorAccount && !secrets.has(provider.id)) {
       try {
         secrets.set(provider.id, await input.getSecret(provider.id));
       } catch {
@@ -349,28 +369,50 @@ export async function resolveSubagentProviders(input: {
       }
     }
     const apiKey = secrets.get(provider.id) ?? "";
-    if (!apiKey && provider.authKind !== "none") {
+    if (!apiKey && !isVendorAccount && provider.authKind !== "none") {
       diagnostics.push(`${definition.name}: provider "${provider.name}" has no API key`);
       continue;
     }
-    const capabilities = resolveThinkingCapabilities({
+    // A vendor account resolves the pinned model against the signed-in
+    // catalog: one account can span wire APIs, and a gateway's model list
+    // does not exist in the builtin one at all.
+    let binding: VendorModelBinding | undefined;
+    if (isVendorAccount) {
+      try {
+        binding = await input.resolveVendorBinding?.(provider, pin.modelId);
+      } catch {
+        binding = undefined;
+      }
+      if (!binding) {
+        diagnostics.push(
+          `${definition.name}: vendor account "${provider.name}" does not offer "${pin.modelId}"`,
+        );
+        continue;
+      }
+    }
+    const capabilities = binding ?? resolveThinkingCapabilities({
       vendorKey: provider.vendorKey || "custom",
       modelId: pin.modelId,
       apiStyle: provider.apiStyle,
     });
-    const modelConfig = resolvePiModelConfig({
-      vendorKey: provider.vendorKey || "custom",
-      modelId: pin.modelId,
-      apiStyle: provider.apiStyle,
-    });
+    const modelConfig =
+      binding?.modelConfig ??
+      resolvePiModelConfig({
+        vendorKey: provider.vendorKey || "custom",
+        modelId: pin.modelId,
+        apiStyle: provider.apiStyle,
+      });
+    const apiStyle = binding?.apiStyle ?? provider.apiStyle;
     resolved[key] = {
       id: provider.id,
       name: provider.name,
-      ...(provider.baseUrl ? { baseUrl: provider.baseUrl } : {}),
+      ...(binding?.baseUrl ?? provider.baseUrl
+        ? { baseUrl: binding?.baseUrl ?? provider.baseUrl }
+        : {}),
       modelId: pin.modelId,
       apiKey,
       ...(provider.authKind ? { authKind: provider.authKind } : {}),
-      ...(provider.apiStyle ? { apiStyle: provider.apiStyle } : {}),
+      ...(apiStyle ? { apiStyle } : {}),
       supportsReasoning: capabilities.supportsReasoning,
       supportedThinkingLevels: [...capabilities.supportedThinkingLevels],
       ...(modelConfig ? { modelConfig } : {}),

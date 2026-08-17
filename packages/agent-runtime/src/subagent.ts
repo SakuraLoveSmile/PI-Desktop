@@ -216,7 +216,7 @@ export class SubagentRun {
           maxRetryDelayMs: PROVIDER_MAX_RETRY_DELAY_MS,
           sessionId: opts.sessionId,
         }),
-      getApiKey: async () => requestKey,
+      getApiKey: async () => requestKey || undefined,
       convertToLlm,
       afterToolCall: async (context) => this.afterToolCall(context),
       initialState: {

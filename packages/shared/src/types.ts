@@ -571,6 +571,13 @@ export type PullRequestSummary = {
   isDraft?: boolean;
 };
 
+/**
+ * `authKind` for a provider row whose credential is a vendor-account OAuth
+ * login rather than a pasted API key. Shared so main, the sidecar runtime and
+ * the renderer all branch on the same spelling.
+ */
+export const OAUTH_AUTH_KIND = "oauth";
+
 export type ProviderPublic = {
   id: string;
   name: string;

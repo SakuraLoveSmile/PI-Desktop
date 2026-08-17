@@ -12,13 +12,16 @@ import {
   createProvider,
   type Api,
   type Model,
+  type ModelAuth,
   type Models,
   type ProviderStreams,
 } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { openAIResponsesApi } from "@earendil-works/pi-ai/api/openai-responses.lazy";
+import { openAICodexResponsesApi } from "@earendil-works/pi-ai/api/openai-codex-responses.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { googleGenerativeAIApi } from "@earendil-works/pi-ai/api/google-generative-ai.lazy";
+import { piMessagesApi } from "@earendil-works/pi-ai/api/pi-messages.lazy";
 import type { ThinkingLevel } from "@pi-desktop/shared";
 import type { PiModelConfig } from "./thinking-level.js";
 
@@ -35,6 +38,15 @@ export type RuntimeProviderConfig = {
   supportedThinkingLevels: ThinkingLevel[];
   /** Complete model metadata resolved from pi-ai by Electron main. */
   modelConfig?: PiModelConfig;
+  /**
+   * Vendor-account auth, resolved once per request by Electron main.
+   *
+   * Injected by the sidecar, never part of the JSON launch payload: an OAuth
+   * access token lives about an hour, so the sidecar holds no credential of
+   * its own and asks for one — already refreshed if it had expired — at the
+   * moment it signs a request.
+   */
+  resolveAuth?: () => Promise<ModelAuth>;
 };
 
 export const DEFAULT_CONTEXT_WINDOW = 128_000;
@@ -61,6 +73,20 @@ export function apiBindingForStyle(apiStyle?: string): ApiBinding {
         api: "anthropic-messages",
         adapter: anthropicMessagesApi,
         defaultBaseUrl: "https://api.anthropic.com",
+      };
+    case "openai_codex_responses":
+      // ChatGPT subscription endpoint. The adapter speaks Responses with the
+      // Codex conversation envelope, which is not the public /v1/responses API.
+      return {
+        api: "openai-codex-responses",
+        adapter: openAICodexResponsesApi,
+        defaultBaseUrl: "https://chatgpt.com/backend-api",
+      };
+    case "pi_messages":
+      return {
+        api: "pi-messages",
+        adapter: piMessagesApi,
+        defaultBaseUrl: "https://radius.pi.dev",
       };
     case "google_generative_ai":
       return {
@@ -114,6 +140,7 @@ export function createProviderModels(
   model: Model<Api>,
 ): Models {
   const requestKey = providerRequestKey(provider);
+  const resolveAuth = provider.resolveAuth;
   const models = createModels();
   models.setProvider(
     createProvider({
@@ -125,7 +152,16 @@ export function createProviderModels(
           name: `${provider.name} API key`,
           // Plain apiKey semantics let each adapter emit its own auth header
           // (Bearer for OpenAI-style APIs, x-api-key for Anthropic, …).
-          resolve: async () => ({ auth: { apiKey: requestKey } }),
+          //
+          // A vendor account resolves instead through Electron main, which
+          // returns the whole `ModelAuth` — token, headers, and the
+          // per-credential baseUrl GitHub Copilot hands out. pi-ai calls this
+          // for every request and caches nothing, so a token that rotates
+          // mid-session is picked up on the next one.
+          resolve: async () =>
+            resolveAuth
+              ? { auth: await resolveAuth(), source: "OAuth" }
+              : { auth: { apiKey: requestKey } },
         },
       },
       models: [model],
