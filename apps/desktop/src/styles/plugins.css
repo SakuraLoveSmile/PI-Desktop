@@ -12,22 +12,22 @@
 .plugins-page {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-/* The page header and segmented row form one quiet tool surface. */
+/* The page header and segmented row form one compact tool surface. */
 .plugins-page > .page-header.plugins-page-header {
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
-  padding: 0 0 8px;
+  padding: 0 0 10px;
   border-bottom: 1px solid var(--ds-border-subtle);
 }
 
 .plugins-title-block {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -35,10 +35,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   flex: 0 0 auto;
-  color: var(--ds-text-muted);
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-md);
+  color: var(--ds-text-secondary);
+  background: var(--ds-bg-secondary);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-subtle);
 }
 
 .plugins-title-copy {
@@ -46,37 +50,19 @@
 }
 
 .plugins-title-copy .page-title {
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-medium-plus);
+  font-size: var(--text-xl);
   letter-spacing: var(--tracking-tight);
 }
 
 .plugins-header-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex: 0 0 auto;
   /* The page sits under the absolute titlebar band, which is a native drag
      rectangle: without this the window moves instead of the button reacting. */
   -webkit-app-region: no-drag;
   app-region: no-drag;
-}
-
-.plugins-header-actions .btn {
-  border-radius: var(--radius-2xs);
-}
-
-.plugins-header-menu {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-2xs);
-  color: var(--ds-text-muted);
-  box-shadow: none;
-}
-
-.plugins-header-menu:hover {
-  background: var(--ds-bg-hover);
-  color: var(--ds-text-primary);
 }
 
 /* Pending-update banner: shown only while updates exist. */
@@ -116,13 +102,13 @@
   font-weight: var(--font-weight-medium-plus);
 }
 
-/* Toolbar: quiet tabs on the left, count + pill search on the right. */
+/* Toolbar: segmented tabs on the left, count + pill search on the right. */
 .plugins-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 0 0 8px;
+  padding: 0 0 10px;
   border-bottom: 1px solid var(--ds-border-subtle);
   flex-wrap: wrap;
 }
@@ -131,15 +117,19 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 0;
+  padding: 2px;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-md);
+  background: var(--ds-bg-secondary);
+  box-shadow: inset 0 0 0 0.5px var(--ds-border-subtle);
 }
 
 .plugins-segment-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
-  padding: 0 9px;
+  height: 28px;
+  padding: 0 10px;
   border-radius: var(--radius-sm);
   color: var(--ds-text-muted);
   font-size: var(--text-sm);
@@ -155,9 +145,9 @@
 }
 
 .plugins-segment-btn.active {
-  background: var(--ds-bg-secondary);
+  background: var(--ds-bg-elevated-opaque, var(--ds-bg-primary));
   color: var(--ds-text-primary);
-  box-shadow: inset 0 0 0 0.5px var(--ds-border-default);
+  box-shadow: 0 0 0 0.5px var(--ds-border-default);
 }
 
 .plugins-segment-count {
