@@ -1109,12 +1109,15 @@ Each scenario is documented in this format:
   scope states, and each action.
 - **Expected**: The four numeric overview cards are absent; tab counts,
   installed group counts, and any update alert remain available in their
-  relevant surfaces. The page header, section headers, empty states, and update
-  alert use compact labels and actions; decision-specific explanations remain
-  in disclosures, details, and dialogs. Installed rows keep their default height low while the
-  disclosure exposes the complete secondary readout. The scope trigger stays
-  aligned with the row action rail, its menu explains each state, and icon
-  actions remain visible at rest while showing labels on hover and focus.
+  relevant surfaces. The page header uses a small unboxed extension mark,
+  medium-weight title, compact primary action, and borderless overflow action;
+  the tab row has no heavy outer container and keeps only the active tab surface.
+  Section headers, empty states, and the update alert use compact labels and
+  actions; decision-specific explanations remain in disclosures, details, and
+  dialogs. Installed rows keep their default height low while the disclosure
+  exposes the complete secondary readout. The scope trigger stays aligned with
+  the row action rail, its menu explains each state, and icon actions remain
+  visible at rest while showing labels on hover and focus.
   Primary and secondary buttons keep
   visible semantic surfaces, text, borders, hover states, and focus rings in
   both themes, and keyboard focus does not depend on pointer hover.

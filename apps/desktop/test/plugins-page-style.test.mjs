@@ -39,9 +39,10 @@ test("plugins page styles use design tokens in both themes", () => {
   assert.match(section, /\.plugins-installed-mark\s*\{[\s\S]*?--ds-success/);
   assert.match(section, /:root\[data-theme="light"\] \.plugins-modal-backdrop/);
   assert.match(section, /\.plugins-page-header\s*\{[\s\S]*?border-bottom:\s*1px solid var\(--ds-border-subtle\)/);
-  assert.match(section, /\.plugins-title-icon\s*\{[\s\S]*?--ds-bg-secondary/);
-  assert.match(section, /\.plugins-segment\s*\{[\s\S]*?border:\s*1px solid var\(--ds-border-default\)/);
-  assert.match(section, /\.plugins-segment-btn\.active\s*\{[\s\S]*?box-shadow:\s*0 0 0 0\.5px var\(--ds-border-default\)/);
+  assert.match(section, /\.plugins-title-icon\s*\{[\s\S]*?--ds-text-muted/);
+  assert.match(section, /\.plugins-header-menu\s*\{[\s\S]*?box-shadow:\s*none/);
+  assert.match(section, /\.plugins-segment\s*\{[\s\S]*?padding:\s*0/);
+  assert.match(section, /\.plugins-segment-btn\.active\s*\{[\s\S]*?box-shadow:\s*inset 0 0 0 0\.5px var\(--ds-border-default\)/);
 
   assert.match(
     stylesSource,
