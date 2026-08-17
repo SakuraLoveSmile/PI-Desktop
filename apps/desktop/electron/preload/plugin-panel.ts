@@ -31,23 +31,7 @@ type ChromeLabels = {
   maximize: string;
   restore: string;
   close: string;
-  safeArea: string;
 };
-
-function isDevelopmentPanel(): boolean {
-  return process.argv.includes("--pi-plugin-panel-development=1");
-}
-
-function panelTitle(): string {
-  const prefix = "--pi-plugin-panel-title=";
-  const raw = process.argv.find((argument) => argument.startsWith(prefix));
-  if (!raw) return document.title;
-  try {
-    return decodeURIComponent(raw.slice(prefix.length));
-  } catch {
-    return document.title;
-  }
-}
 
 function panelTheme(): PluginPanelTheme {
   const prefix = "--pi-plugin-panel-theme=";
@@ -94,7 +78,6 @@ function chromeLabels(): ChromeLabels {
       maximize: "最大化",
       restore: "还原",
       close: "关闭",
-      safeArea: "开发提示 · 安全区 46px",
     };
   }
   return {
@@ -103,7 +86,6 @@ function chromeLabels(): ChromeLabels {
     maximize: "Maximize",
     restore: "Restore",
     close: "Close",
-    safeArea: "Dev hint · 46px safe area",
   };
 }
 
@@ -127,7 +109,7 @@ function createControlButton(
 
 function installPanelChrome(): void {
   const body = document.body;
-  if (!body || document.querySelector("pi-plugin-panel-titlebar")) return;
+  if (!body || document.querySelector("pi-plugin-panel-chrome")) return;
 
   document.documentElement.style.setProperty(
     "--pi-plugin-titlebar-height",
@@ -149,12 +131,11 @@ function installPanelChrome(): void {
 
   const labels = chromeLabels();
   const theme = panelTheme();
-  const surface = pageSurface(theme);
-  const host = document.createElement("pi-plugin-panel-titlebar");
+  const host = document.createElement("pi-plugin-panel-chrome");
   host.dataset.theme = theme;
   host.style.setProperty(
     "--pi-plugin-panel-page-background",
-    surface,
+    pageSurface(theme),
   );
   host.style.setProperty(
     "--pi-plugin-panel-page-foreground",
@@ -176,71 +157,43 @@ function installPanelChrome(): void {
       height: ${PLUGIN_PANEL_TITLEBAR_HEIGHT}px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     }
-    .titlebar {
+    .chrome {
+      position: relative;
+      width: 100%;
+      height: ${PLUGIN_PANEL_TITLEBAR_HEIGHT}px;
+    }
+    .drag-region {
       -webkit-app-region: drag;
       app-region: drag;
       pointer-events: auto;
-      box-sizing: border-box;
-      display: flex;
+      position: absolute;
+      inset: 0;
+      z-index: 0;
       height: ${PLUGIN_PANEL_TITLEBAR_HEIGHT}px;
-      align-items: center;
-      overflow: hidden;
-      border-bottom: 1px solid color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 12%, transparent);
-      background: var(--pi-plugin-panel-page-background);
-      color: var(--pi-plugin-panel-page-foreground);
-      box-shadow: 0 1px 10px color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 8%, transparent);
-      backdrop-filter: blur(18px);
       user-select: none;
     }
-    .title {
-      min-width: 0;
-      flex: 1 1 auto;
-      overflow: hidden;
-      padding: 0 12px;
-      color: var(--pi-plugin-panel-page-foreground);
-      font-size: 13px;
-      font-weight: 550;
-      letter-spacing: -0.01em;
-      line-height: 1.25;
-      text-align: center;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .titlebar.platform-darwin .title {
-      padding-left: 76px;
-      padding-right: 76px;
-    }
-    .titlebar.platform-win32 .title,
-    .titlebar.platform-linux .title {
-      padding-left: 112px;
-    }
-    .safe-area-hint {
-      box-sizing: border-box;
-      flex: 0 0 auto;
-      max-width: 180px;
-      margin-right: 8px;
-      overflow: hidden;
-      border: 1px solid color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 20%, transparent);
-      border-radius: 999px;
-      padding: 4px 8px;
-      background: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 6%, transparent);
-      color: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 68%, transparent);
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.01em;
-      line-height: 1;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .controls {
+    .capsule {
       -webkit-app-region: no-drag;
       app-region: no-drag;
       pointer-events: auto;
+      position: absolute;
+      top: 7px;
+      right: 10px;
+      z-index: 1;
+      box-sizing: border-box;
       display: flex;
-      width: 112px;
-      height: ${PLUGIN_PANEL_TITLEBAR_HEIGHT}px;
-      flex: 0 0 112px;
-      border-left: 1px solid color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 10%, transparent);
+      width: 104px;
+      height: 32px;
+      align-items: center;
+      gap: 2px;
+      overflow: hidden;
+      border: 1px solid color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 20%, transparent);
+      border-radius: 999px;
+      padding: 2px;
+      background: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 8%, transparent);
+      box-shadow: 0 4px 16px color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 12%, transparent);
+      backdrop-filter: blur(18px);
+      user-select: none;
     }
     .control {
       -webkit-app-region: no-drag;
@@ -248,16 +201,17 @@ function installPanelChrome(): void {
       pointer-events: auto;
       display: inline-flex;
       min-width: 0;
-      height: 100%;
+      height: 28px;
       flex: 1 1 0;
       align-items: center;
       justify-content: center;
       border: 0;
-      border-radius: 0;
+      border-radius: 999px;
       outline: none;
       background: transparent;
       color: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 58%, transparent);
-      cursor: default;
+      cursor: pointer;
+      font: inherit;
       transition: background 150ms cubic-bezier(0.22, 1, 0.36, 1), color 150ms cubic-bezier(0.22, 1, 0.36, 1);
     }
     .control:hover {
@@ -309,9 +263,6 @@ function installPanelChrome(): void {
       left: 1px;
       background: var(--pi-plugin-panel-page-background);
     }
-    .control:hover .glyph-restore::after {
-      background: var(--pi-plugin-panel-page-background);
-    }
     .glyph-close::before,
     .glyph-close::after {
       position: absolute;
@@ -331,19 +282,6 @@ function installPanelChrome(): void {
     :host([data-theme="dark"]) {
       color-scheme: dark;
     }
-    @media (max-width: 520px) {
-      .titlebar.platform-win32 .title,
-      .titlebar.platform-linux .title {
-        padding-left: 80px;
-      }
-      .safe-area-hint {
-        max-width: 100px;
-        margin-right: 4px;
-        padding-right: 6px;
-        padding-left: 6px;
-        font-size: 9px;
-      }
-    }
     @media (prefers-reduced-motion: reduce) {
       .control {
         transition-duration: 0.01ms;
@@ -351,81 +289,69 @@ function installPanelChrome(): void {
     }
   `;
 
-  const titlebar = document.createElement("div");
-  titlebar.className = `titlebar platform-${process.platform}`;
+  const chrome = document.createElement("div");
+  chrome.className = "chrome";
 
-  const title = document.createElement("div");
-  title.className = "title";
-  title.textContent = panelTitle();
-  title.title = panelTitle();
-  titlebar.append(title);
+  const dragRegion = document.createElement("div");
+  dragRegion.className = "drag-region";
+  dragRegion.setAttribute("aria-hidden", "true");
 
-  if (isDevelopmentPanel()) {
-    const safeAreaHint = document.createElement("span");
-    safeAreaHint.className = "safe-area-hint";
-    safeAreaHint.textContent = labels.safeArea;
-    safeAreaHint.title = labels.safeArea;
-    safeAreaHint.setAttribute("aria-label", labels.safeArea);
-    titlebar.append(safeAreaHint);
-  }
+  const controls = document.createElement("div");
+  controls.className = "capsule";
+  controls.setAttribute("role", "group");
+  controls.setAttribute("aria-label", labels.toolbar);
 
-  if (process.platform !== "darwin") {
-    const controls = document.createElement("div");
-    controls.className = "controls";
+  const minimize = createControlButton(
+    "minimize",
+    labels.minimize,
+    "minimize",
+  );
+  const maximize = createControlButton(
+    "toggleMaximize",
+    labels.maximize,
+    "maximize",
+  );
+  const close = createControlButton("close", labels.close, "close");
 
-    const minimize = createControlButton(
-      "minimize",
-      labels.minimize,
-      "minimize",
-    );
-    const maximize = createControlButton(
-      "toggleMaximize",
-      labels.maximize,
-      "maximize",
-    );
-    const close = createControlButton("close", labels.close, "close");
-
-    const setMaximized = (maximized: boolean) => {
-      const label = maximized ? labels.restore : labels.maximize;
-      maximize.title = label;
-      maximize.setAttribute("aria-label", label);
-      const glyph = maximize.firstElementChild;
-      if (glyph) {
-        glyph.className = `glyph glyph-${maximized ? "restore" : "maximize"}`;
+  const setMaximized = (maximized: boolean) => {
+    const label = maximized ? labels.restore : labels.maximize;
+    maximize.title = label;
+    maximize.setAttribute("aria-label", label);
+    const glyph = maximize.firstElementChild;
+    if (glyph) {
+      glyph.className = `glyph glyph-${maximized ? "restore" : "maximize"}`;
+    }
+  };
+  const invokeControl = async (action: PluginPanelWindowControlAction) => {
+    try {
+      const result = (await ipcRenderer.invoke(
+        PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
+        action,
+      )) as { maximized?: boolean };
+      if (action === "getState" || action === "toggleMaximize") {
+        setMaximized(Boolean(result?.maximized));
       }
-    };
-    const invokeControl = async (action: PluginPanelWindowControlAction) => {
-      try {
-        const result = (await ipcRenderer.invoke(
-          PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
-          action,
-        )) as { maximized?: boolean };
-        if (action === "getState" || action === "toggleMaximize") {
-          setMaximized(Boolean(result?.maximized));
-        }
-      } catch {
-        // A close action can destroy the sender before Electron resolves IPC.
-      }
-    };
+    } catch {
+      // A close action can destroy the sender before Electron resolves IPC.
+    }
+  };
 
-    minimize.addEventListener("click", () => void invokeControl("minimize"));
-    maximize.addEventListener(
-      "click",
-      () => void invokeControl("toggleMaximize"),
-    );
-    close.addEventListener("click", () => void invokeControl("close"));
-    ipcRenderer.on(
-      PLUGIN_PANEL_WINDOW_STATE_CHANNEL,
-      (_event, state: { maximized?: boolean }) =>
-        setMaximized(Boolean(state?.maximized)),
-    );
-    void invokeControl("getState");
+  minimize.addEventListener("click", () => void invokeControl("minimize"));
+  maximize.addEventListener(
+    "click",
+    () => void invokeControl("toggleMaximize"),
+  );
+  close.addEventListener("click", () => void invokeControl("close"));
+  ipcRenderer.on(
+    PLUGIN_PANEL_WINDOW_STATE_CHANNEL,
+    (_event, state: { maximized?: boolean }) =>
+      setMaximized(Boolean(state?.maximized)),
+  );
+  void invokeControl("getState");
 
-    controls.append(minimize, maximize, close);
-    titlebar.append(controls);
-  }
-
-  shadow.append(style, titlebar);
+  controls.append(minimize, maximize, close);
+  chrome.append(dragRegion, controls);
+  shadow.append(style, chrome);
   document.documentElement.append(host);
 }
 

@@ -53,6 +53,8 @@ describe("scaffold", () => {
     expect(panel.manifest?.permissions).toEqual(["ui.panel"]);
     const panelHtml = await readFile(join(panelDir, "renderer/index.html"), "utf8");
     expect(panelHtml).toContain("--pi-plugin-titlebar-height");
+    expect(panelHtml).toContain("host-owned three-button capsule");
+    expect(panelHtml).toContain("visible panel header belongs");
 
     const fullDir = join(await tempDir(), "full");
     await scaffold({ dir: fullDir, template: "full-demo" });

@@ -25,8 +25,6 @@ export type PluginPanelOpenRequest = {
    * an unmetered outbound channel that bypasses the `net.fetch` permission.
    */
   netDomains?: readonly string[];
-  /** Adds a non-interactive authoring hint to development panels. */
-  development?: boolean;
 };
 
 /** Schemes a panel may always load: its own bundle and devtools plumbing. */
@@ -217,14 +215,9 @@ export class PluginPanelHost {
       // The host theme is only a fallback; the preload samples the actual
       // plugin page colors after it has loaded and paints the chrome from them.
       backgroundColor: request.theme === "light" ? "#ffffff" : "#181818",
-      // Match the main application chrome: macOS retains inset traffic lights,
-      // while Windows/Linux use renderer-drawn controls in a frameless window.
-      ...(process.platform === "darwin"
-        ? {
-            titleBarStyle: "hiddenInset" as const,
-            trafficLightPosition: { x: 16, y: 16 },
-          }
-        : { frame: false }),
+      // Every platform uses the same frameless surface. The preload owns the
+      // only visible window controls: a fixed three-button capsule.
+      frame: false,
       webPreferences: {
         session: ses,
         preload: join(__dirname, "../preload/plugin-panel.js"),
@@ -233,20 +226,14 @@ export class PluginPanelHost {
         sandbox: true,
         webviewTag: false,
         additionalArguments: [
-          `--pi-plugin-panel-title=${encodeURIComponent(request.title)}`,
           `${PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX}${encodeURIComponent(request.locale)}`,
           `--pi-plugin-panel-theme=${request.theme}`,
-          ...(request.development
-            ? ["--pi-plugin-panel-development=1"]
-            : []),
         ],
       },
     });
-    if (process.platform !== "darwin") {
-      // A frameless panel must not reveal Electron's application menu when the
-      // user presses Alt; the host titlebar is the only window chrome.
-      win.setMenu(null);
-    }
+    // A panel owns its visible surface; do not add a native application menu
+    // to the window around the plugin's own UI.
+    win.setMenu(null);
 
     // A panel gets exactly one web contents. `window.open` would otherwise mint
     // a chromeless window outside the egress policy applied above.
@@ -258,11 +245,9 @@ export class PluginPanelHost {
         maximized: win.isMaximized(),
       });
     };
-    if (process.platform !== "darwin") {
-      win.on("maximize", sendWindowState);
-      win.on("unmaximize", sendWindowState);
-      win.webContents.on("did-finish-load", sendWindowState);
-    }
+    win.on("maximize", sendWindowState);
+    win.on("unmaximize", sendWindowState);
+    win.webContents.on("did-finish-load", sendWindowState);
 
     win.on("closed", () => {
       this.windows.delete(request.pluginId);

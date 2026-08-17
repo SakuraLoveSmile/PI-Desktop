@@ -240,6 +240,7 @@
 | D208 | 可恢复的本机工具路径合约 | **保留 D185 的延迟 Glob/Grep 边界，但使每个提示和模式明确显示 Read 接受现有常规文件、Glob 接受目录、Grep 接受文件或目录。目录读取返回 `INVALID_ARGUMENT` 加上结构化的 Glob 恢复参数；显式文件 Grep 仅搜索该文件并将 `include` 应用于其基本名称。工具错误在其 ToolCallRows 上仍然可见，而活动组仅报告处理持续时间，并且从不从子行推断终端转向失败；终端代理事件和专用结果表面仍然具有权威性 (ADR 0069)。** | 持久会话反复显示目录读取和文件作为目录 Grep 错误，然后将恢复的工作显示为最终失败。窄主机边界的兼容性加上一个结果所有者消除了重试和错误失败 UI，而无需将每个搜索模式恢复到 Agent 核心。 |
 | D216 | 跨平台托盘驻留最小化 | **Electron Main 在 macOS、Windows 和 Linux 上创建一个打包资源托盘图标。每个主窗口最小化路径都会被拦截并隐藏窗口，而不需要配置主机或sidecar；托盘 click/double-click、Show 和 macOS 应用程序激活 恢复并聚焦现有窗口（如果已关闭，则创建一个窗口）。本地化托盘菜单显示“显示 PI-Desktop”和显式“退出 PI-Desktop”操作。关闭窗口仍然是退出操作，托盘销毁加上退出使用现有的有序 `before-quit` 关闭路径。** | 用户需要后台工作才能继续而不丢失应用程序窗口，而最小化在本机 macOS 控件和自定义 Windows/Linux shell 中必须意味着相同的事情。主要拥有的托盘生命周期避免了渲染器权限扩展并保持显式退出可观察。 |
 | D218 | 主机拥有的跨平台插件面板窗口栏 | **插件面板窗口采用主窗口的 46px 平台窗口栏：macOS 使用 `hiddenInset`，交通灯位置为 `{x:16,y:16}`；Windows/Linux 使用无框窗口，并提供 112px 宽的自定义最小化、最大化或还原、关闭控制区。沙盒化插件 preload 在封闭的 Shadow DOM 中渲染 manifest 标题与控件，在现有顶部内边距之外再按标题栏高度偏移内容，并使用一个私有、验证发送方、固定动作集合的窗口操作通道；`window.pluginBridge`、每插件 partition 与 host protocol v9 均不扩展。重新打开最小化的面板时会还原并聚焦窗口。** | Electron 默认窗口框架使插件工具看起来脱离 PI-Desktop，且各平台表现不一致。由 preload 拥有窗口栏可实现一致性，同时不将不受信任的插件 HTML 移入主机渲染器，也不暴露通用 Electron 窗口权限（ADR 0081）。 |
+| D234 | 插件拥有的面板表面与主机窗口控制胶囊 | **插件面板在 macOS、Windows 和 Linux 上均使用无框窗口。沙盒化 preload 在每个平台预留相同的透明 46px 安全区，并在右上角的封闭 Shadow DOM 中仅渲染一个固定胶囊，胶囊恰好包含最小化、最大化或还原、关闭三个按钮。主机不再渲染面板标题或开发安全区提示；插件拥有标题、工具栏、背景以及其他所有可见面板界面。普通流内容会自动偏移，固定或粘性界面使用现有的 `--pi-plugin-titlebar-height: 46px`，插件自己的拖拽区域使用 `-webkit-app-region: drag`，交互控件退出拖拽。私有的验证发送方控制通道、本地化标签、页面自适应颜色、`window.pluginBridge`、每插件 partition、host protocol v9 和存储架构保持不变。本决策修订 D218 / ADR 0081 以及 D232 / ADR 0082。** | 主机标题栏占用了插件自己的视觉层级，并且仍然让 macOS 与 Windows/Linux 表现不同。紧凑的主机控制胶囊保留安全的原生窗口操作，同时把面板表面交还给插件。 |
 | D232 | 自定义全局界面字体 | **设置 → 基础 → 外观新增可搜索的字体选择器（触发器以当前字体的字样预览）。选择结果持久化为 `AppSettings.fontFamily`（CSS 字体栈）；缺失时保持内置 `--font-sans` 令牌栈，渲染器通过覆盖根元素的 `--font-sans` 应用字体栈，无需重载。四款内置字体——Geist、Inter、Noto Sans SC、LXGW WenKai——以 woff2 格式按 SIL OFL 1.1 本地发布并附许可证文本；每个自定义字体栈都追加 CJK 回退层，等宽字体栈保持不变。系统已安装字体由 Electron 主进程仅使用平台工具枚举（macOS 用 `system_profiler`、Windows 用 PowerShell、Linux 用 `fc-list`），去重/排序/过滤并缓存 60 秒，通过新增的允许通道 `pi-desktop/app/systemFonts` 暴露；主机协议 v9 与存储架构 v10 不变。** | 用户需要 Codex/dbx 风格的全局字体偏好，但沙盒化渲染器无法枚举系统字体，而针对仅渲染器偏好不应扩大主机 RPC 面。内置 OFL 许可字体保证每个可选字体均商用安全且可离线使用，60 秒缓存限制了 macOS 枚举的耗时（ADR 0083）。 |
 | D230 | 用户可配置的关闭行为与关闭到托盘 | **Windows/Linux 的关闭行为是由 Electron 主进程存放在 `<data>/close-behavior.json` 的持久化偏好。`ask` 是尚未设置的过渡态：首次关闭弹出原生模态框（取消 / 关闭到托盘 / 退出），选定其一即永久保存，取消则保持窗口打开且偏好仍未设置。可设置的只有 `tray` 和 `quit` —— 设置 → 通用仅在 Windows/Linux 渲染两项单选段（关闭到托盘 / 退出应用），`pi-desktop/window/closeBehavior/set` 拒绝 `ask`，因此选择可以切换但无法退回到每次询问。`tray` 把窗口隐藏到 D216 常驻的托盘图标之下（点击恢复，菜单显示或退出）；切换到 `quit` 不会销毁该图标，因为最小化到托盘仍然需要它。除了已经获准的退出之外，每一次非 macOS 的关闭都会被拦截；`quitting` 与 macOS 的关闭直接放行，`quit` 分支自己调用 `app.quit()`，而 `window-all-closed` 只在 `tray` 下保持沉默，因此启动探针与显式退出不受影响，常驻托盘也不会让 `quit` 会话继续活着。在 macOS 上 `closeBehavior/set` 同样以 `INVALID_ARGUMENT` 失败。边界看门狗跳过最小化和隐藏的窗口，所以隐藏到托盘的窗口不会被强制恢复。macOS 保持原生 Dock 生命周期（D216、ADR 0078、ADR 0090）。** | 最小化本来就把窗口收进 D216 的托盘；缺口在关闭：它在 Windows/Linux 上直接退出。固定的关闭到托盘会让期待退出的用户意外，所以这个选择只问一次、记住、并可在设置里回访 —— 与 Codex 风格外壳让长时会话继续存活但不接管关闭按钮的做法一致。 |
 
@@ -1794,3 +1795,17 @@ D193 和 D194。
 - 决策 D231 修订 D201/ADR 0062，触及 sidecar、host-core 的
   `tools.execute` 权限裁决、内置定义、系统提示词和渲染器的工具呈现映射。
   参见 ADR 0089 与 `03-runtime/02-agent-runtime.md` §5f/§5f.1。
+
+## 2026-08-17 — 插件面板将可见表面交给插件
+
+- 插件面板窗口现在在 macOS、Windows 和 Linux 上均使用无框窗口。preload
+  在每个平台预留相同的透明 46px 安全区，并仅在右上角绘制固定胶囊，其中包含
+  最小化、最大化或还原、关闭三个按钮。
+- 主机不再渲染 manifest 标题或开发安全区提示。插件拥有标题、工具栏、背景和
+  其他所有可见面板界面；固定或粘性界面使用现有的
+  `--pi-plugin-titlebar-height` 变量，插件自己的拖拽区域可以使用
+  `-webkit-app-region: drag`。
+- 决策 D234 修订 D218 / ADR 0081 以及 D232 / ADR 0082。私有的验证发送方
+  控制通道、封闭 Shadow DOM、本地化标签、主题自适应胶囊、`window.pluginBridge`、
+  protocol v9 和存储架构保持不变。参见 ADR 0092、`07-plugins/01-plugin-system.md`、
+  `04-ux/07-ui-design-system.md` 和 E2E-024D。
