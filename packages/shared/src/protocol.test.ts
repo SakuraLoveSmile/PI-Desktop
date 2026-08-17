@@ -39,6 +39,22 @@ describe("Plan protocol contracts", () => {
     expect(IPC_WHITELIST.has(IPC.invoke.scheduledRun)).toBe(true);
   });
 
+  it("exposes the vendor-account OAuth channels through the preload whitelist", () => {
+    expect(IPC.invoke.providersOauthStart).toBe(
+      "pi-desktop/providers/oauth/start",
+    );
+    for (const channel of [
+      IPC.invoke.providersOauthVendors,
+      IPC.invoke.providersOauthStart,
+      IPC.invoke.providersOauthRespond,
+      IPC.invoke.providersOauthCancel,
+      IPC.invoke.providersOauthLogout,
+      IPC.event.providersOauth,
+    ]) {
+      expect(IPC_WHITELIST.has(channel)).toBe(true);
+    }
+  });
+
   it("maps legacy Chat values to Plan while keeping Agent as fallback", () => {
     expect(normalizeMode("chat")).toBe("plan");
     expect(normalizeMode("plan")).toBe("plan");
