@@ -14,6 +14,17 @@ const chromeSource = await readFile(
   new URL("../electron/shared/plugin-panel-chrome.ts", import.meta.url),
   "utf8",
 );
+const examplePanelSource = await readFile(
+  new URL("../../../examples/plugins/hello/renderer/index.html", import.meta.url),
+  "utf8",
+);
+const hostCorePluginSource = await readFile(
+  new URL("../../../crates/host-core/src/plugins.rs", import.meta.url),
+  "utf8",
+);
+const bundledPanelSources = [
+  ...hostCorePluginSource.matchAll(/"renderer\/index\.html",\s*br#"(.*?)"#,/gs),
+].map((match) => match[1]);
 
 test("plugin panels match the cross-platform main-window chrome contract", () => {
   assert.match(hostSource, /frame: false/);
@@ -75,4 +86,13 @@ test("plugin content is offset below the strict 46px host drag band", () => {
   assert.match(preloadSource, /host\.dataset\.theme = theme/);
   assert.match(preloadSource, /className = "drag-region"/);
   assert.match(preloadSource, /prefers-reduced-motion: reduce/);
+});
+
+test("checked-in plugin panels follow the host chrome contract", () => {
+  assert.equal(bundledPanelSources.length, 2);
+  for (const panelSource of [examplePanelSource, ...bundledPanelSources]) {
+    assert.match(panelSource, /PI-Desktop reserves exactly a transparent 46px drag band/);
+    assert.match(panelSource, /var\(--pi-plugin-titlebar-height, 46px\)/);
+    assert.doesNotMatch(panelSource, /top:\s*0/);
+  }
 });
