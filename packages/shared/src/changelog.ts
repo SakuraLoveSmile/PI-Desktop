@@ -23,6 +23,20 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.8.0",
+    date: "2026-08-17",
+    highlights: [
+      "Delegate background subagents and wait for their results without blocking the conversation.",
+      "Raise the running subagent cap to 10 and apply each agent's permission scope to delegated work.",
+      "Add built-in explorer and fixer subagents for common background tasks.",
+      "Ask once whether closing the window should minimize to the tray or quit, then remember the choice.",
+      "Let plugin panels follow the app language and color mode.",
+      "Retry mid-stream rate-limit errors in the same turn instead of stopping the reply.",
+      "Recover approved Plan runs after a sidecar interruption.",
+      "Keep sidecar crash notices from breaking a window that is already gone.",
+    ],
+  },
+  {
     version: "0.7.0",
     date: "2026-08-15",
     highlights: [
@@ -319,6 +333,20 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.8.0",
+    date: "2026-08-17",
+    highlights: [
+      "将子代理放到后台委派，并在不阻塞对话的情况下等待结果。",
+      "将并行子代理上限提升到 10，并按每个代理的权限范围执行委派任务。",
+      "内置探索与修复子代理，覆盖常见的后台任务。",
+      "首次关闭窗口时询问是最小化到托盘还是退出，并记住该选择。",
+      "让插件面板跟随应用的语言和颜色模式。",
+      "在同一轮对话中重试中途遇到的限流错误，而不是直接中断回复。",
+      "在 sidecar 中断后恢复已批准的 Plan 执行。",
+      "避免 sidecar 崩溃通知破坏已经关闭的窗口。",
+    ],
+  },
   {
     version: "0.7.0",
     date: "2026-08-15",
