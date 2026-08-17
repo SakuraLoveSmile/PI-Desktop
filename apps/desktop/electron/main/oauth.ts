@@ -18,7 +18,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { InMemoryModelsStore } from "@earendil-works/pi-ai";
+import { getSupportedThinkingLevels, InMemoryModelsStore } from "@earendil-works/pi-ai";
 import type {
   Api,
   AuthEvent,
@@ -34,16 +34,21 @@ import type {
 } from "@earendil-works/pi-ai";
 import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
-import type {
-  OAuthLoginEvent,
-  OAuthPromptRequest,
-  OAuthRespondInput,
-  OAuthStartResult,
-  OAuthVendor,
+import {
+  piModelConfigFromModel,
+  type VendorModelBinding,
+} from "@pi-desktop/agent-runtime";
+import {
+  OAUTH_AUTH_KIND,
+  type OAuthLoginEvent,
+  type OAuthPromptRequest,
+  type OAuthRespondInput,
+  type OAuthStartResult,
+  type OAuthVendor,
+  type ThinkingLevel,
 } from "@pi-desktop/shared";
 
-/** Provider rows created by a vendor-account login carry this auth kind. */
-export const OAUTH_AUTH_KIND = "oauth";
+export { OAUTH_AUTH_KIND };
 
 /** Mirrors `secret_ref_for_provider_oauth` in crates/host-core/src/secrets.rs. */
 export function secretRefForProviderOauth(providerId: string): string {
@@ -310,14 +315,18 @@ export class VendorOAuth {
   }
 
   /**
-   * The api style one model needs. A vendor row stores a single style, but
-   * GitHub Copilot serves Anthropic, Chat Completions and Responses models
-   * under one account, so the selected model — not the row — decides.
+   * Everything a provider binding needs for one model of a signed-in account.
+   *
+   * A vendor row cannot take this from the builtin catalog: one account spans
+   * wire APIs (GitHub Copilot serves Anthropic, Chat Completions and Responses
+   * models, so the selected model — not the row — decides the style), and a
+   * gateway's catalog (radius) is not in the builtin one at all. The
+   * authenticated collection knows both.
    */
-  async apiStyleFor(
+  async bindingFor(
     vendorId: string,
     modelId: string,
-  ): Promise<string | undefined> {
+  ): Promise<VendorModelBinding | undefined> {
     const models = await this.ensureModels();
     let model = models.getModel(vendorId, modelId);
     if (!model) {
@@ -325,7 +334,17 @@ export class VendorOAuth {
       await models.refresh({ providers: [vendorId] });
       model = models.getModel(vendorId, modelId);
     }
-    return model ? apiStyleForWireApi(model.api) : undefined;
+    if (!model) return undefined;
+    const levels: ThinkingLevel[] = model.reasoning
+      ? [...(getSupportedThinkingLevels(model) as ThinkingLevel[])]
+      : ["off"];
+    return {
+      apiStyle: apiStyleForWireApi(model.api),
+      baseUrl: model.baseUrl,
+      modelConfig: piModelConfigFromModel(model),
+      supportsReasoning: model.reasoning === true,
+      supportedThinkingLevels: levels,
+    };
   }
 
   private async run(session: LoginSession, provider: Provider): Promise<void> {

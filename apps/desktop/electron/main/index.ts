@@ -789,10 +789,16 @@ async function resolveAgentRuntimeLaunch(
       errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
     });
   }
-  const secret = await host.call<{ value?: string }>("providers.getSecret", {
-    id: provider.id,
-  });
-  if (!secret.value && provider.authKind !== "none") {
+  // A vendor account has no long-lived key to read: the sidecar asks main for
+  // short-lived request auth instead (see `provider.resolveAuth`), so the
+  // launch payload deliberately carries no credential at all.
+  const isVendorAccount = provider.authKind === OAUTH_AUTH_KIND;
+  const secret = isVendorAccount
+    ? { value: undefined }
+    : await host.call<{ value?: string }>("providers.getSecret", {
+        id: provider.id,
+      });
+  if (!secret.value && !isVendorAccount && provider.authKind !== "none") {
     throw Object.assign(new Error("Provider API key missing"), {
       errorCode: ErrorCodes.PROVIDER_SECRET_MISSING,
     });
@@ -808,16 +814,35 @@ async function resolveAgentRuntimeLaunch(
       errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
     });
   }
-  const thinkingCapabilities = enrichProvider(provider, modelId);
+  // The wire api, endpoint and metadata of a vendor model come from the
+  // signed-in collection, not the builtin catalog: one account can span wire
+  // APIs and a gateway's catalog is not in the builtin one at all.
+  const vendorBinding = isVendorAccount
+    ? await vendorOAuth
+        .bindingFor(provider.vendorKey || "", modelId)
+        .catch(() => undefined)
+    : undefined;
+  if (isVendorAccount && !vendorBinding) {
+    throw Object.assign(
+      new Error(`Vendor account does not offer model "${modelId}"`),
+      { errorCode: ErrorCodes.MODEL_NOT_CONFIGURED },
+    );
+  }
+  const thinkingCapabilities =
+    vendorBinding ?? enrichProvider(provider, modelId);
   const thinkingLevel = clampThinkingLevel(
     thinkingCapabilities,
     normalizeThinkingLevel(session.thinkingLevel),
   );
-  const modelConfig = resolvePiModelConfig({
-    vendorKey: provider.vendorKey || "custom",
-    modelId,
-    apiStyle: provider.apiStyle,
-  });
+  const modelConfig =
+    vendorBinding?.modelConfig ??
+    resolvePiModelConfig({
+      vendorKey: provider.vendorKey || "custom",
+      modelId,
+      apiStyle: provider.apiStyle,
+    });
+  const apiStyle = vendorBinding?.apiStyle ?? provider.apiStyle;
+  const baseUrl = vendorBinding?.baseUrl ?? provider.baseUrl;
   const projectPath =
     typeof session.projectPath === "string" && session.projectPath.trim()
       ? session.projectPath.trim()
@@ -867,6 +892,8 @@ async function resolveAgentRuntimeLaunch(
     providers: providers.providers,
     getSecret: async (id: string) =>
       (await host!.call<{ value?: string }>("providers.getSecret", { id })).value,
+    resolveVendorBinding: (pinned, pinnedModelId) =>
+      vendorOAuth.bindingFor(pinned.vendorKey || "", pinnedModelId),
   });
   const subagentDiagnostics = [
     ...subagentCatalog.diagnostics,
@@ -878,6 +905,23 @@ async function resolveAgentRuntimeLaunch(
       data: { diagnostics: subagentDiagnostics },
     });
   }
+  // Bind the vendor-account rows this turn is allowed to sign requests with:
+  // the session's own provider plus any row a pinned subagent resolved to. The
+  // sidecar may then ask main for request auth, but only for a row named here,
+  // and the set is rewritten on every launch.
+  sidecar?.setVendorAuthBindings(
+    sessionId,
+    [
+      provider.id,
+      ...Object.values(subagentBindings.providers).map((binding) => binding.id),
+    ]
+      .map((id) => providers.providers.find((row) => row.id === id))
+      .flatMap((row) =>
+        row?.authKind === OAUTH_AUTH_KIND && row.vendorKey
+          ? [{ providerId: row.id, vendorKey: row.vendorKey }]
+          : [],
+      ),
+  );
   return {
     providerId: provider.id,
     modelId,
@@ -897,13 +941,13 @@ async function resolveAgentRuntimeLaunch(
         id: provider.id,
         name: provider.name,
         vendorKey: provider.vendorKey,
-        baseUrl: provider.baseUrl,
+        baseUrl,
         modelId,
         apiKey: secret.value || "",
         authKind: provider.authKind,
-        apiStyle: provider.apiStyle,
+        apiStyle,
         supportsReasoning: thinkingCapabilities.supportsReasoning,
-        supportedThinkingLevels: thinkingCapabilities.supportedThinkingLevels,
+        supportedThinkingLevels: [...thinkingCapabilities.supportedThinkingLevels],
         ...(modelConfig ? { modelConfig } : {}),
       },
       pluginTools: [
@@ -3641,6 +3685,10 @@ async function startSidecar(): Promise<void> {
     // record. The sidecar can provide a target path, never an arbitrary root.
     return loadInstructionChain(projectPath, path);
   });
+  // Request auth for a vendor account (ADR 0092). The sidecar names a provider
+  // row it was launched with; main resolves the vendor and returns a short-lived
+  // `ModelAuth`. The refresh token never crosses this boundary.
+  s.setVendorAuthResolver(async ({ vendorKey }) => vendorOAuth.resolveAuth(vendorKey));
   // Agent-driven work panel preview (D100): open a workspace HTML file in
   // the embedded browser; live reload keeps it current through later edits.
   s.setLocalTool("BrowserPreview", async ({ args, sessionId }) => {
@@ -4791,6 +4839,7 @@ function registerIpc() {
     // stale runtime) can't answer with this session's context.
     if (sidecar) {
       sidecar.clearProjectInstructionRoot(id);
+      sidecar.clearVendorAuthBindings(id);
       await sidecar
         .call("agent.disposeSession", { sessionId: id })
         .catch(() => undefined);
@@ -4813,6 +4862,7 @@ function registerIpc() {
       // transcript instead of replaying the discarded branch in memory.
       if (sidecar) {
         sidecar.clearProjectInstructionRoot(sessionId);
+        sidecar.clearVendorAuthBindings(sessionId);
         await sidecar
           .call("agent.disposeSession", { sessionId })
           .catch(() => undefined);
@@ -4862,6 +4912,7 @@ function registerIpc() {
       const sessionId = String(input?.sessionId || "");
       if (sidecar) {
         sidecar.clearProjectInstructionRoot(sessionId);
+        sidecar.clearVendorAuthBindings(sessionId);
         await sidecar
           .call("agent.disposeSession", { sessionId })
           .catch(() => undefined);
@@ -5989,6 +6040,7 @@ function registerIpc() {
       });
       if (sidecar) {
         sidecar.clearProjectInstructionRoot(req.sessionId);
+        sidecar.clearVendorAuthBindings(req.sessionId);
         await sidecar
           .call("agent.disposeSession", { sessionId: req.sessionId })
           .catch(() => undefined);
