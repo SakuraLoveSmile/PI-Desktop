@@ -120,6 +120,8 @@ export type PluginPanelRequest = {
   theme?: "light" | "dark";
   /** The plugin's egress allowlist; the panel session is confined to it. */
   netDomains?: readonly string[];
+  /** Development panels show the host drag-band reminder in their chrome. */
+  development?: boolean;
 };
 
 /** Transport to one plugin host process (ADR 0008). */
@@ -2393,6 +2395,7 @@ export class PluginRuntime {
             height: loaded.manifest.ui?.height ?? 360,
             htmlPath,
             netDomains: this.netDomains(loaded),
+            ...(loaded.development ? { development: true } : {}),
           });
           this.services.audit?.({
             pluginId,

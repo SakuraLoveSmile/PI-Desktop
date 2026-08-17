@@ -133,15 +133,17 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   Shift+F10 remain available to focused content.
 - macOS native commands that create or reload a window wait for the renderer's menu
   subscription acknowledgement instead of relying on a timing delay.
-- Plugin panel windows use the same 46px safe-area metric on every platform.
-  All three use a frameless window with one fixed top-right capsule containing
-  minimize, maximize/restore, and close. The host renders no title or
-  development reminder; the plugin owns its title, toolbar, and all other
-  visible content. The transparent safe area supports light/dark page
-  appearance and reduced motion, stays isolated from plugin styles in a closed
-  Shadow DOM, and exposes `--pi-plugin-titlebar-height: 46px` for fixed/sticky
-  plugin content. Plugin-owned toolbars may opt into `-webkit-app-region: drag`
-  while their interactive controls use `no-drag`.
+- Plugin panel windows use the same strict 46px drag-band metric on every
+  platform. All three use a frameless window with one minimal fixed top-right
+  capsule containing minimize, maximize/restore, and close. The capsule stays
+  inside the 46px band; the band is not clickable outside the capsule, and
+  development panels show a localized reminder. The host renders no title;
+  the plugin owns its title, toolbar, and all other visible content. The
+  transparent band supports light/dark page appearance and reduced motion,
+  stays isolated from plugin styles in a closed Shadow DOM, and exposes
+  `--pi-plugin-titlebar-height: 46px` for fixed/sticky plugin content.
+  Plugin-owned toolbars may opt into `-webkit-app-region: drag` while their
+  interactive controls use `no-drag`.
 
 ---
 

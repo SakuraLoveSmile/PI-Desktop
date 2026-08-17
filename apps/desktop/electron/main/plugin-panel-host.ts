@@ -25,6 +25,8 @@ export type PluginPanelOpenRequest = {
    * an unmetered outbound channel that bypasses the `net.fetch` permission.
    */
   netDomains?: readonly string[];
+  /** Adds a development-only reminder for the non-clickable drag band. */
+  development?: boolean;
 };
 
 /** Schemes a panel may always load: its own bundle and devtools plumbing. */
@@ -228,6 +230,9 @@ export class PluginPanelHost {
         additionalArguments: [
           `${PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX}${encodeURIComponent(request.locale)}`,
           `--pi-plugin-panel-theme=${request.theme}`,
+          ...(request.development
+            ? ["--pi-plugin-panel-development=1"]
+            : []),
         ],
       },
     });

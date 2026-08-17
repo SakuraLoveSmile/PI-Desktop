@@ -20,15 +20,22 @@ test("plugin panels match the cross-platform main-window chrome contract", () =>
   assert.doesNotMatch(hostSource, /titleBarStyle|trafficLightPosition/);
   assert.match(hostSource, /request\.theme === "light"/);
   assert.match(hostSource, /win\.setMenu\(null\)/);
-  assert.doesNotMatch(hostSource, /pi-plugin-panel-development=1/);
+  assert.match(hostSource, /pi-plugin-panel-development=1/);
   assert.match(chromeSource, /PLUGIN_PANEL_TITLEBAR_HEIGHT = 46/);
   assert.match(preloadSource, /-webkit-app-region: drag/);
   assert.match(preloadSource, /className = "capsule"/);
-  assert.match(preloadSource, /top: 7px/);
+  assert.match(preloadSource, /top: 8px/);
   assert.match(preloadSource, /right: 10px/);
-  assert.match(preloadSource, /width: 104px/);
+  assert.match(preloadSource, /width: 96px/);
+  assert.match(preloadSource, /height: 28px/);
   assert.match(preloadSource, /border-radius: 999px/);
   assert.match(preloadSource, /controls\.append\(minimize, maximize, close\)/);
+  const capsuleBlock = preloadSource.slice(
+    preloadSource.indexOf("    .capsule {"),
+    preloadSource.indexOf("    .control {"),
+  );
+  assert.doesNotMatch(capsuleBlock, /box-shadow:|backdrop-filter:/);
+  assert.doesNotMatch(preloadSource, /function panelTitle|panelTitle\(/);
   assert.doesNotMatch(preloadSource, /platform-darwin|padding-left: 76px|width: 112px/);
 });
 
@@ -54,16 +61,18 @@ test("plugin panel window controls stay private, bounded, and accessible", () =>
   );
 });
 
-test("plugin content is offset below the host-owned safe area", () => {
+test("plugin content is offset below the strict 46px host drag band", () => {
   assert.match(preloadSource, /getComputedStyle\(body\)\.paddingTop/);
   assert.match(preloadSource, /padding-top/);
   assert.match(preloadSource, /PLUGIN_PANEL_TITLEBAR_HEIGHT/);
   assert.match(preloadSource, /--pi-plugin-titlebar-height/);
+  assert.match(preloadSource, /isDevelopmentPanel/);
+  assert.match(preloadSource, /safe-area-hint/);
+  assert.match(preloadSource, /顶部 46px 为拖拽区/);
   assert.match(preloadSource, /--pi-plugin-panel-theme=/);
   assert.match(preloadSource, /PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX/);
   assert.match(preloadSource, /panelLocale\(\)\.toLowerCase\(\)/);
   assert.match(preloadSource, /host\.dataset\.theme = theme/);
   assert.match(preloadSource, /className = "drag-region"/);
-  assert.doesNotMatch(preloadSource, /panelTitle|safe-area-hint|isDevelopmentPanel|46px safe area/);
   assert.match(preloadSource, /prefers-reduced-motion: reduce/);
 });

@@ -189,14 +189,15 @@ manifest are reserved for the planned full lifecycle.
 ### `renderer/index.html`
 
 PI-Desktop hosts the panel in a frameless window on every platform. The host
-reserves a transparent 46 CSS px safe area and renders only a fixed capsule in
-the top-right corner with minimize, maximize/restore, and close buttons. The
-panel title, toolbar, and all other visible UI belong to the plugin. Normal-flow
-content is automatically offset below the safe area, so do not add another
-46px top padding to compensate.
+reserves exactly a transparent 46 CSS px drag band and renders a minimal fixed
+capsule in the top-right corner with minimize, maximize/restore, and close
+buttons. The panel title, toolbar, and all other visible UI belong to the
+plugin. Normal-flow content is automatically offset below the drag band, so do
+not add another 46px top padding to compensate. The drag band is not clickable
+outside the capsule; development panels show a reminder for this constraint.
 
 If a panel uses `position: fixed` or `position: sticky` for a top toolbar,
-anchor it below the host chrome instead of using `top: 0`:
+anchor it below the host drag band instead of using `top: 0`:
 
 ```css
 .panel-toolbar {
@@ -210,8 +211,8 @@ anchor it below the host chrome instead of using `top: 0`:
 }
 ```
 
-The host does not inject a panel title or development reminder. Keep the safe
-area in mind for viewport-height calculations as well:
+The host does not inject a panel title. Keep the 46px drag band in mind for
+viewport-height calculations as well:
 `height: calc(100dvh - var(--pi-plugin-titlebar-height, 46px))`.
 
 ```html

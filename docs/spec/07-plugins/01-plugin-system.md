@@ -219,17 +219,19 @@ are reachable there) and CPU/memory limits.
 ### 6.3 Plugin Panel UI
 - Load the plugin page in a dedicated sandboxed `BrowserWindow` and isolated
   per-plugin session partition
-- Use a frameless window on macOS, Windows, and Linux. The preload reserves a
-  transparent 46px safe area and renders only a fixed top-right capsule with
-  three controls: minimize, maximize/restore, and close. Native traffic lights,
-  host-rendered panel titles, and development reminders are not shown.
+- Use a frameless window on macOS, Windows, and Linux. The preload reserves
+  exactly a transparent 46px drag band and renders only a minimal fixed
+  top-right capsule with three controls: minimize, maximize/restore, and close.
+  Native traffic lights and host-rendered panel titles are not shown. The drag
+  band is not clickable outside the capsule; development panels show a
+  localized reminder.
 - Panel titles may remain a legacy string or a localized `{ "en": string,
   "zh-CN": string }` object for the native window identity and launcher
   metadata, but the host does not render that title inside the panel.
 - The capsule follows the loaded plugin page's computed background and text
   colors. The active PI-Desktop theme (`light` / `dark`, including a plugin
   theme's base palette) is the fallback while the page is transparent.
-- Expose the safe-area height as `--pi-plugin-titlebar-height: 46px`;
+- Expose the drag-band height as `--pi-plugin-titlebar-height: 46px`;
   normal-flow content is offset automatically, while fixed/sticky plugin UI
   must use `top: var(--pi-plugin-titlebar-height, 46px)` rather than `top: 0`.
   A plugin-owned toolbar may use `-webkit-app-region: drag`, with

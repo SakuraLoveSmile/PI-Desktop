@@ -31,7 +31,12 @@ type ChromeLabels = {
   maximize: string;
   restore: string;
   close: string;
+  safeArea: string;
 };
+
+function isDevelopmentPanel(): boolean {
+  return process.argv.includes("--pi-plugin-panel-development=1");
+}
 
 function panelTheme(): PluginPanelTheme {
   const prefix = "--pi-plugin-panel-theme=";
@@ -78,6 +83,7 @@ function chromeLabels(): ChromeLabels {
       maximize: "最大化",
       restore: "还原",
       close: "关闭",
+      safeArea: "开发提示 · 顶部 46px 为拖拽区",
     };
   }
   return {
@@ -86,6 +92,7 @@ function chromeLabels(): ChromeLabels {
     maximize: "Maximize",
     restore: "Restore",
     close: "Close",
+    safeArea: "Dev hint · top 46px is drag-only",
   };
 }
 
@@ -172,27 +179,41 @@ function installPanelChrome(): void {
       height: ${PLUGIN_PANEL_TITLEBAR_HEIGHT}px;
       user-select: none;
     }
+    .safe-area-hint {
+      position: absolute;
+      top: 50%;
+      left: 10px;
+      z-index: 1;
+      max-width: calc(100% - 126px);
+      overflow: hidden;
+      color: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 46%, transparent);
+      font-size: 10px;
+      line-height: 1;
+      pointer-events: none;
+      text-overflow: ellipsis;
+      transform: translateY(-50%);
+      user-select: none;
+      white-space: nowrap;
+    }
     .capsule {
       -webkit-app-region: no-drag;
       app-region: no-drag;
       pointer-events: auto;
       position: absolute;
-      top: 7px;
+      top: 8px;
       right: 10px;
-      z-index: 1;
+      z-index: 2;
       box-sizing: border-box;
       display: flex;
-      width: 104px;
-      height: 32px;
+      width: 96px;
+      height: 28px;
       align-items: center;
-      gap: 2px;
+      gap: 1px;
       overflow: hidden;
-      border: 1px solid color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 20%, transparent);
+      border: 1px solid color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 16%, transparent);
       border-radius: 999px;
-      padding: 2px;
-      background: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 8%, transparent);
-      box-shadow: 0 4px 16px color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 12%, transparent);
-      backdrop-filter: blur(18px);
+      padding: 1px;
+      background: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 6%, transparent);
       user-select: none;
     }
     .control {
@@ -201,12 +222,12 @@ function installPanelChrome(): void {
       pointer-events: auto;
       display: inline-flex;
       min-width: 0;
-      height: 28px;
+      height: 24px;
       flex: 1 1 0;
       align-items: center;
       justify-content: center;
       border: 0;
-      border-radius: 999px;
+      border-radius: 7px;
       outline: none;
       background: transparent;
       color: color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 58%, transparent);
@@ -222,7 +243,7 @@ function installPanelChrome(): void {
       box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--pi-plugin-panel-page-foreground) 50%, transparent);
     }
     .control-close:hover {
-      background: rgba(210, 43, 51, 0.92);
+      background: rgba(210, 43, 51, 0.78);
       color: #ffffff;
     }
     .glyph {
@@ -296,6 +317,16 @@ function installPanelChrome(): void {
   dragRegion.className = "drag-region";
   dragRegion.setAttribute("aria-hidden", "true");
 
+  const safeAreaHint = isDevelopmentPanel()
+    ? document.createElement("span")
+    : null;
+  if (safeAreaHint) {
+    safeAreaHint.className = "safe-area-hint";
+    safeAreaHint.textContent = labels.safeArea;
+    safeAreaHint.setAttribute("role", "note");
+    safeAreaHint.setAttribute("aria-label", labels.safeArea);
+  }
+
   const controls = document.createElement("div");
   controls.className = "capsule";
   controls.setAttribute("role", "group");
@@ -350,7 +381,9 @@ function installPanelChrome(): void {
   void invokeControl("getState");
 
   controls.append(minimize, maximize, close);
-  chrome.append(dragRegion, controls);
+  chrome.append(dragRegion);
+  if (safeAreaHint) chrome.append(safeAreaHint);
+  chrome.append(controls);
   shadow.append(style, chrome);
   document.documentElement.append(host);
 }

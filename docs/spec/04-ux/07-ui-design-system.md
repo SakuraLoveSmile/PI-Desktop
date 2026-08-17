@@ -65,13 +65,14 @@ Section labels that use Latin micro-style (`text-transform: uppercase` +
 Applies to sidebar section labels, settings rail group labels, destination
 section labels, and keyboard-shortcut group labels.
 
-Plugin panel chrome follows the same shell context: the host reserves a
-transparent 46px safe area and renders only a page-adaptive capsule with three
-window controls at the fixed top-right corner. The capsule uses the panel
-page's computed surface/text colors with the active theme as a
-transparent-page fallback. It must not force a black surface on a light
-plugin page. The plugin owns its title, toolbar, and every other visible panel
-surface.
+Plugin panel chrome follows the same shell context: the host reserves exactly
+a transparent 46px drag band and renders only a minimal page-adaptive capsule
+with three window controls at the fixed top-right corner. The capsule stays
+inside that band, uses the panel page's computed surface/text colors with the
+active theme as a transparent-page fallback, and must not force a black surface
+on a light plugin page. The band is not clickable outside the capsule;
+development panels expose a localized reminder. The plugin owns its title,
+toolbar, and every other visible panel surface.
 
 ### 3.3 Product identity and marks
 
