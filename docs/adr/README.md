@@ -110,3 +110,4 @@ Each ADR includes:
 | 0091 | Route mid-stream rate limits through the bounded retry | Accepted (amends 0050) |
 | 0092 | Use a plugin-owned surface with a host window-control capsule | Accepted |
 | 0093 | Keep a strict 46px plugin drag band with a minimal capsule | Accepted |
+| 0094 | Admit one desktop instance per data directory | Accepted |

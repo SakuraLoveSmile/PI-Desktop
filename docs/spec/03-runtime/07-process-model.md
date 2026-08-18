@@ -23,6 +23,20 @@ PI-Desktop.app
 
 ## 3. Boot order
 
+Boot begins with a single-instance lock. One data directory admits exactly one
+app process: host-core owns `pi.sqlite` exclusively (D002), Electron main owns
+the persistence outbox and the log tree beside it, and the tray, the global
+launcher shortcut, and the updater are singletons of the running desktop. A
+launch that does not take the lock quits before it creates a window, a tray, a
+log line, or a child process; the instance that holds the lock restores and
+focuses its main window from `second-instance`, recreating a window that was
+closed or hidden into the tray, exactly as the tray's Show action does. The lock
+is Electron's, so its scope is `userData` — derived from the application name,
+which is therefore set before the request — rather than the data directory: a
+run pointed at its own `PI_DESKTOP_DATA_DIR` (E2E harnesses, the capture rig, a
+side-by-side profile) shares no database, outbox, or logs with the default
+installation and stays launchable while one is running (D236, ADR 0094).
+
 1. Electron main starts
 2. Load English locale defaults
 3. Spawn Rust host-core
