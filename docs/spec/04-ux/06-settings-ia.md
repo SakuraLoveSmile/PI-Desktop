@@ -115,9 +115,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     existing accounts do not remove or disable that vendor from the picker, so
     the same vendor can be added again for a different account
   - an account row shows the vendor name, a Subscription badge where the access
-    is plan-backed, a Connected or Needs sign-in badge, the account label, and
-    its default model. Duplicate accounts receive a stable account number in
-    the row
+    is plan-backed, a Connected or Needs sign-in badge, and the account label.
+    Duplicate accounts receive a stable account number in the row; the default
+    model remains available in Defaults and the account editor
   - picking a vendor opens a single dialog that renders whatever the flow asks
     for — an opened browser with a copyable link, a device code, a choice, or a
     text field — with a cancel action that aborts the local callback server or

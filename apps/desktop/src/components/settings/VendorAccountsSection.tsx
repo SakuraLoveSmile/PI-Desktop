@@ -272,14 +272,6 @@ export function VendorAccountsSection() {
                     <div className="vendor-card-meta">
                       {accountName}
                       {duplicateLabel}
-                      {provider?.defaultModelId ? (
-                        <>
-                          <span className="provider-meta-dot" aria-hidden>
-                            ·
-                          </span>
-                          <span className="font-mono">{provider.defaultModelId}</span>
-                        </>
-                      ) : null}
                     </div>
                     {!connected ? (
                       <div className="vendor-card-status">

@@ -4080,7 +4080,8 @@ Each scenario is documented in this format:
   Add account again, pick Anthropic again, and complete a second login with a
   different account; confirm two account rows and two provider ids. 4) Edit
   the first account, change its display name and default model, save, and
-  confirm the row and Defaults selector reflect both values. Press Test
+  confirm the row shows the account label once while the Defaults selector
+  reflects the edited model. Press Test
   connection and confirm the result resolves the edited account. 5) Resolve
   and use each account separately, including model discovery and one streamed
   turn per account. 6) Start the device-code login on a second vendor, then

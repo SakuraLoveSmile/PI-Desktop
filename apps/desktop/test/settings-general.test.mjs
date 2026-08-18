@@ -157,6 +157,16 @@ test("model configuration separates AI services from independently removable ven
   assert.match(vendorPickerSource, /vendors\.map/);
 });
 
+test("vendor account rows keep the summary line to one account name", () => {
+  const accountMeta =
+    vendorAccountsSource.match(
+      /<div className="vendor-card-meta">[\s\S]*?<\/div>/,
+    )?.[0] ?? "";
+  assert.match(accountMeta, /\{accountName\}/);
+  assert.match(accountMeta, /\{duplicateLabel\}/);
+  assert.doesNotMatch(accountMeta, /defaultModelId|provider-meta-dot|font-mono/);
+});
+
 test("OAuth account identity is provider-scoped across IPC and pi-ai", () => {
   assert.match(protocolSource, /providersOauthDelete/);
   assert.doesNotMatch(protocolSource, /providersOauthLogout/);
