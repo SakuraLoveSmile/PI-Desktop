@@ -168,8 +168,13 @@ test("settings nav icons map each destination to a semantic lucide glyph", () =>
   assert.doesNotMatch(settingsPageSource, /import: <IconSnapshot/);
 });
 
-test("settings nav is a flat eight-destination directory with keyword search", () => {
-  assert.match(settingsPageSource, /filteredItems\.map/);
+test("settings nav keeps a flat searchable index with quiet visual groups", () => {
+  assert.match(settingsPageSource, /filteredGroups\.map/);
+  assert.match(settingsPageSource, /className="settings-nav-group"/);
+  assert.match(settingsSearchSource, /group: "core"/);
+  assert.match(settingsSearchSource, /group: "agent"/);
+  assert.match(settingsSearchSource, /group: "workspace"/);
+  assert.match(settingsSearchSource, /group: "about"/);
   assert.doesNotMatch(settingsPageSource, /settings-nav-group-label/);
   assert.doesNotMatch(settingsSearchSource, /settings\.groupPersonal/);
   assert.doesNotMatch(settingsSearchSource, /settings\.groupIntegrations/);
@@ -197,6 +202,10 @@ test("settings nav is a flat eight-destination directory with keyword search", (
   assert.match(settingsSearchSource, /keywordKeys/);
   assert.match(settingsSearchSource, /settings\.projectArchive/);
   assert.match(stylesSource, /\.settings-nav-item\s*\{/);
+  assert.match(
+    stylesSource,
+    /\.settings-nav-group \+ \.settings-nav-group\s*\{[^}]*margin-top:\s*8px;[^}]*padding-top:\s*8px;[^}]*border-top:\s*1px solid var\(--ds-border-subtle\);/s,
+  );
   assert.match(
     stylesSource,
     /\.settings-row\.settings-row-plain\s*\{[^}]*border-bottom:\s*0/s,

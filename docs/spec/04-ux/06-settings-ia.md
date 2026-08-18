@@ -21,7 +21,13 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   with the rail label; do not reuse refresh/rotate glyphs here.
 - The directory is a flat list. Do not add `Personal`, `Integrations`,
   `Coding`, or other group headings around the destinations; the destination
-  names already provide the needed hierarchy.
+  names already provide the needed hierarchy. For scanability, the flat list
+  is visually split into four untitled clusters, preserving the same order:
+  Basics / AI / Shortcuts; Instructions / Model configuration; Import / Project
+  archive; Info. Each boundary uses a quiet hairline divider and a 16px
+  section gap. These are visual breaks only, not a second navigation level.
+  When search filters the directory, empty clusters disappear and no orphan
+  divider remains.
 - No additional settings destinations or placeholder navigation rows are shown
 - Main content pane on primary surface with large section title + elevated
   rounded cards of rows. Its content uses the full width available after the

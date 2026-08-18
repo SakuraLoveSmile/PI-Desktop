@@ -121,11 +121,24 @@
 .settings-nav-scroll {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
   min-height: 0;
   flex: 1;
   overflow: auto;
   padding: 2px 10px 24px;
+}
+
+.settings-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Keep the directory flat, but give related destinations a quiet 16px break. */
+.settings-nav-group + .settings-nav-group {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ds-border-subtle);
 }
 
 .settings-nav-empty {

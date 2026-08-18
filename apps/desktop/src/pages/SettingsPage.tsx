@@ -21,7 +21,7 @@ import {
   type ImportGroupBy,
 } from "../lib/import-groups";
 import { Badge, Button, Select, cx } from "../components/ui";
-import { SETTINGS_NAV } from "../lib/settings-search";
+import { SETTINGS_NAV, type SettingsNavGroupId } from "../lib/settings-search";
 import {
   IconArchive,
   IconBot,
@@ -52,6 +52,7 @@ type NavItem = {
   id: SettingsTab;
   labelKey: string;
   icon: ReactNode;
+  group: SettingsNavGroupId;
   /** i18n keys of the rows inside the tab; search matches their translations. */
   keywordKeys: string[];
 };
@@ -854,6 +855,7 @@ export function SettingsPage() {
       id: entry.id,
       labelKey: entry.labelKey,
       icon: iconFor[entry.id],
+      group: entry.group,
       keywordKeys: entry.keywordKeys,
     }));
   }, []);
@@ -870,6 +872,18 @@ export function SettingsPage() {
       ),
     );
   }, [navItems, query, t]);
+
+  // Keep the destination index flat for search, while giving the rail a few
+  // quiet visual breaks so the eight rows do not read as one dense block.
+  const filteredGroups = useMemo(() => {
+    const groups = new Map<SettingsNavGroupId, NavItem[]>();
+    for (const item of filteredItems) {
+      const items = groups.get(item.group) ?? [];
+      items.push(item);
+      groups.set(item.group, items);
+    }
+    return [...groups.entries()].map(([id, items]) => ({ id, items }));
+  }, [filteredItems]);
 
   const activeLabel =
     navItems.find((item) => item.id === tab)?.labelKey ?? "settings.title";
@@ -903,18 +917,22 @@ export function SettingsPage() {
         </div>
 
         <div className="settings-nav-scroll no-drag">
-          {filteredItems.length === 0 ? (
+          {filteredGroups.length === 0 ? (
             <div className="settings-nav-empty">{t("settings.noResults")}</div>
           ) : (
-            filteredItems.map((item) => (
-              <button
-                key={item.id}
-                className={cx("settings-nav-item", tab === item.id && "active")}
-                onClick={() => setSettingsTab(item.id)}
-              >
-                <span className="settings-nav-icon">{item.icon}</span>
-                <span className="settings-nav-label">{t(item.labelKey)}</span>
-              </button>
+            filteredGroups.map(({ id, items }) => (
+              <div key={id} className="settings-nav-group">
+                {items.map((item) => (
+                  <button
+                    key={item.id}
+                    className={cx("settings-nav-item", tab === item.id && "active")}
+                    onClick={() => setSettingsTab(item.id)}
+                  >
+                    <span className="settings-nav-icon">{item.icon}</span>
+                    <span className="settings-nav-label">{t(item.labelKey)}</span>
+                  </button>
+                ))}
+              </div>
             ))
           )}
         </div>
