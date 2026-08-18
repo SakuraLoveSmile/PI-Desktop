@@ -1108,7 +1108,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
 | Streaming | accent left rail along the whole assistant turn (fragments + tool rows); the rail's space is always reserved so it fading in/out never reflows text; content grows |
 | Thinking streaming | disclosure open; answer bubble omitted until answer text exists |
 | Complete | no streaming rule; full rendered markdown |
-| Error | assistant error card in transcript; localized summary + stable code; details disclosure opens to redacted provider response, provider/model IDs, and copy action; retriable failures show Retry and configuration failures show Open settings |
+| Error | compact assistant error card in transcript; localized summary and stable code share one header with the details disclosure and recovery action; details still opens to redacted provider response, provider/model IDs, and copy action; retriable failures show Retry and configuration failures show Open settings |
 
 ### 8.4a Context compaction row
 

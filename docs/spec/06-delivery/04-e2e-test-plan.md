@@ -4694,6 +4694,13 @@ This test plan spec is accepted when:
 - Expand thinking markdown and confirm it stays visually subordinate to the answer.
 
 
+### US-UI-60c Compact assistant error card
+- Trigger a retriable provider/model failure in the transcript in light and dark themes.
+- Expect the assistant error to use a restrained inline surface with a thin error rail. The localized summary, stable code, details disclosure, and Retry action share one compact header; the card does not render a second bottom action row.
+- Confirm the details remain expanded on first render, keep the redacted provider response and provider/model IDs, and expose an icon-only copy control with an accessible label/tooltip. On a narrow window, the header actions wrap without horizontal overflow.
+- Click Retry and expect the existing retry path to resend the latest prompt.
+
+
 ### US-UI-61 Assistant context inspector + retry (D103, D184)
 - Complete an assistant turn that reports usage.
 - Expect a model badge and compact Context inspector under the answer. The

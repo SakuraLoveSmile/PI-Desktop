@@ -1445,10 +1445,11 @@
 
 .message-error {
   width: min(100%, 680px);
-  border: 1px solid color-mix(in oklab, var(--ds-error) 32%, var(--ds-border-default));
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--ds-error) 7%, var(--ds-bg-secondary));
-  padding: 12px;
+  border: 1px solid var(--ds-border-subtle);
+  border-inline-start: 2px solid var(--ds-error);
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-secondary);
+  padding: 10px 12px;
   color: var(--ds-text-primary);
 }
 
@@ -1459,9 +1460,13 @@
   gap: 8px;
 }
 
+.message-error-heading {
+  min-width: 0;
+}
+
 .message-error-icon {
   display: inline-flex;
-  align-self: flex-start;
+  flex: 0 0 auto;
   color: var(--ds-error);
 }
 
@@ -1469,8 +1474,9 @@
   display: flex;
   min-width: 0;
   flex: 1;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 8px;
 }
 
 .message-error-copy strong {
@@ -1480,19 +1486,33 @@
 
 .message-error-copy code {
   width: fit-content;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-error) 8%, transparent);
+  padding: 2px 6px;
   color: var(--ds-error);
-  font-size: var(--text-xs);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-compact);
+}
+
+.message-error-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
 }
 
 .message-error-toggle {
   display: inline-flex;
-  min-height: 26px;
+  min-height: 24px;
   align-items: center;
   gap: 4px;
-  margin-top: 8px;
+  padding: 3px 4px;
   border-radius: var(--radius-sm);
-  color: var(--ds-text-secondary);
+  color: var(--ds-text-muted);
   font-size: var(--text-xs-plus);
+}
+
+.message-error-toggle:hover {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
 }
 
 .message-error-toggle[aria-expanded="true"] svg {
@@ -1500,14 +1520,14 @@
 }
 
 .message-error-details {
-  margin-top: 6px;
-  border-top: 1px solid color-mix(in oklab, var(--ds-error) 20%, var(--ds-border-default));
+  margin-top: 8px;
+  border-top: 1px solid var(--ds-border-subtle);
   padding-top: 8px;
 }
 
 .message-error-details dl {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
   gap: 3px 10px;
   margin: 0 0 8px;
   color: var(--ds-text-secondary);
@@ -1515,17 +1535,23 @@
 }
 
 .message-error-details dd {
+  min-width: 0;
   overflow-wrap: anywhere;
   color: var(--ds-text-primary);
+}
+
+.message-error-raw {
+  position: relative;
+  min-width: 0;
 }
 
 .message-error-details pre {
   max-height: 180px;
   overflow: auto;
-  margin: 0 0 6px;
+  margin: 0;
   border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--ds-bg-primary) 80%, transparent);
-  padding: 8px 10px;
+  background: var(--ds-bg-inset);
+  padding: 8px 40px 8px 10px;
   color: var(--ds-text-secondary);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -1534,8 +1560,28 @@
   overflow-wrap: anywhere;
 }
 
-.message-error-actions {
-  margin-top: 8px;
+.message-error-raw .copy-btn {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+}
+
+@media (max-width: 560px) {
+  .message-error-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .message-error-actions {
+    width: calc(100% - 24px);
+    flex-basis: calc(100% - 24px);
+    margin-inline-start: 24px;
+    justify-content: flex-start;
+  }
+
+  .message-error-details dl {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
 }
 
 /* Thinking prose base tokens — detailed rules live with .prose-chat. */

@@ -663,17 +663,40 @@ function AssistantErrorMessage({ message }: { message: UiMessage }) {
           <strong>{summary}</strong>
           <code>{error.code}</code>
         </div>
+        <div className="message-error-actions">
+          <button
+            type="button"
+            className="message-error-toggle"
+            aria-expanded={open}
+            aria-controls={detailsId}
+            onClick={() => setOpen((value) => !value)}
+          >
+            <IconChevronRight size={12} aria-hidden />
+            {open ? t("chat.hideErrorDetails") : t("chat.showErrorDetails")}
+          </button>
+          {configurationError ? (
+            <button
+              type="button"
+              className="copy-btn"
+              onClick={() => {
+                useAppStore.getState().setSettingsTab("agent");
+                useAppStore.getState().setPage("settings");
+              }}
+            >
+              {t("errors.action.openSettings")}
+            </button>
+          ) : null}
+          {error.retriable ? (
+            <button
+              type="button"
+              className="copy-btn primary"
+              onClick={() => void retryLastPrompt()}
+            >
+              {t("errors.action.retry")}
+            </button>
+          ) : null}
+        </div>
       </div>
-      <button
-        type="button"
-        className="message-error-toggle"
-        aria-expanded={open}
-        aria-controls={detailsId}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <IconChevronRight size={12} aria-hidden />
-        {open ? t("chat.hideErrorDetails") : t("chat.showErrorDetails")}
-      </button>
       <div
         id={detailsId}
         className={`message-error-details ${open ? "open" : ""}`}
@@ -693,35 +716,10 @@ function AssistantErrorMessage({ message }: { message: UiMessage }) {
             </>
           ) : null}
         </dl>
-        <pre className="selectable">{error.message}</pre>
-        <CopyButton
-          text={error.message}
-          label={t("chat.copyErrorDetails")}
-          withLabel
-        />
-      </div>
-      <div className="message-error-actions">
-        {configurationError ? (
-          <button
-            type="button"
-            className="copy-btn"
-            onClick={() => {
-              useAppStore.getState().setSettingsTab("agent");
-              useAppStore.getState().setPage("settings");
-            }}
-          >
-            {t("errors.action.openSettings")}
-          </button>
-        ) : null}
-        {error.retriable ? (
-          <button
-            type="button"
-            className="copy-btn"
-            onClick={() => void retryLastPrompt()}
-          >
-            {t("errors.action.retry")}
-          </button>
-        ) : null}
+        <div className="message-error-raw">
+          <pre className="selectable">{error.message}</pre>
+          <CopyButton text={error.message} label={t("chat.copyErrorDetails")} />
+        </div>
       </div>
     </section>
   );
