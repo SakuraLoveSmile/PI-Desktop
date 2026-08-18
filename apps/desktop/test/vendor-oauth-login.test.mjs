@@ -86,6 +86,7 @@ function fakeModels(credentials, { login } = {}) {
       api: "anthropic-messages",
       provider: "anthropic",
       baseUrl: "https://api.anthropic.com",
+      input: ["text"],
     },
   ];
   return {
