@@ -2920,10 +2920,10 @@ async function createWindow() {
             // which is still dark from the destination pass; the remaining
             // settings scenes are light so the tabs read as one sequence.
             await setTheme("light");
-            // Model configuration tab: provider cards, defaults, edit dialog.
-            await mainWindow!.webContents.executeJavaScript(`
-              [...document.querySelectorAll('.settings-nav-item')][1]?.dispatchEvent(new MouseEvent('click',{bubbles:true}));
-            `);
+            // Model configuration tab: vendor accounts, provider cards,
+            // defaults, edit dialog. Addressed by tab id — the settings nav
+            // has been reordered since this scene was written.
+            await setSettingsTab("agent");
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-settings-models");
             await mainWindow!.webContents.executeJavaScript(`

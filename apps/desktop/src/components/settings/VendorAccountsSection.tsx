@@ -107,12 +107,15 @@ export function VendorAccountsSection() {
                     <Badge tone="success">{t("settings.vendorConnected")}</Badge>
                   ) : null}
                 </div>
-                <div className="vendor-card-meta">
-                  {vendor.signedIn
-                    ? vendor.accountLabel || t("settings.vendorSignedInGeneric")
-                    : vendor.loginLabel ||
-                      t("settings.vendorSignInTo", { vendor: vendor.name })}
-                </div>
+                {/* A vendor's own call to action, or the account it is signed
+                    into; the button already says what clicking does. */}
+                {vendor.signedIn || vendor.loginLabel ? (
+                  <div className="vendor-card-meta">
+                    {vendor.signedIn
+                      ? vendor.accountLabel || t("settings.vendorSignedInGeneric")
+                      : vendor.loginLabel}
+                  </div>
+                ) : null}
               </div>
               {vendor.signedIn ? (
                 <Button
