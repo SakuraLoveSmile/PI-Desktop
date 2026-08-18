@@ -122,7 +122,6 @@ raw output out of the report except for the lines that carry the failure.`,
 name: fixer
 description: Implement a complete multi-file change from a spec. Use when a feature or fix spans several files and the work is separable — it can write files inside the workspace while you keep working.
 tools: [Read, Glob, Grep, Edit, Write, Bash]
-permission: accept-edits
 maxTurns: 40
 ---
 

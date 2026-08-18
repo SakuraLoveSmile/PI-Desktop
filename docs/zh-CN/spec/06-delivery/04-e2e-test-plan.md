@@ -5030,10 +5030,10 @@ IPC 请求无法关闭。
 
 #### E2E-142：后台委托通过 TaskWait 收敛并遵守权限作用域
 
-- **先决条件**：一个绑定项目、权限模式为 `ask` 的 Agent 会话，其提供方的流
-  可以被驱动；四个内置子代理（`explorer`、`code-reviewer`、`test-runner`、
-  `fixer`）以及一个项目级 `.pi/agents/readonly.md` 定义；`fixer` 声明
-  `permission: accept-edits`。
+- **先决条件**：一个绑定项目、权限模式可以在 `ask`、`accept-edits` 和 `auto`
+  之间切换的 Agent 会话，其提供方的流可以被驱动；四个内置子代理（`explorer`、
+  `code-reviewer`、`test-runner`、`fixer`）以及一个项目级 `.pi/agents/readonly.md`
+  定义。内置定义使用默认的 `permission: inherit` 行为。
 - **步骤**：
   1. 提示一轮，其中助手在一条消息里发出两次 `Task` 调用 —— 一个 `explorer`
      查一个方向，另一个 `explorer` 查另一个方向 —— 然后不结束本轮，继续自己
@@ -5041,9 +5041,11 @@ IPC 请求无法关闭。
   2. 确认父级的可见文本在 `Task` 与 `TaskWait` 之间持续流出（没有死掉的一
      轮）、两条 `Task` 行组成一张一次展开的委托卡片，并且 `TaskWait` 那行
      展示了两份报告。
-  3. 提示一轮，用一份多文件规格委托给 `fixer`。确认该委托在工作区内的
-     `Write`/`Edit` 调用**不出现权限卡片**，而同一个委托的 `Bash` 调用仍然
-     渲染一张标明 `fixer` 的卡片，工作区之外的 `Write` 仍然询问。
+  3. 先将会话设为 `ask`，用一份多文件规格委托给 `fixer`；确认它的
+     `Write`/`Edit`、`Bash` 和外部路径调用都会渲染标明 `fixer` 的权限卡片。切换
+     到 `accept-edits`，确认只有工作区内的 `Write`/`Edit` 自动放行。切换到 `auto`，
+     确认同一委托的 `Write`/`Edit`、`Bash` 以及外部 `Glob`/`Write` 调用都无需第二张
+     授权卡即可完成。
   4. 提示一轮，启动三个委托后以 `mode: "any"`、`minCompleted: 1` 调用
      `TaskWait`；确认它在第一个结算时立即返回，且仍在运行的委托继续运行。
   5. 提示一轮，启动一个委托后不调用 `TaskWait`/`TaskStop` 就结束本轮；确认
@@ -5057,13 +5059,14 @@ IPC 请求无法关闭。
      确认该定义仍然加载但带着一条警告，且它的委托仍在会话的有效模式下裁决
      （工作区内的 `Write` 依旧弹出权限卡片）。
 - **预期**：`Task` 立即带着 `delegationId` 返回，父级继续工作；`TaskWait`
-  带着每个委托的报告与状态收敛；`TaskList`/`TaskStop` 驱动生命周期；`fixer`
-  在其声明的作用域下于工作区内免提示写入，而 Bash 和外部路径保持会话的权限
-  行为；项目定义声明的作用域被丢弃；每会话 10 个运行委托的上限被强制执行；
-  没有委托活过它所属的一轮；重新加载的会话记录保留其委托拓扑。
+  带着每个委托的报告与状态收敛；`TaskList`/`TaskStop` 驱动生命周期；内置 `fixer`
+  继承所选的会话权限模式，因此 `auto` 也会让明确的外部路径无需重复授权卡，
+  而 `ask` 和 `accept-edits` 保留各自的审批边界；项目定义声明的作用域被丢弃；
+  每会话 10 个运行委托的上限被强制执行；没有委托活过它所属的一轮；重新加载的
+  会话记录保留其委托拓扑。
 - **链接规格**：`03-runtime/02-agent-runtime.md` §5f/§5f.1/§7.1、
   `03-runtime/03-tools-and-permissions.md` §10.2、`08-meta/decisions-log.md`
-  （D231）、ADR 0089
+  （D242 修订 D231）、ADR 0089 和 ADR 0100
 - **验收**：C（对话和直播）、E（工具和权限）、F（坚持）、安全性、质量
 - **里程碑**：M6+
 - **状态**：草稿（单元覆盖在 `packages/agent-runtime` 的 `runtime.test.ts`

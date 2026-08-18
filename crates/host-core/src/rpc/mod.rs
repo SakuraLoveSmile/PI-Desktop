@@ -5126,6 +5126,79 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn builtin_delegate_without_permission_scope_inherits_auto_for_external_glob() {
+        let data_dir = tempfile::tempdir().unwrap();
+        let project = data_dir.path().join("project");
+        let outside = data_dir.path().join("outside");
+        fs::create_dir_all(&project).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        let outside_file = outside.join("delegate-note.txt");
+        fs::write(&outside_file, "outside content").unwrap();
+
+        let mut app_state = AppState::open(data_dir.path()).unwrap();
+        app_state.handshook = true;
+        let session = sessions::create_session(
+            &app_state.db,
+            Some("Auto delegate external glob".into()),
+            Some("agent".into()),
+            None,
+            None,
+            Some(project.to_string_lossy().into_owned()),
+        )
+        .unwrap();
+        let session_id = session.id.clone();
+        sessions::configure_session_with_thinking(
+            &app_state.db,
+            &session_id,
+            "agent",
+            None,
+            None,
+            None,
+            Some("auto"),
+        )
+        .unwrap();
+        let state = Arc::new(Mutex::new(app_state));
+        let (notify_tx, mut notify_rx) = mpsc::unbounded_channel();
+        let outside_path = outside.to_string_lossy().into_owned();
+
+        // A builtin fixer inherits the parent mode, so the same external Glob
+        // that triggered the reported card is allowed in auto without a scope.
+        let result = handle_request(
+            state,
+            "tools.execute",
+            json!({
+                "sessionId": session_id,
+                "toolCallId": "delegate-external-glob-auto",
+                "toolName": "Glob",
+                "args": { "path": outside_path, "pattern": "**/*", "limit": 10 },
+                "mode": "agent"
+            }),
+            notify_tx,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result["ok"], true, "external auto Glob failed: {result}");
+        // External Glob results are absolute rather than carrying a root field.
+        let canonical_outside_file = outside_file.canonicalize().unwrap();
+        assert_eq!(
+            result["content"]["matches"][0],
+            json!(canonical_outside_file.to_string_lossy()),
+        );
+
+        let stray = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            notify_rx.recv(),
+        )
+        .await;
+        match stray {
+            Err(_) | Ok(None) => {}
+            Ok(Some(text)) => {
+                panic!("auto external Glob raised an unexpected notification: {text}")
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn plan_authorization_uses_durable_mode_and_keeps_bash_permission_semantics() {
         let data_dir = tempfile::tempdir().unwrap();
         let project = data_dir.path().join("project");

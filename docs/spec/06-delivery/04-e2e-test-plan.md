@@ -5469,11 +5469,12 @@ This test plan spec is accepted when:
 - **Status**: Documented
 #### E2E-142: Background delegation converges through TaskWait and honors permission scopes
 
-- **Preconditions**: A project-bound Agent session in permission mode `ask`,
-  with a provider whose stream can be driven; the four builtin subagents
-  (`explorer`, `code-reviewer`, `test-runner`, `fixer`) and a project
-  `.pi/agents/readonly.md` definition; `fixer` declares
-  `permission: accept-edits`.
+- **Preconditions**: A project-bound Agent session whose permission mode can be
+  switched between `ask`, `accept-edits`, and `auto`, with a provider whose
+  stream can be driven; the four builtin subagents (`explorer`,
+  `code-reviewer`, `test-runner`, `fixer`) and a project
+  `.pi/agents/readonly.md` definition. Builtins use the default
+  `permission: inherit` behavior.
 - **Steps**:
   1. Prompt a turn in which the assistant emits two `Task` calls — `explorer`
      on one direction and a second `explorer` on another — in one assistant
@@ -5482,11 +5483,13 @@ This test plan spec is accepted when:
   2. Confirm the parent's visible text keeps streaming between `Task` and
      `TaskWait` (no dead turn), that the two `Task` rows form one delegation
      card that opens once, and that `TaskWait`'s row shows both reports.
-  3. Prompt a turn that delegates to `fixer` with a multi-file spec. Confirm
-     the delegate's `Write`/`Edit` calls inside the workspace resolve **without
-     a permission card**, while a `Bash` call from the same delegate still
-     renders a card naming `fixer`, and a `Write` outside the workspace still
-     prompts.
+  3. With the session in `ask`, prompt a turn that delegates to `fixer` with a
+     multi-file spec. Confirm its `Write`/`Edit`, `Bash`, and external-path
+     calls each render a card naming `fixer`. Switch the session to
+     `accept-edits` and confirm only `Write`/`Edit` inside the workspace are
+     auto-allowed. Switch it to `auto` and confirm the same delegate's
+     `Write`/`Edit`, `Bash`, and external `Glob`/`Write` calls all resolve
+     without a second authorization card.
   4. Prompt a turn that starts three delegates and then calls `TaskWait` with
      `mode: "any"`, `minCompleted: 1`; confirm it returns as soon as the first
      settles and that the still-running delegates keep running.
@@ -5506,14 +5509,16 @@ This test plan spec is accepted when:
      `Write` inside the workspace still raises a permission card).
 - **Expected**: `Task` returns immediately with a `delegationId` and the parent
   keeps working; `TaskWait` converges with per-delegation reports and statuses;
-  `TaskList`/`TaskStop` drive the lifecycle; `fixer` writes inside the
-  workspace without prompting under its declared scope while Bash and external
-  paths keep the session's permission behavior; a project definition's declared
-  scope is dropped; the per-session running cap of 10 is enforced; no delegate outlives its turn; reloaded transcripts keep
-  their delegation topology.
+  `TaskList`/`TaskStop` drive the lifecycle; builtin `fixer` inherits the
+  selected session permission mode, so `auto` also covers explicit external
+  paths without a duplicate authorization prompt while `ask` and
+  `accept-edits` retain their approval boundaries; a project definition's
+  declared scope is dropped; the per-session running cap of 10 is enforced; no
+  delegate outlives its turn; reloaded transcripts keep their delegation
+  topology.
 - **Specs linked**: `03-runtime/02-agent-runtime.md` §5f/§5f.1/§7.1,
   `03-runtime/03-tools-and-permissions.md` §10.2, `08-meta/decisions-log.md`
-  (D231), ADR 0089
+  (D242 amends D231), ADR 0089 and ADR 0100
 - **Acceptance**: C (conversation), E (tools & permissions), F (persistence),
   Security, Quality
 - **Milestone**: M6+

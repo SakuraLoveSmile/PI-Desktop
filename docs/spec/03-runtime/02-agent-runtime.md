@@ -426,9 +426,11 @@ arrives with the repository, so honoring its scope would let cloned code grant
 itself `auto`. A project document that declares a non-`inherit` scope keeps
 loading with a warning and its delegates run under the session's effective
 mode; a user who wants the scope copies the document into their own agents
-directory. `fixer`, the one write-capable builtin, declares `accept-edits` so
-it can write inside the workspace without prompting while Bash and external
-paths keep asking.
+directory. Builtins, including `fixer`, do not override the parent session by
+default, so the one write-capable builtin follows `auto` completely (including
+explicit external paths) while `ask` and `accept-edits` retain their normal
+approval behavior. An explicit builtin or user scope remains an intentional
+override.
 
 **Tools (ADR 0089).** Delegation is a four-tool lifecycle, built only in Agent
 mode and only when the catalog is non-empty, and all four belong to the Agent
@@ -489,17 +491,20 @@ disposed.
 ### 5f.1 Delegate permission scope (ADR 0089)
 
 A delegate's tool calls flow through the same host `tools.execute` path as the
-parent's. When the definition declares `permission` **and its source is
-`builtin` or `user`**, the sidecar attaches the scope to the delegate's tool
-RPCs and host-core resolves the call under that mode instead of the session's
-effective permission mode. A `project` definition's declared scope is dropped
-at parse time with a warning, so opening an untrusted repository cannot
-escalate its own delegates past the session mode. Two gates stay above
-the scope, exactly as they stay above the session mode: the contract modes'
-hard deny (delegation only exists in Agent mode) and the external-path gate —
-a scoped delegate still asks before touching anything outside the workspace and
-scratch roots. `accept-edits` therefore means "Write/Edit inside the workspace
-resolve without a prompt; everything else behaves as the session mode says".
+parent's. When the definition declares a non-`inherit` `permission` **and its
+source is `builtin` or `user`**, the sidecar attaches the scope to the
+delegate's tool RPCs and host-core resolves the call under that mode instead of
+the session's effective permission mode. With no declared scope — the default,
+and the policy used by the builtins — no override is attached, so the delegate
+inherits the parent's effective permission mode, including `auto` for explicit
+external paths. A `project` definition's declared scope is dropped at parse
+time with a warning, so opening an untrusted repository cannot escalate its
+own delegates past the session mode. Two gates stay above any explicit scope,
+exactly as they stay above the session mode: the contract modes' hard deny
+(delegation only exists in Agent mode) and the external-path gate. An explicit
+`accept-edits` still means "Write/Edit inside the workspace resolve without a
+prompt; external paths and other tools keep their normal approval behavior";
+an explicit scope remains an intentional override.
 
 The surrounding contracts live in `03-tools-and-permissions.md` §10.2 (what a
 delegate may call), `04-data-storage.md` §4.7a (persisted attribution),

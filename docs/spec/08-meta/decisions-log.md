@@ -60,6 +60,7 @@ This log freezes previously open questions into concrete decisions.
 
 | D239 | Place global defaults under AI | **The eight-destination Settings directory remains unchanged. Basics owns Appearance and platform-supported close behavior. 全局 AI / AI owns Permissions and the Defaults card containing default operating mode (Agent / Plan / Goal), command shell selection/fallback status, and Enter-to-send. Model configuration retains the default provider/model selector. Only renderer content and Settings search ownership move; persisted settings, host APIs, runtime semantics, and deep-link contracts remain unchanged (ADR 0097).** | Default mode, command shell, and Enter-to-send change global agent behavior, so placing them beside appearance mixed unrelated concerns and made the AI destination incomplete. |
 | D240 | Independent vendor OAuth accounts and settings ownership | **Amend D237 / ADR 0095: every OAuth login creates a fresh provider row and row-scoped `CredentialStore`, even when `vendorKey` matches an existing account. The Vendor accounts card owns the full OAuth row lifecycle and deletes through `providers.delete`; the AI services list excludes OAuth rows but the default selector may still choose them. Vendor auth bindings and resolution use the exact `providerId`; ambiguous vendor/name aliases for subagents fail closed.** | One vendor-global row made a second account overwrite or reuse the first credential, while sign-out left a stale AI-service row. The row id is the only unambiguous account identity and lets deletion remove exactly one credential and configuration. See ADR 0098. |
+| D242 | Builtin subagents inherit the parent permission mode | **Builtin subagents use the default `permission: inherit` behavior. The builtin `fixer` no longer overrides the parent session, so `auto` covers its in-root and explicit external-path calls without a second authorization card; explicit non-`inherit` scopes on eligible builtin or user definitions remain intentional overrides.** | The observed popup came from the builtin `fixer` replacing an `auto` parent with `accept-edits`; inheriting the parent fixes the UX without weakening host-core containment or external-path permission rules (ADR 0100). |
 | D241 | Titled Settings navigation clusters | **Keep the eight-destination Settings directory flat and searchable, but render four non-interactive localized group headings — Personal / 个人 (Basics, AI, Shortcuts), Agent / 智能体 (Instructions, Model configuration), Workspace / 工作区 (Import, Project archive), and About / 关于 (Info). Headings use whitespace for separation and no divider lines. Empty groups disappear with filtered search. This supersedes only D238's prohibition on group headings; destination order, IDs, search ownership, and marketplace placement remain unchanged.** | The flat rows became visually dense without scan landmarks. Muted headings restore grouping while preserving one-level navigation and the existing destination ownership. |
 
 ## D. Codex visual parity decisions (0.3.5+)
@@ -1987,3 +1988,18 @@ D193, and D194.
   that id. Subagent vendor/name aliases are accepted only when unique, so a
   duplicate vendor account cannot be selected accidentally. See ADR 0098,
   `03-runtime/11-provider-model-system.md`, and E2E-151.
+
+## 2026-08-18 — Builtin subagents inherit the parent permission mode
+
+- The builtin `fixer` no longer declares `permission: accept-edits`; like the
+  other builtins, it defaults to `permission: inherit` and uses the parent
+  session's effective permission mode.
+- In `auto`, builtin delegate calls therefore auto-allow the same in-root,
+  high-risk, and explicit external-path operations as the parent. `ask` and
+  `accept-edits` keep their existing approval boundaries, and explicit
+  non-`inherit` scopes on eligible builtin or user definitions remain
+  intentional overrides.
+- Decision D242 amends D231 / ADR 0089. Host-core's external-path gate and
+  containment checks are unchanged; the fix removes an accidental builtin
+  scope override rather than weakening the security boundary. See ADR 0100,
+  `03-runtime/02-agent-runtime.md` §5f/§5f.1, and E2E-142.

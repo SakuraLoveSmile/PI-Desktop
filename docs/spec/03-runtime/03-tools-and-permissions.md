@@ -488,27 +488,29 @@ Plugin tools, `Skill`, `ToolSearch`, `new_context`, the mode tools and `Task`
 itself are never assignable: a delegate is a bounded file/search/shell worker,
 not a second session.
 
-A delegate's rights are its definition's, never its session's. It cannot gain a
-tool because the parent has it, and a session cannot lend mutation rights to a
-read-only delegate. Delegate calls are built by the session runtime and go
-through the same `tools.execute` path, so path rules (§4), Bash rules (§5),
-permission modes (§6), the operating-mode matrix (§10) and auditing (§9) apply
-unchanged — evaluated against the session, because the session is what owns the
-workspace and the permission mode.
+A delegate's available tools are its definition's, never its session's. It
+cannot gain a tool because the parent has it, and a session cannot lend
+mutation rights to a read-only delegate. Delegate calls are built by the
+session runtime and go through the same `tools.execute` path, so path rules
+(§4), Bash rules (§5), permission modes (§6), the operating-mode matrix (§10)
+and auditing (§9) apply unchanged — evaluated against the owning session.
 
 A **builtin or user** definition may additionally declare `permission: inherit
-| ask | accept-edits | auto` (ADR 0089, default `inherit`). A project
-definition may not: it arrives with the repository, so its declared scope is
-dropped at parse time with a warning and its delegates resolve under the
-session's effective mode — cloning a repository never grants it a permission
-upgrade. When declared by an eligible source, the sidecar attaches the scope to the delegate's `tools.execute` calls and
-host-core resolves each call under that mode instead of the session's effective
-permission mode. The scope is a permission-mode override only: the contract
-modes' hard deny and the external-path gate (§4.1) stay in force, so
-`accept-edits` auto-allows `Write`/`Edit` inside the workspace and scratch
-roots while every other call — Bash included — still follows the session mode.
-`auto` under the scope behaves like the session's `auto` mode. Definitions
-without a declared scope resolve exactly as before the feature existed.
+| ask | accept-edits | auto` (ADR 0089, default `inherit`). With the default
+`inherit` (including all builtins), the sidecar attaches no override and the
+delegate uses the session's effective permission mode. Thus a parent in `auto`
+allows the delegate's explicit external paths without a second authorization
+card. A project definition may not declare a scope: it arrives with the
+repository, so its declaration is dropped at parse time with a warning and its
+delegates resolve under the session's effective mode — cloning a repository
+never grants it a permission upgrade. When an eligible builtin or user
+explicitly declares a non-`inherit` scope, the sidecar attaches it to the
+delegate's `tools.execute` calls and host-core resolves each call under that
+mode instead of the session's effective permission mode. The scope is a
+permission-mode override only: the contract modes' hard deny and the
+external-path gate (§4.1) stay in force. `accept-edits` therefore auto-allows
+`Write`/`Edit` inside the workspace and scratch roots, while external paths and
+other tools retain their normal approval behavior.
 
 Permission requests from a delegate carry the asking delegate's name, so the
 card can say which delegate wants the call (see `04-ux/03-permission-ux.md`

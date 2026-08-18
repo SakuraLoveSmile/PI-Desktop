@@ -116,3 +116,4 @@ Each ADR includes:
 | 0097 | Place global defaults under the AI Settings destination | Accepted |
 | 0098 | Treat every vendor OAuth account as an independent provider row | Accepted for implementation |
 | 0099 | Add titled visual clusters to the Settings directory | Accepted |
+| 0100 | Make builtin subagents inherit the parent permission mode | Accepted |

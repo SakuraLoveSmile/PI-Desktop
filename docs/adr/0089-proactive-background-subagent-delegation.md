@@ -3,7 +3,7 @@
 - Status: Accepted for implementation
 - Date: 2026-08-16
 - Deciders: PI-Desktop core
-- Related: D201, D202, ADR 0062, ADR 0063, ADR 0048, E2E-142
+- Related: D201, D202, ADR 0062, ADR 0063, ADR 0048, ADR 0100, E2E-142
 
 ## Context
 
@@ -76,13 +76,16 @@ write-capable builtin; the other three stay read-only.
 ### 4. Definitions may declare a permission scope
 
 Frontmatter gains `permission: inherit | ask | accept-edits | auto` (default
-`inherit`). When declared, the sidecar attaches the scope to the delegate's
-`tools.execute` calls and host-core resolves each call under that mode instead
-of the session's effective permission mode. The override is a permission-mode
+`inherit`). A definition with an explicit non-`inherit` scope causes the
+sidecar to attach that scope to the delegate's `tools.execute` calls, and
+host-core resolves each call under that mode instead of the session's effective
+permission mode. An omitted or `inherit` scope carries no override, so the
+call uses the parent session's effective mode. The override is a permission-mode
 override only: the contract modes' hard deny and the external-path gate stay in
 force, so `accept-edits` auto-allows `Write`/`Edit` inside the workspace and
-scratch roots while Bash and external paths keep the session's behavior.
-`fixer` ships with `permission: accept-edits`.
+scratch roots while Bash and external paths keep the session's behavior. The
+builtin `fixer` uses the default `inherit` scope; explicit scopes remain
+available to eligible builtin and user definitions.
 
 ### 5. Concurrency
 

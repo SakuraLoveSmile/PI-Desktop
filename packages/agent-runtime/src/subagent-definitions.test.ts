@@ -28,15 +28,16 @@ describe("builtin subagent documents", () => {
       expect(definition.description.length).toBeGreaterThan(20);
       expect(definition.prompt.length).toBeGreaterThan(50);
     }
-    // Only `fixer` may write to the workspace, and only under its declared
-    // permission scope; every other builtin is read-only (the shell delegate
-    // reads and runs commands, which is a permission prompt, not an edit).
+    // Only `fixer` may write to the workspace; every other builtin is
+    // read-only (the shell delegate reads and runs commands, which is a
+    // permission prompt, not an edit). Builtins inherit the parent session's
+    // permission mode unless they explicitly opt into a narrower scope.
     const mutating = definitions.filter(
       (definition) =>
         definition.tools.includes("Write") || definition.tools.includes("Edit"),
     );
     expect(mutating.map((d) => d.name)).toEqual(["fixer"]);
-    expect(mutating[0]?.permission).toBe("accept-edits");
+    expect(mutating[0]?.permission ?? "inherit").toBe("inherit");
     expect(definitions[2].tools).toContain("Bash");
   });
 });
