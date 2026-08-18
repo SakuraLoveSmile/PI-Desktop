@@ -221,6 +221,10 @@ test("settings nav keeps a flat searchable index with quiet visual groups", () =
   );
   assert.match(
     stylesSource,
+    /:root\[data-theme="dark"\] \.settings-nav-group \+ \.settings-nav-group\s*\{[^}]*border-top-color:\s*var\(--ds-border-default\);/s,
+  );
+  assert.match(
+    stylesSource,
     /\.settings-row\.settings-row-plain\s*\{[^}]*border-bottom:\s*0/s,
   );
 });

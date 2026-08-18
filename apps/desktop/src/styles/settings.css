@@ -141,6 +141,11 @@
   border-top: 1px solid var(--ds-border-subtle);
 }
 
+/* Codex-style dark chrome keeps section rules on the visible 8% border tier. */
+:root[data-theme="dark"] .settings-nav-group + .settings-nav-group {
+  border-top-color: var(--ds-border-default);
+}
+
 .settings-nav-empty {
   padding: 12px 10px;
   color: var(--ds-text-muted);

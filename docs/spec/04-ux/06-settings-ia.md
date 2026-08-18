@@ -25,7 +25,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   is visually split into four untitled clusters, preserving the same order:
   Basics / AI / Shortcuts; Instructions / Model configuration; Import / Project
   archive; Info. Each boundary uses a quiet hairline divider and a 16px
-  section gap. These are visual breaks only, not a second navigation level.
+  section gap. The dark rail uses the visible default border tier for these
+  rules, while light mode keeps the subtler tier. These are visual breaks only,
+  not a second navigation level.
   When search filters the directory, empty clusters disappear and no orphan
   divider remains.
 - No additional settings destinations or placeholder navigation rows are shown
