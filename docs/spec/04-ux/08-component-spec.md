@@ -1871,6 +1871,9 @@ Dropdown in Topbar showing current provider/model pair. Allows switching models 
   background refresh updates the list without clearing it first
 - Select: switches model for current session
 - Keyboard: up/down arrow in dropdown, Enter to select, Escape to close
+- Long option labels may ellipsize inside the compact menu; each option keeps
+  its complete display name and model ID in the native hover tooltip so the
+  full value is available without resizing or reflowing the menu.
 
 ### 12.5 Accessibility
 

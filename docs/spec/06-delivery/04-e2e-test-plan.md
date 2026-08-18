@@ -482,7 +482,8 @@ Each scenario is documented in this format:
 - **Expected**: The menu lists enabled runnable providers with a default model
   and opens downward (anchored to the top bar); selecting updates the active
   session model; Settings opens from the command palette/menu. The model trigger
-  ellipsizes long IDs.
+  ellipsizes long IDs. Hovering a long model option exposes its complete display
+  name and model ID in the option tooltip without changing the menu layout.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2, model dropdown),
   `03-runtime/13-model-catalog-and-selection.md`
 - **Acceptance**: C

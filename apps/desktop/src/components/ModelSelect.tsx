@@ -288,10 +288,14 @@ export function ModelSelect() {
                       modelId === model.modelId;
                     const hasAlias =
                       !!model.displayName && model.displayName !== model.modelId;
+                    const modelOptionTitle = hasAlias
+                      ? `${model.displayName} · ${model.modelId}`
+                      : model.modelId;
                     return (
                       <button
                         key={model.modelId}
                         data-model-index={index}
+                        title={modelOptionTitle}
                         className={`composer-plus-item ${active ? "active" : ""} ${
                           modelHighlight === index ? "kb-active" : ""
                         }`}

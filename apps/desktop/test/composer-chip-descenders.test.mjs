@@ -36,6 +36,14 @@ test("model chip label avoids leading-none under truncation", () => {
   );
 });
 
+test("model menu options expose their complete names on hover", () => {
+  assert.match(
+    modelSelectSource,
+    /const modelOptionTitle = hasAlias\s*\?\s*`\$\{model\.displayName\} · \$\{model\.modelId\}`\s*:\s*model\.modelId;/,
+  );
+  assert.match(modelSelectSource, /title=\{modelOptionTitle\}/);
+});
+
 test("composer runtime chips keep compact line-height for descenders", () => {
   for (const selector of [".mode-chip", ".model-chip"]) {
     const block = ruleBlock(styles, selector);
