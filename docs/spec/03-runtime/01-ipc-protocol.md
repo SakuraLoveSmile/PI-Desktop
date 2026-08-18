@@ -737,6 +737,13 @@ type OAuthLoginEvent = { loginId: string; vendorId: string } & (
 );
 ```
 
+A flow may raise its first event before `start` has replied — OpenAI Codex
+asks browser-or-device-code in the same tick the login begins — so the renderer
+must subscribe to the event channel *before* it invokes `start`, hold what
+arrives while `loginId` is unknown, and release the matching events in order
+once the reply lands. Subscribing after the reply drops that first prompt and
+the flow waits forever on a question nobody was shown.
+
 Every flow shape — browser callback, device code, a pasted code, a vendor
 choice — travels this one stream, so the renderer renders what arrived instead
 of branching per vendor. `opened: false` means the browser could not be

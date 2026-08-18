@@ -2,11 +2,19 @@
  * Vendor-account login (ADR 0095). Every flow — PKCE with a local callback,
  * device code, a pasted code — arrives through the same event stream, so this
  * dialog renders whatever the vendor asked for rather than a per-vendor script.
+ *
+ * The dialog starts the login itself, from inside the effect that subscribes to
+ * the stream, because a flow can ask its first question before the start call
+ * returns; see `beginOAuthLogin`.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { OAuthPromptRequest, OAuthVendor } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
+import {
+  beginOAuthLogin,
+  type OAuthLoginSession,
+} from "../../lib/oauth-login-session";
 import { Button, Input, cx } from "../ui";
 import { IconCheck, IconCopy, IconExternal } from "../icons";
 
@@ -18,12 +26,10 @@ type DeviceCodeState = {
 };
 
 export function OAuthLoginDialog({
-  loginId,
   vendor,
   onDone,
   onClose,
 }: {
-  loginId: string;
   vendor: OAuthVendor;
   /** The login succeeded; the provider row is ready to use. */
   onDone: (accountLabel?: string) => void;
@@ -38,52 +44,67 @@ export function OAuthLoginDialog({
   const [error, setError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const session = useRef<OAuthLoginSession | null>(null);
+  // The login is started once, from the subscribing effect. Callers pass fresh
+  // closures on every render, so they are read through refs rather than
+  // re-running the effect — a second run would start a second login.
+  const handlers = useRef({ onDone, onClose });
+  handlers.current = { onDone, onClose };
 
   useEffect(() => {
-    return api.onOauthLogin((event) => {
-      if (event.loginId !== loginId) return;
-      switch (event.kind) {
-        case "info":
-        case "progress":
-          setStatus(event.message);
-          break;
-        case "authUrl":
-          setAuthUrl({
-            url: event.url,
-            instructions: event.instructions,
-            opened: event.opened,
-          });
-          break;
-        case "deviceCode":
-          setDeviceCode({
-            userCode: event.userCode,
-            verificationUri: event.verificationUri,
-          });
-          break;
-        case "prompt":
-          setAnswer("");
-          setPrompt(event.request);
-          break;
-        case "promptCancelled":
-          // The flow answered the step itself — a callback that beat the paste
-          // box — so the input has to go away on its own.
-          setPrompt((current) =>
-            current?.promptId === event.promptId ? null : current,
-          );
-          break;
-        case "done":
-          onDone(event.accountLabel);
-          break;
-        case "error":
-          setPrompt(null);
-          setError(event.message);
-          break;
-        case "cancelled":
-          onClose();
-          break;
-      }
+    const login = beginOAuthLogin({
+      api,
+      vendorId: vendor.vendorId,
+      onError: (message) => setError(message),
+      onEvent: (event) => {
+        switch (event.kind) {
+          case "info":
+          case "progress":
+            setStatus(event.message);
+            break;
+          case "authUrl":
+            setAuthUrl({
+              url: event.url,
+              instructions: event.instructions,
+              opened: event.opened,
+            });
+            break;
+          case "deviceCode":
+            setDeviceCode({
+              userCode: event.userCode,
+              verificationUri: event.verificationUri,
+            });
+            break;
+          case "prompt":
+            setAnswer("");
+            setPrompt(event.request);
+            break;
+          case "promptCancelled":
+            // The flow answered the step itself — a callback that beat the
+            // paste box — so the input has to go away on its own.
+            setPrompt((current) =>
+              current?.promptId === event.promptId ? null : current,
+            );
+            break;
+          case "done":
+            handlers.current.onDone(event.accountLabel);
+            break;
+          case "error":
+            setPrompt(null);
+            setError(event.message);
+            break;
+          case "cancelled":
+            handlers.current.onClose();
+            break;
+        }
+      },
     });
-  }, [loginId, onDone, onClose]);
+    session.current = login;
+    return () => {
+      session.current = null;
+      login.dispose();
+    };
+  }, [vendor.vendorId]);
 
   const cancel = useCallback(async () => {
     if (closing) return;
@@ -92,12 +113,12 @@ export function OAuthLoginDialog({
       // Aborts the local callback server or the device-code polling. The
       // `cancelled` event closes this dialog; a login main no longer knows
       // about is already over, so close directly.
-      const result = await api.cancelOauthLogin(loginId);
-      if (!result?.ok) onClose();
+      const cancelled = await session.current?.cancel();
+      if (!cancelled) onClose();
     } catch {
       onClose();
     }
-  }, [closing, loginId, onClose]);
+  }, [closing, onClose]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -121,9 +142,10 @@ export function OAuthLoginDialog({
 
   const submitAnswer = (value: string) => {
     if (!prompt) return;
+    const promptId = prompt.promptId;
     setPrompt(null);
-    void api
-      .respondOauthLogin({ loginId, promptId: prompt.promptId, value })
+    void session.current
+      ?.respond(promptId, value)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   };
 
