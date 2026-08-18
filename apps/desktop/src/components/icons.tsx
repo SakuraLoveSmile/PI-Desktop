@@ -39,8 +39,10 @@ import {
   Image,
   Info,
   Keyboard,
+  KeyRound,
   Link,
   ListChecks,
+  LogOut,
   Mic,
   MessageSquare,
   MessageSquarePlus,
@@ -150,6 +152,9 @@ export const IconMic = icon(Mic);
 export const IconPlug = icon(Plug);
 export const IconSlash = icon(Slash);
 export const IconUser = icon(UserRound);
+/** A signed-in vendor account, as opposed to a pasted key. */
+export const IconKey = icon(KeyRound);
+export const IconLogOut = icon(LogOut);
 export const IconSparkles = icon(Sparkles);
 export const IconListChecks = icon(ListChecks);
 /** Goal mode: an outcome to reach, as opposed to Plan's list of steps. */

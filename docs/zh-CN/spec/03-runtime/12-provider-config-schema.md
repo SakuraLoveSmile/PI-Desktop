@@ -39,6 +39,7 @@
         "azure_api_key",
         "aws_sdk_default",
         "custom_headers",
+        "oauth",
         "none"
       ]
     },
@@ -47,7 +48,17 @@
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
-    "apiStyle": { "enum": ["chat_completions", "responses", "auto"] },
+    "apiStyle": {
+      "enum": [
+        "chat_completions",
+        "responses",
+        "anthropic_messages",
+        "google_generative_ai",
+        "openai_codex_responses",
+        "pi_messages",
+        "auto"
+      ]
+    },
     "compatibility": {
       "type": "object",
       "properties": {
@@ -79,6 +90,16 @@
 和 `supportedThinkingLevels=["off"]`。原始秘密和内部兼容性
 JSON 保持隐藏状态。
 
+`authKind: "oauth"` 标记厂商账户行（ADR 0095、D237）：其凭据是保存在
+`secret:provider:<id>:oauth` 下的 OAuth 授权，而不是粘贴的密钥，因此该行
+不为它保存 `secretRef`，并以空密钥启动。最后两个 apiStyle 是厂商账户专用的
+线路 API —— `openai_codex_responses`（Codex 会话封装）与 `pi_messages`
+（radius 网关）—— 自定义提供商对话框不提供它们，因为二者都无法配合手输的
+base URL 与粘贴的密钥工作。厂商行的样式不由厂商固定：GitHub Copilot 同时
+提供 Anthropic、Chat Completions 与 Responses 模型，因此样式跟随所选模型，
+并在每次切换模型时重写。`config_json.oauth.accountLabel` 保存已登录账户的
+非敏感展示标签。
+
 ## 3. 内置供应商预设
 
 仅预设预填表单默认值；他们不是一个封闭的世界。
@@ -100,6 +121,23 @@ JSON 保持隐藏状态。
 | 奥拉马 | openai_兼容 | 无 | 是的 |
 | 工作室 | openai_兼容 | 无 | 是的 |
 | 定制 | openai_兼容 | api_key_and_base_url | 是的 |
+
+### 厂商账户预设
+
+这些行由登录创建（设置 → 模型配置 → 厂商账户），而不是由自定义提供商
+对话框创建。列表在运行时由 `models.getProviders().filter(p => p.auth.oauth)`
+派生，因此它跟随 pi-ai 而不是本表；`baseUrl`、`apiStyle` 与 `defaultModelId`
+在登录后由账户自己的目录填入。
+
+| vendorKey | 订阅 | 典型 apiStyle | 登录形态 |
+|---|---|---|---|
+| anthropic | Claude Pro/Max | anthropic_messages | PKCE + 本地回调 |
+| openai-codex | ChatGPT Plus/Pro | openai_codex_responses | PKCE + 本地回调，或手动贴码 |
+| github-copilot | Copilot | 随模型而变 | 设备码 |
+| openrouter | 账户余额 | chat_completions | PKCE + 本地回调 |
+| kimi-coding | Kimi | chat_completions（仅 headers 认证） | 设备码 |
+| xai | xAI | chat_completions | 设备码 |
+| radius | Radius | pi_messages | PKCE + 本地回调 |
 
 ## 4. 模型目录缓存记录
 
@@ -165,10 +203,12 @@ type ModelCatalogCacheRecord = {
 ### `providers.list`
 - 在：`{ includeDisabled?: boolean }`
 - 输出：`{ providers: ProviderPublic[] }`
-- `ProviderPublic` 排除原始秘密；包括 `hasSecret: boolean`
+- `ProviderPublic` 排除原始秘密；包括 `hasSecret: boolean`（**任一种**凭据
+  存在即为真）、`hasOauth: boolean` 与非敏感的 `oauthAccountLabel?: string`
 
 ### `providers.create` / `providers.update`
-- 在：提供商字段+可选的`secretValue`；旧客户端仍可能发送
+- 在：提供商字段 + 可选的 `secretValue` + 可选的 `oauthAccountLabel`
+  （合并进 `config_json.oauth`，传空字符串即清除）；旧客户端仍可能发送
   `supportsReasoning` / `supportedThinkingLevels`
 - 行为：保留配置；如果存在secretValue，则写入密钥存储并设置
   `secretRef`；传统思维领域可能仍保留在
@@ -177,11 +217,15 @@ type ModelCatalogCacheRecord = {
 
 ### `providers.delete`
 - 在：`{ id, deleteSecret?: boolean }` 默认 `deleteSecret=true`
+- 行为：同时清除两个凭据引用（`:api_key` 与 `:oauth`）及其元数据记录，
+  因此重新创建的提供商绝不会继承他人的刷新令牌
 - 输出：`{ ok: true }`
 
 ### `providers.testConnection`
 - 在：`{ id, modelId?: string }`
 - 输出：`{ ok: boolean, latencyMs?: number, error?: AppError, sampleModelId?: string }`
+- `authKind: "oauth"` 行通过解析厂商认证（必要时刷新令牌）来自证，而不是用
+  它并不持有的密钥去访问网络
 
 ### `providers.listModels`
 - 渲染器 IPC 位于：`{ providerId, source?: "cache"|"refresh" }`； `cache`
@@ -189,6 +233,10 @@ type ModelCatalogCacheRecord = {
   在 Electron main 中运行发现
 - 将 RPC 托管在：`{ providerId?: string }` 中；只读取 Rust 拥有的 `models`
   表
+- 对 `authKind: "oauth"` 行，Electron 主进程读取已认证的目录
+  （`models.getAvailable`，它已应用厂商自己的 `filterModels`，因此 Copilot
+  账户列出的是其订阅包含的模型），而不是调用 `/models`；返回的每个模型都
+  带着其线路 API 所隐含的 apiStyle
 - 输出：`{ models: ModelCatalogItem[] }`；每个模型都带有 pi-resolved
   `reasoning` 功能和 `supportedThinkingLevels`。缓存的功能标签
   旧提供程序字段无法覆盖 pi 模型记录。
@@ -226,6 +274,9 @@ type ModelCatalogCacheRecord = {
 
 ```text
 secret:provider:<providerId>:api_key
+secret:provider:<providerId>:oauth
 ```
 
-未来的多重秘密提供商可能会添加后缀（`:client_secret` 等）。
+两个引用相互独立，因此一行可以只有密钥、只有厂商账户，或两者兼有；参见
+[14-secrets-storage](14-secrets-storage.md) §10。未来的多重秘密提供商可能会
+继续添加后缀（`:client_secret` 等）。

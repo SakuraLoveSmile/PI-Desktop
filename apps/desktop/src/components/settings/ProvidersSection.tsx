@@ -14,6 +14,7 @@ import {
   type ProviderForm,
 } from "./provider-form";
 import { ProviderDialog } from "./ProviderDialog";
+import { VendorAccountsSection } from "./VendorAccountsSection";
 
 const DELETE_CONFIRM_MS = 3000;
 
@@ -264,6 +265,8 @@ export function ProvidersSection() {
         </div>
       </section>
 
+      <VendorAccountsSection />
+
       <section className="settings-card-block">
         <div className="provider-section-head">
           <h3 className="settings-card-heading">{t("settings.providers")}</h3>
@@ -320,6 +323,12 @@ export function ProvidersSection() {
                         <span className="provider-row-name">{provider.name}</span>
                         {isDefault ? (
                           <Badge tone="success">{t("settings.default")}</Badge>
+                        ) : null}
+                        {provider.hasOauth ? (
+                          <Badge tone="neutral">
+                            {provider.oauthAccountLabel ||
+                              t("settings.vendorAccountBadge")}
+                          </Badge>
                         ) : null}
                         {!provider.hasSecret && provider.authKind !== "none" ? (
                           <Badge tone="warning">{t("settings.noSecret")}</Badge>

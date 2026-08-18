@@ -1197,7 +1197,9 @@ Delegation rules:
           },
         });
       },
-      getApiKey: async () => runtimeApiKey,
+      // A vendor account has no long-lived key. Leaving it unset keeps pi-ai
+      // from overriding the auth the provider just resolved for this request.
+      getApiKey: async () => runtimeApiKey || undefined,
       convertToLlm,
       prepareNextTurnWithContext: (context, signal) =>
         this.prepareNextTurn(context, signal),

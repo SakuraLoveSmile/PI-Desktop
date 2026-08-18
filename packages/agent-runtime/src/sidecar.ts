@@ -5,6 +5,7 @@
  */
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
+import type { ModelAuth } from "@earendil-works/pi-ai";
 import { ParentHostProxy } from "./parent-host-proxy.js";
 import { classifyAgentError } from "./agent-errors.js";
 import {
@@ -18,7 +19,11 @@ import {
   normalizeSupportedThinkingLevels,
   normalizeThinkingLevel,
 } from "./sidecar-config.js";
-import { isCommandShellOption, normalizeMode } from "@pi-desktop/shared";
+import {
+  isCommandShellOption,
+  normalizeMode,
+  OAUTH_AUTH_KIND,
+} from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   AskToolResolution,
@@ -97,6 +102,29 @@ function write(msg: unknown) {
   process.stdout.write(JSON.stringify(msg) + "\n");
 }
 
+/**
+ * Attach the vendor-account auth resolver to a provider binding.
+ *
+ * The launch payload for an OAuth row carries no credential at all — main
+ * strips it — so the sidecar hands pi-ai a callback that asks main for request
+ * auth instead. Main answers only for a provider it bound to this session, and
+ * only with a short-lived `ModelAuth`; the refresh token stays on its side.
+ */
+function withVendorAuth<T extends RuntimeProviderConfig>(
+  sessionId: string,
+  provider: T,
+): T {
+  if (provider?.authKind !== OAUTH_AUTH_KIND) return provider;
+  return {
+    ...provider,
+    resolveAuth: () =>
+      hostProxy.call<ModelAuth>("provider.resolveAuth", {
+        sessionId,
+        providerId: provider.id,
+      }),
+  };
+}
+
 function notify(method: string, params: unknown) {
   write({ jsonrpc: "2.0", method, params });
 }
@@ -119,20 +147,30 @@ async function runtimeFor(
     });
   }
   const providerInput = params.provider;
-  const provider = {
+  const provider = withVendorAuth(sessionId, {
     ...providerInput,
     supportsReasoning: providerInput?.supportsReasoning === true,
     supportedThinkingLevels: normalizeSupportedThinkingLevels(
       providerInput?.supportedThinkingLevels,
       providerInput?.supportsReasoning === true,
     ),
-  };
+  });
   const thinkingLevel = normalizeThinkingLevel(params.thinkingLevel);
   const pluginTools = params.pluginTools ?? [];
   const pluginSkills = params.pluginSkills ?? [];
   const subagents = params.subagents ?? [];
-  const subagentProviders = params.subagentProviders ?? {};
-  if (!provider?.modelId || (!provider.apiKey && provider.authKind !== "none")) {
+  const subagentProviders = Object.fromEntries(
+    Object.entries(params.subagentProviders ?? {}).map(([key, pinned]) => [
+      key,
+      withVendorAuth(sessionId, pinned),
+    ]),
+  );
+  if (
+    !provider?.modelId ||
+    (!provider.apiKey &&
+      provider.authKind !== "none" &&
+      provider.authKind !== OAUTH_AUTH_KIND)
+  ) {
     throw Object.assign(new Error("model/provider not configured"), {
       rpcCode: -32000,
       errorCode: "MODEL_NOT_CONFIGURED",

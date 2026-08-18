@@ -708,6 +708,45 @@ Forbidden:
 - Writing the full API key into ordinary logs
 - Holding API key plaintext long-term in the renderer
 
+### vendor accounts (OAuth, D237)
+
+Signing in with a vendor subscription is an Electron-main conversation, so it
+uses IPC only — the host protocol version is unchanged. Five invoke channels
+plus one event channel:
+
+- `pi-desktop/providers/oauth/vendors() -> { vendors: OAuthVendor[] }`
+- `pi-desktop/providers/oauth/start({ vendorId }) -> { loginId }`
+- `pi-desktop/providers/oauth/respond({ loginId, promptId, value? })` — an
+  absent `value` cancels that prompt, which aborts the flow
+- `pi-desktop/providers/oauth/cancel({ loginId }) -> { ok: boolean }`
+- `pi-desktop/providers/oauth/logout({ vendorId }) -> { ok: true }`
+- `pi-desktop/providers/oauth/event` streams `OAuthLoginEvent`
+
+```ts
+type OAuthLoginEvent = { loginId: string; vendorId: string } & (
+  | { kind: "info"; message: string; links?: Array<{ url: string; label?: string }> }
+  | { kind: "authUrl"; url: string; instructions?: string; opened: boolean }
+  | { kind: "deviceCode"; userCode: string; verificationUri: string;
+      intervalSeconds?: number; expiresInSeconds?: number }
+  | { kind: "progress"; message: string }
+  | { kind: "prompt"; request: OAuthPromptRequest }
+  | { kind: "promptCancelled"; promptId: string }
+  | { kind: "done"; providerId: string; accountLabel?: string }
+  | { kind: "error"; message: string }
+  | { kind: "cancelled" }
+);
+```
+
+Every flow shape — browser callback, device code, a pasted code, a vendor
+choice — travels this one stream, so the renderer renders what arrived instead
+of branching per vendor. `opened: false` means the browser could not be
+launched and the user must copy the link. `promptCancelled` means the flow
+answered a question itself (a callback that beat the paste box), so the input
+must disappear on its own.
+
+Forbidden here as well: no event carries a token, a refresh token, or an
+authorization code. `accountLabel` is a display string.
+
 ## 9. Project API
 
 - `project/open()`: system directory picker

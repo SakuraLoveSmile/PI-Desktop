@@ -571,6 +571,13 @@ export type PullRequestSummary = {
   isDraft?: boolean;
 };
 
+/**
+ * `authKind` for a provider row whose credential is a vendor-account OAuth
+ * login rather than a pasted API key. Shared so main, the sidecar runtime and
+ * the renderer all branch on the same spelling.
+ */
+export const OAUTH_AUTH_KIND = "oauth";
+
 export type ProviderPublic = {
   id: string;
   name: string;
@@ -580,7 +587,12 @@ export type ProviderPublic = {
   enabled: boolean;
   baseUrl?: string;
   authKind: string;
+  /** True when the provider holds an API key **or** a vendor-account login. */
   hasSecret: boolean;
+  /** True when a vendor-account OAuth credential is stored. */
+  hasOauth?: boolean;
+  /** Non-secret label for the signed-in account; never carries a token. */
+  oauthAccountLabel?: string;
   defaultModelId?: string;
   apiStyle?: string;
   /** Effective capability for the provider's current default model. */
@@ -606,6 +618,11 @@ export type ProviderCreateInput = {
   defaultModelId?: string;
   secretValue?: string;
   apiStyle?: string;
+  /**
+   * Non-secret label for the signed-in vendor account. An empty string clears
+   * it, which is what logout sends.
+   */
+  oauthAccountLabel?: string;
   /** Explicit override for custom model catalogs. */
   supportsReasoning?: boolean;
   /**
@@ -625,6 +642,84 @@ export type ProviderCreateInput = {
 export type ProviderUpdateInput = Partial<ProviderCreateInput> & {
   id: string;
   enabled?: boolean;
+};
+
+/**
+ * A vendor whose subscription account can be signed into instead of pasting an
+ * API key. Derived from the runtime's built-in provider catalog, never a
+ * hardcoded list.
+ */
+export type OAuthVendor = {
+  /** Vendor id in the model runtime, e.g. "anthropic", "github-copilot". */
+  vendorId: string;
+  name: string;
+  /** Vendor-supplied call to action, e.g. "Sign in with Claude Pro/Max". */
+  loginLabel?: string;
+  /** Whether access is backed by a paid subscription rather than usage credit. */
+  isSubscription: boolean;
+  /** Provider row created by a previous login, when one exists. */
+  providerId?: string;
+  /** Non-secret account label shown next to a signed-in vendor. */
+  accountLabel?: string;
+  signedIn: boolean;
+};
+
+export type OAuthPromptOption = {
+  id: string;
+  label: string;
+  description?: string;
+};
+
+/** One question the vendor's login flow needs answered before it can finish. */
+export type OAuthPromptRequest = {
+  promptId: string;
+  type: "text" | "secret" | "select" | "manual_code";
+  message: string;
+  placeholder?: string;
+  options?: OAuthPromptOption[];
+};
+
+/**
+ * Progress of one login attempt, pushed to the renderer. Carries nothing
+ * secret: tokens stay in the main process.
+ */
+export type OAuthLoginEvent = {
+  loginId: string;
+  vendorId: string;
+} & (
+  | { kind: "info"; message: string; links?: Array<{ url: string; label?: string }> }
+  | {
+      kind: "authUrl";
+      url: string;
+      instructions?: string;
+      /** False when the browser could not be launched and the user must copy the link. */
+      opened: boolean;
+    }
+  | {
+      kind: "deviceCode";
+      userCode: string;
+      verificationUri: string;
+      intervalSeconds?: number;
+      expiresInSeconds?: number;
+    }
+  | { kind: "progress"; message: string }
+  | { kind: "prompt"; request: OAuthPromptRequest }
+  /** The flow resolved a prompt on its own — e.g. the callback beat the paste box. */
+  | { kind: "promptCancelled"; promptId: string }
+  | { kind: "done"; providerId: string; accountLabel?: string }
+  | { kind: "error"; message: string }
+  | { kind: "cancelled" }
+);
+
+export type OAuthStartResult = {
+  loginId: string;
+};
+
+export type OAuthRespondInput = {
+  loginId: string;
+  promptId: string;
+  /** Absent cancels the prompt, which aborts the login flow. */
+  value?: string;
 };
 
 export type ModelInfo = {

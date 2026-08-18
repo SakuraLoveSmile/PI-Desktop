@@ -34,10 +34,14 @@ function wireApiForStyle(apiStyle?: string): string {
   switch (apiStyle) {
     case "responses":
       return "openai-responses";
+    case "openai_codex_responses":
+      return "openai-codex-responses";
     case "anthropic_messages":
       return "anthropic-messages";
     case "google_generative_ai":
       return "google-generative-ai";
+    case "pi_messages":
+      return "pi-messages";
     default:
       return "openai-completions";
   }
@@ -99,7 +103,26 @@ export function resolvePiModelConfig(
 ): PiModelConfig | undefined {
   const model = findCatalogModel(input);
   if (!model) return undefined;
+  return piModelConfigFromModel(model);
+}
 
+/**
+ * Flatten one pi-ai model record into the serializable config the sidecar
+ * receives. Vendor-account rows resolve their model from the authenticated
+ * collection rather than the builtin catalog, so this conversion is shared.
+ */
+export function piModelConfigFromModel(model: {
+  name: string;
+  baseUrl: string;
+  reasoning: boolean;
+  thinkingLevelMap?: CatalogModel["thinkingLevelMap"];
+  input: readonly string[];
+  cost: CatalogModel["cost"];
+  contextWindow: number;
+  maxTokens: number;
+  headers?: Record<string, string>;
+  compat?: unknown;
+}): PiModelConfig {
   return {
     source: "pi",
     name: model.name,
@@ -108,7 +131,7 @@ export function resolvePiModelConfig(
     ...(model.thinkingLevelMap
       ? { thinkingLevelMap: { ...model.thinkingLevelMap } }
       : {}),
-    input: [...model.input],
+    input: [...model.input] as PiModelConfig["input"],
     cost: {
       ...model.cost,
       ...(model.cost.tiers

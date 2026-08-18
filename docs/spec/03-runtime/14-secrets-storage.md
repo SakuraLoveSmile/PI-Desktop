@@ -11,9 +11,10 @@ Store provider credentials and future sensitive tokens safely under Rust host ow
 | secret write/read/delete | Rust host-core |
 | secret metadata index | SQLite `secrets_meta` |
 | OS secure storage integration | Rust host-core |
-| renderer knowledge | `hasSecret` boolean only |
+| vendor-account login/refresh orchestration | Electron main (`oauth.ts`) |
+| renderer knowledge | `hasSecret` / `hasOauth` booleans and a non-secret account label |
 
-Node pi sidecar may receive secret **ephemerally in-memory** for a run via host RPC, never persisted by sidecar.
+Node pi sidecar may receive secret **ephemerally in-memory** for a run via host RPC, never persisted by sidecar. For a vendor-account provider it receives even less: a short-lived `ModelAuth` resolved per request, never the OAuth refresh token (§10).
 
 ## 3. Backends
 
@@ -45,11 +46,31 @@ type SecretMeta = {
 // raw value never appears in IPC list/get provider responses
 ```
 
-`secretRef` format:
+`secretRef` formats:
 
 ```text
 secret:provider:<providerId>:api_key
+secret:provider:<providerId>:oauth
 ```
+
+The two refs are independent, so one provider row may hold an API key, a vendor
+account, or both. The OAuth ref stores the serialized pi-ai `OAuthCredential`
+(access token, refresh token, expiry) written through the generic `secrets.set`
+path, so it is encrypted by the same backend but is not indexed in
+`secrets_meta`; provider delete clears both refs and any metadata row for them.
+
+## 4a. Provider readiness flags
+
+| flag | meaning |
+|---|---|
+| `hasSecret` | the row has **either** credential — an API key or a vendor account |
+| `hasOauth` | the row has a vendor-account credential |
+| `oauthAccountLabel` | non-secret display label for the signed-in account (from `config_json.oauth.accountLabel`) |
+
+`hasSecret` deliberately stayed the single readiness signal, so model pickers,
+composer guards, and provider lists needed no new condition when vendor
+accounts arrived. `hasOauth` only drives presentation: the account badge, and
+hiding the API key input on a vendor row.
 
 ## 5. Host RPC
 
@@ -68,7 +89,8 @@ Renderer uses provider methods that accept optional `secretValue` on create/upda
 3. `getForRuntime` requires active run context and is audited
 4. Export excludes secrets by default
 5. Uninstall/reset app deletes secrets unless future explicit migrate tool says otherwise
-6. Provider delete defaults to deleting linked secret
+6. Provider delete defaults to deleting linked secret — both the API key and the OAuth credential
+7. An OAuth refresh token never crosses a process boundary: only Electron main reads it, and only to mint request auth
 
 ## 7. Redaction policy
 
@@ -99,3 +121,28 @@ Replace with:
 - [ ] runtime can fetch secret ephemerally for a turn
 - [ ] logs do not contain raw key material in normal failure tests
 - [ ] fallback backend works when primary unavailable (dev/test harness)
+- [ ] a vendor-account row reports `hasSecret` and `hasOauth` without exposing the credential
+
+## 10. Vendor-account credentials
+
+Electron main owns login, logout, and refresh orchestration (ADR 0095, D237)
+because pi-ai declares it app-owned. `oauth.ts` implements pi-ai's
+`CredentialStore` on top of `secrets.getForRuntime` / `secrets.set` /
+`secrets.delete`, serializing `modify` per provider so pi-ai's locked-refresh
+assumption holds across concurrent turns.
+
+Request auth flows one way only:
+
+1. The launch payload for an `authKind: "oauth"` row carries `apiKey: ""`.
+   Main does not read the credential at launch.
+2. Per request, the runtime calls the host-proxy method
+   `provider.resolveAuth` with `{ sessionId, providerId }`.
+3. Electron main answers it locally — the call is **never forwarded to
+   host-core** — after checking the pair against the per-launch binding table.
+   An unbound provider fails with `PROVIDER_NOT_BOUND`.
+4. The reply is a short-lived `ModelAuth` (`apiKey`, `headers`, `baseUrl`),
+   refreshed under the store lock only when it has expired.
+
+The sidecar therefore holds a revocable, roughly hour-long token scoped to the
+one provider its session is bound to — strictly less than the long-lived API
+key it receives for a keyed row.

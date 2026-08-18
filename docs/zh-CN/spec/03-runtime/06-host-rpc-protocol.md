@@ -191,7 +191,17 @@ type ToolBudgetHealth = {
 - `secrets.set`
 - `secrets.delete`
 - `secrets.has`
+- `secrets.getForRuntime` —— 仅 main/host 可用，渲染器永远够不到
 - // 永远不会将 `secrets.get` 写入渲染器日志
+
+一个提供商行有两个相互独立的引用 —— `secret:provider:<id>:api_key` 与
+`secret:provider:<id>:oauth`（D237）。上面的通用方法同时服务于两者，因此
+厂商账户凭据不需要新的主机方法。`ProviderPublic` 因此报告 `hasSecret`
+（**任一种**凭据存在即为真）、`hasOauth` 与非敏感的 `oauthAccountLabel`；
+`providers.create` / `providers.update` 接受 `oauthAccountLabel`，
+`providers.delete` 清除两个引用。登录编排与令牌刷新留在 Electron 主进程，
+永远不会进入本协议 —— 参见
+[14-secrets-storage](/zh-CN/spec/03-runtime/14-secrets-storage) §10。
 
 ### 设置
 - `settings.get`

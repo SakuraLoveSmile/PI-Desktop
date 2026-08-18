@@ -228,6 +228,36 @@ describe("DesktopAgentRuntime configuration matching", () => {
     await runtime.dispose();
   });
 
+  it("keeps a vendor-account runtime across turns despite a fresh auth resolver", async () => {
+    // The sidecar injects a new `resolveAuth` closure on every launch. If that
+    // counted as a configuration change, an OAuth session would rebuild its
+    // runtime — and lose its warm state — once per turn.
+    const oauthProvider: RuntimeProviderConfig = {
+      ...provider,
+      apiKey: "",
+      authKind: "oauth",
+      resolveAuth: async () => ({ apiKey: "token-turn-1" }),
+    };
+    const runtime = createRuntime({ provider: oauthProvider });
+
+    expect(
+      runtimeMatches(runtime, {
+        provider: {
+          ...oauthProvider,
+          resolveAuth: async () => ({ apiKey: "token-turn-2" }),
+        },
+      }),
+    ).toBe(true);
+    // Everything else about the row still has to match.
+    expect(
+      runtimeMatches(runtime, {
+        provider: { ...oauthProvider, modelId: "another-model" },
+      }),
+    ).toBe(false);
+
+    await runtime.dispose();
+  });
+
   it("guides mutation tools away from patch repair loops", async () => {
     const runtime = createRuntime();
     const prompt = (runtime as any).agent.state.systemPrompt as string;

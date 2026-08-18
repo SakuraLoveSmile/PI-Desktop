@@ -97,6 +97,17 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - persisted legacy `Chat` default values are displayed and stored as Plan
   - default model id
   - Enter to send as a switch (local preference; not on Codex General gold)
+- **Vendor accounts** card (D237), between Defaults and Providers:
+  - one card per vendor whose subscription can be signed into, derived from the
+    runtime catalog; the whole section is hidden when that list is empty
+  - a card shows the vendor name, a Subscription badge where the access is
+    plan-backed, and either its own call to action or, once signed in, a
+    Connected badge with the account label
+  - Sign in opens a single dialog that renders whatever the flow asks for —
+    an opened browser with a copyable link, a device code, a choice, or a text
+    field — with a cancel action that aborts the local callback server or the
+    polling loop
+  - Sign out removes the credential and its readiness, leaving the row visible
 - **Providers** studio:
   - OpenAI-compatible add-provider dialog (opened from Add provider / empty-state CTA)
   - provider cards with avatar initials, host, default model, secret status,
@@ -106,6 +117,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     not editable here
   - empty state with primary add action
   - API keys are never shown raw after save
+  - a signed-in vendor row carries an account badge, and its edit dialog
+    replaces the API key field with that badge — there is nothing to paste
 
 The permission-mode selector remains available in the composer while the
 session is in Agent, Plan, or Goal. In Plan and Goal it controls Bash

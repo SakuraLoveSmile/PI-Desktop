@@ -33,9 +33,25 @@ export type ProjectInstructionResolver = (input: {
   projectPath?: string;
 }) => Promise<unknown>;
 
+/**
+ * Resolve request auth for a vendor account. Answered by main against the
+ * signed-in pi-ai collection; the sidecar names a provider row, never a vendor
+ * or a credential, and gets back only a short-lived `ModelAuth`.
+ */
+export type VendorAuthResolver = (input: {
+  sessionId: string;
+  providerId: string;
+  /** pi-ai provider id main bound to this row when it launched the turn. */
+  vendorKey: string;
+}) => Promise<unknown>;
+
 // The sidecar runs model-directed code paths; it must not be able to pull
 // secrets or mutate configuration through the parent proxy. Tight allowlist
 // of host methods the agent loop legitimately needs.
+//
+// `provider.resolveAuth` is answered by main itself (never forwarded to
+// host-core) and only for a provider row main bound to that same session, so
+// it cannot reach a credential the session was not launched with.
 const HOST_PROXY_ALLOWED = new Set([
   "tools.execute",
   "tools.abort",
@@ -50,6 +66,7 @@ const HOST_PROXY_ALLOWED = new Set([
   "plans.pending",
   "plans.abort",
   "project.instructions.resolve",
+  "provider.resolveAuth",
   "app.health",
 ]);
 
@@ -94,6 +111,11 @@ export class AgentSidecar {
   // Electron main registers this binding from the host-owned session record
   // immediately before starting a runtime turn.
   private projectInstructionRoots = new Map<string, string>();
+  private vendorAuthResolver: VendorAuthResolver | null = null;
+  // Vendor-account rows this session was launched with: provider row id →
+  // pi-ai provider id. The sidecar can only ask for auth it is already using,
+  // and a session that never bound an OAuth row can ask for nothing at all.
+  private vendorAuthBindings = new Map<string, Map<string, string>>();
 
   constructor(onStderr?: StderrHandler) {
     const entry = resolveSidecarEntry();
@@ -248,6 +270,35 @@ export class AgentSidecar {
     this.projectInstructionRoots.delete(sessionId.trim());
   }
 
+  setVendorAuthResolver(resolver: VendorAuthResolver): void {
+    this.vendorAuthResolver = resolver;
+  }
+
+  /**
+   * Bind the vendor-account rows a turn may sign requests with. Replaces the
+   * session's previous set, so a row dropped from the launch payload — a model
+   * switch, a logout — stops being resolvable on the next turn.
+   */
+  setVendorAuthBindings(
+    sessionId: string,
+    bindings: ReadonlyArray<{ providerId: string; vendorKey: string }>,
+  ): void {
+    const id = sessionId.trim();
+    if (!id) return;
+    const map = new Map<string, string>();
+    for (const binding of bindings) {
+      const providerId = binding.providerId?.trim();
+      const vendorKey = binding.vendorKey?.trim();
+      if (providerId && vendorKey) map.set(providerId, vendorKey);
+    }
+    if (map.size > 0) this.vendorAuthBindings.set(id, map);
+    else this.vendorAuthBindings.delete(id);
+  }
+
+  clearVendorAuthBindings(sessionId: string): void {
+    this.vendorAuthBindings.delete(sessionId.trim());
+  }
+
   setHost(host: HostProcess) {
     if (this.closed) return;
     this.host = host;
@@ -273,6 +324,29 @@ export class AgentSidecar {
       this.unsubscribeHostExit = null;
       this.host = null;
     });
+  }
+
+  /**
+   * Answer one `provider.resolveAuth` request. Refuses anything the session was
+   * not launched with: the provider row has to be in this session's bindings,
+   * which main rewrites on every turn.
+   */
+  private async resolveVendorAuth(
+    params: Record<string, unknown>,
+  ): Promise<unknown> {
+    if (!this.vendorAuthResolver) {
+      throw new Error("vendor account auth resolver unavailable");
+    }
+    const sessionId = String(params.sessionId ?? "").trim();
+    const providerId = String(params.providerId ?? "").trim();
+    const vendorKey = this.vendorAuthBindings.get(sessionId)?.get(providerId);
+    if (!vendorKey) {
+      throw Object.assign(
+        new Error("provider is not bound to this session"),
+        { code: -32000, data: { errorCode: "PROVIDER_NOT_BOUND" } },
+      );
+    }
+    return this.vendorAuthResolver({ sessionId, providerId, vendorKey });
   }
 
   private async onLine(line: string) {
@@ -323,6 +397,13 @@ export class AgentSidecar {
             path: String(params.path ?? ""),
             projectPath: this.projectInstructionRoots.get(sessionId),
           });
+          this.writeToChild(
+            JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
+          );
+          return;
+        }
+        if (method === "provider.resolveAuth") {
+          const result = await this.resolveVendorAuth(params);
           this.writeToChild(
             JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }) + "\n",
           );
@@ -447,6 +528,7 @@ export class AgentSidecar {
   async dispose(): Promise<void> {
     this.disposed = true;
     this.projectInstructionRoots.clear();
+    this.vendorAuthBindings.clear();
     this.closeTransport(new Error("agent sidecar disposed"));
     this.exitHandlers.clear();
     this.child.kill();

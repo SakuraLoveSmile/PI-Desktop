@@ -111,3 +111,4 @@ Each ADR includes:
 | 0092 | Use a plugin-owned surface with a host window-control capsule | Accepted |
 | 0093 | Keep a strict 46px plugin drag band with a minimal capsule | Accepted |
 | 0094 | Admit one desktop instance per data directory | Accepted |
+| 0095 | Sign in with a vendor account instead of pasting an API key | Accepted for implementation |

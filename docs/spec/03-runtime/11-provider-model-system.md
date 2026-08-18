@@ -143,6 +143,7 @@ type ProviderAuthKind =
   | "azure_api_key"
   | "aws_sdk_default"
   | "custom_headers"
+  | "oauth" // vendor subscription account, credential owned by Electron main
   | "none" // local no-auth
 
 type ProviderConfig = {
@@ -156,7 +157,14 @@ type ProviderConfig = {
   authKind: ProviderAuthKind
   secretRef?: string            // pointer into secret store
   headers?: Record<string, string> // non-secret headers only
-  apiStyle?: "chat_completions" | "responses" | "auto"
+  apiStyle?:
+    | "chat_completions"
+    | "responses"
+    | "anthropic_messages"
+    | "google_generative_ai"
+    | "openai_codex_responses" // vendor account only
+    | "pi_messages"            // vendor account only
+    | "auto"
   compatibility?: {
     supportsTools?: boolean
     supportsVision?: boolean
@@ -208,6 +216,48 @@ reasoning capability.
 - Provider config stores only `secretRef` / hasSecret boolean
 - Renderer never receives raw key in list APIs
 - Optional key validation call: `providers.testConnection`
+- A vendor-account row stores an OAuth grant instead of a key; `hasSecret`
+  covers either credential and `hasOauth` distinguishes them (§8a)
+
+## 8a. Vendor-account (OAuth) providers
+
+A provider row can be authenticated by a vendor subscription — Claude Pro/Max,
+ChatGPT Plus/Pro, Copilot and the rest of pi-ai's OAuth vendors — instead of a
+pasted key (ADR 0095, D237). The offered vendors are derived from
+`models.getProviders().filter(p => p.auth.oauth)`, so the list follows the pin
+rather than a hardcoded table, and `registerBunOAuthFlows()` runs once at
+startup because pi-ai loads flows through a dynamic import electron-vite
+cannot bundle.
+
+Electron main owns the login conversation and the credential; the renderer sees
+only events and a non-secret account label. Signing in upserts one row per
+`vendorKey` with `authKind: "oauth"`, then fills `baseUrl`, `apiStyle` and
+`defaultModelId` from the account's own catalog.
+
+Request auth is resolved **per request**, not at launch:
+
+```text
+sidecar request
+  → runtime provider binding (`resolveAuth` injected at launch)
+  → host-proxy `provider.resolveAuth` { sessionId, providerId }
+  → Electron main (answered locally, never forwarded to host-core)
+      · binding table check → PROVIDER_NOT_BOUND on a mismatch
+      · pi-ai `models.getAuth(providerId)` → refresh under lock only if expired
+  → short-lived ModelAuth { apiKey?, headers?, baseUrl? }
+```
+
+Two consequences worth stating: a vendor access token lives about an hour, so
+nothing may be cached in the payload or the runtime; and because the row's
+`apiKey` stays `""` and the injected resolver is a function, runtime identity
+(`matches()`) is stable, so an OAuth session reuses its warm runtime across
+turns instead of rebuilding it. The sidecar therefore never holds the refresh
+token, and holds an access token only for the provider its session is bound to.
+
+Model discovery for such a row reads the authenticated catalog
+(`models.getAvailable`, which applies the vendor's own `filterModels`) rather
+than probing `/models`, and the connection test proves the account by resolving
+auth. A vendor may span wire APIs — Copilot serves Anthropic, Chat Completions
+and Responses models — so the row's `apiStyle` follows the selected model.
 
 ## 9. Model catalog service
 
@@ -247,6 +297,7 @@ type ModelDescriptor = {
 - add custom provider
 - edit base URL/headers
 - set/replace/delete key
+- sign in to / out of a vendor account, and see which account a row uses
 - enable/disable provider
 - test connection
 - do not expose reasoning, thinking-level, context-window, output-limit,
@@ -272,7 +323,10 @@ When starting a turn with `(providerId, modelId)`:
 
 1. load provider config from host
 2. if missing/disabled → fail (`MODEL_NOT_CONFIGURED`; reserved detail: `PROVIDER_DISABLED`)
-3. resolve secret via `secretRef` (never log secret; missing → `PROVIDER_SECRET_MISSING`)
+3. resolve the credential: for a keyed row read the secret via `secretRef`
+   (never log it; missing → `PROVIDER_SECRET_MISSING`); for an `oauth` row skip
+   this entirely and launch with an empty key, because auth is resolved per
+   request (§8a)
 4. resolve the complete pi-ai model record by exact vendor/id or a compatible
    gateway alias with a separator-bounded suffix
 5. when resolved, copy pi's name, reasoning flag, thinking-level map, input
@@ -393,6 +447,8 @@ This is the **universal escape hatch** guaranteeing market coverage beyond nativ
 - [ ] Free-form model id accepted when catalog misses it
 - [ ] Catalog refresh populates models for at least one native and one compatible provider, without destroying existing providers
 - [ ] Connection test returns structured success/failure without secret leakage
+- [ ] A vendor account can be signed into from Settings, used for a turn, and
+      signed out of; the sidecar never receives its refresh token
 - [ ] Session can switch model between turns
 - [ ] Reasoning-capable models expose only supported thinking levels and the
       selected level reaches pi; unsupported providers resolve to `off`

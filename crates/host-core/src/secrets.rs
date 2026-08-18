@@ -108,6 +108,13 @@ pub fn secret_ref_for_provider(provider_id: &str) -> String {
     format!("secret:provider:{provider_id}:api_key")
 }
 
+/// Where a vendor-account OAuth credential lives. Kept separate from the API
+/// key ref so a provider can hold both without one overwriting the other, and
+/// so the API-key read path can never hand a refresh token to the runtime.
+pub fn secret_ref_for_provider_oauth(provider_id: &str) -> String {
+    format!("secret:provider:{provider_id}:oauth")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,5 +188,34 @@ mod tests {
             store.get(&secret_ref).expect("get secret"),
             Some("same-value".to_string()),
         );
+    }
+
+    #[test]
+    fn oauth_and_api_key_refs_do_not_collide() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let store = SecretStore::open(dir.path()).expect("open store");
+        let api_key = secret_ref_for_provider("anthropic");
+        let oauth = secret_ref_for_provider_oauth("anthropic");
+
+        assert_eq!(oauth, "secret:provider:anthropic:oauth");
+        store.set(&api_key, "sk-ant-api").expect("set api key");
+        store
+            .set(&oauth, "{\"type\":\"oauth\"}")
+            .expect("set oauth credential");
+
+        // A provider may hold both credentials at once, so storing one must
+        // never clobber the other or leak across the two read paths.
+        assert_eq!(
+            store.get(&api_key).expect("get api key"),
+            Some("sk-ant-api".to_string()),
+        );
+        assert_eq!(
+            store.get(&oauth).expect("get oauth"),
+            Some("{\"type\":\"oauth\"}".to_string()),
+        );
+
+        store.delete(&oauth).expect("delete oauth");
+        assert!(!store.has(&oauth));
+        assert!(store.has(&api_key));
     }
 }

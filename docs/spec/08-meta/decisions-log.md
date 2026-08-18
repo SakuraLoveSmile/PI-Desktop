@@ -54,6 +54,7 @@ This log freezes previously open questions into concrete decisions.
 | D031 | Secrets backend | **OS safeStorage primary + encrypted file fallback** | Robust on macOS first release |
 | D032 | Workspace ignore | **security denylist + defaults + `.pi-desktopignore`** | Safe/predictable tool FS behavior |
 | D033 | Tool result limits | **256KB/4000 lines defaults with explicit truncation markers** | Protect context & UI |
+| D237 | Vendor-account (OAuth) login for providers | **A provider row may be authenticated by a vendor subscription instead of an API key. pi-ai's seven OAuth flows are registered statically at startup (`registerBunOAuthFlows()`); Electron main owns login/logout orchestration and implements pi-ai's `CredentialStore` over host-core's encrypted secret store under the new ref `secret:provider:<id>:oauth`, serializing `modify` per provider for locked refresh. `auth_kind` gains `oauth`, `has_secret` widens to "api key **or** oauth", and a new `has_oauth` plus a non-secret `oauthAccountLabel` drive badges and hide the key input; host protocol and storage schema are unchanged. The vendor card list is derived from `models.getProviders().filter(p => p.auth.oauth)`, and login upserts one row per `vendorKey`. The sidecar's launch payload for an OAuth row carries `apiKey: ""`; the runtime injects a `resolveAuth` callback that calls the new host-proxy method `provider.resolveAuth`, which Electron main answers itself — never forwarding to host-core — after checking the `(sessionId, providerId)` pair against the per-launch binding table. The reply is a short-lived `ModelAuth` (`apiKey`/`headers`/`baseUrl`), so a refresh token never leaves main and `matches()` keeps a vendor runtime warm across turns. `providers.listModels` and the connection test go through the authenticated account instead of probing `/models`; apiStyle follows the selected model and gains `openai_codex_responses` and `pi_messages`. Five invoke channels plus one event channel under `pi-desktop/providers/oauth/*` carry the interaction.** | Subscribers of Claude Pro/Max, ChatGPT Plus/Pro and Copilot had to buy separate API credit to use the app. pi-ai ships the flows but declares login orchestration app-owned. Vendor tokens expire in about an hour, so resolving once at launch would break long sessions and churn `matches()` every turn; per-request resolution keeps the runtime stable while giving the model-directed process only a revocable token for the provider its session is bound to — strictly less than the long-lived API key it receives today (ADR 0095). |
 
 ## D. Codex visual parity decisions (0.3.5+)
 
@@ -1917,3 +1918,51 @@ D193, and D194.
   the capture rig, side-by-side profiles — start as before. No IPC, host
   protocol, or storage schema changed. See ADR 0094,
   `03-runtime/07-process-model.md`, and E2E-150.
+
+## 2026-08-18 — Vendor-account (OAuth) login
+
+- A provider row can now be authenticated by a vendor subscription. The seven
+  pi-ai OAuth vendors — anthropic, openai-codex, github-copilot, openrouter,
+  kimi-coding, xai, radius — ship at once because the card list is derived from
+  `models.getProviders().filter(p => p.auth.oauth)` rather than hardcoded.
+  `registerBunOAuthFlows()` runs once at startup: pi-ai loads flows through a
+  dynamic import with a variable specifier, which electron-vite cannot bundle.
+- Credentials live in the existing encrypted secret store under the new ref
+  `secret:provider:<id>:oauth`, beside (never instead of) the row's API key.
+  `has_secret` widens to "either credential" so existing readiness checks keep
+  working; `has_oauth` and a non-secret `oauthAccountLabel` are new.
+  `auth_kind` gains `oauth` — it was already a free string, so host protocol
+  v9 and storage schema v10 are unchanged. Deleting a provider deletes both
+  refs and both `secrets_meta` rows.
+- Electron main owns login/logout: `oauth.ts` implements pi-ai's
+  `CredentialStore` over `secrets.*`, serializes `modify` per provider for
+  locked refresh, and bridges `AuthInteraction` to the renderer through
+  `providersOauthVendors/Start/Respond/Cancel/Logout` plus the
+  `pi-desktop/providers/oauth/event` stream. Browser-callback, device-code,
+  select and paste-a-code steps all travel that one stream, so a single dialog
+  renders whatever the vendor asked for and cancel aborts the local callback
+  server or the polling loop.
+- The sidecar resolves auth per request. An OAuth row launches with
+  `apiKey: ""`; the runtime injects `resolveAuth`, which calls the host-proxy
+  method `provider.resolveAuth`. Main answers it locally — never forwarding to
+  host-core — after checking `(sessionId, providerId)` against the binding
+  table it rewrites on every launch, and returns a short-lived `ModelAuth`
+  (`apiKey`/`headers`/`baseUrl`, which is how Copilot pins its per-account
+  endpoint). A refresh token never leaves main, and the sidecar receives
+  strictly less than the long-lived API key it gets for a keyed row.
+- `matches()` needs no new field: a vendor row's `apiKey` is permanently `""`
+  and the per-launch `resolveAuth` closure disappears through `JSON.stringify`,
+  so an OAuth session reuses its warm runtime across turns.
+- Model discovery and the connection test go through the account:
+  `providers.listModels` reads `models.getAvailable` (which applies the
+  vendor's own `filterModels`, so Copilot lists what the subscription
+  includes), and the test proves the account by resolving auth instead of
+  probing `/models`. A row's `apiStyle` follows the selected model — Copilot
+  spans wire APIs — and two styles are added: `openai_codex_responses` and
+  `pi_messages`.
+- Settings → Model configuration gains a Vendor accounts section above the
+  provider list; a signed-in row shows an account badge and its dialog replaces
+  the API key input with that badge.
+- Decision D237 extends D028/D031 and touches host-core secrets and providers,
+  Electron main, the agent runtime's provider binding, and the settings UI.
+  See ADR 0095 and `03-runtime/14-secrets-storage.md`.
