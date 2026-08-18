@@ -147,6 +147,10 @@ test("model configuration separates AI services from independently removable ven
   assert.match(vendorAccountsSource, /defaultModelId: form\.modelId\.trim\(\)/);
   assert.match(vendorAccountsSource, /api\.testProvider\(provider\.id\)/);
   assert.match(vendorAccountsSource, /VendorAccountDialog/);
+  assert.match(
+    vendorAccountsSource,
+    /<Button\s+variant="primary"[\s\S]*vendorAddAccount/,
+  );
   assert.doesNotMatch(vendorAccountsSource, /settings-section-subtitle/);
   assert.match(vendorAccountsSource, /settings-panel provider-list-panel/);
   assert.match(vendorAccountsSource, /provider-row-list/);

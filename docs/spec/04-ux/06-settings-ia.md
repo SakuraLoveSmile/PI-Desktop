@@ -112,9 +112,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     including multiple rows for the same vendor. Its list surface uses the same
     single-level panel and row structure as AI services. The whole section is
     hidden when the runtime catalog offers no OAuth vendor
-  - an Add account action in the card header opens every OAuth-capable vendor;
-    existing accounts do not remove or disable that vendor from the picker, so
-    the same vendor can be added again for a different account
+  - a primary Add account action in the card header opens every OAuth-capable
+    vendor; existing accounts do not remove or disable that vendor from the
+    picker, so the same vendor can be added again for a different account
   - an account row shows the vendor name, a Subscription badge where the access
     is plan-backed, a Connected or Needs sign-in badge, and the account label.
     Duplicate accounts receive a stable account number in the row; the default
@@ -136,6 +136,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     provider / empty-state CTA)
   - provider cards with host, default model, secret status,
     and test / make-default / delete actions
+  - Add account and Add provider use the same primary button treatment
   - the add/edit dialog configures connection identity only (name, endpoint,
     API style, model id, and secret); model parameters come from pi-ai and are
     not editable here

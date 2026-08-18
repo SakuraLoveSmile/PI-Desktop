@@ -220,7 +220,7 @@ export function VendorAccountsSection() {
           </div>
         </div>
         <Button
-          variant="secondary"
+          variant="primary"
           disabled={login !== null}
           onClick={() => setPicking(true)}
         >
