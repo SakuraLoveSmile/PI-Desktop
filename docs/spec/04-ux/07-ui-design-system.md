@@ -700,27 +700,31 @@ The composer renders only controls connected to the active pi session:
 - The model trigger shows only the active model ID. Its menu selects a
   configured provider/default-model pair for the active session and links to
   Agent.
-- A reasoning-capable model exposes a separate Thinking trigger immediately to
-  the right of Agent / Plan / Goal in the left toolbar group. The trigger shows the
-  current level and opens the model's real `supportedThinkingLevels` as a
-  compact single-column list with a check on the selected row. The menu fits its
-  content, caps at 160px and the available viewport width, and truncates labels
-  that exceed that cap. It contains only concrete supported levels, with no
-  inherit/default row; models without reasoning support render no trigger.
+- The right toolbar exposes one combined model × reasoning trigger immediately
+  before Send/Abort. The trigger shows the current model and reasoning level;
+  `off` dims Sparkles and omits the level text. Its single `role="menu"`
+  popover opens above the trigger at `bottom: calc(100% + 8px)` and starts with
+  exactly two current-value entries. Each entry replaces the menu contents
+  in-place with a back row and its submenu. The Model submenu contains search
+  plus sticky provider groups; the Reasoning submenu contains only the selected
+  provider's real `supportedThinkingLevels` with a selected-row check. Selecting
+  either value returns to the root without dismissing the popover.
 - While the active session is running, the draft and runtime controls stay
   editable as next-turn choices; only Send is disabled. Host configuration
   remains pinned for the in-flight turn and the latest queued choice is
   persisted after its terminal event. Pending approval still blocks editing.
 - File, photo, and appshot controls remain hidden until their payload contracts
   are implemented end to end.
-- The Thinking menu persists changes to the active session and closes after a
-  selection. It renders exactly the levels published by pi-ai for the selected
-  model. Unknown Custom/OpenAI-compatible models expose no invented reasoning
-  action or graded ladder. Changing provider clamps or resets the durable
-  session value before the next turn.
+- The combined model × reasoning menu persists changes to the active session and
+  returns to its root after a selection. It renders exactly the levels published
+  by pi-ai for the selected provider/model. Unknown Custom/OpenAI-compatible
+  models expose no invented reasoning action or graded ladder. Changing provider
+  clamps or resets the durable session value before the next turn.
 - The left-of-input Composer Agent/Plan/Goal chip is the sole active-session mode
-  control and cycles Agent → Plan → Goal → Agent. The top bar has no duplicate mode segmented control. The model
-  picker closes and is disabled while an active `pending` Plan or Goal approval exists;
+  control and cycles Agent → Plan → Goal → Agent. The Composer-right combined
+  chip owns model and reasoning changes; the top bar has no duplicate mode
+  segmented control. The model picker closes and is disabled while an active
+  `pending` Plan or Goal approval exists;
   terminal proposal snapshots do not disable it. The approval selector remembers
   the last selected mode on this device and uses it for the next pending proposal.
   Live Host events update the latest checkpoint or

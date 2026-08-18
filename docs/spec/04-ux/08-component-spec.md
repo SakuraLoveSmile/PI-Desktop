@@ -1596,22 +1596,20 @@ present the interrupted terminal snapshot after restart.
 
 ### 11.1 Purpose
 
-Input area at the bottom of MainChat for composing and sending prompts. Supports multi-line, mode/permission context display, and abort; model selection remains in the topbar.
+Input area at the bottom of MainChat for composing and sending prompts. Supports
+multi-line input, mode/permission context, abort, and a combined model ×
+reasoning-level control.
 
 ### 11.2 Anatomy
 
 ```text
-+----------------------------------------------+
-| [Agent/Plan/Goal] [Thinking] [permission mode] |
-| ───────────────────────────                  |
-| textarea (auto-growing, 1 line → max 7)      |
-| placeholder: "Ask PI-Desktop to do anything"      |
-| (D094; zh-CN 向 PI-Desktop 下达任意指令; home     |
-|  variant "Ask anything" when project open,   |
-|  D066)                                       |
-| ───────────────────────────                  |
-| [⏹ Abort (when running)] [→ Send / Enter]   |
-+----------------------------------------------+
++----------------------------------------------------------+
+| [Agent/Plan/Goal] [permission mode]          | [model · reasoning ▾] |
+| ──────────────────────────────────────────── | [⏹ Abort / → Send]    |
+| textarea (auto-growing, 1 line → max 7)                         |
+| placeholder: "Ask PI-Desktop to do anything"                    |
+| (D094; zh-CN 向 PI-Desktop 下达任意指令; home variant ... D066)  |
++----------------------------------------------------------+
 ```
 
 ### 11.3 Layout
@@ -1639,6 +1637,15 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   toolbar rhythm. Agent and Plan expose the effective selectable permission;
   Goal displays the localized Auto label as a disabled, non-opening chip while
   the approval card remains the separate place for choosing execution policy.
+- The right toolbar owns one combined model × reasoning-level chip immediately
+  before Send/Abort. It shows Sparkles, the current model name, and the current
+  reasoning level separated by `·`; `off` dims Sparkles and omits the level text.
+- The combined chip opens one anchored menu above itself. The menu starts with
+  only Model and Reasoning level entries, each showing its current value and a
+  chevron. Selecting an entry replaces the menu contents in place with a back
+  row and its submenu; selecting a model or level returns to the two-entry root
+  without closing the popover. The menu is `min(300px, 100vw - 24px)`, uses the
+  large radius/dialog shadow tokens, and enters with a short upward fade.
 - Bottom-anchored: fixed at bottom of MainChat area
 
 ### 11.4 States
@@ -1647,10 +1654,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 |---|---|---|
 | Idle (no model) | textarea active, send button disabled + tooltip "Configure a model first" | Agent link remains available in model menu |
 | Idle (ready) | textarea active, send button enabled | Send active |
-| Home/new-session initialization | textarea and mode/thinking/permission triggers remain available while no active session is projected; the first configuration selection is retained on the unpersisted draft and applied when the first message creates the session | Configure the draft, then send |
-| New session (reasoning model) | Thinking trigger shows the model's highest published level | User may select any published level, including Off when supported |
+| Home/new-session initialization | textarea and mode/model × reasoning/permission triggers remain available while no active session is projected; the first configuration selection is retained on the unpersisted draft and applied when the first message creates the session | Configure the draft, then send |
+| New session (reasoning model) | Combined model × reasoning chip shows the model and its highest published level | User may select any published level, including Off when supported |
 | New session / switch while another session is running | textarea active, send button enabled for the destination session's own run state | Send active, Abort hidden unless the destination session itself is running |
-| Running | textarea and mode/thinking/permission controls remain editable for the next turn; abort button visible | Abort active, Send hidden; configuration is queued |
+| Running | textarea and mode/model × reasoning/permission controls remain editable for the next turn; abort button visible | Abort active, Send hidden; configuration is queued |
 | Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Abort active, Send hidden |
 | Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
 | Plan / Goal / planning | textarea active while idle; contract badge and permission chip visible | inspect, send, or submit a contract |
@@ -1687,10 +1694,10 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Text correction off (D145): composer textarea sets `spellCheck={false}`,
   `autoCorrect="off"`, and `autoCapitalize="off"` so browser/OS spelling and
   autocorrect never rewrite coding prompts
-- Runtime chips keep descenders fully visible (D150): the Thinking, permission,
-  and mode triggers in the Composer use compact line-height rather than
-  `leading-none` under overflow. The topbar model trigger still ellipsizes long
-  IDs.
+- Runtime chips keep descenders fully visible (D150): the model × reasoning,
+  permission, and mode triggers in the Composer use compact line-height rather
+  than `leading-none` under overflow. The topbar model trigger still ellipsizes
+  long IDs.
 - Mode, provider/model, thinking, and permission changes update the active
   session immediately while idle. During a turn, the renderer applies the
   latest selection optimistically as a next-turn choice and persists it only
@@ -1698,13 +1705,14 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   configuration. An active pending Plan or Goal approval still disables these
   controls. Approval actions are the exception while awaiting approval. The
   Composer-left Agent/Plan/Goal chip is the sole mode
-  control and cycles Agent → Plan → Goal → Agent on click; the topbar model picker
-  remains a model-only control. Palette and Composer slash mode commands use the
+  control and cycles Agent → Plan → Goal → Agent on click. The Composer-right
+  model × reasoning chip owns both selections; the topbar model picker remains a
+  model-only control. Palette and Composer slash mode commands use the
   same active-session configuration path; after host confirmation resolves an
   approval, the approval surface is removed rather than remaining as a terminal
   action card.
 - During project or session navigation, the home composer may briefly have no
-  `activeSessionId`. Its idle mode, Thinking, and permission triggers remain
+  `activeSessionId`. Its idle mode, model × reasoning, and permission triggers remain
   enabled; the first configuration action retains the selection on the
   unpersisted draft, and the mode, thinking level, or permission mode is
   applied when the first message creates the session. A new task therefore
@@ -1715,22 +1723,24 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
   models and missing capability metadata start at `off`; reopening or reusing
   an existing session preserves its durable selection.
 - The model menu lists only enabled, runnable providers with a default model.
-- For a reasoning-capable active model, a separate Thinking trigger appears
-  immediately to the right of the mode chip and before the permission
-  control. It shows the current level and opens only the exact model's supported
-  levels in a compact single-column list and canonical order; the selected row
-  carries a trailing check. The menu width fits its content up to 160px and is
-  further constrained by the viewport; longer localized labels truncate. The
-  list contains no inherited/default choice. Selecting a concrete level persists
-  the complete session config and closes the menu. Non-reasoning models render
-  no Thinking trigger.
-- Unknown Custom/OpenAI-compatible models can enable an explicit reasoning
-  override from the model menu. The provider refreshes, the session selects the
-  supported level nearest `medium`, and the toolbar trigger appears; known
-  non-reasoning models remain unavailable rather than receiving an override.
+- The combined model × reasoning menu opens at `bottom: calc(100% + 8px)` with
+  `role="menu"`. Its root has exactly two `role="menuitem"` entries. The Model
+  submenu has a search input and sticky provider headings, while the Reasoning
+  level submenu starts with `Current model <model> supports these reasoning
+  levels` and lists only the provider's supported levels in canonical order.
+  Rows use `role="menuitemradio"`, `aria-checked`, active-row styling, and a
+  trailing check. Selecting a concrete model or level persists the complete
+  session config, clears model filtering, and returns to the root without
+  dismissing the menu. Closing and reopening always starts at the root.
+- Unknown Custom/OpenAI-compatible models remain at `off` until the provider
+  publishes capability metadata. The menu never invents a reasoning ladder or
+  exposes an Enable thinking action for an unknown model.
 - Switching provider preserves an available level, otherwise uses the nearest
   supported level (upward first, then downward); a non-reasoning provider
   persists `off`.
+- The combined menu closes on outside mousedown or Escape. In a submenu,
+  Up/Down moves the highlighted row, Enter selects from the model search/list,
+  and Left returns to the root.
 - The permission chip remains visible beside the mode selector. Agent and Plan
   show the effective Ask / Accept edits / Auto posture. Goal keeps the same
   geometry but is fixed to the localized Auto label and cannot open a menu;
@@ -1748,8 +1758,11 @@ Input area at the bottom of MainChat for composing and sending prompts. Supports
 - Send button: `aria-label="Send message"`
 - Abort button: `aria-label="Abort active turn"`
 - Disabled send: `aria-disabled="true"` with tooltip explanation
-- Thinking levels use radio-menu semantics inside a localized Thinking group;
-  the selected level exposes `aria-checked="true"`
+- The combined model × reasoning chip exposes `aria-haspopup="menu"` and
+  `aria-expanded`. Its root entries use `role="menuitem"`; model and reasoning
+  rows use radio-menu semantics with `aria-checked="true"` on the selected row.
+  Escape/outside click closes the menu; Up/Down, Enter, and Left provide list
+  navigation and root return.
 
 ### 11.7 MVP constraints
 

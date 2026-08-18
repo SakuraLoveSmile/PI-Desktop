@@ -454,10 +454,11 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Provider configured; a new project or new session flow is
   visible while the destination `activeSessionId` is still resolving.
-- **Steps**: 1) Inspect the Composer mode, Thinking, and permission controls
-  during the empty/home transition. 2) Click the mode control and confirm it
-  advances to the next mode. 3) Open Thinking and select a supported level.
-  4) Open permission mode and select Auto. 5) Inspect the destination session
+- **Steps**: 1) Inspect the Composer mode, model × reasoning, and permission
+  controls during the empty/home transition. 2) Click the mode control and
+  confirm it advances to the next mode. 3) Open the combined chip, enter the
+  Reasoning level submenu, and select a supported level. 4) Open permission
+  mode and select Auto. 5) Inspect the destination session
   after navigation completes.
 - **Expected**: None of the idle configuration triggers is disabled merely
   because the destination session has not been projected yet. The first
@@ -1451,30 +1452,33 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`rpc::tests` for project-bound, Temporary, and
   missing-session workspace resolution); full multi-turn UI scenario Draft
 
-#### E2E-050: Thinking selector follows exact model capability
+#### E2E-050: Composer model × reasoning menu follows exact capability
 
 - **Preconditions**: One catalogued reasoning model, one non-reasoning model,
   and one unknown free-form model id.
-- **Steps**: 1) Select each provider/model in turn. 2) Inspect the composer
-  controls beside Agent / Plan / Goal. 3) Open the Thinking trigger and choose multiple
-  supported levels. 4) Inspect the unknown model's menu and Provider Settings.
-- **Expected**: Reasoning models show the current Thinking level immediately to
-  the right of Agent / Plan / Goal, expose only their sparse supported levels as a
-  single-column list in canonical order, mark the selected row with a trailing
-  check, expose no inherit/default row, size the menu to its content without
-  exceeding 160px or the available viewport, truncate overlong labels, and close
-  the menu after selection. Non-reasoning models show no Thinking trigger.
-  Every level comes from pi's selected model record. The unknown model exposes
-  neither a Thinking trigger nor an Enable thinking action, and Provider
-  Settings exposes no reasoning/level override. Refreshing discovered model
-  data cannot replace pi's known-model semantics or invent capabilities for the
-  unknown model.
+- **Steps**: 1) Open the Composer model × reasoning chip. 2) Confirm the root
+  contains only Model and Reasoning level entries with current values. 3) Open
+  Model, search for a model, and select a model from a provider group. 4) Confirm
+  the menu remains open at the root, then open Reasoning level and choose multiple
+  supported levels. 5) Repeat with a non-reasoning provider and an unknown
+  free-form model id; exercise Escape, outside click, Up/Down, Enter, and Left.
+- **Expected**: The chip is in the right toolbar before Send/Abort; Off dims
+  Sparkles and omits the level text. The single anchored menu replaces its root
+  with an in-place back row and submenu, never opens tabs or a second popover,
+  and always reopens at the root. Model search filters sticky provider groups;
+  reasoning rows come only from the selected provider's sparse supported levels,
+  use radio semantics and a trailing check, and show the current model support
+  note. Selecting either value immediately updates the chip and root value,
+  clears model filtering, and keeps the menu open. A non-reasoning provider
+  clamps the durable level to `off` and does not expose an unsupported level.
+  Refreshing discovered model data cannot invent capabilities for the unknown
+  model.
 - **Specs linked**: `03-runtime/11-provider-model-system.md`,
   `03-runtime/12-provider-config-schema.md`,
   `03-runtime/13-model-catalog-and-selection.md`, ADR 0018, ADR 0027
 - **Acceptance**: B (model config), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`thinking-ui.test.mjs`, agent-runtime capability tests); full UI scenario Draft
+- **Status**: Unit-covered (`thinking-ui.test.mjs`, `composer-model-thinking-menu.test.mjs`, agent-runtime capability tests); full UI scenario Draft
 
 #### E2E-051: Thinking level persists with the session
 
@@ -2698,7 +2702,8 @@ Each scenario is documented in this format:
   model is non-reasoning.
 - **Steps**:
   1. Set the reasoning-capable model as the app default and create a new session.
-  2. Inspect the Thinking trigger and the session configuration sent to the host.
+  2. Inspect the Composer model × reasoning chip and the session configuration
+     sent to the host.
   3. Select a lower level or Off, leave the session, and reopen it.
   4. Set the non-reasoning model as default and create another new session.
 - **Expected**:
@@ -2706,8 +2711,9 @@ Each scenario is documented in this format:
     published for the inherited reasoning model, even when the provider returns
     its sparse levels out of order.
   - Reopening the first session preserves the user's later explicit selection.
-  - The non-reasoning session starts at `off` and renders no Thinking trigger;
-    missing capability metadata also falls back to `off`.
+  - The non-reasoning session starts at `off`; its combined chip dims Sparkles,
+    omits level text, and its reasoning submenu exposes only Off. Missing
+    capability metadata also falls back to `off`.
 - **Specs linked**: `03-runtime/13-model-catalog-and-selection.md`,
   `04-ux/08-component-spec.md`, ADR 0018, D153
 - **Acceptance**: B (model config), F (persistence), Quality
@@ -4340,13 +4346,18 @@ This test plan spec is accepted when:
 
 ### US-UI-21 Top-bar model menu configures pi
 - Create a session with provider A/model A, then open the top-bar model menu.
-- Expect enabled, runnable provider/default-model pairs and an Agent entry. The
-  model trigger shows only the model ID; a capability-gated Thinking trigger is
-  placed beside Agent / Plan / Goal instead of being nested in the model menu.
+- Expect the top bar to keep its model-only picker, while the Composer-right
+  model × reasoning chip shows provider A/model A and the current reasoning
+  level. Its menu starts with only Model and Reasoning level entries; Model
+  opens the searchable provider-group list and Reasoning level opens the
+  capability-filtered radio list in the same popover.
 - Select provider B/model B, send a prompt, and expect the main-to-sidecar
   `agent.prompt` payload and pi runtime to use B for that session.
-- Switch away and back; expect B to remain selected. While a turn runs, expect
-  the model control to be disabled.
+- Switch away and back; expect B and its clamped reasoning level to remain
+  selected. Selecting a model or reasoning level returns to the root without
+  closing the Composer menu; outside click and Escape close it. While a turn
+  runs, expect the combined control to remain available only for next-turn
+  configuration unless a pending approval gates it.
 
 ### US-UI-22 Profile footer menu
 - On the sidebar footer, click the `Custom` / `Local profile` trigger.
