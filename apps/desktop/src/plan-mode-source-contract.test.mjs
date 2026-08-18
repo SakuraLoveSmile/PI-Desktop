@@ -92,7 +92,12 @@ test("reject or interruption returns editable planning without changing durable 
   const sendPromptBlock =
     storeSource.match(/sendPrompt: async \(content, draft\)[\s\S]*?\n  compactContext:/)?.[0] ?? "";
   assert.match(sendPromptBlock, /pendingPlans\[sessionId\]\?\.status === "pending"/);
-  assert.match(sendPromptBlock, /await api\.prompt\(\{ sessionId, content \}\)/);
+  assert.match(sendPromptBlock, /await api\.prompt\(\{/);
+  assert.match(sendPromptBlock, /sessionId,\s*content,/);
+  assert.match(
+    sendPromptBlock,
+    /attachments: draft[\s\S]*promptAttachmentsFromDraft\(draft\.fileReferences\)/,
+  );
 });
 
 test("host ordering uses a fresh monotonic token-checked read", () => {
