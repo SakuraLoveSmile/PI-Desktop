@@ -37,7 +37,7 @@ The host is responsible for:
 
 ### Catalog source selection
 
-Settings → Extensions picks where the catalog comes from. host-core resolves
+Plugins → Marketplace picks where the catalog comes from. host-core resolves
 the URL with the environment override on top, so dev builds and tests can point
 at a local catalog without touching persisted settings:
 

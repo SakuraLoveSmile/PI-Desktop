@@ -59,6 +59,8 @@
 | D033 | 工具结果限制 | **256KB/4000 行默认带有显式截断标记** | 保护上下文和 UI |
 | D237 | 提供商的厂商账户（OAuth）登录 | **提供商行可以用厂商订阅账户认证，而不是 API 密钥。pi-ai 的七个 OAuth 流程在启动时静态注册（`registerBunOAuthFlows()`）；Electron 主进程拥有登录/退出编排，并在 host-core 的加密密钥存储之上实现 pi-ai 的 `CredentialStore`，使用新的引用 `secret:provider:<id>:oauth`，并按提供商串行化 `modify` 以满足带锁刷新。`auth_kind` 新增 `oauth`，`has_secret` 放宽为“存在 API 密钥**或** oauth 凭据”，新增的 `has_oauth` 与非敏感的 `oauthAccountLabel` 驱动徽标并隐藏密钥输入框；主机协议与存储架构不变。厂商卡片列表由 `models.getProviders().filter(p => p.auth.oauth)` 派生，登录按 `vendorKey` 幂等 upsert 一行。OAuth 行的 sidecar 启动载荷中 `apiKey: ""`；运行时注入 `resolveAuth` 回调，调用新的宿主代理方法 `provider.resolveAuth`，该方法由 Electron 主进程自行应答 —— 绝不转发给 host-core —— 并先用每次启动重写的绑定表校验 `(sessionId, providerId)`。应答是短时 `ModelAuth`（`apiKey`/`headers`/`baseUrl`），因此刷新令牌永不离开主进程，而 `matches()` 让厂商运行时跨回合保持温热。`providers.listModels` 与连接测试改走已认证的账户，而不是探测 `/models`；apiStyle 跟随所选模型，并新增 `openai_codex_responses` 与 `pi_messages`。交互由 `pi-desktop/providers/oauth/*` 下的五条调用通道与一条事件通道承载。** | Claude Pro/Max、ChatGPT Plus/Pro 与 Copilot 的订阅用户此前必须另买 API 额度才能使用本应用。pi-ai 提供了流程，但明确声明登录编排归宿主应用。厂商令牌约一小时过期，启动时解析一次会让长会话中断，并让 `matches()` 每回合失配；按请求解析既保持运行时稳定，又只把一个可作废的令牌交给运行模型指令的进程，且仅限该会话绑定的提供商 —— 严格少于今天无条件下发的长期 API 密钥（ADR 0095）。 |
 
+| D238 | 扁平设置目录与市场上下文归属 | **设置使用可搜索的扁平目录，顺序固定为基础 / 全局 AI / 快捷键 / 说明 / 模型配置 / 导入 / 项目存档 / 信息。移除个人、集成、编码等分组标题。移除设置中的扩展目的地，将官方/镜像/自定义市场来源选择器移入扩展 → 市场并保留原有持久化与刷新行为。不改变 IPC、主机协议、存储、提供商、权限或项目所有权契约。** | 九项设置目录重复了自身层级，且与应用外壳的扩展目的地使用相同名称；将市场来源与市场浏览放在一起可以去掉重复入口，同时保留镜像/自定义来源工作流（ADR 0096）。 |
+
 ## D. 法典视觉平等决策 (0.3.5+)
 
 黄金来源：当地 Codex 电子捕获；当行发生冲突时，最新行获胜。

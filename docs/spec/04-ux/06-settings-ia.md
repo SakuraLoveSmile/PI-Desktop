@@ -19,6 +19,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   8. **Info** — Lucide `Info` (versions, logs, updates, developer)
   Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
   with the rail label; do not reuse refresh/rotate glyphs here.
+- The directory is a flat list. Do not add `Personal`, `Integrations`,
+  `Coding`, or other group headings around the destinations; the destination
+  names already provide the needed hierarchy.
 - No additional settings destinations or placeholder navigation rows are shown
 - Main content pane on primary surface with large section title + elevated
   rounded cards of rows. Its content uses the full width available after the
@@ -203,6 +206,8 @@ contract modes are intent boundaries, not strict read-only security profiles.
 - Plugin management remains available from the app shell's independent
   **Plugins** destination, including load, enable, disable, and uninstall; it is
   not duplicated in Settings
+- The marketplace source selector lives inside **Plugins → Marketplace**, next
+  to the catalog controls; it is not a separate Settings destination.
 - Project archive is indexed by Settings search and is not duplicated as a home
   sidebar destination or standalone global-search page
 - Back to app returns to chat shell

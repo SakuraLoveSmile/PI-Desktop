@@ -7,7 +7,6 @@ import type {
   CommandShellCatalog,
   CommandShellId,
   GlobalPermissionMode,
-  PluginMarketSource,
   ShortcutPlatform,
 } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
@@ -21,12 +20,8 @@ import {
   groupImportCandidates,
   type ImportGroupBy,
 } from "../lib/import-groups";
-import { Badge, Button, Input, Select, cx } from "../components/ui";
-import {
-  SETTINGS_GROUP_LABEL_KEYS,
-  SETTINGS_NAV,
-  type SettingsNavGroupId,
-} from "../lib/settings-search";
+import { Badge, Button, Select, cx } from "../components/ui";
+import { SETTINGS_NAV } from "../lib/settings-search";
 import {
   IconArchive,
   IconBot,
@@ -40,7 +35,6 @@ import {
   IconMonitor,
   IconMoon,
   IconPalette,
-  IconPlug,
   IconSearch,
   IconSliders,
   IconSparkles,
@@ -60,12 +54,6 @@ type NavItem = {
   icon: ReactNode;
   /** i18n keys of the rows inside the tab; search matches their translations. */
   keywordKeys: string[];
-};
-
-type NavGroup = {
-  id: string;
-  labelKey?: string;
-  items: NavItem[];
 };
 
 function SettingsRow({
@@ -708,124 +696,6 @@ function DeveloperSection({
   );
 }
 
-function ExtensionMarketSection({
-  settings,
-  saveSettings,
-}: {
-  settings: AppSettings;
-  saveSettings: (patch: Partial<AppSettings>) => Promise<void>;
-}) {
-  const { t } = useTranslation();
-  const showToast = useAppStore((s) => s.showToast);
-  const source: PluginMarketSource = settings.pluginMarketSource ?? "official";
-  const [customUrl, setCustomUrl] = useState(settings.pluginMarketCustomUrl ?? "");
-  const [activeUrl, setActiveUrl] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    // Read-only probe: search serves the cached catalog, so this never waits
-    // on the network the way an explicit refresh does.
-    api
-      .marketSearch()
-      .then((res) => {
-        if (!cancelled) setActiveUrl(res.sourceUrl ?? "");
-      })
-      .catch(() => {
-        if (!cancelled) setActiveUrl("");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [source, settings.pluginMarketCustomUrl]);
-
-  /**
-   * Persist the source, then pull the new catalog.
-   *
-   * The host deliberately does not fetch inside `settings.set` — that would
-   * hold its state lock behind a marketplace timeout — so the refresh is the
-   * renderer's job, and its failure is what tells the user the source is
-   * unreachable.
-   */
-  const applySource = async (patch: Partial<AppSettings>) => {
-    try {
-      await saveSettings(patch);
-      const meta = await api.marketRefresh(true);
-      setActiveUrl(meta.sourceUrl ?? "");
-      showToast(
-        t("plugins.marketRefreshed", {
-          count: meta.pluginCount,
-          defaultValue: `Marketplace refreshed (${meta.pluginCount} plugins)`,
-        }),
-        { variant: "success" },
-      );
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : String(e), { variant: "error" });
-    }
-  };
-
-  const commitCustomUrl = () => {
-    const next = customUrl.trim();
-    if (next === (settings.pluginMarketCustomUrl ?? "")) return;
-    void applySource({ pluginMarketCustomUrl: next });
-  };
-
-  return (
-    <SettingsCard title={t("settings.marketProviderTitle")}>
-      <SettingsRow
-        title={t("settings.marketProvider")}
-        description={
-          <>
-            {t("settings.marketProviderDesc")}
-            {source === "mirror" ? (
-              <>
-                {" "}
-                {t("settings.marketProviderMirrorHint")}
-              </>
-            ) : null}
-            {activeUrl ? (
-              <div className="settings-row-desc">
-                {t("settings.marketActiveSource", { url: activeUrl })}
-              </div>
-            ) : null}
-          </>
-        }
-      >
-        <Select
-          value={source}
-          aria-label={t("settings.marketProvider")}
-          onChange={(event) =>
-            void applySource({
-              pluginMarketSource: event.target.value as PluginMarketSource,
-            })
-          }
-        >
-          <option value="official">{t("settings.marketProviderOfficial")}</option>
-          <option value="mirror">{t("settings.marketProviderMirror")}</option>
-          <option value="custom">{t("settings.marketProviderCustom")}</option>
-        </Select>
-      </SettingsRow>
-      {source === "custom" && (
-        <SettingsRow
-          title={t("settings.marketCustomUrl")}
-          description={t("settings.marketCustomUrlDesc")}
-        >
-          <Input
-            type="url"
-            value={customUrl}
-            placeholder={t("settings.marketCustomUrlPlaceholder")}
-            aria-label={t("settings.marketCustomUrl")}
-            onChange={(event) => setCustomUrl(event.target.value)}
-            onBlur={commitCustomUrl}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") commitCustomUrl();
-            }}
-          />
-        </SettingsRow>
-      )}
-    </SettingsCard>
-  );
-}
-
 /**
  * Windows/Linux only: how closing the main window behaves. The first close
  * prompts once (main-process dialog); the remembered choice can be changed
@@ -972,7 +842,7 @@ export function SettingsPage() {
   // Nav structure comes from the shared settings index (lib/settings-search)
   // so the global search dialog and this page stay in sync; only the icons
   // are view-level.
-  const navGroups: NavGroup[] = useMemo(() => {
+  const navItems: NavItem[] = useMemo(() => {
     const iconFor: Record<SettingsTab, ReactNode> = {
       // Semantic Lucide glyphs for the settings destinations.
       general: <IconSliders size={14} />,
@@ -980,54 +850,33 @@ export function SettingsPage() {
       shortcuts: <IconKeyboard size={14} />,
       instructions: <IconFileText size={14} />,
       agent: <IconBot size={14} />,
-      extensions: <IconPlug size={14} />,
       import: <IconDownload size={14} />,
       projects: <IconArchive size={14} />,
       about: <IconInfo size={14} />,
     };
-    const groups = new Map<SettingsNavGroupId, NavGroup>();
-    for (const entry of SETTINGS_NAV) {
-      let group = groups.get(entry.groupId);
-      if (!group) {
-        group = {
-          id: entry.groupId,
-          labelKey: SETTINGS_GROUP_LABEL_KEYS[entry.groupId],
-          items: [],
-        };
-        groups.set(entry.groupId, group);
-      }
-      group.items.push({
-        id: entry.id,
-        labelKey: entry.labelKey,
-        icon: iconFor[entry.id],
-        keywordKeys: entry.keywordKeys,
-      });
-    }
-    return [...groups.values()];
+    return SETTINGS_NAV.map((entry) => ({
+      id: entry.id,
+      labelKey: entry.labelKey,
+      icon: iconFor[entry.id],
+      keywordKeys: entry.keywordKeys,
+    }));
   }, []);
 
   // Search matches the tab label and the titles of the rows inside it, so
   // typing e.g. "theme" or "主题" surfaces Basics even though the tab is
   // named differently.
-  const filteredGroups = useMemo(() => {
+  const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return navGroups;
-    return navGroups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) =>
-          [t(item.labelKey), ...item.keywordKeys.map((key) => t(key))].some(
-            (text) => text.toLowerCase().includes(q),
-          ),
-        ),
-      }))
-      .filter((group) => group.items.length > 0);
-  }, [navGroups, query, t]);
+    if (!q) return navItems;
+    return navItems.filter((item) =>
+      [t(item.labelKey), ...item.keywordKeys.map((key) => t(key))].some((text) =>
+        text.toLowerCase().includes(q),
+      ),
+    );
+  }, [navItems, query, t]);
 
   const activeLabel =
-    navGroups
-      .flatMap((group) => group.items)
-      .find((item) => item.id === tab)?.labelKey ?? "settings.title";
+    navItems.find((item) => item.id === tab)?.labelKey ?? "settings.title";
 
   return (
     <div className="settings-shell settings-shell-full">
@@ -1058,25 +907,18 @@ export function SettingsPage() {
         </div>
 
         <div className="settings-nav-scroll no-drag">
-          {filteredGroups.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div className="settings-nav-empty">{t("settings.noResults")}</div>
           ) : (
-            filteredGroups.map((group) => (
-              <div key={group.id} className="settings-nav-group">
-                {group.labelKey ? (
-                  <div className="settings-nav-group-label">{t(group.labelKey)}</div>
-                ) : null}
-                {group.items.map((item) => (
-                  <button
-                    key={item.id}
-                    className={cx("settings-nav-item", tab === item.id && "active")}
-                    onClick={() => setSettingsTab(item.id)}
-                  >
-                    <span className="settings-nav-icon">{item.icon}</span>
-                    <span className="settings-nav-label">{t(item.labelKey)}</span>
-                  </button>
-                ))}
-              </div>
+            filteredItems.map((item) => (
+              <button
+                key={item.id}
+                className={cx("settings-nav-item", tab === item.id && "active")}
+                onClick={() => setSettingsTab(item.id)}
+              >
+                <span className="settings-nav-icon">{item.icon}</span>
+                <span className="settings-nav-label">{t(item.labelKey)}</span>
+              </button>
             ))
           )}
         </div>
@@ -1362,15 +1204,6 @@ export function SettingsPage() {
           )}
 
           {tab === "agent" && <ProvidersSection />}
-
-          {tab === "extensions" && settings && (
-            <div className="settings-stack">
-              <ExtensionMarketSection
-                settings={settings}
-                saveSettings={saveSettings}
-              />
-            </div>
-          )}
 
           {tab === "instructions" && <AgentInstructionsSection />}
 

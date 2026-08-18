@@ -973,8 +973,8 @@ Each scenario is documented in this format:
 #### E2E-024P: Switch the marketplace catalog source
 
 - **Preconditions**: Network available to `cnb.cool`.
-- **Steps**: 1) Open Settings → Extensions. 2) Switch Marketplace source from GitHub (official) to Mirror (cnb.cool). 3) Open Extensions → Marketplace. 4) Install a plugin.
-- **Expected**: Switching triggers a refresh and reports the new plugin count; the source line and the active-source hint both show the cnb.cool catalog URL; the install downloads its package from the mirror and passes shasum verification. Switching back to official restores the GitHub source. Choosing Custom URL with an empty value falls back to the official default rather than an empty endpoint.
+- **Steps**: 1) Open Extensions → Marketplace. 2) Switch Marketplace source from GitHub (official) to Mirror (cnb.cool). 3) Confirm the catalog refreshes in the same surface. 4) Install a plugin.
+- **Expected**: Switching triggers a refresh and reports the new plugin count; the active-source status shows the cnb.cool catalog URL; the install downloads its package from the mirror and passes shasum verification. Switching back to official restores the GitHub source. Choosing Custom URL with an empty value falls back to the official default rather than an empty endpoint.
 - **Specs linked**: `07-plugins/07-plugin-marketplace.md`
 - **Acceptance**: G (remote marketplace source)
 - **Status**: Documented / host-core unit covered
@@ -4476,7 +4476,9 @@ This test plan spec is accepted when:
 - Model configuration contains the provider studio hero, default mode/model, Enter-to-send
   switch, and card-based Providers management with an add-provider dialog.
 - Plugin load/enable/disable/uninstall remains available from the app shell's
-  independent Extensions destination.
+  independent Extensions destination; its Marketplace tab also owns the
+  official/mirror/custom catalog source picker, so Settings has no duplicate
+  Extensions destination.
 - Dark: rail `#000`, main `#181818`, cards elevated `#212121`.
 
 ### US-UI-38 Composer workspace context omitted

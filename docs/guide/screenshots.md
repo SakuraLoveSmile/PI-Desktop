@@ -155,9 +155,9 @@ Settings is a full-page destination with a searchable tab rail.
 
 ![AI defaults and the permission mode](/screenshots/app/en/settings-models.webp)
 
-![Extension settings with the marketplace source picker](/screenshots/app/en/settings-extensions.webp)
+![Extensions marketplace with the catalog source picker](/screenshots/app/en/settings-extensions.webp)
 
-![A custom marketplace catalog URL](/screenshots/app/en/settings-extensions-custom.webp)
+![Extensions marketplace with a custom catalog URL](/screenshots/app/en/settings-extensions-custom.webp)
 
 ## Regenerating these frames
 

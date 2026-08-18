@@ -114,26 +114,6 @@
   background: #f7f7f7;
 }
 
-/* Settings nav groups: labelled sections in the settings rail. */
-.settings-nav-group {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.settings-nav-group + .settings-nav-group {
-  margin-top: 16px;
-}
-
-.settings-nav-group-label {
-  padding: 0 10px 4px;
-  color: var(--ds-text-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  letter-spacing: var(--tracking-wide);
-  user-select: none;
-}
-
 /* Row variant without the divider, for copy that leads a full-width control
  * (e.g. the theme card grid) inside the same panel. */
 .settings-row.settings-row-plain {

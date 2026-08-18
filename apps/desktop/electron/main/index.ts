@@ -2962,14 +2962,17 @@ async function createWindow() {
               document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
             `);
             await new Promise((r) => setTimeout(r, 200));
-            // Extensions tab: marketplace source picker, including the custom
-            // URL row that only appears for the custom source.
-            await setSettingsTab("extensions");
+            // Plugins marketplace: the source picker lives beside the catalog,
+            // including the custom URL row that only appears for that source.
+            await setPage("plugins");
+            await mainWindow!.webContents.executeJavaScript(
+              `document.querySelector('#plugins-tab-market')?.dispatchEvent(new MouseEvent('click',{bubbles:true}))`,
+            );
             await new Promise((r) => setTimeout(r, 350));
             await shot("pi-settings-extensions");
             await mainWindow!.webContents.executeJavaScript(`
               (() => {
-                const select = document.querySelector('.settings-row-control select');
+                const select = document.querySelector('.plugins-market-settings select');
                 if (!select) return;
                 const setter = Object.getOwnPropertyDescriptor(
                   window.HTMLSelectElement.prototype, 'value',

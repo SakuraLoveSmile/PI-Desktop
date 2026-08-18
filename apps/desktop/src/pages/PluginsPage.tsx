@@ -27,6 +27,7 @@ import { ScopeControl } from "../components/extensions/ScopeControl";
 import { McpSection } from "../components/extensions/McpSection";
 import { SkillsSection } from "../components/extensions/SkillsSection";
 import { SubagentsSection } from "../components/extensions/SubagentsSection";
+import { MarketplaceSourceSettings } from "../components/plugins/MarketplaceSourceSettings";
 import { PluginSettingsSheet } from "../components/plugins/PluginSettingsSheet";
 import type {
   ActivationScope,
@@ -468,6 +469,7 @@ export function PluginsPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const plugins = useAppStore((s) => s.plugins);
+  const settings = useAppStore((s) => s.settings);
   const refreshPlugins = useAppStore((s) => s.refreshPlugins);
   const showToast = useAppStore((s) => s.showToast);
   const openUrlInWorkPanel = useAppStore((s) => s.openUrlInWorkPanel);
@@ -1410,6 +1412,17 @@ export function PluginsPage() {
             aria-labelledby="plugins-tab-market"
             className="plugins-panel"
           >
+            {settings ? (
+              <MarketplaceSourceSettings
+                settings={settings}
+                activeSource={marketSource}
+                onSourceRefreshed={(source) => {
+                  setMarketSource(source);
+                  void refreshMarket(query);
+                }}
+              />
+            ) : null}
+
             {categories.length > 1 ? (
               <div
                 className="plugins-filters"
@@ -1582,12 +1595,6 @@ export function PluginsPage() {
                 })}
               </div>
             )}
-
-            {marketSource ? (
-              <p className="plugins-market-source">
-                {t("plugins.marketSource", { url: marketSource })}
-              </p>
-            ) : null}
           </div>
         )}
       </div>

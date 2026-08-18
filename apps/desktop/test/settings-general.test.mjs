@@ -15,6 +15,17 @@ const providersSource = await readFile(
   new URL("../src/components/settings/ProvidersSection.tsx", import.meta.url),
   "utf8",
 );
+const pluginsPageSource = await readFile(
+  new URL("../src/pages/PluginsPage.tsx", import.meta.url),
+  "utf8",
+);
+const marketplaceSettingsSource = await readFile(
+  new URL(
+    "../src/components/plugins/MarketplaceSourceSettings.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const languageSource = await readFile(
   new URL("../src/lib/app-language.ts", import.meta.url),
   "utf8",
@@ -101,6 +112,7 @@ test("settings nav icons map each destination to a semantic lucide glyph", () =>
   assert.match(settingsPageSource, /general: <IconSliders/);
   assert.match(settingsPageSource, /ai: <IconSparkles/);
   assert.match(settingsPageSource, /shortcuts: <IconKeyboard/);
+  assert.match(settingsPageSource, /instructions: <IconFileText/);
   assert.match(settingsPageSource, /agent: <IconBot/);
   assert.match(settingsPageSource, /import: <IconDownload/);
   assert.match(settingsPageSource, /projects: <IconArchive/);
@@ -110,17 +122,39 @@ test("settings nav icons map each destination to a semantic lucide glyph", () =>
   assert.doesNotMatch(settingsPageSource, /import: <IconSnapshot/);
 });
 
-test("settings nav renders grouped sections with keyword search", () => {
-  assert.match(settingsPageSource, /settings-nav-group-label/);
-  assert.match(settingsSearchSource, /settings\.groupPersonal/);
-  assert.match(settingsSearchSource, /settings\.groupIntegrations/);
+test("settings nav is a flat eight-destination directory with keyword search", () => {
+  assert.match(settingsPageSource, /filteredItems\.map/);
+  assert.doesNotMatch(settingsPageSource, /settings-nav-group-label/);
+  assert.doesNotMatch(settingsSearchSource, /settings\.groupPersonal/);
+  assert.doesNotMatch(settingsSearchSource, /settings\.groupIntegrations/);
+  assert.doesNotMatch(settingsSearchSource, /id: "extensions"/);
+  const navOrder = [
+    "general",
+    "ai",
+    "shortcuts",
+    "instructions",
+    "agent",
+    "import",
+    "projects",
+    "about",
+  ].map((id) => settingsSearchSource.indexOf(`id: "${id}"`));
+  assert.ok(navOrder.every((index) => index >= 0));
+  assert.deepEqual(navOrder, [...navOrder].sort((a, b) => a - b));
   assert.match(settingsSearchSource, /keywordKeys/);
   assert.match(settingsSearchSource, /settings\.projectArchive/);
-  assert.match(stylesSource, /\.settings-nav-group-label\s*\{/);
+  assert.match(stylesSource, /\.settings-nav-item\s*\{/);
   assert.match(
     stylesSource,
     /\.settings-row\.settings-row-plain\s*\{[^}]*border-bottom:\s*0/s,
   );
+});
+
+test("marketplace source settings live inside the Plugins marketplace surface", () => {
+  assert.match(pluginsPageSource, /<MarketplaceSourceSettings/);
+  assert.match(marketplaceSettingsSource, /api\.marketRefresh\(true\)/);
+  assert.match(marketplaceSettingsSource, /settings\.marketProvider/);
+  assert.doesNotMatch(settingsPageSource, /ExtensionMarketSection/);
+  assert.doesNotMatch(settingsPageSource, /tab === "extensions"/);
 });
 
 test("native select menus keep readable theme colors across the app on Windows", () => {

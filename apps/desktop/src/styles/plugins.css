@@ -1172,11 +1172,67 @@
   font-weight: var(--font-weight-medium);
 }
 
-.plugins-market-source {
-  margin: 0;
-  color: var(--ds-text-faint);
+.plugins-market-settings {
+  gap: 0;
+  margin-bottom: 0;
+}
+
+.plugins-market-settings-head,
+.plugins-market-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 16px;
+}
+
+.plugins-market-settings-row {
+  border-top: 1px solid var(--ds-border-subtle);
+}
+
+.plugins-market-settings-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.plugins-market-settings-copy .settings-card-heading {
+  margin-bottom: 3px;
+}
+
+.plugins-market-settings-active {
+  margin: 5px 0 0;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
   font-size: var(--text-xs-plus);
+  line-height: var(--leading-body);
   overflow-wrap: anywhere;
+}
+
+.plugins-market-settings-control {
+  display: flex;
+  flex: 0 0 240px;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.plugins-market-settings-control .field-select,
+.plugins-market-settings-control .field-input {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .plugins-market-settings-head,
+  .plugins-market-settings-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .plugins-market-settings-control {
+    flex-basis: auto;
+    width: 100%;
+  }
 }
 
 /* Loading placeholders keep the grid from collapsing on the first search. */

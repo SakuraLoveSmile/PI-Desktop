@@ -378,8 +378,7 @@
 /* CJK has no case and wide tracking splits glyphs unnaturally. */
 :lang(zh-CN) .sidebar-list-label,
 :lang(zh-CN) .dest-section-label,
-:lang(zh-CN) .shortcut-group-label,
-:lang(zh-CN) .settings-nav-group-label {
+:lang(zh-CN) .shortcut-group-label {
   letter-spacing: var(--tracking-normal);
   text-transform: none;
 }
