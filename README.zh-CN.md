@@ -187,4 +187,4 @@ PI-Desktop 的构建和设计参考了以下开源项目：
 
 ## 许可证
 
-待定 — 将在首个正式版本发布前确定。
+本项目采用 [GNU Lesser General Public License v3.0 or later](LICENSE) 授权。

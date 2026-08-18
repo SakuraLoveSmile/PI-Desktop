@@ -191,4 +191,4 @@ PI-Desktop is built with and informed by these open-source projects:
 
 ## License
 
-TBD — a license will be finalized before the first stable release.
+Licensed under the [GNU Lesser General Public License v3.0 or later](LICENSE).
