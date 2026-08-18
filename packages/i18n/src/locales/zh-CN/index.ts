@@ -611,7 +611,6 @@ export const zhCN = {
     commandShellUnavailable: "不可用",
     commandShellNoEffective: "没有可用于运行命令的 Shell。",
     commandShellDefault: "实际使用：{{shell}}（默认）",
-    commandShellConfigured: "已配置：{{shell}}",
     commandShellFallback: "已配置的 Shell 不可用，当前使用 {{shell}}。",
     commandShellSaveError: "无法保存命令 Shell。",
     editProvider: "编辑",

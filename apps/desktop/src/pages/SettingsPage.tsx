@@ -149,10 +149,6 @@ function CommandShellRow({
       effectiveStatus = t("settings.commandShellFallback", {
         shell: effectiveChoice.label,
       });
-    } else {
-      effectiveStatus = t("settings.commandShellConfigured", {
-        shell: configuredChoice?.label ?? effectiveChoice.label,
-      });
     }
   }
 

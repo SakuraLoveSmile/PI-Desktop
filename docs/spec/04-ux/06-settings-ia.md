@@ -66,8 +66,10 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   `bash` where supported. The selected `defaultCommandShell` persists across
   restart; writes reject unavailable or wrong-platform IDs. If a persisted
   choice later becomes unavailable, the first available platform shell is used
-  and the fallback state is shown. A Bash turn verifies its pinned ID/dialect
-  before execution.
+  and the fallback state is shown. When the selected shell is available, the
+  selector is the only configured-state indicator; status text is reserved for
+  the default, fallback, and no-effective-shell cases. A Bash turn verifies its
+  pinned ID/dialect before execution.
 - Context management has **no card and no controls** (D200 / ADR 0061, kept by
   D203 / ADR 0064). Automatic protection is always on and its budgets and
   retention limits are derived from the active model's window, so there is
@@ -256,7 +258,8 @@ contract modes are intent boundaries, not strict read-only security profiles.
 19. The default operating-mode selector contains Agent, Plan, and Goal; legacy
     Chat values migrate to Plan and do not reappear as a selectable option
 20. Command shell selection persists a platform-valid catalog ID, exposes
-    unavailable/fallback status, and never authorizes a stale ID/dialect
+    status only when it adds information (default, unavailable, fallback, or no
+    effective shell), and never authorizes a stale ID/dialect
 
 ## 5. Basics chrome metrics
 

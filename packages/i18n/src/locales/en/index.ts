@@ -618,7 +618,6 @@ export const en = {
     commandShellUnavailable: "Unavailable",
     commandShellNoEffective: "No shell is available to run commands.",
     commandShellDefault: "Effective: {{shell}} (default)",
-    commandShellConfigured: "Configured: {{shell}}",
     commandShellFallback: "Configured shell unavailable; using {{shell}}.",
     commandShellSaveError: "Couldn't save the command shell.",
     editProvider: "Edit",

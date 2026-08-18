@@ -67,6 +67,7 @@ test("Basics and AI tabs expose their respective app and AI controls", () => {
   assert.match(aiSource, /settings\.defaultsTitle/);
   assert.match(aiSource, /CommandShellRow/);
   assert.match(aiSource, /enterToSend: !settings\.enterToSend/);
+  assert.doesNotMatch(settingsPageSource, /commandShellConfigured/);
   assert.match(
     aiSource,
     /defaultPermissionMode: e\.target\.value as GlobalPermissionMode/,
