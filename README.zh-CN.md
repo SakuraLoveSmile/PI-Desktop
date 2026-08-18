@@ -181,6 +181,10 @@ PI-Desktop 的构建和设计参考了以下开源项目：
   Open Font License 文本位于
   [`apps/desktop/src/assets/fonts/licenses/`](apps/desktop/src/assets/fonts/licenses/)。
 
+## 社区友链
+
+- [Linux.Do](https://linux.do/) — 技术交流与分享社区。
+
 ## 许可证
 
 待定 — 将在首个正式版本发布前确定。

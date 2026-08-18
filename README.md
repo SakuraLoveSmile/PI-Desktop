@@ -185,6 +185,10 @@ PI-Desktop is built with and informed by these open-source projects:
   License texts are included under
   [`apps/desktop/src/assets/fonts/licenses/`](apps/desktop/src/assets/fonts/licenses/).
 
+## Community Links
+
+- [Linux.Do](https://linux.do/) — A community for sharing and discussing technology.
+
 ## License
 
 TBD — a license will be finalized before the first stable release.
