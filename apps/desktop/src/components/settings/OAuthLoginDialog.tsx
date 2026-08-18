@@ -3,18 +3,14 @@
  * device code, a pasted code — arrives through the same event stream, so this
  * dialog renders whatever the vendor asked for rather than a per-vendor script.
  *
- * The dialog starts the login itself, from inside the effect that subscribes to
- * the stream, because a flow can ask its first question before the start call
- * returns; see `beginOAuthLogin`.
+ * The attempt itself belongs to the caller: the dialog only watches it. Opening
+ * a login is not something an effect may do twice, and StrictMode does exactly
+ * that; subscribing is, because a session replays what a new subscriber missed.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { OAuthPromptRequest, OAuthVendor } from "@pi-desktop/shared";
-import { api } from "../../lib/api";
-import {
-  beginOAuthLogin,
-  type OAuthLoginSession,
-} from "../../lib/oauth-login-session";
+import type { OAuthLoginSession } from "../../lib/oauth-login-session";
 import { Button, Input, cx } from "../ui";
 import { IconCheck, IconCopy, IconExternal } from "../icons";
 
@@ -27,10 +23,13 @@ type DeviceCodeState = {
 
 export function OAuthLoginDialog({
   vendor,
+  session,
   onDone,
   onClose,
 }: {
   vendor: OAuthVendor;
+  /** The attempt this dialog reports on, already begun by the caller. */
+  session: OAuthLoginSession;
   /** The login succeeded; the provider row is ready to use. */
   onDone: (accountLabel?: string) => void;
   onClose: () => void;
@@ -44,67 +43,61 @@ export function OAuthLoginDialog({
   const [error, setError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
-  const session = useRef<OAuthLoginSession | null>(null);
-  // The login is started once, from the subscribing effect. Callers pass fresh
-  // closures on every render, so they are read through refs rather than
-  // re-running the effect — a second run would start a second login.
+  // Callers pass fresh closures on every render, so they are read through a ref
+  // rather than re-running the subscription. `settled` keeps a replayed outcome
+  // from closing the dialog, or toasting, a second time.
   const handlers = useRef({ onDone, onClose });
   handlers.current = { onDone, onClose };
+  const settled = useRef(false);
 
   useEffect(() => {
-    const login = beginOAuthLogin({
-      api,
-      vendorId: vendor.vendorId,
-      onError: (message) => setError(message),
-      onEvent: (event) => {
-        switch (event.kind) {
-          case "info":
-          case "progress":
-            setStatus(event.message);
-            break;
-          case "authUrl":
-            setAuthUrl({
-              url: event.url,
-              instructions: event.instructions,
-              opened: event.opened,
-            });
-            break;
-          case "deviceCode":
-            setDeviceCode({
-              userCode: event.userCode,
-              verificationUri: event.verificationUri,
-            });
-            break;
-          case "prompt":
-            setAnswer("");
-            setPrompt(event.request);
-            break;
-          case "promptCancelled":
-            // The flow answered the step itself — a callback that beat the
-            // paste box — so the input has to go away on its own.
-            setPrompt((current) =>
-              current?.promptId === event.promptId ? null : current,
-            );
-            break;
-          case "done":
-            handlers.current.onDone(event.accountLabel);
-            break;
-          case "error":
-            setPrompt(null);
-            setError(event.message);
-            break;
-          case "cancelled":
-            handlers.current.onClose();
-            break;
-        }
-      },
+    return session.subscribe((event) => {
+      switch (event.kind) {
+        case "info":
+        case "progress":
+          setStatus(event.message);
+          break;
+        case "authUrl":
+          setAuthUrl({
+            url: event.url,
+            instructions: event.instructions,
+            opened: event.opened,
+          });
+          break;
+        case "deviceCode":
+          setDeviceCode({
+            userCode: event.userCode,
+            verificationUri: event.verificationUri,
+          });
+          break;
+        case "prompt":
+          setAnswer("");
+          setPrompt(event.request);
+          break;
+        case "promptCancelled":
+          // The flow answered the step itself — a callback that beat the
+          // paste box — so the input has to go away on its own.
+          setPrompt((current) =>
+            current?.promptId === event.promptId ? null : current,
+          );
+          break;
+        case "done":
+          if (settled.current) break;
+          settled.current = true;
+          handlers.current.onDone(event.accountLabel);
+          break;
+        case "error":
+          setPrompt(null);
+          setError(event.message);
+          break;
+        case "cancelled":
+          if (settled.current) break;
+          settled.current = true;
+          handlers.current.onClose();
+          break;
+      }
     });
-    session.current = login;
-    return () => {
-      session.current = null;
-      login.dispose();
-    };
-  }, [vendor.vendorId]);
+  }, [session]);
 
   const cancel = useCallback(async () => {
     if (closing) return;
@@ -113,12 +106,12 @@ export function OAuthLoginDialog({
       // Aborts the local callback server or the device-code polling. The
       // `cancelled` event closes this dialog; a login main no longer knows
       // about is already over, so close directly.
-      const cancelled = await session.current?.cancel();
+      const cancelled = await session.cancel();
       if (!cancelled) onClose();
     } catch {
       onClose();
     }
-  }, [closing, onClose]);
+  }, [closing, onClose, session]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -144,8 +137,8 @@ export function OAuthLoginDialog({
     if (!prompt) return;
     const promptId = prompt.promptId;
     setPrompt(null);
-    void session.current
-      ?.respond(promptId, value)
+    void session
+      .respond(promptId, value)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   };
 

@@ -152,6 +152,8 @@ type LoginSession = {
   prompts: Map<string, PendingPrompt>;
   /** Serializes renderer events so `authUrl` cannot overtake an earlier notice. */
   tail: Promise<void>;
+  /** Settles once the attempt has torn down; set as soon as it is running. */
+  finished?: Promise<void>;
 };
 
 function promptRequest(
@@ -224,9 +226,15 @@ export class VendorOAuth {
     if (!provider?.auth.oauth) {
       throw new Error(`unknown vendor account: ${vendorId}`);
     }
-    // A second click replaces the attempt in flight rather than racing it.
-    for (const running of this.logins.values()) {
-      if (running.vendorId === vendorId) this.cancel(running.loginId);
+    // A second attempt replaces the one in flight rather than racing it, and
+    // waits for it to let go: both hold the same local callback port, so
+    // starting before the old one unwinds is how a login fails on arrival.
+    const superseded = [...this.logins.values()].filter(
+      (running) => running.vendorId === vendorId,
+    );
+    for (const running of superseded) this.cancel(running.loginId);
+    for (const running of superseded) {
+      await running.finished?.catch(() => undefined);
     }
 
     const row = await this.ensureRow(vendorId, provider);
@@ -240,7 +248,7 @@ export class VendorOAuth {
       tail: Promise.resolve(),
     };
     this.logins.set(session.loginId, session);
-    void this.run(session, provider);
+    session.finished = this.run(session, provider);
     return { loginId: session.loginId };
   }
 
