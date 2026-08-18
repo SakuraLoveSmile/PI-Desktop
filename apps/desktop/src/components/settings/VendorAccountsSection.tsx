@@ -12,8 +12,6 @@ import { Badge, Button } from "../ui";
 import { IconKey, IconLogOut } from "../icons";
 import { OAuthLoginDialog } from "./OAuthLoginDialog";
 
-type ActiveLogin = { loginId: string; vendor: OAuthVendor };
-
 export function VendorAccountsSection() {
   const { t } = useTranslation();
   const refreshProviders = useAppStore((s) => s.refreshProviders);
@@ -21,7 +19,7 @@ export function VendorAccountsSection() {
 
   const [vendors, setVendors] = useState<OAuthVendor[] | null>(null);
   const [busyVendor, setBusyVendor] = useState<string | null>(null);
-  const [login, setLogin] = useState<ActiveLogin | null>(null);
+  const [login, setLogin] = useState<OAuthVendor | null>(null);
 
   const loadVendors = useCallback(async () => {
     try {
@@ -37,20 +35,6 @@ export function VendorAccountsSection() {
   useEffect(() => {
     void loadVendors();
   }, [loadVendors]);
-
-  const startLogin = async (vendor: OAuthVendor) => {
-    setBusyVendor(vendor.vendorId);
-    try {
-      const started = await api.startOauthLogin(vendor.vendorId);
-      setLogin({ loginId: started.loginId, vendor });
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), {
-        variant: "error",
-      });
-    } finally {
-      setBusyVendor(null);
-    }
-  };
 
   const signOut = async (vendor: OAuthVendor) => {
     setBusyVendor(vendor.vendorId);
@@ -72,7 +56,7 @@ export function VendorAccountsSection() {
 
   const onLoginDone = useCallback(
     (accountLabel?: string) => {
-      const vendorName = login?.vendor.name ?? "";
+      const vendorName = login?.name ?? "";
       setLogin(null);
       void loadVendors();
       void refreshProviders();
@@ -134,7 +118,7 @@ export function VendorAccountsSection() {
                   size="sm"
                   variant="secondary"
                   disabled={busyVendor === vendor.vendorId || login !== null}
-                  onClick={() => void startLogin(vendor)}
+                  onClick={() => setLogin(vendor)}
                 >
                   <span className="vendor-btn-inner">
                     <IconKey size={13} />
@@ -149,8 +133,7 @@ export function VendorAccountsSection() {
 
       {login ? (
         <OAuthLoginDialog
-          loginId={login.loginId}
-          vendor={login.vendor}
+          vendor={login}
           onDone={onLoginDone}
           onClose={() => {
             setLogin(null);
