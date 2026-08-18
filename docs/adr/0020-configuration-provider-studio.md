@@ -13,16 +13,19 @@ The compact settings directory already keeps Providers inside Agent/Configuratio
 
 Settings → Agent/Configuration is presented as a **provider studio**:
 
-1. A summary hero with provider count, ready count, and the current default pair
-2. A Defaults card using segmented mode control + switch for Enter-to-send
-3. A collapsible OpenAI-compatible add-provider composer
-4. Card-based provider management with secret badges, thinking presets, test connection, make default, and delete
+1. A compact Defaults card for the default provider/model pair
+2. A vendor-account section with one row per OAuth account, including edit,
+   test connection, and remove actions
+3. A modal OpenAI-compatible add/edit provider composer
+4. Card-based provider management with secret badges, thinking presets, test
+   connection, make default, and delete
 
 Secrets remain write-only after save. No new settings rail destinations are introduced.
 
 ## Consequences
 
-- Configuration is easier to scan with multiple providers
+- Configuration is easier to scan with multiple providers and accounts
+- The page keeps one visual hierarchy without a separate summary hero
 - Empty and populated states both have clear next actions
 - Specs, e2e, and i18n describe the studio presentation
 - Future vendor presets can land as composer entry points without changing the rail IA

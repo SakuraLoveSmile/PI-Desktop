@@ -30,6 +30,10 @@ const vendorAccountsSource = await readFile(
   new URL("../src/components/settings/VendorAccountsSection.tsx", import.meta.url),
   "utf8",
 );
+const vendorAccountDialogSource = await readFile(
+  new URL("../src/components/settings/VendorAccountDialog.tsx", import.meta.url),
+  "utf8",
+);
 const vendorPickerSource = await readFile(
   new URL("../src/components/settings/VendorPickerDialog.tsx", import.meta.url),
   "utf8",
@@ -135,8 +139,17 @@ test("model configuration keeps model defaults; AI owns app behavior defaults", 
 test("model configuration separates AI services from independently removable vendor accounts", () => {
   assert.match(providersSource, /authKind !== OAUTH_AUTH_KIND/);
   assert.match(providersSource, /p\.hasSecret \|\| p\.hasOauth/);
-  assert.match(providersSource, /provider-config-hero/);
+  assert.doesNotMatch(providersSource, /provider-config-hero/);
+  assert.doesNotMatch(providersSource, /settings-section-subtitle/);
   assert.match(vendorAccountsSource, /api\.deleteOauthAccount\(account\.providerId\)/);
+  assert.match(vendorAccountsSource, /api\.updateProvider\(/);
+  assert.match(vendorAccountsSource, /oauthAccountLabel: form\.name\.trim\(\)/);
+  assert.match(vendorAccountsSource, /defaultModelId: form\.modelId\.trim\(\)/);
+  assert.match(vendorAccountsSource, /api\.testProvider\(provider\.id\)/);
+  assert.match(vendorAccountsSource, /VendorAccountDialog/);
+  assert.doesNotMatch(vendorAccountsSource, /settings-section-subtitle/);
+  assert.match(vendorAccountDialogSource, /defaultModel/);
+  assert.match(vendorAccountDialogSource, /useProviderModels/);
   assert.match(vendorAccountsSource, /providerIsReady/);
   assert.match(vendorAccountsSource, /defaultProviderId: next\?\.id \?\? ""/);
   assert.match(vendorAccountsSource, /useAppStore\.setState\(\{ settings: nextSettings \}\)/);

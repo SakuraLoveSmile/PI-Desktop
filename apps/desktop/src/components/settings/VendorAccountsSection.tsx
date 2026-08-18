@@ -14,8 +14,12 @@ import {
   type OAuthLoginSession,
 } from "../../lib/oauth-login-session";
 import { Badge, Button, cx } from "../ui";
-import { IconKey, IconTrash } from "../icons";
+import { IconKey, IconPencil, IconPlug, IconTrash } from "../icons";
 import { OAuthLoginDialog } from "./OAuthLoginDialog";
+import {
+  VendorAccountDialog,
+  type VendorAccountForm,
+} from "./VendorAccountDialog";
 import { VendorPickerDialog } from "./VendorPickerDialog";
 
 /** A login in flight, together with the dialog reporting on it. */
@@ -49,6 +53,9 @@ export function VendorAccountsSection() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [login, setLogin] = useState<ActiveLogin | null>(null);
+  const [editingAccount, setEditingAccount] = useState<AccountEntry | null>(null);
+  const [savingAccount, setSavingAccount] = useState(false);
+  const [testingAccount, setTestingAccount] = useState<string | null>(null);
 
   const loadVendors = useCallback(async () => {
     try {
@@ -117,6 +124,67 @@ export function VendorAccountsSection() {
     }
   };
 
+  const saveAccount = async (form: VendorAccountForm) => {
+    const entry = editingAccount;
+    const provider = entry
+      ? providers.find((candidate) => candidate.id === entry.account.providerId)
+      : null;
+    if (!entry || !provider || !form.name.trim() || !form.modelId.trim()) return;
+    setSavingAccount(true);
+    try {
+      await api.updateProvider({
+        id: provider.id,
+        oauthAccountLabel: form.name.trim(),
+        defaultModelId: form.modelId.trim(),
+      });
+      if (settings?.defaultProviderId === provider.id) {
+        await api.setSettings({
+          ...settings,
+          defaultModelId: form.modelId.trim(),
+        });
+      }
+      await Promise.all([loadVendors(), refreshProviders()]);
+      setEditingAccount(null);
+      showToast(t("settings.vendorAccountUpdated"), { variant: "success" });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), {
+        variant: "error",
+      });
+    } finally {
+      setSavingAccount(false);
+    }
+  };
+
+  const testAccount = async (entry: AccountEntry) => {
+    const provider = providers.find((candidate) => candidate.id === entry.account.providerId);
+    if (!provider) return;
+    setTestingAccount(provider.id);
+    try {
+      const result = (await api.testProvider(provider.id)) as {
+        ok?: boolean;
+        message?: string;
+        status?: number;
+      };
+      if (result.ok) {
+        showToast(t("settings.testOk"), { variant: "success" });
+      } else {
+        showToast(
+          result.message ||
+            (result.status
+              ? t("settings.testFailedStatus", { status: result.status })
+              : t("settings.testFailed")),
+          { variant: "error" },
+        );
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), {
+        variant: "error",
+      });
+    } finally {
+      setTestingAccount(null);
+    }
+  };
+
   const onLoginDone = useCallback(
     (accountLabel?: string) => {
       const vendorName = login?.vendor.name ?? "";
@@ -136,6 +204,10 @@ export function VendorAccountsSection() {
   // Nothing to offer until the runtime reports at least one OAuth vendor.
   if (!vendors || vendors.length === 0) return null;
 
+  const editingProvider = editingAccount
+    ? providers.find((candidate) => candidate.id === editingAccount.account.providerId) ?? null
+    : null;
+
   return (
     <section className="settings-card-block vendor-accounts-block">
       <div className="provider-section-head">
@@ -146,7 +218,6 @@ export function VendorAccountsSection() {
               <span className="provider-section-count">{accounts.length}</span>
             ) : null}
           </div>
-          <div className="settings-section-subtitle">{t("settings.vendorAccountsDesc")}</div>
         </div>
         <Button
           variant="secondary"
@@ -167,14 +238,20 @@ export function VendorAccountsSection() {
           <div className="vendor-card-list">
             {accounts.map((entry) => {
               const { vendor, account } = entry;
+              const provider = providers.find((candidate) => candidate.id === account.providerId);
               const connected = account.connected;
-              const accountName = account.accountLabel || t("settings.vendorSignedInGeneric");
+              const accountName =
+                account.accountLabel ||
+                provider?.oauthAccountLabel ||
+                t("settings.vendorSignedInGeneric");
               const duplicateLabel =
                 entry.totalForVendor > 1
                   ? ` · ${t("settings.vendorAccountNumber", { number: entry.ordinal })}`
                   : "";
               const confirming = confirmDeleteId === account.providerId;
               const busy = busyAccount === account.providerId;
+              const testing = testingAccount === account.providerId;
+              const rowBusy = busy || testing;
               return (
                 <div
                   key={account.providerId}
@@ -195,6 +272,14 @@ export function VendorAccountsSection() {
                     <div className="vendor-card-meta">
                       {accountName}
                       {duplicateLabel}
+                      {provider?.defaultModelId ? (
+                        <>
+                          <span className="provider-meta-dot" aria-hidden>
+                            ·
+                          </span>
+                          <span className="font-mono">{provider.defaultModelId}</span>
+                        </>
+                      ) : null}
                     </div>
                     {!connected ? (
                       <div className="vendor-card-status">
@@ -202,28 +287,53 @@ export function VendorAccountsSection() {
                       </div>
                     ) : null}
                   </div>
-                  {confirming ? (
+                  <div className="provider-row-actions">
                     <button
                       type="button"
-                      className="provider-delete-confirm"
-                      disabled={busy}
-                      onBlur={() => setConfirmDeleteId(null)}
-                      onClick={() => void removeAccount(entry)}
+                      className="icon-btn provider-icon-btn"
+                      title={t("settings.editVendorAccount")}
+                      aria-label={t("settings.editVendorAccount")}
+                      disabled={rowBusy || !provider}
+                      onClick={() => setEditingAccount(entry)}
                     >
-                      {t("settings.deleteConfirm")}
+                      <IconPencil size={14} />
                     </button>
-                  ) : (
                     <button
                       type="button"
-                      className="icon-btn provider-icon-btn provider-icon-btn-danger"
-                      title={t("settings.vendorRemoveAccount")}
-                      aria-label={t("settings.vendorRemoveAccount")}
-                      disabled={busy}
-                      onClick={() => setConfirmDeleteId(account.providerId)}
+                      className={cx(
+                        "icon-btn provider-icon-btn",
+                        testing && "is-testing",
+                      )}
+                      title={t("settings.testConnection")}
+                      aria-label={t("settings.testConnection")}
+                      disabled={rowBusy || !provider}
+                      onClick={() => void testAccount(entry)}
                     >
-                      <IconTrash size={14} />
+                      <IconPlug size={14} />
                     </button>
-                  )}
+                    {confirming ? (
+                      <button
+                        type="button"
+                        className="provider-delete-confirm"
+                        disabled={rowBusy}
+                        onBlur={() => setConfirmDeleteId(null)}
+                        onClick={() => void removeAccount(entry)}
+                      >
+                        {t("settings.deleteConfirm")}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="icon-btn provider-icon-btn provider-icon-btn-danger"
+                        title={t("settings.vendorRemoveAccount")}
+                        aria-label={t("settings.vendorRemoveAccount")}
+                        disabled={rowBusy}
+                        onClick={() => setConfirmDeleteId(account.providerId)}
+                      >
+                        <IconTrash size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -244,6 +354,20 @@ export function VendorAccountsSection() {
             });
           }}
           onClose={() => setPicking(false)}
+        />
+      ) : null}
+
+      {editingAccount && editingProvider ? (
+        <VendorAccountDialog
+          provider={editingProvider}
+          initialName={
+            editingAccount.account.accountLabel ||
+            editingProvider.oauthAccountLabel ||
+            editingProvider.name
+          }
+          saving={savingAccount}
+          onClose={() => setEditingAccount(null)}
+          onSave={(form) => void saveAccount(form)}
         />
       ) : null}
 

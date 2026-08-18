@@ -306,6 +306,7 @@ type ModelDescriptor = {
 - edit base URL/headers
 - set/replace/delete key
 - sign in to / out of a vendor account, and see which account a row uses
+- edit a vendor account's non-secret label and default model
 - enable/disable provider
 - test connection
 - do not expose reasoning, thinking-level, context-window, output-limit,

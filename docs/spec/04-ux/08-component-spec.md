@@ -2161,21 +2161,27 @@ groups, select candidates, and start an explicit import.
 ### 19.1 Purpose
 Modern model-configuration surface for adding OpenAI-compatible providers,
 reviewing readiness, and managing connection/default behavior without a dense
-form dump. Model parameters remain owned by pi-ai.
+form dump. Vendor-account identity and default-model editing live in the same
+surface, while model parameters remain owned by pi-ai.
 
 ### 19.2 Anatomy
-1. **Hero summary** — kicker, title, short description, stats for provider count / ready count / default pair
-2. **Defaults card** — default provider/model selector; global operating mode,
+1. **Defaults card** — default provider/model selector; global operating mode,
    command shell, and Enter-to-send live in the Settings AI destination
-3. **Providers head** — section title + primary Add provider toggle
-4. **Composer** — dialog with connection fields (name, base URL, model id, API style, API key); no reasoning, thinking-level, context, output, temperature, or compatibility controls
+2. **Vendor accounts** — one row per OAuth account, including duplicate vendors,
+   with account label, default model, Edit, Test connection, and Remove actions
+3. **Providers head** — section title + primary Add provider action
+4. **Dialogs** — vendor-account edit dialog with name/default model, plus the
+   provider dialog with connection fields (name, base URL, model id, API style,
+   API key); no reasoning, thinking-level, context, output, temperature, or
+   compatibility controls
 5. **Provider cards** — avatar initials, badges (default / secret state), host + model, Test / Make default / Delete
 
 ### 19.3 States
 | State | Presentation |
 |---|---|
-| Empty | Hero shows zeros / No default; composer open; empty panel with primary add CTA |
-| Populated | Cards list every provider; add flow opens a modal dialog |
+| Empty | Defaults shows No default; empty panels expose their primary add actions |
+| Populated | Accounts and AI services list their rows; add/edit flows open modal dialogs |
+| Account editor | Name and default model are editable; model suggestions come from the authenticated account catalog when available |
 | Default provider | Card gets subtle accent wash + default badge; Make default hidden |
 | Secret missing | Warning badge "No API key"; test may fail closed |
 | Busy row | Test/update/delete actions disabled for that card |
@@ -2184,6 +2190,8 @@ form dump. Model parameters remain owned by pi-ai.
 - Add provider opens a modal dialog; Cancel/close resets fields and dismisses the dialog
 - Save creates the provider, stores the secret, sets it as default when successful, and refreshes the list
 - Test connection calls `providers.testConnection` and toasts success/failure
+- Edit account saves `oauthAccountLabel` and `defaultModelId` through `providers.update`; when the account is the global default, its model selection updates with it
+- Test connection on an account resolves that account's OAuth authorization and toasts success/failure
 - Thinking preset updates persist through `providers.update` with D102 semantics
 - Make default updates `defaultProviderId` / `defaultModelId` only
 
@@ -2191,10 +2199,10 @@ form dump. Model parameters remain owned by pi-ai.
 - Segmented controls expose `aria-pressed`
 - Enter-to-send uses `role="switch"` + `aria-checked`
 - Card actions keep visible text labels; thinking select has an accessible name
-- Empty and hero regions expose localized labels
+- Empty regions and account actions expose localized labels
 
 ### 19.6 MVP constraints
-- OpenAI-compatible path only in the composer (vendor marketplace deferred)
+- OpenAI-compatible path only in the provider composer (vendor marketplace deferred)
 - No raw secret redisplay after save
 - No catalog browser yet; custom model id remains first-class
 
@@ -2318,7 +2326,7 @@ Sidebar footer                                        Popover (360px max)
 13. Toasts stack top-center with variant icon + dismiss, auto-dismiss 4s/8s, pause on hover, and announce via `role="status"`/`role="alert"` per §17
 14. Session import defaults to source grouping, offers project-path grouping, collapses all groups after scan/group changes, and exposes accessible group disclosure state per §18
 15. Imported project paths materialize exactly once in the durable Projects index; path-less imports remain Temporary sessions and no filesystem directory is created
-16. ProviderStudio shows hero summary + add dialog + provider cards; secrets never render raw; test/default/delete remain keyboard reachable
+16. ProviderStudio shows compact defaults, vendor-account rows with edit/test/delete actions, add/edit dialogs, and AI service cards; secrets never render raw; every action remains keyboard reachable
 17. NotificationInbox exposes All/Unread views, exact unread badge semantics,
     row activation, mark-all-read and clear actions; it is keyboard-operable
     and never treats a visible-current or aborted turn as a notification

@@ -181,7 +181,7 @@ Each scenario is documented in this format:
 
 - **Preconditions**: App running; no provider configured.
 - **Steps**: 1) Open Settings → Agent. 2) Open the add-provider dialog. 3) Enter name, base URL, model id, and API key. 4) Save.
-- **Expected**: Provider appears as a card with secret badge; key stored securely (not in plaintext config); hero summary counts update.
+- **Expected**: Provider appears as an AI service row with secret badge; key stored securely (not in plaintext config); the default selector can use the saved model.
 - **Specs linked**: `03-runtime/12-provider-config-schema.md`, `03-runtime/14-secrets-storage.md`
 - **Acceptance**: B (add provider, save key)
 - **Milestone**: M2
@@ -4078,14 +4078,17 @@ Each scenario is documented in this format:
   with existing accounts. 2) Pick Anthropic and complete the browser login;
   confirm one connected account row and one OAuth provider row appear. 3) Use
   Add account again, pick Anthropic again, and complete a second login with a
-  different account; confirm two account rows and two provider ids. 4) Resolve
+  different account; confirm two account rows and two provider ids. 4) Edit
+  the first account, change its display name and default model, save, and
+  confirm the row and Defaults selector reflect both values. Press Test
+  connection and confirm the result resolves the edited account. 5) Resolve
   and use each account separately, including model discovery and one streamed
-  turn per account. 5) Start the device-code login on a second vendor, then
+  turn per account. 6) Start the device-code login on a second vendor, then
   press Cancel while the dialog is polling; confirm no row or credential is
-  left. 6) Remove the first Anthropic account, then confirm its provider row
+  left. 7) Remove the first Anthropic account, then confirm its provider row
   and OAuth secret are gone while the second Anthropic account remains usable.
-  7) If the removed account was default, confirm Defaults points to another
-  ready provider or shows no default. 8) Grep sidecar and renderer logs for
+  8) If the removed account was default, confirm Defaults points to another
+  ready provider or shows no default. 9) Grep sidecar and renderer logs for
   token material.
 - **Expected**: Each successful login creates a distinct row with
   `authKind: "oauth"`, `hasSecret` and `hasOauth` both true, a non-secret
@@ -4094,7 +4097,9 @@ Each scenario is documented in this format:
   `secret:provider:<providerId>:oauth` ref and row-scoped pi-ai collection;
   resolving one account never returns the other account's token. The model list
   is the authenticated catalog (a Copilot account lists only what its
-  subscription includes), not a `/models` probe. Both turns run without a
+  subscription includes), not a `/models` probe. The account editor updates
+  only non-secret label/model fields, and Test connection resolves that exact
+  account. Both turns run without a
   pasted key and reuse the same warm runtime — the launch payload carries
   `apiKey: ""` and each request resolves auth through `provider.resolveAuth`,
   which Electron main answers locally and refuses with `PROVIDER_NOT_BOUND` for
@@ -4483,8 +4488,9 @@ This test plan spec is accepted when:
   File-open target, language
   override, menu-bar behavior, and bottom-panel behavior are absent until
   host-backed implementations exist.
-- Model configuration contains the provider studio hero, default model selector,
-  and card-based Providers management with an add-provider dialog.
+- Model configuration contains the default model selector, separate vendor
+  account management with add/edit dialogs, and card-based AI service management
+  with an add-provider dialog.
 - Plugin load/enable/disable/uninstall remains available from the app shell's
   independent Extensions destination; its Marketplace tab also owns the
   official/mirror/custom catalog source picker, so Settings has no duplicate

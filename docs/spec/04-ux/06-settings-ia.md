@@ -103,8 +103,6 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     while the focused frameless window retains an `Alt + Space` fallback
 
 ### Model configuration (`agent` tab)
-- **Studio hero**: a concise model-configuration introduction with counts for API
-  services and connected vendor accounts
 - **Defaults** card: the default provider/model selector. Global operating mode,
   command shell, and Enter-to-send are owned by the AI destination.
 - **Vendor accounts** card (D237/D240), between Defaults and Providers:
@@ -115,8 +113,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     existing accounts do not remove or disable that vendor from the picker, so
     the same vendor can be added again for a different account
   - an account row shows the vendor name, a Subscription badge where the access
-    is plan-backed, a Connected or Needs sign-in badge, and the account label.
-    Duplicate accounts receive a stable account number in the row
+    is plan-backed, a Connected or Needs sign-in badge, the account label, and
+    its default model. Duplicate accounts receive a stable account number in
+    the row
   - picking a vendor opens a single dialog that renders whatever the flow asks
     for — an opened browser with a copyable link, a device code, a choice, or a
     text field — with a cancel action that aborts the local callback server or
@@ -124,6 +123,11 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - Remove account is a destructive, two-step action. It deletes that account's
     OAuth credential and provider row, clears or repairs the global default when
     needed, and leaves other accounts from the same vendor untouched
+  - Edit account opens a compact dialog for the account name and default model;
+    saving updates the OAuth provider row and keeps the global default model in
+    sync when that account is selected
+  - Test connection resolves the account's OAuth authorization and reports a
+    transient success or failure without probing the provider with an API key
 - **Providers** studio:
   - OpenAI-compatible and custom-service add-provider dialog (opened from Add
     provider / empty-state CTA)
@@ -237,8 +241,8 @@ contract modes are intent boundaries, not strict read-only security profiles.
    destination shows the Keyboard shortcuts card; Info shows the Developer card.
    No additional settings destinations are rendered
 7. Provider secrets never display raw key values
-8. Model configuration shows the provider studio (hero + defaults + separate
-   vendor accounts + add dialog + service cards) rather than a dense always-on
+8. Model configuration shows compact Defaults, separate vendor accounts, the
+   account edit/add dialogs, and AI service cards rather than a dense always-on
    form dump
 9. Row descriptions use semantic secondary text and maintain at least 4.5:1
    contrast against their card surface in both light and dark themes

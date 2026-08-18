@@ -5,7 +5,6 @@ import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import { Badge, Button, cx } from "../ui";
 import {
-  IconBot,
   IconPencil,
   IconPlug,
   IconPlus,
@@ -80,9 +79,6 @@ export function ProvidersSection() {
     !!p.defaultModelId &&
     (p.hasSecret || p.hasOauth || p.authKind === "none");
   const aiProviders = providers.filter((p) => p.authKind !== OAUTH_AUTH_KIND);
-  const connectedAccounts = providers.filter(
-    (p) => p.authKind === OAUTH_AUTH_KIND && p.hasOauth,
-  ).length;
   const providerDisplayName = (provider: ProviderPublic) => {
     if (provider.authKind !== OAUTH_AUTH_KIND) return provider.name;
     const sameVendor = providers.filter(
@@ -257,35 +253,9 @@ export function ProvidersSection() {
 
   return (
     <div className="settings-stack">
-      <section className="provider-config-hero">
-        <div className="provider-config-hero-copy">
-          <div className="provider-config-eyebrow">
-            <span className="provider-config-eyebrow-icon" aria-hidden>
-              <IconBot size={14} />
-            </span>
-            <span>{t("settings.modelConfigEyebrow")}</span>
-          </div>
-          <h2 className="provider-config-title">{t("settings.modelConfigTitle")}</h2>
-          <p className="provider-config-desc">{t("settings.modelConfigDesc")}</p>
-        </div>
-        <div className="provider-config-stats" aria-label={t("settings.modelConfigSummary")}>
-          <div className="provider-config-stat">
-            <strong>{aiProviders.length}</strong>
-            <span>{t("settings.modelConfigServiceCount")}</span>
-          </div>
-          <div className="provider-config-stat">
-            <strong>{connectedAccounts}</strong>
-            <span>{t("settings.modelConfigAccountCount")}</span>
-          </div>
-        </div>
-      </section>
-
       <section className="settings-card-block">
         <div className="provider-section-head">
-          <div>
-            <h3 className="settings-card-heading">{t("settings.defaultsTitle")}</h3>
-            <div className="settings-section-subtitle">{t("settings.defaultModelDesc")}</div>
-          </div>
+          <h3 className="settings-card-heading">{t("settings.defaultsTitle")}</h3>
         </div>
         <div className="settings-panel">
           <SettingsRow
@@ -322,12 +292,7 @@ export function ProvidersSection() {
 
       <section className="settings-card-block">
         <div className="provider-section-head">
-          <div>
-            <h3 className="settings-card-heading">{t("settings.providers")}</h3>
-            <div className="settings-section-subtitle">
-              {t("settings.providersDesc")}
-            </div>
-          </div>
+          <h3 className="settings-card-heading">{t("settings.providers")}</h3>
           <Button variant="primary" onClick={openAdd}>
             <span className="provider-add-btn-inner">
               <IconPlus size={14} />
