@@ -59,6 +59,7 @@ This log freezes previously open questions into concrete decisions.
 | D238 | Flat Settings directory and marketplace context ownership | **Settings renders one flat searchable directory in the exact order Basics / AI / Shortcuts / Instructions / Model configuration / Import / Project archive / Info. Personal, Integrations, Coding, and other group headings are removed. The Settings Extensions destination is removed; its official/mirror/custom marketplace source selector moves into Extensions → Marketplace beside the catalog and retains the same persisted settings and refresh behavior. No IPC, host protocol, storage, provider, permission, or project ownership contract changes.** | The nine-entry Settings rail repeated its own navigation hierarchy and used the same Extensions label as the app-shell plugin destination. Putting marketplace source selection beside marketplace browsing removes the duplicate entry while preserving the mirror/custom-source workflow (ADR 0096). |
 
 | D239 | Place global defaults under AI | **The eight-destination Settings directory remains unchanged. Basics owns Appearance and platform-supported close behavior. 全局 AI / AI owns Permissions and the Defaults card containing default operating mode (Agent / Plan / Goal), command shell selection/fallback status, and Enter-to-send. Model configuration retains the default provider/model selector. Only renderer content and Settings search ownership move; persisted settings, host APIs, runtime semantics, and deep-link contracts remain unchanged (ADR 0097).** | Default mode, command shell, and Enter-to-send change global agent behavior, so placing them beside appearance mixed unrelated concerns and made the AI destination incomplete. |
+| D240 | Independent vendor OAuth accounts and settings ownership | **Amend D237 / ADR 0095: every OAuth login creates a fresh provider row and row-scoped `CredentialStore`, even when `vendorKey` matches an existing account. The Vendor accounts card owns the full OAuth row lifecycle and deletes through `providers.delete`; the AI services list excludes OAuth rows but the default selector may still choose them. Vendor auth bindings and resolution use the exact `providerId`; ambiguous vendor/name aliases for subagents fail closed.** | One vendor-global row made a second account overwrite or reuse the first credential, while sign-out left a stale AI-service row. The row id is the only unambiguous account identity and lets deletion remove exactly one credential and configuration. See ADR 0098. |
 
 ## D. Codex visual parity decisions (0.3.5+)
 
@@ -1970,3 +1971,18 @@ D193, and D194.
 - Decision D237 extends D028/D031 and touches host-core secrets and providers,
   Electron main, the agent runtime's provider binding, and the settings UI.
   See ADR 0095 and `03-runtime/14-secrets-storage.md`.
+
+## 2026-08-18 — Independent vendor OAuth accounts
+
+- D240 amends D237 / ADR 0095. The provider row id is the OAuth account
+  identity, and every login creates a new row even when `vendorKey` is the same
+  as an existing account. Each row owns its own pi-ai collection, credential
+  store, refresh serialization chain, and `secret:provider:<id>:oauth` ref.
+- Settings now has one owner per concept: Vendor accounts renders and removes
+  OAuth rows; AI services renders API-key/custom rows only. A connected OAuth
+  row remains selectable in the default model control, while removing it clears
+  or repairs a default that points at the deleted id.
+- The sidecar binds a set of exact OAuth provider ids and main resolves auth by
+  that id. Subagent vendor/name aliases are accepted only when unique, so a
+  duplicate vendor account cannot be selected accidentally. See ADR 0098,
+  `03-runtime/11-provider-model-system.md`, and E2E-151.

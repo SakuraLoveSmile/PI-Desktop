@@ -223,16 +223,21 @@ reasoning capability.
 
 A provider row can be authenticated by a vendor subscription — Claude Pro/Max,
 ChatGPT Plus/Pro, Copilot and the rest of pi-ai's OAuth vendors — instead of a
-pasted key (ADR 0095, D237). The offered vendors are derived from
+pasted key (ADR 0095, D237, D240). The offered vendors are derived from
 `models.getProviders().filter(p => p.auth.oauth)`, so the list follows the pin
 rather than a hardcoded table, and `registerBunOAuthFlows()` runs once at
 startup because pi-ai loads flows through a dynamic import electron-vite
 cannot bundle.
 
 Electron main owns the login conversation and the credential; the renderer sees
-only events and a non-secret account label. Signing in upserts one row per
-`vendorKey` with `authKind: "oauth"`, then fills `baseUrl`, `apiStyle` and
-`defaultModelId` from the account's own catalog.
+only events and a non-secret account label. Every login creates a fresh provider
+row with `authKind: "oauth"`; the row id is the account identity even when
+several rows share the same `vendorKey`. Electron main creates one pi-ai model
+collection and one `CredentialStore` scope per row, mapping the vendor id to
+`secret:provider:<rowId>:oauth`. It then fills `baseUrl`, `apiStyle` and
+`defaultModelId` from that account's own catalog. A vendor catalog response
+contains every local row as an account, including disconnected/orphaned rows so
+the user can remove them explicitly.
 
 Request auth is resolved **per request**, not at launch:
 
@@ -242,7 +247,7 @@ sidecar request
   → host-proxy `provider.resolveAuth` { sessionId, providerId }
   → Electron main (answered locally, never forwarded to host-core)
       · binding table check → PROVIDER_NOT_BOUND on a mismatch
-      · pi-ai `models.getAuth(providerId)` → refresh under lock only if expired
+      · row-scoped pi-ai `models.getAuth(vendorKey)` → refresh under that row's lock only if expired
   → short-lived ModelAuth { apiKey?, headers?, baseUrl? }
 ```
 
@@ -258,6 +263,9 @@ Model discovery for such a row reads the authenticated catalog
 than probing `/models`, and the connection test proves the account by resolving
 auth. A vendor may span wire APIs — Copilot serves Anthropic, Chat Completions
 and Responses models — so the row's `apiStyle` follows the selected model.
+Deleting a row calls the normal host `providers.delete` path, which removes its
+OAuth secret and metadata; it never logs out or deletes another row with the
+same vendor key.
 
 ## 9. Model catalog service
 
@@ -418,8 +426,11 @@ This is the **universal escape hatch** guaranteeing market coverage beyond nativ
 
 ## 17. Multi-provider product rules
 
-1. Multiple providers of same vendorKey are allowed (e.g. two OpenRouter accounts).
-2. Provider `name` is user-editable and unique per workspace/user profile.
+1. Multiple providers of the same `vendorKey` are allowed and independent (for
+   example, two OpenRouter accounts); each row has its own OAuth secret scope.
+2. Provider `name` is user-editable and unique for API/custom services. OAuth
+   rows may share the vendor display name; their stable identity is `providerId`
+   and their non-secret account label is presentation metadata.
 3. Default app model is a `(providerId, modelId)` pair, not modelId alone.
 4. Session stores its own `(providerId, modelId)` binding.
 5. Deleting a provider blocks new turns that reference it; historical sessions keep the ids for audit/display.
@@ -447,8 +458,9 @@ This is the **universal escape hatch** guaranteeing market coverage beyond nativ
 - [ ] Free-form model id accepted when catalog misses it
 - [ ] Catalog refresh populates models for at least one native and one compatible provider, without destroying existing providers
 - [ ] Connection test returns structured success/failure without secret leakage
-- [ ] A vendor account can be signed into from Settings, used for a turn, and
-      signed out of; the sidecar never receives its refresh token
+- [ ] Two accounts from the same vendor can be signed into from Settings, used
+      independently for turns, and removed one at a time; the sidecar never
+      receives either refresh token
 - [ ] Session can switch model between turns
 - [ ] Reasoning-capable models expose only supported thinking levels and the
       selected level reaches pi; unsupported providers resolve to `off`

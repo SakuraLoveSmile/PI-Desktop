@@ -97,36 +97,40 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     while the focused frameless window retains an `Alt + Space` fallback
 
 ### Model configuration (`agent` tab)
-- **Studio hero**: provider count, ready count, and current default provider/model summary
+- **Studio hero**: a concise model-configuration introduction with counts for API
+  services and connected vendor accounts
 - **Defaults** card: the default provider/model selector. Global operating mode,
   command shell, and Enter-to-send are owned by the AI destination.
-- **Vendor accounts** card (D237), between Defaults and Providers:
-  - the card lists accounts, not vendors: one row per vendor already signed in,
-    and an explanatory line in place of the list while there are none. The
-    whole section is hidden when the runtime catalog offers no OAuth vendor
-  - an Add account action in the card header opens a picker of the vendors not
-    yet signed in — the same shape as Add provider, so a build that knows seven
-    vendors does not spend seven rows saying nobody is signed in. The action is
-    disabled once every known vendor has an account
+- **Vendor accounts** card (D237/D240), between Defaults and Providers:
+  - the card lists accounts, not vendors: one row per local OAuth provider row,
+    including multiple rows for the same vendor. The whole section is hidden
+    when the runtime catalog offers no OAuth vendor
+  - an Add account action in the card header opens every OAuth-capable vendor;
+    existing accounts do not remove or disable that vendor from the picker, so
+    the same vendor can be added again for a different account
   - an account row shows the vendor name, a Subscription badge where the access
-    is plan-backed, a Connected badge, and the account label
+    is plan-backed, a Connected or Needs sign-in badge, and the account label.
+    Duplicate accounts receive a stable account number in the row
   - picking a vendor opens a single dialog that renders whatever the flow asks
     for — an opened browser with a copyable link, a device code, a choice, or a
     text field — with a cancel action that aborts the local callback server or
     the polling loop
-  - Sign out removes the credential and its readiness; the row leaves the list
-    and the vendor returns to the picker
+  - Remove account is a destructive, two-step action. It deletes that account's
+    OAuth credential and provider row, clears or repairs the global default when
+    needed, and leaves other accounts from the same vendor untouched
 - **Providers** studio:
-  - OpenAI-compatible add-provider dialog (opened from Add provider / empty-state CTA)
-  - provider cards with avatar initials, host, default model, secret status,
+  - OpenAI-compatible and custom-service add-provider dialog (opened from Add
+    provider / empty-state CTA)
+  - provider cards with host, default model, secret status,
     and test / make-default / delete actions
   - the add/edit dialog configures connection identity only (name, endpoint,
     API style, model id, and secret); model parameters come from pi-ai and are
     not editable here
   - empty state with primary add action
   - API keys are never shown raw after save
-  - a signed-in vendor row carries an account badge, and its edit dialog
-    replaces the API key field with that badge — there is nothing to paste
+  - vendor-account rows are not rendered in the AI services list; a connected
+    vendor account can still be selected in Defaults and is managed only in the
+    Vendor accounts card
 
 The permission-mode selector remains available in the composer while the
 session is in Agent, Plan, or Goal. In Plan and Goal it controls Bash
@@ -227,7 +231,9 @@ contract modes are intent boundaries, not strict read-only security profiles.
    destination shows the Keyboard shortcuts card; Info shows the Developer card.
    No additional settings destinations are rendered
 7. Provider secrets never display raw key values
-8. Model configuration shows the provider studio (hero + defaults + add dialog + cards) rather than a dense always-on form dump
+8. Model configuration shows the provider studio (hero + defaults + separate
+   vendor accounts + add dialog + service cards) rather than a dense always-on
+   form dump
 9. Row descriptions use semantic secondary text and maintain at least 4.5:1
    contrast against their card surface in both light and dark themes
 10. Dragging the empty top band from either side of Settings moves the native

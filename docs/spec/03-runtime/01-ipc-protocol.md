@@ -708,7 +708,7 @@ Forbidden:
 - Writing the full API key into ordinary logs
 - Holding API key plaintext long-term in the renderer
 
-### vendor accounts (OAuth, D237)
+### vendor accounts (OAuth, D237/D240)
 
 Signing in with a vendor subscription is an Electron-main conversation, so it
 uses IPC only — the host protocol version is unchanged. Five invoke channels
@@ -719,7 +719,8 @@ plus one event channel:
 - `pi-desktop/providers/oauth/respond({ loginId, promptId, value? })` — an
   absent `value` cancels that prompt, which aborts the flow
 - `pi-desktop/providers/oauth/cancel({ loginId }) -> { ok: boolean }`
-- `pi-desktop/providers/oauth/logout({ vendorId }) -> { ok: true }`
+- `pi-desktop/providers/oauth/delete({ providerId }) -> { ok: true }` deletes
+  one OAuth account's provider row and its scoped credential
 - `pi-desktop/providers/oauth/event` streams `OAuthLoginEvent`
 
 ```ts

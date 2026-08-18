@@ -1,5 +1,5 @@
 /**
- * One vendor-account login attempt, seen from the renderer (ADR 0096).
+ * One vendor-account login attempt, seen from the renderer (ADR 0098).
  *
  * Two orderings matter here, and getting either wrong costs a real login.
  *

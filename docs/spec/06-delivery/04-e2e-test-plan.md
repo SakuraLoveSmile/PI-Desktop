@@ -4065,41 +4065,49 @@ Each scenario is documented in this format:
 - **Status**: Source-contract and focused integration coverage; full desktop
   journey Draft (do not run E2E locally unless explicitly requested)
 
-#### E2E-151: A vendor account signs in, runs a turn, and signs out
+#### E2E-151: Multiple vendor accounts stay isolated through login, use, and removal
 
 - **Preconditions**: A build with `registerBunOAuthFlows()` running at startup
   and a real subscription for at least one PKCE vendor (Anthropic) and one
   device-code vendor (xAI or GitHub Copilot). No provider row exists yet for
   either vendor.
-- **Steps**: 1) Open Settings -> Model configuration, confirm the vendor
-  accounts card starts empty, and open Add account — the picker lists exactly
-  `models.getProviders().filter(p => p.auth.oauth)` minus anyone signed in.
-  2) Pick Anthropic and start its login, complete the browser consent, and let the local callback
-  finish. 3) Open the model selector, refresh the account's models, pick one,
-  and send a message that streams to completion; send a second message in the
-  same session. 4) Start the device-code login on the second vendor, then press
-  Cancel while the dialog is polling. 5) Repeat step 4 and complete it, then use
-  the row's connection test. 6) Sign out of the Anthropic account, then delete
-  its provider row. 7) Grep the sidecar and renderer logs for token material.
-- **Expected**: Login creates exactly one row per `vendorKey` with
+- **Steps**: 1) Open Settings -> Model configuration, confirm the Vendor
+  accounts card starts empty, and open Add account — the picker lists every
+  `models.getProviders().filter(p => p.auth.oauth)` vendor, including vendors
+  with existing accounts. 2) Pick Anthropic and complete the browser login;
+  confirm one connected account row and one OAuth provider row appear. 3) Use
+  Add account again, pick Anthropic again, and complete a second login with a
+  different account; confirm two account rows and two provider ids. 4) Resolve
+  and use each account separately, including model discovery and one streamed
+  turn per account. 5) Start the device-code login on a second vendor, then
+  press Cancel while the dialog is polling; confirm no row or credential is
+  left. 6) Remove the first Anthropic account, then confirm its provider row
+  and OAuth secret are gone while the second Anthropic account remains usable.
+  7) If the removed account was default, confirm Defaults points to another
+  ready provider or shows no default. 8) Grep sidecar and renderer logs for
+  token material.
+- **Expected**: Each successful login creates a distinct row with
   `authKind: "oauth"`, `hasSecret` and `hasOauth` both true, a non-secret
-  account label, and `baseUrl`/`apiStyle`/`defaultModelId` filled from the
-  account's own catalog. The model list is the authenticated catalog (a Copilot
-  account lists only what its subscription includes), not a `/models` probe.
-  Both turns run without a pasted key and reuse the same warm runtime — the
-  launch payload carries `apiKey: ""` and each request resolves auth through
-  `provider.resolveAuth`, which Electron main answers locally and refuses with
-  `PROVIDER_NOT_BOUND` for an unbound pair. Cancel aborts the local callback
-  server / device-code polling and leaves no row and no credential. The
-  connection test proves the account by resolving auth rather than probing with
-  a key. Sign-out and provider delete clear `secret:provider:<id>:oauth` (and
-  the api_key ref), so a re-created row inherits nothing. No log, event, or IPC
-  payload contains an access token, refresh token, or authorization code.
+  account label, and `baseUrl`/`apiStyle`/`defaultModelId` filled from that
+  account's own catalog. Each row has its own
+  `secret:provider:<providerId>:oauth` ref and row-scoped pi-ai collection;
+  resolving one account never returns the other account's token. The model list
+  is the authenticated catalog (a Copilot account lists only what its
+  subscription includes), not a `/models` probe. Both turns run without a
+  pasted key and reuse the same warm runtime — the launch payload carries
+  `apiKey: ""` and each request resolves auth through `provider.resolveAuth`,
+  which Electron main answers locally and refuses with `PROVIDER_NOT_BOUND` for
+  an unbound provider id. Cancel aborts the local callback server /
+  device-code polling and leaves no row and no credential. The connection test
+  proves the account by resolving auth rather than probing with a key. Remove
+  account delegates to `providers.delete`, clearing both secret refs and
+  metadata for exactly that row. No log, event, or IPC payload contains an
+  access token, refresh token, or authorization code.
 - **Specs linked**: `03-runtime/11-provider-model-system.md` §8a,
   `03-runtime/12-provider-config-schema.md` §3,
   `03-runtime/14-secrets-storage.md` §10,
   `03-runtime/01-ipc-protocol.md` §8, `04-ux/06-settings-ia.md`,
-  `08-meta/decisions-log.md` (D237), ADR 0095
+  `08-meta/decisions-log.md` (D237/D240), ADR 0095, ADR 0098
 - **Acceptance**: B (model config), C (conversation & stream), F (persistence),
   Security, Quality
 - **Milestone**: M6+

@@ -198,13 +198,13 @@ type ToolBudgetHealth = {
 - // never `secrets.get` to renderer logs
 
 A provider row has two independent refs — `secret:provider:<id>:api_key` and
-`secret:provider:<id>:oauth` (D237). The generic methods above serve both, so a
+`secret:provider:<id>:oauth` (D237/D240). The generic methods above serve both, so a
 vendor-account credential needed no new host method. `ProviderPublic` therefore
 reports `hasSecret` (true for **either** credential), `hasOauth`, and the
 non-secret `oauthAccountLabel`; `providers.create` / `providers.update` accept
-`oauthAccountLabel`, and `providers.delete` clears both refs. Login
-orchestration and token refresh stay in Electron main and never reach this
-protocol — see [14-secrets-storage](14-secrets-storage.md) §10.
+`oauthAccountLabel`, and `providers.delete` clears both refs for exactly one
+row. Login orchestration and token refresh stay in Electron main and never
+reach this protocol — see [14-secrets-storage](14-secrets-storage.md) §10.
 
 ### Settings
 - `settings.get`

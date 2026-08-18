@@ -87,7 +87,7 @@ model record instead. Unknown free-form models expose `supportsReasoning=false`
 and `supportedThinkingLevels=["off"]`. The raw secret and internal compatibility
 JSON remain hidden.
 
-`authKind: "oauth"` marks a vendor-account row (ADR 0095, D237): the credential
+`authKind: "oauth"` marks a vendor-account row (ADR 0095, D237, D240): the credential
 is an OAuth grant under `secret:provider:<id>:oauth` rather than a pasted key,
 so the row carries no `secretRef` for it and launches with an empty key. The
 last two apiStyle values are vendor-account wire APIs — `openai_codex_responses`
@@ -98,6 +98,12 @@ vendor: GitHub Copilot serves Anthropic, Chat Completions, and Responses
 models, so the style follows the selected model and is rewritten on each model
 change. `config_json.oauth.accountLabel` holds the non-secret display label for
 the signed-in account.
+Each successful login creates a new row even when another row has the same
+`vendorKey`; the row id scopes the credential and runtime binding. The vendor
+catalog exposes these rows as an `accounts` array with `providerId`, an optional
+non-secret `accountLabel`, and a `connected` flag. The custom-provider dialog
+does not edit or delete OAuth rows; the Vendor accounts card calls
+`providers.delete` for the selected row.
 
 ## 3. Built-in vendor presets
 
@@ -126,8 +132,9 @@ Presets only prefill form defaults; they are not a closed world.
 These rows are created by signing in (Settings -> Model configuration ->
 Vendor accounts), not by the custom-provider dialog. The list is derived at
 runtime from `models.getProviders().filter(p => p.auth.oauth)`, so it tracks
-pi-ai rather than this table; `baseUrl`, `apiStyle`, and `defaultModelId` are
-filled in from the account's own catalog after login.
+pi-ai rather than this table; every login creates a separate row, and
+`baseUrl`, `apiStyle`, and `defaultModelId` are filled in from that account's
+own catalog after login.
 
 | vendorKey | subscription | typical apiStyle | login shape |
 |---|---|---|---|
@@ -220,7 +227,9 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
 - in: `{ id, deleteSecret?: boolean }` default `deleteSecret=true`
 - behavior: clears both credential refs (`:api_key` and `:oauth`) and their
   metadata rows, so a re-created provider can never inherit a stranger's
-  refresh token
+  refresh token. The renderer uses this same operation for removing one OAuth
+  account, so deleting one row cannot remove another account with the same
+  `vendorKey`
 - out: `{ ok: true }`
 
 ### `providers.testConnection`
@@ -261,7 +270,9 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
 
 ## 10. Validation rules
 
-1. `name` unique (case-insensitive) among providers
+1. API/custom `name` unique (case-insensitive) among editable providers;
+   OAuth rows may share a vendor display name because `providerId` is their
+   account identity
 2. `openai_compatible` / local gateways require absolute `baseUrl` unless preset says optional
 3. `authKind=none` forbidden for cloud presets that require keys
 4. headers keys are case-insensitive unique

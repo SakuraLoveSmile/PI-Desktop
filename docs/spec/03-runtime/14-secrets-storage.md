@@ -125,11 +125,14 @@ Replace with:
 
 ## 10. Vendor-account credentials
 
-Electron main owns login, logout, and refresh orchestration (ADR 0095, D237)
+Electron main owns login, account-removal, and refresh orchestration (ADR 0095,
+D237, D240)
 because pi-ai declares it app-owned. `oauth.ts` implements pi-ai's
 `CredentialStore` on top of `secrets.getForRuntime` / `secrets.set` /
 `secrets.delete`, serializing `modify` per provider so pi-ai's locked-refresh
-assumption holds across concurrent turns.
+assumption holds across concurrent turns. Each OAuth provider row gets its own
+collection and store scope; two rows with the same vendor key never share a
+credential or refresh lock.
 
 Request auth flows one way only:
 

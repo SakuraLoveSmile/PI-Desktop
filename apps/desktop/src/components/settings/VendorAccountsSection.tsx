@@ -1,5 +1,5 @@
 /**
- * Sign in with a vendor subscription instead of pasting an API key (ADR 0096).
+ * Sign in with a vendor subscription instead of pasting an API key (ADR 0098).
  * Vendor accounts are separate from API providers in the settings hierarchy;
  * each account row owns exactly one OAuth provider row and can be removed on
  * its own.

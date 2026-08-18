@@ -3,7 +3,7 @@
 - Status: Accepted for implementation
 - Date: 2026-08-18
 - Deciders: PI-Desktop core
-- Related: D237, D028, D031, ADR 0012, ADR 0020, ADR 0027
+- Related: D237, D240, ADR 0098, D028, D031, ADR 0012, ADR 0020, ADR 0027
 
 ## Context
 
@@ -76,10 +76,11 @@ hand it to the sidecar at launch" pattern was not acceptable for it.
    (`models.getAvailable`, which applies the vendor's own `filterModels`, so
    Copilot shows what the subscription actually includes) instead of probing
    `/models` with a key it does not have, and the connection test proves the
-   account by resolving auth. Login upserts one row per vendor key, stores a
-   non-secret account label in the row config, and picks the row's `apiStyle`
-   from the selected model — a vendor may span wire APIs. Two styles are added
-   for this: `openai_codex_responses` and `pi_messages`.
+   account by resolving auth. Login stores a non-secret account label in the row
+   config and picks the row's `apiStyle` from the selected model — a vendor may
+   span wire APIs. The original one-row-per-vendor assumption is amended by
+   ADR 0098: every login now creates an independent row and credential scope.
+   Two styles are added for this: `openai_codex_responses` and `pi_messages`.
 
 ## Consequences
 
@@ -93,7 +94,8 @@ hand it to the sidecar at launch" pattern was not acceptable for it.
   a host or main restart mid-turn fails the request rather than signing it with
   a stale token, which is the intended failure direction.
 - API-key rows are untouched: same storage, same launch payload, same resolve
-  path. The two credential kinds can coexist on one row.
+  path. The two credential kinds remain in the same provider storage domain;
+  each OAuth account owns its own provider row and secret ref (ADR 0098).
 
 ## Alternatives
 
