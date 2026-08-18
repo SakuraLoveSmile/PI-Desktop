@@ -482,8 +482,9 @@ Each scenario is documented in this format:
 - **Expected**: The menu lists enabled runnable providers with a default model
   and opens downward (anchored to the top bar); selecting updates the active
   session model; Settings opens from the command palette/menu. The model trigger
-  ellipsizes long IDs. Hovering a long model option exposes its complete display
-  name and model ID in the option tooltip without changing the menu layout.
+  ellipsizes long IDs. Each option shows one display name only, and hovering a
+  long option exposes its complete display name in the tooltip without changing
+  the menu layout or adding a visible model ID.
 - **Specs linked**: `04-ux/08-component-spec.md` (§2, model dropdown),
   `03-runtime/13-model-catalog-and-selection.md`
 - **Acceptance**: C
@@ -4084,7 +4085,8 @@ Each scenario is documented in this format:
   different account; confirm two account rows and two provider ids. 4) Edit
   the first account, change its display name and default model, save, and
   confirm the row shows the account label once while the Defaults selector
-  reflects the edited model. Press Test
+  reflects the edited model and each option shows only one provider name,
+  without an appended account label or model ID. Press Test
   connection and confirm the result resolves the edited account. 5) Resolve
   and use each account separately, including model discovery and one streamed
   turn per account. 6) Start the device-code login on a second vendor, then

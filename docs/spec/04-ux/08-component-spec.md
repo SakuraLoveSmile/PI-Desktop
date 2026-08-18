@@ -1871,9 +1871,11 @@ Dropdown in Topbar showing current provider/model pair. Allows switching models 
   background refresh updates the list without clearing it first
 - Select: switches model for current session
 - Keyboard: up/down arrow in dropdown, Enter to select, Escape to close
-- Long option labels may ellipsize inside the compact menu; each option keeps
-  its complete display name and model ID in the native hover tooltip so the
-  full value is available without resizing or reflowing the menu.
+- Long option labels may ellipsize inside the compact menu; each option renders
+  one display name only, falling back to the model ID when no display name is
+  available. The native hover tooltip exposes that complete display name
+  without resizing or reflowing the menu; the model ID is not rendered as a
+  second visible label.
 
 ### 12.5 Accessibility
 
@@ -2165,8 +2167,10 @@ form dump. Vendor-account identity and default-model editing live in the same
 surface, while model parameters remain owned by pi-ai.
 
 ### 19.2 Anatomy
-1. **Defaults card** — default provider/model selector; global operating mode,
-   command shell, and Enter-to-send live in the Settings AI destination
+1. **Defaults card** — default provider/model selector; each native option
+   shows the provider name only, without an account label or model ID appended;
+   global operating mode, command shell, and Enter-to-send live in the Settings
+   AI destination
 2. **Vendor accounts** — section title + primary Add account action and one
    single-level list panel using the same row surface as AI services; one row
    per OAuth account, including duplicate vendors, with account label, Edit,

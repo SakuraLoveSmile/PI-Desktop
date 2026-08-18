@@ -79,19 +79,6 @@ export function ProvidersSection() {
     !!p.defaultModelId &&
     (p.hasSecret || p.hasOauth || p.authKind === "none");
   const aiProviders = providers.filter((p) => p.authKind !== OAUTH_AUTH_KIND);
-  const providerDisplayName = (provider: ProviderPublic) => {
-    if (provider.authKind !== OAUTH_AUTH_KIND) return provider.name;
-    const sameVendor = providers.filter(
-      (candidate) =>
-        candidate.authKind === OAUTH_AUTH_KIND &&
-        candidate.vendorKey === provider.vendorKey,
-    );
-    const ordinal = sameVendor.indexOf(provider) + 1;
-    const suffix = sameVendor.length > 1 ? ` #${ordinal}` : "";
-    return `${provider.name} · ${
-      provider.oauthAccountLabel || t("settings.vendorSignedInGeneric")
-    }${suffix}`;
-  };
   const setField = <K extends keyof ProviderForm>(key: K, value: ProviderForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -280,7 +267,7 @@ export function ProvidersSection() {
               ) : null}
               {providers.filter(providerReady).map((p) => (
                 <option key={p.id} value={p.id}>
-                  {providerDisplayName(p)} · {p.defaultModelId}
+                  {p.name}
                 </option>
               ))}
             </select>

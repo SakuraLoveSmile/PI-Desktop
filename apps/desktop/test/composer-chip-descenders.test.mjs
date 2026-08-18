@@ -36,12 +36,15 @@ test("model chip label avoids leading-none under truncation", () => {
   );
 });
 
-test("model menu options expose their complete names on hover", () => {
+test("model menu options show one complete display name on hover", () => {
   assert.match(
     modelSelectSource,
-    /const modelOptionTitle = hasAlias\s*\?\s*`\$\{model\.displayName\} · \$\{model\.modelId\}`\s*:\s*model\.modelId;/,
+    /const modelOptionTitle = model\.displayName \|\| model\.modelId;/,
   );
   assert.match(modelSelectSource, /title=\{modelOptionTitle\}/);
+  const optionBlock =
+    modelSelectSource.match(/const modelOptionTitle[\s\S]*?<\/button>/)?.[0] ?? "";
+  assert.doesNotMatch(optionBlock, /max-w-\[170px\]|font-mono text-text-secondary/);
 });
 
 test("composer runtime chips keep compact line-height for descenders", () => {

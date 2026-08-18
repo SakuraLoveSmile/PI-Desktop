@@ -136,6 +136,18 @@ test("model configuration keeps model defaults; AI owns app behavior defaults", 
   assert.doesNotMatch(providersSource, /settings\.modeAgent/);
 });
 
+test("default model selector shows only one provider name per option", () => {
+  const defaultModelOption =
+    providersSource.match(
+      /providers\.filter\(providerReady\)\.map\(\(p\) => \([\s\S]*?<\/option>/,
+  )?.[0] ?? "";
+  assert.match(defaultModelOption, /\{p\.name\}/);
+  assert.doesNotMatch(
+    defaultModelOption,
+    /providerDisplayName|defaultModelId|oauthAccountLabel/,
+  );
+});
+
 test("model configuration separates AI services from independently removable vendor accounts", () => {
   assert.match(providersSource, /authKind !== OAUTH_AUTH_KIND/);
   assert.match(providersSource, /p\.hasSecret \|\| p\.hasOauth/);

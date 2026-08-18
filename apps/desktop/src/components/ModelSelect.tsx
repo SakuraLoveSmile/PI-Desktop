@@ -286,11 +286,7 @@ export function ModelSelect() {
                     const active =
                       provider?.id === group.provider.id &&
                       modelId === model.modelId;
-                    const hasAlias =
-                      !!model.displayName && model.displayName !== model.modelId;
-                    const modelOptionTitle = hasAlias
-                      ? `${model.displayName} · ${model.modelId}`
-                      : model.modelId;
+                    const modelOptionTitle = model.displayName || model.modelId;
                     return (
                       <button
                         key={model.modelId}
@@ -305,20 +301,10 @@ export function ModelSelect() {
                         onClick={() => void selectModel(group.provider, model.modelId)}
                       >
                         <span className="truncate">
-                          {model.displayName || model.modelId}
+                          {modelOptionTitle}
                         </span>
-                        {hasAlias ? (
-                          <span className="ml-auto max-w-[170px] truncate font-mono text-text-secondary">
-                            {model.modelId}
-                          </span>
-                        ) : null}
                         {active ? (
-                          <IconCheck
-                            size={14}
-                            className={
-                              hasAlias ? "composer-model-check" : "composer-model-check ml-auto"
-                            }
-                          />
+                          <IconCheck size={14} className="composer-model-check ml-auto" />
                         ) : null}
                       </button>
                     );
