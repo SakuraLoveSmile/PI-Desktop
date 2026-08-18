@@ -708,7 +708,7 @@ Forbidden:
 - Writing the full API key into ordinary logs
 - Holding API key plaintext long-term in the renderer
 
-### vendor accounts (OAuth, D234)
+### vendor accounts (OAuth, D237)
 
 Signing in with a vendor subscription is an Electron-main conversation, so it
 uses IPC only — the host protocol version is unchanged. Five invoke channels

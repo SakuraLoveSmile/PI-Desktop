@@ -97,7 +97,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - persisted legacy `Chat` default values are displayed and stored as Plan
   - default model id
   - Enter to send as a switch (local preference; not on Codex General gold)
-- **Vendor accounts** card (D234), between Defaults and Providers:
+- **Vendor accounts** card (D237), between Defaults and Providers:
   - one card per vendor whose subscription can be signed into, derived from the
     runtime catalog; the whole section is hidden when that list is empty
   - a card shows the vendor name, a Subscription badge where the access is

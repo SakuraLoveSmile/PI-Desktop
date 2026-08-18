@@ -1,9 +1,9 @@
-# ADR 0092: Sign in with a vendor account instead of pasting an API key
+# ADR 0095: Sign in with a vendor account instead of pasting an API key
 
 - Status: Accepted for implementation
 - Date: 2026-08-18
 - Deciders: PI-Desktop core
-- Related: D234, D028, D031, ADR 0012, ADR 0020, ADR 0027
+- Related: D237, D028, D031, ADR 0012, ADR 0020, ADR 0027
 
 ## Context
 
@@ -124,4 +124,4 @@ hand it to the sidecar at launch" pattern was not acceptable for it.
 - `apps/desktop/electron/main/oauth.ts`, `apps/desktop/electron/main/agent-sidecar.ts`
 - `packages/agent-runtime/src/provider-binding.ts`
 - `crates/host-core/src/secrets.rs`, `crates/host-core/src/providers.rs`
-- Decision D234, D028, D031
+- Decision D237, D028, D031

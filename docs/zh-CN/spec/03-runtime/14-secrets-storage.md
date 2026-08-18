@@ -121,7 +121,7 @@ Renderer 使用接受 create/update 上的可选 `secretValue` 的提供程序�
 
 ## 10. 厂商账户凭据
 
-Electron 主进程拥有登录、退出与刷新编排（ADR 0092、D234），因为 pi-ai 声明这部分归宿主应用。`oauth.ts` 在 `secrets.getForRuntime` / `secrets.set` / `secrets.delete` 之上实现 pi-ai 的 `CredentialStore`，并按提供商串行化 `modify`，使 pi-ai 的带锁刷新假设在并发回合下依然成立。
+Electron 主进程拥有登录、退出与刷新编排（ADR 0095、D237），因为 pi-ai 声明这部分归宿主应用。`oauth.ts` 在 `secrets.getForRuntime` / `secrets.set` / `secrets.delete` 之上实现 pi-ai 的 `CredentialStore`，并按提供商串行化 `modify`，使 pi-ai 的带锁刷新假设在并发回合下依然成立。
 
 请求认证只朝一个方向流动：
 

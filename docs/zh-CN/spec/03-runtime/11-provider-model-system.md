@@ -225,8 +225,8 @@ type ThinkingLevel =
 ## 8a. 厂商账户（OAuth）提供商
 
 提供商行可以由厂商订阅账户认证 —— Claude Pro/Max、ChatGPT Plus/Pro、
-Copilot 以及 pi-ai 其余的 OAuth 厂商 —— 而不是粘贴的密钥（ADR 0092、
-D234）。可选厂商由 `models.getProviders().filter(p => p.auth.oauth)` 派生，
+Copilot 以及 pi-ai 其余的 OAuth 厂商 —— 而不是粘贴的密钥（ADR 0095、
+D237）。可选厂商由 `models.getProviders().filter(p => p.auth.oauth)` 派生，
 因此列表跟随依赖版本而不是写死的表；`registerBunOAuthFlows()` 在启动时
 调用一次，因为 pi-ai 通过 electron-vite 无法打包的动态 import 加载流程。
 

@@ -108,4 +108,4 @@ Each ADR includes:
 | 0089 | Proactive background subagent delegation | Accepted for implementation |
 | 0090 | User-configurable close behavior with close-to-tray | Accepted for implementation |
 | 0091 | Route mid-stream rate limits through the bounded retry | Accepted (amends 0050) |
-| 0092 | Sign in with a vendor account instead of pasting an API key | Accepted for implementation |
+| 0095 | Sign in with a vendor account instead of pasting an API key | Accepted for implementation |

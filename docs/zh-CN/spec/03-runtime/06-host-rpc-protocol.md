@@ -195,7 +195,7 @@ type ToolBudgetHealth = {
 - // 永远不会将 `secrets.get` 写入渲染器日志
 
 一个提供商行有两个相互独立的引用 —— `secret:provider:<id>:api_key` 与
-`secret:provider:<id>:oauth`（D234）。上面的通用方法同时服务于两者，因此
+`secret:provider:<id>:oauth`（D237）。上面的通用方法同时服务于两者，因此
 厂商账户凭据不需要新的主机方法。`ProviderPublic` 因此报告 `hasSecret`
 （**任一种**凭据存在即为真）、`hasOauth` 与非敏感的 `oauthAccountLabel`；
 `providers.create` / `providers.update` 接受 `oauthAccountLabel`，

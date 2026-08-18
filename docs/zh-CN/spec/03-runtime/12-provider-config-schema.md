@@ -90,7 +90,7 @@
 和 `supportedThinkingLevels=["off"]`。原始秘密和内部兼容性
 JSON 保持隐藏状态。
 
-`authKind: "oauth"` 标记厂商账户行（ADR 0092、D234）：其凭据是保存在
+`authKind: "oauth"` 标记厂商账户行（ADR 0095、D237）：其凭据是保存在
 `secret:provider:<id>:oauth` 下的 OAuth 授权，而不是粘贴的密钥，因此该行
 不为它保存 `secretRef`，并以空密钥启动。最后两个 apiStyle 是厂商账户专用的
 线路 API —— `openai_codex_responses`（Codex 会话封装）与 `pi_messages`

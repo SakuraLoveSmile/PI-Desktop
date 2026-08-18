@@ -223,7 +223,7 @@ reasoning capability.
 
 A provider row can be authenticated by a vendor subscription — Claude Pro/Max,
 ChatGPT Plus/Pro, Copilot and the rest of pi-ai's OAuth vendors — instead of a
-pasted key (ADR 0092, D234). The offered vendors are derived from
+pasted key (ADR 0095, D237). The offered vendors are derived from
 `models.getProviders().filter(p => p.auth.oauth)`, so the list follows the pin
 rather than a hardcoded table, and `registerBunOAuthFlows()` runs once at
 startup because pi-ai loads flows through a dynamic import electron-vite

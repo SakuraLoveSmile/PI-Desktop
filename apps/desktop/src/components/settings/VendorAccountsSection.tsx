@@ -1,5 +1,5 @@
 /**
- * Sign in with a vendor subscription instead of pasting an API key (ADR 0092).
+ * Sign in with a vendor subscription instead of pasting an API key (ADR 0095).
  * The card list is derived from the runtime's built-in provider catalog, so a
  * vendor that gains or loses an OAuth flow needs no change here.
  */

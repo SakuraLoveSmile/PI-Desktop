@@ -708,7 +708,7 @@ type CommandShellCatalog = {
 - 将完整的 API 密钥写入普通日志
 - 在渲染器中长期保留 API 密钥明文
 
-### 厂商账户（OAuth，D234）
+### 厂商账户（OAuth，D237）
 
 用厂商订阅账户登录是 Electron 主进程内的会话，因此只走 IPC —— 主机协议
 版本不变。五条调用通道加一条事件通道：

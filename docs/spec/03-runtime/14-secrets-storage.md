@@ -125,7 +125,7 @@ Replace with:
 
 ## 10. Vendor-account credentials
 
-Electron main owns login, logout, and refresh orchestration (ADR 0092, D234)
+Electron main owns login, logout, and refresh orchestration (ADR 0095, D237)
 because pi-ai declares it app-owned. `oauth.ts` implements pi-ai's
 `CredentialStore` on top of `secrets.getForRuntime` / `secrets.set` /
 `secrets.delete`, serializing `modify` per provider so pi-ai's locked-refresh

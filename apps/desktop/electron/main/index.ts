@@ -3685,7 +3685,7 @@ async function startSidecar(): Promise<void> {
     // record. The sidecar can provide a target path, never an arbitrary root.
     return loadInstructionChain(projectPath, path);
   });
-  // Request auth for a vendor account (ADR 0092). The sidecar names a provider
+  // Request auth for a vendor account (ADR 0095). The sidecar names a provider
   // row it was launched with; main resolves the vendor and returns a short-lived
   // `ModelAuth`. The refresh token never crosses this boundary.
   s.setVendorAuthResolver(async ({ vendorKey }) => vendorOAuth.resolveAuth(vendorKey));

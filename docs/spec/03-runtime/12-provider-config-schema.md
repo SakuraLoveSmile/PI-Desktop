@@ -87,7 +87,7 @@ model record instead. Unknown free-form models expose `supportsReasoning=false`
 and `supportedThinkingLevels=["off"]`. The raw secret and internal compatibility
 JSON remain hidden.
 
-`authKind: "oauth"` marks a vendor-account row (ADR 0092, D234): the credential
+`authKind: "oauth"` marks a vendor-account row (ADR 0095, D237): the credential
 is an OAuth grant under `secret:provider:<id>:oauth` rather than a pasted key,
 so the row carries no `secretRef` for it and launches with an empty key. The
 last two apiStyle values are vendor-account wire APIs — `openai_codex_responses`
