@@ -148,6 +148,12 @@ test("model configuration separates AI services from independently removable ven
   assert.match(vendorAccountsSource, /api\.testProvider\(provider\.id\)/);
   assert.match(vendorAccountsSource, /VendorAccountDialog/);
   assert.doesNotMatch(vendorAccountsSource, /settings-section-subtitle/);
+  assert.match(vendorAccountsSource, /settings-panel provider-list-panel/);
+  assert.match(vendorAccountsSource, /provider-row-list/);
+  assert.match(vendorAccountsSource, /"provider-row",\s*"vendor-account-row"/);
+  assert.doesNotMatch(vendorAccountsSource, /vendor-card/);
+  assert.match(stylesSource, /\.provider-row\.vendor-account-row\.is-disconnected/);
+  assert.doesNotMatch(stylesSource, /\.vendor-card-list/);
   assert.match(vendorAccountDialogSource, /defaultModel/);
   assert.match(vendorAccountDialogSource, /useProviderModels/);
   assert.match(vendorAccountsSource, /providerIsReady/);
@@ -160,8 +166,9 @@ test("model configuration separates AI services from independently removable ven
 test("vendor account rows keep the summary line to one account name", () => {
   const accountMeta =
     vendorAccountsSource.match(
-      /<div className="vendor-card-meta">[\s\S]*?<\/div>/,
+      /<div className="provider-row-meta">[\s\S]*?<\/div>/,
     )?.[0] ?? "";
+  assert.match(accountMeta, /vendor-account-label/);
   assert.match(accountMeta, /\{accountName\}/);
   assert.match(accountMeta, /\{duplicateLabel\}/);
   assert.doesNotMatch(accountMeta, /defaultModelId|provider-meta-dot|font-mono/);

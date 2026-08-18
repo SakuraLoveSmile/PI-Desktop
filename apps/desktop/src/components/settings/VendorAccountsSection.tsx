@@ -231,11 +231,11 @@ export function VendorAccountsSection() {
         </Button>
       </div>
 
-      <div className="settings-panel">
+      <div className="settings-panel provider-list-panel">
         {accounts.length === 0 ? (
           <div className="vendor-account-empty">{t("settings.vendorNoAccounts")}</div>
         ) : (
-          <div className="vendor-card-list">
+          <div className="provider-row-list">
             {accounts.map((entry) => {
               const { vendor, account } = entry;
               const provider = providers.find((candidate) => candidate.id === account.providerId);
@@ -255,11 +255,15 @@ export function VendorAccountsSection() {
               return (
                 <div
                   key={account.providerId}
-                  className={cx("vendor-card", !connected && "is-disconnected")}
+                  className={cx(
+                    "provider-row",
+                    "vendor-account-row",
+                    !connected && "is-disconnected",
+                  )}
                 >
-                  <div className="vendor-card-info">
-                    <div className="vendor-card-title-line">
-                      <span className="vendor-card-name">{vendor.name}</span>
+                  <div className="provider-row-info">
+                    <div className="provider-row-title-line">
+                      <span className="provider-row-name">{vendor.name}</span>
                       {vendor.isSubscription ? (
                         <Badge tone="neutral">{t("settings.vendorSubscription")}</Badge>
                       ) : null}
@@ -269,12 +273,14 @@ export function VendorAccountsSection() {
                           : t("settings.vendorDisconnected")}
                       </Badge>
                     </div>
-                    <div className="vendor-card-meta">
-                      {accountName}
-                      {duplicateLabel}
+                    <div className="provider-row-meta">
+                      <span className="vendor-account-label">
+                        {accountName}
+                        {duplicateLabel}
+                      </span>
                     </div>
                     {!connected ? (
-                      <div className="vendor-card-status">
+                      <div className="vendor-account-status">
                         {t("settings.vendorDisconnectedDesc")}
                       </div>
                     ) : null}

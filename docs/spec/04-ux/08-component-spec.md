@@ -2167,9 +2167,10 @@ surface, while model parameters remain owned by pi-ai.
 ### 19.2 Anatomy
 1. **Defaults card** — default provider/model selector; global operating mode,
    command shell, and Enter-to-send live in the Settings AI destination
-2. **Vendor accounts** — one row per OAuth account, including duplicate vendors,
-   with account label, Edit, Test connection, and Remove actions; the default
-   model is edited in the account dialog and selected from Defaults
+2. **Vendor accounts** — one single-level list panel using the same row surface
+   as AI services; one row per OAuth account, including duplicate vendors, with
+   account label, Edit, Test connection, and Remove actions; the default model
+   is edited in the account dialog and selected from Defaults
 3. **Providers head** — section title + primary Add provider action
 4. **Dialogs** — vendor-account edit dialog with name/default model, plus the
    provider dialog with connection fields (name, base URL, model id, API style,

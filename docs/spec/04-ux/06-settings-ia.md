@@ -109,8 +109,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   command shell, and Enter-to-send are owned by the AI destination.
 - **Vendor accounts** card (D237/D240), between Defaults and Providers:
   - the card lists accounts, not vendors: one row per local OAuth provider row,
-    including multiple rows for the same vendor. The whole section is hidden
-    when the runtime catalog offers no OAuth vendor
+    including multiple rows for the same vendor. Its list surface uses the same
+    single-level panel and row structure as AI services. The whole section is
+    hidden when the runtime catalog offers no OAuth vendor
   - an Add account action in the card header opens every OAuth-capable vendor;
     existing accounts do not remove or disable that vendor from the picker, so
     the same vendor can be added again for a different account

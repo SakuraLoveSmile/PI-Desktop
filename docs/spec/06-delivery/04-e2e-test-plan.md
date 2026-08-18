@@ -4075,7 +4075,9 @@ Each scenario is documented in this format:
 - **Steps**: 1) Open Settings -> Model configuration, confirm the Vendor
   accounts card starts empty, and open Add account — the picker lists every
   `models.getProviders().filter(p => p.auth.oauth)` vendor, including vendors
-  with existing accounts. 2) Pick Anthropic and complete the browser login;
+  with existing accounts; when accounts exist, confirm their rows use the same
+  single-level list surface as AI services. 2) Pick Anthropic and complete the
+  browser login;
   confirm one connected account row and one OAuth provider row appear. 3) Use
   Add account again, pick Anthropic again, and complete a second login with a
   different account; confirm two account rows and two provider ids. 4) Edit
