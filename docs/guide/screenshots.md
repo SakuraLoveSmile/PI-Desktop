@@ -35,10 +35,10 @@ cursor.
 
 ![The minimap rail magnified under the cursor](/screenshots/app/en/minimap-hover.webp)
 
-The top bar switches the model for the session. In the composer, `/` opens the
-command menu and `@` opens the file reference menu.
+The Composer's model × reasoning chip switches the model for the session. In the
+composer, `/` opens the command menu and `@` opens the file reference menu.
 
-![The model menu in the top bar](/screenshots/app/en/model-menu.webp)
+![The model and reasoning menu in the Composer](/screenshots/app/en/model-menu.webp)
 
 ![The slash command menu in the composer](/screenshots/app/en/composer-slash.webp)
 

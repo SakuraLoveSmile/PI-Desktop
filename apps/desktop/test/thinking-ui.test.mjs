@@ -23,8 +23,8 @@ const storeSource = await readFile(
   new URL("../src/stores/app-store.ts", import.meta.url),
   "utf8",
 );
-// Agent/Plan mode remains owned by the left-of-input Composer chip; the
-// conversation top bar only hosts the model picker and window actions.
+// Agent/Plan mode and model selection are owned by the Composer; the
+// conversation top bar only hosts the task title and window actions.
 const topbarSource = await readFile(
   new URL("../src/components/ConversationTopbar.tsx", import.meta.url),
   "utf8",
@@ -61,7 +61,7 @@ test("composer exposes the runtime thinking level order and provider filtering",
   assert.match(composerSource, /thinkingMenuLevels/);
 });
 
-test("Composer owns the mode chip and the top bar keeps only model selection", () => {
+test("Composer owns the mode and model controls", () => {
   const leftToolbar = composerSource.slice(
     composerSource.indexOf('<div className="composer-left">'),
     composerSource.indexOf('<div className="composer-right">'),
@@ -78,7 +78,7 @@ test("Composer owns the mode chip and the top bar keeps only model selection", (
   assert.ok(modeControl >= 0);
   assert.ok(permissionControl > modeControl);
   assert.doesNotMatch(leftToolbar, /composer-thinking|thinking-chip/);
-  assert.match(topbarSource, /<ModelSelect \/>/);
+  assert.doesNotMatch(topbarSource, /ModelSelect|model-chip/);
   assert.doesNotMatch(topbarSource, /ct-mode|ct-mode-btn|configureActiveSession/);
   assert.doesNotMatch(stylesSource, /\.conversation-topbar \.ct-mode/);
   assert.match(rightToolbar, /composer-model-thinking-chip/);

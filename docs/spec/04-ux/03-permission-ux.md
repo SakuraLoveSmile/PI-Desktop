@@ -125,7 +125,8 @@ Session grants are unchanged and still per `toolName` per session: a delegate's
   the prompt becomes read-only. Composer mode, thinking, permission, model, and
   send controls are disabled; the approval surface's Approve and Reject actions
   remain enabled.
-- the left-of-input Composer Agent/Plan/Goal chip and model picker re-enable when the
+- the left-of-input Composer Agent/Plan/Goal chip and Composer model × reasoning
+  picker re-enable when the
   host closes the approval as rejected, expired, or interrupted; terminal
   proposal snapshots are not gates
 - Abort concurrently cancels the turn and explicitly denies the matching host

@@ -722,8 +722,8 @@ The composer renders only controls connected to the active pi session:
   clamps or resets the durable session value before the next turn.
 - The left-of-input Composer Agent/Plan/Goal chip is the sole active-session mode
   control and cycles Agent → Plan → Goal → Agent. The Composer-right combined
-  chip owns model and reasoning changes; the top bar has no duplicate mode
-  segmented control. The model picker closes and is disabled while an active
+  chip owns model and reasoning changes; the top bar has no duplicate mode or
+  model control. The combined Composer picker closes and is disabled while an active
   `pending` Plan or Goal approval exists;
   terminal proposal snapshots do not disable it. The approval selector remembers
   the last selected mode on this device and uses it for the next pending proposal.

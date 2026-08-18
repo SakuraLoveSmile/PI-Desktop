@@ -34,18 +34,13 @@
 }
 
 :root[data-theme="dark"] .composer-toolbar .icon-btn,
-:root[data-theme="dark"] .mode-chip,
-:root[data-theme="dark"] .model-chip {
+:root[data-theme="dark"] .mode-chip {
   color: color-mix(in oklab, var(--gray-0) 78%, transparent);
 }
 
 :root[data-theme="dark"] .empty-hero-icon {
   color: var(--gray-0);
   opacity: 1;
-}
-
-.composer-model {
-  position: relative;
 }
 
 .composer-model-thinking {
@@ -283,32 +278,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.model-chip {
-  height: 28px !important;
-  max-width: 220px;
-  padding: 0 10px !important;
-  gap: 4px !important;
-  border-radius: var(--radius-full) !important;
-  color: var(--ds-text-secondary) !important;
-  line-height: var(--leading-compact);
-  overflow: visible;
-}
-
-/* Horizontal ellipsis only; line-height above preserves glyph descenders. */
-.model-chip-label {
-  display: inline-block;
-  max-width: 190px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-.model-chip:hover {
-  background: var(--ds-bg-hover) !important;
-  color: var(--ds-text-primary) !important;
 }
 
 .composer-plus-item.active {

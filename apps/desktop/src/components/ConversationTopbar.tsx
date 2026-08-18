@@ -1,6 +1,5 @@
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../stores/app-store";
-import { ModelSelect } from "./ModelSelect";
 import {
   IconSidebar,
   IconNewSession,
@@ -104,8 +103,6 @@ export function ConversationTopbar({
       </div>
 
       <div className="ct-right">
-        <ModelSelect />
-
         <div className="ct-actions">
           <button
             type="button"

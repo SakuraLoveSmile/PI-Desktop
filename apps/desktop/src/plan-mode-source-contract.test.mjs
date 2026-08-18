@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
-const [apiSource, appSource, composerSource, settingsSource, commandsSource, storeSource, surfaceSource, transcriptSource, barSource, topbarSource, modelSource, componentSpec, englishSource, chineseSource, planStateSource] =
+const [apiSource, appSource, composerSource, settingsSource, commandsSource, storeSource, surfaceSource, transcriptSource, barSource, topbarSource, componentSpec, englishSource, chineseSource, planStateSource] =
   await Promise.all([
     read("./lib/api.ts"),
     read("./App.tsx"),
@@ -15,7 +15,6 @@ const [apiSource, appSource, composerSource, settingsSource, commandsSource, sto
     read("./components/ChatTranscript.tsx"),
     read("./components/PlanApprovalBar.tsx"),
     read("./components/ConversationTopbar.tsx"),
-    read("./components/ModelSelect.tsx"),
     read("../../../docs/spec/04-ux/08-component-spec.md"),
     read("../../../packages/i18n/src/locales/en/index.ts"),
     read("../../../packages/i18n/src/locales/zh-CN/index.ts"),
@@ -67,9 +66,9 @@ test("only pending proposals form the renderer approval gate", () => {
   assert.match(composerSource, /planCheckpoint\?\.status === "pending"/);
   assert.match(surfaceSource, /planCheckpoint\?\.status === "pending"/);
   assert.match(transcriptSource, /pendingPlans\[sessionId\]\?\.status === "pending"/);
-  assert.match(modelSource, /planCheckpoint\?\.status === "pending"/);
-  assert.match(modelSource, /disabled=\{modelBlocked\}/);
-  assert.match(topbarSource, /<ModelSelect \/>/);
+  assert.match(composerSource, /planCheckpoint\?\.status === "pending"/);
+  assert.match(composerSource, /disabled=\{controlsBlocked\}/);
+  assert.doesNotMatch(topbarSource, /ModelSelect|model-chip/);
   assert.doesNotMatch(topbarSource, /ct-mode|configureActiveSession/);
 });
 
@@ -120,8 +119,9 @@ test("the component spec assigns mode ownership to Composer", () => {
     componentSpec.indexOf("## 12.", componentSpec.indexOf("## 11. Composer")),
   );
   assert.match(topbarSpec, /Project\s+scope/);
-  assert.match(topbarSpec, /model picker/);
+  assert.doesNotMatch(topbarSpec, /model picker/);
   assert.doesNotMatch(topbarSpec, /Agent \| Plan|mode toggle|mode indicator/);
+  assert.match(composerSpec, /combined model ×\s+reasoning-level control/);
   assert.match(composerSpec, /Composer-left Agent\/Plan\/Goal chip is the sole mode/);
 });
 

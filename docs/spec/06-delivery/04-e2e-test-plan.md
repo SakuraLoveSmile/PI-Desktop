@@ -407,15 +407,16 @@ Each scenario is documented in this format:
 
 - **Preconditions**: Provider configured; at least one session exists.
 - **Steps**: 1) Open the chat route. 2) Inspect the 46px bar at the top of the
-  conversation area. 3) Confirm it shows the concise session/task title, the
-  model picker, and the New task / Search / Commands
+  conversation area. 3) Confirm it shows the concise session/task title and the
+  New task / Search / Commands
   action buttons; confirm the
   sidebar toggle appears **only when the sidebar is collapsed** (when expanded,
   the sidebar owns that control). 4) Switch to the Pull requests, Scheduled,
   Plugins, or Settings routes and inspect the same top region.
 - **Expected**: On the chat route the conversation top bar renders with its
-  title, model picker, and actions; it has no Agent|Plan|Goal mode control. The
-  left-of-input Composer chip owns the active session's Agent/Plan/Goal switch. The
+  title and actions only; it has no model or Agent|Plan|Goal mode control. The
+  left-of-input Composer chip owns the active session's Agent/Plan/Goal switch,
+  and the Composer-right combined chip owns model and reasoning selection. The
   task title is the only visible title text and is capped at 10 characters
   with an ellipsis; project scope is available through its tooltip. A compact
   status dot appears while running. The sidebar
@@ -473,20 +474,22 @@ Each scenario is documented in this format:
 - **Milestone**: M2
 - **Status**: Draft
 
-#### E2E-089: Top-bar model picker opens downward and switches model
+#### E2E-089: Composer model menu opens upward and switches model
 
 - **Preconditions**: Chat route active; provider configured.
-- **Steps**: 1) Click the model picker in the top bar. 2) Confirm the dropdown
-  opens downward from the bar. 3) Select a different provider/model. 4) Open
-  Settings from the command palette or application menu (the top bar no longer
-  has a Settings action button).
-- **Expected**: The menu lists enabled runnable providers with a default model
-  and opens downward (anchored to the top bar); selecting updates the active
-  session model; Settings opens from the command palette/menu. The model trigger
-  ellipsizes long IDs. Each option shows one display name only, and hovering a
-  long option exposes its complete display name in the tooltip without changing
-  the menu layout or adding a visible model ID.
-- **Specs linked**: `04-ux/08-component-spec.md` (§2, model dropdown),
+- **Steps**: 1) Click the Composer-right model × reasoning chip. 2) Confirm the
+  menu opens upward from the bottom composer. 3) Enter Model, select a different
+  provider/model, and return to the root. 4) Enter Reasoning level and select a
+  supported level. 5) Open Settings from the command palette or application menu.
+- **Expected**: The root shows only Model and Reasoning level entries; the Model
+  submenu lists enabled runnable providers with a default model and the
+  Reasoning level submenu lists only the selected model's published levels.
+  Selecting updates the active session model/reasoning configuration without
+  dismissing the menu; Settings opens from the command palette/menu. The
+  Composer model trigger ellipsizes long IDs. Each option shows one display name
+  only, and hovering a long option exposes its complete display name in the
+  tooltip without changing the menu layout or adding a visible model ID.
+- **Specs linked**: `04-ux/08-component-spec.md` (§11, model menu),
   `03-runtime/13-model-catalog-and-selection.md`
 - **Acceptance**: C
 - **Milestone**: M2
@@ -2092,7 +2095,7 @@ Each scenario is documented in this format:
 - **Preconditions**: A saved provider has returned at least two models from its
   discovery endpoint and the resulting catalog is stored in `models`.
 - **Steps**: 1) Quit and restart the app. 2) Disconnect the provider endpoint.
-  3) Open the top-bar model picker. 4) Wait for background refresh to fail.
+  3) Open the Composer model menu. 4) Wait for background refresh to fail.
   5) Reconnect the endpoint with one renamed model and one additional model,
   then update the provider configuration and reopen the picker.
 - **Expected**: The first picker open renders the prior catalog without starting
@@ -2115,8 +2118,9 @@ Each scenario is documented in this format:
   ^0.82.1+; a custom or Anthropic-compatible provider uses apiStyle
   `anthropic_messages` (or OpenAI-compatible `chat_completions` with
   `anthropic/claude-opus-5`) and model id `claude-opus-5`.
-- **Steps**: 1) Select `claude-opus-5` in the top-bar model picker. 2) Open
-  the Thinking selector. 3) Start a short turn and inspect the sidecar model
+- **Steps**: 1) Open the Composer model × reasoning menu and select
+  `claude-opus-5` in its Model submenu. 2) Open the Reasoning level submenu.
+  3) Start a short turn and inspect the sidecar model
   snapshot / request metadata (or the unit-equivalent resolution path).
 - **Expected**: The id maps to the pinned pi catalog record (1M
   `contextWindow`, adaptive-thinking compat, published thinking levels including
@@ -4344,12 +4348,13 @@ This test plan spec is accepted when:
 - Switch to dark theme on chat home.
 - Expect main `#181818`, sidebar `#000000`, and the floating composer plate at elevated-primary (`#212121f5` / gray-800 96%) with elevation-prominent stroke + soft lift so the box reads against the main surface.
 
-### US-UI-21 Top-bar model menu configures pi
-- Create a session with provider A/model A, then open the top-bar model menu.
-- Expect the top bar to keep its model-only picker, while the Composer-right
-  model × reasoning chip shows provider A/model A and the current reasoning
-  level. Its menu starts with only Model and Reasoning level entries; Model
-  opens the searchable provider-group list and Reasoning level opens the
+### US-UI-21 Composer model menu configures pi
+- Create a session with provider A/model A, then open the Composer-right model ×
+  reasoning menu.
+- Expect the top bar to show only the task title and window actions. The
+  Composer-right model × reasoning chip shows provider A/model A and the current
+  reasoning level. Its menu starts with only Model and Reasoning level entries;
+  Model opens the searchable provider-group list and Reasoning level opens the
   capability-filtered radio list in the same popover.
 - Select provider B/model B, send a prompt, and expect the main-to-sidecar
   `agent.prompt` payload and pi runtime to use B for that session.

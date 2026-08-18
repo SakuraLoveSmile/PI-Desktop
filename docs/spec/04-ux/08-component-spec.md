@@ -5,7 +5,7 @@
 > Interaction behavior: [09-interaction-patterns.md](09-interaction-patterns.md)
 
 
-> Shell layout is Codex-aligned: left thread sidebar (~275px), main transcript, floating bottom composer with runtime mode/permission controls and a topbar model picker. Prefer neutral charcoal surfaces over blue-slate chrome.
+> Shell layout is Codex-aligned: left thread sidebar (~275px), main transcript, floating bottom composer with runtime mode/permission/model controls, and a compact action-only top bar. Prefer neutral charcoal surfaces over blue-slate chrome.
 >
 > **Precedence rule**: where a metric or copy string below disagrees with a
 > Codex parity decision in [decisions-log §D](../08-meta/decisions-log.md)
@@ -151,16 +151,15 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
 
 ### 2.1 Purpose
 
-Global controls bar: task title, model selection, and window actions. Project
-scope remains available in the title tooltip. The active session's Agent/Plan/Goal
-control belongs solely to the
-left-of-input Composer chip. (Settings is reached from the command palette /
-application menu, not the top bar.)
+Global controls bar: task title and window actions. Project scope remains
+available in the title tooltip. The active session's Agent/Plan/Goal control and
+model selection belong to the Composer. (Settings is reached from the command
+palette / application menu, not the top bar.)
 
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [Task title] [●]   [🤖 Model] [＋ New] [🔍 Search]
+[☰ Sidebar] [Task title] [●]                     [＋ New] [🔍 Search]
 ```
 
 (Icons described functionally; actual render uses Lucide SVGs. The `[☰ Sidebar]`
@@ -168,11 +167,10 @@ toggle renders **only when the sidebar is collapsed**; when the sidebar is
 expanded it owns that control, so the top bar does not duplicate it.)
 
 The conversation top bar renders for the chat route only; Pull requests, Scheduled,
-Plugins, and Settings keep the frameless drag band. It owns the task title, the
-downward-opening model picker, and window actions only. Project scope remains in
-the title tooltip instead of adding another visible label. The left-of-input
-Composer chip is the sole Agent/Plan/Goal control and writes the session `mode`; the
-Thinking and permission triggers remain in the Composer (§11).
+Plugins, and Settings keep the frameless drag band. It owns the task title and
+window actions only. Project scope remains in the title tooltip instead of adding
+another visible label. The Composer owns the Agent/Plan/Goal control and the
+combined model × reasoning selection (§11).
 
 ### 2.3 Layout
 
@@ -185,7 +183,7 @@ Thinking and permission triggers remain in the Composer (§11).
   112px for native window controls
 - Title cluster (task title) flexes and shows at most the first 10 Unicode
   characters plus an ellipsis; the full title remains in the native tooltip.
-  The right cluster (model picker, action icons) is `flex: 0 0 auto`
+  The right cluster (action icons) is `flex: 0 0 auto`
   and is never squeezed by a long title. The conversation surface keeps a
   `min-width` so its content is not crushed on narrow windows.
 - Project scope is available from the title tooltip but is not rendered as a
@@ -199,7 +197,6 @@ Thinking and permission triggers remain in the Composer (§11).
 | Element | Default | Running | Error | No workspace |
 |---|---|---|---|---|
 | Task title | session title (or untitled), capped at 10 characters with an ellipsis when needed | same, plus a compact pulsing status dot | same | same |
-| Model selector | clickable dropdown | disabled during stream | clickable | clickable (no provider warning) |
 | New task / Search | icon buttons | same | same | same |
 | Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
 | Project name | title tooltip only | same | same | omitted |
@@ -208,7 +205,6 @@ Thinking and permission triggers remain in the Composer (§11).
 
 - Every control is keyboard-reachable with Tab
 - Abort button has `aria-label="Abort active turn"`
-- Model selector announces current value via `aria-label`
 
 ### 2.6 MVP constraints
 
@@ -1696,8 +1692,8 @@ reasoning-level control.
   autocorrect never rewrite coding prompts
 - Runtime chips keep descenders fully visible (D150): the model × reasoning,
   permission, and mode triggers in the Composer use compact line-height rather
-  than `leading-none` under overflow. The topbar model trigger still ellipsizes
-  long IDs.
+  than `leading-none` under overflow. The Composer model label ellipsizes long
+  IDs.
 - Mode, provider/model, thinking, and permission changes update the active
   session immediately while idle. During a turn, the renderer applies the
   latest selection optimistically as a next-turn choice and persists it only
@@ -1706,8 +1702,7 @@ reasoning-level control.
   controls. Approval actions are the exception while awaiting approval. The
   Composer-left Agent/Plan/Goal chip is the sole mode
   control and cycles Agent → Plan → Goal → Agent on click. The Composer-right
-  model × reasoning chip owns both selections; the topbar model picker remains a
-  model-only control. Palette and Composer slash mode commands use the
+  model × reasoning chip owns both selections. Palette and Composer slash mode commands use the
   same active-session configuration path; after host confirmation resolves an
   approval, the approval surface is removed rather than remaining as a terminal
   action card.
@@ -1856,30 +1851,31 @@ Anatomy:
 
 ---
 
-## 12. ModelSelector
+## 12. Model selection
 
 ### 12.1 Purpose
 
-Dropdown in Topbar showing current provider/model pair. Allows switching models within the current session.
+Model selection is part of the Composer's combined model × reasoning menu in §11;
+there is no separate top-bar model selector.
 
 ### 12.2 Anatomy
 
 ```text
-[provider icon] provider-name / model-name   [▼ dropdown arrow]
+[✨ model-name · reasoning level ▾]
 ```
 
 ### 12.3 States
 
 | State | Appearance |
 |---|---|
-| Configured | shows current provider/model, clickable |
-| No provider | "Add provider" muted text + link to settings |
-| Running | disabled, shows current model |
-| Dropdown open | cached available models grouped by provider; refreshes in background |
+| Configured | shows the current model and reasoning level, clickable from the Composer |
+| No provider | muted model text with a settings entry in the Composer menu |
+| Running | remains available for next-turn configuration |
+| Dropdown open | model and reasoning entries open in-place submenus |
 
 ### 12.4 Interactions
 
-- Click: opens dropdown with provider/model list
+- Click: opens the Composer menu with model and reasoning entries
 - Cached provider models are available on the first open after restart; a
   background refresh updates the list without clearing it first
 - Select: switches model for current session
@@ -1892,9 +1888,9 @@ Dropdown in Topbar showing current provider/model pair. Allows switching models 
 
 ### 12.5 Accessibility
 
-- `role="combobox"` with `aria-expanded`
-- Current value announced via `aria-label`
-- Dropdown items: `role="option"` with `aria-selected`
+- The Composer model × reasoning chip exposes `aria-haspopup="menu"` and
+  `aria-expanded`; its current value is announced via `aria-label`
+- Model and reasoning rows: `role="menuitemradio"` with `aria-checked`
 
 ### 12.6 MVP constraints
 
@@ -2339,7 +2335,9 @@ Sidebar footer                                        Popover (360px max)
 7. Composer: Enter sends, Shift+Enter newline, draft grows from one through
    seven visible lines then scrolls, disabled during running/pending, abort
    button visible during run
-8. ModelSelector shows provider/model pair; disabled during stream; links to settings when unconfigured
+8. Composer model × reasoning chip shows the provider/model pair; remains
+   available for next-turn configuration during a stream; links to settings
+   when unconfigured
 9. Command palette opens at z-index 60, traps focus, supports keyboard navigation
 10. Empty states always provide an actionable next step, not just a message
 11. All components have correct ARIA roles and labels

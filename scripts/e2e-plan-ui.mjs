@@ -653,7 +653,7 @@ async function inspectUi(state) {
     const approvalMenu = bar?.querySelector(".plan-approval-approve-menu");
     const reject = bar?.querySelector(".plan-approval-reject");
     const prompt = document.querySelector(".composer-input");
-    const model = document.querySelector(".conversation-topbar button.model-chip");
+    const model = document.querySelector(".composer-model-thinking button");
     const mode = operatingModes[0];
     const permission = document.querySelector(".composer-permission button");
     const send = document.querySelector(".composer-shell .send-btn");

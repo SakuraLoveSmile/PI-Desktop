@@ -3,10 +3,6 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { loadStyles } from "./helpers/styles.mjs";
 
-const modelSelectSource = await readFile(
-  new URL("../src/components/ModelSelect.tsx", import.meta.url),
-  "utf8",
-);
 const composerSource = await readFile(
   new URL("../src/components/Composer.tsx", import.meta.url),
   "utf8",
@@ -29,26 +25,26 @@ function ruleBlock(source, selector) {
 }
 
 test("model chip label avoids leading-none under truncation", () => {
-  assert.match(modelSelectSource, /className="model-chip-label text-sm"/);
+  assert.match(composerSource, /className="composer-model-thinking-model"/);
   assert.doesNotMatch(
-    modelSelectSource,
-    /model-chip-label[^"]*leading-none|truncate text-sm leading-none/,
+    composerSource,
+    /composer-model-thinking-model[^"]*leading-none|truncate text-sm leading-none/,
   );
 });
 
 test("model menu options show one complete display name on hover", () => {
   assert.match(
-    modelSelectSource,
-    /const modelOptionTitle = model\.displayName \|\| model\.modelId;/,
+    composerSource,
+    /const optionTitle =\s*model\.displayName \|\| model\.modelId;/,
   );
-  assert.match(modelSelectSource, /title=\{modelOptionTitle\}/);
+  assert.match(composerSource, /title=\{optionTitle\}/);
   const optionBlock =
-    modelSelectSource.match(/const modelOptionTitle[\s\S]*?<\/button>/)?.[0] ?? "";
+    composerSource.match(/const optionTitle[\s\S]*?<\/button>/)?.[0] ?? "";
   assert.doesNotMatch(optionBlock, /max-w-\[170px\]|font-mono text-text-secondary/);
 });
 
 test("composer runtime chips keep compact line-height for descenders", () => {
-  for (const selector of [".mode-chip", ".model-chip"]) {
+  for (const selector of [".mode-chip"]) {
     const block = ruleBlock(styles, selector);
     assert.match(block, /line-height:\s*var\(--leading-compact\);/);
     assert.match(block, /overflow:\s*visible;/);
@@ -56,11 +52,11 @@ test("composer runtime chips keep compact line-height for descenders", () => {
 
   assert.match(
     styles,
-    /\.model-chip-label\s*\{[\s\S]*?max-width:\s*190px;[\s\S]*?overflow:\s*hidden;[\s\S]*?text-overflow:\s*ellipsis;/,
+    /\.composer-model-thinking-chip\s*\{[\s\S]*?line-height:\s*var\(--leading-compact\);/,
   );
   assert.match(
     styles,
-    /\.mode-chip > span,\s*\.model-chip > span,\s*\.model-chip-label\s*\{[\s\S]*?line-height:\s*var\(--leading-compact\);/,
+    /\.composer-model-thinking-model,\s*\.composer-model-thinking-level\s*\{[\s\S]*?text-overflow:\s*ellipsis;/,
   );
 });
 

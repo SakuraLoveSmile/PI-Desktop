@@ -717,8 +717,8 @@ Toast enter/exit 保留现有移除合同（`animationend` 于
   行动或分级阶梯。更换供应商钳位或重置耐用性
   下一轮之前的会话值。
 - 左侧输入 Composer Agent/Plan/Goal 芯片是唯一的活动会话模式
-  控制和循环 Agent → Plan → Goal → Agent。顶部栏没有重复模式分段控件。模型
-  当存在有效的 `pending` Plan 或 Goal 批准时，选择器将关闭并被禁用；
+  控制和循环 Agent → Plan → Goal → Agent。顶部栏没有重复的模式或模型控件。
+  Composer 组合选择器当存在有效的 `pending` Plan 或 Goal 批准时将关闭并被禁用；
   终端提案快照不会禁用它。批准选择器记住
   该设备上最后选择的模式并将其用于下一个待处理的提案。
   Live Host 事件更新最新的检查点或

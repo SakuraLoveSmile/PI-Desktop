@@ -87,8 +87,7 @@
 }
 
 :root[data-theme="light"] .composer-toolbar .icon-btn,
-:root[data-theme="light"] .mode-chip,
-:root[data-theme="light"] .model-chip {
+:root[data-theme="light"] .mode-chip {
   color: color-mix(in oklab, #1a1c1f 84%, transparent) !important;
 }
 
@@ -252,8 +251,8 @@
 }
 
 .mode-chip > span,
-.model-chip > span,
-.model-chip-label {
+.composer-model-thinking-model,
+.composer-model-thinking-level {
   line-height: var(--leading-compact);
 }
 

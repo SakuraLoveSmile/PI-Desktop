@@ -114,7 +114,8 @@ destination, chat as the home surface, tools and permissions inline.
   Goal shows the same approval boundary for an outcome contract. Both keep the
   permission-mode chip and expose their host-written immutable `.pi/plan/*.md`
   or `.pi/goal/*.md` artifact opener after submission. The conversation top bar
-  retains the model picker and window actions but has no duplicate mode control.
+  retains only the task title and window actions; the Composer owns model and
+  reasoning selection as well as mode control.
 - **Backend status capsule**: appears under the titlebar while the backend
   restarts or is fatally degraded (D080), with an Open-logs action.
 
@@ -250,7 +251,7 @@ Extensions destination described in §3.5.
 | Overlay | Trigger | Notes |
 |---|---|---|
 | Command palette | Cmd/Ctrl+K (also Cmd/Ctrl+Shift+P per D014) | builtin + plugin commands |
-| Model menu | top-bar model picker | configured provider/model choices + settings entry (D091) |
+| Model menu | Composer-right model × reasoning chip | configured provider/model choices + settings entry (D091) |
 | Profile menu | sidebar footer | Settings / Logs / Theme cycle (D041) |
 | Notification inbox | sidebar footer bell | All/Unread views, task completion/failure rows, mark-all-read and clear actions (D130/D117) |
 | Toasts | events (plugin toast, backend restored, copy) | top-center; 4s default, 8s for errors |

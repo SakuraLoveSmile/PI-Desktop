@@ -2591,7 +2591,7 @@ async function createWindow() {
             // Open composer + menu for chrome parity proof.
             await mainWindow!.webContents.executeJavaScript(`
               (() => {
-                const btn = document.querySelector('.composer-model button, .model-chip');
+                const btn = document.querySelector('.composer-model-thinking button');
                 if (btn) btn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
               })()
             `);

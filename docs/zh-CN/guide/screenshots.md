@@ -30,9 +30,9 @@ description: PI-Desktop 的每个界面，全部取自运行中的应用。
 
 ![光标下放大的缩略导航条](/screenshots/app/zh/minimap-hover.webp)
 
-顶栏切换当前会话使用的模型。在输入框里，`/` 打开命令菜单，`@` 打开文件引用菜单。
+Composer 的模型 × 推理芯片切换当前会话使用的模型。在输入框里，`/` 打开命令菜单，`@` 打开文件引用菜单。
 
-![顶栏的模型菜单](/screenshots/app/zh/model-menu.webp)
+![Composer 中的模型和推理菜单](/screenshots/app/zh/model-menu.webp)
 
 ![输入框的斜杠命令菜单](/screenshots/app/zh/composer-slash.webp)
 

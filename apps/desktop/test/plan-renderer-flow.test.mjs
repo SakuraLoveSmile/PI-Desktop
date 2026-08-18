@@ -5,13 +5,12 @@ import test from "node:test";
 const readDesktop = (relativePath) =>
   readFile(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
-const [store, planState, approvalBar, composer, model, packageJson] =
+const [store, planState, approvalBar, composer, packageJson] =
   await Promise.all([
     readDesktop("src/stores/app-store.ts"),
     readDesktop("src/lib/plan-mode-state.ts"),
     readDesktop("src/components/PlanApprovalBar.tsx"),
     readDesktop("src/components/Composer.tsx"),
-    readDesktop("src/components/ModelSelect.tsx"),
     readDesktop("package.json"),
   ]);
 
@@ -53,7 +52,6 @@ test("pending input is retained but every composer/model mutation control is gat
   assert.match(composer, /disabled=\{controlsBlocked\}/);
   assert.match(composer, /const controlsBlocked = approvalPending;/);
   assert.match(composer, /const sendBlocked = runActive \|\| approvalPending \|\| pasting;/);
-  assert.match(model, /disabled=\{modelBlocked\}/);
   assert.match(store, /pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.match(store, /pendingPlans\[resolution\.sessionId\]/);
 });

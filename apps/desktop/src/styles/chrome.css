@@ -326,8 +326,8 @@
 }
 
 /* Conversation top bar (Codex/WorkBuddy-style): replaces the empty chat
- * titlebar band with a real toolbar — session title, Agent/Chat mode, model
- * picker, and action buttons. It mirrors the frameless drag semantics of the
+ * titlebar band with a real toolbar — session title and action buttons. It
+ * mirrors the frameless drag semantics of the
  * old .main-titlebar: an absolute 46px band that is draggable, with the
  * interactive controls opting back into pointer events. */
 .conversation-topbar {
@@ -469,12 +469,6 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-}
-
-/* Model picker lives in the top bar; its dropdown must open downward. */
-.composer-model-menu.ct-model-menu {
-  top: calc(100% + 8px);
-  bottom: auto;
 }
 
 /* macOS traffic lights occupy the top-left ~76px; only reserve that space
