@@ -98,16 +98,21 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - default model id
   - Enter to send as a switch (local preference; not on Codex General gold)
 - **Vendor accounts** card (D237), between Defaults and Providers:
-  - one card per vendor whose subscription can be signed into, derived from the
-    runtime catalog; the whole section is hidden when that list is empty
-  - a card shows the vendor name, a Subscription badge where the access is
-    plan-backed, and either its own call to action or, once signed in, a
-    Connected badge with the account label
-  - Sign in opens a single dialog that renders whatever the flow asks for —
-    an opened browser with a copyable link, a device code, a choice, or a text
-    field — with a cancel action that aborts the local callback server or the
-    polling loop
-  - Sign out removes the credential and its readiness, leaving the row visible
+  - the card lists accounts, not vendors: one row per vendor already signed in,
+    and an explanatory line in place of the list while there are none. The
+    whole section is hidden when the runtime catalog offers no OAuth vendor
+  - an Add account action in the card header opens a picker of the vendors not
+    yet signed in — the same shape as Add provider, so a build that knows seven
+    vendors does not spend seven rows saying nobody is signed in. The action is
+    disabled once every known vendor has an account
+  - an account row shows the vendor name, a Subscription badge where the access
+    is plan-backed, a Connected badge, and the account label
+  - picking a vendor opens a single dialog that renders whatever the flow asks
+    for — an opened browser with a copyable link, a device code, a choice, or a
+    text field — with a cancel action that aborts the local callback server or
+    the polling loop
+  - Sign out removes the credential and its readiness; the row leaves the list
+    and the vendor returns to the picker
 - **Providers** studio:
   - OpenAI-compatible add-provider dialog (opened from Add provider / empty-state CTA)
   - provider cards with avatar initials, host, default model, secret status,

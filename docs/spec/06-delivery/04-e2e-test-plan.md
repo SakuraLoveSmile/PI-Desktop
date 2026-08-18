@@ -4071,9 +4071,10 @@ Each scenario is documented in this format:
   and a real subscription for at least one PKCE vendor (Anthropic) and one
   device-code vendor (xAI or GitHub Copilot). No provider row exists yet for
   either vendor.
-- **Steps**: 1) Open Settings -> Model configuration and confirm the vendor
-  cards come from `models.getProviders().filter(p => p.auth.oauth)`. 2) Start
-  the Anthropic login, complete the browser consent, and let the local callback
+- **Steps**: 1) Open Settings -> Model configuration, confirm the vendor
+  accounts card starts empty, and open Add account — the picker lists exactly
+  `models.getProviders().filter(p => p.auth.oauth)` minus anyone signed in.
+  2) Pick Anthropic and start its login, complete the browser consent, and let the local callback
   finish. 3) Open the model selector, refresh the account's models, pick one,
   and send a message that streams to completion; send a second message in the
   same session. 4) Start the device-code login on the second vendor, then press
