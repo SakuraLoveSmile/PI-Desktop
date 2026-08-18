@@ -744,6 +744,15 @@ arrives while `loginId` is unknown, and release the matching events in order
 once the reply lands. Subscribing after the reply drops that first prompt and
 the flow waits forever on a question nobody was shown.
 
+`start` must also be called exactly once per attempt, from a user action rather
+than from a React effect — StrictMode runs an effect twice on mount, and a
+second attempt opens a second browser and contends for the same local callback
+port. The renderer's session object keeps every event it has delivered and
+replays it to a later subscriber, so a dialog may mount, unmount and mount
+again without restarting anything. Main defends the same invariant from its
+side: a `start` for a vendor whose attempt is still in flight cancels that
+attempt and waits for it to unwind before beginning the next one.
+
 Every flow shape — browser callback, device code, a pasted code, a vendor
 choice — travels this one stream, so the renderer renders what arrived instead
 of branching per vendor. `opened: false` means the browser could not be

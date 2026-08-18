@@ -290,6 +290,41 @@ test("signing in again reuses the existing row", async () => {
   assert.equal(stored.access, "access-for-xyz");
 });
 
+test("a second attempt waits for the first to let go of its callback port", async () => {
+  // StrictMode mounts a dialog twice, and a user can click again; either way the
+  // old attempt still owns the local callback server. Standing up a new one
+  // before it unwinds is how a login fails the moment it starts.
+  let inFlight = 0;
+  let overlapped = false;
+  const { events, oauth } = harness({
+    login: async (_id, _type, interaction) => {
+      inFlight += 1;
+      if (inFlight > 1) overlapped = true;
+      try {
+        await interaction.prompt({ type: "manual_code", message: "Paste the code" });
+        return { type: "oauth", refresh: "r", access: "a", expires: 4102444800000 };
+      } finally {
+        // The server closes a turn after the flow gives up, as a real one does.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+      }
+    },
+  });
+
+  const first = await oauth.start("anthropic");
+  await waitFor(events, "prompt");
+  const second = await oauth.start("anthropic");
+
+  assert.equal(overlapped, false, "the attempts never held the port together");
+  assert.notEqual(second.loginId, first.loginId);
+  assert.equal(
+    events.filter((event) => event.kind === "cancelled").length,
+    1,
+    "the superseded attempt reported itself cancelled",
+  );
+  oauth.cancel(second.loginId);
+});
+
 test("the real pi-ai catalog offers every vendor account we ship", async () => {
   const host = fakeHost();
   // No createModels seam here: this exercises registerBunOAuthFlows() plus the

@@ -9,10 +9,17 @@ import { useTranslation } from "react-i18next";
 import type { OAuthVendor } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
+import {
+  beginOAuthLogin,
+  type OAuthLoginSession,
+} from "../../lib/oauth-login-session";
 import { Badge, Button } from "../ui";
 import { IconKey, IconLogOut } from "../icons";
 import { OAuthLoginDialog } from "./OAuthLoginDialog";
 import { VendorPickerDialog } from "./VendorPickerDialog";
+
+/** A login in flight, together with the dialog reporting on it. */
+type ActiveLogin = { vendor: OAuthVendor; session: OAuthLoginSession };
 
 export function VendorAccountsSection() {
   const { t } = useTranslation();
@@ -22,7 +29,7 @@ export function VendorAccountsSection() {
   const [vendors, setVendors] = useState<OAuthVendor[] | null>(null);
   const [busyVendor, setBusyVendor] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
-  const [login, setLogin] = useState<OAuthVendor | null>(null);
+  const [login, setLogin] = useState<ActiveLogin | null>(null);
 
   const loadVendors = useCallback(async () => {
     try {
@@ -38,6 +45,10 @@ export function VendorAccountsSection() {
   useEffect(() => {
     void loadVendors();
   }, [loadVendors]);
+
+  // Closing the dialog — done, cancelled, or the whole page going away — stops
+  // the renderer listening. Cancelling the attempt itself is the dialog's job.
+  useEffect(() => () => login?.session.dispose(), [login]);
 
   const signOut = async (vendor: OAuthVendor) => {
     setBusyVendor(vendor.vendorId);
@@ -59,7 +70,7 @@ export function VendorAccountsSection() {
 
   const onLoginDone = useCallback(
     (accountLabel?: string) => {
-      const vendorName = login?.name ?? "";
+      const vendorName = login?.vendor.name ?? "";
       setLogin(null);
       void loadVendors();
       void refreshProviders();
@@ -138,7 +149,12 @@ export function VendorAccountsSection() {
           vendors={available}
           onPick={(vendor) => {
             setPicking(false);
-            setLogin(vendor);
+            // Started here, not in the dialog: a click happens once, where
+            // StrictMode would run a mount effect twice and open two browsers.
+            setLogin({
+              vendor,
+              session: beginOAuthLogin({ api, vendorId: vendor.vendorId }),
+            });
           }}
           onClose={() => setPicking(false)}
         />
@@ -146,7 +162,8 @@ export function VendorAccountsSection() {
 
       {login ? (
         <OAuthLoginDialog
-          vendor={login}
+          vendor={login.vendor}
+          session={login.session}
           onDone={onLoginDone}
           onClose={() => {
             setLogin(null);
