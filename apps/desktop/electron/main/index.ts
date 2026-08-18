@@ -805,7 +805,9 @@ async function resolveAgentRuntimeLaunch(
   const provider =
     providers.providers.find((item) => item.id === session.providerId) ||
     providers.providers.find((item) => item.id === settings.defaultProviderId) ||
-    providers.providers.find((item) => item.hasSecret) ||
+    providers.providers.find(
+      (item) => item.hasSecret || item.hasOauth || item.authKind === "none",
+    ) ||
     providers.providers[0];
   if (!provider) {
     throw Object.assign(new Error("No provider configured"), {
@@ -842,7 +844,7 @@ async function resolveAgentRuntimeLaunch(
   // APIs and a gateway's catalog is not in the builtin one at all.
   const vendorBinding = isVendorAccount
     ? await vendorOAuth
-        .bindingFor(provider.vendorKey || "", modelId)
+        .bindingFor(provider.id, modelId)
         .catch(() => undefined)
     : undefined;
   if (isVendorAccount && !vendorBinding) {
@@ -916,7 +918,7 @@ async function resolveAgentRuntimeLaunch(
     getSecret: async (id: string) =>
       (await host!.call<{ value?: string }>("providers.getSecret", { id })).value,
     resolveVendorBinding: (pinned, pinnedModelId) =>
-      vendorOAuth.bindingFor(pinned.vendorKey || "", pinnedModelId),
+      vendorOAuth.bindingFor(pinned.id, pinnedModelId),
   });
   const subagentDiagnostics = [
     ...subagentCatalog.diagnostics,
@@ -940,8 +942,8 @@ async function resolveAgentRuntimeLaunch(
     ]
       .map((id) => providers.providers.find((row) => row.id === id))
       .flatMap((row) =>
-        row?.authKind === OAUTH_AUTH_KIND && row.vendorKey
-          ? [{ providerId: row.id, vendorKey: row.vendorKey }]
+        row?.authKind === OAUTH_AUTH_KIND
+          ? [{ providerId: row.id }]
           : [],
       ),
   );
@@ -3711,10 +3713,12 @@ async function startSidecar(): Promise<void> {
     // record. The sidecar can provide a target path, never an arbitrary root.
     return loadInstructionChain(projectPath, path);
   });
-  // Request auth for a vendor account (ADR 0095). The sidecar names a provider
-  // row it was launched with; main resolves the vendor and returns a short-lived
-  // `ModelAuth`. The refresh token never crosses this boundary.
-  s.setVendorAuthResolver(async ({ vendorKey }) => vendorOAuth.resolveAuth(vendorKey));
+  // Request auth for a vendor account (ADR 0096). The sidecar names a provider
+  // row it was launched with; main resolves that row's account and returns a
+  // short-lived `ModelAuth`. The refresh token never crosses this boundary.
+  s.setVendorAuthResolver(async ({ providerId }) =>
+    vendorOAuth.resolveAuth(providerId),
+  );
   // Agent-driven work panel preview (D100): open a workspace HTML file in
   // the embedded browser; live reload keeps it current through later edits.
   s.setLocalTool("BrowserPreview", async ({ args, sessionId }) => {
@@ -5087,15 +5091,13 @@ function registerIpc() {
     );
     if (!local.ok) return { ...local, network: "skipped" };
     const detail = await host.call<{
-      provider?: { baseUrl?: string; authKind?: string; vendorKey?: string };
+      provider?: { baseUrl?: string; authKind?: string };
     }>("providers.get", { id });
     // A vendor account proves itself by resolving auth — refreshing the token
     // if it has expired — not by probing /models with a key it does not have.
     if (detail.provider?.authKind === OAUTH_AUTH_KIND) {
-      const vendorKey = detail.provider.vendorKey;
-      if (!vendorKey) return { ...local, network: "skipped" };
       try {
-        await vendorOAuth.resolveAuth(vendorKey);
+        await vendorOAuth.resolveAuth(id);
         return { ok: true, network: "ok" };
       } catch (e) {
         return {
@@ -5165,11 +5167,11 @@ function registerIpc() {
   handle(IPC.invoke.providersOauthCancel, async (loginId: unknown) => {
     return { ok: typeof loginId === "string" && vendorOAuth.cancel(loginId) };
   });
-  handle(IPC.invoke.providersOauthLogout, async (vendorId: unknown) => {
-    if (typeof vendorId !== "string" || !vendorId) {
-      throw new Error("vendorId required");
+  handle(IPC.invoke.providersOauthDelete, async (providerId: unknown) => {
+    if (typeof providerId !== "string" || !providerId) {
+      throw new Error("providerId required");
     }
-    await vendorOAuth.logout(vendorId);
+    await vendorOAuth.deleteAccount(providerId);
     return { ok: true };
   });
   handle(
@@ -5233,9 +5235,9 @@ function registerIpc() {
       // A signed-in vendor account has no key to probe /models with, and pi-ai
       // already knows which models the account may use (Copilot narrows the
       // list to the subscription).
-      if (provider?.authKind === OAUTH_AUTH_KIND && provider.vendorKey) {
+      if (provider?.authKind === OAUTH_AUTH_KIND) {
         try {
-          const options = await vendorOAuth.listModels(provider.vendorKey);
+          const options = await vendorOAuth.listModels(provider.id);
           if (options.length > 0) {
             return {
               models: options.map((option) =>

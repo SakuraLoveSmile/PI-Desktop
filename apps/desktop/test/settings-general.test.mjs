@@ -26,6 +26,22 @@ const marketplaceSettingsSource = await readFile(
   ),
   "utf8",
 );
+const vendorAccountsSource = await readFile(
+  new URL("../src/components/settings/VendorAccountsSection.tsx", import.meta.url),
+  "utf8",
+);
+const vendorPickerSource = await readFile(
+  new URL("../src/components/settings/VendorPickerDialog.tsx", import.meta.url),
+  "utf8",
+);
+const oauthSource = await readFile(
+  new URL("../electron/main/oauth.ts", import.meta.url),
+  "utf8",
+);
+const protocolSource = await readFile(
+  new URL("../../../packages/shared/src/protocol.ts", import.meta.url),
+  "utf8",
+);
 const languageSource = await readFile(
   new URL("../src/lib/app-language.ts", import.meta.url),
   "utf8",
@@ -114,6 +130,27 @@ test("model configuration keeps model defaults; AI owns app behavior defaults", 
   assert.match(providersSource, /settings\.defaultModel/);
   assert.doesNotMatch(providersSource, /enterToSend/);
   assert.doesNotMatch(providersSource, /settings\.modeAgent/);
+});
+
+test("model configuration separates AI services from independently removable vendor accounts", () => {
+  assert.match(providersSource, /authKind !== OAUTH_AUTH_KIND/);
+  assert.match(providersSource, /p\.hasSecret \|\| p\.hasOauth/);
+  assert.match(providersSource, /provider-config-hero/);
+  assert.match(vendorAccountsSource, /api\.deleteOauthAccount\(account\.providerId\)/);
+  assert.match(vendorAccountsSource, /providerIsReady/);
+  assert.match(vendorAccountsSource, /defaultProviderId: next\?\.id \?\? ""/);
+  assert.match(vendorAccountsSource, /useAppStore\.setState\(\{ settings: nextSettings \}\)/);
+  assert.match(vendorPickerSource, /existing accounts do not disable a vendor/);
+  assert.match(vendorPickerSource, /vendors\.map/);
+});
+
+test("OAuth account identity is provider-scoped across IPC and pi-ai", () => {
+  assert.match(protocolSource, /providersOauthDelete/);
+  assert.doesNotMatch(protocolSource, /providersOauthLogout/);
+  assert.match(oauthSource, /accountModels = new Map<string, AccountModels>/);
+  assert.match(oauthSource, /fresh provider row/);
+  assert.match(oauthSource, /secretRefForProviderOauth\(providerId\)/);
+  assert.match(oauthSource, /deleteAccount\(providerId: string\)/);
 });
 
 

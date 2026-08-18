@@ -619,8 +619,8 @@ export type ProviderCreateInput = {
   secretValue?: string;
   apiStyle?: string;
   /**
-   * Non-secret label for the signed-in vendor account. An empty string clears
-   * it, which is what logout sends.
+   * Non-secret label for the signed-in vendor account. Account removal deletes
+   * the owning provider row instead of clearing only this label.
    */
   oauthAccountLabel?: string;
   /** Explicit override for custom model catalogs. */
@@ -644,10 +644,20 @@ export type ProviderUpdateInput = Partial<ProviderCreateInput> & {
   enabled?: boolean;
 };
 
+/** One locally configured account for a vendor OAuth provider. */
+export type OAuthAccount = {
+  /** Provider row that owns this account's encrypted OAuth grant. */
+  providerId: string;
+  /** Non-secret account label, when the vendor exposes one. */
+  accountLabel?: string;
+  /** False for an orphaned row whose credential has already been removed. */
+  connected: boolean;
+};
+
 /**
  * A vendor whose subscription account can be signed into instead of pasting an
  * API key. Derived from the runtime's built-in provider catalog, never a
- * hardcoded list.
+ * hardcoded list. A vendor can own multiple independent local accounts.
  */
 export type OAuthVendor = {
   /** Vendor id in the model runtime, e.g. "anthropic", "github-copilot". */
@@ -657,11 +667,8 @@ export type OAuthVendor = {
   loginLabel?: string;
   /** Whether access is backed by a paid subscription rather than usage credit. */
   isSubscription: boolean;
-  /** Provider row created by a previous login, when one exists. */
-  providerId?: string;
-  /** Non-secret account label shown next to a signed-in vendor. */
-  accountLabel?: string;
-  signedIn: boolean;
+  /** Every local provider row created for this vendor. */
+  accounts: OAuthAccount[];
 };
 
 export type OAuthPromptOption = {

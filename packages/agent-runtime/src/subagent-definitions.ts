@@ -308,11 +308,16 @@ function findProvider(
   providers: readonly SubagentProviderSource[],
 ): SubagentProviderSource | undefined {
   const alias = providerAlias(providerId);
-  return (
-    providers.find((provider) => provider.id === providerId) ??
-    providers.find((provider) => providerAlias(provider.vendorKey ?? "") === alias) ??
-    providers.find((provider) => providerAlias(provider.name) === alias)
+  const exact = providers.find((provider) => provider.id === providerId);
+  if (exact) return exact;
+  const vendorMatches = providers.filter(
+    (provider) => providerAlias(provider.vendorKey ?? "") === alias,
   );
+  if (vendorMatches.length === 1) return vendorMatches[0];
+  const nameMatches = providers.filter(
+    (provider) => providerAlias(provider.name) === alias,
+  );
+  return nameMatches.length === 1 ? nameMatches[0] : undefined;
 }
 
 /**

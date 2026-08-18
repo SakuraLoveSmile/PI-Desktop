@@ -48,7 +48,7 @@ describe("Plan protocol contracts", () => {
       IPC.invoke.providersOauthStart,
       IPC.invoke.providersOauthRespond,
       IPC.invoke.providersOauthCancel,
-      IPC.invoke.providersOauthLogout,
+      IPC.invoke.providersOauthDelete,
       IPC.event.providersOauth,
     ]) {
       expect(IPC_WHITELIST.has(channel)).toBe(true);

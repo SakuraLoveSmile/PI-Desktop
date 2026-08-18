@@ -117,7 +117,7 @@ export const IPC = {
     providersOauthStart: "pi-desktop/providers/oauth/start",
     providersOauthRespond: "pi-desktop/providers/oauth/respond",
     providersOauthCancel: "pi-desktop/providers/oauth/cancel",
-    providersOauthLogout: "pi-desktop/providers/oauth/logout",
+    providersOauthDelete: "pi-desktop/providers/oauth/delete",
     pluginList: "pi-desktop/plugin/list",
     pluginLoadDev: "pi-desktop/plugin/loadDev",
     pluginReload: "pi-desktop/plugin/reload",

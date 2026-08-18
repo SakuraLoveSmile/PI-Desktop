@@ -317,7 +317,7 @@ export const api = {
       source: "cache" | "remote" | "fallback";
       error?: string;
     }>(IPC.invoke.providersListModels, input),
-  /** Vendor accounts pi-ai can sign in to, with the local row when one exists. */
+  /** Vendor catalog plus every locally configured account for each vendor. */
   listOauthVendors: () =>
     invoke<{ vendors: OAuthVendor[] }>(IPC.invoke.providersOauthVendors),
   /** Begin a login; progress arrives through `onOauthLogin`. */
@@ -328,8 +328,8 @@ export const api = {
     invoke<{ ok: boolean }>(IPC.invoke.providersOauthRespond, input),
   cancelOauthLogin: (loginId: string) =>
     invoke<{ ok: boolean }>(IPC.invoke.providersOauthCancel, loginId),
-  logoutOauthVendor: (vendorId: string) =>
-    invoke<{ ok: boolean }>(IPC.invoke.providersOauthLogout, vendorId),
+  deleteOauthAccount: (providerId: string) =>
+    invoke<{ ok: boolean }>(IPC.invoke.providersOauthDelete, providerId),
   getProject: () =>
     invoke<{ workspace: ProjectWorkspace | null }>(IPC.invoke.projectGet),
   listProjects: () =>

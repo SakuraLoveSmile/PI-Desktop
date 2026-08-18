@@ -42,6 +42,8 @@ function fakeHost() {
       }
       case "providers.delete":
         providers.delete(params.id);
+        secrets.delete(secretRefForProviderOauth(params.id));
+        secrets.delete(`secret:provider:${params.id}:api_key`);
         return { ok: true };
       case "secrets.set":
         secrets.set(params.secretRef, params.value);
@@ -127,7 +129,7 @@ function harness(options = {}) {
   const events = [];
   const opened = [];
   let counter = 0;
-  let credentials;
+  const stores = [];
   const oauth = new VendorOAuth({
     call: host.call,
     emit: (event) => events.push(event),
@@ -136,15 +138,18 @@ function harness(options = {}) {
       if (options.browserFails) throw new Error("no browser");
     },
     createModels: (store) => {
-      credentials = store;
+      stores.push(store);
       return fakeModels(store, options);
     },
     newId: () => `id-${++counter}`,
   });
   // The store the module handed pi-ai, so a test can drive it the way a token
   // refresh would.
-  const store = () => credentials;
-  return { host, events, opened, oauth, store };
+  // The catalog is created first; every following store belongs to one local
+  // provider row. Tests can inspect a specific account without collapsing it
+  // into a vendor-global credential.
+  const store = (accountIndex = 0) => stores[accountIndex + 1];
+  return { host, events, opened, oauth, store, stores };
 }
 
 /** Wait until an event of this kind shows up, so tests never poll blindly. */
@@ -175,9 +180,7 @@ test("vendors are derived from pi-ai, not hardcoded", async () => {
       name: "Anthropic (Claude Pro/Max)",
       loginLabel: "Sign in with Claude Pro/Max",
       isSubscription: true,
-      providerId: undefined,
-      accountLabel: undefined,
-      signedIn: false,
+      accounts: [],
     },
   ]);
 });
@@ -212,11 +215,16 @@ test("a completed login stores the credential and configures the row", async () 
   assert.equal(host.secrets.has(`secret:provider:${row.id}:api_key`), false);
 
   // The sidecar only ever gets the short-lived access token.
-  assert.deepEqual(await oauth.resolveAuth("anthropic"), { apiKey: "access-for-abc" });
+  assert.deepEqual(await oauth.resolveAuth(row.id), { apiKey: "access-for-abc" });
 
   const [vendor] = await oauth.listVendors();
-  assert.equal(vendor.signedIn, true);
-  assert.equal(vendor.providerId, row.id);
+  assert.deepEqual(vendor.accounts, [
+    {
+      providerId: row.id,
+      accountLabel: "Anthropic (Claude Pro/Max)",
+      connected: true,
+    },
+  ]);
 });
 
 test("cancelling takes the half-created row back out", async () => {
@@ -252,31 +260,28 @@ test("a browser that will not open falls back to a copyable link", async () => {
   assert.equal(authUrl.url, "https://claude.ai/oauth/authorize");
 });
 
-test("logout forgets the credential but keeps the configured row", async () => {
+test("deleting an account removes its credential and configured row", async () => {
   const { host, events, oauth } = harness();
   const { loginId } = await oauth.start("anthropic");
   const prompt = await waitFor(events, "prompt");
   oauth.respond({ loginId, promptId: prompt.request.promptId, value: "abc" });
   const done = await waitFor(events, "done");
 
-  await oauth.logout("anthropic");
+  await oauth.deleteAccount(done.providerId);
   assert.equal(host.secrets.has(secretRefForProviderOauth(done.providerId)), false);
-  const row = host.providers.get(done.providerId);
-  assert.equal(row.defaultModelId, "claude-opus-5");
-  assert.equal(row.oauthAccountLabel, "");
+  assert.equal(host.providers.has(done.providerId), false);
 
   const [vendor] = await oauth.listVendors();
-  assert.equal(vendor.signedIn, false);
-  await assert.rejects(() => oauth.resolveAuth("anthropic"), /not signed in/);
+  assert.deepEqual(vendor.accounts, []);
+  await assert.rejects(() => oauth.resolveAuth(done.providerId), /not signed in/);
 });
 
-test("signing in again reuses the existing row", async () => {
+test("signing in again creates an independent account row", async () => {
   const { host, events, oauth } = harness();
   const first = await oauth.start("anthropic");
   const prompt = await waitFor(events, "prompt");
   oauth.respond({ loginId: first.loginId, promptId: prompt.request.promptId, value: "abc" });
   const done = await waitFor(events, "done");
-  await oauth.logout("anthropic");
 
   events.length = 0;
   const second = await oauth.start("anthropic");
@@ -284,10 +289,29 @@ test("signing in again reuses the existing row", async () => {
   oauth.respond({ loginId: second.loginId, promptId: again.request.promptId, value: "xyz" });
   const redone = await waitFor(events, "done");
 
-  assert.equal(redone.providerId, done.providerId);
-  assert.equal(host.providers.size, 1);
-  const stored = JSON.parse(host.secrets.get(secretRefForProviderOauth(done.providerId)));
-  assert.equal(stored.access, "access-for-xyz");
+  assert.notEqual(redone.providerId, done.providerId);
+  assert.equal(host.providers.size, 2);
+  const firstStored = JSON.parse(
+    host.secrets.get(secretRefForProviderOauth(done.providerId)),
+  );
+  const secondStored = JSON.parse(
+    host.secrets.get(secretRefForProviderOauth(redone.providerId)),
+  );
+  assert.equal(firstStored.access, "access-for-abc");
+  assert.equal(secondStored.access, "access-for-xyz");
+  assert.deepEqual(await oauth.resolveAuth(done.providerId), {
+    apiKey: "access-for-abc",
+  });
+  assert.deepEqual(await oauth.resolveAuth(redone.providerId), {
+    apiKey: "access-for-xyz",
+  });
+
+  await oauth.deleteAccount(done.providerId);
+  assert.equal(host.providers.has(done.providerId), false);
+  assert.equal(host.providers.has(redone.providerId), true);
+  assert.deepEqual(await oauth.resolveAuth(redone.providerId), {
+    apiKey: "access-for-xyz",
+  });
 });
 
 test("a second attempt waits for the first to let go of its callback port", async () => {
@@ -347,10 +371,10 @@ test("the real pi-ai catalog offers every vendor account we ship", async () => {
       "xai",
     ],
   );
-  assert.ok(vendors.every((vendor) => vendor.name && !vendor.signedIn));
+  assert.ok(vendors.every((vendor) => vendor.name && vendor.accounts.length === 0));
 });
 
-test("credential writes for one vendor run one at a time", async () => {
+test("credential writes for one account run one at a time", async () => {
   const { host, events, oauth, store } = harness();
   const { loginId } = await oauth.start("anthropic");
   const prompt = await waitFor(events, "prompt");
@@ -369,7 +393,7 @@ test("credential writes for one vendor run one at a time", async () => {
     const next = `rotated-${seen.length}`;
     return { type: "oauth", refresh: next, access: next, expires: 0 };
   };
-  const credentials = store();
+  const credentials = store(0);
   await Promise.all([
     credentials.modify("anthropic", slow),
     credentials.modify("anthropic", slow),

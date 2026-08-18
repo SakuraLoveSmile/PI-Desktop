@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { OAUTH_AUTH_KIND, type ProviderPublic } from "@pi-desktop/shared";
+import type { ProviderPublic } from "@pi-desktop/shared";
 import { Button, Field, Input, Select, cx } from "../ui";
-import { IconClose, IconKey } from "../icons";
+import { IconClose } from "../icons";
 import {
-  API_STYLE_OPTIONS,
   CUSTOM_API_STYLE_OPTIONS,
   type ApiStyle,
   type ProviderForm,
@@ -28,11 +27,6 @@ export function ProviderDialog({
 }) {
   const { t } = useTranslation();
   const models = useProviderModels(true, form, editingProvider);
-  // A signed-in vendor row: its wire API comes from the account's model
-  // catalog on every launch, so neither the style nor a key is editable here.
-  const isVendorAccount = editingProvider?.authKind === OAUTH_AUTH_KIND;
-  const apiStyleOptions: ReadonlyArray<(typeof API_STYLE_OPTIONS)[number]> =
-    isVendorAccount ? API_STYLE_OPTIONS : CUSTOM_API_STYLE_OPTIONS;
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
@@ -158,10 +152,9 @@ export function ProviderDialog({
           <Field label={t("settings.apiStyle")} hint={t("settings.apiStyleDesc")}>
             <Select
               value={form.apiStyle}
-              disabled={isVendorAccount}
               onChange={(e) => setField("apiStyle", e.target.value as ApiStyle)}
             >
-              {apiStyleOptions.map(([value, labelKey]) => (
+              {CUSTOM_API_STYLE_OPTIONS.map(([value, labelKey]) => (
                 <option key={value} value={value}>
                   {t(labelKey)}
                 </option>
@@ -244,37 +237,23 @@ export function ProviderDialog({
               ) : null}
             </div>
           </Field>
-          {isVendorAccount ? (
-            // A vendor-account row is signed in, not keyed; there is nothing to
-            // paste and the credential never reaches the renderer anyway.
-            <Field label={t("settings.apiKey")}>
-              <div className="provider-account-note">
-                <IconKey size={13} />
-                <span>
-                  {editingProvider?.oauthAccountLabel ||
-                    t("settings.vendorAccountBadge")}
-                </span>
-              </div>
-            </Field>
-          ) : (
-            <Field
-              label={t("settings.apiKey")}
-              hint={
-                editingProvider && editingProvider.hasSecret
-                  ? t("settings.apiKeyKeepHint")
-                  : t("settings.apiKeyHint")
-              }
-            >
-              <Input
-                type="password"
-                value={form.apiKey}
-                onChange={(e) => setField("apiKey", e.target.value)}
-                placeholder="sk-…"
-                className="font-mono text-sm-plus"
-                autoComplete="off"
-              />
-            </Field>
-          )}
+          <Field
+            label={t("settings.apiKey")}
+            hint={
+              editingProvider && editingProvider.hasSecret
+                ? t("settings.apiKeyKeepHint")
+                : t("settings.apiKeyHint")
+            }
+          >
+            <Input
+              type="password"
+              value={form.apiKey}
+              onChange={(e) => setField("apiKey", e.target.value)}
+              placeholder="sk-…"
+              className="font-mono text-sm-plus"
+              autoComplete="off"
+            />
+          </Field>
         </div>
 
         <div className="provider-dialog-actions">

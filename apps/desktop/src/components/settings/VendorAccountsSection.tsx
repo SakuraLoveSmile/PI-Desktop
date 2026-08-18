@@ -1,33 +1,52 @@
 /**
- * Sign in with a vendor subscription instead of pasting an API key (ADR 0095).
- * The panel lists accounts, not vendors: one "add" button opens the picker, the
- * same shape as the provider list, so a runtime that knows seven OAuth vendors
- * does not spend seven rows saying nobody is signed in.
+ * Sign in with a vendor subscription instead of pasting an API key (ADR 0096).
+ * Vendor accounts are separate from API providers in the settings hierarchy;
+ * each account row owns exactly one OAuth provider row and can be removed on
+ * its own.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { OAuthVendor } from "@pi-desktop/shared";
+import type { OAuthAccount, OAuthVendor, ProviderPublic } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import {
   beginOAuthLogin,
   type OAuthLoginSession,
 } from "../../lib/oauth-login-session";
-import { Badge, Button } from "../ui";
-import { IconKey, IconLogOut } from "../icons";
+import { Badge, Button, cx } from "../ui";
+import { IconKey, IconTrash } from "../icons";
 import { OAuthLoginDialog } from "./OAuthLoginDialog";
 import { VendorPickerDialog } from "./VendorPickerDialog";
 
 /** A login in flight, together with the dialog reporting on it. */
 type ActiveLogin = { vendor: OAuthVendor; session: OAuthLoginSession };
 
+type AccountEntry = {
+  vendor: OAuthVendor;
+  account: OAuthAccount;
+  ordinal: number;
+  totalForVendor: number;
+};
+
+function providerIsReady(provider: ProviderPublic, excludedId?: string): boolean {
+  return (
+    provider.id !== excludedId &&
+    provider.enabled &&
+    !!provider.defaultModelId &&
+    (provider.hasSecret || provider.hasOauth || provider.authKind === "none")
+  );
+}
+
 export function VendorAccountsSection() {
   const { t } = useTranslation();
+  const providers = useAppStore((s) => s.providers);
+  const settings = useAppStore((s) => s.settings);
   const refreshProviders = useAppStore((s) => s.refreshProviders);
   const showToast = useAppStore((s) => s.showToast);
 
   const [vendors, setVendors] = useState<OAuthVendor[] | null>(null);
-  const [busyVendor, setBusyVendor] = useState<string | null>(null);
+  const [busyAccount, setBusyAccount] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [login, setLogin] = useState<ActiveLogin | null>(null);
 
@@ -50,13 +69,43 @@ export function VendorAccountsSection() {
   // the renderer listening. Cancelling the attempt itself is the dialog's job.
   useEffect(() => () => login?.session.dispose(), [login]);
 
-  const signOut = async (vendor: OAuthVendor) => {
-    setBusyVendor(vendor.vendorId);
+  const accounts = useMemo<AccountEntry[]>(() => {
+    if (!vendors) return [];
+    return vendors.flatMap((vendor) => {
+      const totalForVendor = vendor.accounts.length;
+      return vendor.accounts.map((account, index) => ({
+        vendor,
+        account,
+        ordinal: index + 1,
+        totalForVendor,
+      }));
+    });
+  }, [vendors]);
+
+  const removeAccount = async (entry: AccountEntry) => {
+    const { account, vendor } = entry;
+    setConfirmDeleteId(null);
+    setBusyAccount(account.providerId);
     try {
-      await api.logoutOauthVendor(vendor.vendorId);
-      await loadVendors();
-      await refreshProviders();
-      showToast(t("settings.vendorSignedOut", { vendor: vendor.name }), {
+      await api.deleteOauthAccount(account.providerId);
+
+      // A deleted account cannot remain the global default. Pick the first
+      // still-ready service, including an API provider, so the model picker
+      // does not point at a deleted row after refresh.
+      if (settings?.defaultProviderId === account.providerId) {
+        const next = providers.find((provider) =>
+          providerIsReady(provider, account.providerId),
+        );
+        const nextSettings = {
+          ...settings,
+          defaultProviderId: next?.id ?? "",
+          defaultModelId: next?.defaultModelId ?? "",
+        };
+        await api.setSettings(nextSettings);
+        useAppStore.setState({ settings: nextSettings });
+      }
+      await Promise.all([loadVendors(), refreshProviders()]);
+      showToast(t("settings.vendorAccountRemoved", { vendor: vendor.name }), {
         variant: "success",
       });
     } catch (error) {
@@ -64,7 +113,7 @@ export function VendorAccountsSection() {
         variant: "error",
       });
     } finally {
-      setBusyVendor(null);
+      setBusyAccount(null);
     }
   };
 
@@ -87,17 +136,21 @@ export function VendorAccountsSection() {
   // Nothing to offer until the runtime reports at least one OAuth vendor.
   if (!vendors || vendors.length === 0) return null;
 
-  const accounts = vendors.filter((vendor) => vendor.signedIn);
-  const available = vendors.filter((vendor) => !vendor.signedIn);
-
   return (
-    <section className="settings-card-block">
+    <section className="settings-card-block vendor-accounts-block">
       <div className="provider-section-head">
-        <h3 className="settings-card-heading">{t("settings.vendorAccounts")}</h3>
+        <div>
+          <div className="settings-card-heading-line">
+            <h3 className="settings-card-heading">{t("settings.vendorAccounts")}</h3>
+            {accounts.length > 0 ? (
+              <span className="provider-section-count">{accounts.length}</span>
+            ) : null}
+          </div>
+          <div className="settings-section-subtitle">{t("settings.vendorAccountsDesc")}</div>
+        </div>
         <Button
           variant="secondary"
-          disabled={available.length === 0 || login !== null}
-          title={available.length === 0 ? t("settings.vendorAllSignedIn") : undefined}
+          disabled={login !== null}
           onClick={() => setPicking(true)}
         >
           <span className="vendor-btn-inner">
@@ -108,45 +161,79 @@ export function VendorAccountsSection() {
       </div>
 
       <div className="settings-panel">
-        <div className="vendor-account-desc">{t("settings.vendorAccountsDesc")}</div>
         {accounts.length === 0 ? (
           <div className="vendor-account-empty">{t("settings.vendorNoAccounts")}</div>
         ) : (
           <div className="vendor-card-list">
-            {accounts.map((vendor) => (
-              <div key={vendor.vendorId} className="vendor-card">
-                <div className="vendor-card-info">
-                  <div className="vendor-card-title-line">
-                    <span className="vendor-card-name">{vendor.name}</span>
-                    {vendor.isSubscription ? (
-                      <Badge tone="neutral">{t("settings.vendorSubscription")}</Badge>
-                    ) : null}
-                    <Badge tone="success">{t("settings.vendorConnected")}</Badge>
-                  </div>
-                  <div className="vendor-card-meta">
-                    {vendor.accountLabel || t("settings.vendorSignedInGeneric")}
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busyVendor === vendor.vendorId}
-                  onClick={() => void signOut(vendor)}
+            {accounts.map((entry) => {
+              const { vendor, account } = entry;
+              const connected = account.connected;
+              const accountName = account.accountLabel || t("settings.vendorSignedInGeneric");
+              const duplicateLabel =
+                entry.totalForVendor > 1
+                  ? ` · ${t("settings.vendorAccountNumber", { number: entry.ordinal })}`
+                  : "";
+              const confirming = confirmDeleteId === account.providerId;
+              const busy = busyAccount === account.providerId;
+              return (
+                <div
+                  key={account.providerId}
+                  className={cx("vendor-card", !connected && "is-disconnected")}
                 >
-                  <span className="vendor-btn-inner">
-                    <IconLogOut size={13} />
-                    <span>{t("settings.vendorSignOut")}</span>
-                  </span>
-                </Button>
-              </div>
-            ))}
+                  <div className="vendor-card-info">
+                    <div className="vendor-card-title-line">
+                      <span className="vendor-card-name">{vendor.name}</span>
+                      {vendor.isSubscription ? (
+                        <Badge tone="neutral">{t("settings.vendorSubscription")}</Badge>
+                      ) : null}
+                      <Badge tone={connected ? "success" : "warning"}>
+                        {connected
+                          ? t("settings.vendorConnected")
+                          : t("settings.vendorDisconnected")}
+                      </Badge>
+                    </div>
+                    <div className="vendor-card-meta">
+                      {accountName}
+                      {duplicateLabel}
+                    </div>
+                    {!connected ? (
+                      <div className="vendor-card-status">
+                        {t("settings.vendorDisconnectedDesc")}
+                      </div>
+                    ) : null}
+                  </div>
+                  {confirming ? (
+                    <button
+                      type="button"
+                      className="provider-delete-confirm"
+                      disabled={busy}
+                      onBlur={() => setConfirmDeleteId(null)}
+                      onClick={() => void removeAccount(entry)}
+                    >
+                      {t("settings.deleteConfirm")}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="icon-btn provider-icon-btn provider-icon-btn-danger"
+                      title={t("settings.vendorRemoveAccount")}
+                      aria-label={t("settings.vendorRemoveAccount")}
+                      disabled={busy}
+                      onClick={() => setConfirmDeleteId(account.providerId)}
+                    >
+                      <IconTrash size={14} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
       {picking ? (
         <VendorPickerDialog
-          vendors={available}
+          vendors={vendors}
           onPick={(vendor) => {
             setPicking(false);
             // Started here, not in the dialog: a click happens once, where

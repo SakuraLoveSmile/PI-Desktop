@@ -1,5 +1,5 @@
 /**
- * Vendor-account login (ADR 0095). Every flow — PKCE with a local callback,
+ * Vendor-account login (ADR 0096). Every flow — PKCE with a local callback,
  * device code, a pasted code — arrives through the same event stream, so this
  * dialog renders whatever the vendor asked for rather than a per-vendor script.
  *

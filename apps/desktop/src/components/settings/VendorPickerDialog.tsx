@@ -1,8 +1,4 @@
-/**
- * Pick which vendor to sign in to (ADR 0095). The account list stays short by
- * asking only when the user wants a new account, the same way a provider row
- * starts from one "add" button rather than a card per known service.
- */
+/** Pick which vendor to sign in to; the same vendor can be picked repeatedly. */
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { OAuthVendor } from "@pi-desktop/shared";
@@ -13,7 +9,7 @@ export function VendorPickerDialog({
   onPick,
   onClose,
 }: {
-  /** Vendors that are not signed in yet; never empty when this is rendered. */
+  /** Every OAuth-capable vendor; existing accounts do not disable a vendor. */
   vendors: OAuthVendor[];
   onPick: (vendor: OAuthVendor) => void;
   onClose: () => void;
@@ -54,6 +50,17 @@ export function VendorPickerDialog({
               {vendor.loginLabel || vendor.isSubscription ? (
                 <span className="oauth-option-desc">
                   {vendor.loginLabel || t("settings.vendorSubscription")}
+                  {vendor.accounts.length > 0
+                    ? ` · ${t("settings.vendorExistingAccounts", {
+                        count: vendor.accounts.length,
+                      })}`
+                    : ""}
+                </span>
+              ) : vendor.accounts.length > 0 ? (
+                <span className="oauth-option-desc">
+                  {t("settings.vendorExistingAccounts", {
+                    count: vendor.accounts.length,
+                  })}
                 </span>
               ) : null}
             </button>

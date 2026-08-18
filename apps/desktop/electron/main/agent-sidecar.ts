@@ -41,8 +41,6 @@ export type ProjectInstructionResolver = (input: {
 export type VendorAuthResolver = (input: {
   sessionId: string;
   providerId: string;
-  /** pi-ai provider id main bound to this row when it launched the turn. */
-  vendorKey: string;
 }) => Promise<unknown>;
 
 // The sidecar runs model-directed code paths; it must not be able to pull
@@ -112,10 +110,10 @@ export class AgentSidecar {
   // immediately before starting a runtime turn.
   private projectInstructionRoots = new Map<string, string>();
   private vendorAuthResolver: VendorAuthResolver | null = null;
-  // Vendor-account rows this session was launched with: provider row id →
-  // pi-ai provider id. The sidecar can only ask for auth it is already using,
-  // and a session that never bound an OAuth row can ask for nothing at all.
-  private vendorAuthBindings = new Map<string, Map<string, string>>();
+  // Vendor-account rows this session was launched with. The sidecar can only
+  // ask for auth it is already using, and a session that never bound an OAuth
+  // row can ask for nothing at all.
+  private vendorAuthBindings = new Map<string, Set<string>>();
 
   constructor(onStderr?: StderrHandler) {
     const entry = resolveSidecarEntry();
@@ -277,21 +275,20 @@ export class AgentSidecar {
   /**
    * Bind the vendor-account rows a turn may sign requests with. Replaces the
    * session's previous set, so a row dropped from the launch payload — a model
-   * switch, a logout — stops being resolvable on the next turn.
+   * switch or account removal — stops being resolvable on the next turn.
    */
   setVendorAuthBindings(
     sessionId: string,
-    bindings: ReadonlyArray<{ providerId: string; vendorKey: string }>,
+    bindings: ReadonlyArray<{ providerId: string }>,
   ): void {
     const id = sessionId.trim();
     if (!id) return;
-    const map = new Map<string, string>();
+    const providerIds = new Set<string>();
     for (const binding of bindings) {
       const providerId = binding.providerId?.trim();
-      const vendorKey = binding.vendorKey?.trim();
-      if (providerId && vendorKey) map.set(providerId, vendorKey);
+      if (providerId) providerIds.add(providerId);
     }
-    if (map.size > 0) this.vendorAuthBindings.set(id, map);
+    if (providerIds.size > 0) this.vendorAuthBindings.set(id, providerIds);
     else this.vendorAuthBindings.delete(id);
   }
 
@@ -339,14 +336,14 @@ export class AgentSidecar {
     }
     const sessionId = String(params.sessionId ?? "").trim();
     const providerId = String(params.providerId ?? "").trim();
-    const vendorKey = this.vendorAuthBindings.get(sessionId)?.get(providerId);
-    if (!vendorKey) {
+    const bound = this.vendorAuthBindings.get(sessionId)?.has(providerId);
+    if (!bound) {
       throw Object.assign(
         new Error("provider is not bound to this session"),
         { code: -32000, data: { errorCode: "PROVIDER_NOT_BOUND" } },
       );
     }
-    return this.vendorAuthResolver({ sessionId, providerId, vendorKey });
+    return this.vendorAuthResolver({ sessionId, providerId });
   }
 
   private async onLine(line: string) {

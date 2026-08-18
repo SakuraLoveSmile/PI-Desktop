@@ -3,7 +3,7 @@
  *
  * pi-ai owns the seven login flows and the locked token refresh; persistence
  * and the user-facing half of the conversation are the app's job (see
- * `auth/types.d.ts`: "Login/logout orchestration is app-owned"). This module is
+ * `auth/types.d.ts`: "Login/account-removal orchestration is app-owned"). This module is
  * that half:
  *
  *  - a CredentialStore backed by host-core's encrypted secret store, keyed
@@ -25,7 +25,6 @@ import type {
   AuthInteraction,
   AuthPrompt,
   Credential,
-  CredentialInfo,
   CredentialStore,
   Model,
   ModelAuth,
@@ -142,10 +141,17 @@ type PendingPrompt = {
   reject: (error: Error) => void;
 };
 
+type AccountModels = {
+  providerId: string;
+  vendorId: string;
+  models: MutableModels;
+};
+
 type LoginSession = {
   loginId: string;
   vendorId: string;
   providerId: string;
+  account: AccountModels;
   /** Whether this login created the row, and so owns cleaning it up on failure. */
   createdRow: boolean;
   controller: AbortController;
@@ -179,49 +185,54 @@ function promptRequest(
 export class VendorOAuth {
   private readonly deps: VendorOAuthDeps;
   private readonly logins = new Map<string, LoginSession>();
-  /** pi-ai provider id → PI-Desktop provider row id. */
-  private readonly rowIds = new Map<string, string>();
-  /** Per-vendor write chain: `modify` must be a serialized read-modify-write. */
+  /** One pi-ai collection and credential store per local OAuth account row. */
+  private readonly accountModels = new Map<string, AccountModels>();
+  /** Per-account write chain: `modify` must be a serialized read-modify-write. */
   private readonly chains = new Map<string, Promise<unknown>>();
-  private modelsPromise?: Promise<MutableModels>;
+  private catalogPromise?: Promise<MutableModels>;
+  private oauthFlowsRegistered = false;
 
   constructor(deps: VendorOAuthDeps) {
     this.deps = deps;
   }
 
-  /** Every vendor pi-ai can sign in to, paired with its local row if any. */
+  /** Every vendor pi-ai can sign in to, with every local account row. */
   async listVendors(): Promise<OAuthVendor[]> {
-    const models = await this.ensureModels();
+    const models = await this.ensureCatalogModels();
     const rows = await this.rows();
     return models
       .getProviders()
       .filter((provider) => provider.auth.oauth)
       .map((provider) => {
         const oauth = provider.auth.oauth!;
-        const row = rows.find(
-          (candidate) =>
-            candidate.authKind === OAUTH_AUTH_KIND &&
-            candidate.vendorKey === provider.id,
-        );
+        const accounts = rows
+          .filter(
+            (candidate) =>
+              candidate.authKind === OAUTH_AUTH_KIND &&
+              candidate.vendorKey === provider.id,
+          )
+          .map((row) => ({
+            providerId: row.id,
+            accountLabel: row.oauthAccountLabel || undefined,
+            connected: row.hasOauth === true,
+          }));
         return {
           vendorId: provider.id,
           name: oauth.name || provider.name,
           loginLabel: oauth.loginLabel,
           isSubscription: oauth.isSubscription === true,
-          providerId: row?.id,
-          accountLabel: row?.oauthAccountLabel,
-          signedIn: row?.hasOauth === true,
+          accounts,
         };
       });
   }
 
   /**
-   * Begin a login. The provider row is created first so the credential has a
-   * stable secret ref to land in; a login that fails or is cancelled takes the
-   * row it created back out.
+   * Begin a login. Every attempt gets a fresh provider row and credential
+   * store, so signing into the same vendor twice creates two independent
+   * accounts instead of silently replacing the first one.
    */
   async start(vendorId: string): Promise<OAuthStartResult> {
-    const models = await this.ensureModels();
+    const models = await this.ensureCatalogModels();
     const provider = models.getProvider(vendorId);
     if (!provider?.auth.oauth) {
       throw new Error(`unknown vendor account: ${vendorId}`);
@@ -237,12 +248,22 @@ export class VendorOAuth {
       await running.finished?.catch(() => undefined);
     }
 
-    const row = await this.ensureRow(vendorId, provider);
+    const { provider: row } = await this.deps.call<{
+      provider: OAuthProviderRow;
+    }>("providers.create", {
+      name: provider.auth.oauth?.name || provider.name,
+      vendorKey: vendorId,
+      type: "native",
+      authKind: OAUTH_AUTH_KIND,
+      baseUrl: provider.baseUrl,
+    });
+    const account = this.createAccount(vendorId, row.id);
     const session: LoginSession = {
       loginId: this.nextId(),
       vendorId,
-      providerId: row.providerId,
-      createdRow: row.created,
+      providerId: row.id,
+      account,
+      createdRow: true,
       controller: new AbortController(),
       prompts: new Map(),
       tail: Promise.resolve(),
@@ -274,17 +295,24 @@ export class VendorOAuth {
     return true;
   }
 
-  /** Forget the credential, keeping the row (and its model choice) in place. */
-  async logout(vendorId: string): Promise<void> {
-    const models = await this.ensureModels();
-    await models.logout(vendorId);
-    const providerId = await this.rowIdFor(vendorId);
-    if (providerId) {
-      await this.deps.call("providers.update", {
-        id: providerId,
-        oauthAccountLabel: "",
-      });
+  /**
+   * Delete one account's provider row and its provider-scoped OAuth secret.
+   * Host-core owns the atomic cleanup of the row and both secret references.
+   */
+  async deleteAccount(providerId: string): Promise<void> {
+    const row = (await this.rows()).find((candidate) => candidate.id === providerId);
+    if (!row || row.authKind !== OAUTH_AUTH_KIND) {
+      throw new Error(`unknown vendor account provider: ${providerId}`);
     }
+    const running = [...this.logins.values()].find(
+      (session) => session.providerId === providerId,
+    );
+    if (running) {
+      this.cancel(running.loginId);
+      await running.finished?.catch(() => undefined);
+    }
+    this.accountModels.delete(providerId);
+    await this.deps.call("providers.delete", { id: providerId });
   }
 
   /**
@@ -292,10 +320,11 @@ export class VendorOAuth {
    * the store lock when it has expired; the caller only ever sees the resulting
    * short-lived access token, headers and per-credential baseUrl.
    */
-  async resolveAuth(vendorId: string): Promise<ModelAuth> {
-    const models = await this.ensureModels();
-    const resolved = await models.getAuth(vendorId);
-    if (!resolved) throw new Error(`vendor account not signed in: ${vendorId}`);
+  async resolveAuth(providerId: string): Promise<ModelAuth> {
+    const account = await this.accountForProvider(providerId);
+    if (!account) throw new Error(`vendor account not signed in: ${providerId}`);
+    const resolved = await account.models.getAuth(account.vendorId);
+    if (!resolved) throw new Error(`vendor account not signed in: ${providerId}`);
     return resolved.auth;
   }
 
@@ -304,12 +333,13 @@ export class VendorOAuth {
    * probe: `getAvailable` applies the vendor's own `filterModels`, which is how
    * Copilot narrows the list to the user's subscription.
    */
-  async listModels(vendorId: string): Promise<OAuthModelOption[]> {
-    const models = await this.ensureModels();
+  async listModels(providerId: string): Promise<OAuthModelOption[]> {
+    const account = await this.accountForProvider(providerId);
+    if (!account) throw new Error(`unknown vendor account provider: ${providerId}`);
     // Dynamic catalogs (radius, Copilot) are empty until refreshed; static and
     // unconfigured providers are skipped inside pi-ai.
-    await models.refresh({ providers: [vendorId] });
-    const available = await models.getAvailable(vendorId);
+    await account.models.refresh({ providers: [account.vendorId] });
+    const available = await account.models.getAvailable(account.vendorId);
     return available.map((model) => this.optionFor(model));
   }
 
@@ -332,15 +362,16 @@ export class VendorOAuth {
    * authenticated collection knows both.
    */
   async bindingFor(
-    vendorId: string,
+    providerId: string,
     modelId: string,
   ): Promise<VendorModelBinding | undefined> {
-    const models = await this.ensureModels();
-    let model = models.getModel(vendorId, modelId);
+    const account = await this.accountForProvider(providerId);
+    if (!account) return undefined;
+    let model = account.models.getModel(account.vendorId, modelId);
     if (!model) {
       // Dynamic catalogs are empty until the first refresh.
-      await models.refresh({ providers: [vendorId] });
-      model = models.getModel(vendorId, modelId);
+      await account.models.refresh({ providers: [account.vendorId] });
+      model = account.models.getModel(account.vendorId, modelId);
     }
     if (!model) return undefined;
     const levels: ThinkingLevel[] = model.reasoning
@@ -357,9 +388,11 @@ export class VendorOAuth {
 
   private async run(session: LoginSession, provider: Provider): Promise<void> {
     try {
-      await (
-        await this.ensureModels()
-      ).login(session.vendorId, "oauth", this.interactionFor(session));
+      await session.account.models.login(
+        session.vendorId,
+        "oauth",
+        this.interactionFor(session),
+      );
       const accountLabel = provider.auth.oauth?.name || provider.name;
       await this.completeRow(session, provider, accountLabel);
       this.push(session, {
@@ -396,7 +429,7 @@ export class VendorOAuth {
   ): Promise<void> {
     let chosen: OAuthModelOption | undefined;
     try {
-      const options = await this.listModels(session.vendorId);
+      const options = await this.listModels(session.providerId);
       chosen = options[0];
     } catch (error) {
       // A catalog that will not load is not worth failing a good login over;
@@ -425,9 +458,9 @@ export class VendorOAuth {
 
   private async discardRow(session: LoginSession): Promise<void> {
     if (!session.createdRow) return;
+    this.accountModels.delete(session.providerId);
     try {
       await this.deps.call("providers.delete", { id: session.providerId });
-      this.rowIds.delete(session.vendorId);
     } catch (error) {
       this.log("warn", "could not remove the half-created provider row", {
         vendorId: session.vendorId,
@@ -549,73 +582,128 @@ export class VendorOAuth {
     });
   }
 
-  private async ensureModels(): Promise<MutableModels> {
-    this.modelsPromise ??= (async () => {
-      if (this.deps.createModels) return this.deps.createModels(this.credentials);
-      // pi-ai loads each flow through a variable import specifier so bundlers
-      // cannot follow it into Node-only code; registering the static set keeps
-      // login working in the packaged app. Named for the Bun binary, but the
-      // flows themselves are plain Node.
+  private async ensureCatalogModels(): Promise<MutableModels> {
+    this.catalogPromise ??= Promise.resolve(
+      this.createModels(this.emptyCredentials),
+    );
+    return this.catalogPromise;
+  }
+
+  private createModels(credentials: CredentialStore): MutableModels {
+    if (this.deps.createModels) return this.deps.createModels(credentials);
+    // pi-ai loads each flow through a variable import specifier so bundlers
+    // cannot follow it into Node-only code; registering the static set keeps
+    // login working in the packaged app. Named for the Bun binary, but the
+    // flows themselves are plain Node.
+    if (!this.oauthFlowsRegistered) {
       registerBunOAuthFlows();
-      return builtinModels({
-        credentials: this.credentials,
-        modelsStore: new InMemoryModelsStore(),
-      });
-    })();
-    return this.modelsPromise;
+      this.oauthFlowsRegistered = true;
+    }
+    return builtinModels({
+      credentials,
+      modelsStore: new InMemoryModelsStore(),
+    });
+  }
+
+  private createAccount(vendorId: string, providerId: string): AccountModels {
+    const existing = this.accountModels.get(providerId);
+    if (existing) return existing;
+    const account = {
+      providerId,
+      vendorId,
+      models: this.createModels(this.credentialsFor(providerId, vendorId)),
+    };
+    this.accountModels.set(providerId, account);
+    return account;
+  }
+
+  private async accountForProvider(
+    providerId: string,
+  ): Promise<AccountModels | undefined> {
+    const existing = this.accountModels.get(providerId);
+    if (existing) return existing;
+    const row = (await this.rows()).find(
+      (candidate) =>
+        candidate.id === providerId &&
+        candidate.authKind === OAUTH_AUTH_KIND &&
+        typeof candidate.vendorKey === "string" &&
+        candidate.vendorKey.length > 0,
+    );
+    return row?.vendorKey
+      ? this.createAccount(row.vendorKey, row.id)
+      : undefined;
   }
 
   /**
-   * Credential storage, keyed by pi-ai provider id and translated to the
-   * provider row's secret ref. `modify` is the only write path and is
-   * serialized per vendor, which is what pi-ai's locked refresh assumes.
+   * Create a store scoped to one provider row. pi-ai still addresses the
+   * credential by its builtin vendor id, while the app maps that id to the
+   * row-specific encrypted secret ref.
    */
-  private readonly credentials: CredentialStore = {
-    read: (vendorId) => this.readCredential(vendorId),
-    list: async () => {
-      // Enumerate from row metadata so status never decrypts a token.
-      const rows = await this.rows();
-      return rows.flatMap<CredentialInfo>((row) =>
-        row.authKind === OAUTH_AUTH_KIND && row.hasOauth && row.vendorKey
-          ? [{ providerId: row.vendorKey, type: "oauth" }]
-          : [],
-      );
-    },
-    modify: (vendorId, fn) =>
-      this.serialize(vendorId, async () => {
-        const current = await this.readCredential(vendorId);
-        const next = await fn(current);
-        if (next === undefined) return current;
-        const ref = await this.secretRef(vendorId);
-        if (!ref) throw new Error(`no provider row for vendor ${vendorId}`);
-        await this.deps.call("secrets.set", {
-          secretRef: ref,
-          value: JSON.stringify(next),
+  private credentialsFor(
+    providerId: string,
+    vendorId: string,
+  ): CredentialStore {
+    return {
+      read: (requestedVendorId) => {
+        if (requestedVendorId !== vendorId) return Promise.resolve(undefined);
+        return this.readCredential(providerId);
+      },
+      list: async () => {
+        const row = (await this.rows()).find(
+          (candidate) => candidate.id === providerId,
+        );
+        return row?.authKind === OAUTH_AUTH_KIND && row.hasOauth
+          ? [{ providerId: vendorId, type: "oauth" }]
+          : [];
+      },
+      modify: (requestedVendorId, fn) => {
+        if (requestedVendorId !== vendorId) {
+          throw new Error(`provider is not part of account ${providerId}`);
+        }
+        return this.serialize(providerId, async () => {
+          const current = await this.readCredential(providerId);
+          const next = await fn(current);
+          if (next === undefined) return current;
+          await this.deps.call("secrets.set", {
+            secretRef: secretRefForProviderOauth(providerId),
+            value: JSON.stringify(next),
+          });
+          return next;
         });
-        return next;
-      }),
-    delete: (vendorId) =>
-      this.serialize(vendorId, async () => {
-        const ref = await this.secretRef(vendorId);
-        if (ref) await this.deps.call("secrets.delete", { secretRef: ref });
-      }),
+      },
+      delete: (requestedVendorId) => {
+        if (requestedVendorId !== vendorId) {
+          throw new Error(`provider is not part of account ${providerId}`);
+        }
+        return this.serialize(providerId, async () => {
+          await this.deps.call("secrets.delete", {
+            secretRef: secretRefForProviderOauth(providerId),
+          });
+        });
+      },
+    };
+  }
+
+  private readonly emptyCredentials: CredentialStore = {
+    read: async () => undefined,
+    list: async () => [],
+    modify: async (_providerId, fn) => fn(undefined),
+    delete: async () => undefined,
   };
 
   private async readCredential(
-    vendorId: string,
+    providerId: string,
   ): Promise<Credential | undefined> {
-    const ref = await this.secretRef(vendorId);
-    if (!ref) return undefined;
     const { value } = await this.deps.call<{ value?: string | null }>(
       "secrets.getForRuntime",
-      { secretRef: ref },
+      { secretRef: secretRefForProviderOauth(providerId) },
     );
     if (!value) return undefined;
     try {
       const parsed = JSON.parse(value) as Credential;
       return parsed?.type ? parsed : undefined;
     } catch {
-      this.log("warn", "stored vendor credential is not readable", { vendorId });
+      this.log("warn", "stored vendor credential is not readable", { providerId });
       return undefined;
     }
   }
@@ -631,42 +719,6 @@ export class VendorOAuth {
       ),
     );
     return next;
-  }
-
-  private async secretRef(vendorId: string): Promise<string | undefined> {
-    const providerId = await this.rowIdFor(vendorId);
-    return providerId ? secretRefForProviderOauth(providerId) : undefined;
-  }
-
-  private async rowIdFor(vendorId: string): Promise<string | undefined> {
-    const known = this.rowIds.get(vendorId);
-    if (known) return known;
-    const row = (await this.rows()).find(
-      (candidate) =>
-        candidate.authKind === OAUTH_AUTH_KIND &&
-        candidate.vendorKey === vendorId,
-    );
-    if (row) this.rowIds.set(vendorId, row.id);
-    return row?.id;
-  }
-
-  private async ensureRow(
-    vendorId: string,
-    provider: Provider,
-  ): Promise<{ providerId: string; created: boolean }> {
-    const existing = await this.rowIdFor(vendorId);
-    if (existing) return { providerId: existing, created: false };
-    const { provider: created } = await this.deps.call<{
-      provider: OAuthProviderRow;
-    }>("providers.create", {
-      name: provider.auth.oauth?.name || provider.name,
-      vendorKey: vendorId,
-      type: "native",
-      authKind: OAUTH_AUTH_KIND,
-      baseUrl: provider.baseUrl,
-    });
-    this.rowIds.set(vendorId, created.id);
-    return { providerId: created.id, created: true };
   }
 
   private async rows(): Promise<OAuthProviderRow[]> {

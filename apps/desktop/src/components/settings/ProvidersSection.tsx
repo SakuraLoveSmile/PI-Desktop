@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { ProviderPublic } from "@pi-desktop/shared";
+import { OAUTH_AUTH_KIND, type ProviderPublic } from "@pi-desktop/shared";
 import { useAppStore } from "../../stores/app-store";
 import { api } from "../../lib/api";
 import { Badge, Button, cx } from "../ui";
-import { IconPencil, IconPlug, IconPlus, IconServer, IconTrash } from "../icons";
+import {
+  IconBot,
+  IconPencil,
+  IconPlug,
+  IconPlus,
+  IconServer,
+  IconTrash,
+} from "../icons";
 import {
   API_STYLE_OPTIONS,
   EMPTY_PROVIDER_FORM,
@@ -69,7 +76,26 @@ export function ProvidersSection() {
   if (!settings) return null;
 
   const providerReady = (p: ProviderPublic) =>
-    p.enabled && !!p.defaultModelId && (p.hasSecret || p.authKind === "none");
+    p.enabled &&
+    !!p.defaultModelId &&
+    (p.hasSecret || p.hasOauth || p.authKind === "none");
+  const aiProviders = providers.filter((p) => p.authKind !== OAUTH_AUTH_KIND);
+  const connectedAccounts = providers.filter(
+    (p) => p.authKind === OAUTH_AUTH_KIND && p.hasOauth,
+  ).length;
+  const providerDisplayName = (provider: ProviderPublic) => {
+    if (provider.authKind !== OAUTH_AUTH_KIND) return provider.name;
+    const sameVendor = providers.filter(
+      (candidate) =>
+        candidate.authKind === OAUTH_AUTH_KIND &&
+        candidate.vendorKey === provider.vendorKey,
+    );
+    const ordinal = sameVendor.indexOf(provider) + 1;
+    const suffix = sameVendor.length > 1 ? ` #${ordinal}` : "";
+    return `${provider.name} · ${
+      provider.oauthAccountLabel || t("settings.vendorSignedInGeneric")
+    }${suffix}`;
+  };
   const setField = <K extends keyof ProviderForm>(key: K, value: ProviderForm[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -231,12 +257,39 @@ export function ProvidersSection() {
 
   return (
     <div className="settings-stack">
+      <section className="provider-config-hero">
+        <div className="provider-config-hero-copy">
+          <div className="provider-config-eyebrow">
+            <span className="provider-config-eyebrow-icon" aria-hidden>
+              <IconBot size={14} />
+            </span>
+            <span>{t("settings.modelConfigEyebrow")}</span>
+          </div>
+          <h2 className="provider-config-title">{t("settings.modelConfigTitle")}</h2>
+          <p className="provider-config-desc">{t("settings.modelConfigDesc")}</p>
+        </div>
+        <div className="provider-config-stats" aria-label={t("settings.modelConfigSummary")}>
+          <div className="provider-config-stat">
+            <strong>{aiProviders.length}</strong>
+            <span>{t("settings.modelConfigServiceCount")}</span>
+          </div>
+          <div className="provider-config-stat">
+            <strong>{connectedAccounts}</strong>
+            <span>{t("settings.modelConfigAccountCount")}</span>
+          </div>
+        </div>
+      </section>
+
       <section className="settings-card-block">
-        <h3 className="settings-card-heading">{t("settings.defaultsTitle")}</h3>
+        <div className="provider-section-head">
+          <div>
+            <h3 className="settings-card-heading">{t("settings.defaultsTitle")}</h3>
+            <div className="settings-section-subtitle">{t("settings.defaultModelDesc")}</div>
+          </div>
+        </div>
         <div className="settings-panel">
           <SettingsRow
             title={t("settings.defaultModel")}
-            description={t("settings.defaultModelDesc")}
           >
             <select
               className="field-select"
@@ -257,7 +310,7 @@ export function ProvidersSection() {
               ) : null}
               {providers.filter(providerReady).map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} · {p.defaultModelId}
+                  {providerDisplayName(p)} · {p.defaultModelId}
                 </option>
               ))}
             </select>
@@ -269,7 +322,12 @@ export function ProvidersSection() {
 
       <section className="settings-card-block">
         <div className="provider-section-head">
-          <h3 className="settings-card-heading">{t("settings.providers")}</h3>
+          <div>
+            <h3 className="settings-card-heading">{t("settings.providers")}</h3>
+            <div className="settings-section-subtitle">
+              {t("settings.providersDesc")}
+            </div>
+          </div>
           <Button variant="primary" onClick={openAdd}>
             <span className="provider-add-btn-inner">
               <IconPlus size={14} />
@@ -290,7 +348,7 @@ export function ProvidersSection() {
         ) : null}
 
         <div className="settings-panel provider-list-panel">
-          {providers.length === 0 ? (
+          {aiProviders.length === 0 ? (
             <div className="provider-empty">
               <div className="provider-empty-icon" aria-hidden>
                 <IconServer size={18} />
@@ -306,7 +364,7 @@ export function ProvidersSection() {
             </div>
           ) : (
             <div className="provider-row-list">
-              {providers.map((provider) => {
+              {aiProviders.map((provider) => {
                 const isDefault = settings.defaultProviderId === provider.id;
                 const rowBusy = busyId === provider.id || testingId === provider.id;
                 const styleLabelKey = API_STYLE_OPTIONS.find(
@@ -323,12 +381,6 @@ export function ProvidersSection() {
                         <span className="provider-row-name">{provider.name}</span>
                         {isDefault ? (
                           <Badge tone="success">{t("settings.default")}</Badge>
-                        ) : null}
-                        {provider.hasOauth ? (
-                          <Badge tone="neutral">
-                            {provider.oauthAccountLabel ||
-                              t("settings.vendorAccountBadge")}
-                          </Badge>
                         ) : null}
                         {!provider.hasSecret && provider.authKind !== "none" ? (
                           <Badge tone="warning">{t("settings.noSecret")}</Badge>

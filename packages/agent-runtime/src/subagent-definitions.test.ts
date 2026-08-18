@@ -234,6 +234,23 @@ describe("resolveSubagentProviders", () => {
     expect(resolved["local ollama/qwen3"].apiKey).toBe("");
   });
 
+  it("does not guess when a vendor alias matches multiple account rows", async () => {
+    const duplicate = {
+      ...providers[0],
+      id: "33333333-3333-4333-8333-333333333333",
+    };
+    const { providers: resolved, diagnostics } = await resolveSubagentProviders({
+      definitions: [definition("ambiguous", { providerId: "anthropic", modelId: "claude-haiku-4-5" })],
+      providers: [...providers, duplicate],
+      getSecret,
+    });
+
+    expect(resolved).toEqual({});
+    expect(diagnostics).toEqual([
+      'ambiguous: no enabled provider matches "anthropic"',
+    ]);
+  });
+
   it("resolves each distinct pin once and reuses the secret lookup", async () => {
     const spy = vi.fn(getSecret);
     const { providers: resolved } = await resolveSubagentProviders({
