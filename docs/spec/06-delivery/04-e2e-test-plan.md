@@ -3799,7 +3799,7 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (host-core `user_skills` tests,
   `apps/desktop/test/extensions-page.test.mjs`); full UI journey Draft
 
-#### E2E-102: Composer file and image paste becomes a session-scratch reference
+#### E2E-102: Composer file and image paste keeps structured attachment metadata
 
 - **Preconditions**: The app is running with an Agent session in a project and
   a home composer available. The OS clipboard contains a text snippet, one or
@@ -3813,7 +3813,7 @@ Each scenario is documented in this format:
   4. Inspect the draft before sending: confirm each materialized item is a
      removable leaf-name chip and no scratch absolute path occupies the
      textarea. Hover/focus chips to inspect their full paths, remove one, then
-     send the prompt and inspect the session message.
+     send the prompt and inspect the session message's attachment metadata.
   5. Inspect `<data_dir>/scratch/<sessionId>/pasted/` and compare the saved
      bytes with the source files/image. Check the project `git status`.
   6. Delete the session, then confirm its scratch directory and pasted files
@@ -3823,17 +3823,18 @@ Each scenario is documented in this format:
   - Each file/image is saved with a sanitized, UUID-backed unique name under
     the session scratch root, while its chip shows only the sanitized original
     leaf name. Duplicate leaf names remain separate references.
-  - The dispatched prompt and persisted user message contain the remaining
-    complete paths with whitespace quoting, not labels or binary bytes, and the
-    agent can use its normal file tools to read the materialized files.
+  - The dispatched prompt carries ordinary files through the existing path
+    reference flow and carries pasted files/images as structured attachments;
+    the persisted user message contains refs and metadata, never binary bytes.
+    The agent can use its normal file tools to read the materialized files.
   - A home paste creates or reuses a durable session before writing. The
     workspace remains clean and no workspace artifact row is created.
   - Deleting the session removes the pasted files with the rest of scratch.
 - **Specs linked**: `04-ux/08-component-spec.md` §11.7–11.8,
   `03-runtime/01-ipc-protocol.md` §13c,
   `03-runtime/03-tools-and-permissions.md` §4b,
-  `03-runtime/04-data-storage.md`, `08-meta/decisions-log.md` (D197, D209),
-  ADR 0059, ADR 0070
+  `03-runtime/04-data-storage.md`, `08-meta/decisions-log.md` (D197, D209,
+  D243), ADR 0059, ADR 0070, ADR 0101
 - **Acceptance**: C (conversation & stream), E (tools & permissions),
   F (persistence), Quality
 - **Milestone**: M5
@@ -3897,6 +3898,94 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered
   (`composer-file-reference-display.test.mjs`, `transcript-style.test.mjs`);
   full UI journey Draft (do not run E2E locally unless explicitly requested)
+
+#### E2E-102c: Vision-capable models receive pasted images as image input
+
+- **Preconditions**: A deterministic vision-capable pi-ai model whose resolved
+  record contains `input: ["text", "image"]`; an Agent session; one pasted PNG
+  and one text prompt. Capture the renderer request, main-to-sidecar payload,
+  provider request, durable transcript, and `<data_dir>/attachments/`.
+- **Steps**:
+  1. Select the vision-capable model and paste the PNG into Composer.
+  2. Confirm the compact status row says the model accepts visual input.
+  3. Send a prompt asking the model to identify one visible detail.
+  4. Inspect the provider request and durable session message after completion.
+  5. Reload the session and ask a follow-up about the same image.
+- **Expected**:
+  - The model picker/session capability state comes from the exact pi-ai model
+    record, and the status row is localized, keyboard-readable, and not
+    color-only.
+  - Main writes one content-addressed image blob and sends the sidecar a
+    transient image attachment; the provider adapter emits an image content
+    block/data URL, not only `@<scratch-path>` text.
+  - The durable message contains `kind`, display `name`, MIME/size, and the
+    `attachments/<sha256>` ref, but no base64 or image bytes.
+  - After reload, history hydration restores the image block from the bounded
+    attachment root and the follow-up still has image context.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §5.1/§13c,
+  `03-runtime/02-agent-runtime.md` §5c,
+  `03-runtime/04-data-storage.md`, `03-runtime/13-model-catalog-and-selection.md`
+  §11.2, `04-ux/08-component-spec.md` §11.7–11.8,
+  `08-meta/decisions-log.md` (D243), ADR 0101
+- **Acceptance**: B (model config), C (conversation & stream), F (persistence),
+  Quality, Security
+- **Milestone**: M5
+- **Status**: Unit-covered (`model-capabilities.test.ts`, host-core attachment
+  roundtrip); provider/UI journey Draft (do not run E2E locally unless
+  explicitly requested)
+
+#### E2E-102d: Non-vision and oversized images use the path fallback
+
+- **Preconditions**: One known non-vision model and one known vision-capable
+  model; an Agent session; a normal PNG and a deterministic image just above
+  the 20 MiB inline bound.
+- **Steps**:
+  1. Select the non-vision model, paste the normal PNG, and inspect Composer's
+     fallback status row.
+  2. Send the prompt and inspect the sidecar/provider request.
+  3. Select the vision model, paste the oversized image, and send it.
+  4. Retry each turn after disposing/recreating the runtime.
+- **Expected**:
+  - Both cases show a safe `@path` fallback and no image block/base64 payload.
+  - The non-vision request references the session scratch file; the oversized
+    vision request references a safe path while the image remains available to
+    the normal file tools.
+  - Retries and runtime recreation use the content-addressed image ref and a
+    session `replayed/` path where needed; no duplicate binary blobs are made.
+  - The transcript still stores attachment metadata/ref and the UI does not
+    claim that the image was sent visually.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §5.1,
+  `03-runtime/03-tools-and-permissions.md` §4b,
+  `03-runtime/02-agent-runtime.md` §5c,
+  `03-runtime/04-data-storage.md`, ADR 0101
+- **Acceptance**: B (model config), C (conversation & stream), E (tools &
+  permissions), F (persistence), Security
+- **Milestone**: M5
+- **Status**: Draft (do not run E2E locally unless explicitly requested)
+
+#### E2E-102e: Unknown model ids fail closed for vision transport
+
+- **Preconditions**: A custom provider/model id absent from the pi-ai catalog,
+  discovery data that incorrectly labels it `vision`, and a pasted PNG.
+- **Steps**:
+  1. Refresh the provider model list and select the discovered custom id.
+  2. Paste the PNG and inspect the model picker and Composer status row.
+  3. Send the prompt and inspect the sidecar/provider payload.
+- **Expected**:
+  - The unknown model is runnable as a generic text model but is not promoted
+    to `vision` by discovery/cache metadata.
+  - Composer states the path fallback, and the provider receives no image block
+    or base64 value; the safe file path remains available.
+  - The durable attachment ref is still recorded so a later known vision model
+    can replay the image correctly.
+- **Specs linked**: `03-runtime/11-provider-model-system.md` §6.2/§11,
+  `03-runtime/13-model-catalog-and-selection.md` §11.2,
+  `04-ux/08-component-spec.md` §11.8, ADR 0101
+- **Acceptance**: B (model config), C (conversation & stream), E (tools &
+  permissions), Security
+- **Milestone**: M5
+- **Status**: Unit-covered (`model-capabilities.test.ts`); provider/UI journey
+  Draft (do not run E2E locally unless explicitly requested)
 
 #### E2E-103: A subagent written in the UI reaches Task, scoped and shadowed
 
@@ -4147,15 +4236,15 @@ Each scenario is documented in this format:
 | Acceptance | Scenarios |
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150 |
-| B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-151 |
-| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-147, E2E-151 |
+| B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151 |
+| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-147, E2E-151 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
-| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147 |
-| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-148, E2E-151 |
+| E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147 |
+| F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-148, E2E-151 |
 | G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146 |
-| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151 |
-| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-103, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151 |
+| Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151 |
+| Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151 |
 
 | Milestone | Scenarios |
 |---|---|
@@ -4163,7 +4252,7 @@ Each scenario is documented in this format:
 | M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-089, E2E-090, E2E-144 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
-| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-147 |
+| M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-147 |
 | M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103 |
 | M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151 |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |

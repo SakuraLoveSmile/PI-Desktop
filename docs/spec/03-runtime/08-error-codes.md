@@ -79,7 +79,7 @@ does not turn temporary thread pressure into a host process exit.
 | code | retriable | meaning |
 |---|---|---|
 | `WORKSPACE_REQUIRED` | no | no workspace bound |
-| `PATH_OUTSIDE_WORKSPACE` | no | path escapes sandbox before an explicit outside-path permission decision, or a non-permissioned compatibility call reaches the resolver |
+| `PATH_OUTSIDE_WORKSPACE` | no | path escapes sandbox before an explicit outside-path permission decision, a non-permissioned compatibility call reaches the resolver, or a prompt attachment is outside its session scratch/project/attachment roots |
 | `TOOL_NOT_FOUND` | no | unknown tool |
 | `TOOL_DENIED` | no | permission denied / mode forbidden |
 | `TOOL_TIMEOUT` | yes | tool execution timeout |

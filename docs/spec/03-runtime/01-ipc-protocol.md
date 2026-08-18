@@ -75,8 +75,17 @@ type AppError = {
 type AgentPromptRequest = {
  sessionId: string;
  content: string;
+ attachments?: AgentPromptAttachment[];
  /** Truncate durable transcript to N leading messages before append (regenerate). */
  truncateBefore?: number;
+};
+
+type AgentPromptAttachment = {
+ path: string;
+ name: string;
+ kind: "image" | "file";
+ mimeType?: string;
+ size?: number;
 };
 
 type AgentPromptResponse = {
@@ -93,7 +102,11 @@ The persisted user message stores `content = expanded text` plus an optional
 display. Reseed replays `content`, so the agent context is identical across
 restarts. Builtin/plugin slash aliases never reach this channel — the
 renderer executes them locally. Unknown `/foo` passes through as literal
-content. `@path` tokens are not transformed anywhere in the pipeline (D124).
+content. Ordinary `@path` tokens are not transformed anywhere in the pipeline
+(D124). Composer-owned pasted file references travel separately in
+`attachments`; they are validated and prepared by Electron main at dispatch,
+so a pasted image does not depend on the model being able to interpret a path
+token.
 
 Prompt execution resolves `mode`, `providerId`, `modelId`, and `thinkingLevel`
 from the durable session record and snapshots the effective command shell ID and
@@ -126,7 +139,15 @@ Only a changed effective global `defaultCommandShell` is idle-only across all
 affected sessions: any active turn or pending/queued/running Plan/Goal work blocks
 that shell change, while an omitted or idempotent shell field does not.
 
-Image and file payloads are not part of the current prompt contract.
+`attachments` is an additive prompt field. The renderer sends metadata and a
+source path only; it never sends binary data. Electron main validates the path
+against the session scratch/project roots, persists image bytes in the
+content-addressed attachment store, and derives the exact model transport from
+the pi-ai model record. A known model whose `input` includes `image` receives
+eligible images as transient pi-ai image blocks. Unknown/non-vision models and
+images above the 20 MiB inline bound receive a safe `@path` fallback. The
+durable user message stores `content` plus attachment metadata/ref, never
+base64. Invalid attachment paths fail with `PATH_OUTSIDE_WORKSPACE`.
 
 Regenerate history (D109) also uses session channels:
 
@@ -137,9 +158,11 @@ Regenerate history (D109) also uses session channels:
 Root user turns may include `revisionRootId`, `revisionCount`, and
 `activeRevision`. Activating a revision replaces the live tail with
 `prefix + archived branch` and disposes the session agent.
- Composer
-attachment affordances remain hidden until main, sidecar, pi model
-capabilities, and persistence all consume the payload.
+The sidecar receives only the prepared attachment subset needed for the
+current turn. On a vision runtime, persisted image refs are hydrated from the
+session-bound attachment/scratch roots when history is rebuilt; oversized or
+unavailable images remain path fallbacks. This keeps renderer, main, sidecar,
+pi-ai, and host persistence on one capability-aware contract.
 
 ### 5.2 abort
 
@@ -1231,6 +1254,7 @@ type ComposerPasteFile = {
 type ComposerPastedFile = {
   path: string;     // UUID-backed absolute storage path
   name: string;     // sanitized original leaf display name
+  kind: "image" | "file";
   mimeType: string;
   size: number;
 };
@@ -1240,10 +1264,11 @@ Electron main verifies that `sessionId` resolves to a durable host session,
 limits the request to 20 files, 64 MiB per file, and 128 MiB total, strips
 renderer-provided directory components, and writes unique names below
 `<data_dir>/scratch/<sessionId>/pasted/` with exclusive-create semantics. The
-renderer holds returned paths in transient reference state, displays `name`,
-and serializes each exact path into the text prompt as an `@` reference at
-dispatch. Clipboard bytes never enter the persisted prompt or host agent
-message.
+renderer holds returned paths and kind metadata in transient reference state,
+displays `name`, and submits them through `AgentPromptRequest.attachments`.
+Main persists image bytes by SHA-256 and adds a path fallback only when the
+selected model cannot receive that image as a visual block. Clipboard bytes
+never enter the persisted prompt or host agent message as base64.
 Invalid sessions and malformed/oversized payloads fail with an IPC error, and
 the operation cannot write to the workspace.
 

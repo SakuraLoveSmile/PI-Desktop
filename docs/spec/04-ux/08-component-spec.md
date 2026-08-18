@@ -1765,10 +1765,12 @@ reasoning-level control.
   originating session's scratch directory and adds a compact leaf-name
   reference above the textarea; text-only paste keeps the browser's native
   textarea behavior (D197, D209, ADR 0059, ADR 0070)
-- No inline binary/ImageContent payloads or visual attachment previews. The
-  compact chips are textual draft references; immediately before dispatch
-  they serialize to canonical `@<absolute-path>` text, so the prompt remains
-  text-only and the agent follows the paths with its file tools
+- The compact chips retain structured kind/name/MIME metadata while keeping
+  the textarea free of binary data. The selected model's exact pi-ai
+  capability controls dispatch: eligible images become transient visual input
+  for a model whose `input` includes `image`; non-vision, unknown, and
+  oversized images use the existing canonical `@<path>` file-tool fallback.
+  There are no visual previews in MVP.
 - No voice input
 
 ### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, D209, ADR 0024, ADR 0059, ADR 0070)
@@ -1786,7 +1788,8 @@ Anatomy:
 │  …                                           │
 │  ↑↓ select · Enter confirm · Esc close       │  ← hint bar (footer)
 └──────────────────────────────────────────────┘
-[ file.ext × ] [ another-file.ts × ]            ← when references exist
+[ image.png × ] [ another-file.ts × ]           ← when references exist
+[ visual input status ]                         ← when an image is attached
 [ composer textarea                            ]
 ```
 
@@ -1810,10 +1813,12 @@ Anatomy:
   menu shows an "open a project" empty state.
 - Accepting commands and directories inserts text (`/name ` / `@dir/`);
   accepting a completed file creates a renderer-owned reference. Immediately
-  before dispatch, references serialize in stable order after the visible
-  draft as complete `@path` text using D124's quoting. Reference-only drafts
-  are sendable. Builtin/plugin dispatch still bypasses the model-ready gate
-  when no prompt text or file reference is sent.
+  before dispatch, ordinary references serialize in stable order after the
+  visible draft as complete `@path` text using D124's quoting. Pasted file
+  references travel as structured attachments; main selects image blocks or
+  path fallbacks from the exact model capability. Reference-only drafts are
+  sendable. Builtin/plugin dispatch still bypasses the model-ready gate when no
+  prompt text or file reference is sent.
 - The Agent/Plan/Goal mode aliases can prefix a prompt in the same draft:
   `/agent-mode <prompt>`, `/plan-mode <prompt>`, and `/goal-mode <prompt>` apply
   the mode first, then send `<prompt>` plus any serialized references through
@@ -1831,17 +1836,25 @@ Anatomy:
   metadata to Electron main with the durable session id. Main validates the
   session, writes unique sanitized files under
   `<data_dir>/scratch/<sessionId>/pasted/`, and returns each UUID-backed
-  absolute path with its sanitized original leaf name. The composer displays
-  the leaf name, keeps the path in session-scoped transient reference state,
-  and serializes that path with the same `@` quoting as the file menu only when
-  sending. Removing a chip does not delete scratch bytes. Pasting files counts
-  as input, so the home composer materializes the unpersisted draft into a
-  durable session before saving (D220). The scratch lifecycle removes pasted
-  files with the session and never dirties the workspace git tree.
+  absolute path with its sanitized original leaf name and kind. The composer
+  displays the leaf name, keeps the structured reference in session-scoped
+  transient state, and submits it separately from visible text. Main stores
+  image bytes under `attachments/<sha256>` and sends visual input only when the
+  selected pi-ai model accepts images and the 20 MiB inline bound is met;
+  otherwise it appends a safe `@path` fallback. Removing a chip does not delete
+  scratch bytes. Pasting files counts as input, so the home composer
+  materializes the unpersisted draft into a durable session before saving
+  (D220). The scratch lifecycle removes pasted files with the session and
+  never dirties the workspace git tree.
 - Reference chips wrap within the prompt area, expose the canonical path in
   their tooltip and accessible name, and provide a focus-visible localized
   remove button that restores textarea focus. Duplicate leaf labels remain
   separate because identity and dispatch use the canonical path, not the name.
+- When an image chip is present, a compact `role="status"`/`aria-live="polite"`
+  row states whether the selected model accepts visual input. The row is
+  informational, uses icon plus text rather than color alone, and updates when
+  the model changes. Unknown/custom models use the explicit path-fallback
+  wording.
 - Sent template invocations render in the transcript as a monospace command
   chip from the message's `command` field instead of the expanded body.
 - States: keyboard-active row uses the shared `kb-active` treatment; empty

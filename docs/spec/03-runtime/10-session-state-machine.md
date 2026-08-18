@@ -81,7 +81,8 @@ accept_prompt
    removes an unanswered root user row and restores its session/turn-scoped
    pre-serialization composer snapshot; once assistant text, thinking, or any
    tool row begins, abort preserves the partial transcript and restores no
-   draft.
+   draft. The snapshot keeps structured file/image references and is never
+   reconstructed by parsing model-facing `@path` text.
 4. Permission timeout moves to tool denied, then agent may continue or end based on runtime handling
 5. Session status returns to idle after terminal turn states are persisted
 6. Changing the renderer's active project/session does not transition or abort
@@ -131,7 +132,9 @@ accept_prompt
 Message persistence is two-step per 04-data-storage §5 (D119): fsync'd
 transcript-file line first, index transaction second.
 
-- user message: on accept
+- user message: on accept, including attachment kind/name/MIME/size and a
+  content-addressed image ref when applicable; transient base64 is never a
+  persistence field
 - turn run row: on start + terminal `session.endTurn` update
 - notification row: same transaction as an unseen completed/error terminal
   update; never for a visible-current result or abort

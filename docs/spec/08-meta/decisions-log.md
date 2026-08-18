@@ -54,6 +54,7 @@ This log freezes previously open questions into concrete decisions.
 | D031 | Secrets backend | **OS safeStorage primary + encrypted file fallback** | Robust on macOS first release |
 | D032 | Workspace ignore | **security denylist + defaults + `.pi-desktopignore`** | Safe/predictable tool FS behavior |
 | D033 | Tool result limits | **256KB/4000 lines defaults with explicit truncation markers** | Protect context & UI |
+| D243 | Model-aware image attachment transport | **Amend D197 / ADR 0059: Composer file references retain structured kind/name/MIME metadata. Electron main resolves vision only from the exact pi-ai model record (`input.includes("image")`), stores image bytes as `attachments/<sha256>`, sends eligible images as transient image blocks, and falls back to a safe `@path` for unknown/non-vision or oversized images. Durable messages store refs and metadata, never base64; the renderer shows an accessible capability status.** | The previous path-only contract made a vision-capable GPT model receive a scratch path instead of image content. Keeping capability ownership at pi-ai prevents discovery metadata or unknown model ids from claiming transport the adapter cannot provide, while the path fallback preserves non-vision file-tool behavior (ADR 0101). |
 | D237 | Vendor-account (OAuth) login for providers | **A provider row may be authenticated by a vendor subscription instead of an API key. pi-ai's seven OAuth flows are registered statically at startup (`registerBunOAuthFlows()`); Electron main owns login/logout orchestration and implements pi-ai's `CredentialStore` over host-core's encrypted secret store under the new ref `secret:provider:<id>:oauth`, serializing `modify` per provider for locked refresh. `auth_kind` gains `oauth`, `has_secret` widens to "api key **or** oauth", and a new `has_oauth` plus a non-secret `oauthAccountLabel` drive badges and hide the key input; host protocol and storage schema are unchanged. The vendor card list is derived from `models.getProviders().filter(p => p.auth.oauth)`, and login upserts one row per `vendorKey`. The sidecar's launch payload for an OAuth row carries `apiKey: ""`; the runtime injects a `resolveAuth` callback that calls the new host-proxy method `provider.resolveAuth`, which Electron main answers itself — never forwarding to host-core — after checking the `(sessionId, providerId)` pair against the per-launch binding table. The reply is a short-lived `ModelAuth` (`apiKey`/`headers`/`baseUrl`), so a refresh token never leaves main and `matches()` keeps a vendor runtime warm across turns. `providers.listModels` and the connection test go through the authenticated account instead of probing `/models`; apiStyle follows the selected model and gains `openai_codex_responses` and `pi_messages`. Five invoke channels plus one event channel under `pi-desktop/providers/oauth/*` carry the interaction.** | Subscribers of Claude Pro/Max, ChatGPT Plus/Pro and Copilot had to buy separate API credit to use the app. pi-ai ships the flows but declares login orchestration app-owned. Vendor tokens expire in about an hour, so resolving once at launch would break long sessions and churn `matches()` every turn; per-request resolution keeps the runtime stable while giving the model-directed process only a revocable token for the provider its session is bound to — strictly less than the long-lived API key it receives today (ADR 0095). |
 
 | D238 | Flat Settings directory and marketplace context ownership | **Settings renders one flat searchable directory in the exact order Basics / AI / Shortcuts / Instructions / Model configuration / Import / Project archive / Info. Personal, Integrations, Coding, and other group headings are removed. The Settings Extensions destination is removed; its official/mirror/custom marketplace source selector moves into Extensions → Marketplace beside the catalog and retains the same persisted settings and refresh behavior. No IPC, host protocol, storage, provider, permission, or project ownership contract changes.** | The nine-entry Settings rail repeated its own navigation hierarchy and used the same Extensions label as the app-shell plugin destination. Putting marketplace source selection beside marketplace browsing removes the duplicate entry while preserving the mirror/custom-source workflow (ADR 0096). |
@@ -2003,3 +2004,23 @@ D193, and D194.
   containment checks are unchanged; the fix removes an accidental builtin
   scope override rather than weakening the security boundary. See ADR 0100,
   `03-runtime/02-agent-runtime.md` §5f/§5f.1, and E2E-142.
+
+## 2026-08-18 — Model-aware image attachment transport
+
+- Clipboard images remain compact structured composer references instead of
+  being inserted as base64 or forced into visible `@path` text. Electron main
+  validates the source against the session roots and stores image bytes under
+  `<data>/attachments/<sha256>`; the durable user message stores only the ref,
+  kind, name, MIME type, and size.
+- The exact pi-ai model record owns visual capability. A model with
+  `input.includes("image")` receives eligible images as transient image blocks
+  through the sidecar. Unknown/custom models, non-vision models, and images
+  above the 20 MiB inline bound receive a safe scratch/project path fallback;
+  replayed content-store images use a session `replayed/` copy. Renderer
+  discovery cannot promote an unknown model.
+- Decision D243 amends the image portion of D197 / ADR 0059. It fixes the
+  observed GPT vision gap without moving provider logic into the renderer or
+  putting binary data into host persistence. See ADR 0101,
+  `03-runtime/01-ipc-protocol.md` §5.1/§13c,
+  `03-runtime/04-data-storage.md`, `04-ux/08-component-spec.md` §11.7–11.8,
+  and E2E-102c–102e.

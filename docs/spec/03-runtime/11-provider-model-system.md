@@ -122,6 +122,11 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
    published thinking-level map. Free-form gateway ids that match those catalog
    entries resolve through the same D136 path; ids still absent from the pin
    remain on the generic non-reasoning fallback.
+5. For image transport, pi-ai's `input` list is equally authoritative:
+   `input.includes("image")` is the only signal that enables visual blocks.
+   Renderer discovery, cached `vision` badges, and user-entered capability
+   claims cannot promote an unknown model. The fallback is a path reference so
+   the normal file-tool workflow remains available.
 
 ### 6.3 Model families to cover
 Catalog and custom model entry must support common capability classes:
@@ -342,11 +347,13 @@ When starting a turn with `(providerId, modelId)`:
    modes, pricing, context window, output limit, headers, and compatibility
    verbatim; when unresolved, accept the raw model id with the generic
    text-only, non-reasoning fallback
-6. clamp the session thinking level against pi's supported levels and build the
+6. derive vision transport only from the resolved record's `input` list;
+   discovery/cache/user capability claims cannot promote an unresolved model
+7. clamp the session thinking level against pi's supported levels and build the
    runtime provider adapter by replacing only provider/model identity, selected
    API adapter, auth, and an explicitly configured endpoint URL
-7. execute stream with abort handle and separate answer/thinking events
-8. translate vendor errors into shared `AppError` codes (§15)
+8. execute stream with abort handle and separate answer/thinking events
+9. translate vendor errors into shared `AppError` codes (§15)
 
 If the model is not in pi's catalog, still allow it when the user explicitly
 enters a model id and the provider accepts unknown ids. Cached/discovered

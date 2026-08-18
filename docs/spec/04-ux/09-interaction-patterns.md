@@ -858,10 +858,17 @@ When drag/drop is implemented, these patterns should apply:
   focus; it does not eagerly delete session scratch bytes. Backspace on an
   empty textarea removes the most recent active reference.
 - A reference-only draft enables Send. Before dispatch, active references are
-  appended after visible text and serialized with the canonical relative or
-  absolute paths and existing whitespace quoting. Successful dispatch clears
-  both; failed or rejected dispatch retains both. References are session-scoped
-  and never cross a workspace change.
+  appended after visible text and ordinary references are serialized with the
+  canonical relative or absolute paths and existing whitespace quoting.
+  Pasted references are submitted as structured attachments so the main
+  process can choose visual input or the same path fallback from the exact
+  model capability. Successful dispatch clears both; failed or rejected
+  dispatch retains both. References are session-scoped and never cross a
+  workspace change.
+- When an image reference is active, Composer shows one compact live status
+  line. It names visual transport for a model whose pi-ai `input` includes
+  `image`, and names the file-path fallback for unknown/non-vision models.
+  The status is informational, keyboard-safe, and never relies on color alone.
 - Accepted dispatch retains an in-memory, session/turn-scoped copy of the
   visible text and structured references only while unanswered smart Stop can
   undo the send. That undo restores the original chip order and labels; it

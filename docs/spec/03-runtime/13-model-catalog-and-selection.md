@@ -178,6 +178,18 @@ Warnings are non-blocking unless execution is impossible.
 6. Changing to a non-reasoning provider persists `off`; no unsupported level
    leaks into the next request.
 
+### 11.2 Vision capability resolution
+
+1. Resolve the same exact pi model record used to build the sidecar provider.
+2. Mark the model `vision` only when `input.includes("image")` is true.
+3. A discovered, cached, or user-defined capability flag may remain useful as
+   selection metadata, but it cannot promote an unknown runtime model to image
+   transport. Unknown/custom models therefore show the path-fallback status in
+   Composer.
+4. The main process prepares pasted images as content-addressed refs. A
+   vision-capable model receives images within the 20 MiB app-side inline
+   bound as transient image blocks; other cases receive a safe `@path`.
+
 ## 12. Refresh strategy
 
 - manual refresh button in settings/model picker

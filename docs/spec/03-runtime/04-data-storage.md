@@ -54,7 +54,8 @@ schema v7, v8, and v11:
  │    ├── before          # bounded pre-tool bytes, when reversible
  │    └── meta.json       # path, hashes, diff state, and ownership
  └── scratch/<sessionId>/ # per-session agent temp files (D114), including
-                          # composer pasted files under pasted/ — deleted
+                          # composer pasted files under pasted/ and replayed/
+                          # image fallbacks — deleted
                           # with the session; startup sweep removes orphans
                           # and stale dirs
 ```
@@ -523,11 +524,19 @@ type Block =
       completedAt?: string; durationMs?: number;
       toolUsage?: ToolTokenUsage }
   | { type: "attachment"; kind: "image" | "file"; name: string;
-      ref: string /* attachments/<sha256> or absolute path */ };
+      ref: string /* attachments/<sha256> or absolute path */;
+      mimeType?: string; size?: number };
 ```
 
 - Tool results are stored **post-truncation** (16-tool-result-limits); full
   raw output is not a storage concern.
+- A user attachment block stores only kind, display name, MIME/size metadata,
+  and a ref. Image bytes are content-addressed under `attachments/` before the
+  turn is dispatched; transient base64 used to build a pi-ai
+  image block never enters the transcript, database, or renderer message.
+  Non-vision and oversized-image turns retain a safe scratch/project `@path`
+  fallback for the model. Replayed content-store images use
+  `scratch/<sessionId>/replayed/` when a path fallback is required.
 - Assistant thinking is stored only in `thinking` blocks inside the file. The
   derived `text` column contains final answer text, so transcript search and
   answer previews do not expose or mix reasoning.

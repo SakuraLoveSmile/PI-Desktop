@@ -63,7 +63,9 @@ interface AgentRuntime {
    an unknown free-form id uses the explicit generic fallback
 4. validate model/secret availability
 5. reject if session busy
-6. persist user message
+6. validate structured attachments at Electron main's session-bound path
+   boundary, persist image bytes by SHA-256, and retain only attachment refs in
+   the durable user message
 7. snapshot the effective shell ID and dialect for the turn
 8. start pi turn with the resolved session configuration and effective
    thinking level; request setup receives one bounded pi-ai retry for transient
@@ -369,6 +371,10 @@ criterion-by-criterion report of what was met and the evidence observed.
 - Unsupported requested levels use pi's nearest-supported-level rule: scan
   upward first, then downward. A non-reasoning provider always resolves to
   `off`.
+- Vision support is resolved from the same pi model record: only
+  `input.includes("image")` enables image transport. Unknown/custom model ids
+  remain conservative text/path models even when discovery metadata claims
+  `vision`.
 - The effective level is passed to the pi `Agent`; provider-specific request
   serialization remains pi-ai's responsibility.
 - Pi `thinking` blocks become `UiMessage.thinking` and
@@ -383,6 +389,11 @@ criterion-by-criterion report of what was met and the evidence observed.
   restores as an errored result; a tool row whose assistant row was lost
   gets a synthesized call-only assistant carrier so call/result pairs stay
   well-formed for every provider API.
+- Vision runtimes hydrate persisted image refs only from the session-bound
+  attachment, scratch, and project roots. Images within the 20 MiB inline
+  safety bound become transient pi-ai image blocks; oversized or unavailable
+  images become safe `@path` fallbacks. Base64 is never restored into durable
+  UI messages or transcript records.
 - Failed assistant messages remain durable diagnostic transcript entries but
   are never restored into pi model context on a later turn.
 - Restored checkpoints clear provider usage from retained assistant messages
