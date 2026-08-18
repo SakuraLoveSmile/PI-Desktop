@@ -36,6 +36,7 @@ Tables (canonical DDL in [04-data-storage](04-data-storage.md) §4.3–4.4, §4.
         "azure_api_key",
         "aws_sdk_default",
         "custom_headers",
+        "oauth",
         "none"
       ]
     },
@@ -44,7 +45,17 @@ Tables (canonical DDL in [04-data-storage](04-data-storage.md) §4.3–4.4, §4.
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
-    "apiStyle": { "enum": ["chat_completions", "responses", "auto"] },
+    "apiStyle": {
+      "enum": [
+        "chat_completions",
+        "responses",
+        "anthropic_messages",
+        "google_generative_ai",
+        "openai_codex_responses",
+        "pi_messages",
+        "auto"
+      ]
+    },
     "compatibility": {
       "type": "object",
       "properties": {
@@ -76,6 +87,18 @@ model record instead. Unknown free-form models expose `supportsReasoning=false`
 and `supportedThinkingLevels=["off"]`. The raw secret and internal compatibility
 JSON remain hidden.
 
+`authKind: "oauth"` marks a vendor-account row (ADR 0092, D234): the credential
+is an OAuth grant under `secret:provider:<id>:oauth` rather than a pasted key,
+so the row carries no `secretRef` for it and launches with an empty key. The
+last two apiStyle values are vendor-account wire APIs — `openai_codex_responses`
+(the Codex conversation envelope) and `pi_messages` (the radius gateway) — and
+are not offered in the custom-provider dialog because neither works against a
+hand-typed base URL with a pasted key. A vendor row's style is not fixed by the
+vendor: GitHub Copilot serves Anthropic, Chat Completions, and Responses
+models, so the style follows the selected model and is rewritten on each model
+change. `config_json.oauth.accountLabel` holds the non-secret display label for
+the signed-in account.
+
 ## 3. Built-in vendor presets
 
 Presets only prefill form defaults; they are not a closed world.
@@ -97,6 +120,24 @@ Presets only prefill form defaults; they are not a closed world.
 | ollama | openai_compatible | none | yes |
 | lmstudio | openai_compatible | none | yes |
 | custom | openai_compatible | api_key_and_base_url | yes |
+
+### Vendor-account presets
+
+These rows are created by signing in (Settings -> Model configuration ->
+Vendor accounts), not by the custom-provider dialog. The list is derived at
+runtime from `models.getProviders().filter(p => p.auth.oauth)`, so it tracks
+pi-ai rather than this table; `baseUrl`, `apiStyle`, and `defaultModelId` are
+filled in from the account's own catalog after login.
+
+| vendorKey | subscription | typical apiStyle | login shape |
+|---|---|---|---|
+| anthropic | Claude Pro/Max | anthropic_messages | PKCE + local callback |
+| openai-codex | ChatGPT Plus/Pro | openai_codex_responses | PKCE + local callback, or pasted code |
+| github-copilot | Copilot | varies by model | device code |
+| openrouter | account credit | chat_completions | PKCE + local callback |
+| kimi-coding | Kimi | chat_completions (headers-only auth) | device code |
+| xai | xAI | chat_completions | device code |
+| radius | Radius | pi_messages | PKCE + local callback |
 
 ## 4. Model catalog cache record
 
@@ -162,11 +203,14 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
 ### `providers.list`
 - in: `{ includeDisabled?: boolean }`
 - out: `{ providers: ProviderPublic[] }`
-- `ProviderPublic` excludes raw secrets; includes `hasSecret: boolean`
+- `ProviderPublic` excludes raw secrets; includes `hasSecret: boolean` (true
+  for **either** credential), `hasOauth: boolean`, and the non-secret
+  `oauthAccountLabel?: string`
 
 ### `providers.create` / `providers.update`
-- in: provider fields + optional `secretValue`; legacy clients may still send
-  `supportsReasoning` / `supportedThinkingLevels`
+- in: provider fields + optional `secretValue` + optional `oauthAccountLabel`
+  (merged into `config_json.oauth`, cleared with an empty string); legacy
+  clients may still send `supportsReasoning` / `supportedThinkingLevels`
 - behavior: persist config; if secretValue present, write secret store and set
   `secretRef`; legacy thinking fields may remain in
   `config_json.compatibility` but do not affect runtime resolution
@@ -174,11 +218,17 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
 
 ### `providers.delete`
 - in: `{ id, deleteSecret?: boolean }` default `deleteSecret=true`
+- behavior: clears both credential refs (`:api_key` and `:oauth`) and their
+  metadata rows, so a re-created provider can never inherit a stranger's
+  refresh token
 - out: `{ ok: true }`
 
 ### `providers.testConnection`
 - in: `{ id, modelId?: string }`
 - out: `{ ok: boolean, latencyMs?: number, error?: AppError, sampleModelId?: string }`
+- an `authKind: "oauth"` row proves itself by resolving vendor auth (refreshing
+  the token if it expired) instead of probing the network with a key it does
+  not have
 
 ### `providers.listModels`
 - renderer IPC in: `{ providerId, source?: "cache"|"refresh" }`; `cache`
@@ -186,6 +236,10 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
   runs discovery in Electron main
 - host RPC in: `{ providerId?: string }`; reads only the Rust-owned `models`
   table
+- for an `authKind: "oauth"` row Electron main reads the authenticated catalog
+  (`models.getAvailable`, which applies the vendor's own `filterModels`, so a
+  Copilot account lists what its subscription includes) instead of calling
+  `/models`; each returned model carries the apiStyle its wire API implies
 - out: `{ models: ModelCatalogItem[] }`; each model carries pi-resolved
   `reasoning` capability and `supportedThinkingLevels`. Cached capability tags
   and legacy provider fields cannot override the pi model record.
@@ -223,6 +277,9 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
 
 ```text
 secret:provider:<providerId>:api_key
+secret:provider:<providerId>:oauth
 ```
 
-Future multi-secret providers may add suffixes (`:client_secret`, etc.).
+The two refs are independent, so one row may hold a key, a vendor account, or
+both; see [14-secrets-storage](14-secrets-storage.md) §10. Future multi-secret
+providers may add further suffixes (`:client_secret`, etc.).

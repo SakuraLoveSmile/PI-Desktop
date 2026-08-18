@@ -708,6 +708,42 @@ type CommandShellCatalog = {
 - 将完整的 API 密钥写入普通日志
 - 在渲染器中长期保留 API 密钥明文
 
+### 厂商账户（OAuth，D234）
+
+用厂商订阅账户登录是 Electron 主进程内的会话，因此只走 IPC —— 主机协议
+版本不变。五条调用通道加一条事件通道：
+
+- `pi-desktop/providers/oauth/vendors() -> { vendors: OAuthVendor[] }`
+- `pi-desktop/providers/oauth/start({ vendorId }) -> { loginId }`
+- `pi-desktop/providers/oauth/respond({ loginId, promptId, value? })` ——
+  不带 `value` 表示取消该提问，从而中止整个流程
+- `pi-desktop/providers/oauth/cancel({ loginId }) -> { ok: boolean }`
+- `pi-desktop/providers/oauth/logout({ vendorId }) -> { ok: true }`
+- `pi-desktop/providers/oauth/event` 推送 `OAuthLoginEvent`
+
+```ts
+type OAuthLoginEvent = { loginId: string; vendorId: string } & (
+  | { kind: "info"; message: string; links?: Array<{ url: string; label?: string }> }
+  | { kind: "authUrl"; url: string; instructions?: string; opened: boolean }
+  | { kind: "deviceCode"; userCode: string; verificationUri: string;
+      intervalSeconds?: number; expiresInSeconds?: number }
+  | { kind: "progress"; message: string }
+  | { kind: "prompt"; request: OAuthPromptRequest }
+  | { kind: "promptCancelled"; promptId: string }
+  | { kind: "done"; providerId: string; accountLabel?: string }
+  | { kind: "error"; message: string }
+  | { kind: "cancelled" }
+);
+```
+
+所有登录形态 —— 浏览器回调、设备码、手动贴码、厂商选项 —— 都走这一条
+事件流，因此渲染层只渲染收到的内容，而不按厂商分支。`opened: false` 表示
+浏览器无法启动，用户需要自己复制链接。`promptCancelled` 表示流程自己回答了
+某个提问（回调赶在了贴码框前面），因此输入框必须自行消失。
+
+同样禁止：任何事件都不携带令牌、刷新令牌或授权码。`accountLabel` 只是
+展示字符串。
+
 ## 9. API 项目
 
 - `project/open()`：系统目录选择器

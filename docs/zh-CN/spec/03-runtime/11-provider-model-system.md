@@ -146,6 +146,7 @@ type ProviderAuthKind =
   | "azure_api_key"
   | "aws_sdk_default"
   | "custom_headers"
+  | "oauth" // 厂商订阅账户，凭据由 Electron 主进程持有
   | "none" // local no-auth
 
 type ProviderConfig = {
@@ -159,7 +160,14 @@ type ProviderConfig = {
   authKind: ProviderAuthKind
   secretRef?: string            // pointer into secret store
   headers?: Record<string, string> // non-secret headers only
-  apiStyle?: "chat_completions" | "responses" | "auto"
+  apiStyle?:
+    | "chat_completions"
+    | "responses"
+    | "anthropic_messages"
+    | "google_generative_ai"
+    | "openai_codex_responses" // 仅厂商账户
+    | "pi_messages"            // 仅厂商账户
+    | "auto"
   compatibility?: {
     supportsTools?: boolean
     supportsVision?: boolean
@@ -211,6 +219,43 @@ type ThinkingLevel =
 - 提供程序配置仅存储 `secretRef` / hasSecret 布尔值
 - Renderer 从未在列表 API 中接收原始密钥
 - 可选的密钥验证调用：`providers.testConnection`
+- 厂商账户行保存的是 OAuth 授权而不是密钥；`hasSecret` 覆盖任一种凭据，
+  `hasOauth` 用于区分二者（第 8a 节）
+
+## 8a. 厂商账户（OAuth）提供商
+
+提供商行可以由厂商订阅账户认证 —— Claude Pro/Max、ChatGPT Plus/Pro、
+Copilot 以及 pi-ai 其余的 OAuth 厂商 —— 而不是粘贴的密钥（ADR 0092、
+D234）。可选厂商由 `models.getProviders().filter(p => p.auth.oauth)` 派生，
+因此列表跟随依赖版本而不是写死的表；`registerBunOAuthFlows()` 在启动时
+调用一次，因为 pi-ai 通过 electron-vite 无法打包的动态 import 加载流程。
+
+Electron 主进程拥有登录会话与凭据；渲染层只看到事件与一个非敏感的账户
+标签。登录会按 `vendorKey` 幂等 upsert 一行 `authKind: "oauth"`，随后用
+账户自己的目录填入 `baseUrl`、`apiStyle` 与 `defaultModelId`。
+
+请求认证**按请求**解析，而不是在启动时解析：
+
+```text
+sidecar 请求
+  → 运行时 provider binding（启动时注入 `resolveAuth`）
+  → 宿主代理 `provider.resolveAuth` { sessionId, providerId }
+  → Electron 主进程（本地应答，绝不转发给 host-core）
+      · 绑定表校验 → 不匹配则 PROVIDER_NOT_BOUND
+      · pi-ai `models.getAuth(providerId)` → 仅过期时在锁下刷新
+  → 短时 ModelAuth { apiKey?, headers?, baseUrl? }
+```
+
+有两条后果值得写明：厂商访问令牌约一小时有效，因此载荷与运行时都不得
+缓存它；而由于该行的 `apiKey` 恒为 `""`、注入的解析器是函数，运行时身份
+（`matches()`）保持稳定，所以 OAuth 会话跨回合复用温热运行时而不是重建。
+因此 sidecar 永远拿不到刷新令牌，拿到的访问令牌也只属于其会话绑定的那个
+提供商。
+
+这类行的模型发现读取已认证的目录（`models.getAvailable`，它已应用厂商
+自己的 `filterModels`），而不是探测 `/models`；连接测试通过解析认证来
+证明账户。一个厂商可以跨越多种线路 API —— Copilot 同时提供 Anthropic、
+Chat Completions 与 Responses 模型 —— 因此行的 `apiStyle` 跟随所选模型。
 
 ## 9. 模型目录服务
 
@@ -250,6 +295,7 @@ type ModelDescriptor = {
 - 添加自定义提供商
 - 编辑基础 URL/headers
 - set/replace/delete 键
+- 登录/退出厂商账户，并看到某一行使用的是哪个账户
 - enable/disable 提供商
 - 测试连接
 - 不要暴露推理、思维水平、上下文窗口、输出限制、
@@ -275,7 +321,9 @@ type ModelDescriptor = {
 
 1.从主机加载提供程序配置
 2. 如果 missing/disabled → 失败（`MODEL_NOT_CONFIGURED`；保留详细信息：`PROVIDER_DISABLED`）
-3. 通过 `secretRef` 解析机密（从不记录机密；丢失 → `PROVIDER_SECRET_MISSING`）
+3. 解析凭据：密钥行通过 `secretRef` 读取机密（从不记录机密；丢失 →
+   `PROVIDER_SECRET_MISSING`）；`oauth` 行完全跳过这一步并以空密钥启动，
+   因为认证按请求解析（第 8a 节）
 4. 通过精确的 vendor/id 或兼容的解析完整的 pi-ai 模型记录
    带有分隔符限制后缀的网关别名
 5.解决后，复制pi的名字，推理标志，思维层次图，输入
@@ -396,6 +444,8 @@ UI 可能会显示层级提示，但默认情况下不得硬阻止未知模型�
 - [ ] 当目录丢失时接受自由格式模型 ID
 - [ ] 目录刷新填充至少一个本机和一个兼容提供程序的模型，而不破坏现有提供程序
 - [ ] 连接测试返回结构化 success/failure，无秘密泄露
+- [ ] 可以在设置中登录厂商账户、用它跑完一个回合并退出登录；sidecar 全程
+      拿不到刷新令牌
 - [ ] 会话可以在回合之间切换模型
 - [ ] 具有推理能力的模型仅公开受支持的思维水平和
       所选级别达到pi；不受支持的提供商解析为 `off`

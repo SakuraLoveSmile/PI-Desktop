@@ -57,6 +57,7 @@
 | D031 | 秘密后端 | **操作系统安全存储主要+加密文件后备** | 在 macOS 首次发布上稳健 |
 | D032 | 工作区忽略 | **安全拒绝列表 + 默认值 + `.pi-desktopignore`** | Safe/predictable 工具 FS 行为 |
 | D033 | 工具结果限制 | **256KB/4000 行默认带有显式截断标记** | 保护上下文和 UI |
+| D234 | 提供商的厂商账户（OAuth）登录 | **提供商行可以用厂商订阅账户认证，而不是 API 密钥。pi-ai 的七个 OAuth 流程在启动时静态注册（`registerBunOAuthFlows()`）；Electron 主进程拥有登录/退出编排，并在 host-core 的加密密钥存储之上实现 pi-ai 的 `CredentialStore`，使用新的引用 `secret:provider:<id>:oauth`，并按提供商串行化 `modify` 以满足带锁刷新。`auth_kind` 新增 `oauth`，`has_secret` 放宽为“存在 API 密钥**或** oauth 凭据”，新增的 `has_oauth` 与非敏感的 `oauthAccountLabel` 驱动徽标并隐藏密钥输入框；主机协议与存储架构不变。厂商卡片列表由 `models.getProviders().filter(p => p.auth.oauth)` 派生，登录按 `vendorKey` 幂等 upsert 一行。OAuth 行的 sidecar 启动载荷中 `apiKey: ""`；运行时注入 `resolveAuth` 回调，调用新的宿主代理方法 `provider.resolveAuth`，该方法由 Electron 主进程自行应答 —— 绝不转发给 host-core —— 并先用每次启动重写的绑定表校验 `(sessionId, providerId)`。应答是短时 `ModelAuth`（`apiKey`/`headers`/`baseUrl`），因此刷新令牌永不离开主进程，而 `matches()` 让厂商运行时跨回合保持温热。`providers.listModels` 与连接测试改走已认证的账户，而不是探测 `/models`；apiStyle 跟随所选模型，并新增 `openai_codex_responses` 与 `pi_messages`。交互由 `pi-desktop/providers/oauth/*` 下的五条调用通道与一条事件通道承载。** | Claude Pro/Max、ChatGPT Plus/Pro 与 Copilot 的订阅用户此前必须另买 API 额度才能使用本应用。pi-ai 提供了流程，但明确声明登录编排归宿主应用。厂商令牌约一小时过期，启动时解析一次会让长会话中断，并让 `matches()` 每回合失配；按请求解析既保持运行时稳定，又只把一个可作废的令牌交给运行模型指令的进程，且仅限该会话绑定的提供商 —— 严格少于今天无条件下发的长期 API 密钥（ADR 0092）。 |
 
 ## D. 法典视觉平等决策 (0.3.5+)
 
@@ -1794,3 +1795,43 @@ D193 和 D194。
 - 决策 D231 修订 D201/ADR 0062，触及 sidecar、host-core 的
   `tools.execute` 权限裁决、内置定义、系统提示词和渲染器的工具呈现映射。
   参见 ADR 0089 与 `03-runtime/02-agent-runtime.md` §5f/§5f.1。
+
+## 2026-08-18 — 厂商账户（OAuth）登录
+
+- 提供商行现在可以用厂商订阅账户认证。pi-ai 的七个 OAuth 厂商 ——
+  anthropic、openai-codex、github-copilot、openrouter、kimi-coding、xai、
+  radius —— 一次性全部支持，因为卡片列表由
+  `models.getProviders().filter(p => p.auth.oauth)` 派生，而不是写死。
+  `registerBunOAuthFlows()` 在启动时调用一次：pi-ai 用变量说明符的动态
+  import 加载流程，electron-vite 无法打包这条路径。
+- 凭据存放在既有的加密密钥存储中，使用新引用
+  `secret:provider:<id>:oauth`，与该行的 API 密钥并存（而非取代）。
+  `has_secret` 放宽为“任一种凭据”，使既有的就绪判断保持正确；
+  `has_oauth` 与非敏感的 `oauthAccountLabel` 是新增字段。`auth_kind` 新增
+  `oauth` —— 它本来就是自由字符串，因此主机协议 v9 与存储架构 v10 不变。
+  删除提供商会同时删除两个引用及两条 `secrets_meta` 记录。
+- Electron 主进程拥有登录/退出：`oauth.ts` 在 `secrets.*` 之上实现 pi-ai 的
+  `CredentialStore`，按提供商串行化 `modify` 以满足带锁刷新，并通过
+  `providersOauthVendors/Start/Respond/Cancel/Logout` 与
+  `pi-desktop/providers/oauth/event` 事件流把 `AuthInteraction` 桥接到
+  渲染层。浏览器回调、设备码、单选与手动贴码都走同一条事件流，因此单个
+  对话框渲染厂商要求的任何形态，取消会中止本地回调服务器或轮询循环。
+- sidecar 按请求解析认证。OAuth 行以 `apiKey: ""` 启动；运行时注入
+  `resolveAuth`，它调用宿主代理方法 `provider.resolveAuth`。主进程在本地
+  应答 —— 绝不转发给 host-core —— 并先用每次启动重写的绑定表校验
+  `(sessionId, providerId)`，然后返回短时 `ModelAuth`（`apiKey`/`headers`/
+  `baseUrl`，Copilot 正是靠 `baseUrl` 绑定它自己的账户端点）。刷新令牌
+  永不离开主进程，sidecar 拿到的东西严格少于密钥行今天下发的长期密钥。
+- `matches()` 不需要新字段：厂商行的 `apiKey` 恒为 `""`，每次启动新建的
+  `resolveAuth` 闭包在 `JSON.stringify` 中消失，因此 OAuth 会话跨回合复用
+  同一个温热运行时。
+- 模型发现与连接测试改走账户：`providers.listModels` 读取
+  `models.getAvailable`（它已应用厂商自己的 `filterModels`，因此 Copilot
+  只列出订阅包含的模型），连接测试通过解析认证来证明账户，而不是探测
+  `/models`。行的 `apiStyle` 跟随所选模型 —— Copilot 跨越多种线路 API ——
+  并新增两种样式：`openai_codex_responses` 与 `pi_messages`。
+- 设置 → 模型配置在提供商列表上方新增“厂商账户”分区；已登录的行显示账户
+  徽标，其对话框用该徽标替换 API 密钥输入框。
+- 决策 D234 扩展 D028/D031，触及 host-core 的密钥与提供商模块、Electron
+  主进程、代理运行时的 provider binding 以及设置界面。参见 ADR 0092 与
+  `03-runtime/14-secrets-storage.md`。
