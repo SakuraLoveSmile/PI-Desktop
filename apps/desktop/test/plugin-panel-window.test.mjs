@@ -14,19 +14,40 @@ const chromeSource = await readFile(
   new URL("../electron/shared/plugin-panel-chrome.ts", import.meta.url),
   "utf8",
 );
+const examplePanelSource = await readFile(
+  new URL("../../../examples/plugins/hello/renderer/index.html", import.meta.url),
+  "utf8",
+);
+const hostCorePluginSource = await readFile(
+  new URL("../../../crates/host-core/src/plugins.rs", import.meta.url),
+  "utf8",
+);
+const bundledPanelSources = [
+  ...hostCorePluginSource.matchAll(/"renderer\/index\.html",\s*br#"(.*?)"#,/gs),
+].map((match) => match[1]);
 
 test("plugin panels match the cross-platform main-window chrome contract", () => {
-  assert.match(
-    hostSource,
-    /process\.platform === "darwin"[\s\S]*titleBarStyle: "hiddenInset"[\s\S]*trafficLightPosition: \{ x: 16, y: 16 \}[\s\S]*frame: false/,
-  );
+  assert.match(hostSource, /frame: false/);
+  assert.doesNotMatch(hostSource, /titleBarStyle|trafficLightPosition/);
   assert.match(hostSource, /request\.theme === "light"/);
   assert.match(hostSource, /win\.setMenu\(null\)/);
   assert.match(hostSource, /pi-plugin-panel-development=1/);
   assert.match(chromeSource, /PLUGIN_PANEL_TITLEBAR_HEIGHT = 46/);
   assert.match(preloadSource, /-webkit-app-region: drag/);
-  assert.match(preloadSource, /width: 112px/);
-  assert.match(preloadSource, /padding-left: 76px/);
+  assert.match(preloadSource, /className = "capsule"/);
+  assert.match(preloadSource, /top: 8px/);
+  assert.match(preloadSource, /right: 10px/);
+  assert.match(preloadSource, /width: 96px/);
+  assert.match(preloadSource, /height: 28px/);
+  assert.match(preloadSource, /border-radius: 999px/);
+  assert.match(preloadSource, /controls\.append\(minimize, maximize, close\)/);
+  const capsuleBlock = preloadSource.slice(
+    preloadSource.indexOf("    .capsule {"),
+    preloadSource.indexOf("    .control {"),
+  );
+  assert.doesNotMatch(capsuleBlock, /box-shadow:|backdrop-filter:/);
+  assert.doesNotMatch(preloadSource, /function panelTitle|panelTitle\(/);
+  assert.doesNotMatch(preloadSource, /platform-darwin|padding-left: 76px|width: 112px/);
 });
 
 test("plugin panel window controls stay private, bounded, and accessible", () => {
@@ -40,6 +61,7 @@ test("plugin panel window controls stay private, bounded, and accessible", () =>
   assert.match(preloadSource, /focus-visible/);
   assert.match(preloadSource, /pageColor\("backgroundColor"/);
   assert.match(preloadSource, /--pi-plugin-panel-page-background/);
+  assert.match(preloadSource, /cursor: pointer/);
   const publicBridgeSource = preloadSource.slice(
     preloadSource.indexOf("const bridge ="),
     preloadSource.indexOf('contextBridge.exposeInMainWorld("pluginBridge"'),
@@ -50,16 +72,27 @@ test("plugin panel window controls stay private, bounded, and accessible", () =>
   );
 });
 
-test("plugin content is offset below the host-owned titlebar", () => {
+test("plugin content is offset below the strict 46px host drag band", () => {
   assert.match(preloadSource, /getComputedStyle\(body\)\.paddingTop/);
   assert.match(preloadSource, /padding-top/);
   assert.match(preloadSource, /PLUGIN_PANEL_TITLEBAR_HEIGHT/);
   assert.match(preloadSource, /--pi-plugin-titlebar-height/);
-  assert.match(preloadSource, /46px safe area/);
   assert.match(preloadSource, /isDevelopmentPanel/);
+  assert.match(preloadSource, /safe-area-hint/);
+  assert.match(preloadSource, /顶部 46px 为拖拽区/);
   assert.match(preloadSource, /--pi-plugin-panel-theme=/);
   assert.match(preloadSource, /PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX/);
   assert.match(preloadSource, /panelLocale\(\)\.toLowerCase\(\)/);
   assert.match(preloadSource, /host\.dataset\.theme = theme/);
+  assert.match(preloadSource, /className = "drag-region"/);
   assert.match(preloadSource, /prefers-reduced-motion: reduce/);
+});
+
+test("checked-in plugin panels follow the host chrome contract", () => {
+  assert.equal(bundledPanelSources.length, 2);
+  for (const panelSource of [examplePanelSource, ...bundledPanelSources]) {
+    assert.match(panelSource, /PI-Desktop reserves exactly a transparent 46px drag band/);
+    assert.match(panelSource, /var\(--pi-plugin-titlebar-height, 46px\)/);
+    assert.doesNotMatch(panelSource, /top:\s*0/);
+  }
 });

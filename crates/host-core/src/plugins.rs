@@ -1581,6 +1581,9 @@ module.exports = { onLoad, onUnload };
     <title>Hello Plugin</title>
     <style>
       body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 16px; background: #0b1020; color: #e8eefc; }
+      /* PI-Desktop reserves exactly a transparent 46px drag band. Normal-flow
+         content is offset automatically; fixed/sticky top UI starts at
+         top: var(--pi-plugin-titlebar-height, 46px). */
       .card { border: 1px solid #24304d; border-radius: 12px; padding: 16px; background: #121a2f; }
       button { margin-top: 12px; border: 0; border-radius: 8px; padding: 8px 12px; background: #4f7cff; color: white; cursor: pointer; }
     </style>
@@ -1704,6 +1707,9 @@ module.exports = { onLoad, onUnload };
   <title>Workspace Notes</title>
   <style>
     body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0b1020; color: #e8eefc; padding: 16px; }
+    /* PI-Desktop reserves exactly a transparent 46px drag band. Normal-flow
+       content is offset automatically; fixed/sticky top UI starts at
+       top: var(--pi-plugin-titlebar-height, 46px). */
     textarea { width: 100%; min-height: 180px; border-radius: 10px; border: 1px solid #24304d; background: #121a2f; color: inherit; padding: 10px; box-sizing: border-box; }
     .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
     button { border: 0; border-radius: 8px; padding: 8px 12px; background: #4f7cff; color: white; cursor: pointer; }

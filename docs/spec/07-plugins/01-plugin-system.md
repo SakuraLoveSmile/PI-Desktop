@@ -219,21 +219,25 @@ are reachable there) and CPU/memory limits.
 ### 6.3 Plugin Panel UI
 - Load the plugin page in a dedicated sandboxed `BrowserWindow` and isolated
   per-plugin session partition
-- Reserve a host-owned 46px custom titlebar above plugin content: macOS keeps
-  hidden-inset traffic lights at `{x:16,y:16}`; Windows/Linux use a frameless
-  window with custom minimize, maximize/restore, and close controls
-- Panel titles may be a legacy string or a localized `{ "en": string,
-  "zh-CN": string }` object. The host resolves the title using the active
-  PI-Desktop UI language, not the plugin window's OS/browser locale.
-- The titlebar follows the loaded plugin page's computed background and text
+- Use a frameless window on macOS, Windows, and Linux. The preload reserves
+  exactly a transparent 46px drag band and renders only a minimal fixed
+  top-right capsule with three controls: minimize, maximize/restore, and close.
+  Native traffic lights and host-rendered panel titles are not shown. The drag
+  band is not clickable outside the capsule; development panels show a
+  localized reminder.
+- Panel titles may remain a legacy string or a localized `{ "en": string,
+  "zh-CN": string }` object for the native window identity and launcher
+  metadata, but the host does not render that title inside the panel.
+- The capsule follows the loaded plugin page's computed background and text
   colors. The active PI-Desktop theme (`light` / `dark`, including a plugin
   theme's base palette) is the fallback while the page is transparent.
-- Expose the titlebar height as `--pi-plugin-titlebar-height: 46px`; normal-flow
-  content is offset automatically, while fixed/sticky top UI must use
-  `top: var(--pi-plugin-titlebar-height, 46px)` rather than `top: 0`
-- Development panels show a host-owned safe-area reminder in the titlebar;
-  production panels keep the reminder hidden
-- Render the host titlebar in a closed preload-owned Shadow DOM so plugin CSS
+- Expose the drag-band height as `--pi-plugin-titlebar-height: 46px`;
+  normal-flow content is offset automatically, while fixed/sticky plugin UI
+  must use `top: var(--pi-plugin-titlebar-height, 46px)` rather than `top: 0`.
+  A plugin-owned toolbar may use `-webkit-app-region: drag`, with
+  `-webkit-app-region: no-drag` on its interactive controls.
+- The plugin owns its title, toolbar, and every other visible panel surface.
+- Render the host capsule in a closed preload-owned Shadow DOM so plugin CSS
   cannot restyle its controls
 - Can only call the safe APIs exposed by the plugin preload
 - Cannot access the host DOM / host store by default

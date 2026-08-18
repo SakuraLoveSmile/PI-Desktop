@@ -12,8 +12,14 @@
         background: #0b1020;
         color: #e8eefc;
       }
-      /* Host chrome reserves 46px. Fixed/sticky top UI should use:
-         top: var(--pi-plugin-titlebar-height, 46px); */
+      /*
+       * PI-Desktop reserves exactly a transparent 46px drag band and overlays
+       * only the host-owned three-button capsule. Normal-flow content is
+       * offset automatically; do not add another 46px top padding. Development
+       * panels show a reminder that the band is not clickable outside the
+       * capsule. Fixed/sticky top UI should use:
+       * top: var(--pi-plugin-titlebar-height, 46px);
+       */
       .card {
         border: 1px solid #24304d;
         border-radius: 12px;

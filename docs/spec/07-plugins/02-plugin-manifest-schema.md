@@ -55,7 +55,7 @@ type PluginUiConfig = {
  title?: string | {
    en: string;
    "zh-CN": string;
- }; // localized panel title; both locales are required for an object
+ }; // localized native panel identity; both locales are required for an object
 };
 ```
 

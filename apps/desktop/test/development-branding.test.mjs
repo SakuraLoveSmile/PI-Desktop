@@ -65,9 +65,12 @@ test("macOS development uses the canonical PI-Desktop Dock icon", () => {
   assert.match(mainSource, /nativeImage\.createFromPath\(iconPath\)/);
   assert.match(mainSource, /if \(icon\.isEmpty\(\)\)/);
   assert.match(mainSource, /app\.dock\.setIcon\(icon\)/);
+  // Branding is the first thing readiness does, after the only statement that
+  // may precede it: the bail for a launch that lost the single-instance lock
+  // and must not touch the running app's Dock tile.
   assert.match(
     mainSource,
-    /app\.whenReady\(\)\.then\(async \(\) => \{\s+applyDevelopmentBranding\(\);/,
+    /app\.whenReady\(\)\.then\(async \(\) => \{(?:\n\s+\/\/[^\n]*)*\n\s+if \(!hasSingleInstanceLock\) return;\s+applyDevelopmentBranding\(\);/,
   );
 });
 

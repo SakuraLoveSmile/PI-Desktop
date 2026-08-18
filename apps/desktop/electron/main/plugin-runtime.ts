@@ -120,7 +120,7 @@ export type PluginPanelRequest = {
   theme?: "light" | "dark";
   /** The plugin's egress allowlist; the panel session is confined to it. */
   netDomains?: readonly string[];
-  /** Development panels show the host safe-area reminder in their chrome. */
+  /** Development panels show the host drag-band reminder in their chrome. */
   development?: boolean;
 };
 
@@ -2709,4 +2709,3 @@ export class PluginRuntime {
     };
   }
 }
-

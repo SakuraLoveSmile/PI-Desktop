@@ -133,14 +133,17 @@ Outer frame that positions Topbar, Sidebar, MainChat, and WorkPanel. Owns resize
   Shift+F10 remain available to focused content.
 - macOS native commands that create or reload a window wait for the renderer's menu
   subscription acknowledgement instead of relying on a timing delay.
-- Plugin panel windows use the same 46px chrome metrics and platform split.
-  macOS keeps inset traffic lights with a centered, ellipsized plugin title;
-  Windows/Linux use the shared 112px control band with minimize,
-  maximize/restore, and close. The host-owned titlebar reserves space above the
-  plugin document, supports light/dark system appearance and reduced motion,
-  and stays isolated from plugin styles in a closed Shadow DOM. The preload
-  exposes `--pi-plugin-titlebar-height: 46px` for fixed/sticky plugin content;
-  development panels display a compact safe-area reminder in the host chrome.
+- Plugin panel windows use the same strict 46px drag-band metric on every
+  platform. All three use a frameless window with one minimal fixed top-right
+  capsule containing minimize, maximize/restore, and close. The capsule stays
+  inside the 46px band; the band is not clickable outside the capsule, and
+  development panels show a localized reminder. The host renders no title;
+  the plugin owns its title, toolbar, and all other visible content. The
+  transparent band supports light/dark page appearance and reduced motion,
+  stays isolated from plugin styles in a closed Shadow DOM, and exposes
+  `--pi-plugin-titlebar-height: 46px` for fixed/sticky plugin content.
+  Plugin-owned toolbars may opt into `-webkit-app-region: drag` while their
+  interactive controls use `no-drag`.
 
 ---
 

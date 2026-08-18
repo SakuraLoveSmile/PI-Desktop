@@ -73,6 +73,34 @@ module.exports = { onLoad, onUnload };
 uncaught error during load rolls the whole load back and leaves the plugin in `load_error`.
 Only `onLoad` and `onUnload` are fired today.
 
+## Panel UI
+
+PI-Desktop hosts every panel in a frameless window. The host reserves exactly a
+transparent 46px drag band and renders only a minimal fixed capsule in the
+top-right with minimize, maximize/restore, and close controls. The panel title,
+toolbar, background, and every other visible surface belong to the plugin.
+Normal-flow content is offset automatically, so do not add another 46px top
+padding. The drag band is not clickable outside the capsule; development
+panels show a reminder for this constraint.
+
+For `position: fixed` or `position: sticky` top UI, use the host variable rather
+than `top: 0`:
+
+```css
+.panel-toolbar {
+  position: sticky;
+  top: var(--pi-plugin-titlebar-height, 46px);
+  -webkit-app-region: drag;
+}
+
+.panel-toolbar button {
+  -webkit-app-region: no-drag;
+}
+```
+
+Account for the same 46px value in viewport-height calculations:
+`height: calc(100dvh - var(--pi-plugin-titlebar-height, 46px))`.
+
 The panel receives `window.pluginBridge`, not `pi`. Use the fixed bridge channels such as
 `ui.showToast`, `ui.closePanel`, `ui.getNotificationPermission`,
 `ui.requestNotificationPermission`, `ui.showNativeNotification`, `plugin.getSettings`,

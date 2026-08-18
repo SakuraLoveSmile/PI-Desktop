@@ -33,15 +33,20 @@ test("plugins page styles use design tokens in both themes", () => {
   }
 
   assert.match(section, /\.plugins-segment-btn\.active\s*\{[\s\S]*?--ds-text-primary/);
-  assert.match(section, /\.plugins-icon-btn\.is-bordered\s*\{[\s\S]*?--ds-border-default/);
+  assert.match(section, /\.plugins-header-menu\s*\{[\s\S]*?--ds-border-subtle/);
   assert.match(section, /\.plugins-search\s*\{[\s\S]*?--ds-text-primary/);
   assert.match(section, /\.plugins-modal\s*\{[\s\S]*?--ds-bg-elevated-opaque/);
   assert.match(section, /\.plugins-installed-mark\s*\{[\s\S]*?--ds-success/);
   assert.match(section, /:root\[data-theme="light"\] \.plugins-modal-backdrop/);
   assert.match(section, /\.plugins-page-header\s*\{[\s\S]*?border-bottom:\s*1px solid var\(--ds-border-subtle\)/);
-  assert.match(section, /\.plugins-title-icon\s*\{[\s\S]*?--ds-bg-secondary/);
+  assert.match(section, /\.plugins-title-icon\s*\{[\s\S]*?--ds-border-subtle/);
   assert.match(section, /\.plugins-segment\s*\{[\s\S]*?border:\s*1px solid var\(--ds-border-default\)/);
   assert.match(section, /\.plugins-segment-btn\.active\s*\{[\s\S]*?box-shadow:\s*0 0 0 0\.5px var\(--ds-border-default\)/);
+
+  assert.match(section, /\.plugins-title-icon\s*\{[\s\S]*?width:\s*24px[\s\S]*?height:\s*24px/);
+  assert.match(section, /\.plugins-title-copy \.page-title\s*\{[\s\S]*?font-size:\s*var\(--text-lg\)[\s\S]*?font-weight:\s*var\(--font-weight-medium-plus\)/);
+  assert.match(section, /\.plugins-header-actions > \.btn\s*\{[\s\S]*?min-height:\s*30px[\s\S]*?padding:\s*5px 10px/);
+  assert.match(section, /\.plugins-header-menu:focus-visible\s*\{[\s\S]*?box-shadow:/);
 
   assert.match(
     stylesSource,

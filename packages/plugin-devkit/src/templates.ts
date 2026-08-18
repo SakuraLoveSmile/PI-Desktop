@@ -345,9 +345,11 @@ function panelHtml(vars: TemplateVars): string {
         color: #e8eefc;
       }
       /*
-       * PI-Desktop adds the host titlebar safe area to normal flow. For a
-       * fixed/sticky top toolbar, use top: var(--pi-plugin-titlebar-height,
-       * 46px) so it does not sit beneath the frameless window chrome.
+       * PI-Desktop reserves exactly a transparent 46px drag band and overlays
+       * only the host-owned three-button capsule. The visible panel header belongs
+       * to the plugin. Development panels show a reminder that this
+       * band is not clickable outside the capsule. For fixed/sticky top UI,
+       * use top: var(--pi-plugin-titlebar-height, 46px).
        */
       .card {
         border: 1px solid #24304d;
@@ -471,12 +473,17 @@ install time.
 `
     : ""
 }
-### Panel safe area
+### Panel top drag band
 
-PI-Desktop owns a 46px frameless titlebar above panel content. Normal-flow
-content is offset automatically. Do not add another top padding or create a
-second titlebar. For \`position: fixed\` or \`position: sticky\` content, use
+PI-Desktop reserves exactly a transparent 46px frameless drag band above panel
+content and renders a minimal fixed three-button window-control capsule in its
+top-right corner. Normal-flow content is offset automatically. The panel title,
+toolbar, and every other visible surface belong to the plugin. Development
+panels show a reminder that the top 46px is not clickable outside the capsule.
+For \`position: fixed\` or \`position: sticky\` content, use
 \`top: var(--pi-plugin-titlebar-height, 46px)\` and account for the same value
-in viewport-height calculations.
+in viewport-height calculations. Add \`-webkit-app-region: drag\` to a
+plugin-owned toolbar when it should move the window, and
+\`-webkit-app-region: no-drag\` to controls inside it.
 `;
 }

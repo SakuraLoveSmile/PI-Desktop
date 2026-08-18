@@ -220,7 +220,23 @@ Host Main (PI-Desktop)
 可以到达）和 CPU/memory 限制。
 
 ### 6. 3 插件面板用户界面
-- 使用 `iframe` 或 `webview` 加载插件页面
+- 在专用的沙盒 `BrowserWindow` 中加载插件页面，并为每个插件使用隔离的会话分区
+- 在 macOS、Windows 和 Linux 上都使用无边框窗口。preload 精确保留透明的
+  46px 拖拽带，并只在右上角渲染最简胶囊：最小化、最大化/还原和关闭。
+  不显示原生交通灯或主机渲染的面板标题；胶囊之外的拖拽带不可点击，
+  开发面板会显示本地化提醒。
+- 面板标题可以继续作为旧字符串或本地化的 `{ "en": string,
+  "zh-CN": string }` 对象，用于原生窗口身份和启动器元数据，但主机不会
+  在面板内部渲染该标题。
+- 胶囊跟随插件页面计算得到的背景色和文字色。页面透明时，以当前
+  PI-Desktop 主题（`light` / `dark`，包括插件主题的基础色板）作为回退。
+- 通过 `--pi-plugin-titlebar-height: 46px` 暴露拖拽带高度；普通流内容会
+  自动偏移，固定或粘性插件界面必须使用
+  `top: var(--pi-plugin-titlebar-height, 46px)`，而不是 `top: 0`。
+  插件自己的工具栏可以使用 `-webkit-app-region: drag`，其中的交互控件
+  使用 `-webkit-app-region: no-drag`。
+- 插件负责自己的标题、工具栏以及所有其他可见面板界面
+- 在 preload 自己拥有的闭合 Shadow DOM 中渲染主机胶囊，防止插件 CSS 重写控件
 - 只能调用插件preload公开的安全API
 - 默认情况下无法访问主机 DOM/主机存储
 

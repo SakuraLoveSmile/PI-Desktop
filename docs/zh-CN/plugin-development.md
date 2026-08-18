@@ -191,6 +191,31 @@ ES 模块。模块评估加上 `onLoad` 有 15 秒预算。 `onUnload`
 
 ### `renderer/index.html`
 
+PI-Desktop 在 macOS、Windows 和 Linux 上都使用无边框窗口承载面板。
+主机精确保留透明的 46 CSS 像素拖拽带，并只在右上角渲染最简胶囊，
+其中包含最小化、最大化/还原和关闭三个按钮。面板标题、工具栏、背景
+以及其他所有可见界面都由插件实现。普通流内容会由主机自动偏移到拖拽带
+下方，不要再额外添加 46px 顶部内边距。拖拽带除胶囊外不可点击；开发面板
+会显示这一限制的提醒。
+
+如果面板使用 `position: fixed` 或 `position: sticky` 实现顶部界面，
+不要使用 `top: 0`，而应使用主机变量：
+
+```css
+.panel-toolbar {
+  position: sticky;
+  top: var(--pi-plugin-titlebar-height, 46px);
+  -webkit-app-region: drag;
+}
+
+.panel-toolbar button {
+  -webkit-app-region: no-drag;
+}
+```
+
+计算视口高度时也要扣除同一个 46px：
+`height: calc(100dvh - var(--pi-plugin-titlebar-height, 46px))`。
+
 ```html
 <!doctype html>
 <html lang="en">

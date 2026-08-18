@@ -156,6 +156,29 @@ if (process.platform === "win32") {
   app.setAppUserModelId(APP_ID);
 }
 
+// One data directory admits exactly one desktop process. host-core owns
+// `pi.sqlite` exclusively (D002), Electron main owns the persistence outbox and
+// the log tree beside it, and the tray, the global launcher shortcut, and the
+// updater are singletons of the running app — a second process fights the first
+// for every one of them and leaves the user with two shells over one database.
+//
+// Electron keeps the lock in `userData`, which is derived from the app name set
+// just above, so it is taken after `setName` and before anything else in this
+// module touches the data directory. That scope is the installation, not
+// `PI_DESKTOP_DATA_DIR`: a run pointed at its own data directory (E2E
+// harnesses, the capture rig, a side-by-side profile) shares no state with the
+// default installation and stays launchable while one is running.
+const singleInstanceRequired = !process.env.PI_DESKTOP_DATA_DIR;
+const hasSingleInstanceLock = singleInstanceRequired
+  ? app.requestSingleInstanceLock()
+  : true;
+if (!hasSingleInstanceLock) {
+  // Nothing has booted yet: no window, no tray, no child process, no log line.
+  // Quit here and let the instance that holds the lock surface itself from
+  // `second-instance`.
+  app.quit();
+}
+
 const WINDOW_MIN_WIDTH = 1040;
 const WINDOW_MIN_HEIGHT = 700;
 
@@ -6958,6 +6981,9 @@ function registerIpc() {
 }
 
 app.whenReady().then(async () => {
+  // A launch that lost the single-instance lock is already quitting. Never
+  // create a window, a tray, or a child process on top of the running app.
+  if (!hasSingleInstanceLock) return;
   applyDevelopmentBranding();
   // Load the close-behavior preference before the first window exists: the
   // close handler reads `closeBehavior` synchronously, and a window created
@@ -7113,6 +7139,10 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", (event) => {
+  // A duplicate launch has no host, sidecar, panel, or outbox of its own, and
+  // the shutdown sequence below would write into the running instance's data
+  // directory. Let it exit straight away.
+  if (!hasSingleInstanceLock) return;
   if (shutdownComplete) return;
   event.preventDefault();
   if (shutdownPromise) return;
@@ -7151,6 +7181,15 @@ app.on("before-quit", (event) => {
 });
 
 app.on("activate", () => {
+  restoreMainWindow();
+});
+
+// Launching PI-Desktop again is a request to see the app that is already
+// running, not to start another one. The duplicate process quits before it
+// boots anything, and Electron hands its launch to the lock holder here, so the
+// visible result is the same as the tray's Show action — including a window
+// that was closed or hidden into the tray, which `restoreMainWindow` recreates.
+app.on("second-instance", () => {
   restoreMainWindow();
 });
 
