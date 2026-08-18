@@ -113,3 +113,4 @@ Each ADR includes:
 | 0094 | Admit one desktop instance per data directory | Accepted |
 | 0095 | Sign in with a vendor account instead of pasting an API key | Accepted for implementation |
 | 0096 | Flatten the Settings directory and colocate marketplace source configuration | Accepted |
+| 0097 | Place global defaults under the AI Settings destination | Accepted |

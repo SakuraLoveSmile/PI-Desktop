@@ -153,7 +153,7 @@ Settings is a full-page destination with a searchable tab rail.
 
 ![Basics in the dark theme](/screenshots/app/en/dark-settings.webp)
 
-![AI defaults and the permission mode](/screenshots/app/en/settings-models.webp)
+![Model configuration provider defaults](/screenshots/app/en/settings-models.webp)
 
 ![Extensions marketplace with the catalog source picker](/screenshots/app/en/settings-extensions.webp)
 

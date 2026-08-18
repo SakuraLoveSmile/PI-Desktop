@@ -9,8 +9,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - The 46px top band across both the rail and content pane is a native window
   drag region; interactive controls remain explicitly non-draggable
 - A compact navigation directory with icons, in this exact order:
-  1. **Basics** — Lucide `SlidersHorizontal` (appearance, defaults)
-  2. **全局 AI / AI** — Lucide `Sparkles` (permissions, context management)
+  1. **Basics** — Lucide `SlidersHorizontal` (appearance)
+  2. **全局 AI / AI** — Lucide `Sparkles` (permissions, defaults, command shell)
   3. **Shortcuts** — Lucide `Keyboard` (keyboard shortcuts)
   4. **Instructions** — Lucide `FileText` (global and project instruction files)
   5. **Model configuration** — Lucide `Bot` (providers and default model)
@@ -51,15 +51,17 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - native select triggers and their opened option lists use the active theme's
     readable foreground/background pairing on macOS, Windows, and Linux; the
     shared native-select contract applies to every app surface
-- **Defaults** card retains the host-backed default mode and Enter-to-send
-  controls.
+- Platform-specific **Close behavior** remains in Basics because it changes
+  application-window behavior rather than agent behavior.
 - File-open target, menu-bar behavior, and bottom-panel behavior are not
   rendered until their host-backed settings schemas and runtime effects exist.
 
 ### 全局 AI (`ai` tab)
 - **Permissions** card: the global permission-mode control
   (ask / accept-edits / auto) that governs how autonomously the agent acts.
-- **Command shell** card: the host-discovered catalog of native PowerShell,
+- **Defaults** card: the host-backed default operating mode (Agent / Plan / Goal),
+  command shell selection, and Enter-to-send control.
+- The **Command shell** row in Defaults uses the host-discovered catalog of native PowerShell,
   cmd, Git Bash, and Bash with IDs `windows-powershell`, `cmd`, `git-bash`, and
   `bash` where supported. The selected `defaultCommandShell` persists across
   restart; writes reject unavailable or wrong-platform IDs. If a persisted
@@ -94,12 +96,8 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 
 ### Model configuration (`agent` tab)
 - **Studio hero**: provider count, ready count, and current default provider/model summary
-- **Defaults** card:
-  - default operating mode via segmented control (Agent / Plan / Goal), with Agent
-    selected for new sessions and new scheduled tasks
-  - persisted legacy `Chat` default values are displayed and stored as Plan
-  - default model id
-  - Enter to send as a switch (local preference; not on Codex General gold)
+- **Defaults** card: the default provider/model selector. Global operating mode,
+  command shell, and Enter-to-send are owned by the AI destination.
 - **Vendor accounts** card (D237), between Defaults and Providers:
   - the card lists accounts, not vendors: one row per vendor already signed in,
     and an explanatory line in place of the list while there are none. The
@@ -131,7 +129,7 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 The permission-mode selector remains available in the composer while the
 session is in Agent, Plan, or Goal. In Plan and Goal it controls Bash
 confirmation only: Ask and Accept edits prompt, while Auto may run a mutating
-Bash command without confirmation. The Defaults card must describe that both
+Bash command without confirmation. The AI Defaults card must describe that both
 contract modes are intent boundaries, not strict read-only security profiles.
 
 ### Instructions (`instructions` tab)
@@ -222,8 +220,8 @@ contract modes are intent boundaries, not strict read-only security profiles.
 4. Providers is part of Agent and has no standalone rail destination
 5. Plugins has no Settings destination; the app-shell Plugins page supports
    load, enable, disable, and uninstall
-6. Basics shows host-backed Appearance and Defaults cards only; the AI
-   destination shows Permissions and Command shell; the Shortcuts
+6. Basics shows the host-backed Appearance card; the AI destination shows
+   Permissions and Defaults, including the Command shell row; the Shortcuts
    destination shows the Keyboard shortcuts card; Info shows the Developer card.
    No additional settings destinations are rendered
 7. Provider secrets never display raw key values

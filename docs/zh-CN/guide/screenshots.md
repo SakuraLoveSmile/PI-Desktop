@@ -142,7 +142,7 @@ MCP 服务、技能和子智能体独立于插件管理，各自可以全局启�
 
 ![深色主题下的基础设置](/screenshots/app/zh/dark-settings.webp)
 
-![AI 默认值与权限模式](/screenshots/app/zh/settings-models.webp)
+![模型配置中的默认模型与 AI 服务](/screenshots/app/zh/settings-models.webp)
 
 ![扩展市场中的插件目录源选择](/screenshots/app/zh/settings-extensions.webp)
 

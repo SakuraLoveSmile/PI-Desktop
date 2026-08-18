@@ -48,22 +48,30 @@ const sharedTypesSource = await readFile(
 );
 const stylesSource = await loadStyles();
 
-test("General and AI tabs expose their respective app and AI controls", () => {
-  assert.match(settingsPageSource, /settings\.language/);
-  assert.match(settingsPageSource, /settings\.languageAuto/);
-  assert.match(settingsPageSource, /"zh-CN"/);
-  assert.match(settingsPageSource, /defaultMode: value/);
-  assert.match(settingsPageSource, /enterToSend: !settings\.enterToSend/);
+test("Basics and AI tabs expose their respective app and AI controls", () => {
+  const generalStart = settingsPageSource.indexOf('{tab === "general" && settings && (');
+  const aiStart = settingsPageSource.indexOf('{tab === "ai" && settings && (');
+  const shortcutsStart = settingsPageSource.indexOf(
+    '{tab === "shortcuts" && settings && (',
+  );
+  const generalSource = settingsPageSource.slice(generalStart, aiStart);
+  const aiSource = settingsPageSource.slice(aiStart, shortcutsStart);
+
+  assert.match(generalSource, /settings\.language/);
+  assert.match(generalSource, /settings\.languageAuto/);
+  assert.match(generalSource, /"zh-CN"/);
+  assert.doesNotMatch(generalSource, /defaultMode: value/);
+  assert.doesNotMatch(generalSource, /enterToSend: !settings\.enterToSend/);
+  assert.doesNotMatch(generalSource, /settings\.defaultsTitle/);
+  assert.match(aiSource, /defaultMode: value/);
+  assert.match(aiSource, /settings\.defaultsTitle/);
+  assert.match(aiSource, /CommandShellRow/);
+  assert.match(aiSource, /enterToSend: !settings\.enterToSend/);
   assert.match(
-    settingsPageSource,
+    aiSource,
     /defaultPermissionMode: e\.target\.value as GlobalPermissionMode/,
   );
-  assert.match(settingsPageSource, /"accept-edits"/);
-  assert.ok(
-    settingsPageSource.indexOf('{tab === "ai" && settings && (') <
-      settingsPageSource.indexOf("defaultPermissionMode: e.target.value"),
-    "permission mode remains in the AI tab",
-  );
+  assert.match(aiSource, /"accept-edits"/);
 });
 
 test("language persists as part of shared app settings", () => {
@@ -101,7 +109,7 @@ test("sandboxed preload receives the OS locale without importing main-only APIs"
   assert.doesNotMatch(preloadSource, /locale:\s*app\.getLocale\(\)/);
 });
 
-test("model configuration keeps model defaults; basics owns app behavior", () => {
+test("model configuration keeps model defaults; AI owns app behavior defaults", () => {
   assert.match(providersSource, /settings\.defaultModel/);
   assert.doesNotMatch(providersSource, /enterToSend/);
   assert.doesNotMatch(providersSource, /settings\.modeAgent/);
@@ -140,6 +148,14 @@ test("settings nav is a flat eight-destination directory with keyword search", (
   ].map((id) => settingsSearchSource.indexOf(`id: "${id}"`));
   assert.ok(navOrder.every((index) => index >= 0));
   assert.deepEqual(navOrder, [...navOrder].sort((a, b) => a - b));
+  const generalStart = settingsSearchSource.indexOf('id: "general"');
+  const aiStart = settingsSearchSource.indexOf('id: "ai"');
+  const shortcutsStart = settingsSearchSource.indexOf('id: "shortcuts"');
+  const generalEntry = settingsSearchSource.slice(generalStart, aiStart);
+  const aiEntry = settingsSearchSource.slice(aiStart, shortcutsStart);
+  assert.doesNotMatch(generalEntry, /settings\.defaultsTitle/);
+  assert.match(aiEntry, /settings\.defaultsTitle/);
+  assert.match(aiEntry, /settings\.commandShell/);
   assert.match(settingsSearchSource, /keywordKeys/);
   assert.match(settingsSearchSource, /settings\.projectArchive/);
   assert.match(stylesSource, /\.settings-nav-item\s*\{/);

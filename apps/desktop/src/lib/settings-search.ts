@@ -34,10 +34,6 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.closeBehaviorTitle",
       "settings.closeBehaviorTray",
       "settings.closeBehaviorQuit",
-      "settings.defaultsTitle",
-      "settings.mode",
-      "settings.commandShell",
-      "settings.enterToSend",
     ],
   },
   {
@@ -49,6 +45,10 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.permissionModeAsk",
       "settings.permissionModeAcceptEdits",
       "settings.permissionModeAuto",
+      "settings.defaultsTitle",
+      "settings.mode",
+      "settings.commandShell",
+      "settings.enterToSend",
     ],
   },
   {

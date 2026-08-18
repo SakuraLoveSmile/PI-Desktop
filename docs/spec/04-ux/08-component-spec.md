@@ -2162,7 +2162,8 @@ form dump. Model parameters remain owned by pi-ai.
 
 ### 19.2 Anatomy
 1. **Hero summary** — kicker, title, short description, stats for provider count / ready count / default pair
-2. **Defaults card** — segmented default mode, default model id, Enter-to-send switch
+2. **Defaults card** — default provider/model selector; global operating mode,
+   command shell, and Enter-to-send live in the Settings AI destination
 3. **Providers head** — section title + primary Add provider toggle
 4. **Composer** — dialog with connection fields (name, base URL, model id, API style, API key); no reasoning, thinking-level, context, output, temperature, or compatibility controls
 5. **Provider cards** — avatar initials, badges (default / secret state), host + model, Test / Make default / Delete

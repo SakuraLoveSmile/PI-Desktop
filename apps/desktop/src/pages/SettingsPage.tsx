@@ -1115,6 +1115,34 @@ export function SettingsPage() {
               </SettingsCard>
 
               {platform !== "darwin" && <CloseBehaviorSection />}
+            </div>
+          )}
+
+          {tab === "ai" && settings && (
+            <div className="settings-stack">
+              <SettingsCard title={t("settings.permissions")}>
+                <SettingsRow
+                  title={t("settings.permissionMode")}
+                  description={t("settings.permissionModeDesc")}
+                >
+                  <select
+                    className="field-select"
+                    aria-label={t("settings.permissionMode")}
+                    value={settings.defaultPermissionMode ?? "ask"}
+                    onChange={(e) =>
+                      void saveSettings({
+                        defaultPermissionMode: e.target.value as GlobalPermissionMode,
+                      })
+                    }
+                  >
+                    <option value="ask">{t("settings.permissionModeAsk")}</option>
+                    <option value="accept-edits">
+                      {t("settings.permissionModeAcceptEdits")}
+                    </option>
+                    <option value="auto">{t("settings.permissionModeAuto")}</option>
+                  </select>
+                </SettingsRow>
+              </SettingsCard>
 
               <SettingsCard title={t("settings.defaultsTitle")}>
                 <SettingsRow title={t("settings.mode")} description={t("settings.modeDesc")}>
@@ -1160,34 +1188,6 @@ export function SettingsPage() {
                   >
                     <span className="settings-toggle-thumb" />
                   </button>
-                </SettingsRow>
-              </SettingsCard>
-            </div>
-          )}
-
-          {tab === "ai" && settings && (
-            <div className="settings-stack">
-              <SettingsCard title={t("settings.permissions")}>
-                <SettingsRow
-                  title={t("settings.permissionMode")}
-                  description={t("settings.permissionModeDesc")}
-                >
-                  <select
-                    className="field-select"
-                    aria-label={t("settings.permissionMode")}
-                    value={settings.defaultPermissionMode ?? "ask"}
-                    onChange={(e) =>
-                      void saveSettings({
-                        defaultPermissionMode: e.target.value as GlobalPermissionMode,
-                      })
-                    }
-                  >
-                    <option value="ask">{t("settings.permissionModeAsk")}</option>
-                    <option value="accept-edits">
-                      {t("settings.permissionModeAcceptEdits")}
-                    </option>
-                    <option value="auto">{t("settings.permissionModeAuto")}</option>
-                  </select>
                 </SettingsRow>
               </SettingsCard>
             </div>
