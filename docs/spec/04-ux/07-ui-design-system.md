@@ -955,7 +955,7 @@ Full component contract and usage rules: [08-component-spec.md §17](08-componen
 
 ### 12.3 Streaming indicator
 
-- Running agent: compact warning status dot in topbar + subtle pulse on left border of latest assistant message
+- Running agent: transcript working feedback + subtle pulse on the left border of the latest assistant message; the topbar remains free of a duplicate status dot
 - Completed: spinner replaced by success icon for 2s, then fades
 - Error: spinner replaced by error icon, persistent until dismissed
 

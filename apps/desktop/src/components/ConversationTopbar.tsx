@@ -44,8 +44,6 @@ export function ConversationTopbar({
   const { t } = useTranslation();
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const sessions = useAppStore((s) => s.sessions);
-  const runningSessions = useAppStore((s) => s.runningSessions);
-  const isRunning = useAppStore((s) => s.isRunning);
   const workspace = useAppStore((s) => s.workspace);
 
   const activeSession = sessions.find((session) => session.id === activeSessionId);
@@ -55,8 +53,6 @@ export function ConversationTopbar({
     : activeSession?.title || t("chat.untitledTask");
   const taskTitle = truncateTopbarTitle(fullTaskTitle);
   const project = projectName(workspace?.path, workspace?.name);
-  const sessionRunning = Boolean(activeSessionId && runningSessions[activeSessionId]);
-  const busy = isRunning || sessionRunning;
 
   return (
     <div
@@ -90,16 +86,6 @@ export function ConversationTopbar({
         >
           <span className="ct-title">{taskTitle}</span>
         </div>
-        {busy ? (
-          <span
-            className="ct-running"
-            role="status"
-            aria-label={t("chat.running")}
-            title={t("chat.running")}
-          >
-            <span className="ct-running-dot" aria-hidden />
-          </span>
-        ) : null}
       </div>
 
       <div className="ct-right">

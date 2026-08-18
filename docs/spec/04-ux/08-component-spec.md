@@ -159,7 +159,7 @@ palette / application menu, not the top bar.)
 ### 2.2 Anatomy
 
 ```text
-[☰ Sidebar] [Task title] [●]                     [＋ New] [🔍 Search]
+[☰ Sidebar] [Task title]                          [＋ New] [🔍 Search]
 ```
 
 (Icons described functionally; actual render uses Lucide SVGs. The `[☰ Sidebar]`
@@ -196,7 +196,7 @@ combined model × reasoning selection (§11).
 
 | Element | Default | Running | Error | No workspace |
 |---|---|---|---|---|
-| Task title | session title (or untitled), capped at 10 characters with an ellipsis when needed | same, plus a compact pulsing status dot | same | same |
+| Task title | session title (or untitled), capped at 10 characters with an ellipsis when needed | same | same | same |
 | New task / Search | icon buttons | same | same | same |
 | Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
 | Project name | title tooltip only | same | same | omitted |
@@ -205,6 +205,8 @@ combined model × reasoning selection (§11).
 
 - Every control is keyboard-reachable with Tab
 - Abort button has `aria-label="Abort active turn"`
+- The topbar does not render a separate running-state indicator; the Composer
+  abort control and transcript working feedback remain the running-state cues.
 
 ### 2.6 MVP constraints
 

@@ -216,6 +216,8 @@ Each scenario is documented in this format:
 - **Expected**: The transcript immediately shows a compact localized `Working…`
   status after send, before the first assistant or tool event. It yields to
   concrete thinking/tool/answer feedback, and disappears when the turn ends.
+  The conversation topbar keeps only the task title and window actions; it does
+  not add a separate running-state indicator.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`, `03-runtime/10-session-state-machine.md`
 - **Acceptance**: C (new session, send message)
 - **Milestone**: M2
