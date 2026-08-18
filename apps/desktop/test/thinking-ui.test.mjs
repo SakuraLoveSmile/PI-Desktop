@@ -55,14 +55,10 @@ test("composer exposes the runtime thinking level order and provider filtering",
   assert.doesNotMatch(stylesSource, /\.composer-thinking-level\b/);
   assert.match(
     stylesSource,
-    /\.composer-model-menu\.composer-thinking-menu\s*\{[\s\S]*?width:\s*auto;[\s\S]*?max-width:\s*min\(160px,\s*calc\(100vw - 24px\)\);/,
+    /\.composer-model-thinking-menu\s*\{[\s\S]*?width:\s*min\(300px,\s*calc\(100vw - 24px\)\);/,
   );
-  const thinkingControlSource = composerSource.slice(
-    composerSource.indexOf('<div className="composer-thinking"'),
-    composerSource.indexOf('<div className="composer-permission"'),
-  );
-  assert.doesNotMatch(thinkingControlSource, /permissionInherit|"inherit"/);
   assert.match(composerSource, /availableThinkingLevels/);
+  assert.match(composerSource, /thinkingMenuLevels/);
 });
 
 test("Composer owns the mode chip and the top bar keeps only model selection", () => {
@@ -73,21 +69,22 @@ test("Composer owns the mode chip and the top bar keeps only model selection", (
   const modeControl = leftToolbar.indexOf(
     'className="icon-btn mode-chip composer-mode-chip"',
   );
-  const thinkingControl = leftToolbar.indexOf('className="composer-thinking"');
   const permissionControl = leftToolbar.indexOf('className="composer-permission"');
+  const rightToolbar = composerSource.slice(
+    composerSource.indexOf('<div className="composer-right">'),
+    composerSource.indexOf('<div className="composer-right">') + 12000,
+  );
 
   assert.ok(modeControl >= 0);
-  assert.ok(thinkingControl >= 0);
-  assert.ok(modeControl < thinkingControl);
-  assert.ok(permissionControl > thinkingControl);
+  assert.ok(permissionControl > modeControl);
+  assert.doesNotMatch(leftToolbar, /composer-thinking|thinking-chip/);
   assert.match(topbarSource, /<ModelSelect \/>/);
   assert.doesNotMatch(topbarSource, /ct-mode|ct-mode-btn|configureActiveSession/);
   assert.doesNotMatch(stylesSource, /\.conversation-topbar \.ct-mode/);
-  assert.match(
-    leftToolbar,
-    /thinkingProvider\?\.supportsReasoning\s*&&\s*availableThinkingLevels\.length/,
-  );
-  assert.match(leftToolbar, /composer-thinking-menu/);
+  assert.match(rightToolbar, /composer-model-thinking-chip/);
+  assert.match(rightToolbar, /composer-model-thinking-menu/);
+  assert.match(rightToolbar, /composer-menu-entry/);
+  assert.match(rightToolbar, /composer-menu-back/);
 });
 
 test("conversation topbar keeps only the concise task title visible", () => {

@@ -366,6 +366,8 @@ export const zhCN = {
     effortXhigh: "很高",
     effortMax: "最高",
     permissionMode: "权限模式",
+    reasoningLevel: "推理等级",
+    reasoningSupportedBy: "当前模型 {{model}} 支持的推理等级",
     permissionInherit: "跟随默认",
     permissionAsk: "每次询问",
     permissionAcceptEdits: "自动接受编辑",

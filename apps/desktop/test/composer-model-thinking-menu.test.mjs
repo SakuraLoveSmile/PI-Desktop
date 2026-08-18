@@ -1,0 +1,44 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import { loadStyles } from "./helpers/styles.mjs";
+
+const composerSource = await readFile(
+  new URL("../src/components/Composer.tsx", import.meta.url),
+  "utf8",
+);
+const stylesSource = await loadStyles();
+
+test("Composer uses one model × reasoning popover with a root and in-place submenus", () => {
+  assert.match(composerSource, /useState<ComposerMenuView>\("root"\)/);
+  assert.match(composerSource, /showModelThinkingView\("model"\)/);
+  assert.match(composerSource, /showModelThinkingView\("thinking"\)/);
+  assert.match(composerSource, /className="composer-model-menu composer-model-thinking-menu"/);
+  assert.match(composerSource, /role="menuitem"[\s\S]*?aria-haspopup="menu"/);
+  assert.match(composerSource, /className="composer-menu-back"/);
+  assert.match(composerSource, /IconChevronLeft/);
+  assert.doesNotMatch(composerSource, /className="composer-thinking"/);
+  assert.doesNotMatch(composerSource, /className={`icon-btn mode-chip thinking-chip/);
+});
+
+test("model and reasoning selection return to the root without closing", () => {
+  assert.match(composerSource, /await configureActiveSession\(\{[\s\S]*?thinkingLevel: thinkingLevelForProvider/);
+  assert.match(composerSource, /setModelQuery\(""\);[\s\S]*?setModelThinkingView\("root"\)/);
+  assert.match(composerSource, /const selectThinkingLevel = async/);
+  assert.match(composerSource, /setModelThinkingView\("root"\);[\s\S]*?setThinkingHighlight\(-1\)/);
+  assert.match(composerSource, /const thinkingMenuLevels: ThinkingLevel\[\] = availableThinkingLevels\.length/);
+});
+
+test("the combined chip and menu meet the compact accessible visual contract", () => {
+  assert.match(composerSource, /aria-haspopup="menu"/);
+  assert.match(composerSource, /aria-expanded=\{modelThinkingOpen\}/);
+  assert.match(composerSource, /role="menuitemradio"/);
+  assert.match(composerSource, /aria-checked=\{active\}/);
+  assert.match(composerSource, /aria-checked=\{thinkingLevel === level\}/);
+  assert.match(composerSource, /e\.key === "ArrowLeft"/);
+  assert.match(composerSource, /e\.key === "Escape"/);
+  assert.match(stylesSource, /\.composer-model-thinking-menu\s*\{[\s\S]*?bottom:\s*calc\(100% \+ 8px\)/);
+  assert.match(stylesSource, /\.composer-model-thinking-menu\s*\{[\s\S]*?width:\s*min\(300px,\s*calc\(100vw - 24px\)\)/);
+  assert.match(stylesSource, /\.composer-model-thinking-icon\.is-off\s*\{[\s\S]*?opacity:\s*0\.3/);
+  assert.match(stylesSource, /@media \(prefers-reduced-motion: reduce\)/);
+});

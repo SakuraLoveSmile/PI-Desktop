@@ -295,6 +295,7 @@
   font-size: var(--text-md);
   line-height: var(--leading-compact);
   text-align: left;
+  cursor: pointer;
   transition: background var(--motion-duration-fast) var(--motion-ease-out);
 }
 

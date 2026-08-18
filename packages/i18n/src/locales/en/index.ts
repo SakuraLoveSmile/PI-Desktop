@@ -371,6 +371,8 @@ export const en = {
     effortXhigh: "Very high",
     effortMax: "Max",
     permissionMode: "Permission mode",
+    reasoningLevel: "Reasoning level",
+    reasoningSupportedBy: "Current model {{model}} supports these reasoning levels",
     permissionInherit: "Default",
     permissionAsk: "Ask every time",
     permissionAcceptEdits: "Accept edits",
