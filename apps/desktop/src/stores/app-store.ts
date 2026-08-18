@@ -2,6 +2,7 @@ import { create } from "zustand";
 import i18n from "i18next";
 import type {
   AgentEventEnvelope,
+  AgentPromptAttachment,
   AskToolResolution,
   AppError,
   AppNotification,
@@ -119,6 +120,33 @@ const ErrorCodes = {
 } as const;
 
 export type { WorkPanelTab } from "../lib/work-panel-tabs";
+
+function promptAttachmentsFromDraft(
+  references: ComposerDraftSnapshot["fileReferences"],
+): AgentPromptAttachment[] {
+  return references.map((reference) => ({
+    path: reference.path,
+    name: reference.name,
+    kind:
+      reference.kind ??
+      (/\.(avif|bmp|gif|heic|jpe?g|png|tiff?|webp)$/i.test(reference.path)
+        ? "image"
+        : "file"),
+    ...(reference.mimeType ? { mimeType: reference.mimeType } : {}),
+  }));
+}
+
+function promptAttachmentsFromMessage(
+  attachments: UiMessage["attachments"],
+): AgentPromptAttachment[] {
+  return (attachments ?? []).map((attachment) => ({
+    path: attachment.ref,
+    name: attachment.name,
+    kind: attachment.kind,
+    ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
+    ...(attachment.size !== undefined ? { size: attachment.size } : {}),
+  }));
+}
 
 // Sessions created before locale switches keep their old default title, so
 // match against every locale's defaults (case-insensitive), not just the
@@ -446,7 +474,11 @@ export type AppState = {
   compactContext: () => Promise<void>;
   retryAssistantMessage: (messageId: string) => Promise<void>;
   /** Replace a user prompt and regenerate from it; the old branch stays in the revision pager. */
-  editUserMessage: (messageId: string, content: string) => Promise<boolean>;
+  editUserMessage: (
+    messageId: string,
+    content: string,
+    attachments?: UiMessage["attachments"],
+  ) => Promise<boolean>;
   retryLastPrompt: () => Promise<void>;
   clearError: () => void;
   activateMessageRevision: (rootUserId: string, revisionIndex: number) => Promise<void>;
@@ -1416,7 +1448,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         submittedComposerDrafts.delete(startedIn);
         return false;
       }
-      await api.prompt({ sessionId, content });
+      await api.prompt({
+        sessionId,
+        content,
+        attachments: draft
+          ? promptAttachmentsFromDraft(draft.fileReferences)
+          : [],
+      });
       if (submission.abortResolution && (await submission.abortResolution)) {
         return false;
       }
@@ -1497,17 +1535,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     let userIndex = -1;
     for (let i = index - 1; i >= 0; i -= 1) {
       const candidate = state.messages[i];
-      if (candidate.role === "user" && candidate.content.trim()) {
+      if (
+        candidate.role === "user" &&
+        (candidate.content.trim() || candidate.attachments?.length)
+      ) {
         userIndex = i;
         break;
       }
     }
     if (userIndex < 0) return;
     const root = state.messages[userIndex];
-    await get().editUserMessage(root.id, root.content);
+    await get().editUserMessage(root.id, root.content, root.attachments);
   },
 
-  editUserMessage: async (messageId, content) => {
+  editUserMessage: async (messageId, content, attachments) => {
     // Editing a prompt is a regenerate with different text: keep history up to
     // that prompt (exclusive), then send the new text so the durable
     // transcript and live agent both drop the discarded assistant/tool tail.
@@ -1519,11 +1560,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!sessionId) return false;
     if (state.pendingPlans[sessionId]?.status === "pending") return false;
     const prompt = content.trim();
-    if (!prompt) return false;
     const userIndex = state.messages.findIndex(
       (message) => message.id === messageId,
     );
     if (userIndex < 0 || state.messages[userIndex].role !== "user") return false;
+    if (
+      !prompt &&
+      !(attachments ?? state.messages[userIndex].attachments)?.length
+    ) {
+      return false;
+    }
+    const promptAttachments = promptAttachmentsFromMessage(
+      attachments ?? state.messages[userIndex].attachments,
+    );
     const kept = state.messages.slice(0, userIndex);
 
     set((s) => ({
@@ -1541,6 +1590,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await api.prompt({
         sessionId,
         content: prompt,
+        attachments: promptAttachments,
         truncateBefore: userIndex,
       });
       return true;
@@ -1603,13 +1653,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     let userIndex = -1;
     for (let i = state.messages.length - 1; i >= 0; i -= 1) {
       const candidate = state.messages[i];
-      if (candidate.role === "user" && candidate.content.trim()) {
+      if (
+        candidate.role === "user" &&
+        (candidate.content.trim() || candidate.attachments?.length)
+      ) {
         userIndex = i;
         break;
       }
     }
     if (userIndex < 0) return;
     const prompt = state.messages[userIndex].content;
+    const promptAttachments = promptAttachmentsFromMessage(
+      state.messages[userIndex].attachments,
+    );
     const kept = state.messages.slice(0, userIndex);
     set((s) => ({
       messages: kept,
@@ -1625,6 +1681,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await api.prompt({
         sessionId,
         content: prompt,
+        attachments: promptAttachments,
         truncateBefore: userIndex,
       });
     } catch (e) {

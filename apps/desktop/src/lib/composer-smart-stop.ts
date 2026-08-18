@@ -1,6 +1,8 @@
 export type ComposerDraftFileReference = {
   path: string;
   name: string;
+  kind?: "image" | "file";
+  mimeType?: string;
 };
 
 export type ComposerDraftSnapshot = {

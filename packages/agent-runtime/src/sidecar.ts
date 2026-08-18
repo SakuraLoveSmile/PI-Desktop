@@ -4,13 +4,17 @@
  * Host access is proxied through main (single host-core process).
  */
 import { createInterface } from "node:readline";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { isAbsolute, relative, resolve } from "node:path";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import { ParentHostProxy } from "./parent-host-proxy.js";
 import { classifyAgentError } from "./agent-errors.js";
 import {
   DesktopAgentRuntime,
   type PluginToolDef,
+  type RuntimePrompt,
+  type RuntimePromptAttachment,
   type RuntimeProviderConfig,
 } from "./runtime.js";
 import type { PluginSkillDef } from "./plugin-skills-prompt.js";
@@ -20,6 +24,7 @@ import {
   normalizeThinkingLevel,
 } from "./sidecar-config.js";
 import {
+  formatFileInsert,
   isCommandShellOption,
   normalizeMode,
   OAUTH_AUTH_KIND,
@@ -32,6 +37,7 @@ import type {
   ContextCompactionSettings,
   CommandShellOption,
   Mode,
+  MessageAttachment,
   PlanExecution,
   ThinkingLevel,
   UiMessage,
@@ -42,6 +48,7 @@ type RuntimeMap = Map<string, DesktopAgentRuntime>;
 const runtimes: RuntimeMap = new Map();
 const hostProxy = new ParentHostProxy();
 const testRuntimeIds = new WeakMap<DesktopAgentRuntime, string>();
+const MAX_INLINE_IMAGE_BYTES = 20 * 1024 * 1024;
 
 function testRuntimeIdentity(sessionId: string) {
   if (process.env.PI_DESKTOP_PLAN_UI_PROBE !== "1") {
@@ -96,6 +103,9 @@ type RuntimeParams = {
   projectPath?: string;
   projectInstructions?: ProjectInstructions;
   compactionSettings?: ContextCompactionSettings;
+  attachmentsDir?: string;
+  userMessageId?: string;
+  attachments?: RuntimePromptAttachment[];
 };
 
 function write(msg: unknown) {
@@ -132,6 +142,133 @@ function notify(method: string, params: unknown) {
 function respond(id: string | number, result?: unknown, error?: unknown) {
   if (error) write({ jsonrpc: "2.0", id, error });
   else write({ jsonrpc: "2.0", id, result });
+}
+
+function pathInside(root: string, candidate: string): boolean {
+  const child = relative(root, candidate);
+  return child === "" || (!child.startsWith("..") && !isAbsolute(child));
+}
+
+async function replayedAttachmentPath(
+  params: RuntimeParams,
+  attachment: NonNullable<UiMessage["attachments"]>[number],
+  source: string,
+  bytes: Buffer,
+): Promise<string> {
+  if (!params.scratchDir || !attachment.ref.startsWith("attachments/")) {
+    return source;
+  }
+  const root = resolve(params.scratchDir, "replayed");
+  await mkdir(root, { recursive: true });
+  const safeName =
+    attachment.name.replace(/[^\p{L}\p{N}._-]+/gu, "_") || "attachment";
+  const suffix = createHash("sha256")
+    .update(attachment.ref)
+    .digest("hex")
+    .slice(0, 12);
+  const target = resolve(root, `${safeName}-${suffix}`);
+  try {
+    await writeFile(target, bytes, { flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code !== "EEXIST") throw error;
+  }
+  return target;
+}
+
+async function hydrateAttachmentHistory(
+  history: UiMessage[],
+  params: RuntimeParams,
+): Promise<UiMessage[]> {
+  const supportsVision = params.provider.modelConfig?.input.includes("image") === true;
+  const roots = [
+    params.scratchDir,
+    params.projectPath,
+    params.attachmentsDir,
+  ].filter((value): value is string => Boolean(value));
+  const canonicalRoots = await Promise.all(
+    roots.map(async (root) => {
+      try {
+        return await realpath(root);
+      } catch {
+        return undefined;
+      }
+    }),
+  );
+  const resolveAttachment = async (
+    attachment: NonNullable<UiMessage["attachments"]>[number],
+  ): Promise<{ attachment: MessageAttachment; fallbackPath?: string }> => {
+    const ref = attachment.ref.trim();
+    if (!ref) return { attachment };
+    const candidate =
+      ref.startsWith("attachments/") && params.attachmentsDir
+        ? resolve(params.attachmentsDir, ref.slice("attachments/".length))
+        : isAbsolute(ref)
+          ? resolve(ref)
+          : params.projectPath
+            ? resolve(params.projectPath, ref)
+            : undefined;
+    if (!candidate) return { attachment };
+    try {
+      const canonical = await realpath(candidate);
+      if (!canonicalRoots.some((root) => root && pathInside(root, canonical))) {
+        return { attachment };
+      }
+      const needsBytes =
+        ref.startsWith("attachments/") ||
+        (attachment.kind === "image" && supportsVision);
+      const bytes = needsBytes ? await readFile(canonical) : undefined;
+      if (attachment.kind === "image" && supportsVision && bytes) {
+        if (bytes.byteLength <= MAX_INLINE_IMAGE_BYTES) {
+          return { attachment: { ...attachment, data: bytes.toString("base64") } };
+        }
+      }
+      if (attachment.kind === "file" || !supportsVision || !bytes) {
+        return {
+          attachment,
+          fallbackPath: await replayedAttachmentPath(
+            params,
+            attachment,
+            canonical,
+            bytes ?? Buffer.alloc(0),
+          ),
+        };
+      }
+      return {
+        attachment,
+        fallbackPath: await replayedAttachmentPath(
+          params,
+          attachment,
+          canonical,
+          bytes,
+        ),
+      };
+    } catch {
+      return { attachment };
+    }
+  };
+
+  return Promise.all(
+    history.map(async (message) => {
+      if (message.role !== "user" || !message.attachments?.length) return message;
+      const resolved = await Promise.all(message.attachments.map(resolveAttachment));
+      const fallbackPaths = resolved
+        .map((item) => item.fallbackPath)
+        .filter((path): path is string => Boolean(path))
+        .map((path) => formatFileInsert(path, "file"))
+        .join("")
+        .trim();
+      const content = message.content.trim()
+        ? fallbackPaths
+          ? `${message.content}\n${fallbackPaths}`
+          : message.content
+        : fallbackPaths;
+      return {
+        ...message,
+        content,
+        attachments: resolved.map((item) => item.attachment),
+      };
+    }),
+  );
 }
 
 async function runtimeFor(
@@ -217,14 +354,18 @@ async function runtimeFor(
         compaction?: ContextCompactionRecord;
       } | null;
     }>("session.get", { id: sessionId });
-    history = detail?.session?.messages ?? [];
+    history = await hydrateAttachmentHistory(detail?.session?.messages ?? [], params);
     compaction = detail?.session?.compaction;
   } catch {
     // History restore is best-effort; a prompt can still start cleanly.
   }
   if (currentPrompt !== undefined) {
     const last = history.at(-1);
-    if (last?.role === "user" && last.content === currentPrompt) {
+    if (
+      last?.role === "user" &&
+      ((params.userMessageId && last.id === params.userMessageId) ||
+        (!params.userMessageId && last.content === currentPrompt))
+    ) {
       history = history.slice(0, -1);
     }
   }
@@ -308,12 +449,16 @@ async function handle(method: string, params: any): Promise<unknown> {
         typeof params.turnId === "string" && params.turnId.trim()
           ? params.turnId
           : randomUUID();
+      const attachments = Array.isArray(params.attachments)
+        ? (params.attachments as RuntimePromptAttachment[])
+        : undefined;
       const runtime = await runtimeFor(params, content);
       const userMessageId =
         typeof params.userMessageId === "string" && params.userMessageId
           ? params.userMessageId
           : undefined;
-      void runtime.prompt(content, userMessageId, turnId).catch((err) => {
+      const prompt: RuntimePrompt = { text: content, attachments };
+      void runtime.prompt(prompt, userMessageId, turnId).catch((err) => {
         // Rejected-prompt path (pre-flight/transport failures). Streamed
         // provider errors surface via stopReason "error" and are classified
         // and emitted by the runtime itself.

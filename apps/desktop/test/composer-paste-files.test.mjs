@@ -21,7 +21,7 @@ test("composer keeps text paste native and materializes clipboard files", () => 
   assert.match(composer, /file\.arrayBuffer\(\)/);
   assert.match(
     composer,
-    /createFileReference\(file\.path, file\.name, sessionId\)/,
+    /createFileReference\(file\.path, file\.name, sessionId, \{[\s\S]*kind: file\.kind/,
   );
   assert.match(composer, /setFileReferences\(\(current\) => \[/);
   assert.match(
@@ -30,7 +30,7 @@ test("composer keeps text paste native and materializes clipboard files", () => 
   );
   assert.match(
     composer,
-    /const hasDraftContent = Boolean\(value\.trim\(\) \|\| activeFileReferences\.length\)/,
+    /const serializedContent = serializeComposerFileReferences\(value, activeFileReferences\)/,
   );
   assert.match(composer, /el\.setSelectionRange\(selectionStart, selectionEnd\)/);
   assert.doesNotMatch(composer, /formatFileInsert\(file\.path, "file"\)/);
@@ -50,7 +50,8 @@ test("pasted bytes stay in the session scratch directory", () => {
   assert.match(saver, /basename\(normalized\)/);
   assert.match(saver, /writeFile\(path, bytes, \{ flag: "wx" \}\)/);
   assert.match(saver, /MAX_TOTAL_BYTES/);
-  assert.match(saver, /return \{ path, name, mimeType, size: bytes\.byteLength \}/);
+  assert.match(saver, /kind: isImageFile\(name, mimeType\) \? "image" : "file"/);
+  assert.match(saver, /size: bytes\.byteLength/);
 });
 
 test("paste results separate display names from unique storage paths", async () => {
@@ -73,6 +74,7 @@ test("paste results separate display names from unique storage paths", async () 
     ]);
 
     assert.deepEqual(files.map((file) => file.name), ["image.png", "image.png"]);
+    assert.deepEqual(files.map((file) => file.kind), ["image", "image"]);
     assert.notEqual(files[0].path, files[1].path);
     assert.match(basename(files[0].path), /^pasted-.+-image\.png$/);
     assert.notEqual(basename(files[0].path), files[0].name);

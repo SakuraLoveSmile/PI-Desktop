@@ -183,7 +183,7 @@ test("editing a user prompt regenerates it and keeps the old branch reachable", 
   );
   // Edit lives on the user turn (the prompt is what gets rewritten), not on
   // the assistant answer.
-  assert.match(transcriptSource, /editUserMessage\(message\.id, next\)/);
+  assert.match(transcriptSource, /editUserMessage\(message\.id, next, message\.attachments\)/);
   assert.match(transcriptSource, /className="message-edit-input selectable"/);
   assert.match(transcriptSource, /chat\.editMessage/);
   assert.doesNotMatch(transcriptSource, /editAssistantMessage/);
@@ -192,9 +192,12 @@ test("editing a user prompt regenerates it and keeps the old branch reachable", 
   assert.match(transcriptSource, /const editSeed = \(isUser && message\.command\) \|\| message\.content/);
   // Same branch mechanics as regenerate, so main archives the replaced turn
   // as a revision the pager can walk back to.
-  assert.match(storeSource, /editUserMessage:\s*async \(messageId, content\)/);
+  assert.match(storeSource, /editUserMessage:\s*async \(messageId, content, attachments\)/);
   assert.match(storeSource, /truncateBefore:\s*userIndex/);
-  assert.match(storeSource, /editUserMessage\(root\.id, root\.content\)/);
+  assert.match(
+    storeSource,
+    /editUserMessage\(root\.id, root\.content, root\.attachments\)/,
+  );
   assert.match(stylesSource, /\.message-edit-input/);
   assert.match(
     stylesSource,

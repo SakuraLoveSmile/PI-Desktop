@@ -19,6 +19,11 @@ export type ModelCapabilities = {
   supportedThinkingLevels: ThinkingLevel[];
 };
 
+/** Whether the resolved pi-ai model accepts image input blocks. */
+export function resolveVisionCapability(input: ModelCapabilityInput): boolean {
+  return findCatalogModel(input)?.input.includes("image") ?? false;
+}
+
 /** Public name used by the desktop main-process provider enrichment. */
 export type ThinkingCapabilities = ModelCapabilities;
 

@@ -3,11 +3,29 @@ import {
   clampThinkingLevel,
   resolvePiModelConfig,
   resolveThinkingCapabilities,
+  resolveVisionCapability,
   type ModelCapabilities,
 } from "./model-capabilities.js";
 import type { ThinkingLevel } from "@pi-desktop/shared";
 
 describe("pi-ai model resolution", () => {
+  it("uses pi-ai input metadata as the vision capability source", () => {
+    expect(
+      resolveVisionCapability({
+        vendorKey: "openai",
+        modelId: "gpt-5.1",
+        apiStyle: "responses",
+      }),
+    ).toBe(true);
+    expect(
+      resolveVisionCapability({
+        vendorKey: "custom",
+        modelId: "unknown-model",
+        apiStyle: "chat_completions",
+      }),
+    ).toBe(false);
+  });
+
   it("uses the exact pi-ai catalog model and its supported levels", () => {
     const capabilities = resolveThinkingCapabilities({
       vendorKey: "openai",

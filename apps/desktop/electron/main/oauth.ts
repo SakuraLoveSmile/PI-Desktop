@@ -107,6 +107,7 @@ export type OAuthModelOption = {
   displayName: string;
   apiStyle: string;
   baseUrl: string;
+  input: Array<"text" | "image">;
 };
 
 export type VendorOAuthDeps = {
@@ -349,6 +350,7 @@ export class VendorOAuth {
       displayName: model.name || model.id,
       apiStyle: apiStyleForWireApi(model.api),
       baseUrl: model.baseUrl,
+      input: [...model.input],
     };
   }
 

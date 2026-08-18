@@ -114,12 +114,27 @@ pub struct MessageUsage {
     pub total_tokens: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageAttachment {
+    pub kind: String,
+    pub name: String,
+    #[serde(rename = "ref")]
+    pub reference: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub size: Option<i64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UiMessage {
     pub id: String,
     pub role: String,
     pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<Vec<MessageAttachment>>,
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking: Option<String>,
@@ -268,7 +283,7 @@ fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String>) {
         Some(Value::Object(meta_obj))
     };
 
-    let mut blocks = Vec::with_capacity(2);
+    let mut blocks = Vec::with_capacity(2 + message.attachments.as_ref().map_or(0, Vec::len));
     if let Some(thinking) = &message.thinking {
         blocks.push(json!({ "type": "thinking", "text": thinking }));
     }
@@ -306,6 +321,22 @@ fn ui_to_record(message: &UiMessage) -> (MessageRecord, Option<String>) {
         None
     } else {
         blocks.push(json!({ "type": "text", "text": message.content }));
+        if let Some(attachments) = &message.attachments {
+            for attachment in attachments {
+                let mut block = serde_json::Map::new();
+                block.insert("type".into(), json!("attachment"));
+                block.insert("kind".into(), json!(attachment.kind));
+                block.insert("name".into(), json!(attachment.name));
+                block.insert("ref".into(), json!(attachment.reference));
+                if let Some(mime_type) = &attachment.mime_type {
+                    block.insert("mimeType".into(), json!(mime_type));
+                }
+                if let Some(size) = attachment.size {
+                    block.insert("size".into(), json!(size));
+                }
+                blocks.push(Value::Object(block));
+            }
+        }
         Some(message.content.clone())
     };
 
@@ -384,6 +415,25 @@ fn record_to_ui(record: MessageRecord) -> UiMessage {
         .collect::<Vec<_>>();
     let thinking = (!thinking.is_empty()).then(|| thinking.concat());
     let is_error = record.is_error.then_some(true);
+    let attachments = blocks
+        .iter()
+        .filter_map(|block| {
+            (block.get("type").and_then(|t| t.as_str()) == Some("attachment")).then(|| {
+                Some(MessageAttachment {
+                    kind: block.get("kind").and_then(|v| v.as_str())?.to_string(),
+                    name: block.get("name").and_then(|v| v.as_str())?.to_string(),
+                    reference: block.get("ref").and_then(|v| v.as_str())?.to_string(),
+                    mime_type: block
+                        .get("mimeType")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string),
+                    size: block.get("size").and_then(|v| v.as_i64()),
+                })
+            })
+        })
+        .flatten()
+        .collect::<Vec<_>>();
+    let attachments = (!attachments.is_empty()).then_some(attachments);
 
     if record.role == "tool" {
         let block = blocks
@@ -400,6 +450,7 @@ fn record_to_ui(record: MessageRecord) -> UiMessage {
             id: record.id,
             role: record.role,
             content: text,
+            attachments: None,
             created_at: record.created_at,
             thinking,
             status,
@@ -445,6 +496,7 @@ fn record_to_ui(record: MessageRecord) -> UiMessage {
             id: record.id,
             role: record.role,
             content,
+            attachments,
             created_at: record.created_at,
             thinking,
             status,
@@ -1765,6 +1817,7 @@ mod tests {
             id: id.into(),
             role: "user".into(),
             content: content.into(),
+            attachments: None,
             created_at: ts.into(),
             thinking: None,
             status: None,
@@ -2194,6 +2247,7 @@ mod tests {
             id: "m2".into(),
             role: "tool".into(),
             content: "ok".into(),
+            attachments: None,
             created_at: "2025-05-01T00:00:02Z".into(),
             thinking: None,
             status: Some("complete".into()),
@@ -2290,6 +2344,36 @@ mod tests {
     }
 
     #[test]
+    fn user_attachments_roundtrip_as_canonical_blocks() {
+        let db = test_db();
+        let session = create_session(&db, None, None, None, None, None).unwrap();
+        let mut user = user_msg("image-1", "这是什么", "2025-05-01T00:00:00Z");
+        user.attachments = Some(vec![MessageAttachment {
+            kind: "image".into(),
+            name: "image.png".into(),
+            reference: "attachments/abc123".into(),
+            mime_type: Some("image/png".into()),
+            size: Some(42),
+        }]);
+
+        append_message(&db, &session.id, &user, None).unwrap();
+
+        let detail = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(detail.messages[0].attachments, user.attachments);
+        assert_eq!(detail.messages[0].content, "这是什么");
+
+        let record = transcripts::read_transcript(db.data_dir(), &session.id)
+            .unwrap()
+            .into_iter()
+            .find(|record| record.id == user.id)
+            .expect("attachment message record");
+        let blocks = record.blocks;
+        assert_eq!(blocks[1]["type"], "attachment");
+        assert_eq!(blocks[1]["ref"], "attachments/abc123");
+        assert!(blocks[1].get("data").is_none());
+    }
+
+    #[test]
     fn assistant_thinking_roundtrips_as_canonical_blocks() {
         let db = test_db();
         let session = create_session(&db, None, None, None, None, None).unwrap();
@@ -2297,6 +2381,7 @@ mod tests {
             id: "assistant-1".into(),
             role: "assistant".into(),
             content: "final answer".into(),
+            attachments: None,
             created_at: "2025-05-01T00:00:01Z".into(),
             thinking: Some("first plan\nsecond plan".into()),
             status: Some("complete".into()),

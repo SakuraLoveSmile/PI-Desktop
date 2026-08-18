@@ -45,6 +45,7 @@ import {
   IconSparkles,
   IconTarget,
   IconFileText,
+  IconImage,
   IconX,
 } from "./icons";
 
@@ -57,12 +58,19 @@ type ComposerFileReference = {
   sessionId: string;
   path: string;
   name: string;
+  kind: "image" | "file";
+  mimeType?: string;
 };
+
+function isImageFilePath(path: string): boolean {
+  return /\.(avif|bmp|gif|heic|jpe?g|png|tiff?|webp)$/i.test(path);
+}
 
 function createFileReference(
   path: string,
   preferredName?: string,
   sessionId = "",
+  metadata?: { kind?: "image" | "file"; mimeType?: string },
 ): ComposerFileReference {
   composerFileReferenceSequence += 1;
   return {
@@ -70,6 +78,8 @@ function createFileReference(
     sessionId,
     path,
     name: fileReferenceLabel(path, preferredName),
+    kind: metadata?.kind ?? (isImageFilePath(path) ? "image" : "file"),
+    ...(metadata?.mimeType ? { mimeType: metadata.mimeType } : {}),
   };
 }
 
@@ -276,6 +286,9 @@ export function Composer({
   const activeFileReferences = fileReferences.filter(
     (fileReference) => fileReference.sessionId === referenceSessionId,
   );
+  const activeImageReferences = activeFileReferences.filter(
+    (fileReference) => fileReference.kind === "image",
+  );
 
   useEffect(() => {
     const previousKey = draftKeyRef.current;
@@ -284,14 +297,24 @@ export function Composer({
         text: value,
         fileReferences: fileReferences
           .filter((fileReference) => fileReference.sessionId === previousKey)
-          .map(({ path, name }) => ({ path, name })),
+          .map(({ path, name, kind, mimeType }) => ({
+            path,
+            name,
+            kind,
+            ...(mimeType ? { mimeType } : {}),
+          })),
       });
       draftKeyRef.current = draftKey;
       const nextDraft = draftCacheRef.current.get(draftKey);
       setValue(nextDraft?.text ?? "");
       setFileReferences(
         nextDraft?.fileReferences.map((fileReference) =>
-          createFileReference(fileReference.path, fileReference.name, referenceSessionId),
+          createFileReference(
+            fileReference.path,
+            fileReference.name,
+            referenceSessionId,
+            fileReference,
+          ),
         ) ?? [],
       );
       setCursor(nextDraft?.text.length ?? 0);
@@ -302,7 +325,12 @@ export function Composer({
       text: value,
       fileReferences: fileReferences
         .filter((fileReference) => fileReference.sessionId === referenceSessionId)
-        .map(({ path, name }) => ({ path, name })),
+        .map(({ path, name, kind, mimeType }) => ({
+          path,
+          name,
+          kind,
+          ...(mimeType ? { mimeType } : {}),
+        })),
     });
   }, [draftKey, fileReferences, referenceSessionId, value]);
 
@@ -340,6 +368,7 @@ export function Composer({
           fileReference.path,
           fileReference.name,
           composerPrefill.sessionId,
+          fileReference,
         ),
       ),
     ]);
@@ -500,6 +529,11 @@ export function Composer({
   const selectedModel = provider?.id
     ? providerModels[provider.id]?.find((model) => model.modelId === modelId)
     : undefined;
+  const modelSupportsVision =
+    selectedModel?.capabilities.includes("vision") ??
+    activeSession?.supportsVision ??
+    provider?.supportsVision ??
+    false;
   const modelLabel = selectedModel?.displayName || modelId || t("chat.model");
   const thinkingMenuLevels: ThinkingLevel[] = availableThinkingLevels.length
     ? availableThinkingLevels
@@ -739,26 +773,32 @@ export function Composer({
 
   const draftSnapshot = (text: string): ComposerDraftSnapshot => ({
     text: text.trim(),
-    fileReferences: activeFileReferences.map(({ path, name }) => ({ path, name })),
+    fileReferences: activeFileReferences.map(({ path, name, kind, mimeType }) => ({
+      path,
+      name,
+      kind,
+      ...(mimeType ? { mimeType } : {}),
+    })),
   });
 
   const submit = async () => {
-    const content = serializeComposerFileReferences(value, activeFileReferences);
-    if (!content || sendBlocked) return;
+    const content = value.trim();
+    const serializedContent = serializeComposerFileReferences(value, activeFileReferences);
+    if (!serializedContent || sendBlocked) return;
     const submittedDraftKey = draftKey;
     // Slash dispatch (D123): builtin/plugin aliases execute locally without
     // a session or a model; templates and unknown /names stay prompt text
     // (main expands templates). Runs before the model-ready gate on purpose.
-    if (content.startsWith("/")) {
-      const commandEnd = content.search(/\s/);
-      const name = content.slice(
+    if (serializedContent.startsWith("/")) {
+      const commandEnd = serializedContent.search(/\s/);
+      const name = serializedContent.slice(
         1,
         commandEnd === -1 ? undefined : commandEnd,
       );
       const command = name ? await resolveComposerCommand(name) : null;
       if (command && command.kind !== "template" && command.id) {
         const commandBody =
-          commandEnd === -1 ? "" : content.slice(commandEnd).trim();
+          commandEnd === -1 ? "" : serializedContent.slice(commandEnd).trim();
         const isModeCommand =
           command.id === "builtin.mode.agent" ||
           command.id === "builtin.mode.plan" ||
@@ -777,7 +817,7 @@ export function Composer({
                 ? ""
                 : visibleDraft.slice(visibleCommandEnd).trim();
             const accepted = await sendPrompt(
-              commandBody,
+              content.slice(content.search(/\s/) + 1).trim(),
               draftSnapshot(visibleCommandBody),
             );
             if (accepted) clearDraftForKey(submittedDraftKey);
@@ -849,7 +889,10 @@ export function Composer({
       setFileReferences((current) => [
         ...current,
         ...result.files.map((file) =>
-          createFileReference(file.path, file.name, sessionId),
+          createFileReference(file.path, file.name, sessionId, {
+            kind: file.kind,
+            mimeType: file.mimeType,
+          }),
         ),
       ]);
       requestAnimationFrame(() => {
@@ -890,6 +933,7 @@ export function Composer({
           acceptedFileReference.path,
           acceptedFileReference.name,
           referenceSessionId,
+          { kind: isImageFilePath(acceptedFileReference.path) ? "image" : "file" },
         ),
       ]);
     }
@@ -938,6 +982,22 @@ export function Composer({
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
           ) : null}
           <div className="composer-input-wrap">
+            {activeImageReferences.length ? (
+              <div
+                className={`composer-vision-note${modelSupportsVision ? " is-supported" : " is-fallback"}`}
+                role="status"
+                aria-live="polite"
+              >
+                <IconImage size={13} aria-hidden />
+                <span>
+                  {t(
+                    modelSupportsVision
+                      ? "chat.visionAttachmentReady"
+                      : "chat.visionAttachmentFallback",
+                  )}
+                </span>
+              </div>
+            ) : null}
             {activeFileReferences.length ? (
               <div
                 className="composer-file-references"
@@ -952,7 +1012,11 @@ export function Composer({
                     title={fileReference.path}
                     aria-label={`${fileReference.name} — ${fileReference.path}`}
                   >
-                    <IconFileText size={13} aria-hidden />
+                    {fileReference.kind === "image" ? (
+                      <IconImage size={13} aria-hidden />
+                    ) : (
+                      <IconFileText size={13} aria-hidden />
+                    )}
                     <span className="composer-file-reference-name">
                       {fileReference.name}
                     </span>

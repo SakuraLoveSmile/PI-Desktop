@@ -217,6 +217,17 @@ export type MessageUsage = {
   totalTokens: number;
 };
 
+export type MessageAttachment = {
+  kind: "image" | "file";
+  name: string;
+  /** Workspace-relative path or session-scratch absolute path. */
+  ref: string;
+  mimeType?: string;
+  size?: number;
+  /** Sidecar-only hydrated image data; never persisted or sent by the host. */
+  data?: string;
+};
+
 /** Estimated context footprint for one tool call and its returned result. */
 export type ToolTokenUsage = {
   argumentTokens: number;
@@ -229,6 +240,8 @@ export type UiMessage = {
   id: string;
   role: UiMessageRole;
   content: string;
+  /** Files or images associated with a user turn, kept separate from text. */
+  attachments?: MessageAttachment[];
   /** Model reasoning kept separate from the answer text. */
   thinking?: string;
   createdAt: string;
@@ -289,6 +302,8 @@ export type SessionSummary = {
   permissionMode: PermissionMode;
   /** Effective capability for this session's exact provider/model pair. */
   supportsReasoning?: boolean;
+  /** Effective image-input capability for this session's exact model. */
+  supportsVision?: boolean;
   supportedThinkingLevels?: ThinkingLevel[];
   updatedAt: string;
   createdAt: string;
@@ -376,12 +391,22 @@ export type AgentStatus = {
 export type AgentPromptRequest = {
   sessionId: string;
   content: string;
+  /** Attachments are resolved by Electron main and never trusted by the sidecar. */
+  attachments?: AgentPromptAttachment[];
   /**
    * When set, truncate the durable transcript to this many leading messages
    * before appending the new user turn. Used by regenerate / edit-resend so
    * the branch replaces the tail instead of stacking a duplicate turn.
    */
   truncateBefore?: number;
+};
+
+export type AgentPromptAttachment = {
+  path: string;
+  name: string;
+  kind: "image" | "file";
+  mimeType?: string;
+  size?: number;
 };
 
 export type AgentPromptResponse = {
@@ -597,6 +622,8 @@ export type ProviderPublic = {
   apiStyle?: string;
   /** Effective capability for the provider's current default model. */
   supportsReasoning: boolean;
+  /** Effective image-input capability for the provider's current default model. */
+  supportsVision?: boolean;
   supportedThinkingLevels: ThinkingLevel[];
   /** Model context window override in tokens (runtime default when absent). */
   contextWindow?: number;
@@ -1157,6 +1184,7 @@ export type ComposerPastedFile = {
   path: string;
   /** Sanitized original leaf name used only for compact composer display. */
   name: string;
+  kind: "image" | "file";
   mimeType: string;
   size: number;
 };

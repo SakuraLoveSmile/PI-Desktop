@@ -10,6 +10,18 @@ const SAFE_SESSION_ID = /^[A-Za-z0-9_-]+$/;
 const MAX_FILES = 20;
 const MAX_FILE_BYTES = 64 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 128 * 1024 * 1024;
+const IMAGE_EXTENSIONS = new Set([
+  ".avif",
+  ".bmp",
+  ".gif",
+  ".heic",
+  ".jpeg",
+  ".jpg",
+  ".png",
+  ".tif",
+  ".tiff",
+  ".webp",
+]);
 
 const MIME_EXTENSIONS: Record<string, string> = {
   "image/gif": ".gif",
@@ -24,6 +36,15 @@ const MIME_EXTENSIONS: Record<string, string> = {
   "application/pdf": ".pdf",
   "application/zip": ".zip",
 };
+
+function isImageMimeType(mimeType: string): boolean {
+  return mimeType.startsWith("image/");
+}
+
+function isImageFile(name: string, mimeType: string): boolean {
+  if (isImageMimeType(mimeType)) return true;
+  return IMAGE_EXTENSIONS.has(extname(name).toLowerCase());
+}
 
 function bytesOf(data: unknown): Uint8Array {
   if (data instanceof Uint8Array) return data;
@@ -91,7 +112,13 @@ export async function saveComposerPasteFiles(
       const outputName = `pasted-${randomUUID()}-${name}`;
       const path = join(root, outputName);
       await writeFile(path, bytes, { flag: "wx" });
-      return { path, name, mimeType, size: bytes.byteLength };
+      return {
+        path,
+        name,
+        kind: isImageFile(name, mimeType) ? "image" : "file",
+        mimeType,
+        size: bytes.byteLength,
+      };
     }),
   );
 }

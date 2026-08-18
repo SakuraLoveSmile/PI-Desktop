@@ -29,6 +29,7 @@ import {
   Type,
   type Api,
   type AssistantMessage,
+  type ImageContent,
   type Model,
   type Models,
   type ToolResultMessage,
@@ -39,6 +40,7 @@ import { DEFAULT_COMMAND_TIMEOUT_MS } from "@pi-desktop/shared";
 import type {
   AgentEventEnvelope,
   AgentStatus,
+  AgentPromptAttachment,
   AskToolQuestion,
   AskToolRequest,
   AskToolResolution,
@@ -49,6 +51,7 @@ import type {
   ContextCompactionSettings,
   MessageUsage,
   Mode,
+  MessageAttachment,
   PlanExecution,
   PlanProposal,
   PlanningState,
@@ -117,6 +120,65 @@ import { pluginSkillsDigest } from "./plugin-skills.js";
 import { logTiming } from "./timing.js";
 
 export type { RuntimeProviderConfig } from "./provider-binding.js";
+
+export type RuntimePromptAttachment = AgentPromptAttachment & {
+  /** Base64 payload is transient and only crosses the sidecar for this turn. */
+  data?: string;
+};
+
+export type RuntimePrompt = {
+  text: string;
+  attachments?: RuntimePromptAttachment[];
+};
+
+function promptContent(input: string | RuntimePrompt): UserMessage["content"] {
+  if (typeof input === "string") return input;
+  const text = input.text;
+  const images = (input.attachments ?? []).filter(
+    (attachment) =>
+      attachment.kind === "image" &&
+      typeof attachment.data === "string" &&
+      attachment.data.length > 0,
+  );
+  if (!images.length) return text;
+  return [
+    ...(text.trim() ? [{ type: "text" as const, text }] : []),
+    ...images.map((attachment) => ({
+      type: "image" as const,
+      data: attachment.data!,
+      mimeType: attachment.mimeType || "image/png",
+    })),
+  ];
+}
+
+function promptImages(input: RuntimePrompt): ImageContent[] {
+  return (input.attachments ?? [])
+    .filter(
+      (attachment) =>
+        attachment.kind === "image" &&
+        typeof attachment.data === "string" &&
+        attachment.data.length > 0,
+    )
+    .map((attachment) => ({
+      type: "image" as const,
+      data: attachment.data!,
+      mimeType: attachment.mimeType || "image/png",
+    }));
+}
+
+function runtimeAttachmentFromMessage(
+  attachment: MessageAttachment,
+  data?: string,
+): RuntimePromptAttachment {
+  return {
+    path: attachment.ref,
+    name: attachment.name,
+    kind: attachment.kind,
+    ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
+    ...(attachment.size !== undefined ? { size: attachment.size } : {}),
+    ...(data ? { data } : {}),
+  };
+}
 
 const PROVIDER_REQUEST_MAX_RETRIES = 1;
 const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;
@@ -1421,8 +1483,20 @@ Delegation rules:
       const timestamp = Date.parse(m.createdAt) || Date.now();
       if (m.role === "user") {
         toolCarrier = undefined;
-        if (!(m.content || "").trim()) continue;
-        append(m.id, { role: "user", content: m.content, timestamp });
+        const attachments = (m.attachments ?? []).map((attachment) =>
+          runtimeAttachmentFromMessage(
+            attachment,
+            attachment.data,
+          ),
+        );
+        const content = promptContent({ text: m.content, attachments });
+        if (
+          !(m.content || "").trim() &&
+          !attachments.some((attachment) => attachment.data)
+        ) {
+          continue;
+        }
+        append(m.id, { role: "user", content, timestamp });
       } else if (m.role === "assistant") {
         toolCarrier = undefined;
         // Failed provider responses belong in the transcript for diagnosis,
@@ -4744,7 +4818,7 @@ Delegation rules:
   }
 
   async prompt(
-    content: string,
+    input: string | RuntimePrompt,
     userMessageId?: string,
     durableTurnId?: string,
   ): Promise<{ turnId: string }> {
@@ -4763,6 +4837,7 @@ Delegation rules:
       status: this.getStatus(),
     });
     try {
+      const content = promptContent(input);
       const incomingUserMessage: AgentMessage = {
         role: "user",
         content,
@@ -4788,7 +4863,11 @@ Delegation rules:
           return { turnId: this.turnId };
         }
       }
-      await this.agent.prompt(content);
+      if (typeof input === "string") {
+        await this.agent.prompt(input);
+      } else {
+        await this.agent.prompt(input.text, promptImages(input));
+      }
       await this.agent.waitForIdle();
 
       if (!(await this.runPendingRecoveries())) return { turnId: this.turnId };

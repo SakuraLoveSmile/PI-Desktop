@@ -93,6 +93,26 @@
   margin-bottom: 6px;
 }
 
+.composer-vision-note {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 5px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+  line-height: var(--leading-compact);
+}
+
+.composer-vision-note.is-supported {
+  color: var(--ds-accent);
+}
+
+.composer-vision-note.is-fallback {
+  color: var(--ds-text-secondary);
+}
+
 .composer-file-reference {
   display: inline-flex;
   max-width: min(100%, 280px);

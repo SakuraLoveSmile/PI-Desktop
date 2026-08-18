@@ -94,6 +94,7 @@ import {
   IconFileText,
   IconFolder,
   IconGlobe,
+  IconImage,
   IconListChecks,
   IconPencil,
   IconSearch,
@@ -1649,14 +1650,14 @@ const MessageRow = memo(function MessageRow({
   };
   const saveEdit = async () => {
     const next = editValue.trim();
-    if (savingEdit || !next) return;
+    if (savingEdit || (!next && !message.attachments?.length)) return;
     // An unchanged prompt is not worth a regenerate branch.
     if (next === editSeed.trim()) {
       setEditing(false);
       return;
     }
     setSavingEdit(true);
-    const saved = await editUserMessage(message.id, next);
+    const saved = await editUserMessage(message.id, next, message.attachments);
     setSavingEdit(false);
     if (saved) setEditing(false);
   };
@@ -1704,7 +1705,7 @@ const MessageRow = memo(function MessageRow({
                   <button
                     type="button"
                     className="copy-btn primary"
-                    disabled={savingEdit || !editValue.trim()}
+                    disabled={savingEdit || (!editValue.trim() && !message.attachments?.length)}
                     onClick={() => void saveEdit()}
                   >
                     {savingEdit ? t("chat.savingEdit") : t("chat.saveEdit")}
@@ -1712,21 +1713,48 @@ const MessageRow = memo(function MessageRow({
                 </div>
               </div>
             ) : isUser ? (
-              <div className="message-user-text selectable">
-                {message.command ? (
-                  // Slash invocations show the typed form as a chip; the
-                  // expanded template body lives in `content` (hover reveals
-                  // it) and is what regenerate/reseed replay (D123).
-                  <code
-                    className="chat-command-chip"
-                    title={String(message.content || "")}
+              <>
+                {message.attachments?.length ? (
+                  <div
+                    className="message-attachments"
+                    role="list"
+                    aria-label={t("chat.messageAttachments")}
                   >
-                    {message.command}
-                  </code>
-                ) : (
-                  <LinkifiedText text={String(message.content || "")} />
-                )}
-              </div>
+                    {message.attachments.map((attachment) => (
+                      <div
+                        key={`${attachment.ref}:${attachment.name}`}
+                        className="message-attachment"
+                        role="listitem"
+                        title={attachment.ref}
+                      >
+                        {attachment.kind === "image" ? (
+                          <IconImage size={13} aria-hidden />
+                        ) : (
+                          <IconFileText size={13} aria-hidden />
+                        )}
+                        <span>{attachment.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {message.content ? (
+                  <div className="message-user-text selectable">
+                    {message.command ? (
+                      // Slash invocations show the typed form as a chip; the
+                      // expanded template body lives in `content` (hover reveals
+                      // it) and is what regenerate/reseed replay (D123).
+                      <code
+                        className="chat-command-chip"
+                        title={String(message.content || "")}
+                      >
+                        {message.command}
+                      </code>
+                    ) : (
+                      <LinkifiedText text={String(message.content || "")} />
+                    )}
+                  </div>
+                ) : null}
+              </>
             ) : (
               <div className="prose-chat">
                 <Markdown source={displayed} />
