@@ -21,7 +21,11 @@ import {
   type ImportGroupBy,
 } from "../lib/import-groups";
 import { Badge, Button, Select, cx } from "../components/ui";
-import { SETTINGS_NAV, type SettingsNavGroupId } from "../lib/settings-search";
+import {
+  SETTINGS_NAV,
+  SETTINGS_NAV_GROUP_LABELS,
+  type SettingsNavGroupId,
+} from "../lib/settings-search";
 import {
   IconArchive,
   IconBot,
@@ -873,8 +877,8 @@ export function SettingsPage() {
     );
   }, [navItems, query, t]);
 
-  // Keep the destination index flat for search, while giving the rail a few
-  // quiet visual breaks so the eight rows do not read as one dense block.
+  // Keep the destination index flat for search, while giving the rail titled
+  // visual clusters so the eight rows do not read as one dense block.
   const filteredGroups = useMemo(() => {
     const groups = new Map<SettingsNavGroupId, NavItem[]>();
     for (const item of filteredItems) {
@@ -922,6 +926,9 @@ export function SettingsPage() {
           ) : (
             filteredGroups.map(({ id, items }) => (
               <div key={id} className="settings-nav-group">
+                <div className="settings-nav-group-label">
+                  {t(SETTINGS_NAV_GROUP_LABELS[id])}
+                </div>
                 {items.map((item) => (
                   <button
                     key={item.id}

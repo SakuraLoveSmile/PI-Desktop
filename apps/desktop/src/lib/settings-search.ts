@@ -17,6 +17,13 @@ export type SettingsTabId =
 
 export type SettingsNavGroupId = "core" | "agent" | "workspace" | "about";
 
+export const SETTINGS_NAV_GROUP_LABELS: Record<SettingsNavGroupId, string> = {
+  core: "settings.groupPersonal",
+  agent: "settings.groupAgent",
+  workspace: "settings.groupWorkspace",
+  about: "settings.groupAbout",
+};
+
 export type SettingsNavEntry = {
   id: SettingsTabId;
   labelKey: string;

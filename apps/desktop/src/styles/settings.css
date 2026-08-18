@@ -121,11 +121,11 @@
 .settings-nav-scroll {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 14px;
   min-height: 0;
   flex: 1;
   overflow: auto;
-  padding: 2px 10px 24px;
+  padding: 14px 10px 24px;
 }
 
 .settings-nav-group {
@@ -134,16 +134,12 @@
   gap: 1px;
 }
 
-/* Keep the directory flat, but give related destinations a quiet 16px break. */
-.settings-nav-group + .settings-nav-group {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--ds-border-subtle);
-}
-
-/* Codex-style dark chrome keeps section rules on the visible 8% border tier. */
-:root[data-theme="dark"] .settings-nav-group + .settings-nav-group {
-  border-top-color: var(--ds-border-default);
+.settings-nav-group-label {
+  padding: 0 10px 6px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-tight);
 }
 
 .settings-nav-empty {

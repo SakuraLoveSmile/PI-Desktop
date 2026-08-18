@@ -19,17 +19,14 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   8. **Info** — Lucide `Info` (versions, logs, updates, developer)
   Icons are decorative (`aria-hidden` via the SVG default) and stay monochrome
   with the rail label; do not reuse refresh/rotate glyphs here.
-- The directory is a flat list. Do not add `Personal`, `Integrations`,
-  `Coding`, or other group headings around the destinations; the destination
-  names already provide the needed hierarchy. For scanability, the flat list
-  is visually split into four untitled clusters, preserving the same order:
-  Basics / AI / Shortcuts; Instructions / Model configuration; Import / Project
-  archive; Info. Each boundary uses a quiet hairline divider and a 16px
-  section gap. The dark rail uses the visible default border tier for these
-  rules, while light mode keeps the subtler tier. These are visual breaks only,
-  not a second navigation level.
-  When search filters the directory, empty clusters disappear and no orphan
-  divider remains.
+- The directory remains a flat searchable list in the same exact order. For
+  scanability, the destinations are shown in four titled visual clusters:
+  `Personal` / `个人` (Basics, AI, Shortcuts), `Agent` / `智能体` (Instructions,
+  Model configuration), `Workspace` / `工作区` (Import, Project archive), and
+  `About` / `关于` (Info). Headings are muted, non-interactive labels and use
+  whitespace for separation; no divider lines are rendered. These are visual
+  landmarks only, not a second navigation level. When search filters the
+  directory, empty clusters and their headings disappear.
 - No additional settings destinations or placeholder navigation rows are shown
 - Main content pane on primary surface with large section title + elevated
   rounded cards of rows. Its content uses the full width available after the

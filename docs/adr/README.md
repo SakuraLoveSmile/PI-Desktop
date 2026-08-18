@@ -115,3 +115,4 @@ Each ADR includes:
 | 0096 | Flatten the Settings directory and colocate marketplace source configuration | Accepted |
 | 0097 | Place global defaults under the AI Settings destination | Accepted |
 | 0098 | Treat every vendor OAuth account as an independent provider row | Accepted for implementation |
+| 0099 | Add titled visual clusters to the Settings directory | Accepted |

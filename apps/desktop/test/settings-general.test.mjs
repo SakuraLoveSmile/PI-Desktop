@@ -50,6 +50,14 @@ const languageSource = await readFile(
   new URL("../src/lib/app-language.ts", import.meta.url),
   "utf8",
 );
+const enLocaleSource = await readFile(
+  new URL("../../../packages/i18n/src/locales/en/index.ts", import.meta.url),
+  "utf8",
+);
+const zhLocaleSource = await readFile(
+  new URL("../../../packages/i18n/src/locales/zh-CN/index.ts", import.meta.url),
+  "utf8",
+);
 const mainSource = await readFile(
   new URL("../src/main.tsx", import.meta.url),
   "utf8",
@@ -214,16 +222,25 @@ test("settings nav icons map each destination to a semantic lucide glyph", () =>
   assert.doesNotMatch(settingsPageSource, /import: <IconSnapshot/);
 });
 
-test("settings nav keeps a flat searchable index with quiet visual groups", () => {
+test("settings nav keeps a flat searchable index with titled visual groups", () => {
   assert.match(settingsPageSource, /filteredGroups\.map/);
   assert.match(settingsPageSource, /className="settings-nav-group"/);
+  assert.match(settingsPageSource, /SETTINGS_NAV_GROUP_LABELS/);
+  assert.match(settingsPageSource, /className="settings-nav-group-label"/);
   assert.match(settingsSearchSource, /group: "core"/);
   assert.match(settingsSearchSource, /group: "agent"/);
   assert.match(settingsSearchSource, /group: "workspace"/);
   assert.match(settingsSearchSource, /group: "about"/);
-  assert.doesNotMatch(settingsPageSource, /settings-nav-group-label/);
-  assert.doesNotMatch(settingsSearchSource, /settings\.groupPersonal/);
-  assert.doesNotMatch(settingsSearchSource, /settings\.groupIntegrations/);
+  for (const key of [
+    "settings.groupPersonal",
+    "settings.groupAgent",
+    "settings.groupWorkspace",
+    "settings.groupAbout",
+  ]) {
+    assert.match(settingsSearchSource, new RegExp(key.replace(".", "\\.")));
+    assert.match(enLocaleSource, new RegExp(`${key.split(".")[1]}:`));
+    assert.match(zhLocaleSource, new RegExp(`${key.split(".")[1]}:`));
+  }
   assert.doesNotMatch(settingsSearchSource, /id: "extensions"/);
   const navOrder = [
     "general",
@@ -248,14 +265,9 @@ test("settings nav keeps a flat searchable index with quiet visual groups", () =
   assert.match(settingsSearchSource, /keywordKeys/);
   assert.match(settingsSearchSource, /settings\.projectArchive/);
   assert.match(stylesSource, /\.settings-nav-item\s*\{/);
-  assert.match(
-    stylesSource,
-    /\.settings-nav-group \+ \.settings-nav-group\s*\{[^}]*margin-top:\s*8px;[^}]*padding-top:\s*8px;[^}]*border-top:\s*1px solid var\(--ds-border-subtle\);/s,
-  );
-  assert.match(
-    stylesSource,
-    /:root\[data-theme="dark"\] \.settings-nav-group \+ \.settings-nav-group\s*\{[^}]*border-top-color:\s*var\(--ds-border-default\);/s,
-  );
+  assert.match(stylesSource, /\.settings-nav-group-label\s*\{/);
+  assert.doesNotMatch(stylesSource, /\.settings-nav-group \+ \.settings-nav-group/);
+  assert.doesNotMatch(stylesSource, /\.settings-nav-group-label[^}]*border/);
   assert.match(
     stylesSource,
     /\.settings-row\.settings-row-plain\s*\{[^}]*border-bottom:\s*0/s,
