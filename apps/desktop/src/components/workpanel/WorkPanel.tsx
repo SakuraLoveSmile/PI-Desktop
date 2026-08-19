@@ -57,7 +57,7 @@ const TAB_ICONS = {
  *
  * Review, Terminal, and Files are on their way out of this list: they are being
  * moved to first-party plugins that reach the panel through `contributes.views`
- * like any third-party one, leaving Browser as the only built-in (ADR 0103).
+ * like any third-party one, leaving Browser as the only built-in (ADR 0104).
  * Until that migration lands they stay here, and the plugin-views group below
  * renders alongside them.
  */

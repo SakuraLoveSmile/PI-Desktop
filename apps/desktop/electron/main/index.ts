@@ -7177,7 +7177,7 @@ function registerIpc() {
   });
 
   /**
-   * Work panel views a plugin contributes (ADR 0102).
+   * Work panel views a plugin contributes (ADR 0103).
    *
    * Unlike `pluginThemes`, this list *is* filtered by activation scope: a theme
    * is one global app setting, but a view is something the plugin does inside a

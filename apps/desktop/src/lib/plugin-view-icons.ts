@@ -29,7 +29,7 @@ import {
 } from "../components/icons";
 
 /**
- * Icon tokens a plugin may name for a contributed work panel view (ADR 0102).
+ * Icon tokens a plugin may name for a contributed work panel view (ADR 0103).
  *
  * The manifest carries a token, never markup: the icon is drawn inside host
  * chrome next to first-party controls, so plugin SVG there would be an
