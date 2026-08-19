@@ -7,16 +7,20 @@
     <style>
       :root {
         color-scheme: dark;
-        --bg: #171717;
-        --surface: #1e1e1e;
-        --surface-hover: rgba(255, 255, 255, 0.06);
-        --surface-active: rgba(255, 255, 255, 0.1);
-        --fg: #e8e8e8;
-        --muted: #8d8d8d;
-        --faint: #666666;
-        --border: rgba(255, 255, 255, 0.1);
-        --accent: #7aa2f7;
-        --danger: #f38ba8;
+        /* Mirror the host's neutral Codex ramp; plugin pages cannot inherit
+           renderer CSS, so these values intentionally track tokens.css. */
+        --bg: #181818;
+        --surface: #181818;
+        --surface-hover: color-mix(in oklab, #ffffff 6%, transparent);
+        --surface-active: color-mix(in oklab, #ffffff 10%, transparent);
+        --fg: #ffffff;
+        --secondary: color-mix(in oklab, #ffffff 70%, transparent);
+        --muted: color-mix(in oklab, #ffffff 52%, transparent);
+        --faint: color-mix(in oklab, #ffffff 38%, transparent);
+        --border: color-mix(in oklab, #ffffff 5%, transparent);
+        --border-strong: color-mix(in oklab, #ffffff 14%, transparent);
+        --accent: #ffffff;
+        --danger: #ff6764;
         --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
       }
@@ -24,14 +28,16 @@
         color-scheme: light;
         --bg: #fafafa;
         --surface: #ffffff;
-        --surface-hover: rgba(0, 0, 0, 0.05);
-        --surface-active: rgba(0, 0, 0, 0.08);
+        --surface-hover: color-mix(in oklab, #1a1c1f 5%, transparent);
+        --surface-active: color-mix(in oklab, #1a1c1f 8%, transparent);
         --fg: #1a1c1f;
-        --muted: #6b7280;
-        --faint: #9ca3af;
-        --border: rgba(0, 0, 0, 0.1);
-        --accent: #2563eb;
-        --danger: #c2415b;
+        --secondary: color-mix(in oklab, #1a1c1f 74%, transparent);
+        --muted: #5d5d5d;
+        --faint: #afafaf;
+        --border: color-mix(in oklab, #1a1c1f 5%, transparent);
+        --border-strong: color-mix(in oklab, #1a1c1f 12%, transparent);
+        --accent: #1a1c1f;
+        --danger: #e02e2a;
       }
       * {
         box-sizing: border-box;
@@ -48,7 +54,7 @@
         font: inherit;
       }
       button:focus-visible {
-        outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+        outline: 2px solid color-mix(in oklab, var(--accent) 58%, transparent);
         outline-offset: -2px;
       }
       .app {
@@ -59,12 +65,12 @@
       }
       .toolbar {
         display: flex;
-        min-height: 44px;
+        min-height: 38px;
         flex: 0 0 auto;
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        padding: 7px 10px 7px 12px;
+        padding: 5px 8px 5px 10px;
         border-bottom: 1px solid var(--border);
         background: var(--surface);
       }
@@ -72,24 +78,24 @@
         display: flex;
         min-width: 0;
         align-items: center;
-        gap: 8px;
+        gap: 7px;
       }
       .toolbar-icon {
         display: inline-flex;
-        width: 24px;
-        height: 24px;
+        width: 16px;
+        height: 16px;
         flex: 0 0 auto;
         align-items: center;
         justify-content: center;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        color: var(--muted);
+        border: 0;
+        border-radius: 0;
+        color: var(--secondary);
       }
       .toolbar-copy {
         display: flex;
         min-width: 0;
-        flex-direction: column;
-        gap: 1px;
+        align-items: baseline;
+        gap: 6px;
       }
       .toolbar-name,
       .toolbar-subtitle {
@@ -98,12 +104,14 @@
         white-space: nowrap;
       }
       .toolbar-name {
-        font-size: 13px;
-        font-weight: 600;
+        font-size: 12.5px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
       }
       .toolbar-subtitle {
+        min-width: 0;
         color: var(--muted);
-        font-size: 10px;
+        font-size: 11px;
       }
       .icon-button {
         display: inline-flex;
@@ -112,10 +120,14 @@
         align-items: center;
         justify-content: center;
         border: 0;
-        border-radius: 6px;
+        border-radius: 12px;
         background: transparent;
-        color: var(--muted);
+        color: var(--secondary);
         cursor: pointer;
+        transition:
+          background 150ms cubic-bezier(0.22, 1, 0.36, 1),
+          color 150ms cubic-bezier(0.22, 1, 0.36, 1),
+          opacity 150ms cubic-bezier(0.22, 1, 0.36, 1);
       }
       .icon-button:hover {
         background: var(--surface-hover);
@@ -123,7 +135,10 @@
       }
       .icon-button:disabled {
         cursor: default;
-        opacity: 0.55;
+        opacity: 0.4;
+      }
+      .icon-button[data-loading="true"] svg {
+        animation: spin 800ms linear infinite;
       }
       .content {
         min-height: 0;
@@ -144,10 +159,10 @@
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        padding: 9px 12px 7px;
+        padding: 8px 12px 6px;
         color: var(--muted);
-        font-size: 10px;
-        font-weight: 600;
+        font-size: 11px;
+        font-weight: 500;
         letter-spacing: 0.06em;
         text-transform: uppercase;
       }
@@ -166,16 +181,21 @@
       .tree-row {
         display: flex;
         width: 100%;
-        min-height: 28px;
+        min-height: 24px;
         align-items: center;
         gap: 6px;
         border: 0;
         border-radius: 6px;
-        padding: 4px 8px 4px 6px;
+        padding: 3px 8px 3px 6px;
         background: transparent;
-        color: var(--muted);
+        color: var(--secondary);
         cursor: pointer;
+        font-size: 12px;
+        line-height: 1.45;
         text-align: left;
+        transition:
+          background 150ms cubic-bezier(0.22, 1, 0.36, 1),
+          color 150ms cubic-bezier(0.22, 1, 0.36, 1);
       }
       .tree-row:hover {
         background: var(--surface-hover);
@@ -184,6 +204,7 @@
       .tree-row[aria-current="true"] {
         background: var(--surface-active);
         color: var(--fg);
+        box-shadow: inset 2px 0 0 var(--accent);
       }
       .tree-row[aria-expanded="true"] {
         color: var(--fg);
@@ -211,7 +232,7 @@
         color: var(--muted);
       }
       .tree-row[aria-expanded="true"] .tree-icon {
-        color: var(--accent);
+        color: var(--secondary);
       }
       .tree-name {
         min-width: 0;
@@ -232,14 +253,18 @@
         text-align: center;
       }
       .tree-note {
-        padding: 10px 12px;
+        display: flex;
+        min-height: 24px;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 12px;
         text-align: left;
       }
       .tree-note.error {
         color: var(--danger);
       }
       .tree-retry {
-        margin-left: 4px;
+        margin-left: auto;
         border: 0;
         background: transparent;
         color: inherit;
@@ -247,19 +272,29 @@
         text-decoration: underline;
         text-underline-offset: 2px;
       }
+      .mini-spinner {
+        display: inline-block;
+        width: 11px;
+        height: 11px;
+        flex: 0 0 auto;
+        border: 1.5px solid var(--border-strong);
+        border-top-color: var(--secondary);
+        border-radius: 50%;
+        animation: spin 800ms linear infinite;
+      }
       .empty {
         display: flex;
         height: 100%;
         align-items: center;
         justify-content: center;
-        padding: 24px 18px;
+        padding: 28px 24px;
       }
       .empty-inner {
         display: flex;
         max-width: 30ch;
         flex-direction: column;
         align-items: center;
-        gap: 7px;
+        gap: 6px;
       }
       .empty-icon {
         display: inline-flex;
@@ -267,17 +302,19 @@
         height: 38px;
         align-items: center;
         justify-content: center;
-        border-radius: 12px;
-        background: var(--surface-active);
-        color: var(--muted);
+        margin-bottom: 4px;
+        border-radius: 50%;
+        background: color-mix(in oklab, var(--fg) 7%, transparent);
+        color: var(--secondary);
       }
       .empty-title {
         color: var(--fg);
-        font-size: 14px;
-        font-weight: 600;
+        font-size: 15px;
+        font-weight: 520;
       }
       .empty-copy {
         color: var(--muted);
+        font-size: 13px;
         line-height: 1.55;
       }
       .viewer-view {
@@ -301,7 +338,9 @@
         color: var(--fg);
         font-family: var(--mono);
         font-size: 11px;
+        direction: rtl;
         text-overflow: ellipsis;
+        text-align: left;
         white-space: nowrap;
       }
       .viewer-meta {
@@ -317,6 +356,11 @@
       }
       .viewer-loading,
       .viewer-message {
+        display: flex;
+        min-height: 112px;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
         padding: 24px 16px;
         color: var(--muted);
         text-align: center;
@@ -324,9 +368,9 @@
       .code {
         min-width: max-content;
         margin: 0;
-        padding: 12px 0 22px;
+        padding: 10px 0 20px;
         color: var(--fg);
-        font: 11px/1.55 var(--mono);
+        font: 11.5px/1.5 var(--mono);
         tab-size: 2;
         white-space: pre;
       }
@@ -356,6 +400,13 @@
         .tree-row {
           transition: none;
         }
+        .icon-button[data-loading="true"] svg,
+        .mini-spinner {
+          animation: none;
+        }
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
       }
     </style>
   </head>
@@ -417,7 +468,10 @@
       let selected = null;
       let workspace = null;
       let workspaceLoaded = false;
+      let workspaceRevision = 0;
       let locale = "en";
+      let isRefreshing = false;
+      let viewerState = null;
 
       const copy = {
         en: {
@@ -428,6 +482,7 @@
           noWorkspaceCopy: "Choose a project from the sidebar, then come back here to inspect its files.",
           empty: "This project has no readable files.",
           loading: "Loading…",
+          refreshing: "Refreshing…",
           error: "Could not load this folder.",
           retry: "Retry",
           refresh: "Refresh",
@@ -448,6 +503,7 @@
           noWorkspaceCopy: "请先从侧边栏选择项目，再回到这里查看文件。",
           empty: "此项目没有可读取的文件。",
           loading: "加载中…",
+          refreshing: "刷新中…",
           error: "无法加载此文件夹。",
           retry: "重试",
           refresh: "刷新",
@@ -504,21 +560,39 @@
         document.getElementById("back").setAttribute("aria-label", t("back"));
         if (!viewerView.hidden && selected) viewerPath.title = selected;
         renderTree();
+        if (!viewerView.hidden && viewerState) {
+          if (viewerState.type === "text") renderText(viewerState.text);
+          else if (viewerState.type !== "loading") showViewerMessage(viewerState.type);
+        }
       };
 
       const directoryState = (path) => directories.get(path);
 
+      const updateRefreshButton = () => {
+        const rootLoading = !directoryState("") || directoryState("")?.loading === true;
+        const loading = isRefreshing || rootLoading;
+        refreshButton.disabled = !workspace || loading;
+        refreshButton.dataset.loading = String(loading);
+        const label = loading ? t("refreshing") : t("refresh");
+        refreshButton.title = label;
+        refreshButton.setAttribute("aria-label", label);
+        refreshButton.setAttribute("aria-busy", String(loading));
+      };
+
       async function loadDirectory(path, force = false) {
+        const revision = workspaceRevision;
         const existing = directoryState(path);
         if (existing?.loading && !force) return existing.promise;
         if (existing?.entries && !force) return existing.entries;
         const promise = bridge.invoke("fs.list", { path })
           .then((entries) => {
+            if (revision !== workspaceRevision) return [];
             directories.set(path, { entries: Array.isArray(entries) ? entries : [] });
             renderTree();
             return entries;
           })
           .catch((error) => {
+            if (revision !== workspaceRevision) return [];
             directories.set(path, { error });
             renderTree();
             return [];
@@ -531,7 +605,15 @@
       const makeTreeNote = (message, path, retry = false) => {
         const note = document.createElement("div");
         note.className = `tree-note${retry ? " error" : ""}`;
-        note.textContent = message;
+        if (!retry && message === t("loading")) {
+          const spinner = document.createElement("span");
+          spinner.className = "mini-spinner";
+          spinner.setAttribute("aria-hidden", "true");
+          note.append(spinner);
+        }
+        const copy = document.createElement("span");
+        copy.textContent = message;
+        note.append(copy);
         if (retry) {
           const button = document.createElement("button");
           button.className = "tree-retry";
@@ -611,7 +693,7 @@
           empty.querySelector(".empty-icon").setAttribute("aria-hidden", "true");
           tree.append(empty);
           treeCount.textContent = "";
-          refreshButton.disabled = true;
+          updateRefreshButton();
           return;
         }
         tree.setAttribute("aria-busy", String(!directoryState("")));
@@ -622,7 +704,7 @@
         const count = root?.entries?.length;
         treeCount.textContent = typeof count === "number" ? String(count) : "";
         toolbarSubtitle.textContent = workspace.name || t("projectFiles");
-        refreshButton.disabled = false;
+        updateRefreshButton();
       }
 
       const showTree = () => {
@@ -635,17 +717,32 @@
       const showViewer = (path) => {
         treeView.hidden = true;
         viewerView.hidden = false;
+        viewerState = { type: "loading" };
         viewerPath.textContent = path;
         viewerPath.title = path;
         viewerMeta.textContent = "";
         viewerBody.replaceChildren();
         const loading = document.createElement("div");
         loading.className = "viewer-loading";
-        loading.textContent = t("loading");
+        const spinner = document.createElement("span");
+        spinner.className = "mini-spinner";
+        spinner.setAttribute("aria-hidden", "true");
+        loading.append(spinner, document.createTextNode(t("loading")));
+        loading.setAttribute("role", "status");
         viewerBody.append(loading);
       };
 
+      const showViewerMessage = (messageKey) => {
+        viewerState = { type: messageKey };
+        const message = document.createElement("div");
+        message.className = "viewer-message";
+        message.setAttribute("role", "status");
+        message.textContent = t(messageKey);
+        viewerBody.replaceChildren(message);
+      };
+
       const renderText = (text) => {
+        viewerState = { type: "text", text };
         const lines = text.split("\n");
         const truncated = lines.length > MAX_LINES || text.length > MAX_TEXT_BYTES;
         const visible = lines.slice(0, MAX_LINES);
@@ -680,28 +777,19 @@
         showViewer(path);
         viewerMeta.textContent = formatSize(fileSizes.get(path));
         if (isImagePath(path)) {
-          const message = document.createElement("div");
-          message.className = "viewer-message";
-          message.textContent = t("image");
-          viewerBody.replaceChildren(message);
+          showViewerMessage("image");
           return;
         }
         try {
           const text = await bridge.invoke("fs.readText", { path });
           if (selected !== path) return;
           if (typeof text !== "string" || text.includes("\0")) {
-            const message = document.createElement("div");
-            message.className = "viewer-message";
-            message.textContent = t("binary");
-            viewerBody.replaceChildren(message);
+            showViewerMessage("binary");
             return;
           }
           renderText(text);
         } catch {
-          const message = document.createElement("div");
-          message.className = "viewer-message";
-          message.textContent = t("readError");
-          viewerBody.replaceChildren(message);
+          showViewerMessage("readError");
         }
       }
 
@@ -749,12 +837,19 @@
 
       document.getElementById("back").addEventListener("click", showTree);
       refreshButton.addEventListener("click", async () => {
-        if (!workspace) return;
+        if (!workspace || isRefreshing) return;
+        isRefreshing = true;
+        updateRefreshButton();
         directories.clear();
         fileSizes.clear();
         renderTree();
-        await loadDirectory("");
-        await Promise.all([...expanded].map((path) => loadDirectory(path)));
+        try {
+          await loadDirectory("");
+          await Promise.all([...expanded].map((path) => loadDirectory(path)));
+        } finally {
+          isRefreshing = false;
+          renderTree();
+        }
       });
 
       async function syncWorkspace() {
@@ -764,10 +859,12 @@
         workspaceLoaded = true;
         toolbarSubtitle.textContent = workspace?.name || t("projectFiles");
         if (!changed) return;
+        workspaceRevision += 1;
         directories.clear();
         fileSizes.clear();
         expanded.clear();
         selected = null;
+        viewerState = null;
         viewerView.hidden = true;
         treeView.hidden = false;
         renderTree();
