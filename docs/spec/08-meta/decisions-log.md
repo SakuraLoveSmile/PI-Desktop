@@ -2032,7 +2032,7 @@ D193, and D194.
 
 ## 2026-08-19 — The work panel becomes a plugin extension point
 
-- Decision D244. A plugin declares work panel surfaces with `contributes.views`
+- Decision D246. A plugin declares work panel surfaces with `contributes.views`
   (id, plain or localized title, icon token, HTML entry, order), gated by the
   new low-risk `ui.view` permission. `ui.view` and `ui.panel` are independent,
   so a plugin may ship docked views, a detached window, or both.
@@ -2054,7 +2054,7 @@ D193, and D194.
   one global app setting. A view is scoped work, so a project-scoped plugin must
   not offer it elsewhere. Permission, scope, and entry existence are re-checked
   on open; the renderer is never the authority.
-- Decision D245. Review, Terminal, and Files move out of the host and ship as
+- Decision D247. Review, Terminal, and Files move out of the host and ship as
   bundled first-party plugins on that same `contributes.views` channel, leaving
   Browser as the only built-in tool. This gives the plugin API a first-party
   consumer, so a gap in it becomes a shipped-feature bug. It requires new
@@ -2101,7 +2101,7 @@ D193, and D194.
 
 ## 2026-08-19 — Files ships as the first bundled plugin
 
-- Decision D246 implements the first step of D245. Browsing the project is now
+- Decision D248 implements the first step of D247. Browsing the project is now
   the bundled `pi.files` plugin, reached through `contributes.views` like any
   third-party one, and the host's tool list no longer carries a Files entry.
   Review and Terminal stay built in until their capabilities exist as plugin
@@ -2115,7 +2115,7 @@ D193, and D194.
 - Only the *tool* migrated. A `file:<path>` tab is a transcript artifact — a
   file link or plan checkpoint the conversation opened — and stays host-owned,
   exactly like Review's artifacts. The same split will apply when Review moves.
-- Writing the plugin proved D245's premise immediately: `fs.glob` returns a
+- Writing the plugin proved D247's premise immediately: `fs.glob` returns a
   flat, 500-capped file list with no directories and cannot back a lazy tree, so
   `pi.fs.list` was added under the existing `fs.read` permission. It applies the
   same guards as `glob` — declared scope, deny-list, protected paths, skipped
