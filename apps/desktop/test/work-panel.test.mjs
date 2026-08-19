@@ -149,12 +149,11 @@ test("work panel header exposes one unified menu with no duplicated entries", ()
   assert.match(panelSource, /className="work-panel-current-close"/);
   assert.match(panelSource, /className="work-panel-menu-close"/);
   // The tools section lists each singleton once with its own close control, so
-  // the second section may only carry transcript-opened resources.
-  assert.match(panelSource, /function isToolTab\(tab: WorkPanelTab\)/);
-  assert.match(panelSource, /return tab\.id === tab\.kind/);
+  // the second section may only carry transcript-opened resources. Plugin views
+  // are tools too, so the predicate lives in work-panel-tabs alongside them.
   assert.match(
     panelSource,
-    /const resourceTabs = tabs\.filter\(\(tab\) => !isToolTab\(tab\)\)/,
+    /const resourceTabs = tabs\.filter\(\(tab\) => !isToolWorkPanelTab\(tab\)\)/,
   );
   assert.match(panelSource, /\{resourceTabs\.length > 0 && \(/);
   assert.match(panelSource, /resourceTabs\.map\(\(tab, index\) =>/);
@@ -171,10 +170,14 @@ test("work panel header exposes one unified menu with no duplicated entries", ()
   assert.match(panelSource, /panel\.tools/);
   assert.match(panelSource, /panel\.openItems/);
   assert.match(panelSource, /panel\.tabs\.file/);
+  assert.match(panelSource, /panel\.pluginViews/);
   assert.doesNotMatch(panelSource, /panel\.openTool/);
+  // Every native surface in the panel — the preview browser and each plugin
+  // view — composites above the renderer, so one blocking condition governs
+  // them all.
   assert.match(
     panelSource,
-    /blocked=\{[\s\S]*exiting \|\| browserBlocked \|\| contextOpen \|\| dragWidth !== null[\s\S]*\}/,
+    /blocked=\{[\s\S]*exiting \|\| panelBlocked \|\| contextOpen \|\| dragWidth !== null[\s\S]*\}/,
   );
   assert.doesNotMatch(panelSource, /onContextMenu|createPortal|work-panel-tools-menu/);
   assert.match(

@@ -52,6 +52,57 @@ export type PluginPanelBlockedRequest = (input: {
 }) => void;
 
 /**
+ * Confine everything a plugin's web contents can reach to its declared domains.
+ *
+ * Shared by the detached panel window and the docked work-panel view: both are
+ * full web pages under the same plugin identity, so one policy governs both.
+ * Registering again on the same persisted partition replaces the previous
+ * handlers, so re-opening re-reads the current allowlist rather than stacking
+ * filters.
+ */
+export function applyPluginEgressPolicy(
+  ses: Electron.Session,
+  input: {
+    pluginId: string;
+    netDomains?: readonly string[];
+    onBlockedRequest?: PluginPanelBlockedRequest;
+  },
+): void {
+  const domains = input.netDomains ?? [];
+  ses.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, callback) => {
+    let scheme = "";
+    try {
+      scheme = new URL(details.url).protocol;
+    } catch {
+      // An unparseable URL cannot be matched against the allowlist; drop it.
+      callback({ cancel: true });
+      return;
+    }
+    if (PANEL_LOCAL_SCHEMES.has(scheme)) {
+      callback({ cancel: false });
+      return;
+    }
+    if (isNetUrlAllowed(details.url, domains)) {
+      callback({ cancel: false });
+      return;
+    }
+    input.onBlockedRequest?.({ pluginId: input.pluginId, url: details.url });
+    callback({ cancel: true });
+  });
+  // A panel is a document, not a device. Nothing in this list is reachable
+  // over the bridge either, so denying wholesale costs the plugin nothing.
+  ses.setPermissionRequestHandler((_contents, _permission, callback) => {
+    callback(false);
+  });
+  ses.setPermissionCheckHandler(() => false);
+}
+
+/** Persisted session partition shared by a plugin's panel window and views. */
+export function pluginSessionPartition(pluginId: string): string {
+  return `persist:pi-plugin-${pluginId.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+}
+
+/**
  * Hosts isolated plugin panel windows.
  * Each plugin panel gets a dedicated session partition and no Node integration.
  */
@@ -60,11 +111,23 @@ export class PluginPanelHost {
   private bridge: BridgeHandler;
   private onBlockedRequest?: PluginPanelBlockedRequest;
   private handlerReady = false;
+  /**
+   * Other owners of plugin web contents that may use the panel bridge — the
+   * docked work-panel views. Kept separate from `windows` so window controls
+   * stay window-only: a docked view must not be able to close the same
+   * plugin's detached panel window.
+   */
+  private senderResolvers: Array<(senderId: number) => string | null> = [];
 
   constructor(bridge: BridgeHandler, onBlockedRequest?: PluginPanelBlockedRequest) {
     this.bridge = bridge;
     this.onBlockedRequest = onBlockedRequest;
     this.ensureHandlers();
+  }
+
+  /** Lets another host serve `pluginBridge` calls from its own web contents. */
+  addSenderResolver(resolve: (senderId: number) => string | null): void {
+    this.senderResolvers.push(resolve);
   }
 
   private ensureHandlers(): void {
@@ -128,12 +191,24 @@ export class PluginPanelHost {
     for (const [pluginId, win] of this.windows) {
       if (!win.isDestroyed() && win.webContents.id === senderId) return pluginId;
     }
+    for (const resolve of this.senderResolvers) {
+      const pluginId = resolve(senderId);
+      if (pluginId) return pluginId;
+    }
     return null;
   }
 
+  /**
+   * The panel *window* a sender owns. Deliberately not routed through
+   * `pluginIdForSender`: that also resolves docked views, and a docked view
+   * asking for a window control must not reach the same plugin's separate
+   * panel window.
+   */
   private windowForSender(senderId: number): BrowserWindow | null {
-    const pluginId = this.pluginIdForSender(senderId);
-    return pluginId ? (this.windows.get(pluginId) ?? null) : null;
+    for (const win of this.windows.values()) {
+      if (!win.isDestroyed() && win.webContents.id === senderId) return win;
+    }
+    return null;
   }
 
   private applyWindowControl(
@@ -158,41 +233,18 @@ export class PluginPanelHost {
 
   /**
    * Confine everything the panel's web contents can reach to the plugin's
-   * declared domains. Registering again on the same persisted partition simply
-   * replaces the previous handlers, so re-opening a panel re-reads the current
-   * allowlist rather than stacking filters.
+   * declared domains. See `applyPluginEgressPolicy`, which the docked work-panel
+   * view host shares.
    */
   private applyEgressPolicy(
     ses: Electron.Session,
     request: PluginPanelOpenRequest,
   ): void {
-    const domains = request.netDomains ?? [];
-    ses.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, callback) => {
-      let scheme = "";
-      try {
-        scheme = new URL(details.url).protocol;
-      } catch {
-        // An unparseable URL cannot be matched against the allowlist; drop it.
-        callback({ cancel: true });
-        return;
-      }
-      if (PANEL_LOCAL_SCHEMES.has(scheme)) {
-        callback({ cancel: false });
-        return;
-      }
-      if (isNetUrlAllowed(details.url, domains)) {
-        callback({ cancel: false });
-        return;
-      }
-      this.onBlockedRequest?.({ pluginId: request.pluginId, url: details.url });
-      callback({ cancel: true });
+    applyPluginEgressPolicy(ses, {
+      pluginId: request.pluginId,
+      netDomains: request.netDomains,
+      onBlockedRequest: this.onBlockedRequest,
     });
-    // A panel is a document, not a device. Nothing in this list is reachable
-    // over the bridge either, so denying wholesale costs the plugin nothing.
-    ses.setPermissionRequestHandler((_contents, _permission, callback) => {
-      callback(false);
-    });
-    ses.setPermissionCheckHandler(() => false);
   }
 
   async open(request: PluginPanelOpenRequest): Promise<void> {
@@ -204,7 +256,7 @@ export class PluginPanelHost {
       return;
     }
 
-    const partition = `persist:pi-plugin-${request.pluginId.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const partition = pluginSessionPartition(request.pluginId);
     const ses = session.fromPartition(partition, { cache: true });
     this.applyEgressPolicy(ses, request);
 

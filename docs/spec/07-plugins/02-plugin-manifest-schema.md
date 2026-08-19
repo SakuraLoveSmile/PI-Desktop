@@ -71,6 +71,7 @@ type PluginContributes = {
  mcpServers?: PluginMcpServerContrib[];
  services?: PluginServiceContrib[];
  bus?: PluginBusContrib;
+ views?: PluginViewContrib[];
 };
 
 type PluginCommandContrib = {
@@ -103,6 +104,14 @@ type PluginSettingContrib = {
  /** Fixed to plugin for now; global shortcut registration is not supported. */
  scope?: "plugin";
  secret?: boolean;
+};
+
+type PluginViewContrib = {
+ id: string; // ^[a-zA-Z][a-zA-Z0-9_-]{0,63}$, unique within the plugin
+ title: string | { en: string; "zh-CN": string };
+ icon?: string; // token from the host icon set; unknown tokens draw a letter tile
+ entry: string; // relative path to the view's HTML entry
+ order?: number; // ascending sort key in the plugin-views menu group, default 0
 };
 
 type PluginThemeContrib = {
@@ -149,6 +158,7 @@ type PluginBusContrib = {
 ```ts
 type PluginPermission =
  | "ui.panel"
+ | "ui.view"
  | "ui.theme"
  | "clipboard.read"
  | "clipboard.write"
@@ -260,9 +270,9 @@ MVP may implement only:
 3. Whether a manifest that declares `ui.panel` needs the `ui.panel` permission implicitly (auto-filled) or by explicit declaration is an **open question** (tracked in [08-meta/open-questions.md](../08-meta/open-questions.md))
 4. If `agentTools` are present, `agent.tool.register` must be declared
 5. Path fields must not use absolute paths or `..`
-6. `main` / `ui.panel` / skills paths must exist
+6. `main` / `ui.panel` / skills / `views[].entry` paths must exist
 7. tool `name` allows only `[a-zA-Z][a-zA-Z0-9_]*`
-8. Contribution ids (`themes`, `mcpServers`, `services`) must match
+8. Contribution ids (`themes`, `mcpServers`, `services`, `views`) must match
    `[a-zA-Z][a-zA-Z0-9_-]{0,63}` and be unique within their own list
 9. `themes[].path` must exist and end in `.css`; `themes[].base` may only be
    `light` or `dark`
@@ -273,7 +283,8 @@ MVP may implement only:
 11. `bus.publish` entries must be concrete topics and `bus.subscribe` entries
    valid patterns (§5.1)
 12. A contribution that needs a permission fails validation when the permission
-   is missing: `themes` → `ui.theme`, stdio servers → `mcp.server.local`, remote
+   is missing: `themes` → `ui.theme`, `views` → `ui.view`, stdio servers →
+   `mcp.server.local`, remote
    servers → `mcp.server.remote`, `services` → `background.service`,
    `bus.publish` → `bus.publish`, `bus.subscribe` → `bus.subscribe`.
    `skills` is the exception — it predates the permission gate, so a manifest
@@ -289,6 +300,10 @@ MVP may implement only:
     on `delete` only, and `root` only on `workspace` / `userSelected`
 15. `net.domains` entries must be bare hostnames, optionally prefixed `*.`; a
     bare `*` is refused
+16. `views[].title` is required and, when localized, must carry both `en` and
+    `zh-CN`. `views[].icon` is **not** validated against the token list: an
+    unknown token degrades to a letter tile, so refusing one would break a
+    plugin over a cosmetic detail. The packaging check warns about it instead
 
 ## 8. Example: minimal plugin
 

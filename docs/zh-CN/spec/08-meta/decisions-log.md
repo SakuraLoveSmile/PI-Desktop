@@ -1896,3 +1896,30 @@ D193 和 D194。
 - 决策 D242 修订 D231 / ADR 0089。host-core 的外部路径门禁和 containment 检查不变；
   修复移除了意外的内置 scope 覆盖，而没有放宽安全边界。参见 ADR 0100、
   `03-runtime/02-agent-runtime.md` §5f/§5f.1 和 E2E-142。
+
+## 2026-08-19 — 工作面板成为插件扩展点
+
+- 决策 D244。插件通过 `contributes.views`（id、纯文本或本地化标题、图标 token、
+  HTML 入口、排序）声明工作面板表面，由新的低风险权限 `ui.view` 把关。
+  `ui.view` 与 `ui.panel` 相互独立，因此插件可以只提供停靠视图、只提供独立窗口，
+  或两者兼有。
+- 视图渲染为主进程持有的 `WebContentsView`，按渲染进程测量的矩形定位 —— 这正是
+  预览浏览器自 D100 起使用的机制 —— 并完整复用插件已有的隔离：同一套沙箱
+  preload、与该插件面板窗口相同的 `persist:pi-plugin-<id>` 分区，以及同一份
+  `net.domains` 出口过滤。出口策略与分区名提取为共享函数，使两种放置方式无法
+  漂移。`<iframe>` 方案被否决，因为 Electron 无法为 iframe 单独分配会话分区，
+  那会让停靠视图的隔离严格弱于它所替代的独立窗口。
+- 图标是宿主拥有的封闭 token 列表，而非插件提供的标记：图标绘制在宿主 chrome
+  内，插件 SVG 会成为注入面，并让插件得以伪装成宿主。未知 token 降级为字母瓷砖，
+  而不是让校验失败。
+- 视图列表按激活范围过滤，这与贡献主题（`pluginThemes`，刻意不过滤，因为所选主题
+  是全局唯一设置）不同。视图属于项目内的工作，因此按项目范围限定的插件不得在别处
+  提供它。打开时会重新校验权限、范围与入口是否存在；渲染进程从不是权威。
+- 决策 D245。审阅、终端与文件迁出宿主，作为随应用打包的官方插件走同一条
+  `contributes.views` 通道，只保留浏览器一个内置工具。这为插件 API 引入了第一方
+  消费者，使 API 的缺口变成已发布功能的缺陷。它需要新的 `pi.review.*` 与
+  `pi.terminal.*` API；`terminal.pty` 被划为 critical，因为 PTY 等同于以用户身份
+  任意执行，这一代价是有意承担的，而不是用第一方私有特权绕开。
+- 参见 ADR 0103、ADR 0104、`07-plugins/02-plugin-manifest-schema.md` §4/§5/§7、
+  `07-plugins/03-plugin-api.md` §6、`07-plugins/13-plugin-permissions-matrix.md`
+  §2/§3、`04-ux/08-component-spec.md` §5 与 E2E-152。

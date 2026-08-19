@@ -2024,3 +2024,38 @@ D193, and D194.
   `03-runtime/01-ipc-protocol.md` §5.1/§13c,
   `03-runtime/04-data-storage.md`, `04-ux/08-component-spec.md` §11.7–11.8,
   and E2E-102c–102e.
+
+## 2026-08-19 — The work panel becomes a plugin extension point
+
+- Decision D244. A plugin declares work panel surfaces with `contributes.views`
+  (id, plain or localized title, icon token, HTML entry, order), gated by the
+  new low-risk `ui.view` permission. `ui.view` and `ui.panel` are independent,
+  so a plugin may ship docked views, a detached window, or both.
+- A view renders as a main-process `WebContentsView` positioned from a
+  renderer-measured rect — the mechanism the preview browser has used since
+  D100 — and reuses the plugin's existing isolation wholesale: the same
+  sandboxed preload, the same `persist:pi-plugin-<id>` partition as that
+  plugin's panel window, and the same `net.domains` egress filter. The egress
+  policy and partition name are shared functions so the two placements cannot
+  drift apart. An `<iframe>` was rejected because Electron cannot give one its
+  own partition, which would make a docked view strictly less isolated than the
+  detached window it replaces.
+- Icons are tokens from a host-owned closed list, never plugin markup: the icon
+  is drawn inside host chrome, so SVG there would be an injection surface and
+  would let a plugin impersonate the host. An unknown token degrades to a
+  lettered tile rather than failing validation.
+- The view list is filtered by activation scope, unlike contributed themes
+  (D-themes/`pluginThemes`), which stay unfiltered because the selected theme is
+  one global app setting. A view is scoped work, so a project-scoped plugin must
+  not offer it elsewhere. Permission, scope, and entry existence are re-checked
+  on open; the renderer is never the authority.
+- Decision D245. Review, Terminal, and Files move out of the host and ship as
+  bundled first-party plugins on that same `contributes.views` channel, leaving
+  Browser as the only built-in tool. This gives the plugin API a first-party
+  consumer, so a gap in it becomes a shipped-feature bug. It requires new
+  `pi.review.*` and `pi.terminal.*` APIs; `terminal.pty` is classified critical
+  because a PTY is arbitrary execution as the user, and it is accepted
+  deliberately rather than sidestepped with private first-party privileges.
+- See ADR 0103, ADR 0104, `07-plugins/02-plugin-manifest-schema.md` §4/§5/§7,
+  `07-plugins/03-plugin-api.md` §6, `07-plugins/13-plugin-permissions-matrix.md`
+  §2/§3, `04-ux/08-component-spec.md` §5, and E2E-152.

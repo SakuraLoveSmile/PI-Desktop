@@ -398,6 +398,15 @@ function AppShell() {
     return api.onPluginChanged(() => void useAppStore.getState().refreshPlugins());
   }, [ready]);
 
+  // Work panel views are filtered by activation scope, so opening a different
+  // project changes the list as much as installing a plugin does.
+  useEffect(() => {
+    if (!ready) return;
+    const refresh = () => void useAppStore.getState().refreshPluginViews();
+    refresh();
+    return api.onPluginChanged(refresh);
+  }, [ready, projectPath]);
+
   useEffect(() => {
     const preference = settings?.theme ?? "system";
     const pluginTheme = preference.startsWith("plugin:")
@@ -1616,7 +1625,7 @@ function AppShell() {
 
           {(presentedWorkPanelOpen || workPanelExiting) && (
             <WorkPanel
-              browserBlocked={searchOpen}
+              panelBlocked={searchOpen}
               exiting={workPanelExiting}
               onExitAnimationEnd={() =>
                 finishWorkPanelExit(workPanelExitGeneration.current)

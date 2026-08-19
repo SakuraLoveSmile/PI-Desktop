@@ -879,6 +879,7 @@ export const en = {
     collapse: "Hide work panel",
     resize: "Resize work panel",
     tools: "Tools",
+    pluginViews: "Plugin views",
     openItems: "Open resources",
     closeTab: "Close {{name}}",
     tabs: {
@@ -886,6 +887,10 @@ export const en = {
       terminal: "Terminal",
       browser: "Browser",
       file: "Files",
+      plugin: "Plugin view",
+    },
+    pluginView: {
+      failed: "This view could not be loaded. Reload the plugin and try again.",
     },
     empty: {
       title: "No resource open",
@@ -1104,6 +1109,7 @@ export const en = {
     contributeGuide: "How to contribute",
     capabilities: {
       panel: "Panel",
+      views: "Work panel views",
       commands: "Commands",
       tools: "Agent tools",
       skills: "Skills",

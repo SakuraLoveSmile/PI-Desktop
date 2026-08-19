@@ -13,6 +13,7 @@ A plugin can contribute one or more of these capabilities:
 |---|---|---|
 | Command | An explicit action in global search | `contributes.commands`, `pi.commands.register` |
 | Panel | A small isolated HTML interface | `ui.panel`, `ui.panel` permission, `window.pluginBridge` |
+| Work panel view | An interface docked in the app's right work panel | `contributes.views`, `ui.view` permission, `window.pluginBridge` |
 | Agent tool | A function the Agent can call | `contributes.agentTools`, `pi.agent.registerTool` |
 | Skill | Instructions loaded by the Agent on demand | `contributes.skills`, `agent.prompt.inject` permission |
 | Theme | Design-token overrides | `contributes.themes`, `ui.theme` permission |
@@ -504,7 +505,63 @@ Override PI-Desktop design tokens in that CSS. The host sanitizes contributed
 CSS, refuses imports and non-data URLs, caps each file at 256 KiB, and allows up
 to eight themes per plugin. The user selects the theme in Settings.
 
-### 6.8 MCP server
+### 6.8 Work panel view
+
+A view is an interface docked in the app's right work panel, next to Review,
+Terminal, Browser, and Files. It is the same isolated page as `ui.panel` — you
+can reuse the same HTML — but it is shown inside the main window instead of a
+separate one, which suits anything the user consults while reading the
+conversation: a change list, a file tree, an issue queue.
+
+```json
+{
+  "contributes": {
+    "views": [
+      {
+        "id": "changes",
+        "title": { "en": "Changes", "zh-CN": "改动" },
+        "icon": "diff",
+        "entry": "views/changes.html",
+        "order": 10
+      }
+    ]
+  },
+  "permissions": ["ui.view"]
+}
+```
+
+Declare as many as the plugin needs; each becomes its own row in the panel's
+header menu. `title` may be a plain string or an `{ en, "zh-CN" }` object.
+`order` sorts the rows and defaults to declaration order.
+
+`icon` is a token from a fixed list the host draws from its own icon set —
+`bell`, `book`, `bot`, `branch`, `browser`, `chat`, `clock`, `diff`, `files`,
+`folder`, `image`, `key`, `link`, `list-checks`, `palette`, `plug`,
+`pull-request`, `search`, `server`, `shield`, `sparkles`, `target`, `terminal`,
+`workflow`, `wrench`. A plugin cannot supply its own SVG, because the icon is
+drawn inside host chrome. An unknown token is not an error: it renders as a
+lettered tile, and `pi-plugin check` warns about it.
+
+Inside the page, `window.pluginBridge` works exactly as in a panel window. The
+one difference is the chrome: a docked view has no window controls and no drag
+band, so read `--pi-plugin-titlebar-height` instead of hard-coding `46px` and
+the same file lays out correctly in both placements.
+
+```css
+body {
+  /* 0px docked, 46px in a panel window. */
+  padding-top: calc(var(--pi-plugin-titlebar-height, 0px) + 12px);
+}
+```
+
+A view is confined the same way a panel window is: sandboxed page, no Node, the
+plugin's own persisted session partition, and network limited to
+`manifest.net.domains` (§6.6). It is also filtered by activation scope — a
+plugin restricted to certain projects does not offer its views in others.
+
+`examples/plugins/hello` ships a working view at `views/greetings.html`.
+
+### 6.9 MCP server
 
 MCP servers are declarative. A local server requires `mcp.server.local`; a
 remote server requires `mcp.server.remote`:
@@ -543,7 +600,7 @@ loopback HTTP. Setting references read only this plugin's settings—the host
 environment and provider secrets are never forwarded. MCP tools follow the
 same Agent-only policy and namespacing as hand-written plugin tools.
 
-### 6.9 Resident service and message bus
+### 6.10 Resident service and message bus
 
 Declare service ids and allowed topics:
 
@@ -596,7 +653,7 @@ Undeclared or ungranted API calls fail with `PERMISSION_DENIED`.
 
 | Risk | Permissions |
 |---|---|
-| Low | `ui.panel`, `ui.theme`, `notify` |
+| Low | `ui.panel`, `ui.view`, `ui.theme`, `notify` |
 | Medium | `clipboard.read`, `clipboard.write`, `fs.read`, `shell.openExternal`, `background.service`, `bus.publish`, `bus.subscribe` |
 | High | `fs.write`, `fs.delete`, `agent.tool.register`, `agent.prompt.inject`, `net.fetch`, `mcp.server.local`, `mcp.server.remote` |
 
@@ -725,6 +782,8 @@ for roadmap details.
 | `manifest.json is missing` | Wrong directory selected | Select the directory whose root contains `manifest.json` |
 | `main entry missing` | `main` points to source that was not built | Compile/bundle first or correct the relative path |
 | Panel does not open | Missing file, `ui.panel`, or permission | Declare the panel path and `ui.panel`; reload for a new grant |
+| View is missing from the work panel menu | Missing `ui.view`, missing entry file, or the plugin's activation scope excludes the open project | Declare `ui.view`, check `views[].entry` exists, and set the scope to Global or to this project |
+| View shows a letter tile instead of an icon | Unknown `views[].icon` token | Use a token from the supported list; `pi-plugin check` warns about unknown ones |
 | `pluginBridge` is unavailable | HTML opened in a normal browser | Test bridge calls inside the PI-Desktop panel |
 | Tool never appears | Missing contribution, registration, or grant | Align `agentTools`, `registerTool`, and `agent.tool.register`; use Agent mode |
 | Skill never applies | Missing permission or weak metadata | Add `agent.prompt.inject` and specific `name`/`description` front matter |

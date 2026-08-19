@@ -570,7 +570,8 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 
 Docked right work column for inspecting and steering the agent's workspace:
 Review (working-tree diff), Terminal (interactive PTY), Browser (embedded
-preview), and Files (workspace browser). Codex-parity surface.
+preview), and Files (workspace browser), plus any views installed plugins
+contribute (ADR 0103). Codex-parity surface.
 
 ### 5.2 Anatomy
 
@@ -584,6 +585,10 @@ preview), and Files (workspace browser). Codex-parity surface.
 |   ◎ Browser                 ¦         |
 |   ▤ Files                   ¦         |
 |  ------------------------   ¦         |
+| Plugin views                ¦         |
+|   ⑂ GitLens                 ¦         |
+|   ▤ File Manager         [×]¦         |
+|  ------------------------   ¦         |
 | Open items                  ¦         |
 |   ▤ App.tsx              [×]¦         |
 +---------------------------------------+
@@ -592,14 +597,21 @@ preview), and Files (workspace browser). Codex-parity surface.
 |  Terminal: xterm host                 |
 |  Browser: URL bar + preview           |
 |  Files: tree + file viewer            |
+|  Plugin view: the plugin's own page   |
 |  no resource: empty state + tool list |
 +---------------------------------------+
  ▌ active row edge marker   • open, inactive
 ^ 10px transparent resize hit area on the left edge
 ```
 
+The plugin-views group appears only when at least one loaded plugin
+contributes a view that is in scope (ADR 0103). Its rows are structurally
+identical to the tool rows — edge marker, open dot, reserved close slot — so a
+plugin surface does not read as second-class beside a built-in one. A view
+whose `icon` token this build does not know renders a lettered tile instead.
+
 With no resource the body is an empty state — tiled icon, title, one line of
-copy — followed by the same four tools the header menu lists, as plain rows:
+copy — followed by the same entries the header menu lists, as plain rows:
 
 ```text
 +---------------------------------------+
@@ -618,10 +630,11 @@ copy — followed by the same four tools the header menu lists, as plain rows:
 
 - Panel body uses quiet inset paper (`#fafafa`); the 46px header band and tool
   chrome (review toolbar, browser chrome, file viewer header) stay white
-- The header exposes one unified context trigger. Its menu lists the four tools
-  (Review, Terminal, Browser, Files) in a fixed order first — each row showing
-  its own open state and, once open, its own close control — and, after a
-  divider, only the further resources the transcript opened. No entry appears
+- The header exposes one unified context trigger. Its menu lists the built-in
+  tools (Review, Terminal, Browser, Files) in a fixed order first — each row
+  showing its own open state and, once open, its own close control — then, after
+  a divider, the plugin-contributed views in declared order, and after a second
+  divider only the further resources the transcript opened. No entry appears
   twice. Rows use a neutral fill with a straight 2px left edge marker for the
   active row, never color alone; the trailing close slot is always reserved so
   labels and open dots never shift between rows. The menu fades in over ≤4px with
@@ -656,6 +669,8 @@ copy — followed by the same four tools the header menu lists, as plain rows:
 | No workspace | Each tab renders its own "open a project" empty state |
 | Open with no resource | `Cmd/Ctrl + J` reveals the panel without creating a tab, so the body renders the no-resource empty state: title, one line of copy, and the four tools as entry rows. Activating a row is equivalent to the same tool in the header menu — it creates or selects that singleton tab (D224). The body is not a `role="tabpanel"` here because no tab labels it. |
 | Constrained work area | The panel stays at its committed width; MainChat reflows to absorb it and may fall below its 360px target on small windows (ADR 0033) |
+| Plugin view active | The body hosts the plugin's own isolated page as a native `WebContentsView`, positioned from the measured surface rect. It is hidden whenever the tab is inactive, the panel is animating or being resized, or a blocking overlay is open — the same rule the Browser preview follows, since both composite above renderer content. A view whose plugin is disabled, uninstalled, reloaded, or crashed is destroyed; the tab stays and re-opens the page on the next lifecycle event (ADR 0103) |
+| Plugin out of scope | A view contributed by a plugin that is not active in the current project disappears from the menu when the project changes. Unlike contributed themes, which are one global setting and stay unfiltered, a view is scoped work |
 
 ### 5.4 Interactions
 

@@ -1,4 +1,9 @@
-export type WorkPanelTabKind = "review" | "terminal" | "browser" | "file";
+export type WorkPanelTabKind =
+  | "review"
+  | "terminal"
+  | "browser"
+  | "file"
+  | "plugin";
 
 export type WorkPanelTab = {
   id: string;
@@ -49,9 +54,47 @@ export function switchWorkPanelContextState(
 }
 
 export function toolWorkPanelTab(
-  kind: Exclude<WorkPanelTabKind, "file">,
+  kind: Exclude<WorkPanelTabKind, "file" | "plugin">,
 ): WorkPanelTab {
   return { id: kind, kind };
+}
+
+/**
+ * A plugin-contributed view (ADR 0103).
+ *
+ * Keyed by `<pluginId>/<viewId>` so two plugins may ship a view with the same
+ * local id, and so re-opening the same view reuses its tab instead of stacking
+ * duplicates. Like the tool singletons, a view is a *tool* rather than a
+ * transcript resource — see `isToolWorkPanelTab`.
+ */
+export function pluginWorkPanelTab(pluginId: string, viewId: string): WorkPanelTab {
+  const resource = `${pluginId}/${viewId}`;
+  return { id: `plugin:${resource}`, kind: "plugin", resource };
+}
+
+export function parsePluginViewRef(
+  resource: string | undefined,
+): { pluginId: string; viewId: string } | null {
+  if (!resource) return null;
+  // A plugin id may itself contain dots but never a slash, and a view id is
+  // slash-free by manifest validation, so the first separator splits cleanly.
+  const separator = resource.indexOf("/");
+  if (separator <= 0 || separator === resource.length - 1) return null;
+  return {
+    pluginId: resource.slice(0, separator),
+    viewId: resource.slice(separator + 1),
+  };
+}
+
+/**
+ * Tools are the panel's stable entry points; everything else is a resource the
+ * transcript opened. Tool singletons are keyed by kind; a plugin view is also a
+ * tool, so it belongs in the tools half of the menu rather than under "open
+ * resources" — its id carries a resource only because that is how it is
+ * addressed.
+ */
+export function isToolWorkPanelTab(tab: WorkPanelTab): boolean {
+  return tab.id === tab.kind || tab.kind === "plugin";
 }
 
 export function normalizeWorkPanelFilePath(path: string): string {

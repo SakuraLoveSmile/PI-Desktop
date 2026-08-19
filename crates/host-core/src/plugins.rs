@@ -2417,6 +2417,50 @@ fn validate_contributions(root: &Path, manifest: &PluginManifest) -> Result<()> 
         }
     }
 
+    if let Some(views) = map.get("views") {
+        let entries = array_of(views, "contributes.views")?;
+        if !entries.is_empty() {
+            require_permission(manifest, "ui.view", "views")?;
+        }
+        let mut seen: Vec<&str> = Vec::new();
+        for entry in entries {
+            let obj = entry.as_object().ok_or_else(|| {
+                anyhow!("PLUGIN_INVALID: contributes.views entry must be an object")
+            })?;
+            let id = obj
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|id| is_contrib_id(id))
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: view id is missing or invalid"))?;
+            if seen.contains(&id) {
+                bail!("PLUGIN_INVALID: duplicate view id {id}");
+            }
+            seen.push(id);
+            // A title may be a plain string or a { en, "zh-CN" } object; the
+            // per-locale completeness check belongs to the SDK validator, which
+            // the packaging tool runs. Here we only require something rendered.
+            let has_title = match obj.get("title") {
+                Some(Value::String(s)) => !s.trim().is_empty(),
+                Some(Value::Object(map)) => map
+                    .values()
+                    .any(|v| v.as_str().map(|s| !s.trim().is_empty()).unwrap_or(false)),
+                _ => false,
+            };
+            if !has_title {
+                bail!("PLUGIN_INVALID: view {id} requires a title");
+            }
+            let entry_path = obj
+                .get("entry")
+                .and_then(Value::as_str)
+                .filter(|entry| !entry.trim().is_empty())
+                .ok_or_else(|| anyhow!("PLUGIN_INVALID: view {id} requires an entry"))?;
+            let resolved = safe_join(root, entry_path)?;
+            if !resolved.exists() {
+                bail!("PLUGIN_INVALID: view entry missing: {entry_path}");
+            }
+        }
+    }
+
     if let Some(servers) = map.get("mcpServers") {
         let entries = array_of(servers, "contributes.mcpServers")?;
         let mut seen: Vec<&str> = Vec::new();
@@ -2660,6 +2704,9 @@ fn derive_capabilities(manifest: &PluginManifest) -> Vec<String> {
     };
     if has("commands") {
         out.push("commands".into());
+    }
+    if has("views") {
+        out.push("views".into());
     }
     if has("agentTools") {
         out.push("tools".into());
@@ -3614,6 +3661,7 @@ mod tests {
                 "ui": { "panel": "renderer/index.html" },
                 "contributes": {
                     "commands": [{ "id": "a", "title": "A" }],
+                    "views": [{ "id": "changes", "title": "Changes", "entry": "views/changes.html" }],
                     "settings": [{
                         "key": "openShortcut",
                         "title": "Open shortcut",
@@ -3634,6 +3682,7 @@ mod tests {
                 },
                 "permissions": [
                     "ui.panel",
+                    "ui.view",
                     "ui.theme",
                     "agent.tool.register",
                     "mcp.server.local",
@@ -3645,6 +3694,7 @@ mod tests {
             }),
             &[
                 ("renderer/index.html", "<html></html>"),
+                ("views/changes.html", "<html></html>"),
                 ("skills/a.md", "---\nname: A\n---\nbody"),
                 ("skills/b.md", "body"),
                 ("themes/m.css", ":root { --ds-bg: #000; }"),
@@ -3653,7 +3703,7 @@ mod tests {
         let manifest = PluginManager::read_manifest(&root).unwrap();
         assert_eq!(
             derive_capabilities(&manifest),
-            vec!["panel", "commands", "tools", "skills", "themes", "mcp", "services", "bus"]
+            vec!["panel", "commands", "views", "tools", "skills", "themes", "mcp", "services", "bus"]
         );
 
         let data = tempdir().unwrap();
@@ -3730,6 +3780,61 @@ mod tests {
             &[("themes/a.json", "{}")],
         );
         assert!(read_manifest_err(&wrong_ext).contains(".css file"));
+    }
+
+    #[test]
+    fn view_contributions_require_permission_and_an_existing_entry() {
+        let dir = tempdir().unwrap();
+        let view = |extra: Value| json!({ "views": [extra] });
+
+        let no_perm = dir.path().join("no-perm");
+        write_plugin(
+            &no_perm,
+            capability_manifest(
+                view(json!({ "id": "a", "title": "A", "entry": "views/a.html" })),
+                json!([]),
+            ),
+            &[("views/a.html", "<html></html>")],
+        );
+        assert!(read_manifest_err(&no_perm).contains("ui.view permission"));
+
+        let missing_entry = dir.path().join("missing-entry");
+        write_plugin(
+            &missing_entry,
+            capability_manifest(
+                view(json!({ "id": "a", "title": "A", "entry": "views/a.html" })),
+                json!(["ui.view"]),
+            ),
+            &[],
+        );
+        assert!(read_manifest_err(&missing_entry).contains("view entry missing"));
+
+        let no_title = dir.path().join("no-title");
+        write_plugin(
+            &no_title,
+            capability_manifest(
+                view(json!({ "id": "a", "title": "  ", "entry": "views/a.html" })),
+                json!(["ui.view"]),
+            ),
+            &[("views/a.html", "<html></html>")],
+        );
+        assert!(read_manifest_err(&no_title).contains("requires a title"));
+
+        // A localized title is accepted, and the entry may not escape the root.
+        let escaping = dir.path().join("escaping");
+        write_plugin(
+            &escaping,
+            capability_manifest(
+                view(json!({
+                    "id": "a",
+                    "title": { "en": "A", "zh-CN": "甲" },
+                    "entry": "../outside.html"
+                })),
+                json!(["ui.view"]),
+            ),
+            &[],
+        );
+        assert!(read_manifest_err(&escaping).contains("traversal"));
     }
 
     #[test]

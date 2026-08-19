@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hello Panel</title>
+    <style>
+      /*
+       * A docked work panel view is the same isolated page as `ui.panel`, but
+       * it is composited inside the host window instead of a separate one, so
+       * it gets no window-control capsule and no 46px drag band. Read
+       * `--pi-plugin-titlebar-height` rather than hard-coding a value: the host
+       * publishes 0px here and 46px in a detached panel window, so one entry
+       * file lays out correctly in both placements.
+       */
+      body {
+        margin: 0;
+        padding: calc(var(--pi-plugin-titlebar-height, 0px) + 12px) 12px 12px;
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0b1020;
+        color: #e8eefc;
+      }
+      h2 {
+        margin: 0 0 4px;
+        font-size: 14px;
+      }
+      p {
+        margin: 0 0 12px;
+        color: #9fb0d4;
+      }
+      button {
+        border: 0;
+        border-radius: 8px;
+        padding: 7px 11px;
+        background: #4f7cff;
+        color: white;
+        cursor: pointer;
+        font: inherit;
+      }
+      #log {
+        margin-top: 12px;
+        border-radius: 8px;
+        padding: 8px;
+        background: #121a2f;
+        color: #9fb0d4;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Hello Panel</h2>
+    <p>A plugin-contributed view, docked in the work panel.</p>
+    <button id="ping">Toast from the view</button>
+    <div id="log">Ready.</div>
+    <script>
+      const log = document.getElementById("log");
+      // The bridge is identical in a docked view and a detached panel window.
+      document.getElementById("ping").addEventListener("click", async () => {
+        try {
+          await window.pluginBridge.invoke("ui.showToast", {
+            message: "Hello from a docked plugin view",
+          });
+          log.textContent = "Sent ui.showToast through the panel bridge.";
+        } catch (error) {
+          log.textContent = `Bridge call failed: ${error}`;
+        }
+      });
+    </script>
+  </body>
+</html>

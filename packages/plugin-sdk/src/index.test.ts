@@ -9,6 +9,7 @@ import {
   validateManifest,
   LEGACY_FS_PERMISSIONS,
   PLUGIN_PERMISSIONS,
+  PLUGIN_VIEW_ICONS,
 } from "./index.js";
 
 const base = { schemaVersion: 1, id: "demo.x", name: "X", version: "0.1.0", main: "main.js" };
@@ -118,6 +119,64 @@ describe("validateContributions", () => {
   });
 });
 
+describe("contributes.views", () => {
+  const view = { id: "changes", title: "Changes", entry: "views/changes.html" };
+
+  it("accepts plain and localized titles, icons, and order", () => {
+    expect(
+      validateContributions({
+        views: [
+          view,
+          {
+            id: "history",
+            title: { en: "History", "zh-CN": "历史" },
+            icon: "clock",
+            entry: "views/history.html",
+            order: 10,
+          },
+        ],
+      }),
+    ).toBeUndefined();
+  });
+
+  it("requires an id, a title, and an entry", () => {
+    expect(validateContributions({ views: [{ ...view, id: "1bad" }] })).toMatch(/views id/);
+    expect(validateContributions({ views: [{ ...view, title: undefined as never }] })).toMatch(
+      /requires a title/,
+    );
+    expect(validateContributions({ views: [{ ...view, title: "  " }] })).toMatch(
+      /requires a title/,
+    );
+    expect(validateContributions({ views: [{ ...view, entry: "" }] })).toMatch(
+      /requires an entry/,
+    );
+  });
+
+  it("requires both locales for a localized title", () => {
+    expect(
+      validateContributions({ views: [{ ...view, title: { en: "Changes" } as never }] }),
+    ).toMatch(/zh-CN is required/);
+  });
+
+  it("rejects duplicate ids and escaping entry paths", () => {
+    expect(validateContributions({ views: [view, view] })).toMatch(/duplicate view id/);
+    expect(
+      validateContributions({ views: [{ ...view, entry: "../outside.html" }] }),
+    ).toMatch(/\.\./);
+    expect(
+      validateContributions({ views: [{ ...view, entry: "/etc/passwd" }] }),
+    ).toMatch(/absolute path/);
+  });
+
+  it("accepts an unknown icon token, because it degrades to a letter tile", () => {
+    expect(
+      validateContributions({ views: [{ ...view, icon: "not-a-real-icon" }] }),
+    ).toBeUndefined();
+    expect(PLUGIN_VIEW_ICONS).toContain("diff");
+    expect(new Set(PLUGIN_VIEW_ICONS).size).toBe(PLUGIN_VIEW_ICONS.length);
+  });
+});
+
 describe("naming helpers", () => {
   it("keeps the forced plugin tool prefix", () => {
     expect(pluginToolName("demo.hello", "echo-text")).toBe("plugin_demo_hello_echo_text");
@@ -136,6 +195,7 @@ describe("PLUGIN_PERMISSIONS", () => {
   it("declares the capability permissions and stays unique", () => {
     for (const permission of [
       "ui.theme",
+      "ui.view",
       "mcp.server.local",
       "mcp.server.remote",
       "background.service",

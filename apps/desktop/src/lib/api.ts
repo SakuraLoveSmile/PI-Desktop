@@ -36,6 +36,7 @@ import type {
   PluginSummary,
   PluginSettingDefinition,
   PluginServiceStatus,
+  PluginViewMeta,
   PluginTheme,
   MarketPluginSummary,
   MarketPluginDetail,
@@ -532,6 +533,24 @@ export const api = {
   dismissPluginLauncher: () => invoke(IPC.invoke.pluginLauncherDismiss),
   listPluginThemes: () => invoke<PluginTheme[]>(IPC.invoke.pluginThemes),
   listPluginServices: () => invoke<PluginServiceStatus[]>(IPC.invoke.pluginServices),
+  /**
+   * Work panel views, already filtered by permission, activation scope, and
+   * entry existence, with titles resolved for the active locale (ADR 0103).
+   */
+  listPluginViews: () => invoke<PluginViewMeta[]>(IPC.invoke.pluginViews),
+  /** Create or reuse the view's web contents. Does not show it. */
+  pluginViewOpen: (pluginId: string, viewId: string) =>
+    invoke(IPC.invoke.pluginViewOpen, { pluginId, viewId }),
+  pluginViewClose: (pluginId: string, viewId: string) =>
+    invoke(IPC.invoke.pluginViewClose, { pluginId, viewId }),
+  pluginViewSetBounds: (bounds: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }) => invoke(IPC.invoke.pluginViewSetBounds, bounds),
+  pluginViewSetVisible: (pluginId: string, viewId: string, visible: boolean) =>
+    invoke(IPC.invoke.pluginViewSetVisible, { pluginId, viewId, visible }),
   marketRefresh: (force = true) =>
     invoke<{
       providerId: string;

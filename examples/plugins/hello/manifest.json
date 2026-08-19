@@ -17,6 +17,18 @@
  }
  },
  "contributes": {
+ "views": [
+ {
+ "id": "greetings",
+ "title": {
+   "en": "Hello Panel",
+   "zh-CN": "你好面板"
+ },
+ "icon": "sparkles",
+ "entry": "views/greetings.html",
+ "order": 10
+ }
+ ],
  "commands": [
  {
  "id": "hello.open",
@@ -69,6 +81,7 @@
  },
  "permissions": [
  "ui.panel",
+ "ui.view",
  "ui.theme",
  "agent.tool.register",
  "agent.prompt.inject",

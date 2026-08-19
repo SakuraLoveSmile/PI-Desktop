@@ -892,6 +892,28 @@ export type PluginUiMeta = {
 };
 
 /**
+ * One plugin-contributed work panel view, resolved for the current window.
+ *
+ * The renderer never reads a manifest: the main process resolves the localized
+ * title against the active locale, filters by permission, activation scope, and
+ * entry existence, and hands over only what the panel menu has to draw. `icon`
+ * is a token from the SDK's closed list, not plugin markup.
+ */
+export type PluginViewMeta = {
+  pluginId: string;
+  /** Plugin-local view id from `contributes.views[].id`. */
+  viewId: string;
+  /** `<pluginId>/<viewId>` — the work panel tab's resource string. */
+  ref: string;
+  /** Already resolved against the host locale. */
+  title: string;
+  /** Owning plugin's display name, for tooltips and disambiguation. */
+  pluginName: string;
+  icon?: string;
+  order: number;
+};
+
+/**
  * Which files one file mode may touch, straight from `manifest.fs`. Declared
  * here rather than imported from the plugin SDK because this package sits under
  * it: the SDK owns the matching and the host owns the enforcement, while this is
@@ -920,6 +942,7 @@ export type PluginLocalizedString = {
 
 export type PluginCapability =
   | "panel"
+  | "views"
   | "commands"
   | "tools"
   | "skills"
