@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-02
-- Amended by: D225 (the panel is click-toggled, not hover-opened)
+- Amended by: D225 (click-toggled panel) and D244 (compact summary presentation)
 - Related: [D103](../spec/08-meta/decisions-log.md) ·
   [D183](../spec/08-meta/decisions-log.md) ·
   [D184](../spec/08-meta/decisions-log.md) ·

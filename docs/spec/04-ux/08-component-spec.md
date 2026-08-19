@@ -1082,30 +1082,24 @@ Single message render — either user (plaintext) or assistant (markdown streami
   under the answer. The inspector keeps a small remaining-capacity ring beside
   the `Context` label and percentage; low capacity changes the semantic color
   without making color the only signal. Clicking the trigger (or activating it
-  from the keyboard) toggles a
-  non-modal, scrollable panel with a clear remaining-token header, used/window
-  counts, a used-capacity meter, and compact turn/speed summary cells. Provider
-  and tool sections carry explicit reported/estimated source badges. The
-  provider section shows exact input/output/cache/reasoning usage and the
-  provider-reported cache hit rate (`cacheRead / (input + cacheRead)`) when
-  cache-read metadata is available; generation speed is a completed-turn value
-  in tokens per second and is not updated while a response is streaming. The
-  panel also lists each unique tool type from the
-  assistant turn in first-seen execution order, with its call count, aggregated
-  argument/result footprint, share bar, and cumulative duration. Provider
-  totals are exact; the context-window total uses the same `pi-ai` model
-  metadata as the agent sidecar, while unknown models fall back to the provider
-  catalog or the default window. Tool rows are explicitly marked as estimates
-  because providers do not report per-tool context allocation. The panel is
-  portaled to the document body as a fixed viewport overlay, flips
-  above or below the trigger, clamps to viewport margins, and repositions on
-  transcript scrolling or window resize so no transcript clipping ancestor can
-  hide it (D103, D184). When the active session has an installed context
-  checkpoint, the panel adds one muted line between the provider and tool
-  sections — how many times the session has compacted and the newest summary's
-  estimated token cost — and renders nothing there otherwise. The transcript
-  shows one row per compaction; this line adds what those rows cannot, next to
-  what the context is currently spent on (D203).
+  from the keyboard) toggles a non-modal panel with the remaining-token header,
+  used/window counts, and two unboxed turn/speed summary values. Model usage is
+  compressed into one inline summary row that retains exact input/output/cache/
+  reasoning values and the provider-reported cache hit rate when available.
+  Tool usage is compressed into one aggregate row showing tool types, calls,
+  and estimated tokens; per-tool rows, share bars, source badges, and the
+  explanatory estimate note are intentionally omitted from the default view.
+  Generation speed is a completed-turn value in tokens per second and is not
+  updated while a response is streaming. The context-window total uses the
+  same `pi-ai` model metadata as the agent sidecar, while unknown models fall
+  back to the provider catalog or the default window. The panel is portaled to
+  the document body as a fixed viewport overlay, flips above or below the
+  trigger, clamps to viewport margins, and repositions on transcript scrolling
+  or window resize so no transcript clipping ancestor can hide it (D103, D184,
+  D244). When the active session has an installed context checkpoint, the
+  panel adds one muted summary line for the compaction count and newest
+  summary's estimated token cost; the transcript still shows one row per
+  compaction (D203).
 - Gap: 12px vertical padding between consecutive message rows (denser than
   consumer chat, closer to WorkBuddy task transcript); assistant turns add a
   little extra bottom air so a completed answer separates from the next prompt
@@ -1146,8 +1140,8 @@ message its checkpoint covers.
 - Context inspector trigger is keyboard focusable, exposes a localized
   remaining percentage and token count, carries `aria-haspopup="dialog"`,
   `aria-expanded`, and an `aria-controls` relationship to the panel, and opens
-  the same breakdown on click or keyboard activation; Escape or a click outside
-  closes it and returns focus to the trigger
+  the same compact summary on click or keyboard activation; Escape or a click
+  outside closes it and returns focus to the trigger
 - Timestamps: `aria-label` with full time string, visual shows relative time
 
 ### 8.6 MVP constraints
@@ -1806,7 +1800,6 @@ Anatomy:
 │  ↑↓ select · Enter confirm · Esc close       │  ← hint bar (footer)
 └──────────────────────────────────────────────┘
 [ image.png × ] [ another-file.ts × ]           ← when references exist
-[ visual input status ]                         ← when an image is attached
 [ composer textarea                            ]
 ```
 
@@ -1867,11 +1860,8 @@ Anatomy:
   their tooltip and accessible name, and provide a focus-visible localized
   remove button that restores textarea focus. Duplicate leaf labels remain
   separate because identity and dispatch use the canonical path, not the name.
-- When an image chip is present, a compact `role="status"`/`aria-live="polite"`
-  row states whether the selected model accepts visual input. The row is
-  informational, uses icon plus text rather than color alone, and updates when
-  the model changes. Unknown/custom models use the explicit path-fallback
-  wording.
+  Image and file references use the same compact chip treatment; no separate
+  explanatory vision-status row is rendered.
 - Sent template invocations render in the transcript as a monospace command
   chip from the message's `command` field instead of the expanded body.
 - States: keyboard-active row uses the shared `kb-active` treatment; empty
@@ -2228,7 +2218,7 @@ surface, while model parameters remain owned by pi-ai.
 |---|---|
 | Empty | Defaults shows No default; empty panels expose their primary add actions |
 | Populated | Accounts and AI services list their rows; add/edit flows open modal dialogs |
-| Account editor | Name and default model are editable; model suggestions come from the authenticated account catalog when available |
+| Account editor | Name and default model are editable; model suggestions come from the authenticated account catalog when available, using the shared searchable combobox with aligned IDs/display names, keyboard selection, free-form IDs, and a fixed collision-aware suggestion layer that does not change dialog layout or get clipped by dialog overflow |
 | Default provider | Card gets subtle accent wash + default badge; Make default hidden |
 | Secret missing | Warning badge "No API key"; test may fail closed |
 | Busy row | Test/update/delete actions disabled for that card |

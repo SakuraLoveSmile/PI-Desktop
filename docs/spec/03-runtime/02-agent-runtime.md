@@ -68,10 +68,9 @@ interface AgentRuntime {
    the durable user message
 7. snapshot the effective shell ID and dialect for the turn
 8. start pi turn with the resolved session configuration and effective
-   thinking level; request setup receives one bounded pi-ai retry for transient
-   transport/provider failures, while a transient failure after streaming has
-   started receives one same-turn runtime retry before the turn is failed
-   (D127, D186)
+   thinking level; HTTP 429 setup and stream failures use the runtime-owned
+   silent five-retry budget, while other transient transport/provider failures
+   keep their existing bounded setup or same-turn recovery (D127, D186, D245)
 9. stream normalized answer and thinking events to UI
 10. on tool calls, delegate to Rust host bridge with the durable `sessionId`;
     host resolves the session-bound workspace root
@@ -87,30 +86,46 @@ not select a second model, planner service, permission implementation, or
 runtime. The same Agent changes its planning state and tool registry after a
 host-confirmed transition.
 
-### 5d. Bounded provider stream recovery and diagnostics (D186, ADR 0050)
+### 5d. Bounded provider recovery and diagnostics (D186, D245, ADR 0091)
 
-Provider request setup uses one pi-ai retry with an interruptible backoff
-capped at 8 seconds. This covers failures before a response is established;
-it does not make the whole agent turn an unbounded retry loop.
+Provider request setup and stream delivery are separate failure phases, but
+HTTP 429 handling is one logical-turn policy. pi-ai's nested adapter retry is
+disabled for this path so the runtime can share one budget across both phases.
 
-When a provider terminates or closes an incomplete stream after the assistant
-has started, the runtime classifies the event as retryable `STREAM_FAILED`.
-`NETWORK_ERROR`, `TIMEOUT`, and `PROVIDER_RATE_LIMITED` (a mid-stream HTTP 429)
-have the same bounded path when they occur during stream delivery. The runtime
-waits 750 ms with an abortable backoff, removes the failed assistant from the
-next model context, and calls `continue()` once. The existing assistant
-message id is reused, so the partial response is replaced in one visible
-bubble. The first attempt's `turn_end` and `agent_end` are suppressed; the
-retry emits the single terminal lifecycle. A second failure is terminal and
-emits the normal assistant error plus lifecycle `error` event.
-Authentication, model-selection, malformed-request, and context errors do not
-use this same-turn replay path.
+`PROVIDER_RATE_LIMITED` receives at most five retries after the initial
+attempt, for six provider attempts total. A setup 429 is retried inside the
+provider stream adapter. A mid-stream 429 removes the failed assistant from
+the next model context and calls `continue()` in the same turn. Both phases
+claim the same counter, so a setup 429 followed by a stream 429 cannot reset or
+multiply the budget. The main session and builtin subagents use the same
+controller and policy.
 
-Provider failures carry bounded diagnostics in `AppError.details` when
-available: `phase` (`request` or `stream`), `providerStatus`, `providerCode`,
-`providerWaitMs`, `streamMs`, and `retryAttempt`. Provider messages remain
-redacted and capped; credentials and unrestricted response bodies never enter
-the event or log.
+429 retries are silent: no intermediate assistant error, lifecycle `error`,
+`turn_end`, `agent_end`, or duplicate assistant bubble reaches the UI. The
+visible assistant message id is reused when a retry starts, replacing any
+partial content in one bubble. End events are emitted once by the final
+successful or exhausted attempt. An abort during the wait cancels the timer
+and prevents the next provider request.
+
+The delay follows the OpenCode-style order `retry-after-ms`, `retry-after`
+seconds, `retry-after` HTTP-date, then exponential backoff. The fallback starts
+at 2 seconds and grows exponentially with up to 25% positive jitter; every
+server or calculated value is capped at 30 seconds. The runtime captures the
+failed response status and headers from fetch because pi-ai's ordinary response
+callback only covers an established response.
+
+Other transient failures preserve their previous finite behavior: request setup
+gets one bounded retry, while `STREAM_FAILED`, `NETWORK_ERROR`, and `TIMEOUT`
+after streaming starts get one abortable same-turn replay. Authentication,
+model-selection, malformed-request, context, and other non-retryable errors do
+not enter either provider replay path.
+
+When the 429 budget is exhausted, the final assistant error and lifecycle
+`error` are emitted once. Provider failures carry bounded diagnostics in
+`AppError.details` when available: `phase` (`request` or `stream`),
+`providerStatus`, `providerCode`, `providerWaitMs`, `streamMs`, and
+`retryAttempt`. For a persistent 429, `retryAttempt` is `5`; credentials and
+unrestricted response bodies never enter the event or log.
 
 ### 5e. Silent-turn recovery
 

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { ProviderPublic } from "@pi-desktop/shared";
 import { Button, Field, Input } from "../ui";
 import { IconClose } from "../icons";
+import { ModelCombobox } from "./ModelCombobox";
 import { normalizeApiStyle } from "./provider-form";
 import { useProviderModels } from "./useProviderModels";
 
@@ -38,7 +39,6 @@ export function VendorAccountDialog({
     },
     provider,
   );
-  const modelListId = `vendor-account-models-${provider.id}`;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -98,28 +98,16 @@ export function VendorAccountDialog({
                   : undefined
             }
           >
-            <Input
+            <ModelCombobox
               value={form.modelId}
-              list={modelListId}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, modelId: event.target.value }))
-              }
-              className="font-mono text-sm-plus"
+              models={models.status !== "idle" ? models.models : []}
+              loading={models.status === "loading"}
+              loadingLabel={t("settings.modelsLoading")}
               placeholder={t("settings.searchOrEnterModel")}
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-              autoComplete="off"
+              onChange={(modelId) =>
+                setForm((current) => ({ ...current, modelId }))
+              }
             />
-            <datalist id={modelListId}>
-              {models.status !== "idle"
-                ? models.models.map((model) => (
-                    <option key={model.modelId} value={model.modelId}>
-                      {model.displayName}
-                    </option>
-                  ))
-                : null}
-            </datalist>
           </Field>
         </div>
 

@@ -351,7 +351,6 @@ function ContextUsageInspector({
       <div className="context-inspector-heading">
         <div className="context-inspector-heading-copy">
           <span className="context-inspector-eyebrow">
-            <span className="context-inspector-status-dot" aria-hidden="true" />
             {t("chat.usageContextLabel")}
           </span>
           <strong>
@@ -373,13 +372,9 @@ function ContextUsageInspector({
             window: formatTokenCount(contextWindow),
           })}
         </strong>
-      </div>
-      <div className="context-inspector-meter-caption">
-        <span>{t("chat.usageContextUsed")}</span>
-        <span>{context.usedPercent}%</span>
-      </div>
-      <div className="context-inspector-meter" aria-hidden="true">
-        <span style={{ width: `${context.usedPercent}%` }} />
+        <span className="context-inspector-window-percent">
+          {context.usedPercent}%
+        </span>
       </div>
       <div className="context-inspector-kpis">
         <div>
@@ -402,48 +397,49 @@ function ContextUsageInspector({
           </strong>
         </div>
       </div>
-      <div className="context-inspector-section">
-        <div className="context-inspector-section-heading">
-          <div className="context-inspector-section-title">
-            <strong>{t("chat.usageProviderUsage")}</strong>
-          </div>
-          <span className="context-inspector-source-badge exact">
-            {t("chat.usageExact")}
+      <div className="context-inspector-summary">
+        <div className="context-inspector-summary-row">
+          <strong>{t("chat.usageProviderUsage")}</strong>
+          <span className="context-inspector-summary-values">
+            <span>
+              {t("chat.usageInput")} {formatTokenCount(turnUsage.inputTokens)}
+            </span>
+            <span>
+              {t("chat.usageOutput")} {formatTokenCount(turnUsage.outputTokens)}
+            </span>
+            {turnUsage.cacheReadTokens !== undefined ? (
+              <span>
+                {t("chat.usageCacheRead")} {formatTokenCount(turnUsage.cacheReadTokens)}
+              </span>
+            ) : null}
+            {cacheRate !== undefined ? (
+              <span>
+                {t("chat.usageCacheRate")} {cacheRate}%
+              </span>
+            ) : null}
+            {turnUsage.cacheWriteTokens !== undefined ? (
+              <span>
+                {t("chat.usageCacheWrite")} {formatTokenCount(turnUsage.cacheWriteTokens)}
+              </span>
+            ) : null}
+            {turnUsage.reasoningTokens !== undefined ? (
+              <span>
+                {t("chat.usageReasoning")} {formatTokenCount(turnUsage.reasoningTokens)}
+              </span>
+            ) : null}
           </span>
         </div>
-        <div className="context-inspector-breakdown">
-          <div className="context-inspector-row">
-            <span>{t("chat.usageInput")}</span>
-            <strong>{formatTokenCount(turnUsage.inputTokens)}</strong>
-          </div>
-          <div className="context-inspector-row">
-            <span>{t("chat.usageOutput")}</span>
-            <strong>{formatTokenCount(turnUsage.outputTokens)}</strong>
-          </div>
-          {turnUsage.cacheReadTokens !== undefined ? (
-            <div className="context-inspector-row">
-              <span>{t("chat.usageCacheRead")}</span>
-              <strong>{formatTokenCount(turnUsage.cacheReadTokens)}</strong>
-            </div>
-          ) : null}
-          {cacheRate !== undefined ? (
-            <div className="context-inspector-row">
-              <span>{t("chat.usageCacheRate")}</span>
-              <strong>{cacheRate}%</strong>
-            </div>
-          ) : null}
-          {turnUsage.cacheWriteTokens !== undefined ? (
-            <div className="context-inspector-row">
-              <span>{t("chat.usageCacheWrite")}</span>
-              <strong>{formatTokenCount(turnUsage.cacheWriteTokens)}</strong>
-            </div>
-          ) : null}
-          {turnUsage.reasoningTokens !== undefined ? (
-            <div className="context-inspector-row">
-              <span>{t("chat.usageReasoning")}</span>
-              <strong>{formatTokenCount(turnUsage.reasoningTokens)}</strong>
-            </div>
-          ) : null}
+        <div className="context-inspector-summary-row">
+          <strong>{t("chat.usageTools")}</strong>
+          <span className="context-inspector-summary-values">
+            {toolRows.length > 0
+              ? t("chat.usageToolsSummary", {
+                  count: toolRows.length,
+                  calls: tools.length,
+                  tokens: formatTokenCount(toolTotal),
+                })
+              : t("chat.usageNoTools")}
+          </span>
         </div>
       </div>
       {compaction ? (
@@ -454,77 +450,6 @@ function ContextUsageInspector({
           <strong>~{formatTokenCount(compaction.summaryTokens)}</strong>
         </div>
       ) : null}
-      <div className="context-inspector-section context-inspector-tools">
-        <div className="context-inspector-section-heading">
-          <div className="context-inspector-section-title">
-            <strong>{t("chat.usageTools")}</strong>
-            <span className="context-inspector-section-summary">
-              {t("chat.usageToolsSummary", {
-                count: toolRows.length,
-                calls: tools.length,
-                tokens: formatTokenCount(toolTotal),
-              })}
-            </span>
-          </div>
-          <span className="context-inspector-source-badge estimated">
-            {t("chat.usageEstimated")}
-          </span>
-        </div>
-        <p className="context-inspector-note">{t("chat.usageToolEstimate")}</p>
-        {toolRows.length > 0 ? (
-          <div className="context-inspector-tool-list">
-            {toolRows.map((row) => {
-              const percent =
-                toolTotal > 0
-                  ? Math.round((row.totalTokens / toolTotal) * 100)
-                  : 0;
-              const name =
-                getToolDisplayName(row.toolName) ||
-                row.toolName ||
-                t("chat.usageUnknownTool");
-              return (
-                <div
-                  className="context-inspector-tool"
-                  key={row.toolName ?? "unknown-tool"}
-                >
-                  <div className="context-inspector-tool-heading">
-                    <span title={row.toolName}>{name}</span>
-                    <strong>~{formatTokenCount(row.totalTokens)}</strong>
-                  </div>
-                  <div className="context-inspector-tool-track" aria-hidden="true">
-                    <span style={{ width: `${percent}%` }} />
-                  </div>
-                  <div className="context-inspector-tool-meta">
-                    <span className="context-inspector-tool-meta-main">
-                      <span className="context-inspector-tool-calls">
-                        {t("chat.usageToolCalls", { count: row.callCount })}
-                      </span>
-                      <span className="context-inspector-tool-breakdown">
-                        {t("chat.usageToolArgs", {
-                          count: formatTokenCount(row.argumentTokens),
-                        })}
-                        {" · "}
-                        {t("chat.usageToolResult", {
-                          count: formatTokenCount(row.resultTokens),
-                        })}
-                      </span>
-                    </span>
-                    {row.durationMs !== undefined ? (
-                      <span className="context-inspector-tool-duration">
-                        {t("chat.usageToolDuration", {
-                          time: formatToolDuration(row.durationMs / 1000),
-                        })}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="context-inspector-empty">{t("chat.usageNoTools")}</p>
-        )}
-      </div>
     </div>
   ) : null;
 

@@ -236,6 +236,64 @@ describe("SubagentRun reporting", () => {
   });
 });
 
+describe("SubagentRun provider rate-limit recovery", () => {
+  it("retries five 429s silently and reuses one assistant row", async () => {
+    const { run, events } = createRun();
+    const failure = {
+      ...assistantMessage({
+        content: [{ type: "text", text: "partial" }],
+        stopReason: "error",
+      }),
+      errorMessage: "429: too many requests",
+    };
+    const state = {
+      messages: [] as Array<Record<string, unknown>>,
+    };
+    const continueRun = vi.fn(async () => {
+      state.messages = [...state.messages, failure];
+      run.handleEvent({ type: "message_start", message: { ...failure, content: [] } });
+      run.handleEvent({ type: "message_end", message: failure });
+    });
+    run.agent = {
+      state,
+      prompt: vi.fn(async () => {
+        state.messages = [{ role: "user", content: "task" }, failure];
+        run.handleEvent({ type: "message_start", message: failure });
+        run.handleEvent({ type: "message_end", message: failure });
+      }),
+      waitForIdle: vi.fn(async () => undefined),
+      continue: continueRun,
+      abort: vi.fn(),
+    };
+
+    vi.useFakeTimers();
+    try {
+      const resultPromise = run.run();
+      await vi.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(continueRun).toHaveBeenCalledTimes(5);
+      expect(result.status).toBe("failed");
+      expect(result.error?.code).toBe("PROVIDER_RATE_LIMITED");
+      expect(events.filter((event) => event.event.type === "message_start")).toHaveLength(1);
+      expect(events.filter((event) => event.event.type === "message_end")).toHaveLength(1);
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          event: expect.objectContaining({
+            type: "message_end",
+            message: expect.objectContaining({
+              status: "error",
+              isError: true,
+            }),
+          }),
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("SubagentRun turn cap", () => {
   it("terminates the delegate once it reaches maxTurns", async () => {
     const { run } = createRun({ definition: definition({ maxTurns: 2 }) });

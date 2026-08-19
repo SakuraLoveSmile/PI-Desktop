@@ -415,6 +415,19 @@
   animation: provider-model-spin 700ms linear infinite;
 }
 
+.provider-model-chevron {
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  width: 8px;
+  height: 8px;
+  margin-top: -5px;
+  border-right: 1.5px solid var(--ds-text-muted);
+  border-bottom: 1.5px solid var(--ds-text-muted);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
 @keyframes provider-model-spin {
   to {
     transform: rotate(360deg);
@@ -422,27 +435,33 @@
 }
 
 .provider-model-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 50;
+  position: fixed;
+  z-index: 60;
   max-height: 220px;
   overflow: auto;
   padding: 4px;
+  border: 1px solid var(--ds-border-subtle);
   border-radius: var(--radius-md-plus);
   background: var(--ds-bg-primary);
-  box-shadow:
-    0 0 0 0.5px var(--ds-border-default),
-    0 12px 32px color-mix(in oklab, #000 18%, transparent);
+  box-shadow: 0 12px 32px color-mix(in oklab, #000 18%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.provider-model-menu.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .provider-model-option {
   display: flex;
   width: 100%;
-  align-items: baseline;
-  gap: 8px;
-  padding: 6px 8px;
+  min-height: 34px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -456,25 +475,34 @@
   background: var(--ds-bg-hover);
 }
 
+.provider-model-option:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ds-accent) 55%, transparent);
+  outline-offset: -2px;
+}
+
 .provider-model-option.selected .provider-model-option-id {
   color: var(--ds-accent);
 }
 
 .provider-model-option-id {
   min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
+  font-weight: var(--font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .provider-model-option-name {
-  flex: 0 1 auto;
   min-width: 0;
+  max-width: 45%;
+  flex: 0 1 45%;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--ds-text-muted);
   font-size: var(--text-xs-plus);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Vendor accounts — sign in with a subscription instead of a pasted key */

@@ -68,7 +68,7 @@ does not turn temporary thread pressure into a host process exit.
 | `MODEL_NOT_CONFIGURED` | no | no usable model selected, or provider rejects the selected model as unknown |
 | `PROVIDER_ERROR` | yes | upstream provider failure |
 | `PROVIDER_UNAUTHORIZED` | no | bad/missing provider credentials |
-| `PROVIDER_RATE_LIMITED` | yes | provider rate limited; a mid-stream 429 gets one same-turn retry before the terminal event |
+| `PROVIDER_RATE_LIMITED` | yes | provider rate limited; runtime silently retries up to five times across setup/stream before the terminal event |
 | `CONTEXT_TOO_LARGE` | no | prompt/context still exceeds the safe model budget after recovery, the second provider overflow occurred, or automatic recovery is disabled |
 | `CONTEXT_COMPACTION_FAILED` | no | automatic retained-tail recovery could not prepare, persist, or fit a checkpoint, or manual checkpoint summary generation / durable append failed; the guarded next provider request does not start |
 | `STREAM_FAILED` | yes | provider stream was terminated, closed prematurely, or otherwise ended before a complete response; one same-turn retry may precede the terminal event |
@@ -208,9 +208,13 @@ Node sidecar maps provider SDK errors into:
 - `STREAM_FAILED`
 
 An exact `terminated` provider message and equivalent premature stream-close
-messages map to `STREAM_FAILED`. A post-response transient failure —
-`STREAM_FAILED`, `NETWORK_ERROR`, `TIMEOUT`, or `PROVIDER_RATE_LIMITED` — may
-be retried once by the runtime; the second failure remains terminal.
+messages map to `STREAM_FAILED`. A request-setup or post-response
+`PROVIDER_RATE_LIMITED` uses the shared runtime budget: five retries after the
+initial attempt, with setup and stream failures counting together. Other
+post-response transient failures — `STREAM_FAILED`, `NETWORK_ERROR`, or
+`TIMEOUT` — may be retried once by the runtime; the second failure remains
+terminal. The 429 budget is abortable and honors `retry-after-ms`,
+`retry-after` seconds, and HTTP-date headers before client backoff.
 
 ### Permission timeout
 UI/host timeout emits `PERMISSION_TIMEOUT` internally, tool result presented as denied (`TOOL_DENIED`) to agent.
@@ -237,8 +241,10 @@ wrong contract, so no artifact is written and no approval row is created.
 | internal/host unavailable | degraded banner + recovery tip |
 
 Message-bound provider failures never use a toast or floating global banner.
-The assistant error message shows a localized summary and stable code, with an
-accessible details disclosure containing the redacted provider response,
+A `PROVIDER_RATE_LIMITED` failure remains invisible while its bounded retry
+budget is available; only exhaustion renders the assistant error and lifecycle
+error. The assistant error message shows a localized summary and stable code,
+with an accessible details disclosure containing the redacted provider response,
 provider ID, and model ID. Provider detail is capped at 600 characters and
 common credential/header values are redacted before event emission or
 persistence. When available, the details disclosure and timing logs may also

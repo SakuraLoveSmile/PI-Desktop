@@ -564,8 +564,8 @@ may be retained while exactly one workspace supplies the visible shell context.
   the summary's estimated token cost (or that no summary was generated). The row
   has no actions and is not selectable.
 - The context usage inspector keeps one muted line for the newest checkpoint,
-  shown while its panel is open — the count and the summary cost, in the one
-  place that also shows what the context is spent on.
+  shown while its panel is open — the count and summary cost sit below the
+  compact model/tool usage summaries without adding explanatory copy.
 
 ## 4. Long content collapse / expand
 

@@ -1925,44 +1925,36 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`transcript-style.test.mjs`); full visual scenario Draft
 
-#### E2E-060d: Assistant meta chips, context inspector, and retry action
+#### E2E-060d: Assistant meta chips, compact context summary, and retry action
 
 - **Preconditions**: A completed assistant message includes modelId and token
   usage; another completed assistant message has content but no usage.
 - **Steps**: 1) Open the session. 2) Hover the completed assistant turn that has
   usage, confirm the panel stays closed, then click its Context inspector
-  trigger. 3) Inspect
-  the panel's remaining-token header, used percentage and meter, the
-  pi-ai-resolved model context-window size, exact input/output/cache/reasoning
-  breakdown, cache hit rate when cache-read metadata is reported, completed
-  generation tokens/s value, source badges, and each
-  unique tool type's aggregated call count and estimated argument/result token
-  allocation. 4)
-  Scroll the transcript until the trigger is close to the top, bottom, and
-  right viewport edges, and resize the window while the panel is open. 5) Move
-  the pointer away from the panel, then dismiss it by clicking the trigger
-  again, clicking outside it, and pressing Escape from the keyboard. 6) Click
-  Retry on that turn while idle. 7) Confirm a turn without usage still offers
-  Retry and omits the inspector.
+  trigger. 3) Inspect the compact remaining-token header, used/window counts,
+  unboxed turn/speed values, one inline provider-usage summary, and one
+  aggregate tool-usage summary. 4) Scroll the transcript until the trigger is
+  close to the top, bottom, and right viewport edges, and resize the window
+  while the panel is open. 5) Move the pointer away from the panel, then
+  dismiss it by clicking the trigger again, clicking outside it, and pressing
+  Escape from the keyboard. 6) Click Retry on that turn while idle. 7) Confirm
+  a turn without usage still offers Retry and omits the inspector.
 - **Expected**: Model badge and compact Context inspector appear under completed
   assistant answers when data exists; the trigger shows remaining capacity and
   low-space warning/error states, and click or keyboard activation toggles the
-  same complete token panel while pointer hover alone never opens or closes it.
-  An open panel survives the pointer leaving it and closes on a second trigger
+  same compact summary while pointer hover alone never opens or closes it. An
+  open panel survives the pointer leaving it and closes on a second trigger
   activation, an outside click, or Escape, which returns focus to the trigger.
-  The panel's exact provider and estimated tool
-  sources are visibly distinguished, and its cache hit rate uses cached prompt
-  tokens divided by all reported prompt tokens (cached plus uncached); when
-  cache-read metadata is absent, the rate is omitted rather than inferred. Its
-  context-window total matches the model metadata used by the agent runtime;
-  tool rows show each unique tool type in first-seen order, aggregate repeated
-  calls, include call counts and cumulative duration, and explicitly mark their
-  estimates. The generation
-  rate remains a completed-turn value and does not update during streaming;
-  Retry re-sends the nearest preceding user prompt and is disabled while a turn
-  is running; the portaled panel remains fully visible within the viewport,
-  never clipped by transcript scrolling, and follows the trigger after
-  scrolling or resize; Copy still excludes thinking text.
+  Provider values remain exact, tool values remain visibly approximate through
+  the `~` aggregate total, and no per-tool list, source badge, progress bar, or
+  explanatory estimate paragraph is rendered. The cache hit rate is omitted
+  when cache-read metadata is absent rather than inferred. The context-window
+  total matches the model metadata used by the agent runtime. Generation rate
+  remains a completed-turn value and does not update during streaming; Retry
+  re-sends the nearest preceding user prompt and is disabled while a turn is
+  running; the portaled panel remains fully visible within the viewport, never
+  clipped by transcript scrolling, and follows the trigger after scrolling or
+  resize; Copy still excludes thinking text.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/10-workbuddy-benchmark-ux.md`, `03-runtime/01-ipc-protocol.md`
 - **Acceptance**: C (chat stream), Quality
@@ -3123,10 +3115,10 @@ Each scenario is documented in this format:
     lifecycle event. Available details include phase, stream timing, provider
     status, and `retryAttempt`, without credentials or an unrestricted provider
     body.
-  - A mid-stream HTTP 429 is classified as `PROVIDER_RATE_LIMITED` and follows
-    the same bounded path (E2E-149).
+  - A mid-stream HTTP 429 is covered by E2E-149's separate five-retry path;
+    it is not charged to this one-retry non-429 scenario.
   - Authentication, model-selection, context, and malformed-request failures
-    do not enter this same-turn stream replay path.
+    do not enter either provider replay path.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/08-error-codes.md`,
   `08-meta/decisions-log.md` (D186), ADR 0050
@@ -3135,36 +3127,58 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`agent-errors.test.ts`, `runtime.test.ts`); full
   provider/UI journey Draft
 
-#### E2E-149: Recover one mid-stream rate-limit (429) in place
+#### E2E-149: Recover provider rate limits (429) silently in place
 
-- **Preconditions**: A project-bound Agent session uses a deterministic
-  provider fixture that emits a partial assistant stream, then fails the
-  stream with HTTP 429 once and succeeds on the next request; a second fixture
-  run fails with 429 twice; timing logs are enabled.
+- **Preconditions**: A project-bound Agent session uses deterministic provider
+  fixtures for a setup HTTP 429 and a mid-stream HTTP 429. Each fixture can
+  succeed after a retry and can return six consecutive 429 responses. Fixtures
+  cover `retry-after-ms`, `retry-after` seconds, and HTTP-date headers, expose
+  timing logs, and support aborting during the wait. A builtin subagent uses a
+  fixture with the same responses.
 - **Steps**:
-  1. Start an Agent turn with the one-429 fixture and observe the partial
-     assistant response.
-  2. Wait for the bounded retry and inspect the transcript, session state, and
-     model timing log after recovery.
-  3. Repeat with the two-429 fixture and inspect the terminal error
-     message/event and its diagnostic details.
+  1. Start an Agent turn with a setup-429 fixture whose next request succeeds.
+  2. Repeat with a mid-stream-429 fixture whose next request succeeds.
+  3. Inspect the transcript, lifecycle events, request count, and timing log
+     for both recoveries.
+  4. Repeat with six consecutive 429 responses, then inspect the terminal
+     assistant error and diagnostic details.
+  5. Start the subagent fixture, then repeat the persistent six-429 case.
+  6. Start another 429 turn and abort while it is waiting; inspect that no
+     later provider request or terminal retry is started.
+  7. Repeat with authentication, model-selection, malformed-request, and
+     context-error fixtures.
 - **Expected**:
-  - The 429 is classified as retryable `PROVIDER_RATE_LIMITED` with
-    `providerStatus: 429`.
-  - The first mid-stream 429 waits for one abortable bounded backoff, removes
-    the failed assistant from model context, and retries once without a
-    duplicate assistant bubble or terminal error notification.
-  - The recovered turn emits one terminal lifecycle and keeps the same visible
-    assistant message id. The timing log records `outcome=retry` with
-    `errorCode=PROVIDER_RATE_LIMITED` and `retryAttempt=1`.
-  - A second 429 emits one terminal `PROVIDER_RATE_LIMITED` assistant error and
-    lifecycle event with `retryAttempt: 1` in the details; no further
-    automatic retry occurs.
-- **Specs linked**: `03-runtime/02-agent-runtime.md` (D186 amended),
-  `03-runtime/08-error-codes.md`, `08-meta/decisions-log.md` (D233), ADR 0091
+  - Every 429 is classified as retryable `PROVIDER_RATE_LIMITED`, including a
+    response body that omits rate-limit wording when the captured HTTP status
+    is 429. Diagnostics retain `providerStatus: 429`.
+  - Setup and mid-stream failures share one budget of five retries after the
+    initial attempt. A persistent fixture therefore makes six provider
+    attempts, never multiplies attempts through nested pi-ai retries, and
+    emits no intermediate assistant error, lifecycle `error`, `turn_end`, or
+    `agent_end`.
+  - A recovered attempt removes the failed assistant from model context and
+    reuses its visible assistant message id. The transcript has one assistant
+    bubble and one terminal lifecycle; the timing log records each retry with
+    its phase, delay, and attempt number.
+  - Delay precedence is `retry-after-ms`, `retry-after` seconds, HTTP-date,
+    then exponential backoff with positive jitter. Server and fallback waits
+    are capped at 30 seconds and the wait is abortable.
+  - Exhaustion emits one terminal `PROVIDER_RATE_LIMITED` assistant error and
+    lifecycle event with `retryAttempt: 5` and `providerStatus: 429`; no sixth
+    retry occurs. The error remains retriable for the manual UI action.
+  - The subagent uses the same five-retry budget and one visible child bubble;
+    its final report is failed only after the budget is exhausted, while
+    intermediate 429s never become a parent-visible error report.
+  - Aborting during a backoff cancels the pending timer and starts no later
+    provider request. Authentication, model-selection, malformed-request, and
+    context fixtures make no automatic retry.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` (D245),
+  `03-runtime/08-error-codes.md`, `08-meta/decisions-log.md` (D245), ADR 0091
 - **Acceptance**: C (chat & stream), H (diagnostics), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`runtime.test.ts`); full provider/UI journey Draft
+- **Status**: Unit-covered (`provider-retry.test.ts`, `runtime.test.ts`,
+  `subagent.test.ts`); full provider/UI journey Draft
+
 ## 7A. M6 Plan and shell scenarios
 
 #### E2E-104: Legacy contract values migrate to schema v11
@@ -3955,14 +3969,15 @@ Each scenario is documented in this format:
   provider request, durable transcript, and `<data_dir>/attachments/`.
 - **Steps**:
   1. Select the vision-capable model and paste the PNG into Composer.
-  2. Confirm the compact status row says the model accepts visual input.
+  2. Confirm the PNG appears as a removable image chip above the textarea and
+     no separate explanatory vision-status row is rendered.
   3. Send a prompt asking the model to identify one visible detail.
   4. Inspect the provider request and durable session message after completion.
   5. Reload the session and ask a follow-up about the same image.
 - **Expected**:
   - The model picker/session capability state comes from the exact pi-ai model
-    record, and the status row is localized, keyboard-readable, and not
-    color-only.
+    record, and Composer shows the image as a removable chip without a separate
+    explanatory status row.
   - Main writes one content-addressed image blob and sends the sidecar a
     transient image attachment; the provider adapter emits an image content
     block/data URL, not only `@<scratch-path>` text.
@@ -3989,12 +4004,14 @@ Each scenario is documented in this format:
   the 20 MiB inline bound.
 - **Steps**:
   1. Select the non-vision model, paste the normal PNG, and inspect Composer's
-     fallback status row.
+     removable image chip.
   2. Send the prompt and inspect the sidecar/provider request.
   3. Select the vision model, paste the oversized image, and send it.
   4. Retry each turn after disposing/recreating the runtime.
 - **Expected**:
-  - Both cases show a safe `@path` fallback and no image block/base64 payload.
+  - Composer shows the pasted image as a removable chip without a separate
+    vision-status explanation. Both cases show a safe `@path` fallback and no
+    image block/base64 payload.
   - The non-vision request references the session scratch file; the oversized
     vision request references a safe path while the image remains available to
     the normal file tools.
@@ -4017,13 +4034,14 @@ Each scenario is documented in this format:
   discovery data that incorrectly labels it `vision`, and a pasted PNG.
 - **Steps**:
   1. Refresh the provider model list and select the discovered custom id.
-  2. Paste the PNG and inspect the model picker and Composer status row.
+  2. Paste the PNG and inspect the model picker and Composer image chip.
   3. Send the prompt and inspect the sidecar/provider payload.
 - **Expected**:
   - The unknown model is runnable as a generic text model but is not promoted
     to `vision` by discovery/cache metadata.
-  - Composer states the path fallback, and the provider receives no image block
-    or base64 value; the safe file path remains available.
+  - Composer keeps the image chip without rendering a model-dependent status
+    message, and the provider receives no image block or base64 value; the safe
+    file path remains available.
   - The durable attachment ref is still recorded so a later known vision model
     can replay the image correctly.
 - **Specs linked**: `03-runtime/11-provider-model-system.md` §6.2/§11,
@@ -4233,8 +4251,14 @@ Each scenario is documented in this format:
   the first account, change its display name and default model, save, and
   confirm the row shows the account label once while the Defaults selector
   reflects the edited model and each option shows only one provider name,
-  without an appended account label or model ID. Press Test
-  connection and confirm the result resolves the edited account. 5) Resolve
+  without an appended account label or model ID. Before saving, focus the
+  default-model field and confirm the authenticated suggestions open as an
+  app-styled list with aligned model IDs/display names, that typing filters it,
+  ArrowDown/ArrowUp plus Enter selects an option, Escape closes it, and the
+  fixed list is portaled above the dialog without changing dialog height or
+  being clipped by the dialog's overflow. Confirm a custom model ID can still
+  be entered. Press Test connection and confirm the result resolves the edited
+  account. 5) Resolve
   and use each account separately, including model discovery and one streamed
   turn per account. 6) Start the device-code login on a second vendor, then
   press Cancel while the dialog is polling; confirm no row or credential is
@@ -4886,15 +4910,14 @@ This test plan spec is accepted when:
 - Click Retry and expect the existing retry path to resend the latest prompt.
 
 
-### US-UI-61 Assistant context inspector + retry (D103, D184)
+### US-UI-61 Assistant context summary + retry (D103, D184, D244)
 - Complete an assistant turn that reports usage.
 - Expect a model badge and compact Context inspector under the answer. The
   trigger shows the remaining context percentage; clicking it (or activating it
-  from the keyboard) shows
-  used/remaining/window tokens, exact input/output/cache/reasoning usage,
-  generation tokens/s, and each unique tool type's aggregated call count,
-  argument/result footprint, share, and duration. The panel labels provider
-  totals as reported and tool rows as estimates.
+  from the keyboard) shows used/remaining/window tokens, two unboxed turn/speed
+  values, one inline exact provider-usage summary, and one aggregate tool-usage
+  summary with types, calls, and approximate tokens. Per-tool rows, bars,
+  badges, and explanatory estimate copy are not shown.
 - Hovering the trigger changes nothing; the open panel closes on a second
   activation, an outside click, or Escape.
 - Move the trigger near each viewport edge and scroll or resize while the panel

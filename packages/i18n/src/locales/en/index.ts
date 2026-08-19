@@ -195,8 +195,6 @@ export const en = {
     fileReferences: "Files referenced by this draft",
     removeFileReference: "Remove file reference {{name}}",
     messageAttachments: "Attachments in this message",
-    visionAttachmentReady: "Supported images will be sent as visual input to this model",
-    visionAttachmentFallback: "This model cannot see images; they will be sent as file paths",
     fileEmpty: "No matching files",
     fileNoWorkspace: "Open a project to reference files",
     fileTruncated: "Showing the first 8000 matching files",

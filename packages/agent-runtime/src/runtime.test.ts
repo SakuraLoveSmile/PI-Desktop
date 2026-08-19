@@ -2511,7 +2511,14 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
       await handleAgentEvent({ type: "agent_end", messages: [] });
     });
 
-    await runtime.prompt("hello", "user-1");
+    vi.useFakeTimers();
+    try {
+      const prompt = runtime.prompt("hello", "user-1");
+      await vi.runAllTimersAsync();
+      await prompt;
+    } finally {
+      vi.useRealTimers();
+    }
 
     const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
     expect(agent.continue).toHaveBeenCalledOnce();
@@ -2531,7 +2538,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     await runtime.dispose();
   });
 
-  it("surfaces a repeated 429 as a terminal rate-limit error after one retry", async () => {
+  it("surfaces repeated 429s only after exhausting the five-retry budget", async () => {
     const onEvent = vi.fn();
     const runtime = createRuntime({ onEvent });
     const agent = (runtime as any).agent;
@@ -2567,6 +2574,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
     });
     agent.waitForIdle = vi.fn(async () => undefined);
     agent.continue = vi.fn(async () => {
+      agent.state.messages = [...agent.state.messages, rateLimitedMessage];
       await handleAgentEvent({ type: "agent_start" });
       await handleAgentEvent({ type: "turn_start" });
       await handleAgentEvent({
@@ -2578,10 +2586,17 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
       await handleAgentEvent({ type: "agent_end", messages: [] });
     });
 
-    await runtime.prompt("hello", "user-1");
+    vi.useFakeTimers();
+    try {
+      const prompt = runtime.prompt("hello", "user-1");
+      await vi.runAllTimersAsync();
+      await prompt;
+    } finally {
+      vi.useRealTimers();
+    }
 
     const events = onEvent.mock.calls.map(([envelope]) => (envelope as any).event);
-    expect(agent.continue).toHaveBeenCalledOnce();
+    expect(agent.continue).toHaveBeenCalledTimes(5);
     expect(events).toContainEqual(
       expect.objectContaining({
         type: "message_end",
@@ -2593,7 +2608,7 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
             retriable: true,
             details: expect.objectContaining({
               phase: "stream",
-              retryAttempt: 1,
+              retryAttempt: 5,
             }),
           }),
         }),

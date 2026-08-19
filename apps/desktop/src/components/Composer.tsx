@@ -286,9 +286,6 @@ export function Composer({
   const activeFileReferences = fileReferences.filter(
     (fileReference) => fileReference.sessionId === referenceSessionId,
   );
-  const activeImageReferences = activeFileReferences.filter(
-    (fileReference) => fileReference.kind === "image",
-  );
 
   useEffect(() => {
     const previousKey = draftKeyRef.current;
@@ -529,11 +526,6 @@ export function Composer({
   const selectedModel = provider?.id
     ? providerModels[provider.id]?.find((model) => model.modelId === modelId)
     : undefined;
-  const modelSupportsVision =
-    selectedModel?.capabilities.includes("vision") ??
-    activeSession?.supportsVision ??
-    provider?.supportsVision ??
-    false;
   const modelLabel = selectedModel?.displayName || modelId || t("chat.model");
   const thinkingMenuLevels: ThinkingLevel[] = availableThinkingLevels.length
     ? availableThinkingLevels
@@ -982,22 +974,6 @@ export function Composer({
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
           ) : null}
           <div className="composer-input-wrap">
-            {activeImageReferences.length ? (
-              <div
-                className={`composer-vision-note${modelSupportsVision ? " is-supported" : " is-fallback"}`}
-                role="status"
-                aria-live="polite"
-              >
-                <IconImage size={13} aria-hidden />
-                <span>
-                  {t(
-                    modelSupportsVision
-                      ? "chat.visionAttachmentReady"
-                      : "chat.visionAttachmentFallback",
-                  )}
-                </span>
-              </div>
-            ) : null}
             {activeFileReferences.length ? (
               <div
                 className="composer-file-references"
