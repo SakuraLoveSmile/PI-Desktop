@@ -262,6 +262,7 @@ Namespace: `pi.plugin.*`
 ### Workspace (requires permission)
 - `pi.workspace.get()`
 - `pi.fs.readText(path)`
+- `pi.fs.openDefault(path)` // open the selected file with the OS-associated app
 - `pi.fs.writeText(path, content)` // high risk
 - `pi.fs.glob(pattern)`
 

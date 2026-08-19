@@ -14,7 +14,7 @@ Provide a permission–capability–risk–default-policy reference table for re
 | `clipboard.read` | medium | `clipboard.readText` | Confirm on first use | May read sensitive information |
 | `clipboard.write` | medium | `clipboard.writeText` | Confirm on first use | Prevents clipboard pollution |
 | `notify` | low | `ui.notify`, `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | Can be granted by default | Native delivery is OS-controlled; avoid notification-spam abuse |
-| `fs.read` | medium | `fs.readText` / `fs.glob` / `fs.list` / `fs.requestDirectory` | Granted at install, bounded by `manifest.fs.read` | Whole-tree scope is allowed; egress is what makes a read dangerous and it is closed separately (§2A) |
+| `fs.read` | medium | `fs.readText` / `fs.openDefault` / `fs.glob` / `fs.list` / `fs.requestDirectory` | Granted at install, bounded by `manifest.fs.read` | `fs.openDefault` is limited to an explicit file and the same read scope; all file calls remain root- and deny-list-checked |
 | `fs.write` | high | `fs.writeText` | Granted at install, bounded by `manifest.fs.write` | Scope is required; a whole-tree pattern fails validation. Out of scope asks the user |
 | `fs.delete` | high | `fs.remove` | Granted at install, bounded by `manifest.fs.delete` | Two tiers (`own` / `scope`), always via the OS trash, non-recursive, rate-braked (§2B) |
 | `fs.read.workspace` | medium | — | Downgraded on load to `fs.read` with a whole-tree scope | Legacy name; predates scopes |

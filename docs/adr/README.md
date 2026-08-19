@@ -125,3 +125,4 @@ Each ADR includes:
 | 0106 | Keep only five core builtin commands | Accepted |
 | 0107 | Make current-session task notification suppression atomic | Accepted |
 | 0108 | Remove the built-in interactive terminal | Accepted |
+| 0109 | Open Files entries with the OS-associated application | Accepted |

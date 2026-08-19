@@ -100,6 +100,7 @@ type PluginNotificationPermission = "granted" | "denied" | "unknown" | "unsuppor
 pi.workspace.get(): Promise<{ path: string; name: string } | null>
 
 pi.fs.readText(pathFromRoot: string): Promise<string>
+pi.fs.openDefault(pathFromRoot: string): Promise<void>
 pi.fs.writeText(pathFromRoot: string, content: string): Promise<void>
 pi.fs.glob(pattern: string): Promise<string[]>
 pi.fs.list(pathFromRoot: string): Promise<Array<{
@@ -111,6 +112,10 @@ pi.fs.list(pathFromRoot: string): Promise<Array<{
 pi.fs.remove(pathFromRoot: string): Promise<void>
 pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 ```
+
+`fs.openDefault` 使用操作系统默认关联应用打开一个已存在的文件。它与
+`fs.readText` 使用相同的 `fs.read` 根目录、符号链接、受保护路径、拒绝列表和范围检查；
+目录会被拒绝。主机会记录这次操作，并且不会接受插件传入的绝对路径。
 
 路径相对于该模式的 root —— 工作区，或者当该模式声明
 `root: "userSelected"` 时，用户通过 `requestDirectory()` 选中的目录。
@@ -275,7 +280,7 @@ window.pluginBridge.on(event, handler)
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`、`ui.requestNotificationPermission`、`ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`、`workspace.get`、`app.getAppearance` | 无 |
-| `fs.readText`、`fs.glob`、`fs.list` | `fs.read` |
+| `fs.readText`、`fs.openDefault`、`fs.glob`、`fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |
 | `clipboard.readText` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |
@@ -304,6 +309,7 @@ window.pluginBridge.on(event, handler)
 - fs.writeText
 - fs.remove、fs.requestDirectory，以及每一次被拒绝的 fs 调用（连同路径与
   `errorCode`），还有每一次同意的答复及其被问的原因（`scope` / `rate`）
+- fs.openDefault（记录 root-relative 路径以及系统打开是否成功）
 - 在agent.registerTool之后执行（包括从插件发现的工具）
   MCP 服务器）
 - 网络获取
@@ -331,7 +337,7 @@ window.pluginBridge.on(event, handler)
 桌面插件运行时现在实现本地和市场插件使用的 MVP 主机 API 表面：
 
 - `app.*`、`plugin.*`、`commands.*`、`ui.*`、`workspace.*`
-- `fs.readText` / `fs.writeText` / `fs.glob` / `fs.remove` /
+- `fs.readText` / `fs.openDefault` / `fs.writeText` / `fs.glob` / `fs.remove` /
   `fs.requestDirectory`，范围由 `manifest.fs` 限定（ADR 0088）
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`、`shell.openExternal`、`net.fetch`

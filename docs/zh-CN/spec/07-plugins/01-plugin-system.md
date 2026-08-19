@@ -260,6 +260,7 @@ Host Main (PI-Desktop)
 ### 工作区（需要许可）
 - `pi.workspace.get()`
 - `pi.fs.readText(path)`
+- `pi.fs.openDefault(path)` // 使用系统关联应用打开选中的文件
 - `pi.fs.writeText(path, content)` // 高风险
 - `pi.fs.glob(pattern)`
 

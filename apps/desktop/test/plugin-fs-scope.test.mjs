@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   readFileSync,
   symlinkSync,
   utimesSync,
@@ -117,6 +118,7 @@ async function harness(t, { id, permissions, fs: fsPolicy, workspace, granted, c
   const audits = [];
   const consents = [];
   const trashed = [];
+  const opened = [];
   const answers = [...(consent ?? [])];
   const runtime = new PluginRuntime({
     hostEntry: hostProcessEntry,
@@ -124,6 +126,7 @@ async function harness(t, { id, permissions, fs: fsPolicy, workspace, granted, c
     getWorkspacePath: () => ws,
     audit: (entry) => audits.push(entry),
     trashItem: async (fullPath) => trashed.push(fullPath),
+    openPath: async (fullPath) => opened.push(fullPath),
     ...(protectedPaths ? { protectedPaths: () => protectedPaths } : {}),
     ...(consent
       ? {
@@ -139,7 +142,7 @@ async function harness(t, { id, permissions, fs: fsPolicy, workspace, granted, c
   });
   const dir = writePlugin({ id, permissions, fs: fsPolicy });
   await runtime.loadFromPath(dir, granted);
-  return { runtime, ws, audits, consents, trashed, dir };
+  return { runtime, ws, audits, consents, trashed, opened, dir };
 }
 
 function refused(t, promise, code, pattern) {
@@ -321,6 +324,44 @@ test("list cannot escape the root", async (t) => {
     t,
     runtime.invokePanelBridge("fs.list.escape", "fs.list", { path: "../.." }),
     "INVALID_ARGUMENT",
+  );
+});
+
+test("default-app opening reuses the readable file scope", async (t) => {
+  const { runtime, ws, opened, audits } = await harness(t, {
+    id: "fs.open-default.scoped",
+    permissions: ["fs.read"],
+    fs: { read: { scope: ["docs/**", "docs"] } },
+  });
+
+  assert.deepEqual(
+    await runtime.invokePanelBridge("fs.open-default.scoped", "fs.openDefault", {
+      path: "docs/a.md",
+    }),
+    { ok: true },
+  );
+  assert.deepEqual(opened, [realpathSync(join(ws, "docs/a.md"))]);
+  assert.ok(
+    audits.some((entry) => entry.api === "fs.openDefault" && entry.ok === true),
+    "opening a file is audited",
+  );
+
+  await refused(
+    t,
+    runtime.invokePanelBridge("fs.open-default.scoped", "fs.openDefault", {
+      path: "docs",
+    }),
+    "INVALID_ARGUMENT",
+    /only files can be opened/,
+  );
+
+  await refused(
+    t,
+    runtime.invokePanelBridge("fs.open-default.scoped", "fs.openDefault", {
+      path: "notes.txt",
+    }),
+    "PERMISSION_DENIED",
+    /outside manifest\.fs\.read\.scope/,
   );
 });
 
