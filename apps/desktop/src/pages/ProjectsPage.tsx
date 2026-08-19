@@ -16,6 +16,7 @@ import {
   IconPin,
   IconPlus,
   IconSearch,
+  IconStar,
   IconX,
 } from "../components/icons";
 import {
@@ -585,7 +586,11 @@ export function ProjectsPage() {
                         title={project.path}
                       >
                         <span className="projects-glyph" style={{ background: color }}>
-                          <IconFolder size={15} />
+                          {project.pinned ? (
+                            <IconStar size={15} fill="currentColor" aria-hidden />
+                          ) : (
+                            <IconFolder size={15} aria-hidden />
+                          )}
                         </span>
                         <span className="projects-name-copy">
                           <span className="projects-name-title">

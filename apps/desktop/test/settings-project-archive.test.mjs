@@ -96,6 +96,14 @@ test("project archive renders the overview, toolbar, and grouped index bands", (
   assert.match(projectsPageSource, /projects-empty/);
 });
 
+test("pinned projects use a distinct star glyph", () => {
+  assert.match(projectsPageSource, /IconStar/);
+  assert.match(
+    projectsPageSource,
+    /projects-glyph[^]*project\.pinned \? \([\s\S]*<IconStar size=\{15\} fill="currentColor" aria-hidden \/>[\s\S]*<IconFolder size=\{15\} aria-hidden \/>/,
+  );
+});
+
 test("project archive row menu closes on escape and outside press", () => {
   assert.match(projectsPageSource, /addEventListener\("mousedown", onPointerDown\)/);
   assert.match(projectsPageSource, /addEventListener\("keydown", onKeyDown\)/);

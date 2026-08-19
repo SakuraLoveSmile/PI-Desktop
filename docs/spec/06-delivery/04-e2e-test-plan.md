@@ -1439,8 +1439,10 @@ Each scenario is documented in this format:
   right without flipping left, and
   session/project/section body-level menus use the same right-side rule with a
   narrow-viewport width cap. Pinned rows remain ahead
-  of unpinned rows under every selected secondary order; each sort produces the
-  documented stable order; archived rows disappear from the default view but
+  of unpinned rows under every selected secondary order; pinned project rows use
+  a filled Star in the colored glyph while unpinned rows retain Folder, and the
+  localized pinned tag remains visible beside the project name. Each sort
+  produces the documented stable order; archived rows disappear from the default view but
   retain transcripts/project records and reappear in Show archived; restore
   returns them to the selected order; archiving the active row selects a visible
   non-archived fallback or creates the documented empty fallback instead of
@@ -4629,7 +4631,8 @@ This test plan spec is accepted when:
 - Expect each row to carry a colored glyph, the project name with its Active /
   Open / pinned / Archived tags, one meta line with the shortened monospace
   path, branch, and session count, a relative last-active time, and the
-  hover-revealed New task and row-menu actions. Archived rows stay listed and
+  hover-revealed New task and row-menu actions. Ordinary rows use a Folder glyph;
+  pinned rows use a filled Star glyph and retain the pinned text tag. Archived rows stay listed and
   softened rather than hidden.
 - Expand a non-active project and open one of its sessions; expect the app to
   activate that project before selecting the session, so workspace tools and

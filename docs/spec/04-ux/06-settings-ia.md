@@ -184,9 +184,11 @@ contract modes are intent boundaries, not strict read-only security profiles.
      its rows inside one settings panel with hairline separators. Empty sections
      are omitted
 - Row anatomy: disclosure control, color glyph, project name with state tags
-  (Active, Open, pinned glyph, Archived), one meta line carrying the shortened
+  (Active, Open, pinned tag, Archived), one meta line carrying the shortened
   monospace path, branch, and session count, a relative last-active time, and a
-  hover/focus-revealed action pair (New task, row menu)
+  hover/focus-revealed action pair (New task, row menu). The colored glyph uses
+  Folder for ordinary projects and a filled Star for pinned projects, while the
+  pinned tag remains as the localized text cue.
 - The row menu groups create/edit actions above pin, archive/restore, and the
   destructive Close action, and closes on Escape or any outside press
 - Project search also matches session titles. Matching a session retains and
