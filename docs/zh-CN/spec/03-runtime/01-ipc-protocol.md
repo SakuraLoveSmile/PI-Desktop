@@ -80,6 +80,8 @@ type AgentPromptRequest = {
  content: string;
  /** Truncate durable transcript to N leading messages before append (regenerate). */
  truncateBefore?: number;
+ /** Renderer snapshot used to close the prompt-to-completion notification race. */
+ viewingSessionId?: string | null;
 };
 
 type AgentPromptResponse = {
@@ -434,8 +436,11 @@ type AgentEvent =
 渲染器调用
 `pi-desktop/notification/setViewingSession({ sessionId })` 每当聊天时
 页面的活动会话发生变化； `sessionId: null` 清除查看上下文
-非聊天页面。 Electron 将此提示与 Main 拥有的窗口结合起来
-visibility/focus 位于最终事件边界。它还调用
+非聊天页面。渲染器发起的 `agent/prompt` 也会携带匹配的
+`viewingSessionId` 快照，Electron 会在异步回合初始化之前安装它，
+避免快速完成先于查看上下文更新。Electron 将此提示与 Main 拥有的窗口
+visibility/focus 结合起来，在终态事件边界进行判断。缺失、null 或不匹配的
+上下文都会安全地创建公告。它还调用
 `pi-desktop/notification/showNative({ id, sessionId, title, body })` 之后
 本地化新记录。这个仅限电子的请求永远不会进入主机
 RPC 域。

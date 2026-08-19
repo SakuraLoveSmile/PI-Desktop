@@ -93,7 +93,9 @@ accept_prompt
    transaction, unseen `completed` inserts `task.completed`, unseen `error`
    inserts `task.failed`, and a result already visible in the focused current
    chat or any `aborted` turn inserts no notification (D117). Repeated terminal
-   calls are no-ops.
+   calls are no-ops. Renderer terminal lifecycle events update the transcript
+   and turn result card; the sidebar terminal mark is derived only from the
+   corresponding unread notification, never from `agent_end` alone.
 9. Fork is allowed only while the source is idle. The child begins idle with
    no turn or waiting-permission state. Electron returns `AGENT_BUSY` for its
    active runtime guard and normalizes the host's persisted running-turn

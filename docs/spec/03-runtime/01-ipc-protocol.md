@@ -78,6 +78,8 @@ type AgentPromptRequest = {
  attachments?: AgentPromptAttachment[];
  /** Truncate durable transcript to N leading messages before append (regenerate). */
  truncateBefore?: number;
+ /** Renderer snapshot used to close the prompt-to-completion notification race. */
+ viewingSessionId?: string | null;
 };
 
 type AgentPromptAttachment = {
@@ -454,8 +456,12 @@ to the singular host RPC domain without renderer access to SQLite:
 The renderer invokes
 `pi-desktop/notification/setViewingSession({ sessionId })` whenever the chat
 page's active session changes; `sessionId: null` clears the viewing context on
-non-chat pages. Electron combines this hint with Main-owned window
-visibility/focus at the terminal event boundary. It also invokes
+non-chat pages. A renderer-originated `agent/prompt` also carries a matching
+`viewingSessionId` snapshot, which Electron installs before asynchronous turn
+setup so a fast completion cannot beat the viewing-context update. Electron
+combines this hint with Main-owned window visibility/focus at the terminal event
+boundary. Missing, null, or mismatched context fails safe to notification. It
+also invokes
 `pi-desktop/notification/showNative({ id, sessionId, title, body })` after
 localizing a new record. This Electron-only request never crosses into the host
 RPC domain.

@@ -2082,7 +2082,7 @@ Each scenario is documented in this format:
   close/reopen the popover and restart the app. 8) Select the other session
   from its terminal-marked sidebar row. 9) Generate a host fixture with 205
   eligible terminal turns. 10) Use Mark all read, then Clear.
-- **Expected**: A's visible-current completion creates no row. Exactly two rows
+- **Expected**: A's visible-current completion creates no row or terminal sidebar mark. Exactly two rows
   exist, newest first: the unfocused A completion and background B failure,
   with localized labels, snapshotted session titles, and B's stable code.
   Abort/repeated terminal calls create no row. The former footer Help shortcut
@@ -2116,7 +2116,7 @@ Each scenario is documented in this format:
   by the OS. 8) On Windows, inspect the native notification attribution,
   notification-settings entry, taskbar group, installed executable, and Start
   menu shortcut.
-- **Expected**: Focused-current A creates neither inbox row nor native banner.
+- **Expected**: Focused-current A creates neither inbox row, terminal sidebar mark, nor native banner.
   Focused-background B creates an inbox row without a native banner. Unfocused
   current A and the minimized failure each create one durable row and one
   localized native notification. Clicking restores, shows, and focuses the

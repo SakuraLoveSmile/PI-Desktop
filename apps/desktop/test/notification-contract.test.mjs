@@ -60,14 +60,27 @@ test("terminal notifications flow from host completion to the renderer", () => {
 });
 
 test("the visible chat session suppresses durable task notifications", () => {
-  assert.match(mainSource, /notificationViewingSessionId === sessionId/);
-  assert.match(mainSource, /mainWindow\.isVisible\(\)/);
-  assert.match(mainSource, /mainWindow\.isFocused\(\)/);
+  assert.match(mainSource, /shouldCreateTaskNotificationPolicy/);
+  assert.match(mainSource, /viewingSessionId: notificationViewingSessionId/);
+  assert.match(mainSource, /mainWindow(?:\?\.)?isVisible\(\)/);
+  assert.match(mainSource, /mainWindow(?:\?\.)?isFocused\(\)/);
   assert.match(mainSource, /createNotification,/);
   assert.match(mainSource, /"did-start-loading"[\s\S]*notificationViewingSessionId = null/);
   assert.match(mainSource, /"render-process-gone"[\s\S]*notificationViewingSessionId = null/);
   assert.match(appSource, /page === "chat" \? activeSessionId \?\? null : null/);
   assert.match(appSource, /setNotificationViewingSession\(viewingSessionId\)/);
+});
+
+test("sidebar terminal outcomes are notification-backed, not lifecycle-backed", () => {
+  const terminalBlock =
+    storeSource.match(
+      /} else if \(\n\s*event\.type === "agent_end"[\s\S]*?void flushPendingSessionConfiguration\(envelope\.sessionId\);/,
+    )?.[0] ?? "";
+  assert.match(terminalBlock, /latestTurnResults/);
+  assert.doesNotMatch(terminalBlock, /sessionOutcomes:/);
+  assert.match(storeSource, /receiveNotification:[\s\S]*sessionOutcomes:/);
+  assert.match(storeSource, /viewingSessionId: viewingSessionIdForPrompt\(get\(\), sessionId\)/);
+  assert.match(mainSource, /req\.viewingSessionId/);
 });
 
 test("native notifications only show for an unfocused window and navigate back", () => {

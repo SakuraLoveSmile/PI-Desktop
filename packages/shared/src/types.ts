@@ -399,6 +399,12 @@ export type AgentPromptRequest = {
    * the branch replaces the tail instead of stacking a duplicate turn.
    */
   truncateBefore?: number;
+  /**
+   * Renderer snapshot of the chat session visible when the prompt was sent.
+   * Electron installs it before asynchronous turn setup for notification
+   * suppression; missing, null, or mismatched values fail safe.
+   */
+  viewingSessionId?: string | null;
 };
 
 export type AgentPromptAttachment = {

@@ -123,3 +123,4 @@ Each ADR includes:
 | 0104 | Let plugins contribute work panel views | Accepted |
 | 0105 | Ship Files as a bundled plugin; keep Review and Terminal in the host | Accepted |
 | 0106 | Keep only five core builtin commands | Accepted |
+| 0107 | Make current-session task notification suppression atomic | Accepted |

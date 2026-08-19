@@ -291,8 +291,8 @@ visually distinct from list content.
 | Active session | Accent-blue outlined status ring plus active row background |
 | Selecting session | Destination row receives the active treatment immediately while transcript/workspace resolution continues |
 | Session in progress | Orange breathing dot; static under reduced motion |
-| Session completed | Green check mark when the row is not selected |
-| Session failed | Red circled alert mark when the row is not selected |
+| Session completed | Green check mark from the latest unread task notification when the row is not selected |
+| Session failed | Red circled alert mark from the latest unread task notification when the row is not selected |
 | Hover session | bg-tertiary background |
 | Active project | Header carries active state; topbar follows that workspace; composer exposes no workspace identity |
 | Collapsed project | Header remains visible; child conversations are hidden |

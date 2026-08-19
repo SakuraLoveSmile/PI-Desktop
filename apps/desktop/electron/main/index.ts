@@ -109,6 +109,9 @@ import type {
 import { resolvePluginLocalizedString } from "@pi-desktop/plugin-sdk";
 
 import { HostProcess } from "./host-process";
+import {
+  shouldCreateTaskNotification as shouldCreateTaskNotificationPolicy,
+} from "./notification-policy";
 import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
 import { PluginRuntime } from "./plugin-runtime";
@@ -1724,13 +1727,13 @@ function waitForTurnSettlement(sessionId: string, turnId: string): Promise<void>
 }
 
 function shouldCreateTaskNotification(sessionId: string) {
-  const userIsViewingResult =
-    mainWindow !== null &&
-    !mainWindow.isDestroyed() &&
-    mainWindow.isVisible() &&
-    mainWindow.isFocused() &&
-    notificationViewingSessionId === sessionId;
-  return !userIsViewingResult;
+  const liveWindow = mainWindow !== null && !mainWindow.isDestroyed();
+  return shouldCreateTaskNotificationPolicy({
+    finishingSessionId: sessionId,
+    viewingSessionId: notificationViewingSessionId,
+    windowVisible: liveWindow && mainWindow?.isVisible() === true,
+    windowFocused: liveWindow && mainWindow?.isFocused() === true,
+  });
 }
 
 async function withGitBranch<T extends { path?: string; name?: string } | null | undefined>(
@@ -6287,6 +6290,16 @@ function registerIpc() {
 
   handle(IPC.invoke.agentPrompt, async (req: AgentPromptRequest) => {
     if (!host || !sidecar) throw new Error("backend unavailable");
+    // Install the renderer's prompt-time snapshot before any asynchronous
+    // setup. This closes the gap where a fast completion could beat the
+    // effect that reports the active chat session. Missing or mismatched
+    // context is deliberately fail-safe.
+    const requestedViewingSessionId =
+      typeof req.viewingSessionId === "string" ? req.viewingSessionId.trim() : "";
+    notificationViewingSessionId =
+      requestedViewingSessionId && requestedViewingSessionId === req.sessionId
+        ? requestedViewingSessionId
+        : null;
     const settings = await host.call<any>("settings.get");
     const sessionResult = await host.call<{ session?: any }>("session.get", {
       id: req.sessionId,

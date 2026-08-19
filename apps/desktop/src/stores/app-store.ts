@@ -160,6 +160,15 @@ function withoutRecordKey<T>(record: Record<string, T>, key: string): Record<str
   return next;
 }
 
+function viewingSessionIdForPrompt(
+  state: Pick<AppState, "page" | "activeSessionId">,
+  sessionId: string,
+): string | null {
+  return state.page === "chat" && state.activeSessionId === sessionId
+    ? sessionId
+    : null;
+}
+
 export type ToastVariant = "info" | "success" | "warning" | "error";
 
 export type ToastItem = {
@@ -1457,6 +1466,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await api.prompt({
         sessionId,
         content,
+        viewingSessionId: viewingSessionIdForPrompt(get(), sessionId),
         attachments: draft
           ? promptAttachmentsFromDraft(draft.fileReferences)
           : [],
@@ -1596,6 +1606,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await api.prompt({
         sessionId,
         content: prompt,
+        viewingSessionId: viewingSessionIdForPrompt(get(), sessionId),
         attachments: promptAttachments,
         truncateBefore: userIndex,
       });
@@ -1687,6 +1698,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       await api.prompt({
         sessionId,
         content: prompt,
+        viewingSessionId: viewingSessionIdForPrompt(get(), sessionId),
         attachments: promptAttachments,
         truncateBefore: userIndex,
       });
@@ -2656,6 +2668,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       event.type === "agent_end" ||
       event.type === "error"
     ) {
+      // The terminal chat event updates the visible transcript only. Sidebar
+      // terminal marks are notification-backed, so a focused current session
+      // never creates its own unread completion marker.
       set((s) => ({
         runningSessions: { ...s.runningSessions, [envelope.sessionId]: false },
         pendingPermissions: clearSessionPermissions(
@@ -2677,17 +2692,6 @@ export const useAppStore = create<AppState>((set, get) => ({
                     ? { errorCode: event.error.code }
                     : {}),
                 },
-              },
-        sessionOutcomes:
-          event.type === "error" && event.error.code === "TURN_ABORTED"
-            ? withoutRecordKey(s.sessionOutcomes, envelope.sessionId)
-            : {
-                ...s.sessionOutcomes,
-                [envelope.sessionId]:
-                  event.type === "error" ||
-                  s.sessionOutcomes[envelope.sessionId] === "failed"
-                    ? "failed"
-                    : "completed",
               },
       }));
       void flushPendingSessionConfiguration(envelope.sessionId);
