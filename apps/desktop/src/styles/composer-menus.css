@@ -14,14 +14,6 @@
   outline: 0;
 }
 
-:root[data-theme="dark"] .composer-dock-home .composer-shell {
-  /* Keep the same restrained single-surface treatment in dark mode. */
-  background: var(--ds-bg-elevated-primary);
-  background-color: #212121f5;
-  background-image: none;
-  box-shadow: var(--ds-shadow-composer);
-}
-
 :root[data-theme="dark"] .composer-input::placeholder,
 :root[data-theme="dark"] .composer-placeholder {
   /* Codex dark placeholder ~42% white */

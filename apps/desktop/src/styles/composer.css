@@ -106,10 +106,6 @@
   animation: composer-placeholder-fade-in var(--motion-duration-fast) var(--motion-ease-out) both;
 }
 
-.composer-input-home + .composer-placeholder {
-  padding-left: 14px;
-}
-
 @keyframes composer-placeholder-fade-in {
   from {
     opacity: 0;

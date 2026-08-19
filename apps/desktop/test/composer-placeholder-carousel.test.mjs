@@ -33,7 +33,10 @@ test("composer cycles view-specific welcome and slash-command placeholders", () 
 test("placeholder changes fade without duplicating the native accessible value", () => {
   assert.match(composerStyles, /\.composer-input-stage\s*\{/);
   assert.match(composerStyles, /\.composer-placeholder\s*\{/);
-  assert.match(composerStyles, /\.composer-input-home \+ \.composer-placeholder/);
+  // Home and docked composers use the same input/placeholder alignment; only
+  // the localized copy changes between the two variants.
+  assert.doesNotMatch(composer, /composer-input-home/);
+  assert.doesNotMatch(composerStyles, /composer-input-home/);
   assert.match(composerStyles, /animation:\s*composer-placeholder-fade-in/);
   assert.match(composerStyles, /@keyframes composer-placeholder-fade-in/);
   assert.match(composerStyles, /opacity:\s*0\s*!important/);

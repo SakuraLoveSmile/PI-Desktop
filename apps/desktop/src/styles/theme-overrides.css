@@ -62,30 +62,9 @@
   border: 0;
 }
 
-.composer-dock-home .composer-shell {
-  display: flex;
-  flex-direction: column;
-}
-
-.composer-dock-home .composer-input-wrap {
-  flex: 0 0 auto;
-  min-height: 44px;
-  align-items: flex-start;
-  padding: 10px 14px 0;
-}
-
-.composer-dock-home .composer-input {
-  font-size: var(--text-base);
-  line-height: var(--leading-body);
-  min-height: 22px;
-}
-
-.composer-dock-home .composer-toolbar {
-  margin-top: auto;
-  /* Gold send sits ~44px inset from plate right */
-  padding: 6px 14px 10px;
-}
-
+/* Home and thread-docked composers share the base shell metrics. The home
+ * variant only controls placement and placeholder copy; visual spacing stays
+ * identical in both conversation states. */
 :root[data-theme="light"] .composer-toolbar .icon-btn,
 :root[data-theme="light"] .mode-chip {
   color: color-mix(in oklab, #1a1c1f 84%, transparent) !important;

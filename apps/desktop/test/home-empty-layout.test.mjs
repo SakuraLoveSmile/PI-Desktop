@@ -5,10 +5,11 @@ import { loadStyles } from "./helpers/styles.mjs";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [chatSurface, styles, checklist] = await Promise.all([
+const [chatSurface, styles, checklist, composer] = await Promise.all([
   read("../src/components/ChatSurface.tsx"),
   loadStyles(),
   read("../src/components/OnboardingChecklist.tsx"),
+  read("../src/components/Composer.tsx"),
 ]);
 
 test("empty home uses a single scrollable stack instead of dual-grow portals", () => {
@@ -95,4 +96,28 @@ test("home and docked composers share one width envelope", () => {
   // The minimap is out of flow, so appearing after overflow cannot consume
   // inline space from either composer variant.
   assert.match(styles, /\.minimap-rail\s*\{[\s\S]*?position:\s*absolute;/);
+});
+
+test("home and docked composers share visual shell metrics", () => {
+  assert.match(composer, /className="composer-input"/);
+  assert.doesNotMatch(composer, /composer-input-home/);
+  // Home keeps a distinct placement wrapper, but its shell, input, and toolbar
+  // must inherit the same rules as the transcript composer.
+  assert.doesNotMatch(
+    styles,
+    /\.composer-dock-home \.composer-(?:shell|input-wrap|input|toolbar)\s*\{/,
+  );
+  assert.doesNotMatch(styles, /\.composer-input-home\b/);
+  assert.match(
+    styles,
+    /\.composer-input-wrap\s*\{[\s\S]*?padding:\s*10px 12px 0;[\s\S]*?min-height:\s*44px;/,
+  );
+  assert.match(
+    styles,
+    /\.composer-input\s*\{[\s\S]*?min-height:\s*28px;[\s\S]*?font-size:\s*var\(--text-base\);/,
+  );
+  assert.match(
+    styles,
+    /\.composer-toolbar\s*\{[\s\S]*?padding:\s*4px 8px 8px;/,
+  );
 });

@@ -4845,8 +4845,11 @@ This test plan spec is accepted when:
   that fits one viewport, then grow it until the left-edge conversation minimap
   appears.
 - The empty-home and docked composer plates use the same horizontal gutter and
-  maximum content width. The minimap remains out of flow on the transcript's
-  left edge and does not squeeze or resize the composer.
+  maximum content width. Their shell, textarea, placeholder alignment, toolbar
+  padding, minimum input height, theme fill, and shadow are visually identical;
+  only the parent placement and localized welcome copy differ. The minimap
+  remains out of flow on the transcript's left edge and does not squeeze or
+  resize the composer.
 - When transcript content first overflows, the native scrollbar gutter is
   already reserved on both sides, so the transcript and composer keep one
   horizontal center instead of jumping left.

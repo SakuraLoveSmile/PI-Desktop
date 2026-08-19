@@ -133,7 +133,3 @@
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
-
-.composer-input-home {
-  padding-left: 14px;
-}

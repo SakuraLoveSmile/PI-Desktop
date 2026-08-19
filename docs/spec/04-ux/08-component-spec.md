@@ -1687,6 +1687,11 @@ reasoning-level control.
   and a `768px` maximum content envelope. The left-edge conversation minimap
   is absolutely positioned outside that envelope, so its appearance or
   disappearance never changes the composer shell width.
+- Visual parity: Home and thread-docked composers use the same
+  `.composer-shell`, `.composer-input-wrap`, `.composer-input`, and
+  `.composer-toolbar` spacing, minimum heights, theme surfaces, and controls.
+  Only the parent placement and the localized placeholder copy differ between
+  the empty home and a recorded conversation.
 - Scroll stability: The thread scrollport reserves stable gutters on both
   inline edges, so the centered transcript does not shift when overflow and
   the minimap first appear.

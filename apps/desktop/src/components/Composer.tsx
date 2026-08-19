@@ -1061,7 +1061,7 @@ export function Composer({
             <div className="composer-input-stage">
               <textarea
                 ref={ref}
-                className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}
+                className="composer-input"
                 readOnly={inputBlocked}
                 aria-readonly={inputBlocked}
                 aria-busy={pasting}
