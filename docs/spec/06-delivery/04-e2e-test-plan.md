@@ -4255,7 +4255,8 @@ Each scenario is documented in this format:
   default-model field and confirm the authenticated suggestions open as an
   app-styled list with aligned model IDs/display names, that typing filters it,
   ArrowDown/ArrowUp plus Enter selects an option, Escape closes it, and the
-  list does not cover the dialog actions. Confirm a custom model ID can still
+  fixed list is portaled above the dialog without changing dialog height or
+  being clipped by the dialog's overflow. Confirm a custom model ID can still
   be entered. Press Test connection and confirm the result resolves the edited
   account. 5) Resolve
   and use each account separately, including model discovery and one streamed

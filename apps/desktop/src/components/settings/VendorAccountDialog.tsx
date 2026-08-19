@@ -104,7 +104,6 @@ export function VendorAccountDialog({
               loading={models.status === "loading"}
               loadingLabel={t("settings.modelsLoading")}
               placeholder={t("settings.searchOrEnterModel")}
-              flowMenu
               onChange={(modelId) =>
                 setForm((current) => ({ ...current, modelId }))
               }

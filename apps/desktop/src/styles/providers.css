@@ -435,11 +435,8 @@
 }
 
 .provider-model-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 50;
+  position: fixed;
+  z-index: 60;
   max-height: 220px;
   overflow: auto;
   padding: 4px;
@@ -447,15 +444,15 @@
   border-radius: var(--radius-md-plus);
   background: var(--ds-bg-primary);
   box-shadow: 0 12px 32px color-mix(in oklab, #000 18%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }
 
-/* Compact dialogs keep the action row below the expanded suggestion list. */
-.provider-model-combo-flow .provider-model-menu {
-  position: relative;
-  top: auto;
-  left: auto;
-  right: auto;
-  margin-top: 4px;
+.provider-model-menu.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .provider-model-option {
