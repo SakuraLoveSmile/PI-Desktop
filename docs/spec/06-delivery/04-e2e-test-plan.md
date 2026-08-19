@@ -894,7 +894,9 @@ Each scenario is documented in this format:
   content does not overflow one viewport; the rail reappears once overflow
   returns after a resize. Dense markers remain centered in the unobstructed
   span between the 46px titlebar and docked composer, compress uniformly, and
-  remain interactive without entering the native window drag region.
+  remain interactive without entering the native window drag region. The
+  empty-home and docked composer use the same horizontal width envelope, and
+  the composer does not shrink when the minimap appears.
 - **Specs linked**: `04-ux/08-component-spec.md`
 - **Acceptance**: C (chat stream), Quality (keyboard and long-thread navigation)
 - **Milestone**: M3
@@ -4834,6 +4836,14 @@ This test plan spec is accepted when:
 - Superseded by US-UI-31 home empty vertical stack (D111).
 
 
+
+### US-UI-45 Composer width remains stable when the minimap appears
+- Open empty home and record the composer plate width. Open a short transcript
+  that fits one viewport, then grow it until the left-edge conversation minimap
+  appears.
+- The empty-home and docked composer plates use the same horizontal gutter and
+  maximum content width. The minimap remains out of flow on the transcript's
+  left edge and does not squeeze or resize the composer.
 
 ### US-UI-46 Home-with-project composer chrome
 - Open a project on empty home (no transcript).

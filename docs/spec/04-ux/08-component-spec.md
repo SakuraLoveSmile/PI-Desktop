@@ -1680,6 +1680,10 @@ reasoning-level control.
   row and its submenu; selecting a model or level returns to the two-entry root
   without closing the popover. The menu is `min(300px, 100vw - 24px)`, uses the
   large radius/dialog shadow tokens, and enters with a short upward fade.
+- Width: Home and thread-docked composers share one `24px` horizontal gutter
+  and a `768px` maximum content envelope. The left-edge conversation minimap
+  is absolutely positioned outside that envelope, so its appearance or
+  disappearance never changes the composer shell width.
 - Bottom-anchored: fixed at bottom of MainChat area
 - Placeholder carousel: home uses `chat.placeholderHome` (welcome) and
   `chat.placeholderHomeHint` (command hint); a session composer uses

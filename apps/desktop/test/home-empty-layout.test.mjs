@@ -72,11 +72,27 @@ test("short windows keep the empty stack scrollable rather than overlapping", ()
 test("empty home keeps the composer in a bottom region", () => {
   assert.match(
     styles,
-    /\.home-composer-wrap\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?padding:\s*0 12px 16px;/,
+    /\.home-composer-wrap\s*\{[\s\S]*?flex:\s*0 0 auto;[\s\S]*?padding:\s*0 24px 16px;/,
   );
   assert.match(styles, /\.composer-dock-home\s*\{[\s\S]*?position:\s*relative;/);
   assert.doesNotMatch(
     styles,
     /\.home-quick-actions|\.home-quick-action|\.home-suggestion-card|\.home-starters|\.home-starter-card/,
   );
+});
+
+test("home and docked composers share one width envelope", () => {
+  const homeComposer =
+    styles.match(/\.home-composer-wrap\s*\{[^}]*\}/)?.[0] ?? "";
+  const dockedComposer =
+    styles.match(/\.composer-dock-docked\s*\{[^}]*\}/)?.[0] ?? "";
+  const homeStack =
+    styles.match(/\.composer-dock-home \.composer-stack\s*\{[^}]*\}/)?.[0] ?? "";
+  assert.match(homeComposer, /width:\s*100%/);
+  assert.match(homeComposer, /padding:\s*0 24px 16px/);
+  assert.match(dockedComposer, /padding:\s*0 24px 16px/);
+  assert.match(homeStack, /width:\s*min\(100%,\s*768px\)/);
+  // The minimap is out of flow, so appearing after overflow cannot consume
+  // inline space from either composer variant.
+  assert.match(styles, /\.minimap-rail\s*\{[\s\S]*?position:\s*absolute;/);
 });

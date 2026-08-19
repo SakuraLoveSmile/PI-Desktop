@@ -32,7 +32,8 @@
 }
 
 .composer-dock-home .composer-stack {
-  width: 100%;
+  /* Keep home and docked modes on the same 768px content cap. */
+  width: min(100%, 768px);
   max-width: 100%;
   gap: 0;
   overflow: visible;
