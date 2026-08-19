@@ -465,6 +465,19 @@ pub struct InstallResult {
     pub permission_diff: Vec<String>,
 }
 
+/// Directory holding the plugins this application build ships, if any.
+///
+/// Electron resolves the packaged location and passes it down, because only it
+/// knows whether the app is running from `resources/` or a source checkout.
+fn builtin_plugins_dir() -> Option<PathBuf> {
+    let raw = std::env::var("PI_DESKTOP_BUILTIN_PLUGINS_DIR").ok()?;
+    let path = PathBuf::from(raw.trim());
+    if path.as_os_str().is_empty() || !path.is_dir() {
+        return None;
+    }
+    Some(path)
+}
+
 pub struct PluginManager {
     data_dir: PathBuf,
     runtime: Vec<PluginSummary>,
@@ -487,8 +500,93 @@ impl PluginManager {
         let _ = mgr.ensure_dirs();
         let _ = mgr.ensure_default_catalog();
         let _ = mgr.reload_from_disk();
+        let _ = mgr.sync_builtin(builtin_plugins_dir().as_deref());
         mgr
     }
+
+    /// Reconcile the registry with the plugins this application build ships.
+    ///
+    /// Bundled plugins are not installed by the user and cannot be uninstalled,
+    /// but they are ordinary plugins in every other respect — the whole point of
+    /// ADR 0104 is that first-party panel surfaces go through the same
+    /// contribution channel third parties use. Their row is therefore rebuilt
+    /// from the shipped manifest on every launch (so an app update refreshes the
+    /// version and contributions), while the two pieces of state the *user*
+    /// owns — whether it is enabled, and its activation scope — are carried
+    /// across. A bundled plugin that disappears from a newer build leaves the
+    /// registry with it.
+    pub fn sync_builtin(&mut self, dir: Option<&Path>) -> Result<()> {
+        let mut shipped: Vec<PluginSummary> = Vec::new();
+        if let Some(dir) = dir {
+            let entries = match fs::read_dir(dir) {
+                Ok(entries) => entries,
+                // A build without bundled plugins is valid, not an error.
+                Err(_) => return self.drop_missing_builtin(&shipped),
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.join("manifest.json").exists() {
+                    continue;
+                }
+                let manifest = match Self::read_manifest(&path) {
+                    Ok(manifest) => manifest,
+                    // A malformed bundled plugin is a build defect. Skip it
+                    // rather than refusing to start the whole host.
+                    Err(_) => continue,
+                };
+                let previous = self.runtime.iter().find(|p| p.id == manifest.id);
+                let now = Utc::now().to_rfc3339();
+                shipped.push(PluginSummary {
+                    id: manifest.id.clone(),
+                    name: manifest.name.clone(),
+                    version: manifest.version.clone(),
+                    enabled: previous.map(|p| p.enabled).unwrap_or(true),
+                    scope: previous.map(|p| p.scope.clone()).unwrap_or_default(),
+                    source: "builtin".into(),
+                    status: if previous.map(|p| p.enabled).unwrap_or(true) {
+                        "ready".into()
+                    } else {
+                        "disabled".into()
+                    },
+                    error_message: None,
+                    permissions: manifest.permissions.clone(),
+                    path: Some(path.to_string_lossy().to_string()),
+                    capabilities: derive_capabilities(&manifest),
+                    description: manifest.description.clone(),
+                    author: manifest.author.clone(),
+                    installed_at: previous
+                        .and_then(|p| p.installed_at.clone())
+                        .or(Some(now.clone())),
+                    updated_at: Some(now),
+                    marketplace: None,
+                    auto_update: None,
+                    update_available: None,
+                    // A bundled plugin has no publisher to yank it; its
+                    // lifecycle is the application's own release cycle.
+                    yanked: None,
+                    ui: manifest.ui.clone(),
+                    fs: manifest.fs.clone(),
+                    settings: derive_settings(&manifest),
+                });
+            }
+        }
+
+        self.drop_missing_builtin(&shipped)?;
+        for summary in shipped {
+            self.runtime.retain(|p| p.id != summary.id);
+            self.runtime.push(summary);
+        }
+        self.save()
+    }
+
+    /// Forget bundled rows this build no longer ships.
+    fn drop_missing_builtin(&mut self, shipped: &[PluginSummary]) -> Result<()> {
+        let keep: Vec<&str> = shipped.iter().map(|p| p.id.as_str()).collect();
+        self.runtime
+            .retain(|p| p.source != "builtin" || keep.contains(&p.id.as_str()));
+        Ok(())
+    }
+
 
     fn ensure_dirs(&self) -> Result<()> {
         for rel in [
@@ -829,6 +927,12 @@ impl PluginManager {
 
     pub fn uninstall(&mut self, id: &str) -> Result<bool> {
         let existing = self.get(id);
+        // A bundled plugin is part of the application, so there is nothing to
+        // remove and its files are not ours to delete. Disabling is the
+        // supported way to turn one off (ADR 0104).
+        if existing.as_ref().map(|p| p.source.as_str()) == Some("builtin") {
+            bail!("PLUGIN_INVALID: a bundled plugin cannot be uninstalled; disable it instead");
+        }
         let before = self.runtime.len();
         self.runtime.retain(|p| p.id != id);
         self.save()?;
@@ -3820,6 +3924,66 @@ mod tests {
             &[],
         );
         assert!(read_manifest_err(&escaping).contains("traversal"));
+    }
+
+    #[test]
+    fn bundled_plugins_refresh_from_disk_but_keep_user_state() {
+        let ship = tempdir().unwrap();
+        let plugin_manifest = |version: &str| {
+            json!({
+                "schemaVersion": 1,
+                "id": "pi.files",
+                "name": "Files",
+                "version": version,
+                "main": "main.js",
+                "contributes": {
+                    "views": [{ "id": "tree", "title": "Files", "entry": "views/tree.html" }]
+                },
+                "permissions": ["ui.view"],
+            })
+        };
+        let root = ship.path().join("pi.files");
+        write_plugin(
+            &root,
+            plugin_manifest("1.0.0"),
+            &[("views/tree.html", "<html></html>")],
+        );
+
+        let data = tempdir().unwrap();
+        let mut mgr = PluginManager::new(data.path(), None);
+        mgr.sync_builtin(Some(ship.path())).unwrap();
+
+        let listed = mgr.get("pi.files").expect("bundled plugin is registered");
+        assert_eq!(listed.source, "builtin");
+        assert_eq!(listed.version, "1.0.0");
+        assert!(listed.enabled, "a bundled plugin is on by default");
+        assert!(listed.capabilities.contains(&"views".to_string()));
+
+        // A bundled plugin is part of the app, so it cannot be uninstalled.
+        assert!(
+            mgr.uninstall("pi.files")
+                .unwrap_err()
+                .to_string()
+                .contains("cannot be uninstalled"),
+        );
+
+        // The user turning it off must survive the next launch, even though the
+        // rest of the row is rebuilt from the shipped manifest.
+        mgr.set_enabled("pi.files", false).unwrap();
+        write_plugin(
+            &root,
+            plugin_manifest("2.0.0"),
+            &[("views/tree.html", "<html></html>")],
+        );
+        mgr.sync_builtin(Some(ship.path())).unwrap();
+        let after = mgr.get("pi.files").unwrap();
+        assert_eq!(after.version, "2.0.0", "an app update refreshes the row");
+        assert!(!after.enabled, "the user's choice is not overwritten");
+
+        // A build that stops shipping it leaves no orphan row behind.
+        fs::remove_dir_all(&root).unwrap();
+        mgr.sync_builtin(Some(ship.path())).unwrap();
+        assert!(mgr.get("pi.files").is_none());
     }
 
     #[test]
