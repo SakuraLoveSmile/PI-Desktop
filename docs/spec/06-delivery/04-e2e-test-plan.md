@@ -3955,14 +3955,15 @@ Each scenario is documented in this format:
   provider request, durable transcript, and `<data_dir>/attachments/`.
 - **Steps**:
   1. Select the vision-capable model and paste the PNG into Composer.
-  2. Confirm the compact status row says the model accepts visual input.
+  2. Confirm the PNG appears as a removable image chip above the textarea and
+     no separate explanatory vision-status row is rendered.
   3. Send a prompt asking the model to identify one visible detail.
   4. Inspect the provider request and durable session message after completion.
   5. Reload the session and ask a follow-up about the same image.
 - **Expected**:
   - The model picker/session capability state comes from the exact pi-ai model
-    record, and the status row is localized, keyboard-readable, and not
-    color-only.
+    record, and Composer shows the image as a removable chip without a separate
+    explanatory status row.
   - Main writes one content-addressed image blob and sends the sidecar a
     transient image attachment; the provider adapter emits an image content
     block/data URL, not only `@<scratch-path>` text.
@@ -3989,12 +3990,14 @@ Each scenario is documented in this format:
   the 20 MiB inline bound.
 - **Steps**:
   1. Select the non-vision model, paste the normal PNG, and inspect Composer's
-     fallback status row.
+     removable image chip.
   2. Send the prompt and inspect the sidecar/provider request.
   3. Select the vision model, paste the oversized image, and send it.
   4. Retry each turn after disposing/recreating the runtime.
 - **Expected**:
-  - Both cases show a safe `@path` fallback and no image block/base64 payload.
+  - Composer shows the pasted image as a removable chip without a separate
+    vision-status explanation. Both cases show a safe `@path` fallback and no
+    image block/base64 payload.
   - The non-vision request references the session scratch file; the oversized
     vision request references a safe path while the image remains available to
     the normal file tools.
@@ -4017,13 +4020,14 @@ Each scenario is documented in this format:
   discovery data that incorrectly labels it `vision`, and a pasted PNG.
 - **Steps**:
   1. Refresh the provider model list and select the discovered custom id.
-  2. Paste the PNG and inspect the model picker and Composer status row.
+  2. Paste the PNG and inspect the model picker and Composer image chip.
   3. Send the prompt and inspect the sidecar/provider payload.
 - **Expected**:
   - The unknown model is runnable as a generic text model but is not promoted
     to `vision` by discovery/cache metadata.
-  - Composer states the path fallback, and the provider receives no image block
-    or base64 value; the safe file path remains available.
+  - Composer keeps the image chip without rendering a model-dependent status
+    message, and the provider receives no image block or base64 value; the safe
+    file path remains available.
   - The durable attachment ref is still recorded so a later known vision model
     can replay the image correctly.
 - **Specs linked**: `03-runtime/11-provider-model-system.md` §6.2/§11,

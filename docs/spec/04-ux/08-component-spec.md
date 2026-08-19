@@ -1791,7 +1791,6 @@ Anatomy:
 │  ↑↓ select · Enter confirm · Esc close       │  ← hint bar (footer)
 └──────────────────────────────────────────────┘
 [ image.png × ] [ another-file.ts × ]           ← when references exist
-[ visual input status ]                         ← when an image is attached
 [ composer textarea                            ]
 ```
 
@@ -1852,11 +1851,8 @@ Anatomy:
   their tooltip and accessible name, and provide a focus-visible localized
   remove button that restores textarea focus. Duplicate leaf labels remain
   separate because identity and dispatch use the canonical path, not the name.
-- When an image chip is present, a compact `role="status"`/`aria-live="polite"`
-  row states whether the selected model accepts visual input. The row is
-  informational, uses icon plus text rather than color alone, and updates when
-  the model changes. Unknown/custom models use the explicit path-fallback
-  wording.
+  Image and file references use the same compact chip treatment; no separate
+  explanatory vision-status row is rendered.
 - Sent template invocations render in the transcript as a monospace command
   chip from the message's `command` field instead of the expanded body.
 - States: keyboard-active row uses the shared `kb-active` treatment; empty
