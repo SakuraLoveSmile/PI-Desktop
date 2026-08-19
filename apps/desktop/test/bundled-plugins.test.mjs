@@ -47,6 +47,33 @@ test("the Files view uses only public bridge channels", () => {
   assert.match(view, /var\(--pi-plugin-titlebar-height, 0px\)/);
 });
 
+test("the Files view keeps the former browser workflow while staying plugin-owned", () => {
+  // The old host FilesTab established the useful interaction contract: a
+  // lazy tree opens a focused viewer, and Back returns to the same selection.
+  // Keep those affordances in the isolated plugin page so moving ownership did
+  // not make the feature less capable.
+  for (const marker of [
+    'id="refresh"',
+    'id="back"',
+    'id="viewer-body"',
+    'role="tree"',
+    'role", "treeitem"',
+    'aria-expanded',
+    'MAX_LINES = 5000',
+    'prefers-reduced-motion: reduce',
+  ]) {
+    assert.ok(view.includes(marker), `expected Files view marker: ${marker}`);
+  }
+  assert.match(view, /fs\.readText/);
+  assert.match(view, /text\.includes\("\\0"\)/);
+  assert.match(view, /appearance:changed/);
+  assert.match(view, /locale.*startsWith\("zh"\)/);
+  assert.match(view, /retry/);
+  // The plugin cannot reach host-only reveal or renderer APIs. Keeping this
+  // page on the public bridge is part of the bundled-plugin contract.
+  assert.doesNotMatch(view, /fsReveal|ipcRenderer|require\(/);
+});
+
 test("the host no longer offers Files as a built-in tool", () => {
   const tools = panelSource.slice(
     panelSource.indexOf("const HEADER_TOOLS = ["),
