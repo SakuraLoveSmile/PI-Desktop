@@ -4,7 +4,7 @@
 
 > 管理仓库：[vastsa/pi-plugin-center](https://github.com/vastsa/pi-plugin-center)
 > 分发仓库：[vastsa/pi-desktop-plugins](https://github.com/vastsa/pi-desktop-plugins)
-> 决策记录：[ADR 0102](../../adr/0102-publisher-owned-plugin-source-and-git-hosted-artifacts.md)
+> 决策记录：[ADR 0102](../../../adr/0102-publisher-owned-plugin-source-and-git-hosted-artifacts.md)
 > 客户端契约：[07-plugin-marketplace.md](07-plugin-marketplace.md)
 
 本文定义取代单仓库市场的分发系统，是插件中心服务的规范性方案；桌面客户端消费什么，
