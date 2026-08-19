@@ -1923,3 +1923,23 @@ D193 和 D194。
 - 参见 ADR 0103、ADR 0104、`07-plugins/02-plugin-manifest-schema.md` §4/§5/§7、
   `07-plugins/03-plugin-api.md` §6、`07-plugins/13-plugin-permissions-matrix.md`
   §2/§3、`04-ux/08-component-spec.md` §5 与 E2E-152。
+
+## 2026-08-19 — 文件成为第一个内置插件
+
+- 决策 D246 落实 D245 的第一步。浏览项目现在由随应用打包的 `pi.files` 插件承担，
+  与任何第三方插件一样经由 `contributes.views` 进入面板，宿主工具列表不再包含
+  文件条目。审阅与终端在其能力成为插件 API 之前仍保持内置。
+- 内置插件带有 `source: "builtin"`。host-core 在每次启动时依据 Electron 通过
+  `PI_DESKTOP_BUILTIN_PLUGINS_DIR` 报告的目录协调注册表，因此应用更新会刷新版本
+  与贡献，而属于用户的两项状态 —— 是否启用、激活范围 —— 会被保留。它们不可卸载，
+  只能禁用；新版本不再附带的插件不会留下孤儿注册行。
+- 只有「工具」发生了迁移。`file:<path>` 选项卡是对话产生的工件 —— 对话打开的文件
+  链接或计划检查点 —— 仍归宿主所有，与审阅的工件完全一致。审阅迁移时将适用同样的
+  划分。
+- 编写该插件立刻验证了 D245 的前提：`fs.glob` 返回的是上限 500 条、不含目录的扁平
+  文件列表，无法支撑惰性目录树，因此在既有 `fs.read` 权限下新增了 `pi.fs.list`。
+  它施加与 `glob` 相同的守卫 —— 声明范围、deny-list、受保护路径、跳过重目录 ——
+  因为列目录本身就是一次读取；目录始终返回，使范围很窄时仍能得到可导航的树。
+- 参见 ADR 0104、`07-plugins/03-plugin-api.md` §3/§6、
+  `07-plugins/13-plugin-permissions-matrix.md` §2、
+  `04-ux/08-component-spec.md` §5 与 E2E-153。

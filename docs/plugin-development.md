@@ -379,7 +379,7 @@ These APIs require explicit permissions:
 
 | Permission | Plugin-process API | Panel bridge channel |
 |---|---|---|
-| `fs.read` | `pi.fs.readText`, `pi.fs.glob`, `pi.fs.requestDirectory` | `fs.readText`, `fs.glob` |
+| `fs.read` | `pi.fs.readText`, `pi.fs.glob`, `pi.fs.list`, `pi.fs.requestDirectory` | `fs.readText`, `fs.glob`, `fs.list` |
 | `fs.write` | `pi.fs.writeText` | `fs.writeText` |
 | `fs.delete` | `pi.fs.remove` | Not exposed |
 | `clipboard.read` | `pi.clipboard.readText` | `clipboard.readText` |
@@ -387,6 +387,11 @@ These APIs require explicit permissions:
 | `net.fetch` | `pi.net.fetch` | `net.fetch` |
 | `shell.openExternal` | `pi.shell.openExternal` | `shell.openExternal` |
 | `notify` | `pi.ui.notify`, `pi.ui.getNotificationPermission`, `pi.ui.requestNotificationPermission`, `pi.ui.showNativeNotification` | `ui.notify`, `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` |
+
+Use `fs.list` rather than `fs.glob` when you are showing a tree: it returns one
+directory at a time (name-sorted, directories included), so the user expands
+what they want instead of waiting on a whole-repo walk that is capped at 500
+matches. Both obey the same read scope.
 
 A file permission is only half the declaration: `manifest.fs` says which paths
 each mode may touch (see §6.5). Paths are relative to the mode's root. Absolute
@@ -559,7 +564,10 @@ plugin's own persisted session partition, and network limited to
 `manifest.net.domains` (§6.6). It is also filtered by activation scope — a
 plugin restricted to certain projects does not offer its views in others.
 
-`examples/plugins/hello` ships a working view at `views/greetings.html`.
+`examples/plugins/hello` ships a working view at `views/greetings.html`, and
+PI-Desktop's own **Files** panel is a bundled plugin built the same way —
+`apps/desktop/resources/plugins/pi.files` is a complete, non-toy example of a
+view that reads the workspace over the bridge.
 
 ### 6.9 MCP server
 

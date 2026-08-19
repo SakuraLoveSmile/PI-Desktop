@@ -2098,3 +2098,29 @@ D193, and D194.
 - Decision D245 amends D186 and D233. See ADR 0091,
   `03-runtime/02-agent-runtime.md` §5d, `03-runtime/08-error-codes.md`, and
   E2E-149.
+
+## 2026-08-19 — Files ships as the first bundled plugin
+
+- Decision D246 implements the first step of D245. Browsing the project is now
+  the bundled `pi.files` plugin, reached through `contributes.views` like any
+  third-party one, and the host's tool list no longer carries a Files entry.
+  Review and Terminal stay built in until their capabilities exist as plugin
+  APIs.
+- Bundled plugins carry `source: "builtin"`. host-core reconciles its registry
+  against the directory Electron reports in `PI_DESKTOP_BUILTIN_PLUGINS_DIR` on
+  every launch, so an app update refreshes version and contributions, while the
+  two pieces of state the user owns — enabled, and activation scope — carry
+  across. They cannot be uninstalled, only disabled, and a plugin dropped from a
+  newer build leaves no orphan registry row.
+- Only the *tool* migrated. A `file:<path>` tab is a transcript artifact — a
+  file link or plan checkpoint the conversation opened — and stays host-owned,
+  exactly like Review's artifacts. The same split will apply when Review moves.
+- Writing the plugin proved D245's premise immediately: `fs.glob` returns a
+  flat, 500-capped file list with no directories and cannot back a lazy tree, so
+  `pi.fs.list` was added under the existing `fs.read` permission. It applies the
+  same guards as `glob` — declared scope, deny-list, protected paths, skipped
+  heavy directories — because a listing is a read; directories are always
+  returned so a narrow scope still yields a navigable tree.
+- See ADR 0104, `07-plugins/03-plugin-api.md` §3/§6,
+  `07-plugins/13-plugin-permissions-matrix.md` §2,
+  `04-ux/08-component-spec.md` §5, and E2E-153.

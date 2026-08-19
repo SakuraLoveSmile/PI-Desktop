@@ -17,7 +17,7 @@
 | `clipboard.read` | 中等 | `clipboard.readText` | 首次使用时确认 | 可能会读取敏感信息 |
 | `clipboard.write` | 中等 | `clipboard.writeText` | 首次使用时确认 | 防止剪贴板污染 |
 | `notify` | 低 | `ui.notify`、`ui.getNotificationPermission`、`ui.requestNotificationPermission`、`ui.showNativeNotification` | 可以默认授予 | 本机交付由操作系统控制；避免通知垃圾邮件滥用 |
-| `fs.read` | 中等 | `fs.readText` / `fs.glob` / `fs.requestDirectory` | 安装时授予，范围由 `manifest.fs.read` 限定 | 允许声明整棵树；读取之所以危险在于数据能不能出去，而出口已被单独关闭（§2A） |
+| `fs.read` | 中等 | `fs.readText` / `fs.glob` / `fs.list` / `fs.requestDirectory` | 安装时授予，范围由 `manifest.fs.read` 限定 | 允许声明整棵树；读取之所以危险在于数据能不能出去，而出口已被单独关闭（§2A） |
 | `fs.write` | 高 | `fs.writeText` | 安装时授予，范围由 `manifest.fs.write` 限定 | 必须声明范围；整棵树的模式无法通过校验。范围外要问用户 |
 | `fs.delete` | 高 | `fs.remove` | 安装时授予，范围由 `manifest.fs.delete` 限定 | 分两档（`own` / `scope`），一律进系统回收站，不递归，并有速率刹车（§2B） |
 | `fs.read.workspace` | 中等 | — | 加载时降级为 `fs.read` + 整棵树范围 | 旧权限名，早于文件范围机制 |

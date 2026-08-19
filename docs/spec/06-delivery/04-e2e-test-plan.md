@@ -4342,6 +4342,43 @@ Each scenario is documented in this format:
   `packages/plugin-sdk` and host-core manifest validation; the desktop journey
   is Draft (do not run E2E locally unless explicitly requested)
 
+#### E2E-153: The bundled Files plugin replaces the built-in Files tool
+
+- **Preconditions**: A packaged build (so `resources/plugins` is copied outside
+  the asar) and a project with nested directories, a `node_modules`, a `.env`,
+  and a binary file.
+- **Steps**:
+  1. Open the Plugins page. Confirm **Files** is listed with source "builtin",
+     enabled, showing a work-panel-views capability, and that it offers no
+     Uninstall action.
+  2. Reveal the work panel and open the header menu. Confirm the Tools group
+     lists only Review, Terminal, and Browser, and that Files appears under
+     Plugin views.
+  3. Open the Files view. Confirm the tree lists the project, expands
+     directories lazily, and omits `node_modules`, `.git`, and `.env`.
+  4. Click a text file. Confirm its contents render; click the binary file and
+     confirm it reports as binary rather than printing replacement characters.
+  5. Click a file path in the conversation. Confirm it still opens a host
+     `file:<path>` tab under Open resources — transcript artifacts did not move
+     to the plugin.
+  6. Disable the Files plugin. Confirm the view disappears from the menu and the
+     panel, and that transcript file links still work.
+  7. Re-enable it, then restart the app. Confirm the enabled state and the tree
+     return, and that the registry did not gain a duplicate row.
+- **Expected**: A first-party panel surface runs entirely on the public plugin
+  contribution channel, is user-disableable, cannot be uninstalled, and survives
+  restart. Its file access obeys the declared `fs.read` scope and the standard
+  deny-lists.
+- **Specs linked**: `07-plugins/03-plugin-api.md` §3,
+  `07-plugins/13-plugin-permissions-matrix.md` §2,
+  `04-ux/08-component-spec.md` §5, ADR 0103, ADR 0104
+- **Acceptance**: G (plugins), D (workspace), Security, Quality
+- **Milestone**: M6+
+- **Status**: Unit coverage in `apps/desktop/test/bundled-plugins.test.mjs`,
+  `apps/desktop/test/plugin-fs-scope.test.mjs` (`fs.list` guards), and host-core
+  `bundled_plugins_refresh_from_disk_but_keep_user_state`; the packaged journey
+  is Draft (do not run E2E locally unless explicitly requested)
+
 ## 8. Traceability Matrix
 
 
@@ -4356,7 +4393,7 @@ Each scenario is documented in this format:
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
 | E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-148, E2E-151 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152 |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152, E2E-153 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151 |
 | Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151 |
