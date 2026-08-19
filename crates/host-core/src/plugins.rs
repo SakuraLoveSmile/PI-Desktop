@@ -3158,9 +3158,6 @@ mod tests {
             assert_eq!(installed.plugin.source, "marketplace");
             let listed = mgr.list();
             assert_eq!(listed.len(), 1);
-            unsafe {
-                std::env::remove_var("PI_DESKTOP_DATA_DIR");
-            }
         });
     }
 
@@ -3217,9 +3214,6 @@ mod tests {
             assert_eq!(installed.plugin.id, "demo.hello");
             assert_eq!(installed.plugin.version, "0.2.0");
 
-            unsafe {
-                std::env::remove_var("PI_DESKTOP_DATA_DIR");
-            }
         });
     }
 
@@ -3282,9 +3276,6 @@ mod tests {
             );
             assert_eq!(compare_plugin_versions("0.5.1", "0.5.0"), Ordering::Greater);
             assert_eq!(compare_plugin_versions("0.5.1", "0.5.1-beta.1"), Ordering::Greater);
-            unsafe {
-                std::env::remove_var("PI_DESKTOP_DATA_DIR");
-            }
         });
     }
 
@@ -3344,9 +3335,6 @@ mod tests {
             assert!(mgr.apply_updates(false).unwrap().is_empty());
             assert_eq!(mgr.get("demo.hello").unwrap().version, "0.2.0");
 
-            unsafe {
-                std::env::remove_var("PI_DESKTOP_DATA_DIR");
-            }
         });
     }
 
@@ -3401,6 +3389,9 @@ mod tests {
 
     #[test]
     fn package_path_traversal_rejected() {
+        // PI_DESKTOP_DATA_DIR is process-wide; hold the same lock the market
+        // tests use so two tests cannot point it at each other's directory.
+        let _env = lock_market_env();
         let dir = tempdir().unwrap();
         unsafe {
             std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
@@ -3455,9 +3446,6 @@ mod tests {
                 .permissions
                 .iter()
                 .any(|p| p == "net.fetch"));
-            unsafe {
-                std::env::remove_var("PI_DESKTOP_DATA_DIR");
-            }
         });
     }
 
@@ -3558,9 +3546,6 @@ mod tests {
             .unwrap();
             assert!(mgr.cached_catalog_matches_source(MIRROR_MARKET_CATALOG_URL));
             assert!(!mgr.cached_catalog_matches_source(OFFICIAL_MARKET_CATALOG_URL));
-            unsafe {
-                std::env::remove_var("PI_DESKTOP_DATA_DIR");
-            }
         });
     }
 
@@ -3607,9 +3592,6 @@ mod tests {
             .unwrap();
             let results = mgr.market_search(None, None).unwrap();
             assert!(results.iter().any(|p| p.id == "mirror.only"));
-            unsafe {
-                std::env::remove_var("PI_DESKTOP_DATA_DIR");
-            }
         });
     }
 
@@ -3648,6 +3630,9 @@ mod tests {
 
     #[test]
     fn accepts_and_summarizes_new_contributions() {
+        // PI_DESKTOP_DATA_DIR is process-wide; hold the same lock the market
+        // tests use so two tests cannot point it at each other's directory.
+        let _env = lock_market_env();
         let dir = tempdir().unwrap();
         let root = dir.path().join("plugin");
         write_plugin(
@@ -3936,6 +3921,9 @@ mod tests {
     /// things that rewrite a plugin record: a restart and a reinstall.
     #[test]
     fn a_project_scope_survives_a_reload_and_a_reinstall() {
+        // PI_DESKTOP_DATA_DIR is process-wide; hold the same lock the market
+        // tests use so two tests cannot point it at each other's directory.
+        let _env = lock_market_env();
         let dir = tempdir().unwrap();
         unsafe {
             std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
@@ -4011,6 +3999,30 @@ mod tests {
         unsafe {
             std::env::remove_var("PI_DESKTOP_DATA_DIR");
         }
+    }
+
+    /// Build a manager whose catalog is already on disk.
+    ///
+    /// `PluginManager::new` falls back to `built_in_catalog` when no catalog
+    /// exists, and that helper reads the process-wide `PI_DESKTOP_DATA_DIR` and
+    /// materializes packages under it. A test that triggers the fallback
+    /// therefore writes into whichever directory another test happens to have
+    /// set, which is how this suite becomes order-dependent. Pre-writing the
+    /// catalog keeps these tests off that path entirely.
+    fn offline_manager(dir: &Path) -> PluginManager {
+        let catalog_path = dir.join("plugins/market/catalog.json");
+        fs::create_dir_all(catalog_path.parent().unwrap()).unwrap();
+        fs::write(
+            &catalog_path,
+            serde_json::to_string(&json!({
+                "schemaVersion": 2,
+                "providerId": "official",
+                "plugins": [],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        PluginManager::new(dir, None)
     }
 
     /// Build a catalog v2 entry with one live and one withdrawn version.
@@ -4167,7 +4179,7 @@ mod tests {
     fn a_yanked_version_is_never_offered_or_installed() {
         with_local_market(|| {
             let dir = tempdir().unwrap();
-            let mgr = PluginManager::new(dir.path(), None);
+            let mgr = offline_manager(dir.path());
             let entry = v2_entry();
 
             // 1.1.0 is newer but withdrawn, so the offered version is 1.0.0.
@@ -4200,7 +4212,7 @@ mod tests {
     fn a_version_requiring_a_newer_host_is_not_installable() {
         with_local_market(|| {
             let dir = tempdir().unwrap();
-            let mgr = PluginManager::new(dir.path(), None);
+            let mgr = offline_manager(dir.path());
             let mut entry = v2_entry();
             entry.versions.retain(|v| !v.yanked);
             entry.versions[0].min_pi_desktop = Some("999.0.0".into());
@@ -4224,7 +4236,7 @@ mod tests {
     fn a_package_url_off_the_allowlist_is_not_offered_for_install() {
         with_local_market(|| {
             let dir = tempdir().unwrap();
-            let mgr = PluginManager::new(dir.path(), None);
+            let mgr = offline_manager(dir.path());
             let mut entry = v2_entry();
             entry.versions.retain(|v| !v.yanked);
             entry.versions[0].url = "https://evil.test/acme.todo-1.0.0.piplug".into();
@@ -4237,16 +4249,16 @@ mod tests {
         let _guard = lock_market_env();
         let dir = tempdir().unwrap();
 
-        // A catalog already on disk keeps manager construction offline.
-        let catalog_path = dir.path().join("plugins/market/catalog.json");
-        fs::create_dir_all(catalog_path.parent().unwrap()).unwrap();
-        fs::write(&catalog_path, serde_json::to_string(&built_in_catalog()).unwrap()).unwrap();
-
+        // A catalog already on disk keeps manager construction offline. It is
+        // written literally rather than from `built_in_catalog`, which reads
+        // the process-wide PI_DESKTOP_DATA_DIR: borrowing another test's data
+        // directory is exactly the kind of shared state that makes a suite
+        // flaky.
         // Safety: test-only process env mutation, serialized by the market lock.
         unsafe {
             std::env::set_var("PI_DESKTOP_PLUGIN_MARKET_URL", OFFICIAL_MARKET_CATALOG_URL);
         }
-        let official = PluginManager::new(dir.path(), None);
+        let official = offline_manager(dir.path());
         assert_eq!(official.resolve_trust(&v2_entry()), "verified");
 
         // The same claim from a source the user pointed at themselves cannot
@@ -4254,7 +4266,7 @@ mod tests {
         unsafe {
             std::env::set_var("PI_DESKTOP_PLUGIN_MARKET_URL", "https://plugins.company.local/catalog.json");
         }
-        let custom = PluginManager::new(dir.path(), None);
+        let custom = offline_manager(dir.path());
         assert_eq!(custom.resolve_trust(&v2_entry()), "community");
 
         // An unrecognised tier is not trusted, and a v1 entry keeps its meaning.
