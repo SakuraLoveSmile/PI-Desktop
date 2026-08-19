@@ -55,23 +55,24 @@ const TAB_ICONS = {
 /**
  * Tools the host itself provides.
  *
- * Review, Terminal, and Files are on their way out of this list: they are being
- * moved to first-party plugins that reach the panel through `contributes.views`
- * like any third-party one, leaving Browser as the only built-in (ADR 0104).
- * Until that migration lands they stay here, and the plugin-views group below
- * renders alongside them.
+ * Shrinking toward Browser alone (ADR 0104). Files has left: browsing the
+ * project is now the bundled `pi.files` plugin, reached through the same
+ * `contributes.views` channel a third-party plugin uses. Review and Terminal
+ * follow once their capabilities exist as plugin APIs.
+ *
+ * The `file` *kind* stays, because it is not this list: a `file:<path>` tab is a
+ * transcript artifact — a file link or plan checkpoint the conversation opened —
+ * and the host still owns those, exactly as it owns Review's artifacts.
  */
 const HEADER_TOOLS = [
   { kind: "review", Icon: IconDiff },
   { kind: "terminal", Icon: IconTerminal },
   { kind: "browser", Icon: IconGlobe },
-  { kind: "file", Icon: IconFileText },
 ] as const;
 
 type HeaderToolKind = (typeof HEADER_TOOLS)[number]["kind"];
 
 function headerToolTab(kind: HeaderToolKind): WorkPanelTab {
-  if (kind === "file") return { id: "file", kind };
   return toolWorkPanelTab(kind);
 }
 

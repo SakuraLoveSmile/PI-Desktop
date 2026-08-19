@@ -117,6 +117,10 @@
         "to": "skills"
       },
       {
+        "from": "resources/plugins",
+        "to": "plugins"
+      },
+      {
         "from": "node_modules/node-pty/deps/winpty/LICENSE",
         "to": "licenses/node-pty-winpty.LICENSE"
       }
