@@ -868,6 +868,7 @@ export const zhCN = {
     collapse: "收起工作面板",
     resize: "调整工作面板宽度",
     tools: "工具",
+    pluginViews: "插件视图",
     openItems: "打开的资源",
     closeTab: "关闭{{name}}",
     tabs: {
@@ -875,6 +876,10 @@ export const zhCN = {
       terminal: "终端",
       browser: "浏览器",
       file: "文件",
+      plugin: "插件视图",
+    },
+    pluginView: {
+      failed: "无法加载该视图。请重新加载插件后重试。",
     },
     empty: {
       title: "还没有打开的资源",
@@ -1092,6 +1097,7 @@ export const zhCN = {
     contributeGuide: "贡献指南",
     capabilities: {
       panel: "面板",
+      views: "工作面板视图",
       commands: "命令",
       tools: "智能体工具",
       skills: "技能",

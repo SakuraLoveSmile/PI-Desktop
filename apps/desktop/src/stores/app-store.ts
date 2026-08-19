@@ -20,6 +20,7 @@ import type {
   PlanningStateEvent,
   PluginSummary,
   PluginTheme,
+  PluginViewMeta,
   PermissionMode,
   ProjectWorkspace,
   ProposalKind,
@@ -423,6 +424,8 @@ export type AppState = {
   plugins: PluginSummary[];
   /** Themes contributed by loaded plugins, with their sanitized CSS. */
   pluginThemes: PluginTheme[];
+  /** Work panel views contributed by loaded plugins, in menu order. */
+  pluginViews: PluginViewMeta[];
   /** Per-session permission queue, oldest first; parallel delegates can each
    * be waiting on one (ADR 0062). */
   pendingPermissions: PermissionQueues;
@@ -525,6 +528,8 @@ export type AppState = {
   refreshPlugins: () => Promise<void>;
   /** Reload contributed themes (plugins may come and go at runtime). */
   refreshPluginThemes: () => Promise<void>;
+  /** Reload contributed work panel views (scope and lifecycle change them). */
+  refreshPluginViews: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
   receiveNotification: (notification: AppNotification) => void;
   markNotificationRead: (id: string) => Promise<void>;
@@ -792,6 +797,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   providerModels: {},
   plugins: [],
   pluginThemes: [],
+  pluginViews: [],
   pendingPermissions: {},
   pendingAsks: {},
   planningStates: {},
@@ -2437,6 +2443,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       // A missing channel (older main process) must not break the shell; the
       // built-in themes keep working.
       set({ pluginThemes: [] });
+    }
+  },
+
+  refreshPluginViews: async () => {
+    try {
+      set({ pluginViews: await api.listPluginViews() });
+    } catch {
+      // Same reasoning as themes: an older main process without the channel
+      // leaves the panel with its built-in tool only, rather than breaking it.
+      set({ pluginViews: [] });
     }
   },
 

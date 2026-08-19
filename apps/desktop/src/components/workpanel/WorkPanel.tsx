@@ -7,8 +7,15 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
+import type { PluginViewMeta } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
-import { toolWorkPanelTab } from "../../lib/work-panel-tabs";
+import {
+  isToolWorkPanelTab,
+  parsePluginViewRef,
+  pluginWorkPanelTab,
+  toolWorkPanelTab,
+} from "../../lib/work-panel-tabs";
+import { pluginViewIcon, pluginViewInitial } from "../../lib/plugin-view-icons";
 import { useAppStore } from "../../stores/app-store";
 import type { WorkPanelTab } from "../../stores/app-store";
 import { cx } from "../ui";
@@ -20,12 +27,14 @@ import {
   IconFileText,
   IconGlobe,
   IconPanel,
+  IconPlug,
   IconTerminal,
 } from "../icons";
 import { ReviewTab } from "./ReviewTab";
 import { TerminalTab } from "./TerminalTab";
 import { BrowserTab } from "./BrowserTab";
 import { FilesTab } from "./FilesTab";
+import { PluginViewTab } from "./PluginViewTab";
 import { WorkTabEmpty } from "./WorkTabEmpty";
 import {
   WORK_PANEL_DEFAULT_WIDTH,
@@ -40,8 +49,18 @@ const TAB_ICONS = {
   terminal: IconTerminal,
   browser: IconGlobe,
   file: IconFileText,
+  plugin: IconPlug,
 } as const;
 
+/**
+ * Tools the host itself provides.
+ *
+ * Review, Terminal, and Files are on their way out of this list: they are being
+ * moved to first-party plugins that reach the panel through `contributes.views`
+ * like any third-party one, leaving Browser as the only built-in (ADR 0102).
+ * Until that migration lands they stay here, and the plugin-views group below
+ * renders alongside them.
+ */
 const HEADER_TOOLS = [
   { kind: "review", Icon: IconDiff },
   { kind: "terminal", Icon: IconTerminal },
@@ -56,28 +75,38 @@ function headerToolTab(kind: HeaderToolKind): WorkPanelTab {
   return toolWorkPanelTab(kind);
 }
 
-/** Tool tabs are singletons keyed by kind; every other tab carries a resource. */
-function isToolTab(tab: WorkPanelTab) {
-  return tab.id === tab.kind;
-}
-
 function clampWidth(width: number) {
   return clampWorkPanelWidth(width);
 }
 
-function tabLabel(tab: WorkPanelTab, t: (key: string) => string) {
+function tabLabel(
+  tab: WorkPanelTab,
+  t: (key: string) => string,
+  pluginViews: PluginViewMeta[],
+) {
+  if (tab.kind === "plugin") {
+    const view = pluginViews.find((candidate) => candidate.ref === tab.resource);
+    // A view whose plugin was disabled mid-session no longer resolves; fall
+    // back to its id rather than leaving the header blank until the tab closes.
+    return view?.title ?? tab.resource ?? t("panel.tabs.plugin");
+  }
   if (tab.kind !== "file") return t(`panel.tabs.${tab.kind}`);
   const path = tab.resource ?? "";
   return path.split("/").filter(Boolean).pop() || t("panel.tabs.file");
 }
 
 export function WorkPanel({
-  browserBlocked = false,
+  panelBlocked = false,
   onCollapse,
   exiting = false,
   onExitAnimationEnd,
 }: {
-  browserBlocked?: boolean;
+  /**
+   * Hides every native surface in the panel. Both the preview browser and a
+   * plugin view are `WebContentsView`s composited above renderer content, so a
+   * blocking overlay must suppress them alike.
+   */
+  panelBlocked?: boolean;
   onCollapse?: () => void;
   /** Plays work-panel-out; parent unmounts after animationend. */
   exiting?: boolean;
@@ -87,6 +116,7 @@ export function WorkPanel({
   const tabs = useAppStore((s) => s.workPanelTabs);
   const activeTabId = useAppStore((s) => s.activeWorkPanelTabId);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
+  const pluginViews = useAppStore((s) => s.pluginViews);
   const width = useAppStore((s) => s.workPanelWidth);
   const activateTab = useAppStore((s) => s.activateWorkPanelTab);
   const closeTab = useAppStore((s) => s.closeWorkPanelTab);
@@ -94,8 +124,8 @@ export function WorkPanel({
   const setWidth = useAppStore((s) => s.setWorkPanelWidth);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
   const terminalOpen = tabs.some((tab) => tab.kind === "terminal");
-  /** Resources opened from the transcript; the tool singletons list above. */
-  const resourceTabs = tabs.filter((tab) => !isToolTab(tab));
+  /** Resources opened from the transcript; tools and plugin views list above. */
+  const resourceTabs = tabs.filter((tab) => !isToolWorkPanelTab(tab));
 
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const dragState = useRef<{
@@ -223,6 +253,20 @@ export function WorkPanel({
       const existing = tabs.find((tab) => tab.id === kind);
       if (existing) activateTab(existing.id);
       else openWorkPanelTab(headerToolTab(kind));
+      closeContext();
+    },
+    [activateTab, closeContext, openWorkPanelTab, tabs],
+  );
+
+  const openPluginView = useCallback(
+    (view: PluginViewMeta) => {
+      // Same singleton rule as the built-in tools: one tab per view, so
+      // re-picking it from the menu returns to the live page rather than
+      // stacking a second copy of the same plugin surface.
+      const tab = pluginWorkPanelTab(view.pluginId, view.viewId);
+      const existing = tabs.find((candidate) => candidate.id === tab.id);
+      if (existing) activateTab(existing.id);
+      else openWorkPanelTab(tab);
       closeContext();
     },
     [activateTab, closeContext, openWorkPanelTab, tabs],
@@ -360,8 +404,16 @@ export function WorkPanel({
     },
     [finishResize, renderWidth, setWidth, widthLimits.max, widthLimits.min],
   );
-  const activeLabel = activeTab ? tabLabel(activeTab, t) : t("panel.title");
-  const ActiveIcon = activeTab ? TAB_ICONS[activeTab.kind] : IconDiff;
+  const activeLabel = activeTab ? tabLabel(activeTab, t, pluginViews) : t("panel.title");
+  const activePluginView =
+    activeTab?.kind === "plugin"
+      ? pluginViews.find((view) => view.ref === activeTab.resource)
+      : undefined;
+  const ActiveIcon = activeTab
+    ? (activeTab.kind === "plugin"
+        ? pluginViewIcon(activePluginView?.icon) ?? TAB_ICONS.plugin
+        : TAB_ICONS[activeTab.kind])
+    : IconDiff;
   const exitAnimationReady = exiting && nativeSurfaceReadyForExit;
   const panelStyle = {
     width: renderWidth,
@@ -498,6 +550,83 @@ export function WorkPanel({
                     );
                   })}
                 </div>
+                {pluginViews.length > 0 && (
+                  <>
+                    <div className="work-panel-context-divider" />
+                    {/* Plugin views sit with the tools rather than the opened
+                        resources: they are entry points the user picks, not
+                        things the transcript produced. Rows mirror the tool
+                        rows exactly — edge marker, open dot, reserved close
+                        slot — so a plugin surface is not visibly second-class
+                        next to a built-in one. */}
+                    <div
+                      className="work-panel-menu-group"
+                      role="group"
+                      aria-labelledby="work-panel-menu-plugin-views"
+                    >
+                      <div
+                        className="work-panel-menu-title"
+                        id="work-panel-menu-plugin-views"
+                      >
+                        {t("panel.pluginViews")}
+                      </div>
+                      {pluginViews.map((view, index) => {
+                        const tabId = pluginWorkPanelTab(view.pluginId, view.viewId).id;
+                        const tab = tabs.find((candidate) => candidate.id === tabId);
+                        const selected = tab?.id === activeTabId;
+                        const Icon = pluginViewIcon(view.icon);
+                        const itemIndex = HEADER_TOOLS.length + index;
+                        return (
+                          <div
+                            className={cx("work-panel-menu-row", selected && "active")}
+                            role="none"
+                            key={view.ref}
+                          >
+                            <button
+                              type="button"
+                              role="menuitemradio"
+                              aria-checked={selected}
+                              tabIndex={-1}
+                              data-work-panel-menu-item=""
+                              data-work-panel-close-id={tab ? tab.id : undefined}
+                              data-work-panel-plugin-view={view.ref}
+                              className="work-panel-menu-item"
+                              title={`${view.title} — ${view.pluginName}`}
+                              onClick={() => openPluginView(view)}
+                            >
+                              {Icon ? (
+                                <Icon size={15} />
+                              ) : (
+                                <span className="work-panel-view-initial" aria-hidden>
+                                  {pluginViewInitial(view.title)}
+                                </span>
+                              )}
+                              <span className="work-panel-menu-label">{view.title}</span>
+                              {tab && !selected && (
+                                <span className="work-panel-open-dot" aria-hidden />
+                              )}
+                            </button>
+                            <span className="work-panel-menu-slot">
+                              {tab && (
+                                <button
+                                  type="button"
+                                  tabIndex={-1}
+                                  data-work-panel-menu-close=""
+                                  className="work-panel-menu-close"
+                                  title={t("panel.closeTab", { name: view.title })}
+                                  aria-label={t("panel.closeTab", { name: view.title })}
+                                  onClick={() => closeTabFromMenu(tab.id, itemIndex)}
+                                >
+                                  <IconClose size={12} />
+                                </button>
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
                 {resourceTabs.length > 0 && (
                   <>
                     <div className="work-panel-context-divider" />
@@ -513,10 +642,13 @@ export function WorkPanel({
                         {t("panel.openItems")}
                       </div>
                       {resourceTabs.map((tab, index) => {
-                        const label = tabLabel(tab, t);
+                        const label = tabLabel(tab, t, pluginViews);
                         const Icon = TAB_ICONS[tab.kind];
                         const selected = tab.id === activeTabId;
-                        const itemIndex = HEADER_TOOLS.length + index;
+                        // Focus restoration after a close counts menu rows, so
+                        // this index has to include every group drawn above.
+                        const itemIndex =
+                          HEADER_TOOLS.length + pluginViews.length + index;
                         return (
                           <div
                             className={cx("work-panel-menu-row", selected && "active")}
@@ -623,7 +755,7 @@ export function WorkPanel({
             >
               <BrowserTab
                 blocked={
-                  exiting || browserBlocked || contextOpen || dragWidth !== null
+                  exiting || panelBlocked || contextOpen || dragWidth !== null
                 }
                 sessionId={activeSessionId}
                 initialUrl={activeTab.resource}
@@ -641,11 +773,40 @@ export function WorkPanel({
               <FilesTab />
             </div>
           )}
+          {/* A plugin view is remounted per ref so switching between two views
+              of the same plugin re-measures rather than reusing a stale rect.
+              The host process keeps the page alive across that remount, so the
+              plugin does not lose its state. */}
+          {activeTab?.kind === "plugin" &&
+            (() => {
+              const ref = parsePluginViewRef(activeTab.resource);
+              if (!ref) return null;
+              return (
+                <div
+                  key={activeTab.id}
+                  id={`work-panel-surface-${activeTab.id}`}
+                  className="work-panel-tabpane"
+                  role="tabpanel"
+                  aria-labelledby={`work-panel-title-${activeTab.id}`}
+                >
+                  <PluginViewTab
+                    pluginId={ref.pluginId}
+                    viewId={ref.viewId}
+                    title={activeLabel}
+                    icon={activePluginView?.icon}
+                    blocked={
+                      exiting || panelBlocked || contextOpen || dragWidth !== null
+                    }
+                  />
+                </div>
+              );
+            })()}
           {/* `Cmd/Ctrl+J` reveals the panel without creating a resource, so the
               body can be empty. No tab exists to label a tabpanel here; the
-              same four tools the header menu offers are listed inline so the
-              revealed panel is not a dead end. An empty tab set also means the
-              terminal cannot be mounted, so this never hides a live PTY. */}
+              same entries the header menu offers — built-in tools first, then
+              plugin views — are listed inline so the revealed panel is not a
+              dead end. An empty tab set also means the terminal cannot be
+              mounted, so this never hides a live PTY. */}
           {!activeTab && (
             <div className="work-panel-tabpane" data-testid="work-panel-empty">
               <WorkTabEmpty
@@ -670,6 +831,28 @@ export function WorkPanel({
                       <span>{t(`panel.tabs.${kind}`)}</span>
                     </button>
                   ))}
+                  {pluginViews.map((view) => {
+                    const Icon = pluginViewIcon(view.icon);
+                    return (
+                      <button
+                        key={view.ref}
+                        type="button"
+                        className="work-panel-empty-tool"
+                        data-work-panel-plugin-view={view.ref}
+                        title={`${view.title} — ${view.pluginName}`}
+                        onClick={() => openPluginView(view)}
+                      >
+                        {Icon ? (
+                          <Icon size={15} />
+                        ) : (
+                          <span className="work-panel-view-initial" aria-hidden>
+                            {pluginViewInitial(view.title)}
+                          </span>
+                        )}
+                        <span>{view.title}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </WorkTabEmpty>
             </div>
