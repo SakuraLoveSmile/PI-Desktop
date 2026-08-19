@@ -997,11 +997,11 @@ Each scenario is documented in this format:
 - **Acceptance**: G (marketplace install + permission review)
 - **Status**: Documented / host-core covered by unit tests + protocol methods
 
-#### E2E-024R: Install from a catalog v2 source with a re-hosted artifact
+#### E2E-024R: Install a center-published plugin from the unchanged distribution source
 
-- **Preconditions**: A `schemaVersion: 2` catalog whose `artifactBaseUrl` points at plugin-center release assets, with one plugin carrying provenance and an approved review verdict.
-- **Steps**: 1) Point the marketplace source at the v2 catalog. 2) Open a plugin's detail sheet. 3) Read the Source section. 4) Install the selected version. 5) Switch to the CNB mirror and repeat the install.
-- **Expected**: The relative package URL resolves against `artifactBaseUrl`, not the catalog directory; the detail sheet shows the source repository, commit, and builder before install; the download follows the GitHub release redirect to its storage host and verifies the catalog checksum; the mirror declares its own base so the mirrored install resolves under CNB with an identical checksum; the installed record keeps publisher, trust tier, and source pin.
+- **Preconditions**: A `schemaVersion: 2` catalog served from the distribution repository, with one plugin carrying provenance and an approved review verdict, its package under `packages/`. A second fixture declares `artifactBaseUrl` for the mirror/enterprise case.
+- **Steps**: 1) Keep the marketplace source at its default. 2) Open a plugin's detail sheet. 3) Read the Source section. 4) Install the selected version. 5) Switch to the CNB mirror and repeat the install. 6) Repeat against the fixture that declares a base.
+- **Expected**: No settings change or client update is needed to see center-published plugins, because the catalog URL is unchanged; the relative package URL resolves against the catalog directory, so GitHub serves it from `raw.githubusercontent.com` and the mirror from `cnb.cool` with an identical checksum; a declared `artifactBaseUrl` takes precedence when present; the detail sheet shows the source repository, commit, and builder before install; the installed record keeps publisher, trust tier, and source pin.
 - **Specs linked**: `07-plugins/07-plugin-marketplace.md`, `07-plugins/15-plugin-center.md`
 - **Acceptance**: G (publisher-owned source distribution)
 - **Status**: Documented / host-core covered by unit tests

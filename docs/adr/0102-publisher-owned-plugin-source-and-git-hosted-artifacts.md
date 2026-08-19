@@ -1,5 +1,9 @@
 # ADR 0102: Publisher-owned plugin source with a Git-hosted artifact store
 
+> Amended 2026-08-19: artifacts are committed to the existing distribution
+> repository rather than published as releases of the center repository. The
+> ownership model and every other decision below are unchanged.
+
 - Status: Accepted for implementation
 - Date: 2026-08-18
 - Deciders: PI-Desktop plugin and distribution maintainers
@@ -45,27 +49,36 @@ source into a project-owned repository. `pluginId`, `publisherId`, the linked
 repository, and the packaged `manifest.json` identity must agree, and a published
 version is pinned to exactly one `(repository, commit, path)` tuple.
 
-### 2. The center re-hosts artifacts on GitHub Releases, mirrored to CNB
+### 2. Management and distribution are separate repositories
 
-The plugin center is the only artifact origin the client downloads from. There is
-no S3, no R2, and no separately operated CDN.
+`vastsa/pi-plugin-center` is the management plane: submissions, ownership
+verification, isolated builds, review, the policy gate, and the registry that
+records what has been published.
+
+`vastsa/pi-desktop-plugins` stays the distribution repository. It keeps serving
+`catalog.json` from its root and packages from `packages/`, and the CNB copy
+keeps mirroring it. There is no S3, no R2, and no separately operated CDN.
 
 - The publisher builds and attaches `<id>-<version>.piplug` to a release in their
   own repository, or the center's isolated runner builds it from the pinned
   commit.
-- The center verifies the bytes, then publishes them as a release asset of
-  `vastsa/pi-plugin-center` under the immutable tag `<pluginId>@<version>`.
-- A CNB mirror carries byte-identical assets and its own `catalog.json` for
-  networks that cannot reach GitHub.
-- Client downloads resolve against the catalog's own `artifactBaseUrl`, so
-  switching source never crosses providers mid-install and never changes the
-  checksum being verified.
+- The center verifies the bytes, then commits the package to
+  `pi-desktop-plugins/packages/` together with a regenerated `catalog.json`, in
+  one commit.
+- Package URLs stay relative, so they resolve against whichever host served the
+  catalog. Switching between GitHub and the CNB mirror therefore cannot send a
+  download to the other provider or change the checksum being verified.
 
-GitHub Releases are not WORM storage. Immutability is enforced instead by three
-independent records: the artifact digest written to the center database inside
-the publish transaction, the digest committed to the Git-tracked catalog, and the
-client's own checksum verification. A silently replaced asset fails the client
-check and is visible as a digest that disagrees with catalog history.
+Keeping distribution where it already is means the default catalog URL never
+changes and no installed client needs to migrate. It also means the artifact
+bytes and the digest that describes them land in the same Git commit, which is a
+stronger record than a release asset: changing published bytes requires rewriting
+history rather than re-uploading a file. The residual risk is a force-push, which
+branch protection on the distribution repository is expected to prevent.
+
+The accepted cost is repository growth. Committed binaries are permanent — an
+unused version can be removed from `packages/` but stays in history, so every
+clone pays for every version ever published.
 
 ### 3. Catalog schema v2 is the client contract
 
@@ -101,14 +114,18 @@ attention.
 
 - Third-party publishers can ship plugins without write access to any
   PI-Desktop-owned repository, and can version on their own schedule.
-- The marketplace repository stops accumulating binary history; artifacts live in
-  releases and can be pruned by policy without rewriting Git history.
+- The default catalog URL is unchanged, so no client release and no user action
+  is needed to reach plugins published through the center.
+- The client needs no code change for this decision: relative package URLs
+  already resolve against the catalog that carried them, and the download host
+  allowlist already covers both distribution hosts.
 - Every installed marketplace plugin can be traced to a repository and commit,
   and the desktop can show that provenance before install.
-- Losing object storage costs WORM semantics. The tamper-evidence chain above is
-  weaker than a versioned bucket with object lock, and this is an accepted trade.
-- The client must tolerate two catalog schemas until the v1 marketplace
-  repository is retired.
+- Losing object storage costs WORM semantics and versioned-bucket retention. The
+  Git record above is tamper-evident rather than tamper-proof, and the
+  distribution repository grows without bound. Both are accepted trades.
+- The client must tolerate two catalog schemas while the distribution repository
+  serves v1 entries alongside center-published v2 ones.
 - Publisher signing keys remain out of scope. The center signs; publisher-held
   keys stay in ADR 0008's later phase.
 
@@ -120,6 +137,11 @@ attention.
   the download path entirely, but a publisher can delete or replace a release
   asset out from under a published version, and the client would need an
   open-ended host allowlist.
+- **Publish artifacts as releases of the distribution repository.** Keeps Git
+  history free of binaries and allows pruning old versions, at the cost of a
+  catalog that must declare an artifact base, and a CNB mirror that has to
+  replicate release assets separately instead of riding along with the Git
+  mirror that already exists.
 - **Center builds every plugin from source with no publisher artifact.** Strongest
   reproducibility, and makes the center responsible for every plugin's toolchain
   and dependency supply chain from day one. Retained as the runner path for

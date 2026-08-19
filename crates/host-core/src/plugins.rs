@@ -4029,6 +4029,35 @@ mod tests {
         );
     }
 
+    /// The distribution repository serves `catalog.json` from its root and
+    /// packages from `packages/`, and the CNB copy is a Git mirror of it. Both
+    /// therefore work with a relative URL and no declared base, which is the
+    /// reason moving publishing into the plugin center needs no client change.
+    #[test]
+    fn official_and_mirror_sources_each_resolve_their_own_packages() {
+        let relative = "packages/acme.todo-1.0.0.piplug";
+
+        let github =
+            PluginManager::resolve_package_url(OFFICIAL_MARKET_CATALOG_URL, None, relative);
+        assert_eq!(
+            github,
+            "https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/packages/acme.todo-1.0.0.piplug"
+        );
+
+        let mirror = PluginManager::resolve_package_url(MIRROR_MARKET_CATALOG_URL, None, relative);
+        assert_eq!(
+            mirror,
+            "https://cnb.cool/aixk/pi-desktop-plugins/-/git/raw/main/packages/acme.todo-1.0.0.piplug"
+        );
+
+        // Neither resolution leaves the source the user picked, and both hosts
+        // are ones the download boundary already accepts.
+        package_host_allowed(&github, OFFICIAL_MARKET_CATALOG_URL).unwrap();
+        package_host_allowed(&mirror, MIRROR_MARKET_CATALOG_URL).unwrap();
+        assert!(github.starts_with("https://raw.githubusercontent.com/"));
+        assert!(mirror.starts_with("https://cnb.cool/"));
+    }
+
     #[test]
     fn a_yanked_version_is_never_offered_or_installed() {
         with_local_market(|| {
