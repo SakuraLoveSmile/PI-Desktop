@@ -193,12 +193,39 @@ function shortSha(value?: string): string {
 }
 
 /**
- * A catalog version is installable only once its package is published. The
- * host refuses the download otherwise, so every install affordance reads this
- * instead of offering a button that can only fail.
+ * A catalog version is installable only once its package is published and
+ * while it is still offered. The host refuses the download otherwise, so every
+ * install affordance reads this instead of offering a button that can only
+ * fail.
  */
-function versionInstallable(version?: { url?: string; shasum?: string } | null): boolean {
-  return !!version?.url?.trim() && !!version?.shasum?.trim();
+function versionInstallable(
+  version?: { url?: string; shasum?: string; yanked?: boolean } | null,
+): boolean {
+  return !!version?.url?.trim() && !!version?.shasum?.trim() && !version.yanked;
+}
+
+/**
+ * Withdrawn is a different refusal from not-yet-published: the version existed
+ * and was pulled, so the sheet explains it rather than telling the user to wait
+ * for an upload that will never come.
+ */
+function versionWithdrawn(version?: { yanked?: boolean } | null): boolean {
+  return !!version?.yanked;
+}
+
+/**
+ * Whether a marketplace entry may render the verified shield.
+ *
+ * Catalog v2 carries an explicit tier that only the plugin center can issue,
+ * and the host already downgrades a claim it cannot attribute to the official
+ * source. A v1 entry has no tier, so its maintainer-written boolean still
+ * decides. Rendering `trust` first keeps the badge from being something a
+ * publisher can grant themselves.
+ */
+function showsVerifiedBadge(entry?: { trust?: string; verified?: boolean } | null): boolean {
+  if (!entry) return false;
+  if (entry.trust) return entry.trust === "verified";
+  return !!entry.verified;
 }
 
 /** Single-glyph stand-in for a marketplace icon we deliberately do not fetch. */
@@ -910,6 +937,9 @@ export function PluginsPage() {
       ? !versionInstallable(activeVersion)
       : detail.installable === false
     : false;
+  // Withdrawn and not-yet-published both block the install, and they are not
+  // the same news: one is over, the other is pending.
+  const detailWithdrawn = versionWithdrawn(activeVersion);
 
   return (
     <div className="thread-scroll">
@@ -1514,7 +1544,7 @@ export function PluginsPage() {
                           <span className="plugins-card-ident">
                             <span className="plugins-card-title">
                               <span className="plugins-card-name">{item.name}</span>
-                              {item.verified ? (
+                              {showsVerifiedBadge(item) ? (
                                 <span
                                   className="plugins-verified"
                                   title={t("plugins.verified")}
@@ -1620,7 +1650,7 @@ export function PluginsPage() {
               <div className="plugins-sheet-ident">
                 <h2 className="plugins-sheet-title">
                   {detail?.name || selectedId}
-                  {detail?.verified ? (
+                  {showsVerifiedBadge(detail) ? (
                     <span
                       className="plugins-verified"
                       title={t("plugins.verified")}
@@ -1663,7 +1693,9 @@ export function PluginsPage() {
                   <div className="plugins-sheet-cta-copy">
                     <span className="plugins-sheet-cta-version">v{installTarget}</span>
                     <span className="plugins-sheet-cta-meta">
-                      {detailPackagePending
+                      {detailWithdrawn
+                        ? t("plugins.withdrawnHint", { version: installTarget })
+                        : detailPackagePending
                         ? t("plugins.packagePendingHint", { version: installTarget })
                         : (
                             <>
@@ -1698,7 +1730,9 @@ export function PluginsPage() {
                         })
                       }
                     >
-                      {detailPackagePending
+                      {detailWithdrawn
+                        ? t("plugins.withdrawn")
+                        : detailPackagePending
                         ? t("plugins.packagePending")
                         : busyId === detail.id
                           ? t("plugins.installing")
@@ -1739,6 +1773,49 @@ export function PluginsPage() {
                       </div>
                     ) : null}
                   </section>
+
+                  {activeVersion?.provenance?.sourceRepository ? (
+                    <section className="plugins-sheet-section">
+                      <h3 className="plugins-sheet-section-title">
+                        {t("plugins.sourceTitle")}
+                      </h3>
+                      <div className="plugins-sheet-links">
+                        <button
+                          type="button"
+                          className="plugins-sheet-link"
+                          onClick={() =>
+                            openUrlInWorkPanel(activeVersion.provenance!.sourceRepository)
+                          }
+                        >
+                          <IconLink size={13} />
+                          <span className="plugins-sheet-link-label">
+                            {t("plugins.repository")}
+                          </span>
+                          <span className="plugins-sheet-link-url">
+                            {activeVersion.provenance.sourceRepository}
+                          </span>
+                        </button>
+                      </div>
+                      <dl className="plugins-provenance">
+                        {activeVersion.provenance.sourceCommit ? (
+                          <div className="plugins-provenance-row">
+                            <dt>{t("plugins.sourceCommit")}</dt>
+                            <dd>
+                              <code title={activeVersion.provenance.sourceCommit}>
+                                {shortSha(activeVersion.provenance.sourceCommit)}
+                              </code>
+                            </dd>
+                          </div>
+                        ) : null}
+                        {activeVersion.provenance.builder ? (
+                          <div className="plugins-provenance-row">
+                            <dt>{t("plugins.sourceBuiltBy")}</dt>
+                            <dd>{activeVersion.provenance.builder}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                    </section>
+                  ) : null}
 
                   {detail.safetyNotes ? (
                     <section className="plugins-callout">
@@ -1792,12 +1869,17 @@ export function PluginsPage() {
                     <div className="plugins-version-list">
                       {(detail.versions ?? []).map((version) => {
                         const active = activeVersion?.version === version.version;
-                        const pending = !versionInstallable(version);
+                        const withdrawn = versionWithdrawn(version);
+                        const pending = !withdrawn && !versionInstallable(version);
                         return (
                           <button
                             key={version.version}
                             type="button"
-                            className={cx("plugins-version", active && "active")}
+                            className={cx(
+                              "plugins-version",
+                              active && "active",
+                              withdrawn && "withdrawn",
+                            )}
                             aria-pressed={active}
                             onClick={() => setSelectedVersion(version.version)}
                           >
@@ -1810,7 +1892,11 @@ export function PluginsPage() {
                                 <span>{formatDate(version.publishedAt, locale)}</span>
                               </span>
                               <span className="plugins-version-meta">
-                                {pending ? (
+                                {withdrawn ? (
+                                  <span className="plugins-version-withdrawn">
+                                    {t("plugins.withdrawn")}
+                                  </span>
+                                ) : pending ? (
                                   <span className="plugins-version-pending">
                                     {t("plugins.packagePending")}
                                   </span>
@@ -1826,7 +1912,13 @@ export function PluginsPage() {
                                   </>
                                 )}
                               </span>
-                              {version.changelog ? (
+                              {withdrawn && version.yankedReason ? (
+                                <span className="plugins-version-changelog">
+                                  {t("plugins.withdrawnReason", {
+                                    reason: version.yankedReason,
+                                  })}
+                                </span>
+                              ) : version.changelog ? (
                                 <span className="plugins-version-changelog">
                                   {version.changelog}
                                 </span>

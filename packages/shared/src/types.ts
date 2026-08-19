@@ -831,10 +831,57 @@ export type PluginUpdateInfo = {
   permissionDiff?: string[];
 };
 
+/**
+ * Trust tier the host is willing to render for a catalog entry.
+ *
+ * Issued by the plugin center, never asserted by a publisher: the host
+ * downgrades a `verified` claim from any source other than the configured
+ * official one, and renders an unrecognised tier as `unknown` (ADR 0102).
+ */
+export type MarketTrust = "verified" | "community" | "unknown";
+
+/**
+ * Source pin recorded for a published version.
+ *
+ * Evidence for a human decision before install, not an integrity control — it
+ * is only as trustworthy as the catalog it came from, and the checksum stays
+ * the mechanism that decides whether bytes are accepted.
+ */
+export type MarketProvenance = {
+  /** Canonical https URL of the publisher's own repository. */
+  sourceRepository: string;
+  /** `refs/tags/<tag>` or a 40-hex commit, as submitted. */
+  sourceRef?: string;
+  /** Resolved 40-hex commit the artifact was built from. */
+  sourceCommit?: string;
+  /** Plugin directory inside that repository. */
+  sourcePath?: string;
+  builder?: string;
+  builtAt?: string;
+};
+
+/** Publish verdict issued by the center's policy evaluator. */
+export type MarketReview = {
+  decision?: string;
+  risk?: string;
+  policyVersion?: string;
+  reviewedAt?: string;
+};
+
+/** Distribution-side withdrawal of the exact version installed here. */
+export type PluginYankNotice = {
+  version: string;
+  reason?: string;
+};
+
 export type PluginMarketplaceMeta = {
   providerId: string;
   shasum?: string;
   publisherId?: string;
+  /** Trust tier accepted at install time, kept for later display. */
+  trust?: MarketTrust;
+  /** Source pin of the installed version, when the catalog carried one. */
+  provenance?: MarketProvenance;
 };
 
 export type PluginUiMeta = {
@@ -958,6 +1005,12 @@ export type PluginSummary = {
   marketplace?: PluginMarketplaceMeta;
   autoUpdate?: boolean;
   updateAvailable?: PluginUpdateInfo;
+  /**
+   * Set when the catalog withdrew the exact version installed here. The host
+   * surfaces it and leaves the plugin running; withdrawal is a distribution
+   * signal, not consent to disable working software.
+   */
+  yanked?: PluginYankNotice;
   ui?: PluginUiMeta;
   /** Declared file scope, so the page can show it next to the permissions. */
   fs?: PluginFsPolicy;
@@ -1114,11 +1167,16 @@ export type MarketPluginSummary = {
   categories?: string[];
   permissionSummary: string[];
   verified?: boolean;
+  /** Catalog v2 trust tier, as the host is willing to render it. */
+  trust?: MarketTrust;
+  publisherId?: string;
   installed?: boolean;
   installedVersion?: string;
   updateAvailable?: boolean;
   /** False when `latestVersion` has no published package to download yet. */
   installable?: boolean;
+  /** True when every catalog version of this plugin has been withdrawn. */
+  yanked?: boolean;
 };
 
 export type MarketPluginDetail = MarketPluginSummary & {
@@ -1132,6 +1190,14 @@ export type MarketPluginDetail = MarketPluginSummary & {
     url: string;
     sizeBytes: number;
     permissions: string[];
+    /** Withdrawn: still listed in history, never offered for install. */
+    yanked?: boolean;
+    yankedReason?: string;
+    provenance?: MarketProvenance;
+    review?: MarketReview;
+    signature?: string;
+    signatureAlg?: string;
+    keyId?: string;
   }>;
   screenshots?: string[];
   homepage?: string;
