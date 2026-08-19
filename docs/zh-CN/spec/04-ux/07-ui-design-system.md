@@ -622,7 +622,10 @@ Toast enter/exit 保留现有移除合同（`animationend` 于
 
 ## 8. 0 Home 空栈和底部 Composer (D111/D204/D206)
 
-空输入框占位符：EN `Ask PI-Desktop to do anything` / zh-CN `向 PI-Desktop 下达任意指令`。
+空输入框占位符轮播：首页从 `chat.placeholderHome` 开始，会话输入框从
+`chat.placeholder` 开始；输入框为空且未操作时，每 4 秒切换到本地化的
+斜杠命令提示（`chat.placeholderHomeHint` / `chat.placeholderHint`）。
+可见文案使用透明度渐变，并在浅色和深色输入框面板上保持可读。
 
 空聊天主页将内容和输入框保留在单独的垂直区域中
 `home-main-content` 内部（D111/D204/D206；取代 D047 双生长门户

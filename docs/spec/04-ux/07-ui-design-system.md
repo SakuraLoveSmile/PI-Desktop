@@ -624,7 +624,11 @@ High-frequency workstation feedback must remain compositor-friendly and bounded:
 
 ## 8.0 Home empty stack and bottom composer (D111/D204/D206)
 
-Empty composer placeholder: EN `Ask PI-Desktop to do anything` / zh-CN `向 PI-Desktop 下达任意指令`.
+Empty composer placeholder carousel: home starts with `chat.placeholderHome` and
+thread-docked starts with `chat.placeholder`; each rotates every 4 seconds to
+its localized slash-command hint (`chat.placeholderHomeHint` /
+`chat.placeholderHint`) while the draft is empty and inactive. The visible copy
+uses an opacity fade and remains legible on the light and dark composer plates.
 
 Empty chat home keeps the content and composer in separate vertical regions
 inside `home-main-content` (D111/D204/D206; supersedes the D047 dual-grow portal

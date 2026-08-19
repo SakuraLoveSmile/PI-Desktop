@@ -174,6 +174,8 @@ export const zhCN = {
     emptyHint: "添加 AI 模型服务、打开项目，然后发送第一条消息。",
     placeholder: "让 PI-Desktop 帮你做任何事",
     placeholderHome: "随便问问",
+    placeholderHint: "输入 / 调用命令",
+    placeholderHomeHint: "输入 / 调用命令",
     addFiles: "添加文件等内容",
     attachFiles: "附加文件或文件夹",
     addPhotos: "添加图片",

@@ -66,6 +66,10 @@
     transform: none;
   }
 
+  .composer-placeholder {
+    animation: none;
+  }
+
   .composer-shell,
   .composer-shell:focus-within,
   .btn,

@@ -1615,8 +1615,8 @@ reasoning-level control.
 | [Agent/Plan/Goal] [permission mode]          | [model · reasoning ▾] |
 | ──────────────────────────────────────────── | [⏹ Abort / → Send]    |
 | textarea (auto-growing, 1 line → max 7)                         |
-| placeholder: "Ask PI-Desktop to do anything"                    |
-| (D094; zh-CN 向 PI-Desktop 下达任意指令; home variant ... D066)  |
+| placeholder: welcome ↔ "Type / to invoke a command"            |
+| (EN/zh-CN welcome + hint pairs; home uses its own welcome key)   |
 +----------------------------------------------------------+
 ```
 
@@ -1655,6 +1655,12 @@ reasoning-level control.
   without closing the popover. The menu is `min(300px, 100vw - 24px)`, uses the
   large radius/dialog shadow tokens, and enters with a short upward fade.
 - Bottom-anchored: fixed at bottom of MainChat area
+- Placeholder carousel: home uses `chat.placeholderHome` (welcome) and
+  `chat.placeholderHomeHint` (command hint); a session composer uses
+  `chat.placeholder` and `chat.placeholderHint`. The welcome copy is shown
+  first, then the hint copy every 4 seconds in a loop. The visible copy is a
+  keyed opacity fade while the native `placeholder` value remains in the
+  textarea for assistive technology.
 
 ### 11.4 States
 
@@ -1678,6 +1684,11 @@ reasoning-level control.
 
 - Enter: send message (configurable: Shift+Enter for newline)
 - Shift+Enter: newline in textarea
+- Placeholder carousel: starts on the welcome copy and changes every 4 seconds
+  while the draft is empty and inactive. Non-empty text or file references,
+  retained focus, and IME composition pause the timer. Clearing the draft
+  releases the pause so rotation resumes even if focus remains after send;
+  switching between home and session views resets to that view's welcome copy.
 - Escape: when textarea focused, clears input or blurs (not abort)
 - Abort: stops the running turn and cancels pending permission. Before any
   assistant text, thinking, or tool row begins, it also removes the just-sent
@@ -1809,10 +1820,12 @@ Anatomy:
   shadow, subtle hairline, `--radius-lg`); max-height caps with internal
   scroll and `scrollIntoView(nearest)` keyboard follow.
 - Slash mode (`/` typed at position 0, cursor inside the first token, no
-  whitespace yet): groups in order — prompt templates (name +
+  whitespace yet): the placeholder hint teaches `Type / to invoke a command`
+  (localized in zh-CN), and groups appear in order — prompt templates (name +
   `argument-hint` ghost text + description, project source before
   user-global), app commands (builtin slash aliases), plugin commands.
-  Matched characters highlight in accent.
+  The core aliases remain `/new`, `/compact`, `/agent-mode`, `/plan-mode`, and
+  `/goal-mode`; matched characters highlight in accent.
 - File mode (`@` token at cursor, boundary-preceded): rows persistently show
   only the leaf file or directory name; directories get a trailing `/` and
   continue completion on accept. The complete relative path remains available
@@ -1988,7 +2001,8 @@ Guidance surfaces when key data is absent. Must always provide an **action link*
 | No sessions | "Start your first conversation" | "New Task" button → focus composer |
 | No provider | "No model provider configured" | "Add provider" link → Settings → Agent → Providers |
 | No project (Agent, Plan, or Goal) | "No project open — workspace tools unavailable" | "Open folder" button → ProjectPicker |
-| Session empty (first message) | "Ask PI-Desktop to do anything" placeholder (home variant "Ask anything", D094/D066) | N/A |
+| Session empty (first message) | Welcome placeholder (`chat.placeholder`); it rotates with the localized `/` command hint (`chat.placeholderHint`) | N/A |
+| Home empty (first message) | Welcome placeholder (`chat.placeholderHome`); it rotates with the localized `/` command hint (`chat.placeholderHomeHint`) | N/A |
 
 ### 15.3 Layout
 

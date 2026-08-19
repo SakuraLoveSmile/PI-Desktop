@@ -51,6 +51,7 @@ import {
 
 const COMPOSER_MIN_HEIGHT_PX = 28;
 const COMPOSER_MAX_VISIBLE_ROWS = 7;
+const PLACEHOLDER_CAROUSEL_INTERVAL_MS = 4_000;
 let composerFileReferenceSequence = 0;
 
 type ComposerFileReference = {
@@ -257,6 +258,10 @@ export function Composer({
   const [cursor, setCursor] = useState(0);
   const [composing, setComposing] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  // Clearing a draft releases the focus pause so guidance can resume after a
+  // send, even when the textarea keeps focus. A new focus starts paused again.
+  const placeholderFocusPauseReleasedRef = useRef(false);
   const [permissionOpen, setPermissionOpen] = useState(false);
   const permissionRef = useRef<HTMLDivElement>(null);
   const [modelThinkingOpen, setModelThinkingOpen] = useState(false);
@@ -286,6 +291,33 @@ export function Composer({
   const activeFileReferences = fileReferences.filter(
     (fileReference) => fileReference.sessionId === referenceSessionId,
   );
+  const placeholderKey =
+    variant === "home"
+      ? placeholderIndex === 0
+        ? "chat.placeholderHome"
+        : "chat.placeholderHomeHint"
+      : placeholderIndex === 0
+        ? "chat.placeholder"
+        : "chat.placeholderHint";
+  const placeholderText = t(placeholderKey);
+  const placeholderPaused =
+    value.length > 0 ||
+    activeFileReferences.length > 0 ||
+    composing ||
+    (inputFocused && !placeholderFocusPauseReleasedRef.current);
+
+  useEffect(() => {
+    setPlaceholderIndex(0);
+    placeholderFocusPauseReleasedRef.current = false;
+  }, [variant]);
+
+  useEffect(() => {
+    if (placeholderPaused) return;
+    const timer = window.setInterval(() => {
+      setPlaceholderIndex((current) => (current + 1) % 2);
+    }, PLACEHOLDER_CAROUSEL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [placeholderPaused, variant]);
 
   useEffect(() => {
     const previousKey = draftKeyRef.current;
@@ -303,6 +335,7 @@ export function Composer({
       });
       draftKeyRef.current = draftKey;
       const nextDraft = draftCacheRef.current.get(draftKey);
+      placeholderFocusPauseReleasedRef.current = false;
       setValue(nextDraft?.text ?? "");
       setFileReferences(
         nextDraft?.fileReferences.map((fileReference) =>
@@ -754,6 +787,7 @@ export function Composer({
     draftCacheRef.current.delete(key);
     const currentKey = draftKeyForSession(useAppStore.getState().activeSessionId);
     if (currentKey !== key) return;
+    placeholderFocusPauseReleasedRef.current = true;
     setValue("");
     setFileReferences((current) =>
       current.filter(
@@ -1007,6 +1041,9 @@ export function Composer({
                       })}
                       disabled={inputBlocked}
                       onClick={() => {
+                        if (activeFileReferences.length === 1) {
+                          placeholderFocusPauseReleasedRef.current = true;
+                        }
                         setFileReferences((current) =>
                           current.filter(
                             (candidate) => candidate.id !== fileReference.id,
@@ -1021,83 +1058,105 @@ export function Composer({
                 ))}
               </div>
             ) : null}
-            <textarea
-              ref={ref}
-              className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}
-              readOnly={inputBlocked}
-              aria-readonly={inputBlocked}
-              aria-busy={pasting}
-              rows={2}
-              placeholder={t(variant === "home" ? "chat.placeholderHome" : "chat.placeholder")}
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
-              value={value}
-              onPaste={pasteClipboardFiles}
-              onChange={(e) => {
-                setValue(e.target.value);
-                setCursor(e.target.selectionStart ?? e.target.value.length);
-              }}
-              onSelect={(e) => {
-                setCursor(e.currentTarget.selectionStart ?? 0);
-              }}
-              onCompositionStart={() => setComposing(true)}
-              onCompositionEnd={(e) => {
-                setComposing(false);
-                setCursor(e.currentTarget.selectionStart ?? 0);
-              }}
-              onFocus={() => setInputFocused(true)}
-              onBlur={() => setInputFocused(false)}
-              onKeyDown={(e) => {
-                // An Enter that confirms an IME candidate (isComposing, or the
-                // WebKit 229 quirk) must commit the text, never send it — and
-                // never drive the autocomplete menu (D125).
-                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229)
-                  return;
-                if (
-                  e.key === "Backspace" &&
-                  value.length === 0 &&
-                  activeFileReferences.length
-                ) {
-                  e.preventDefault();
-                  const lastReference = activeFileReferences.at(-1);
-                  setFileReferences((current) =>
-                    current.filter(
-                      (fileReference) => fileReference.id !== lastReference?.id,
-                    ),
-                  );
-                  return;
-                }
-                if (composerAc.open && e.key === "Escape") {
-                  // Escape closes only the menu; overlay handlers must not
-                  // also fire on the same press.
-                  e.preventDefault();
-                  e.stopPropagation();
-                  composerAc.close();
-                  return;
-                }
-                if (composerAc.hasItems) {
-                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            <div className="composer-input-stage">
+              <textarea
+                ref={ref}
+                className={variant === "docked" ? "composer-input" : "composer-input composer-input-home"}
+                readOnly={inputBlocked}
+                aria-readonly={inputBlocked}
+                aria-busy={pasting}
+                rows={2}
+                placeholder={placeholderText}
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
+                value={value}
+                onPaste={pasteClipboardFiles}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  placeholderFocusPauseReleasedRef.current = nextValue.length === 0;
+                  setValue(nextValue);
+                  setCursor(e.target.selectionStart ?? nextValue.length);
+                }}
+                onSelect={(e) => {
+                  setCursor(e.currentTarget.selectionStart ?? 0);
+                }}
+                onCompositionStart={() => setComposing(true)}
+                onCompositionEnd={(e) => {
+                  setComposing(false);
+                  setCursor(e.currentTarget.selectionStart ?? 0);
+                }}
+                onFocus={() => {
+                  placeholderFocusPauseReleasedRef.current = false;
+                  setInputFocused(true);
+                }}
+                onBlur={() => {
+                  placeholderFocusPauseReleasedRef.current = false;
+                  setInputFocused(false);
+                }}
+                onKeyDown={(e) => {
+                  // An Enter that confirms an IME candidate (isComposing, or the
+                  // WebKit 229 quirk) must commit the text, never send it — and
+                  // never drive the autocomplete menu (D125).
+                  if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229)
+                    return;
+                  if (
+                    e.key === "Backspace" &&
+                    value.length === 0 &&
+                    activeFileReferences.length
+                  ) {
                     e.preventDefault();
-                    const delta = e.key === "ArrowDown" ? 1 : -1;
-                    const count = composerAc.items.length;
-                    composerAc.setHighlight(
-                      (composerAc.highlight + delta + count) % count,
+                    const lastReference = activeFileReferences.at(-1);
+                    if (activeFileReferences.length === 1) {
+                      placeholderFocusPauseReleasedRef.current = true;
+                    }
+                    setFileReferences((current) =>
+                      current.filter(
+                        (fileReference) => fileReference.id !== lastReference?.id,
+                      ),
                     );
                     return;
                   }
-                  if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+                  if (composerAc.open && e.key === "Escape") {
+                    // Escape closes only the menu; overlay handlers must not
+                    // also fire on the same press.
                     e.preventDefault();
-                    acceptCompletion(composerAc.highlight);
+                    e.stopPropagation();
+                    composerAc.close();
                     return;
                   }
-                }
-                if (e.key === "Enter" && !e.shiftKey && enterToSend) {
-                  e.preventDefault();
-                  void submit();
-                }
-              }}
-            />
+                  if (composerAc.hasItems) {
+                    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                      e.preventDefault();
+                      const delta = e.key === "ArrowDown" ? 1 : -1;
+                      const count = composerAc.items.length;
+                      composerAc.setHighlight(
+                        (composerAc.highlight + delta + count) % count,
+                      );
+                      return;
+                    }
+                    if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+                      e.preventDefault();
+                      acceptCompletion(composerAc.highlight);
+                      return;
+                    }
+                  }
+                  if (e.key === "Enter" && !e.shiftKey && enterToSend) {
+                    e.preventDefault();
+                    void submit();
+                  }
+                }}
+              />
+              {value.length === 0 ? (
+                <span
+                  key={`${variant}-${placeholderIndex}-${placeholderText}`}
+                  className="composer-placeholder"
+                  aria-hidden="true"
+                >
+                  {placeholderText}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           <div className="composer-toolbar">

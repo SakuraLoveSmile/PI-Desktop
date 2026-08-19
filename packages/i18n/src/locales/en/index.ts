@@ -179,6 +179,8 @@ export const en = {
     emptyHint: "Add an AI provider, open a project, then send your first message.",
     placeholder: "Ask PI-Desktop to help with anything",
     placeholderHome: "Ask anything",
+    placeholderHint: "Type / to invoke a command",
+    placeholderHomeHint: "Type / to invoke a command",
     addFiles: "Add files and more",
     attachFiles: "Attach files or folders",
     addPhotos: "Add photos",

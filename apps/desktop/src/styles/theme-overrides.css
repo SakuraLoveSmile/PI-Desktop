@@ -91,7 +91,8 @@
   color: color-mix(in oklab, #1a1c1f 84%, transparent) !important;
 }
 
-:root[data-theme="light"] .composer-input::placeholder {
+:root[data-theme="light"] .composer-input::placeholder,
+:root[data-theme="light"] .composer-placeholder {
   /* Gold empty-home placeholder ink ~#525355–#58595b */
   color: #4a4c4f;
   -webkit-text-fill-color: #4a4c4f;

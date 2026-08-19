@@ -84,6 +84,41 @@
   min-height: 44px;
 }
 
+.composer-input-stage {
+  position: relative;
+  width: 100%;
+}
+
+.composer-placeholder {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding-top: 2px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  opacity: 0.72;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  user-select: none;
+  white-space: nowrap;
+  animation: composer-placeholder-fade-in var(--motion-duration-fast) var(--motion-ease-out) both;
+}
+
+.composer-input-home + .composer-placeholder {
+  padding-left: 14px;
+}
+
+@keyframes composer-placeholder-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 0.72;
+  }
+}
+
 .composer-file-references {
   display: flex;
   width: 100%;
@@ -155,9 +190,11 @@
 }
 
 .composer-input::placeholder {
+  /* Keep the native value for assistive technology; the visible copy is the
+     keyed span above so text changes can fade instead of flashing. */
   color: var(--ds-text-secondary);
   -webkit-text-fill-color: var(--ds-text-secondary);
-  opacity: 0.72;
+  opacity: 0 !important;
 }
 
 .composer-toolbar {
