@@ -117,4 +117,7 @@ Each ADR includes:
 | 0098 | Treat every vendor OAuth account as an independent provider row | Accepted for implementation |
 | 0099 | Add titled visual clusters to the Settings directory | Accepted |
 | 0100 | Make builtin subagents inherit the parent permission mode | Accepted |
+| 0101 | Route image attachments by model vision capability | Accepted |
 | 0102 | Publisher-owned plugin source with a Git-hosted artifact store | Accepted for implementation (supersedes 0006) |
+| 0103 | Let plugins contribute work panel views | Accepted |
+| 0104 | Ship the built-in work panel tools as bundled plugins | Accepted for implementation |

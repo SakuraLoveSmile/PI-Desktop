@@ -9,6 +9,7 @@ Provide a permission–capability–risk–default-policy reference table for re
 | Permission | Risk | Allowed API / capability | Default policy | Notes |
 |---|---|---|---|---|
 | `ui.panel` | low | Open the plugin panel | Granted at install | Needed by almost all UI plugins |
+| `ui.view` | low | `contributes.views` are listed in the work panel and may be opened | Granted at install | Same isolation as a panel window: sandboxed page, per-plugin partition, `net.domains` egress. Filtered by activation scope |
 | `ui.theme` | low | `contributes.themes` CSS is loaded and offered in Settings | Granted at install | CSS is sanitized by the host; it cannot script |
 | `clipboard.read` | medium | `clipboard.readText` | Confirm on first use | May read sensitive information |
 | `clipboard.write` | medium | `clipboard.writeText` | Confirm on first use | Prevents clipboard pollution |
@@ -70,6 +71,8 @@ plugin, so it carries three bounds the other modes do not:
 ## 3. Permission dependencies
 
 - `ui.panel` is required to load a panel entry
+- `ui.view` is required to contribute work panel views; it is independent of
+  `ui.panel`, so a plugin may ship docked views without a detached window
 - `agent.tool.register` is required to contribute agentTools
 - When `fs.write` is present, it is recommended to also declare `fs.read`
 - `manifest.fs.<mode>` requires the matching `fs.<mode>` permission; a scope

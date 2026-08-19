@@ -316,6 +316,7 @@ therefore applies only to brokered APIs until runtime sandboxing is delivered.
 | permission | Risk | Description |
 |---|---|---|
 | `ui.panel` | low | Show panel |
+| `ui.view` | low | Contribute work panel views |
 | `ui.theme` | low | Contribute a theme CSS file |
 | `clipboard.read` | medium | Read clipboard |
 | `clipboard.write` | medium | Write clipboard |

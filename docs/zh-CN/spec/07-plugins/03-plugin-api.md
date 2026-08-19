@@ -249,6 +249,12 @@ window.pluginBridge.invoke(channel, payload?)
 window.pluginBridge.on(event, handler)
 ```
 
+同一个桥同时服务插件的两种表面：独立的 `ui.panel` 窗口，以及停靠在工作面板中的
+`contributes.views` 表面（ADR 0103）。通道列表、权限门与 preload 完全相同，
+因此同一份 HTML 入口在两种放置方式下都能工作。唯一的差别在于 chrome：停靠视图
+没有窗口控制胶囊、没有拖拽带，其 `--pi-plugin-titlebar-height` 为 `0px` 而非
+`46px`。
+
 主机拥有的 preload 仅将固定通道转发到插件运行时：
 
 | 频道 | 所需许可 |

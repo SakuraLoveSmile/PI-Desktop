@@ -314,6 +314,7 @@ Electron 主进程通知 API 并共享清单 `notify`
 | 许可 | 风险 | 描述 |
 |---|---|---|
 | `ui.panel` | 低 | 显示面板 |
+| `ui.view` | 低 | 贡献工作面板视图 |
 | `ui.theme` | 低 | 贡献主题 CSS 文件 |
 | `clipboard.read` | 中等 | 读取剪贴板 |
 | `clipboard.write` | 中等 | 写入剪贴板 |

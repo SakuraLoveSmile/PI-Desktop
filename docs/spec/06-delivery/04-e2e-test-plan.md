@@ -4275,6 +4275,49 @@ Each scenario is documented in this format:
   needs live vendor accounts (do not run E2E locally unless explicitly
   requested)
 
+#### E2E-152: A plugin contributes a work panel view
+
+- **Preconditions**: A development plugin declaring `ui.view` and one
+  `contributes.views` entry whose `entry` is a small HTML page calling
+  `window.pluginBridge.invoke("ui.showToast", …)`. Two projects open, with the
+  plugin's activation scope limited to the first.
+- **Steps**:
+  1. Load the plugin as a development plugin. Confirm the Plugins page shows a
+     work-panel-views capability badge.
+  2. Press `Cmd/Ctrl + J` to reveal the work panel and open the header menu.
+     Confirm a "Plugin views" group appears between the built-in tools and the
+     open-resources group, with the view's localized title and its icon (or a
+     lettered tile if the manifest names an unknown token).
+  3. Activate the row. Confirm the plugin's page renders inside the panel body
+     with no window-control capsule and no reserved 46px band, and that its
+     button reaches the host toast.
+  4. Drag the panel divider and resize the window. Confirm the page tracks the
+     panel rect without lag or tearing.
+  5. Open global search, then Settings. Confirm the page is hidden while each
+     overlay is up and returns when it closes.
+  6. Re-pick the same view from the menu. Confirm it returns to the live page —
+     same scroll position, no reload — rather than stacking a second tab.
+  7. Switch to the second project. Confirm the view disappears from the menu and
+     from the empty-panel entry list.
+  8. Switch back, reopen the view, then disable the plugin. Confirm the tab
+     closes and the view's renderer process exits (Activity Monitor / Task
+     Manager).
+  9. Re-enable, reopen, then edit the plugin's HTML on disk to trigger a
+     development reload. Confirm the view reloads rather than going blank.
+- **Expected**: A plugin view is reachable, isolated, correctly positioned, and
+  bounded by the plugin's lifecycle and activation scope. It never renders while
+  a blocking overlay is open, and it never obtains window controls.
+- **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4/§5,
+  `07-plugins/13-plugin-permissions-matrix.md` §2,
+  `04-ux/08-component-spec.md` §5, ADR 0103, ADR 0092
+- **Acceptance**: G (plugins), Security, Quality
+- **Milestone**: M6+
+- **Status**: Unit coverage in
+  `apps/desktop/test/plugin-work-panel-views.test.mjs` (addressing, menu
+  grouping, isolation parity, scope filtering, lifecycle teardown),
+  `packages/plugin-sdk` and host-core manifest validation; the desktop journey
+  is Draft (do not run E2E locally unless explicitly requested)
+
 ## 8. Traceability Matrix
 
 
@@ -4289,7 +4332,7 @@ Each scenario is documented in this format:
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078 |
 | E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-148, E2E-151 |
-| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148 |
+| G — Plugins | E2E-022, E2E-022A, E2E-022B, E2E-022C, E2E-023, E2E-024, E2E-024B, E2E-024C, E2E-024D, E2E-024E, E2E-024F, E2E-024G, E2E-024H, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M, E2E-024N, E2E-024O, E2E-024P, E2E-025, E2E-026, E2E-105, E2E-117, E2E-120, E2E-122, E2E-123, E2E-024Q, E2E-148, E2E-152 |
 | H — Diagnostics | E2E-027, E2E-031, E2E-034, E2E-042, E2E-096, E2E-098, E2E-104, E2E-107, E2E-108, E2E-109, E2E-110, E2E-113, E2E-115, E2E-116, E2E-118, E2E-121, E2E-146 |
 | Security | E2E-028, E2E-029, E2E-030, E2E-024J, E2E-024K, E2E-024M, E2E-049, E2E-068, E2E-086, E2E-102c, E2E-102d, E2E-102e, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-113, E2E-115, E2E-116, E2E-117, E2E-119, E2E-121, E2E-122, E2E-123, E2E-142, E2E-148, E2E-151 |
 | Quality | E2E-032, E2E-033, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-053, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-024N, E2E-024O, E2E-059a, E2E-060b, E2E-060c, E2E-060d, E2E-061a, E2E-073a, E2E-111, E2E-114, E2E-117, E2E-118, E2E-119, E2E-120, E2E-122, E2E-123, E2E-142, E2E-143, E2E-144, E2E-145, E2E-146, E2E-147, E2E-148, E2E-150, E2E-151 |

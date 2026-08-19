@@ -71,6 +71,7 @@ type PluginContributes = {
  mcpServers?: PluginMcpServerContrib[];
  services?: PluginServiceContrib[];
  bus?: PluginBusContrib;
+ views?: PluginViewContrib[];
 };
 
 type PluginCommandContrib = {
@@ -101,6 +102,14 @@ type PluginSettingContrib = {
  command?: string; // shortcut 设置调用这个已声明的插件命令
  scope?: "plugin"; // 暂不支持全局插件快捷键
  secret?: boolean;
+};
+
+type PluginViewContrib = {
+ id: string; // ^[a-zA-Z][a-zA-Z0-9_-]{0,63}$，插件内唯一
+ title: string | { en: string; "zh-CN": string };
+ icon?: string; // 宿主图标集中的 token；未知 token 渲染为字母瓷砖
+ entry: string; // 视图 HTML 入口的相对路径
+ order?: number; // 插件视图分组内的升序排序键，默认 0
 };
 
 type PluginThemeContrib = {
@@ -147,6 +156,7 @@ type PluginBusContrib = {
 ```ts
 type PluginPermission =
  | "ui.panel"
+ | "ui.view"
  | "ui.theme"
  | "clipboard.read"
  | "clipboard.write"
@@ -255,9 +265,9 @@ MVP 只能实现：
 3. 声明 `ui.panel` 的清单是否需要隐式（自动填充）或通过显式声明获得 `ui.panel` 权限是一个 **悬而未决的问题**（在 [08-meta/open-questions.md](/zh-CN/spec/08-meta/open-questions) 中跟踪）
 4. 如果存在 `agentTools`，则必须声明 `agent.tool.register`
 5. 路径字段不得使用绝对路径或 `..`
-6. `main` / `ui.panel` / 技能路径必须存在
+6. `main` / `ui.panel` / 技能 / `views[].entry` 路径必须存在
 7.工具`name`仅允许`[a-zA-Z][a-zA-Z0-9_]*`
-8. 贡献 ID（`themes`、`mcpServers`、`services`）必须匹配
+8. 贡献 ID（`themes`、`mcpServers`、`services`、`views`）必须匹配
    `[a-zA-Z][a-zA-Z0-9_-]{0,63}` 并在自己的列表中保持唯一
 9. `themes[].path` 必须存在且以 `.css` 结尾； `themes[].base` 可能只是
    `light` 或 `dark`
@@ -268,7 +278,8 @@ MVP 只能实现：
 11. `bus.publish` 条目必须是具体主题，`bus.subscribe` 条目必须是具体主题
    有效模式（§5.1）
 12. 需要权限的贡献在权限验证时失败
-   缺少：`themes` → `ui.theme`，stdio 服务器 → `mcp.server.local`，远程
+   缺少：`themes` → `ui.theme`，`views` → `ui.view`，stdio 服务器 →
+   `mcp.server.local`，远程
    服务器 → `mcp.server.remote`、`services` → `background.service`、
    `bus.publish` → `bus.publish`，`bus.subscribe` → `bus.subscribe`。
 `skills` 是一个例外 - 它早于权限门，因此清单
@@ -283,6 +294,9 @@ MVP 只能实现：
     `./*`）。`own` 只在 `delete` 上被接受，`root` 只能是 `workspace` /
     `userSelected`
 15. `net.domains` 条目必须是裸主机名，可选前缀 `*.`；裸 `*` 会被拒绝
+16. `views[].title` 必填；使用本地化对象时必须同时提供 `en` 与 `zh-CN`。
+    `views[].icon` **不**按 token 列表校验：未知 token 会降级为字母瓷砖，
+    为一个纯外观细节拒绝插件并不合理。打包检查会改为给出警告
 
 ## 8. 示例：最小插件
 
