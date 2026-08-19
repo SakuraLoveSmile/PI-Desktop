@@ -106,7 +106,7 @@ export class HostProcess {
         PI_DESKTOP_DATA_DIR: dataDir,
         // Only Electron knows whether this build runs from `resources/` or a
         // source checkout, so it resolves the bundled-plugin directory and
-        // host-core simply reconciles its registry against it (ADR 0104).
+        // host-core simply reconciles its registry against it (ADR 0105).
         ...(builtinPlugins ? { PI_DESKTOP_BUILTIN_PLUGINS_DIR: builtinPlugins } : {}),
       },
     });

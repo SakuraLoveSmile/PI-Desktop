@@ -53,19 +53,25 @@ const TAB_ICONS = {
 } as const;
 
 /**
- * Tools the host itself provides.
+ * Tools the host itself provides — the panel's manually launchable surfaces.
  *
- * Shrinking toward Browser alone (ADR 0104). Files has left: browsing the
- * project is now the bundled `pi.files` plugin, reached through the same
- * `contributes.views` channel a third-party plugin uses. Review and Terminal
- * follow once their capabilities exist as plugin APIs.
+ * The list settled at two (ADR 0104, amended):
  *
- * The `file` *kind* stays, because it is not this list: a `file:<path>` tab is a
- * transcript artifact — a file link or plan checkpoint the conversation opened —
- * and the host still owns those, exactly as it owns Review's artifacts.
+ * - **Files left** for the bundled `pi.files` plugin, reaching the panel over
+ *   the same `contributes.views` channel a third-party plugin uses.
+ * - **Review left** in the other direction: it is an *artifact* panel, not a
+ *   tool. It shows what the conversation's Write/Edit calls recorded, so it is
+ *   opened by those artifacts exactly as a `file:<path>` tab is opened by a
+ *   file link — never picked from a launcher. Its records are message-owned
+ *   (ADR 0043), which is also why it could not become a plugin without moving
+ *   that ownership into the host.
+ * - **Terminal stayed** because handing a plugin a PTY means arbitrary
+ *   execution as the user, a wider trust boundary than this buys back.
+ *
+ * Both `review` and `file` therefore remain live tab *kinds* while being absent
+ * from this list; see the panel body below.
  */
 const HEADER_TOOLS = [
-  { kind: "review", Icon: IconDiff },
   { kind: "terminal", Icon: IconTerminal },
   { kind: "browser", Icon: IconGlobe },
 ] as const;

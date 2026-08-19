@@ -60,7 +60,7 @@ export function toolWorkPanelTab(
 }
 
 /**
- * A plugin-contributed view (ADR 0103).
+ * A plugin-contributed view (ADR 0104).
  *
  * Keyed by `<pluginId>/<viewId>` so two plugins may ship a view with the same
  * local id, and so re-opening the same view reuses its tab instead of stacking

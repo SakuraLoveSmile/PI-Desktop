@@ -119,6 +119,6 @@ Each ADR includes:
 | 0100 | Make builtin subagents inherit the parent permission mode | Accepted |
 | 0101 | Route image attachments by model vision capability | Accepted |
 | 0102 | Publisher-owned plugin source with a Git-hosted artifact store | Accepted for implementation (supersedes 0006) |
-| 0103 | Let plugins contribute work panel views | Accepted |
 | 0103 | Compact context usage summary | Accepted (amends 0047) |
-| 0104 | Ship the built-in work panel tools as bundled plugins | Accepted for implementation |
+| 0104 | Let plugins contribute work panel views | Accepted |
+| 0105 | Ship Files as a bundled plugin; keep Review and Terminal in the host | Accepted |

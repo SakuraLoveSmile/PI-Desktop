@@ -10,7 +10,7 @@ import {
 } from "../src/lib/work-panel-tabs.ts";
 
 /**
- * Plugin-contributed work panel views (ADR 0103).
+ * Plugin-contributed work panel views (ADR 0104).
  *
  * The surface itself is a native WebContentsView, so the behavior that can be
  * asserted here is the addressing scheme, the menu's classification of a view

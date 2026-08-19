@@ -104,7 +104,7 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       to: "skills",
     },
     // Bundled first-party plugins, for the same reason: host-core reads their
-    // manifests from disk and the views are loaded as file:// pages (ADR 0104).
+    // manifests from disk and the views are loaded as file:// pages (ADR 0105).
     {
       from: "resources/plugins",
       to: "plugins",

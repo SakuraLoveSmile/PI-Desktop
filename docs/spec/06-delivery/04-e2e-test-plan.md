@@ -4333,7 +4333,7 @@ Each scenario is documented in this format:
   a blocking overlay is open, and it never obtains window controls.
 - **Specs linked**: `07-plugins/02-plugin-manifest-schema.md` §4/§5,
   `07-plugins/13-plugin-permissions-matrix.md` §2,
-  `04-ux/08-component-spec.md` §5, ADR 0103, ADR 0092
+  `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0092
 - **Acceptance**: G (plugins), Security, Quality
 - **Milestone**: M6+
 - **Status**: Unit coverage in
@@ -4352,8 +4352,9 @@ Each scenario is documented in this format:
      enabled, showing a work-panel-views capability, and that it offers no
      Uninstall action.
   2. Reveal the work panel and open the header menu. Confirm the Tools group
-     lists only Review, Terminal, and Browser, and that Files appears under
-     Plugin views.
+     lists only Terminal and Browser, and that Files appears under
+     Plugin views. Trigger an agent edit and confirm Review opens itself under
+     Open resources — it is an artifact surface, not a launcher entry.
   3. Open the Files view. Confirm the tree lists the project, expands
      directories lazily, and omits `node_modules`, `.git`, and `.env`.
   4. Click a text file. Confirm its contents render; click the binary file and
@@ -4371,7 +4372,7 @@ Each scenario is documented in this format:
   deny-lists.
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
   `07-plugins/13-plugin-permissions-matrix.md` §2,
-  `04-ux/08-component-spec.md` §5, ADR 0103, ADR 0104
+  `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0105
 - **Acceptance**: G (plugins), D (workspace), Security, Quality
 - **Milestone**: M6+
 - **Status**: Unit coverage in `apps/desktop/test/bundled-plugins.test.mjs`,
