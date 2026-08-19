@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
   PLUGIN_PANEL_TITLEBAR_HEIGHT,
+  PLUGIN_PANEL_EMBEDDED_ARGUMENT,
   PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX,
   PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
   PLUGIN_PANEL_WINDOW_STATE_CHANNEL,
@@ -36,6 +37,11 @@ type ChromeLabels = {
 
 function isDevelopmentPanel(): boolean {
   return process.argv.includes("--pi-plugin-panel-development=1");
+}
+
+/** True when this surface is docked in the host work panel, not its own window. */
+function isEmbeddedPanel(): boolean {
+  return process.argv.includes(PLUGIN_PANEL_EMBEDDED_ARGUMENT);
 }
 
 function panelTheme(): PluginPanelTheme {
@@ -117,6 +123,14 @@ function createControlButton(
 function installPanelChrome(): void {
   const body = document.body;
   if (!body || document.querySelector("pi-plugin-panel-chrome")) return;
+
+  // A docked view has no window controls and no drag band, so it gets the full
+  // surface. The variable is still published — at 0 — so a plugin's fixed
+  // toolbar offset resolves to the right value in both placements.
+  if (isEmbeddedPanel()) {
+    document.documentElement.style.setProperty("--pi-plugin-titlebar-height", "0px");
+    return;
+  }
 
   document.documentElement.style.setProperty(
     "--pi-plugin-titlebar-height",

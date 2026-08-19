@@ -51,6 +51,7 @@ import {
   parseMcpImport,
   type ActivationScope,
   type ComposerPasteFile,
+  type PluginViewMeta,
   normalizeMode,
   normalizeGlobalPermissionMode,
   normalizeProposalKind,
@@ -121,6 +122,7 @@ import {
 import { builtinSkills, loadBuiltinSkillBody } from "./builtin-skills";
 import { registerPluginDevTools } from "./plugin-dev-tools";
 import { PluginPanelHost } from "./plugin-panel-host";
+import { PluginViewHost, pluginViewKey } from "./plugin-view-host";
 import type { PluginAppearance } from "../shared/plugin-panel-chrome";
 import { Logger } from "./logger";
 import { collectWorkspaceDiff } from "./git-diff";
@@ -407,6 +409,10 @@ const plugins = new PluginRuntime({
     sendToRenderer(IPC.event.toast, {
       message: `Plugin stopped unexpectedly: ${name}`,
     });
+    // The view's page outlived the process behind its bridge, so it is a dead
+    // surface. Drop it; the renderer re-opens it on the pluginChanged event if
+    // the tab is still active and the plugin came back.
+    pluginViews.closePlugin(pluginId);
     sendToRenderer(IPC.event.pluginChanged, { reason: "crash", pluginId });
   },
   // Supervision state is UI-only: the runtime owns restarts, the renderer just
@@ -431,6 +437,8 @@ const plugins = new PluginRuntime({
     sendToRenderer(IPC.event.toast, {
       message: ok ? `Reloaded ${name}` : `Reload failed: ${name} — ${message ?? ""}`,
     });
+    // Views were loaded from the previous revision of the plugin's files.
+    pluginViews.closePlugin(pluginId);
     sendToRenderer(IPC.event.pluginChanged, { reason: "reload", pluginId });
   },
 });
@@ -465,6 +473,14 @@ const sessionProjects = new Map<string, string | null>();
 const browserPane = new BrowserPane((state) =>
   sendToRenderer(IPC.event.browserState, state),
 );
+const pluginViews = new PluginViewHost(({ pluginId, url }) => {
+  logger.app("plugin", "warn", "plugin.api", {
+    pluginId,
+    code: "PERMISSION_DENIED",
+    data: { api: "view.egress", ok: false, url, ts: Date.now() },
+  });
+});
+pluginPanels.addSenderResolver((senderId) => pluginViews.pluginIdForSender(senderId));
 let scannedImportSessions = new Map<string, ExternalSessionSummary>();
 
 const IMPORT_SOURCES = new Set<ExternalSource>([
@@ -898,6 +914,15 @@ function pluginActiveInProject(pluginId: string, projectPath: string | null | un
   const scope = pluginScopes.get(pluginId);
   if (!scope) return true;
   return isActiveInProject({ enabled: true, scope }, projectPath);
+}
+
+/**
+ * The workspace the window is showing, from the cache Main keeps in sync with
+ * every `workspace.get` / open-folder result. Synchronous on purpose: scope
+ * filtering runs inside IPC handlers that must not await the host.
+ */
+function currentWorkspacePath(): string | null {
+  return (globalThis as { __piWorkspacePath?: string | null }).__piWorkspacePath ?? null;
 }
 
 /** One-line message for an error of unknown shape, for user-facing lists. */
@@ -2247,6 +2272,7 @@ async function createWindow() {
   screen.on("display-removed", reconcileWorkPanelDisplay);
 
   browserPane.setWindow(window);
+  pluginViews.setWindow(window);
   window.on("closed", () => {
     screen.removeListener("display-metrics-changed", reconcileWorkPanelDisplay);
     screen.removeListener("display-added", reconcileWorkPanelDisplay);
@@ -2262,6 +2288,7 @@ async function createWindow() {
     if (mainWindow !== window) return;
     mainWindow = null;
     browserPane.setWindow(null);
+    pluginViews.setWindow(null);
     if (
       process.platform !== "darwin" &&
       pluginLauncherWindow &&
@@ -6832,6 +6859,7 @@ function registerIpc() {
 
   handle(IPC.invoke.pluginDisable, async (id: string) => {
     if (!host) throw new Error("host unavailable");
+    pluginViews.closePlugin(id);
     await plugins.unload(id);
     logger.app("plugin", "info", "plugin disabled", { pluginId: id });
     const res = await host.call("plugins.disable", { id });
@@ -6841,6 +6869,7 @@ function registerIpc() {
 
   handle(IPC.invoke.pluginUninstall, async (id: string) => {
     if (!host) throw new Error("host unavailable");
+    pluginViews.closePlugin(id);
     await plugins.unload(id);
     logger.app("plugin", "info", "plugin uninstalled", { pluginId: id });
     const res = await host.call("plugins.uninstall", { id });
@@ -7146,6 +7175,107 @@ function registerIpc() {
     });
     return { ok: true };
   });
+
+  /**
+   * Work panel views a plugin contributes (ADR 0101).
+   *
+   * Unlike `pluginThemes`, this list *is* filtered by activation scope: a theme
+   * is one global app setting, but a view is something the plugin does inside a
+   * project, so a project-scoped plugin must not offer its view elsewhere.
+   */
+  handle(IPC.invoke.pluginViews, async () => {
+    const workspacePath = currentWorkspacePath();
+    const views: PluginViewMeta[] = [];
+    for (const loaded of plugins.listLoaded()) {
+      const pluginId = loaded.manifest.id;
+      if (!loaded.permissions.has("ui.view")) continue;
+      if (!pluginActiveInProject(pluginId, workspacePath)) continue;
+      const contributed = loaded.manifest.contributes?.views ?? [];
+      contributed.forEach((view, index) => {
+        if (!view?.id || !view.entry) return;
+        // The manifest is validated at install, but a development plugin's
+        // files change under us; a missing entry must not become a blank pane.
+        if (!existsSync(join(loaded.path, view.entry))) return;
+        views.push({
+          pluginId,
+          viewId: view.id,
+          ref: pluginViewKey(pluginId, view.id),
+          title: resolvePluginLocalizedString(view.title, updaterLocale, view.id),
+          pluginName: loaded.manifest.name,
+          icon: view.icon,
+          order: Number.isFinite(view.order) ? Number(view.order) : index,
+        });
+      });
+    }
+    // Stable order across refreshes: declared order first, then plugin name, so
+    // the menu never reshuffles under the pointer when an unrelated plugin
+    // loads.
+    return views.sort(
+      (a, b) =>
+        a.order - b.order ||
+        a.pluginName.localeCompare(b.pluginName) ||
+        a.viewId.localeCompare(b.viewId),
+    );
+  });
+
+  handle(
+    IPC.invoke.pluginViewOpen,
+    async (payload: { pluginId?: string; viewId?: string }) => {
+      const pluginId = String(payload?.pluginId ?? "");
+      const viewId = String(payload?.viewId ?? "");
+      const loaded = plugins.getLoaded(pluginId);
+      if (!loaded) throw new Error("plugin not loaded");
+      if (!loaded.permissions.has("ui.view")) {
+        throw new Error("PERMISSION_DENIED: ui.view");
+      }
+      if (!pluginActiveInProject(pluginId, currentWorkspacePath())) {
+        throw new Error("plugin is not active in this project");
+      }
+      const view = (loaded.manifest.contributes?.views ?? []).find(
+        (candidate) => candidate?.id === viewId,
+      );
+      if (!view) throw new Error("plugin has no such view");
+      const htmlPath = join(loaded.path, view.entry);
+      if (!existsSync(htmlPath)) throw new Error("view entry missing");
+      pluginViews.open({
+        pluginId,
+        viewId,
+        locale: updaterLocale,
+        theme: pluginPanelTheme,
+        htmlPath,
+        netDomains: loaded.manifest.net?.domains?.map((domain) => String(domain)),
+      });
+      return { ok: true };
+    },
+  );
+
+  handle(
+    IPC.invoke.pluginViewClose,
+    async (payload: { pluginId?: string; viewId?: string }) => {
+      pluginViews.close(String(payload?.pluginId ?? ""), String(payload?.viewId ?? ""));
+      return { ok: true };
+    },
+  );
+
+  handle(
+    IPC.invoke.pluginViewSetBounds,
+    async (payload: { x: number; y: number; width: number; height: number }) => {
+      pluginViews.setBounds(payload ?? { x: 0, y: 0, width: 0, height: 0 });
+      return { ok: true };
+    },
+  );
+
+  handle(
+    IPC.invoke.pluginViewSetVisible,
+    async (payload: { pluginId?: string; viewId?: string; visible?: boolean }) => {
+      pluginViews.setVisible(
+        String(payload?.pluginId ?? ""),
+        String(payload?.viewId ?? ""),
+        payload?.visible === true,
+      );
+      return { ok: true };
+    },
+  );
 
   // Plugin themes: the renderer needs the sanitized CSS itself, so this
   // channel returns the payload rather than only the catalog.
@@ -7472,6 +7602,7 @@ app.on("before-quit", (event) => {
     plugins.disposeWatchers();
     userMcp.disposeAll();
     browserPane.dispose();
+    pluginViews.dispose();
     const sidecarShutdown = sidecar?.dispose();
 
     try {

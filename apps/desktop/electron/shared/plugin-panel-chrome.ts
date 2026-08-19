@@ -25,6 +25,17 @@ export type PluginAppearance = {
 
 export const PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX = "--pi-plugin-panel-locale=";
 
+/**
+ * Marks a plugin surface as docked inside the host work panel rather than
+ * living in its own window.
+ *
+ * An embedded view has no window to minimize, maximize, or drag, so the preload
+ * skips the control capsule and the 46px safe area entirely and reports a
+ * titlebar height of 0. `window.pluginBridge` is identical either way, so the
+ * same HTML entry works in both placements (ADR 0092 §2 addendum).
+ */
+export const PLUGIN_PANEL_EMBEDDED_ARGUMENT = "--pi-plugin-panel-embedded=1";
+
 export const PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL =
   "pi-plugin-panel-window-control";
 export const PLUGIN_PANEL_WINDOW_STATE_CHANNEL =
