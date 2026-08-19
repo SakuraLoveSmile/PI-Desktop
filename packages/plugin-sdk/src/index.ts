@@ -278,6 +278,16 @@ export type PluginNativeNotificationResult = {
   permission: PluginNotificationPermission;
 };
 
+/** One entry returned by `fs.list`, relative to the rule's root. */
+export type PluginFsEntry = {
+  name: string;
+  /** Root-relative path, usable directly with `fs.readText` / `fs.list`. */
+  path: string;
+  isDirectory: boolean;
+  /** Files only. */
+  size?: number;
+};
+
 export type PluginHostApi = {
   app: {
     getVersion: () => Promise<string>;
@@ -317,6 +327,13 @@ export type PluginHostApi = {
     readText: (pathFromRoot: string) => Promise<string>;
     writeText: (pathFromRoot: string, content: string) => Promise<void>;
     glob: (pattern: string) => Promise<string[]>;
+    /**
+     * One directory's entries, sorted by name. Lets a plugin walk a tree lazily
+     * instead of pulling a whole-repo `glob` and reassembling it. Directories
+     * are always listed so the tree stays navigable; files are filtered by the
+     * declared read scope, and heavy or protected directories are skipped.
+     */
+    list: (pathFromRoot: string) => Promise<PluginFsEntry[]>;
     remove: (pathFromRoot: string) => Promise<void>;
     /**
      * Ask the user to point at a directory, which becomes the root for this
