@@ -1418,6 +1418,7 @@ export const zhCN = {
     action: {
       openSettings: "打开设置",
       retry: "重试",
+      continue: "继续",
       dismiss: "关闭",
     },
   },

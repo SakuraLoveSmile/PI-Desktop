@@ -1443,6 +1443,7 @@ export const en = {
     action: {
       openSettings: "Open settings",
       retry: "Try again",
+      continue: "Continue",
       dismiss: "Dismiss",
     },
   },

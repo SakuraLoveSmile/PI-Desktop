@@ -578,6 +578,7 @@ function AssistantErrorMessage({ message }: { message: UiMessage }) {
     "PROVIDER_SECRET_MISSING",
     "PROVIDER_UNAUTHORIZED",
   ].includes(error.code);
+  const continueAction = error.code === "PROVIDER_RATE_LIMITED";
 
   return (
     <section className="message-error" aria-label={t("chat.responseError")}>
@@ -618,7 +619,9 @@ function AssistantErrorMessage({ message }: { message: UiMessage }) {
               className="copy-btn primary"
               onClick={() => void retryLastPrompt()}
             >
-              {t("errors.action.retry")}
+              {t(
+                continueAction ? "errors.action.continue" : "errors.action.retry",
+              )}
             </button>
           ) : null}
         </div>

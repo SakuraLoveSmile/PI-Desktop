@@ -31,5 +31,10 @@ test("assistant error messages expose readable provider details and actions", as
   assert.match(transcript, /message\.modelId/);
   assert.match(transcript, /copyErrorDetails/);
   assert.match(transcript, /retryLastPrompt/);
+  assert.match(transcript, /const continueAction = error\.code === "PROVIDER_RATE_LIMITED"/);
+  assert.match(
+    transcript,
+    /continueAction \? "errors\.action\.continue" : "errors\.action\.retry"/,
+  );
   assert.match(transcript, /setSettingsTab\("agent"\)/);
 });
