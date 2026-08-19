@@ -4,6 +4,7 @@ import {
   LEGACY_FS_PERMISSIONS,
   PLUGIN_FS_MODES,
   PLUGIN_PERMISSIONS,
+  PLUGIN_VIEW_ICONS,
   validateManifest,
   type PluginManifest,
 } from "@pi-desktop/plugin-sdk";
@@ -137,6 +138,33 @@ export async function check(dirInput: string): Promise<CheckResult> {
     errors.push({ code: "panel.missing", message: `ui.panel "${panel}" does not exist` });
   }
 
+  for (const view of manifest.contributes?.views ?? []) {
+    const entry = view?.entry;
+    if (typeof entry !== "string" || !entry.trim()) continue;
+    if (isEscapingPath(entry)) {
+      errors.push({
+        code: "view.escapes",
+        message: `contributes.views entry "${entry}" must be relative and must not contain ".."`,
+      });
+      continue;
+    }
+    if (!(await fileExists(join(dir, entry)))) {
+      errors.push({
+        code: "view.missing",
+        message: `view entry "${entry}" does not exist`,
+      });
+      continue;
+    }
+    // An unknown token is not fatal — the host draws a letter tile — but it is
+    // almost always a typo, and the author cannot see that from the manifest.
+    if (view.icon && !PLUGIN_VIEW_ICONS.includes(view.icon as never)) {
+      warnings.push({
+        code: "view.unknown-icon",
+        message: `view "${view.id}" names icon "${view.icon}", which is not a known token, so it renders as a letter tile`,
+      });
+    }
+  }
+
   for (const path of skillPaths(manifest)) {
     if (isEscapingPath(path)) {
       errors.push({
@@ -231,6 +259,12 @@ export async function check(dirInput: string): Promise<CheckResult> {
     errors.push({
       code: "permission.panel-missing",
       message: 'ui.panel requires the "ui.panel" permission',
+    });
+  }
+  if (manifest.contributes?.views?.length && !permissions.includes("ui.view")) {
+    errors.push({
+      code: "permission.views-missing",
+      message: 'contributes.views requires the "ui.view" permission',
     });
   }
 

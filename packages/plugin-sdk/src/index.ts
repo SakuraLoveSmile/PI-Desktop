@@ -43,6 +43,8 @@ export type PluginManifest = {
     mcpServers?: PluginMcpServerContrib[];
     services?: PluginServiceContrib[];
     bus?: PluginBusContrib;
+    /** Surfaces the plugin docks inside the host's work panel. */
+    views?: PluginViewContrib[];
   };
   permissions?: string[];
   /**
@@ -154,6 +156,66 @@ export type PluginBusContrib = {
   publish?: string[];
   /** Topic patterns this plugin may subscribe to. */
   subscribe?: string[];
+};
+
+/**
+ * Icon tokens a docked view may name.
+ *
+ * Deliberately a closed set drawn from the host's own icon library rather than
+ * a plugin-supplied SVG: the icon is rendered inside the host's chrome, next to
+ * first-party controls, so accepting plugin markup there would add an injection
+ * surface and let a plugin impersonate host UI for nothing gained. An unknown
+ * token is not an error — the host falls back to a lettered tile — so this list
+ * can grow without invalidating installed plugins.
+ */
+export const PLUGIN_VIEW_ICONS = [
+  "bell",
+  "book",
+  "bot",
+  "branch",
+  "browser",
+  "chat",
+  "clock",
+  "diff",
+  "files",
+  "folder",
+  "image",
+  "key",
+  "link",
+  "list-checks",
+  "palette",
+  "plug",
+  "pull-request",
+  "search",
+  "server",
+  "shield",
+  "sparkles",
+  "target",
+  "terminal",
+  "workflow",
+  "wrench",
+] as const;
+
+export type PluginViewIcon = (typeof PLUGIN_VIEW_ICONS)[number];
+
+/**
+ * One surface the plugin docks inside the host's work panel.
+ *
+ * A view is the same isolated web page as `ui.panel`, rendered in the panel
+ * column instead of a separate window. A plugin may declare several: a Git
+ * plugin can ship "Changes" and "History" as two independent entries.
+ */
+export type PluginViewContrib = {
+  /** Plugin-local view id; `<pluginId>/<id>` addresses it globally. */
+  id: string;
+  /** Menu label. Localized objects are resolved against the host locale. */
+  title: PluginLocalizedString | string;
+  /** Token from `PLUGIN_VIEW_ICONS`; anything else renders as a letter tile. */
+  icon?: string;
+  /** Relative path to the view's HTML entry. */
+  entry: string;
+  /** Ascending sort key within the plugin-views menu group. Defaults to 0. */
+  order?: number;
 };
 
 export type PluginCommand = {
@@ -315,6 +377,7 @@ export type PluginModule = {
 
 export const PLUGIN_PERMISSIONS = [
   "ui.panel",
+  "ui.view",
   "ui.theme",
   "clipboard.read",
   "clipboard.write",
@@ -367,24 +430,8 @@ export function validateManifest(raw: unknown): {
     if (!ui || typeof ui !== "object" || Array.isArray(ui)) {
       return { ok: false, error: "manifest.ui must be an object" };
     }
-    const title = ui.title;
-    if (title !== undefined && typeof title !== "string") {
-      if (!title || typeof title !== "object" || Array.isArray(title)) {
-        return {
-          ok: false,
-          error: "manifest.ui.title must be a string or { en, \"zh-CN\" }",
-        };
-      }
-      const localized = title as Record<string, unknown>;
-      for (const locale of ["en", "zh-CN"] as const) {
-        if (typeof localized[locale] !== "string" || !localized[locale]?.trim()) {
-          return {
-            ok: false,
-            error: `manifest.ui.title.${locale} is required for localized titles`,
-          };
-        }
-      }
-    }
+    const titleError = localizedStringError(ui.title, "manifest.ui.title");
+    if (titleError) return { ok: false, error: titleError };
   }
   const contributesError = validateContributions(m.contributes);
   if (contributesError) {
@@ -521,6 +568,32 @@ export function validateContributions(
     }
   }
 
+  const viewIds = new Set<string>();
+  for (const view of contributes.views ?? []) {
+    if (!view || typeof view !== "object") return "contributes.views entries must be objects";
+    if (typeof view.id !== "string" || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(view.id)) {
+      return "contributes.views id must match [a-zA-Z][a-zA-Z0-9_-]{0,63}";
+    }
+    if (viewIds.has(view.id)) return `duplicate view id "${view.id}"`;
+    viewIds.add(view.id);
+    if (view.title === undefined) return `view "${view.id}" requires a title`;
+    const titleError = localizedStringError(view.title, `view "${view.id}" title`);
+    if (titleError) return titleError;
+    if (typeof view.title === "string" && !view.title.trim()) {
+      return `view "${view.id}" requires a title`;
+    }
+    if (typeof view.entry !== "string" || !view.entry.trim()) {
+      return `view "${view.id}" requires an entry`;
+    }
+    const entryError = relativePathError(view.entry, `view "${view.id}" entry`);
+    if (entryError) return entryError;
+    if (view.order !== undefined && !Number.isFinite(view.order)) {
+      return `view "${view.id}" order must be a number`;
+    }
+    // `icon` is intentionally unchecked: an unknown token degrades to a letter
+    // tile, so rejecting one would break a plugin over a cosmetic detail.
+  }
+
   const serverIds = new Set<string>();
   for (const server of contributes.mcpServers ?? []) {
     const result = validateMcpServer(server);
@@ -571,6 +644,26 @@ function isValidShortcutShape(value: unknown): boolean {
     return false;
   }
   return parts.slice(0, -1).every((part) => ["Mod", "Ctrl", "Alt", "Shift"].includes(part));
+}
+
+/**
+ * Shape check for a label that may be plain or localized. A localized label
+ * must carry both shipped locales: a half-translated title would silently fall
+ * back at runtime and read as a plugin bug rather than a manifest one.
+ */
+function localizedStringError(value: unknown, field: string): string | undefined {
+  if (value === undefined || typeof value === "string") return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return `${field} must be a string or { en, "zh-CN" }`;
+  }
+  const localized = value as Record<string, unknown>;
+  for (const locale of ["en", "zh-CN"] as const) {
+    const entry = localized[locale];
+    if (typeof entry !== "string" || !entry.trim()) {
+      return `${field}.${locale} is required for localized titles`;
+    }
+  }
+  return undefined;
 }
 
 function relativePathError(value: string, field: string): string | undefined {
