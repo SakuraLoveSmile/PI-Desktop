@@ -86,7 +86,18 @@ pnpm pi-plugin check .
 pnpm pi-plugin pack .
 
 # outputs dist/demo.hello-0.1.0.piplug
+
+# pack and pin the version to the commit that produced it
+pnpm pi-plugin publish .
+
+# also writes dist/demo.hello-0.1.0.submission.json
 ```
+
+`publish` 用于通过插件中心分发。它先打包，再把规范化仓库 URL、tag 或 commit ref、
+解析后的 commit 以及插件子目录，连同安装包校验和一起记录下来，使制品与它声称的来源
+描述同一个时刻。它拒绝有未提交改动的工作区，也拒绝带凭证的 git remote；当 HEAD 上
+没有 tag 时给出警告。插件中心会自行重新解析这些值；一次提交只是一个待核验的声明。
+见 [15-plugin-center.md](15-plugin-center.md)。
 
 `check` 重现安装程序强制执行的每条规则，因此 `check` 传递意味着
 安装会通过。它报告错误 - 丢失或无法解析的 `manifest.json`，

@@ -73,6 +73,13 @@ sample remains visible in Installed so it can still be disabled or uninstalled.
 - Auto-update policy + permission-diff gating implemented
 - Ratings / mandatory signing still planned
 
+### Phase D (in progress)
+
+Plugin source moves to the publisher's own repository and the catalog gains
+schema v2 (ADR 0102). The client reads v1 and v2 from the same code path; v2
+adds source provenance, review verdicts, yank state, and a declared artifact
+base. See [15-plugin-center.md](15-plugin-center.md) for the publishing side.
+
 ## 3. Market Provider abstraction
 
 ```ts
@@ -91,6 +98,83 @@ Supports multiple providers:
 - `local-mock` (development)
 
 ## 4. Data model
+
+### Catalog schema v2
+
+A catalog without `schemaVersion` is v1 and keeps its current meaning. `schemaVersion: 2`
+adds the fields below; every one of them is optional so a v1 catalog parses
+unchanged, and the client treats a missing field as "not asserted" rather than
+as a default-allow.
+
+```jsonc
+{
+  "schemaVersion": 2,
+  "providerId": "official",
+  "catalogId": "pi-plugin-center",
+  "generatedAt": "2026-08-18T02:00:00Z",
+  "policyVersion": "2026.08.1",
+  // Package URLs resolve against this base instead of the catalog directory.
+  // A mirror declares its own base, so switching source cannot cross providers.
+  "artifactBaseUrl": "https://github.com/vastsa/pi-plugin-center/releases/download/",
+  "plugins": [
+    {
+      "id": "acme.todo",
+      "publisherId": "acme",
+      "trust": "verified | community | unknown",
+      "repository": "https://github.com/acme/pi-plugin-todo",
+      "versions": [
+        {
+          "version": "1.2.0",
+          "url": "acme.todo@1.2.0/acme.todo-1.2.0.piplug",
+          "shasum": "<sha256 hex>",
+          "sizeBytes": 40960,
+          "permissions": ["fs.read"],
+          "minPiDesktop": "0.8.0",
+          "yanked": false,
+          "yankedReason": null,
+          "provenance": {
+            "sourceRepository": "https://github.com/acme/pi-plugin-todo",
+            "sourceRef": "refs/tags/v1.2.0",
+            "sourceCommit": "<40-hex commit>",
+            "sourcePath": ".",
+            "builder": "pi-plugin-center-builder@1.0.0",
+            "builtAt": "2026-08-18T01:55:00Z"
+          },
+          "review": {
+            "decision": "approved",
+            "risk": "low",
+            "policyVersion": "2026.08.1",
+            "reviewedAt": "2026-08-18T01:58:00Z"
+          },
+          "signature": "<base64>",
+          "signatureAlg": "ed25519",
+          "keyId": "pi-center-2026"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Client rules for v2:
+
+- `artifactBaseUrl` takes precedence over the catalog directory when resolving a
+  relative package URL. An absolute package URL is used as given and must still
+  pass the download host allowlist.
+- `trust` is display-only and is never derived from publisher-supplied text. A
+  value the client cannot attribute to the configured official source renders as
+  `unknown`. See [15-plugin-center.md](15-plugin-center.md) §11.
+- `yanked: true` removes the version from install and update selection. It stays
+  visible in version history with its reason, and an installed copy of a yanked
+  version is surfaced as needing attention.
+- `minPiDesktop` blocks install when the running app is older, before download.
+- `provenance` is stored with the installed plugin and shown in the detail sheet,
+  so an installed marketplace plugin can be traced back to a repository and
+  commit.
+- `signature` verification is specified in
+  [08-plugin-signing-updates.md](08-plugin-signing-updates.md) and remains
+  optional until the center's signing phase lands. An unverifiable signature is
+  never treated as a valid one.
 
 ### MarketPluginSummary
 ```ts
@@ -188,6 +272,39 @@ browse/search
 ```
 
 On any validation failure: abort and optionally clean up the cache.
+
+### Download host allowlist
+
+A v1 catalog kept every package under one known repository, so the host could
+follow any redirect and rely on the checksum alone. Once package URLs describe a
+publisher-influenced release, the host must also constrain *where the request
+goes*, not only what comes back.
+
+Before a marketplace package is fetched, host-core resolves the URL and rejects it
+unless it satisfies all of:
+
+1. The scheme is `https`, or `file://` for a local development catalog.
+2. The URL carries no embedded credentials.
+3. The host is on the allowlist below, or is the same host that served the
+   catalog currently in effect.
+
+| Host | Why |
+|---|---|
+| `github.com` | Release asset download entry point |
+| `objects.githubusercontent.com` | Where GitHub redirects release assets |
+| `release-assets.githubusercontent.com` | Current release asset origin |
+| `raw.githubusercontent.com` | Catalog and repository-hosted packages |
+| `codeload.github.com` | Repository archive downloads |
+| `cnb.cool` | Mirror catalog and mirrored assets |
+
+Redirects are restricted to HTTPS and re-checked: the effective URL after
+redirection must satisfy the same rules as the initial URL. A custom or
+enterprise catalog is trusted for its own host only — pointing the client at a
+private catalog does not widen the allowlist for arbitrary third-party hosts.
+
+An off-allowlist package URL fails with `PLUGIN_MARKET_UNTRUSTED_HOST` before any
+network request is made, and the failure names the rejected host so an operator
+can tell a misconfigured private source apart from a hostile catalog entry.
 
 The host refreshes the catalog immediately before a marketplace download so
 the package URL and checksum come from the same current catalog snapshot. This
@@ -291,6 +408,13 @@ renderer performs no remote image loads (D169).
 The UI must make the trust level visible.
 Community must not be disguised as verified.
 
+Under catalog v2 the level is issued by the plugin center, not asserted by a
+publisher. The client renders `unknown` for any entry whose level it cannot
+attribute to the configured official source, and never promotes a level because
+the catalog says so. A v1 catalog's boolean `verified` maps to `verified` /
+`community` unchanged, because a v1 catalog is only writable by marketplace
+maintainers.
+
 ## 9. Private sources (enterprise-facing)
 
 Supports configuration:
@@ -355,6 +479,8 @@ Installs always pass through checksum verification and permission review before 
 
 ## 13. Official marketplace repository
 
+### Current source (catalog v1)
+
 Repository: [vastsa/pi-desktop-plugins](https://github.com/vastsa/pi-desktop-plugins)
 
 ```text
@@ -372,6 +498,24 @@ Maintenance flow:
 3. `python3 scripts/rebuild_catalog.py`
 4. Commit + push to `main`
 5. PI-Desktop refreshes via `market.refresh` / marketplace UI
+
+This repository holds plugin source, packages, and catalog together. It stays
+the default source until the center's catalog v2 takes over (ADR 0102, migration
+phase 3), after which it remains selectable as a custom source.
+
+### Target source (catalog v2)
+
+Repository: [vastsa/pi-plugin-center](https://github.com/vastsa/pi-plugin-center)
+
+Plugin source lives in the publisher's own repository. The center stores the
+pinned build inputs, re-hosts the verified `.piplug` as a release asset under the
+tag `<pluginId>@<version>`, mirrors it to CNB, and generates `catalog.json`.
+Publishers submit a repository coordinate rather than source code.
+
+Because the catalog and artifacts are static files on GitHub and CNB, browse,
+install, and update keep working even when the center's API is unavailable.
+
+See [15-plugin-center.md](15-plugin-center.md).
 
 An explicit update check performs a fresh remote catalog fetch and falls back
 to the last valid local catalog when offline. Opening the Extensions page also

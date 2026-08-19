@@ -20,8 +20,9 @@
 - Performance / stress testing (post-MVP).
 - Native Windows/Linux release qualification (published artifacts exist; native
   qualification gaps remain documented).
-- Marketplace publisher provenance and hostile-plugin sandbox scenarios; basic
-  browse/install/update flows are already part of the catalog.
+- Hostile-plugin sandbox scenarios. Publisher provenance and the marketplace
+  download boundary are now in scope (E2E-024R through E2E-024V); basic
+  browse/install/update flows were already part of the catalog.
 - Remote gateway / control-plane scenarios (post-MVP — ADR 0004 / baseline #20).
 
 ---
@@ -995,6 +996,51 @@ Each scenario is documented in this format:
 - **Specs linked**: `07-plugins/07-plugin-marketplace.md`, `07-plugins/13-plugin-permissions-matrix.md`
 - **Acceptance**: G (marketplace install + permission review)
 - **Status**: Documented / host-core covered by unit tests + protocol methods
+
+#### E2E-024R: Install from a catalog v2 source with a re-hosted artifact
+
+- **Preconditions**: A `schemaVersion: 2` catalog whose `artifactBaseUrl` points at plugin-center release assets, with one plugin carrying provenance and an approved review verdict.
+- **Steps**: 1) Point the marketplace source at the v2 catalog. 2) Open a plugin's detail sheet. 3) Read the Source section. 4) Install the selected version. 5) Switch to the CNB mirror and repeat the install.
+- **Expected**: The relative package URL resolves against `artifactBaseUrl`, not the catalog directory; the detail sheet shows the source repository, commit, and builder before install; the download follows the GitHub release redirect to its storage host and verifies the catalog checksum; the mirror declares its own base so the mirrored install resolves under CNB with an identical checksum; the installed record keeps publisher, trust tier, and source pin.
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md`, `07-plugins/15-plugin-center.md`
+- **Acceptance**: G (publisher-owned source distribution)
+- **Status**: Documented / host-core covered by unit tests
+
+#### E2E-024S: Package host allowlist refuses an untrusted download
+
+- **Preconditions**: A catalog fixture whose version URL points at a host outside the allowlist, plus one with embedded credentials and one on plain HTTP.
+- **Steps**: 1) Refresh the marketplace. 2) Inspect the plugin card and detail sheet. 3) Attempt an install. 4) Repeat with a private catalog whose packages sit on its own host.
+- **Expected**: The row does not offer an install action for an off-allowlist URL; an attempted install fails with `PLUGIN_MARKET_UNTRUSTED_HOST` naming the rejected host before any request leaves the machine; a credentialed URL and non-loopback plain HTTP are refused the same way; a private catalog can still serve packages from the host that served it, without widening the allowlist for third-party hosts.
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md`, `07-plugins/04-plugin-security.md`
+- **Acceptance**: G (marketplace download boundary)
+- **Status**: Documented / host-core covered by unit tests
+
+#### E2E-024T: A withdrawn version is not offered, installed, or hidden
+
+- **Preconditions**: A catalog where the newest version is `yanked` with a reason, an older version is live, and the yanked version is installed locally.
+- **Steps**: 1) Open the plugin's detail sheet. 2) Inspect version history. 3) Select the withdrawn version. 4) Run Check for updates. 5) Run Apply automatic updates. 6) Inspect the installed row.
+- **Expected**: The offered latest version is the newest non-yanked one; the withdrawn version stays in history with its reason and a struck-through number; selecting it disables the install action with withdrawn copy rather than not-yet-published copy; an explicit install of it fails with `PLUGIN_MARKET_YANKED` and the reason; no update is offered when the newest live version is not newer than the installed one, so a downgrade is never presented as an update; the installed row is flagged as needing attention and the plugin keeps running.
+- **Specs linked**: `07-plugins/08-plugin-signing-updates.md`
+- **Acceptance**: G (incident response propagation)
+- **Status**: Documented / host-core covered by unit tests
+
+#### E2E-024U: Trust tier and host version bound are enforced by the client
+
+- **Preconditions**: A custom-source catalog claiming `trust: "verified"`, a catalog with an unrecognised tier, and a version whose `minPiDesktop` exceeds the running host.
+- **Steps**: 1) Point the marketplace at the custom source. 2) Inspect the card and detail sheet badges. 3) Attempt to install the version pinned to a newer host. 4) Repeat with a `minPiDesktop` that is a range expression rather than a version.
+- **Expected**: A `verified` claim from a non-official source renders as community with no shield; an unrecognised tier renders as unknown; the version requiring a newer host is not offered and an explicit install fails with `PLUGIN_HOST_TOO_OLD` naming both versions; an unparseable bound is ignored rather than making the plugin uninstallable.
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md`, `07-plugins/15-plugin-center.md`
+- **Acceptance**: G (trust presentation)
+- **Status**: Documented / host-core covered by unit tests
+
+#### E2E-024V: Publisher pins a version with pi-plugin publish
+
+- **Preconditions**: A plugin directory inside a git repository with an https or ssh origin remote.
+- **Steps**: 1) Run `pi-plugin publish` with uncommitted changes. 2) Commit and tag, then rerun. 3) Rerun on a commit with no tag. 4) Rerun with a remote containing credentials. 5) Feed the resulting registry entry through the center's catalog build and the client preflight.
+- **Expected**: A dirty worktree is refused so the submitted commit describes the packaged bytes; a clean run writes the package, its sha256, the canonical repository URL, the tag ref, the resolved commit, and the plugin subdirectory into a submission payload; an untagged commit is accepted with a warning; a credentialed remote is refused; the generated catalog passes the same preflight the client ships.
+- **Specs linked**: `07-plugins/10-plugin-devex.md`, `07-plugins/15-plugin-center.md`
+- **Acceptance**: G (publisher tooling)
+- **Status**: Documented / devkit covered by unit tests
 
 #### E2E-024C: Plugin package install and auto-update path
 
