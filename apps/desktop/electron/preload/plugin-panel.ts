@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
   PLUGIN_PANEL_TITLEBAR_HEIGHT,
+  PLUGIN_PANEL_CHROME_META_NAME,
+  PLUGIN_PANEL_CHROME_VERSION,
   PLUGIN_PANEL_EMBEDDED_ARGUMENT,
   PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX,
   PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
@@ -81,6 +83,22 @@ function pageSurface(theme: PluginPanelTheme): string {
   return pageColor("backgroundColor", theme === "light" ? "#ffffff" : "#181818");
 }
 
+function publishTitlebarHeight(): void {
+  document.documentElement?.style.setProperty(
+    "--pi-plugin-titlebar-height",
+    `${isEmbeddedPanel() ? 0 : PLUGIN_PANEL_TITLEBAR_HEIGHT}px`,
+  );
+}
+
+function pluginOwnsTitlebarSpacing(): boolean {
+  return (
+    document
+      .querySelector(`meta[name="${PLUGIN_PANEL_CHROME_META_NAME}"]`)
+      ?.getAttribute("content")
+      ?.trim() === PLUGIN_PANEL_CHROME_VERSION
+  );
+}
+
 function chromeLabels(): ChromeLabels {
   if (panelLocale().toLowerCase().startsWith("zh")) {
     return {
@@ -124,6 +142,11 @@ function installPanelChrome(): void {
   const body = document.body;
   if (!body || document.querySelector("pi-plugin-panel-chrome")) return;
 
+  // Publish this before the page's DOMContentLoaded handlers run so modern
+  // plugin CSS can resolve its variable without an extra reflow or a second
+  // 46px offset.
+  publishTitlebarHeight();
+
   // A docked view has no window controls and no drag band, so it gets the full
   // surface. The variable is still published — at 0 — so a plugin's fixed
   // toolbar offset resolves to the right value in both placements.
@@ -132,36 +155,40 @@ function installPanelChrome(): void {
     return;
   }
 
-  document.documentElement.style.setProperty(
-    "--pi-plugin-titlebar-height",
-    `${PLUGIN_PANEL_TITLEBAR_HEIGHT}px`,
-  );
-
-  const originalPaddingTop = Number.parseFloat(
-    window.getComputedStyle(body).paddingTop,
-  );
-  body.style.setProperty("box-sizing", "border-box", "important");
-  body.style.setProperty(
-    "padding-top",
-    `${
-      (Number.isFinite(originalPaddingTop) ? originalPaddingTop : 0) +
-      PLUGIN_PANEL_TITLEBAR_HEIGHT
-    }px`,
-    "important",
-  );
+  // v2 pages use `padding-top: var(--pi-plugin-titlebar-height, 0px)` (or
+  // their own calc from it), so preserving the original body padding is what
+  // keeps their content tight. Legacy pages do not know about the variable;
+  // retain the additive fallback for those pages only.
+  if (!pluginOwnsTitlebarSpacing()) {
+    const originalPaddingTop = Number.parseFloat(
+      window.getComputedStyle(body).paddingTop,
+    );
+    body.style.setProperty("box-sizing", "border-box", "important");
+    body.style.setProperty(
+      "padding-top",
+      `${
+        (Number.isFinite(originalPaddingTop) ? originalPaddingTop : 0) +
+        PLUGIN_PANEL_TITLEBAR_HEIGHT
+      }px`,
+      "important",
+    );
+  }
 
   const labels = chromeLabels();
   const theme = panelTheme();
   const host = document.createElement("pi-plugin-panel-chrome");
   host.dataset.theme = theme;
-  host.style.setProperty(
-    "--pi-plugin-panel-page-background",
-    pageSurface(theme),
-  );
-  host.style.setProperty(
-    "--pi-plugin-panel-page-foreground",
-    pageColor("color", theme === "light" ? "#1a1c1f" : "#ffffff"),
-  );
+  const syncPageColors = () => {
+    host.style.setProperty(
+      "--pi-plugin-panel-page-background",
+      pageSurface(theme),
+    );
+    host.style.setProperty(
+      "--pi-plugin-panel-page-foreground",
+      pageColor("color", theme === "light" ? "#1a1c1f" : "#ffffff"),
+    );
+  };
+  syncPageColors();
   host.setAttribute("role", "toolbar");
   host.setAttribute("aria-label", labels.toolbar);
   const shadow = host.attachShadow({ mode: "closed" });
@@ -214,8 +241,8 @@ function installPanelChrome(): void {
       app-region: no-drag;
       pointer-events: auto;
       position: absolute;
-      top: 8px;
-      right: 10px;
+      top: 9px;
+      right: 8px;
       z-index: 2;
       box-sizing: border-box;
       display: flex;
@@ -392,6 +419,12 @@ function installPanelChrome(): void {
     (_event, state: { maximized?: boolean }) =>
       setMaximized(Boolean(state?.maximized)),
   );
+  // The plugin receives appearance changes through the same event channel.
+  // Re-sample after the page has applied its new data attribute so the capsule
+  // remains legible when a plugin switches between light and dark palettes.
+  ipcRenderer.on("pi-plugin-panel-event:appearance:changed", () => {
+    window.setTimeout(syncPageColors, 0);
+  });
   void invokeControl("getState");
 
   controls.append(minimize, maximize, close);
@@ -401,6 +434,10 @@ function installPanelChrome(): void {
   shadow.append(style, chrome);
   document.documentElement.append(host);
 }
+
+// Pre-publish the value before page styles and DOMContentLoaded handlers run.
+// The install path repeats this defensively for pages that replace their root.
+publishTitlebarHeight();
 
 if (document.readyState === "loading") {
   window.addEventListener("DOMContentLoaded", installPanelChrome, { once: true });

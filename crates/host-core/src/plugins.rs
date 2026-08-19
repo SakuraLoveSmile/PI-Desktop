@@ -1971,14 +1971,21 @@ module.exports = { onLoad, onUnload };
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="pi-plugin-chrome" content="v2" />
     <title>Hello Plugin</title>
     <style>
-      body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 16px; background: #0b1020; color: #e8eefc; }
+      :root { color-scheme: dark; --bg: #181818; --surface: #212121; --fg: #ffffff; --muted: color-mix(in oklab, #ffffff 52%, transparent); --border: color-mix(in oklab, #ffffff 10%, transparent); --accent: #ffffff; }
+      :root[data-base="light"] { color-scheme: light; --bg: #ffffff; --surface: #f9f9f9; --fg: #1a1c1f; --muted: #5d5d5d; --border: color-mix(in oklab, #1a1c1f 10%, transparent); --accent: #1a1c1f; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: var(--pi-plugin-titlebar-height, 0px) 16px 16px; overflow: auto; background: var(--bg); color: var(--fg); }
       /* PI-Desktop reserves exactly a transparent 46px drag band. Normal-flow
          content is offset automatically; fixed/sticky top UI starts at
          top: var(--pi-plugin-titlebar-height, 46px). */
-      .card { border: 1px solid #24304d; border-radius: 12px; padding: 16px; background: #121a2f; }
-      button { margin-top: 12px; border: 0; border-radius: 8px; padding: 8px 12px; background: #4f7cff; color: white; cursor: pointer; }
+      .card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--surface); }
+      h2 { margin: 0 0 4px; font-size: 16px; font-weight: 560; letter-spacing: -0.02em; }
+      p { margin: 0; color: var(--muted); }
+      button { margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--accent); color: var(--bg); cursor: pointer; font: inherit; }
+      button:focus-visible { outline: 2px solid color-mix(in oklab, var(--accent) 58%, transparent); outline-offset: 2px; }
     </style>
   </head>
   <body>
@@ -1988,6 +1995,14 @@ module.exports = { onLoad, onUnload };
       <button id="ping">Toast Ping</button>
     </div>
     <script>
+      const applyAppearance = (appearance) => {
+        const base = appearance?.base;
+        document.documentElement.dataset.base = base === "light" || base === "dark"
+          ? base
+          : window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      };
+      window.pluginBridge?.on("appearance:changed", applyAppearance);
+      window.pluginBridge?.invoke("app.getAppearance").then(applyAppearance).catch(() => applyAppearance(null));
       document.getElementById("ping").addEventListener("click", async () => {
         if (window.pluginBridge?.invoke) {
           await window.pluginBridge.invoke("ui.showToast", { message: "Hello panel bridge" });
@@ -2097,17 +2112,21 @@ module.exports = { onLoad, onUnload };
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="pi-plugin-chrome" content="v2" />
   <title>Workspace Notes</title>
   <style>
-    body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0b1020; color: #e8eefc; padding: 16px; }
+    :root { color-scheme: dark; --bg: #181818; --surface: #212121; --fg: #ffffff; --muted: color-mix(in oklab, #ffffff 52%, transparent); --border: color-mix(in oklab, #ffffff 10%, transparent); --accent: #ffffff; }
+    :root[data-base="light"] { color-scheme: light; --bg: #ffffff; --surface: #f9f9f9; --fg: #1a1c1f; --muted: #5d5d5d; --border: color-mix(in oklab, #1a1c1f 10%, transparent); --accent: #1a1c1f; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg); padding: var(--pi-plugin-titlebar-height, 0px) 16px 16px; overflow: auto; }
     /* PI-Desktop reserves exactly a transparent 46px drag band. Normal-flow
        content is offset automatically; fixed/sticky top UI starts at
        top: var(--pi-plugin-titlebar-height, 46px). */
-    textarea { width: 100%; min-height: 180px; border-radius: 10px; border: 1px solid #24304d; background: #121a2f; color: inherit; padding: 10px; box-sizing: border-box; }
+    textarea { width: 100%; min-height: 180px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: inherit; padding: 10px; box-sizing: border-box; font: inherit; }
     .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-    button { border: 0; border-radius: 8px; padding: 8px 12px; background: #4f7cff; color: white; cursor: pointer; }
-    button.secondary { background: #24304d; }
-    .meta { color: #9db0d4; font-size: 12px; margin-bottom: 8px; }
+    button { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: var(--accent); color: var(--bg); cursor: pointer; font: inherit; }
+    button.secondary { background: var(--surface); color: var(--fg); }
+    .meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -2121,6 +2140,14 @@ module.exports = { onLoad, onUnload };
     <button class="secondary" id="docs">Open docs</button>
   </div>
   <script>
+    const applyAppearance = (appearance) => {
+      const base = appearance?.base;
+      document.documentElement.dataset.base = base === "light" || base === "dark"
+        ? base
+        : window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    };
+    window.pluginBridge?.on("appearance:changed", applyAppearance);
+    window.pluginBridge?.invoke("app.getAppearance").then(applyAppearance).catch(() => applyAppearance(null));
     const notes = document.getElementById('notes');
     async function reload() {
       try { notes.value = await window.pluginBridge.invoke('fs.readText', { path: 'NOTES.md' }); }

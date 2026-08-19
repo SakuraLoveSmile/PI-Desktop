@@ -51,6 +51,7 @@ test("the Files view uses only public bridge channels", () => {
   // The titlebar height is read, not hard-coded, so the same file also works
   // in a detached panel window.
   assert.match(view, /var\(--pi-plugin-titlebar-height, 0px\)/);
+  assert.match(view, /meta name="pi-plugin-chrome" content="v2"/);
 });
 
 test("the Files view keeps the former browser workflow while staying plugin-owned", () => {

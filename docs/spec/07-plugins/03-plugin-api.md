@@ -279,6 +279,11 @@ works in either placement. The only difference is chrome: a docked view has no
 window-control capsule and no drag band, and its
 `--pi-plugin-titlebar-height` is `0px` rather than `46px`.
 
+Detached panel pages using the current chrome contract declare
+`<meta name="pi-plugin-chrome" content="v2">` and use the published variable
+for normal-flow top spacing. The host preserves that page-owned spacing. A
+page without the marker remains supported through the legacy additive offset.
+
 The host-owned preload forwards only fixed channels to the plugin runtime:
 
 | Channel | Required permission |

@@ -52,10 +52,12 @@ describe("scaffold", () => {
     expect(panel.manifest?.ui?.panel).toBe("renderer/index.html");
     expect(panel.manifest?.permissions).toEqual(["ui.panel"]);
     const panelHtml = await readFile(join(panelDir, "renderer/index.html"), "utf8");
+    expect(panelHtml).toContain('meta name="pi-plugin-chrome" content="v2"');
     expect(panelHtml).toContain("--pi-plugin-titlebar-height");
     expect(panelHtml).toContain("exactly a transparent 46px drag band");
     expect(panelHtml).toContain("band is not clickable outside the capsule");
     expect(panelHtml).toContain("visible panel header belongs");
+    expect(panelHtml).not.toContain("#4f7cff");
 
     const fullDir = join(await tempDir(), "full");
     await scaffold({ dir: fullDir, template: "full-demo" });

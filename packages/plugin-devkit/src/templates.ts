@@ -335,14 +335,38 @@ function panelHtml(vars: TemplateVars): string {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="pi-plugin-chrome" content="v2" />
     <title>${vars.name}</title>
     <style>
+      :root {
+        color-scheme: dark;
+        --bg: #181818;
+        --surface: #212121;
+        --surface-hover: color-mix(in oklab, #ffffff 6%, transparent);
+        --fg: #ffffff;
+        --muted: color-mix(in oklab, #ffffff 52%, transparent);
+        --border: color-mix(in oklab, #ffffff 10%, transparent);
+        --accent: #ffffff;
+      }
+      :root[data-base="light"] {
+        color-scheme: light;
+        --bg: #ffffff;
+        --surface: #f9f9f9;
+        --surface-hover: color-mix(in oklab, #1a1c1f 5%, transparent);
+        --fg: #1a1c1f;
+        --muted: #5d5d5d;
+        --border: color-mix(in oklab, #1a1c1f 10%, transparent);
+        --accent: #1a1c1f;
+      }
+      * { box-sizing: border-box; }
       body {
         margin: 0;
-        padding: 16px;
-        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #0b1020;
-        color: #e8eefc;
+        min-height: 100vh;
+        padding: var(--pi-plugin-titlebar-height, 0px) 16px 16px;
+        overflow: auto;
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--fg);
       }
       /*
        * PI-Desktop reserves exactly a transparent 46px drag band and overlays
@@ -352,19 +376,36 @@ function panelHtml(vars: TemplateVars): string {
        * use top: var(--pi-plugin-titlebar-height, 46px).
        */
       .card {
-        border: 1px solid #24304d;
+        border: 1px solid var(--border);
         border-radius: 12px;
         padding: 16px;
-        background: #121a2f;
+        background: var(--surface);
+      }
+      h2 {
+        margin: 0 0 4px;
+        font-size: 16px;
+        font-weight: 560;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
       }
       button {
         margin-top: 12px;
-        border: 0;
+        border: 1px solid var(--border);
         border-radius: 8px;
         padding: 8px 12px;
-        background: #4f7cff;
-        color: #fff;
+        background: var(--accent);
+        color: var(--bg);
         cursor: pointer;
+        font: inherit;
+        transition: opacity 150ms ease;
+      }
+      button:hover { opacity: 0.82; }
+      button:focus-visible {
+        outline: 2px solid color-mix(in oklab, var(--accent) 58%, transparent);
+        outline-offset: 2px;
       }
     </style>
   </head>
@@ -375,6 +416,14 @@ function panelHtml(vars: TemplateVars): string {
       <button id="ping">Toast ping</button>
     </div>
     <script>
+      const applyAppearance = (appearance) => {
+        const base = appearance?.base;
+        document.documentElement.dataset.base = base === "light" || base === "dark"
+          ? base
+          : window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      };
+      window.pluginBridge?.on("appearance:changed", applyAppearance);
+      window.pluginBridge?.invoke("app.getAppearance").then(applyAppearance).catch(() => applyAppearance(null));
       document.getElementById("ping").addEventListener("click", async () => {
         if (window.pluginBridge?.invoke) {
           await window.pluginBridge.invoke("ui.showToast", { message: "${vars.name} panel bridge" });

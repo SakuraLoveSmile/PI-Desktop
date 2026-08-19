@@ -74,6 +74,14 @@ on a light plugin page. The band is not clickable outside the capsule;
 development panels expose a localized reminder. The plugin owns its title,
 toolbar, and every other visible panel surface.
 
+Plugin pages that use the current chrome contract declare
+`<meta name="pi-plugin-chrome" content="v2">` and lay out normal-flow content
+with `--pi-plugin-titlebar-height`. Detached panels publish `46px`; docked
+views publish `0px`. The host does not add a second top padding to v2 pages,
+which keeps the capsule's safe band from becoming an empty spacer. Pages without
+the marker retain the additive legacy offset so older installed plugins remain
+usable while they migrate.
+
 ### 3.3 Product identity and marks
 
 The visible product identity is **PI-Desktop**, even where the shell borrows

@@ -35,8 +35,8 @@ test("plugin panels match the cross-platform main-window chrome contract", () =>
   assert.match(chromeSource, /PLUGIN_PANEL_TITLEBAR_HEIGHT = 46/);
   assert.match(preloadSource, /-webkit-app-region: drag/);
   assert.match(preloadSource, /className = "capsule"/);
-  assert.match(preloadSource, /top: 8px/);
-  assert.match(preloadSource, /right: 10px/);
+  assert.match(preloadSource, /top: 9px/);
+  assert.match(preloadSource, /right: 8px/);
   assert.match(preloadSource, /width: 96px/);
   assert.match(preloadSource, /height: 28px/);
   assert.match(preloadSource, /border-radius: 999px/);
@@ -75,6 +75,9 @@ test("plugin panel window controls stay private, bounded, and accessible", () =>
 test("plugin content is offset below the strict 46px host drag band", () => {
   assert.match(preloadSource, /getComputedStyle\(body\)\.paddingTop/);
   assert.match(preloadSource, /padding-top/);
+  assert.match(preloadSource, /PLUGIN_PANEL_CHROME_META_NAME/);
+  assert.match(preloadSource, /PLUGIN_PANEL_CHROME_VERSION/);
+  assert.match(preloadSource, /pluginOwnsTitlebarSpacing/);
   assert.match(preloadSource, /PLUGIN_PANEL_TITLEBAR_HEIGHT/);
   assert.match(preloadSource, /--pi-plugin-titlebar-height/);
   assert.match(preloadSource, /isDevelopmentPanel/);
@@ -91,6 +94,7 @@ test("plugin content is offset below the strict 46px host drag band", () => {
 test("checked-in plugin panels follow the host chrome contract", () => {
   assert.equal(bundledPanelSources.length, 2);
   for (const panelSource of [examplePanelSource, ...bundledPanelSources]) {
+    assert.match(panelSource, /meta name="pi-plugin-chrome" content="v2"/);
     assert.match(panelSource, /PI-Desktop reserves exactly a transparent 46px drag band/);
     assert.match(panelSource, /var\(--pi-plugin-titlebar-height, 46px\)/);
     assert.doesNotMatch(panelSource, /top:\s*0/);

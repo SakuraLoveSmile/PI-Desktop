@@ -44,6 +44,11 @@ Every template scaffolds a manifest with `schemaVersion: 1`, a `main.js`, a
 README, and only the permissions the template actually uses. Scaffolding refuses
 to write into a non-empty directory.
 
+Panel templates include the current `pi-plugin-chrome` v2 marker and the
+neutral PI-Desktop surface tokens. Their body uses
+`var(--pi-plugin-titlebar-height, 0px)` so the same entry works in a detached
+window and a docked work-panel view without adding a second top spacer.
+
 Current repo example:
 - `examples/plugins/hello`
 

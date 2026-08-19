@@ -1,10 +1,34 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hello Panel</title>
-    <style>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <meta name="pi-plugin-chrome" content="v2" />
+      <title>Hello Panel</title>
+      <style>
+      :root {
+        color-scheme: dark;
+        --bg: #181818;
+        --surface: #212121;
+        --surface-hover: color-mix(in oklab, #ffffff 6%, transparent);
+        --fg: #ffffff;
+        --secondary: color-mix(in oklab, #ffffff 70%, transparent);
+        --muted: color-mix(in oklab, #ffffff 52%, transparent);
+        --border: color-mix(in oklab, #ffffff 10%, transparent);
+        --accent: #ffffff;
+      }
+      :root[data-base="light"] {
+        color-scheme: light;
+        --bg: #ffffff;
+        --surface: #f9f9f9;
+        --surface-hover: color-mix(in oklab, #1a1c1f 5%, transparent);
+        --fg: #1a1c1f;
+        --secondary: color-mix(in oklab, #1a1c1f 74%, transparent);
+        --muted: #5d5d5d;
+        --border: color-mix(in oklab, #1a1c1f 10%, transparent);
+        --accent: #1a1c1f;
+      }
+      * { box-sizing: border-box; }
       /*
        * A docked work panel view is the same isolated page as `ui.panel`, but
        * it is composited inside the host window instead of a separate one, so
@@ -15,10 +39,11 @@
        */
       body {
         margin: 0;
-        padding: calc(var(--pi-plugin-titlebar-height, 0px) + 12px) 12px 12px;
+        min-height: 100%;
+        padding: var(--pi-plugin-titlebar-height, 0px) 12px 12px;
         font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #0b1020;
-        color: #e8eefc;
+        background: var(--bg);
+        color: var(--fg);
       }
       h2 {
         margin: 0 0 4px;
@@ -26,14 +51,14 @@
       }
       p {
         margin: 0 0 12px;
-        color: #9fb0d4;
+        color: var(--muted);
       }
       button {
-        border: 0;
+        border: 1px solid var(--border);
         border-radius: 8px;
         padding: 7px 11px;
-        background: #4f7cff;
-        color: white;
+        background: var(--accent);
+        color: var(--bg);
         cursor: pointer;
         font: inherit;
       }
@@ -41,8 +66,8 @@
         margin-top: 12px;
         border-radius: 8px;
         padding: 8px;
-        background: #121a2f;
-        color: #9fb0d4;
+        background: var(--surface);
+        color: var(--secondary);
         font-size: 12px;
         white-space: pre-wrap;
       }
@@ -54,6 +79,14 @@
     <button id="ping">Toast from the view</button>
     <div id="log">Ready.</div>
     <script>
+      const applyAppearance = (appearance) => {
+        const base = appearance?.base;
+        document.documentElement.dataset.base = base === "light" || base === "dark"
+          ? base
+          : window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      };
+      window.pluginBridge?.on("appearance:changed", applyAppearance);
+      window.pluginBridge?.invoke("app.getAppearance").then(applyAppearance).catch(() => applyAppearance(null));
       const log = document.getElementById("log");
       // The bridge is identical in a docked view and a detached panel window.
       document.getElementById("ping").addEventListener("click", async () => {

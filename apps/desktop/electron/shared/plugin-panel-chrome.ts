@@ -1,5 +1,13 @@
 export const PLUGIN_PANEL_TITLEBAR_HEIGHT = 46;
 
+/**
+ * Opt-in marker for plugin pages that use the host-published titlebar CSS
+ * variable. Pages with this marker own their normal-flow top spacing; legacy
+ * pages keep the host's additive padding fallback.
+ */
+export const PLUGIN_PANEL_CHROME_META_NAME = "pi-plugin-chrome";
+export const PLUGIN_PANEL_CHROME_VERSION = "v2";
+
 export type PluginPanelTheme = "light" | "dark";
 
 /**

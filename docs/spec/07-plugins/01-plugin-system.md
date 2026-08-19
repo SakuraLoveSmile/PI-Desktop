@@ -236,6 +236,10 @@ are reachable there) and CPU/memory limits.
   must use `top: var(--pi-plugin-titlebar-height, 46px)` rather than `top: 0`.
   A plugin-owned toolbar may use `-webkit-app-region: drag`, with
   `-webkit-app-region: no-drag` on its interactive controls.
+- Current panel pages declare `<meta name="pi-plugin-chrome" content="v2">`
+  and use the published variable for their own top spacing. The host does not
+  add padding to these pages, avoiding a duplicated safe band; pages without
+  the marker retain the legacy additive offset for compatibility.
 - The plugin owns its title, toolbar, and every other visible panel surface.
 - Render the host capsule in a closed preload-owned Shadow DOM so plugin CSS
   cannot restyle its controls
