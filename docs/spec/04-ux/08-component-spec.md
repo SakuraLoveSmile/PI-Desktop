@@ -655,6 +655,32 @@ copy — followed by the same entries the header menu lists, as plain rows:
   Copy wraps at 34ch rather than 48ch because the panel can be 244px wide. No
   hero art, cards, or marketing framing (design-system §14, D206)
 
+### 5.2.2 Files plugin surface
+
+The bundled `pi.files` view keeps the former Files tool's focused browsing
+workflow while rendering entirely inside the plugin's isolated page:
+
+- The compact toolbar identifies the active project and offers one explicit
+  refresh action. The tree loads one directory at a time, keeps directories
+  above files, preserves expanded folders, and shows file sizes without
+  walking the whole workspace up front.
+- Directory rows use `role="treeitem"` with `aria-expanded`; Enter/Space opens
+  the row and Arrow/Home/End keys move through visible rows. Hover and active
+  fills are neutral theme surfaces, with the caret and folder/file SVGs carrying
+  the hierarchy instead of emoji or text glyphs.
+- Selecting a file switches to a focused viewer with a Back action, the
+  root-relative path, file size, line numbers, and a bounded preview. Loading,
+  read failures, binary content, image content, empty folders, and folders
+  that fail to load each have a distinct localized state; a failed directory
+  can be retried in place.
+- The page follows `app.getAppearance` and `appearance:changed` for base theme
+  and English/Simplified Chinese copy. Its only data access remains the public
+  `workspace.get`, `fs.list`, and `fs.readText` bridge, so the richer surface
+  does not add host-only capabilities. Text previews are capped at 5,000 lines;
+  images are reported as unavailable rather than sending binary data through a
+  text-only channel. A long-lived view rechecks `workspace.get` so switching
+  projects cannot leave the previous project's tree visible.
+
 ### 5.3 States
 
 | State | Behavior |
