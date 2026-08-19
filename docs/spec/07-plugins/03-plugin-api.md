@@ -104,6 +104,12 @@ pi.workspace.get(): Promise<{ path: string; name: string } | null>
 pi.fs.readText(pathFromRoot: string): Promise<string>
 pi.fs.writeText(pathFromRoot: string, content: string): Promise<void>
 pi.fs.glob(pattern: string): Promise<string[]>
+pi.fs.list(pathFromRoot: string): Promise<Array<{
+  name: string;
+  path: string;        // root-relative, usable directly with readText / list
+  isDirectory: boolean;
+  size?: number;       // files only
+}>>
 pi.fs.remove(pathFromRoot: string): Promise<void>
 pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 ```
@@ -114,6 +120,14 @@ picked through `requestDirectory()` when the mode declares
 anything outside it prompts the user, and the credential deny-list overrides both
 (see [04-plugin-security.md](04-plugin-security.md) §6). `remove` is
 non-recursive and moves the path to the OS trash.
+
+`list` returns one directory's entries, name-sorted, so a plugin can walk a tree
+lazily instead of pulling a whole-repo `glob` and reassembling it. It applies the
+same guards as `glob`, because a listing is a read: files outside the declared
+read scope are omitted, denied names and protected paths are omitted, and heavy
+directories (`node_modules` and friends) are skipped. Directories are always
+returned so a narrow scope still yields a navigable tree, and at most 1000
+entries come back per call.
 
 ### agent
 ```ts
@@ -267,7 +281,7 @@ The host-owned preload forwards only fixed channels to the plugin runtime:
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`, `workspace.get`, `app.getAppearance` | None |
-| `fs.readText`, `fs.glob` | `fs.read` |
+| `fs.readText`, `fs.glob`, `fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |
 | `clipboard.readText` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |

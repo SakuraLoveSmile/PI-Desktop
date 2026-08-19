@@ -254,6 +254,7 @@ const HOST_API_ALLOWLIST = new Set([
   "fs.readText",
   "fs.writeText",
   "fs.glob",
+  "fs.list",
   "fs.remove",
   "fs.requestDirectory",
   "clipboard.readText",
@@ -323,6 +324,8 @@ export const MAX_DELETES_PER_WINDOW = 50;
 const DELETE_RATE_WINDOW_MS = 60_000;
 /** Kept from the pre-scope implementation: a listing is not a search index. */
 const MAX_GLOB_MATCHES = 500;
+/** Entries returned for one directory. A tree is walked lazily, not dumped. */
+const MAX_LIST_ENTRIES = 1000;
 /** Directories `pi.fs.glob` never walks into; they are noise and are denied anyway. */
 const GLOB_SKIP_DIRS = new Set([".git", "node_modules", ".venv", "__pycache__"]);
 /** Entries in one plugin's write ledger; oldest are dropped past this. */
@@ -1051,6 +1054,8 @@ export class PluginRuntime {
         return { ok: true };
       case "fs.glob":
         return api.fs.glob(String(payload?.pattern ?? "*"));
+      case "fs.list":
+        return api.fs.list(String(payload?.path ?? ""));
       // Deleting is not reachable from a panel; choosing a directory is, and
       // has to be, because a "pick a folder" button is panel UI by nature.
       case "fs.requestDirectory":
@@ -2450,6 +2455,80 @@ export class PluginRuntime {
             path: rel,
           });
           return content;
+        },
+        /**
+         * One directory's entries, so a plugin can walk a tree lazily instead
+         * of pulling a whole-repo glob it then has to reassemble.
+         *
+         * The guards match `fs.glob` exactly — declared read scope, protected
+         * paths, denied names, skipped heavy directories — because a listing is
+         * a read: what a plugin may not open, it may not learn the name of.
+         */
+        list: async (pathFromRoot: string) => {
+          this.assertPermission(loaded, "fs.read");
+          const rule = loaded.fsPolicy.read ?? { root: "workspace", scope: [] };
+          const root =
+            rule.root === "userSelected" ? loaded.userRoot : this.services.getWorkspacePath();
+          if (!root) throw apiError("NOT_FOUND", "No workspace is open");
+          const rel = normalizeFsPath(String(pathFromRoot ?? ""));
+          if (rel.split("/").includes("..")) {
+            throw apiError("INVALID_ARGUMENT", "path must stay inside the root");
+          }
+          const base = realpathOrSelf(root);
+          const dir = rel ? join(base, rel) : base;
+          if (this.isProtectedPath(dir)) {
+            throw apiError("PERMISSION_DENIED", "path is protected");
+          }
+          let names: string[] = [];
+          try {
+            names = readdirSync(dir);
+          } catch {
+            throw apiError("NOT_FOUND", `cannot list ${rel || "."}`);
+          }
+          const entries: Array<{
+            name: string;
+            path: string;
+            isDirectory: boolean;
+            size?: number;
+          }> = [];
+          for (const name of names.sort()) {
+            if (entries.length >= MAX_LIST_ENTRIES) break;
+            const childRel = rel ? `${rel}/${name}` : name;
+            const full = join(dir, name);
+            if (isDeniedFsPath(childRel)) continue;
+            if (this.isProtectedPath(full)) continue;
+            let st: ReturnType<typeof statSync>;
+            try {
+              st = statSync(full);
+            } catch {
+              continue;
+            }
+            if (st.isDirectory()) {
+              if (GLOB_SKIP_DIRS.has(name)) continue;
+              // A directory is offered whenever anything under it could be in
+              // scope, so a narrow scope still yields a navigable tree.
+              entries.push({ name, path: childRel, isDirectory: true });
+              continue;
+            }
+            if (rule.root !== "userSelected" && !isFsPathInScope(childRel, rule.scope)) {
+              continue;
+            }
+            entries.push({
+              name,
+              path: childRel,
+              isDirectory: false,
+              size: st.size,
+            });
+          }
+          this.services.audit?.({
+            pluginId,
+            api: "fs.list",
+            ok: true,
+            ts: Date.now(),
+            path: rel,
+            data: { entries: entries.length },
+          });
+          return entries;
         },
         writeText: async (pathFromRoot: string, content: string) => {
           const { full, rel } = await this.resolveFsRequest(

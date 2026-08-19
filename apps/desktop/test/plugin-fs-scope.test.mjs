@@ -273,6 +273,70 @@ test("glob returns only what the read scope already allows", async (t) => {
   );
 });
 
+test("list walks one directory and honours the same guards as glob", async (t) => {
+  const ws = makeWorkspace({ "docs/sub/deep.md": "d", "node_modules/pkg/i.js": "x" });
+  const { runtime, audits } = await harness(t, {
+    id: "fs.list.scoped",
+    permissions: ["fs.read"],
+    fs: { read: { scope: ["docs/**"] } },
+    workspace: ws,
+  });
+
+  const root = await runtime.invokePanelBridge("fs.list.scoped", "fs.list", { path: "" });
+  const byName = Object.fromEntries(root.map((entry) => [entry.name, entry]));
+
+  // A directory is always offered, so a narrow scope still yields a navigable
+  // tree rather than an empty one.
+  assert.equal(byName.docs?.isDirectory, true);
+  assert.equal(byName.docs?.path, "docs");
+  // A file outside the read scope is not named, because a listing is a read.
+  assert.equal(byName["notes.txt"], undefined);
+  // Credentials and repository internals stay hidden under any scope.
+  assert.equal(byName[".env"], undefined);
+  assert.equal(byName[".git"], undefined);
+  // Heavy trees are skipped, exactly as glob skips them.
+  assert.equal(byName.node_modules, undefined);
+
+  const docs = await runtime.invokePanelBridge("fs.list.scoped", "fs.list", { path: "docs" });
+  const doc = docs.find((entry) => entry.name === "a.md");
+  assert.equal(doc.isDirectory, false);
+  assert.equal(doc.path, "docs/a.md", "paths are root-relative and directly readable");
+  assert.equal(typeof doc.size, "number");
+  assert.equal(
+    await runtime.invokePanelBridge("fs.list.scoped", "fs.readText", { path: doc.path }),
+    "a",
+  );
+
+  assert.ok(audits.some((entry) => entry.api === "fs.list" && entry.ok === true));
+});
+
+test("list cannot escape the root", async (t) => {
+  const { runtime } = await harness(t, {
+    id: "fs.list.escape",
+    permissions: ["fs.read"],
+    fs: { read: { scope: ["**/*"] } },
+  });
+
+  await refused(
+    t,
+    runtime.invokePanelBridge("fs.list.escape", "fs.list", { path: "../.." }),
+    "INVALID_ARGUMENT",
+  );
+});
+
+test("list requires the read permission", async (t) => {
+  const { runtime } = await harness(t, {
+    id: "fs.list.nogrant",
+    permissions: [],
+  });
+
+  await refused(
+    t,
+    runtime.invokePanelBridge("fs.list.nogrant", "fs.list", { path: "" }),
+    "PERMISSION_DENIED",
+  );
+});
+
 test("a path the host reserves is refused even reached through a link", async (t) => {
   const ws = makeWorkspace({ "vault/keys.json": "{}" });
   const { runtime, audits } = await harness(t, {

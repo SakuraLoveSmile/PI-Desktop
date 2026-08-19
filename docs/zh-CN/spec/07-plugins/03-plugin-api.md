@@ -102,6 +102,12 @@ pi.workspace.get(): Promise<{ path: string; name: string } | null>
 pi.fs.readText(pathFromRoot: string): Promise<string>
 pi.fs.writeText(pathFromRoot: string, content: string): Promise<void>
 pi.fs.glob(pattern: string): Promise<string[]>
+pi.fs.list(pathFromRoot: string): Promise<Array<{
+  name: string;
+  path: string;        // 相对 root，可直接用于 readText / list
+  isDirectory: boolean;
+  size?: number;       // 仅文件
+}>>
 pi.fs.remove(pathFromRoot: string): Promise<void>
 pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 ```
@@ -112,6 +118,12 @@ pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 而凭证 deny-list 压过两者（参见
 [04-plugin-security.md](/zh-CN/spec/07-plugins/04-plugin-security) §6）。
 `remove` 不递归，并且把路径移进系统回收站。
+
+`list` 返回单个目录的条目（按名称排序），使插件可以惰性遍历目录树，
+而不必拉取整个仓库的 `glob` 再自行重组。它施加与 `glob` 完全相同的守卫，
+因为列目录本身就是一次读取：读取范围之外的文件不会出现，被拒绝的名称与
+受保护路径不会出现，`node_modules` 之类的重目录会被跳过。目录始终返回，
+因此即使范围很窄也能得到可导航的树；单次调用最多返回 1000 个条目。
 
 ###代理
 ```ts
@@ -263,7 +275,7 @@ window.pluginBridge.on(event, handler)
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`、`ui.requestNotificationPermission`、`ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`、`workspace.get`、`app.getAppearance` | 无 |
-| `fs.readText`、`fs.glob` | `fs.read` |
+| `fs.readText`、`fs.glob`、`fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |
 | `clipboard.readText` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |

@@ -137,7 +137,10 @@ test("work panel header exposes one unified menu with no duplicated entries", ()
   assert.match(panelSource, /aria-controls="work-panel-context-menu"/);
   assert.match(panelSource, /data-action=\{`open-work-panel-\$\{kind\}`\}/);
   assert.match(panelSource, /function headerToolTab\(kind: HeaderToolKind\): WorkPanelTab/);
-  assert.match(panelSource, /if \(kind === "file"\) return \{ id: "file", kind \}/);
+  // Browsing the project is the bundled `pi.files` plugin now, so the host's
+  // tool list no longer carries a Files entry. The `file` *kind* remains: a
+  // `file:<path>` tab is a transcript artifact, not a launcher entry.
+  assert.doesNotMatch(panelSource, /\{ kind: "file", Icon/);
   assert.match(panelSource, /openWorkPanelTab\(headerToolTab\(kind\)\)/);
   assert.match(panelSource, /className="work-panel-context-menu"/);
   assert.match(panelSource, /id=\{activeTab \? `work-panel-title-\$\{activeTab\.id\}`/);

@@ -50,6 +50,25 @@ function resolveHostBinary(): string {
   );
 }
 
+/**
+ * Directory holding the plugins this build ships, or null when it ships none.
+ *
+ * Mirrors `resolveBuiltinSkillPath`: electron-builder copies
+ * `resources/plugins` to `<resources>/plugins`, and a source checkout reaches
+ * the same tree relatively.
+ */
+function resolveBuiltinPluginsDir(): string | null {
+  const candidates = [
+    join(process.resourcesPath || "", "plugins"),
+    join(__dirname, "../../resources/plugins"),
+    join(__dirname, "../../../resources/plugins"),
+  ];
+  for (const candidate of candidates) {
+    if (candidate && existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 export class HostProcess {
   private child: ChildProcessWithoutNullStreams;
   private pending = new Map<
@@ -79,11 +98,16 @@ export class HostProcess {
       this.resolveExit = resolve;
     });
     this.binaryPath = resolveHostBinary();
+    const builtinPlugins = resolveBuiltinPluginsDir();
     this.child = spawn(this.binaryPath, [], {
       stdio: ["pipe", "pipe", "pipe"],
       env: {
         ...process.env,
         PI_DESKTOP_DATA_DIR: dataDir,
+        // Only Electron knows whether this build runs from `resources/` or a
+        // source checkout, so it resolves the bundled-plugin directory and
+        // host-core simply reconciles its registry against it (ADR 0104).
+        ...(builtinPlugins ? { PI_DESKTOP_BUILTIN_PLUGINS_DIR: builtinPlugins } : {}),
       },
     });
 

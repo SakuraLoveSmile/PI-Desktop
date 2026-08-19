@@ -41,11 +41,18 @@ its own plugin API is adequate: nothing first-party depends on it.
 
    | Plugin | Needs | Status |
    |---|---|---|
-   | `pi.files` | `pi.fs.glob`, `pi.fs.readText` | Already exists; declares `fs.read` over the workspace |
+   | `pi.files` | `pi.fs.list`, `pi.fs.readText` | **Shipped.** Implementation showed `fs.glob` was not enough — it returns a flat, 500-capped file list with no directories, which cannot back a lazy tree — so `fs.list` was added to the public API under the existing `fs.read` permission |
    | `pi.review` | Session review records and rollback | New `pi.review.*` API over the existing host-core `review.rs`; new `session.review` permission |
    | `pi.terminal` | A PTY | New `pi.terminal.*` API over the existing `PtyManager`; new `terminal.pty` permission |
 
-5. **`terminal.pty` is classified critical.** Granting a plugin a PTY is
+5. **Only the *tool* migrates, not every surface that shares its component.**
+   A `file:<path>` work panel tab is a transcript artifact — a file link or a
+   plan checkpoint the conversation opened — and stays host-owned, exactly like
+   Review's artifacts. What moves to `pi.files` is the Files entry in the tool
+   launcher: the act of a user browsing the project. The same split will apply
+   to Review when it migrates.
+
+6. **`terminal.pty` is classified critical.** Granting a plugin a PTY is
    granting it arbitrary execution as the user, which is stronger than any
    permission in the current matrix. It requires an explicit grant at least as
    prominent as `fs.write`, and is documented as such in the security spec. This
@@ -56,7 +63,8 @@ its own plugin API is adequate: nothing first-party depends on it.
 ## Consequences
 
 - The plugin API gains a first-party consumer, so a gap in it becomes a bug in a
-  shipped feature rather than an abstract complaint.
+  shipped feature rather than an abstract complaint. This paid off immediately:
+  `pi.files` could not be written against `fs.glob`, which produced `fs.list`.
 - A user can replace any panel tool. A better Git view can supersede Review by
   disabling it and installing an alternative — the arrangement ADR 0103 exists
   to enable.
@@ -67,10 +75,11 @@ its own plugin API is adequate: nothing first-party depends on it.
 - `terminal.pty` widens the plugin trust boundary. Nothing forces a user to
   grant it, and no plugin that lacks it can spawn a shell, but the permission
   now exists for third parties to request.
-- Migration is sequenced — `pi.files` first, since it needs no new API, then
-  `pi.review`, then `pi.terminal` — so each step proves the path before the next
-  depends on it. Until all three land, `HEADER_TOOLS` keeps the not-yet-migrated
-  tools and the plugin-views group renders beside them.
+- Migration is sequenced — `pi.files` first, then `pi.review`, then
+  `pi.terminal` — so each step proves the path before the next depends on it.
+  Until all three land, `HEADER_TOOLS` keeps the not-yet-migrated tools and the
+  plugin-views group renders beside them. `pi.files` has shipped; Review and
+  Terminal remain built in.
 
 ## Alternatives considered
 

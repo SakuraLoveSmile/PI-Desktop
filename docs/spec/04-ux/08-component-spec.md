@@ -569,9 +569,10 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 ### 5.1 Purpose
 
 Docked right work column for inspecting and steering the agent's workspace:
-Review (working-tree diff), Terminal (interactive PTY), Browser (embedded
-preview), and Files (workspace browser), plus any views installed plugins
-contribute (ADR 0103). Codex-parity surface.
+Review (working-tree diff), Terminal (interactive PTY), and Browser (embedded
+preview), plus the views installed plugins contribute (ADR 0103) — including
+the bundled `pi.files` plugin, which is how the project is browsed now that
+Files is no longer a host tool (ADR 0104). Codex-parity surface.
 
 ### 5.2 Anatomy
 
@@ -583,11 +584,10 @@ contribute (ADR 0103). Codex-parity surface.
 |  ▌◫ Review               [×]¦         |
 |   > Terminal            •   ¦         |
 |   ◎ Browser                 ¦         |
-|   ▤ Files                   ¦         |
 |  ------------------------   ¦         |
 | Plugin views                ¦         |
-|   ⑂ GitLens                 ¦         |
-|   ▤ File Manager         [×]¦         |
+|   ▤ Files                   ¦         |
+|   ⑂ GitLens              [×]¦         |
 |  ------------------------   ¦         |
 | Open items                  ¦         |
 |   ▤ App.tsx              [×]¦         |
@@ -596,7 +596,7 @@ contribute (ADR 0103). Codex-parity surface.
 |  Review: recorded changes + diff      |
 |  Terminal: xterm host                 |
 |  Browser: URL bar + preview           |
-|  Files: tree + file viewer            |
+|  File: viewer for a transcript file   |
 |  Plugin view: the plugin's own page   |
 |  no resource: empty state + tool list |
 +---------------------------------------+
@@ -622,7 +622,7 @@ copy — followed by the same entries the header menu lists, as plain rows:
 |        ◫ Review                        |
 |        > Terminal                      |  28px rows, hover fill only
 |        ◎ Browser                       |
-|        ▤ Files                         |
+|        ▤ Files (plugin view)           |
 +---------------------------------------+
 ```
 

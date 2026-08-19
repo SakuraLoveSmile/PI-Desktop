@@ -103,6 +103,12 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       from: "resources/skills",
       to: "skills",
     },
+    // Bundled first-party plugins, for the same reason: host-core reads their
+    // manifests from disk and the views are loaded as file:// pages (ADR 0104).
+    {
+      from: "resources/plugins",
+      to: "plugins",
+    },
     {
       from: "node_modules/node-pty/deps/winpty/LICENSE",
       to: "licenses/node-pty-winpty.LICENSE",
