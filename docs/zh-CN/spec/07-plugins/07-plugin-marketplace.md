@@ -109,9 +109,10 @@ interface MarketProvider {
   "catalogId": "pi-plugin-center",
   "generatedAt": "2026-08-18T02:00:00Z",
   "policyVersion": "2026.08.1",
-  // 相对包 URL 以此为基址解析，而不是目录文件所在目录。
-  // 镜像声明自己的基址，因此切换源不会跨提供方下载。
-  "artifactBaseUrl": "https://github.com/vastsa/pi-plugin-center/releases/download/",
+  // 可选。官方源不声明它：相对包 URL 按目录文件所在目录解析，
+  // 因此 GitHub 与 CNB 镜像各自提供自己的安装包，不会跨提供方。
+  // 把安装包放在别处的镜像或企业源，在这里声明自己的基址。
+  "artifactBaseUrl": null,
   "plugins": [
     {
       "id": "acme.todo",
@@ -121,7 +122,7 @@ interface MarketProvider {
       "versions": [
         {
           "version": "1.2.0",
-          "url": "acme.todo@1.2.0/acme.todo-1.2.0.piplug",
+          "url": "packages/acme.todo-1.2.0.piplug",
           "shasum": "<sha256 hex>",
           "sizeBytes": 40960,
           "permissions": ["fs.read"],
@@ -451,19 +452,19 @@ scripts/rebuild_catalog.py
 4. 提交 + 推送至 `main`
 5. PI-Desktop 通过 `market.refresh`/市场 UI 刷新
 
-该仓库把插件源码、安装包和目录放在一起。在插件中心的目录 v2 接管之前（ADR 0102
-迁移第 3 阶段），它仍是默认源；之后仍可作为自定义源选用。
+目前由维护者就地编辑源码、打包、手工重建目录。下面要变的正是这一点，而地址不变。
 
-### 目标源（目录 v2）
+### 由谁写入（目录 v2）
 
 存储库：[vastsa/pi-plugin-center](https://github.com/vastsa/pi-plugin-center)
 
-插件源码位于发布者自己的仓库。插件中心保存固定的构建输入，把校验通过的 `.piplug`
-以 `<pluginId>@<version>` 标签转存为 release 资产，镜像到 CNB，并生成
-`catalog.json`。发布者提交的是仓库坐标，而不是源码。
+该仓库仍是分发源。变的是谁往里写：插件中心接管 `catalog.json` 的生成和
+`packages/*.piplug` 的发布，第三方插件的源码留在发布者自己的仓库，而不是放进
+`plugins/`。
 
-由于目录和制品都是 GitHub 与 CNB 上的静态文件，即使插件中心的 API 不可用，浏览、
-安装和更新依然可用。
+默认目录 URL、镜像 URL 和相对包 URL 全部不变，因此不需要发布客户端版本，也不需要
+用户操作。由于目录和安装包都是这里以及 CNB Git 镜像上的静态文件，即使插件中心的
+API 不可用，浏览、安装和更新依然可用。
 
 见 [15-plugin-center.md](15-plugin-center.md)。
 

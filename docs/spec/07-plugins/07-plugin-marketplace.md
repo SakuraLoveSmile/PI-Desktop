@@ -113,9 +113,11 @@ as a default-allow.
   "catalogId": "pi-plugin-center",
   "generatedAt": "2026-08-18T02:00:00Z",
   "policyVersion": "2026.08.1",
-  // Package URLs resolve against this base instead of the catalog directory.
-  // A mirror declares its own base, so switching source cannot cross providers.
-  "artifactBaseUrl": "https://github.com/vastsa/pi-plugin-center/releases/download/",
+  // Optional. The official source omits it: relative package URLs resolve
+  // against the catalog directory, so GitHub and the CNB mirror each serve
+  // their own packages without crossing providers. A mirror or enterprise
+  // source that stores packages elsewhere declares its own base here.
+  "artifactBaseUrl": null,
   "plugins": [
     {
       "id": "acme.todo",
@@ -125,7 +127,7 @@ as a default-allow.
       "versions": [
         {
           "version": "1.2.0",
-          "url": "acme.todo@1.2.0/acme.todo-1.2.0.piplug",
+          "url": "packages/acme.todo-1.2.0.piplug",
           "shasum": "<sha256 hex>",
           "sizeBytes": 40960,
           "permissions": ["fs.read"],
@@ -499,21 +501,22 @@ Maintenance flow:
 4. Commit + push to `main`
 5. PI-Desktop refreshes via `market.refresh` / marketplace UI
 
-This repository holds plugin source, packages, and catalog together. It stays
-the default source until the center's catalog v2 takes over (ADR 0102, migration
-phase 3), after which it remains selectable as a custom source.
+Today a maintainer edits the source in place, packs it, and regenerates the
+catalog by hand. That is what changes below; the addresses do not.
 
-### Target source (catalog v2)
+### Who writes it (catalog v2)
 
 Repository: [vastsa/pi-plugin-center](https://github.com/vastsa/pi-plugin-center)
 
-Plugin source lives in the publisher's own repository. The center stores the
-pinned build inputs, re-hosts the verified `.piplug` as a release asset under the
-tag `<pluginId>@<version>`, mirrors it to CNB, and generates `catalog.json`.
-Publishers submit a repository coordinate rather than source code.
+This repository stays the distribution source. What changes is who writes to it:
+the plugin center takes over generating `catalog.json` and publishing
+`packages/*.piplug`, and third-party plugin source stays in the publisher's own
+repository rather than under `plugins/`.
 
-Because the catalog and artifacts are static files on GitHub and CNB, browse,
-install, and update keep working even when the center's API is unavailable.
+The default catalog URL, the mirror URL, and the relative package URLs are all
+unchanged, so no client release or user action is needed. Because the catalog and
+packages are static files here and on the CNB Git mirror, browse, install, and
+update keep working even when the center's API is unavailable.
 
 See [15-plugin-center.md](15-plugin-center.md).
 
