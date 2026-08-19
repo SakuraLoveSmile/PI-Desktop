@@ -23,6 +23,18 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.8.1",
+    date: "2026-08-19",
+    highlights: [
+      "Sign in to multiple vendor accounts and choose the account used for each provider.",
+      "Use each model's capabilities to decide when image attachments are supported.",
+      "Choose reasoning effort directly from the composer for models that expose it.",
+      "Keep one PI-Desktop instance per data directory to prevent conflicting sessions.",
+      "Organize Settings into clearer groups and simplify provider account management.",
+      "Keep built-in subagents aligned with the parent conversation's permission mode.",
+    ],
+  },
+  {
     version: "0.8.0",
     date: "2026-08-17",
     highlights: [
@@ -333,6 +345,18 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.8.1",
+    date: "2026-08-19",
+    highlights: [
+      "支持登录多个供应商账号，并为每个供应商选择实际使用的账号。",
+      "根据模型能力决定是否支持图片附件。",
+      "在输入框中直接选择支持该功能的模型的推理强度。",
+      "每个数据目录只运行一个 PI-Desktop 实例，避免会话冲突。",
+      "重新整理设置分组，简化供应商账号管理。",
+      "让内置子代理遵循父级对话的权限模式。",
+    ],
+  },
   {
     version: "0.8.0",
     date: "2026-08-17",
