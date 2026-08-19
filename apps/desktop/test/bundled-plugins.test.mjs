@@ -69,6 +69,13 @@ test("the Files view keeps the former browser workflow while staying plugin-owne
   assert.match(view, /appearance:changed/);
   assert.match(view, /locale.*startsWith\("zh"\)/);
   assert.match(view, /retry/);
+  assert.match(view, /refreshing/);
+  assert.match(view, /mini-spinner/);
+  assert.match(view, /aria-busy/);
+  assert.match(view, /direction:\s*rtl/);
+  // The main app is intentionally monochrome; the bundled view must not
+  // drift back to the blue accent it used before joining the host palette.
+  assert.doesNotMatch(view, /#7aa2f7|#2563eb|#22c55e/);
   // The plugin cannot reach host-only reveal or renderer APIs. Keeping this
   // page on the public bridge is part of the bundled-plugin contract.
   assert.doesNotMatch(view, /fsReveal|ipcRenderer|require\(/);
