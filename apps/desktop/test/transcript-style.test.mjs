@@ -343,6 +343,13 @@ test("conversation minimap hides until content overflows one viewport", () => {
   assert.match(minimapSource, /updateOverflow/);
 });
 
+test("thread scroll reserves stable gutters before overflow appears", () => {
+  assert.match(
+    stylesSource,
+    /\.thread-scroll\s*\{[\s\S]*?overflow:\s*auto;[\s\S]*?scrollbar-gutter:\s*stable both-edges;/,
+  );
+});
+
 test("conversation minimap stays centered below titlebar at high density", () => {
   assert.match(
     minimapSource,

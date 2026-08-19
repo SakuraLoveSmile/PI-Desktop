@@ -1687,6 +1687,9 @@ reasoning-level control.
   and a `768px` maximum content envelope. The left-edge conversation minimap
   is absolutely positioned outside that envelope, so its appearance or
   disappearance never changes the composer shell width.
+- Scroll stability: The thread scrollport reserves stable gutters on both
+  inline edges, so the centered transcript does not shift when overflow and
+  the minimap first appear.
 - Bottom-anchored: fixed at bottom of MainChat area
 - Placeholder carousel: home uses `chat.placeholderHome` (welcome) and
   `chat.placeholderHomeHint` (command hint); a session composer uses

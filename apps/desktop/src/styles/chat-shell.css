@@ -144,6 +144,9 @@
   min-height: 0;
   flex: 1;
   overflow: auto;
+  /* Keep the centered transcript on one x-axis when overflow and the minimap
+   * appear together; native scrollbars must not steal inline space mid-turn. */
+  scrollbar-gutter: stable both-edges;
   /* Pinned-follow drives the scroll position; native anchoring fights it. */
   overflow-anchor: none;
 }

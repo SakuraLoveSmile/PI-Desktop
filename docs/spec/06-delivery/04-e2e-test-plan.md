@@ -4847,6 +4847,9 @@ This test plan spec is accepted when:
 - The empty-home and docked composer plates use the same horizontal gutter and
   maximum content width. The minimap remains out of flow on the transcript's
   left edge and does not squeeze or resize the composer.
+- When transcript content first overflows, the native scrollbar gutter is
+  already reserved on both sides, so the transcript and composer keep one
+  horizontal center instead of jumping left.
 
 ### US-UI-46 Home-with-project composer chrome
 - Open a project on empty home (no transcript).
