@@ -23,6 +23,19 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.9.0",
+    date: "2026-08-20",
+    highlights: [
+      "Browse project files in the bundled Files panel and open them with the operating system's default app.",
+      "Add isolated plugin-contributed views to the work panel and keep marketplace provenance and withdrawn-version status visible.",
+      "Remove the built-in interactive terminal while keeping Bash output in the conversation and interactive shells in the external terminal.",
+      "Retry provider rate limits in place without duplicate assistant messages, then offer Continue when the retry budget is exhausted.",
+      "Use a compact context summary to see model, tool, cache, and compaction usage at a glance.",
+      "Teach the five core session commands through localized slash-command hints in the composer.",
+      "Keep home and conversation composers aligned while their welcome and command hints rotate smoothly.",
+    ],
+  },
+  {
     version: "0.8.1",
     date: "2026-08-19",
     highlights: [
@@ -345,6 +358,19 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.9.0",
+    date: "2026-08-20",
+    highlights: [
+      "在内置 Files 面板中浏览项目文件，并使用操作系统默认应用打开文件。",
+      "为工作面板添加隔离的插件视图，并展示插件市场的来源信息和撤回版本状态。",
+      "移除内置交互式终端；Bash 输出仍保留在对话中，交互式 Shell 使用外部终端。",
+      "原地重试供应商限流，不产生重复的助手消息；重试额度耗尽后提供“继续”操作。",
+      "使用紧凑的上下文摘要，一眼查看模型、工具、缓存和压缩使用情况。",
+      "通过输入框中的本地化斜杠命令提示，了解五个核心会话命令。",
+      "统一首页与会话输入框的布局，让欢迎语和命令提示平滑轮换。",
+    ],
+  },
   {
     version: "0.8.1",
     date: "2026-08-19",
