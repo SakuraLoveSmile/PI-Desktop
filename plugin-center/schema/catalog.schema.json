@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pi-plugin-center.dev/schema/catalog.schema.json",
+  "title": "Plugin catalog v2",
+  "description": "The only contract the PI-Desktop client depends on. Generated from the registry; never hand-edited. Because it is a static file on GitHub and CNB, browse/install/update keep working while the center API is down.",
+  "type": "object",
+  "required": ["schemaVersion", "providerId", "plugins"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "providerId": { "type": "string" },
+    "catalogId": { "type": "string" },
+    "name": { "type": "string" },
+    "homepage": { "type": "string", "format": "uri" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "policyVersion": { "type": "string" },
+    "artifactBaseUrl": {
+      "type": "string",
+      "pattern": "^https://",
+      "description": "Relative package URLs resolve against this. Each mirror declares its own, so a source switch never sends a download to another provider and never changes the checksum being verified."
+    },
+    "plugins": { "type": "array", "items": { "$ref": "#/$defs/plugin" } }
+  },
+  "$defs": {
+    "plugin": {
+      "type": "object",
+      "required": ["id", "name", "description", "author", "versions"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "author": { "type": "string" },
+        "publisherId": { "type": "string" },
+        "trust": {
+          "enum": ["verified", "community", "unknown"],
+          "description": "The client honours `verified` only from its configured official source or mirror."
+        },
+        "verified": { "type": "boolean", "description": "v1 compatibility mirror of trust === verified." },
+        "categories": { "type": "array", "items": { "type": "string" } },
+        "iconUrl": { "type": "string" },
+        "downloads": { "type": "integer", "minimum": 0 },
+        "homepage": { "type": "string" },
+        "repository": { "type": "string" },
+        "readmeMarkdown": { "type": "string" },
+        "safetyNotes": { "type": "string" },
+        "versions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/version" } }
+      }
+    },
+    "version": {
+      "type": "object",
+      "required": ["version", "publishedAt", "permissions"],
+      "properties": {
+        "version": { "type": "string" },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "changelog": { "type": "string" },
+        "minPiDesktop": { "type": "string" },
+        "shasum": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "url": {
+          "type": "string",
+          "description": "Relative to artifactBaseUrl, or absolute. An absolute URL still has to pass the client's package host allowlist."
+        },
+        "sizeBytes": { "type": "integer", "minimum": 1 },
+        "permissions": { "type": "array", "items": { "type": "string" } },
+        "fs": { "type": "object" },
+        "yanked": { "type": "boolean" },
+        "yankedReason": { "type": "string" },
+        "provenance": {
+          "type": "object",
+          "required": ["sourceRepository", "sourceCommit"],
+          "properties": {
+            "sourceRepository": { "type": "string" },
+            "sourceRef": { "type": "string" },
+            "sourceCommit": { "type": "string" },
+            "sourcePath": { "type": "string" },
+            "builder": { "type": "string" },
+            "builtAt": { "type": "string" }
+          }
+        },
+        "review": {
+          "type": "object",
+          "properties": {
+            "decision": { "type": "string" },
+            "risk": { "type": "string" },
+            "policyVersion": { "type": "string" },
+            "reviewedAt": { "type": "string" }
+          }
+        },
+        "signature": { "type": "string" },
+        "signatureAlg": { "type": "string" },
+        "keyId": { "type": "string" }
+      }
+    }
+  }
+}

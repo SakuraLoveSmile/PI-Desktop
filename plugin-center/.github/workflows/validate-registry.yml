@@ -1,0 +1,50 @@
+name: Validate registry
+
+# Runs on pull requests, including from forks. `pull_request` (not
+# `pull_request_target`) with a read-only token is deliberate: this job reads
+# submitted JSON, and must never hand a fork's contents a writable token or a
+# secret. Nothing here installs dependencies or executes plugin code.
+on:
+  pull_request:
+    paths:
+      - "registry/**"
+      - "catalog.json"
+      - "catalog/**"
+      - "scripts/**"
+      - ".github/workflows/validate-registry.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate registry entries
+        run: node scripts/validate-registry.mjs
+
+      - name: Rebuild the catalog
+        # The committed catalog is a projection. If regenerating it produces a
+        # different file, either the catalog was hand-edited or the generator
+        # changed — both need a human before anything is published.
+        run: |
+          cp catalog.json /tmp/catalog.committed.json
+          GENERATED_AT="$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('/tmp/catalog.committed.json','utf8')).generatedAt ?? '')")"
+          node scripts/build-catalog.mjs --generated-at "$GENERATED_AT"
+          if ! diff -u /tmp/catalog.committed.json catalog.json; then
+            echo "::error::catalog.json is out of date; run scripts/build-catalog.mjs and commit the result"
+            exit 1
+          fi
+
+      - name: Check the catalog against the client contract
+        # The same preflight PI-Desktop ships, so a catalog that passes here
+        # cannot fail the client's own rules on a user's machine.
+        run: node scripts/check-catalog-client-contract.mjs --url catalog.json
