@@ -32,6 +32,7 @@ import {
   type ImageContent,
   type Model,
   type Models,
+  type SimpleStreamOptions,
   type ToolResultMessage,
   type Usage,
   type UserMessage,
@@ -118,6 +119,13 @@ import {
 } from "./plugin-skills-prompt.js";
 import { pluginSkillsDigest } from "./plugin-skills.js";
 import { logTiming } from "./timing.js";
+import {
+  captureProviderResponse,
+  createProviderRetryStream,
+  delayWithAbort,
+  PROVIDER_RATE_LIMIT_MAX_RETRIES,
+  providerRateLimitDelayMs,
+} from "./provider-retry.js";
 
 export type { RuntimeProviderConfig } from "./provider-binding.js";
 
@@ -180,8 +188,9 @@ function runtimeAttachmentFromMessage(
   };
 }
 
-const PROVIDER_REQUEST_MAX_RETRIES = 1;
-const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;
+// pi-ai's adapter retry is disabled here so setup and mid-stream 429s share
+// one runtime-owned budget instead of multiplying nested retry loops.
+const PROVIDER_REQUEST_MAX_RETRIES = 0;
 const PROVIDER_STREAM_RETRY_BACKOFF_MS = 750;
 const MAX_MUTATION_RECOVERY_FAILURES = 2;
 const BASH_PATCH_FAILURE_KEY = "__bash_patch_command__";
@@ -649,25 +658,6 @@ function isPatchCommand(command: unknown): boolean {
   );
 }
 
-function delayWithAbort(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(Object.assign(new Error("Request aborted"), { name: "AbortError" }));
-      return;
-    }
-    let timeout: ReturnType<typeof setTimeout>;
-    const onAbort = () => {
-      clearTimeout(timeout);
-      reject(Object.assign(new Error("Request aborted"), { name: "AbortError" }));
-    };
-    timeout = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
-}
-
 type CheckpointPersistResult = "persisted" | "oversized" | "failed";
 
 /**
@@ -1084,8 +1074,14 @@ export class DesktopAgentRuntime {
   private requestStartedAt?: number;
   private streamStartedAt?: number;
   private providerResponseStatus?: number;
+  private providerRetryHeaders?: Record<string, string>;
   private pendingProviderRetry?: ReturnType<typeof classifyAgentError>;
+  /** One same-turn retry for non-rate-limit stream failures. */
   private providerRetryAttempted = false;
+  /** One request-setup retry for non-rate-limit transient failures. */
+  private providerSetupRetryAttempted = false;
+  /** Shared OpenCode-style 429 retry count across setup and stream phases. */
+  private providerRateLimitRetryAttempt = 0;
   private activeProviderRetryAttempt = 0;
   private providerRetryInProgress = false;
   private suppressProviderRetryRunEnd = false;
@@ -1245,19 +1241,48 @@ Delegation rules:
     this.agent = new Agent({
       streamFn: (m, context, options) => {
         this.providerResponseStatus = undefined;
-        return models.streamSimple(m, context, {
+        this.providerRetryHeaders = undefined;
+        const requestOptions: SimpleStreamOptions = {
           ...options,
-          // Keep provider-level retries bounded. A second retry is handled
-          // only for a mid-stream transient failure, after the failed
-          // assistant has been removed from the model context.
           maxRetries: PROVIDER_REQUEST_MAX_RETRIES,
-          maxRetryDelayMs: PROVIDER_MAX_RETRY_DELAY_MS,
           sessionId: this.sessionId,
+          // pi-ai only exposes onResponse after a request succeeds. Capture the
+          // failed response separately so a 429 can honor Retry-After headers.
+          fetch: captureProviderResponse(options?.fetch, (response) => {
+            this.providerResponseStatus = response?.status;
+            this.providerRetryHeaders =
+              response?.status === 429 ? response.headers : undefined;
+          }),
           onResponse: async (response, responseModel) => {
             this.providerResponseStatus = response.status;
             await options?.onResponse?.(response, responseModel);
           },
-        });
+        };
+        return createProviderRetryStream(
+          m,
+          context,
+          requestOptions,
+          (retryOptions) => models.streamSimple(m, context, retryOptions),
+          {
+            claim: (error, phase) => this.claimProviderRetry(error, phase),
+            headers: () => this.providerRetryHeaders,
+            status: () => this.providerResponseStatus,
+            onRetry: ({ error, phase, attempt, delayMs }) => {
+              logTiming("model", {
+                model: this.provider.modelId,
+                providerId: this.provider.id,
+                sessionId: this.sessionId,
+                turnId: this.turnId,
+                phase,
+                outcome: "retry",
+                errorCode: error.code,
+                retryAttempt: attempt,
+                retryDelayMs: delayMs,
+                providerStatus: this.providerResponseStatus,
+              });
+            },
+          },
+        );
       },
       // A vendor account has no long-lived key. Leaving it unset keeps pi-ai
       // from overriding the auth the provider just resolved for this request.
@@ -3250,17 +3275,54 @@ Delegation rules:
     });
   }
 
-  private shouldRetryProviderError(
+  /**
+   * Claim a retry without exposing an intermediate error to the user. Rate
+   * limits use one shared five-attempt budget across request setup and stream
+   * recovery; other transient failures retain their existing one-retry rules.
+   */
+  private claimProviderRetry(
     error: ReturnType<typeof classifyAgentError>,
-  ): boolean {
-    return (
-      !this.providerRetryAttempted &&
-      error.retriable === true &&
-      (error.code === "STREAM_FAILED" ||
-        error.code === "NETWORK_ERROR" ||
-        error.code === "TIMEOUT" ||
-        error.code === "PROVIDER_RATE_LIMITED")
-    );
+    phase: "request" | "stream",
+  ): number | undefined {
+    if (!error.retriable) return undefined;
+    if (error.code === "PROVIDER_RATE_LIMITED") {
+      if (
+        this.providerRateLimitRetryAttempt >=
+        PROVIDER_RATE_LIMIT_MAX_RETRIES
+      ) {
+        return undefined;
+      }
+      const attempt = ++this.providerRateLimitRetryAttempt;
+      this.activeProviderRetryAttempt = attempt;
+      return attempt;
+    }
+
+    if (phase === "request") {
+      if (this.providerSetupRetryAttempted) return undefined;
+      if (
+        error.code !== "NETWORK_ERROR" &&
+        error.code !== "TIMEOUT" &&
+        error.code !== "STREAM_FAILED" &&
+        error.code !== "PROVIDER_ERROR"
+      ) {
+        return undefined;
+      }
+      this.providerSetupRetryAttempted = true;
+      this.activeProviderRetryAttempt = 1;
+      return 1;
+    }
+
+    if (
+      this.providerRetryAttempted ||
+      (error.code !== "STREAM_FAILED" &&
+        error.code !== "NETWORK_ERROR" &&
+        error.code !== "TIMEOUT")
+    ) {
+      return undefined;
+    }
+    this.providerRetryAttempted = true;
+    this.activeProviderRetryAttempt = 1;
+    return 1;
   }
 
   private providerErrorWithDiagnostics(
@@ -3301,6 +3363,9 @@ Delegation rules:
     this.suppressOverflowRunEnd = false;
     this.pendingProviderRetry = undefined;
     this.providerRetryAttempted = false;
+    this.providerSetupRetryAttempted = false;
+    this.providerRateLimitRetryAttempt = 0;
+    this.providerRetryHeaders = undefined;
     this.activeProviderRetryAttempt = 0;
     this.providerRetryInProgress = false;
     this.suppressProviderRetryRunEnd = false;
@@ -3319,6 +3384,13 @@ Delegation rules:
 
   private async retryPendingProviderFailure(): Promise<void> {
     if (!this.pendingProviderRetry) return;
+    const retryError = this.pendingProviderRetry;
+    const retryAttempt =
+      this.activeProviderRetryAttempt ||
+      (retryError.code === "PROVIDER_RATE_LIMITED"
+        ? this.providerRateLimitRetryAttempt
+        : 1);
+    this.activeProviderRetryAttempt = retryAttempt;
     this.pendingProviderRetry = undefined;
 
     const messages = [...this.agent.state.messages];
@@ -3332,15 +3404,18 @@ Delegation rules:
     this.requestStartedAt = Date.now();
     this.providerRetryAbort = new AbortController();
     try {
-      await delayWithAbort(
-        PROVIDER_STREAM_RETRY_BACKOFF_MS,
-        this.providerRetryAbort.signal,
-      );
+      const delayMs =
+        retryError.code === "PROVIDER_RATE_LIMITED"
+          ? providerRateLimitDelayMs(
+              retryAttempt || this.providerRateLimitRetryAttempt,
+              this.providerRetryHeaders,
+            )
+          : PROVIDER_STREAM_RETRY_BACKOFF_MS;
+      await delayWithAbort(delayMs, this.providerRetryAbort.signal);
       if (this.disposed) throw new Error("runtime disposed");
       // The failed attempt has already finished. Only its lifecycle events
       // are suppressed; the retry must close the visible run normally.
       this.suppressProviderRetryRunEnd = false;
-      this.activeProviderRetryAttempt = 1;
       await this.agent.continue();
       await this.agent.waitForIdle();
     } finally {
@@ -3401,7 +3476,7 @@ Delegation rules:
    * caller must stop; the error event is already emitted.
    */
   private async runPendingRecoveries(): Promise<boolean> {
-    if (this.pendingProviderRetry) {
+    while (this.pendingProviderRetry) {
       await this.retryPendingProviderFailure();
     }
 
@@ -4215,9 +4290,15 @@ Delegation rules:
   private async handleAgentEvent(event: AgentEvent) {
     switch (event.type) {
       case "agent_start":
+        if (this.providerRetryInProgress || this.silentTurnRerunInProgress) {
+          break;
+        }
         this.emit({ type: "agent_start" });
         break;
       case "turn_start":
+        if (this.providerRetryInProgress || this.silentTurnRerunInProgress) {
+          break;
+        }
         this.emit({ type: "turn_start" });
         break;
       case "message_start": {
@@ -4436,13 +4517,16 @@ Delegation rules:
           }
           const emptyResponse = silentTurn;
           const diagnosticError = classifiedError;
-          const retryProviderError =
+          const retryProviderAttempt =
             !overflow &&
-            diagnosticError !== undefined &&
-            this.shouldRetryProviderError(diagnosticError);
-          if (retryProviderError) {
+            diagnosticError !== undefined
+              ? this.claimProviderRetry(diagnosticError, "stream")
+              : undefined;
+          if (
+            retryProviderAttempt !== undefined &&
+            diagnosticError !== undefined
+          ) {
             this.pendingProviderRetry = diagnosticError;
-            this.providerRetryAttempted = true;
             this.suppressProviderRetryRunEnd = true;
             this.currentAssistant = {
               ...this.currentAssistant,
@@ -4468,7 +4552,7 @@ Delegation rules:
               thinkingLevel: this.thinkingLevel,
               outcome: "retry",
               errorCode: diagnosticError.code,
-              retryAttempt: 1,
+              retryAttempt: retryProviderAttempt,
               providerStatus: this.providerResponseStatus,
             });
             this.streamStartedAt = undefined;

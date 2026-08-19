@@ -51,6 +51,13 @@ import {
   providerRequestKey,
   type RuntimeProviderConfig,
 } from "./provider-binding.js";
+import {
+  captureProviderResponse,
+  createProviderRetryStream,
+  delayWithAbort,
+  PROVIDER_RATE_LIMIT_MAX_RETRIES,
+  providerRateLimitDelayMs,
+} from "./provider-retry.js";
 
 export const SUBAGENT_TOOL_NAME = "Task";
 /** Converge on running delegations and read their reports (ADR 0089). */
@@ -60,8 +67,7 @@ export const SUBAGENT_LIST_TOOL_NAME = "TaskList";
 /** Stop running delegations (ADR 0089). */
 export const SUBAGENT_STOP_TOOL_NAME = "TaskStop";
 
-const PROVIDER_REQUEST_MAX_RETRIES = 1;
-const PROVIDER_MAX_RETRY_DELAY_MS = 8_000;
+const PROVIDER_REQUEST_MAX_RETRIES = 0;
 /** The report is the only thing that enters the parent's context; keep it
  * from becoming the context problem delegation was supposed to avoid. */
 export const MAX_SUBAGENT_REPORT_CHARS = 12_000;
@@ -202,6 +208,12 @@ export class SubagentRun {
   private usage?: MessageUsage;
   private cappedTurns = false;
   private streamError?: { code: string; message: string };
+  private pendingProviderRetry?: ReturnType<typeof classifyAgentError>;
+  private providerRetryInProgress = false;
+  private providerSetupRetryAttempted = false;
+  private providerRateLimitRetryAttempt = 0;
+  private providerRetryHeaders?: Record<string, string>;
+  private providerResponseStatus?: number;
 
   constructor(opts: SubagentRunOptions) {
     this.opts = opts;
@@ -209,13 +221,31 @@ export class SubagentRun {
     const models = createProviderModels(opts.provider, model);
     const requestKey = providerRequestKey(opts.provider);
     this.agent = new Agent({
-      streamFn: (m, context, options) =>
-        models.streamSimple(m, context, {
+      streamFn: (m, context, options) => {
+        this.providerRetryHeaders = undefined;
+        this.providerResponseStatus = undefined;
+        const requestOptions = {
           ...options,
           maxRetries: PROVIDER_REQUEST_MAX_RETRIES,
-          maxRetryDelayMs: PROVIDER_MAX_RETRY_DELAY_MS,
           sessionId: opts.sessionId,
-        }),
+          fetch: captureProviderResponse(options?.fetch, (response) => {
+            this.providerResponseStatus = response?.status;
+            this.providerRetryHeaders =
+              response?.status === 429 ? response.headers : undefined;
+          }),
+        };
+        return createProviderRetryStream(
+          m,
+          context,
+          requestOptions,
+          (retryOptions) => models.streamSimple(m, context, retryOptions),
+          {
+            claim: (error, phase) => this.claimProviderRetry(error, phase),
+            headers: () => this.providerRetryHeaders,
+            status: () => this.providerResponseStatus,
+          },
+        );
+      },
       getApiKey: async () => requestKey || undefined,
       convertToLlm,
       afterToolCall: async (context) => this.afterToolCall(context),
@@ -243,6 +273,9 @@ export class SubagentRun {
     try {
       await this.agent.prompt(this.opts.task);
       await this.agent.waitForIdle();
+      while (this.pendingProviderRetry && !signal?.aborted) {
+        await this.retryPendingProviderFailure();
+      }
     } catch (error) {
       const classified = classifyAgentError(error);
       if (classified.code === "TURN_ABORTED" || signal?.aborted) {
@@ -273,6 +306,58 @@ export class SubagentRun {
       });
     }
     return this.result("completed", this.lastReportText);
+  }
+
+  private claimProviderRetry(
+    error: ReturnType<typeof classifyAgentError>,
+    phase: "request" | "stream",
+  ): number | undefined {
+    if (!error.retriable) return undefined;
+    if (error.code === "PROVIDER_RATE_LIMITED") {
+      if (this.providerRateLimitRetryAttempt >= PROVIDER_RATE_LIMIT_MAX_RETRIES) {
+        return undefined;
+      }
+      return ++this.providerRateLimitRetryAttempt;
+    }
+    if (
+      phase !== "request" ||
+      this.providerSetupRetryAttempted ||
+      (error.code !== "NETWORK_ERROR" &&
+        error.code !== "TIMEOUT" &&
+        error.code !== "STREAM_FAILED" &&
+        error.code !== "PROVIDER_ERROR")
+    ) {
+      return undefined;
+    }
+    this.providerSetupRetryAttempted = true;
+    return 1;
+  }
+
+  private async retryPendingProviderFailure(): Promise<void> {
+    const retryError = this.pendingProviderRetry;
+    if (!retryError) return;
+    this.pendingProviderRetry = undefined;
+    const messages = [...this.agent.state.messages];
+    if (messages.at(-1)?.role !== "assistant") {
+      throw new Error("Cannot retry a subagent provider stream without its failed assistant message");
+    }
+    messages.pop();
+    this.agent.state.messages = messages;
+    this.providerRetryInProgress = true;
+    try {
+      await delayWithAbort(
+        providerRateLimitDelayMs(
+          this.providerRateLimitRetryAttempt,
+          this.providerRetryHeaders,
+        ),
+        this.opts.signal,
+      );
+      if (this.opts.signal?.aborted) return;
+      await this.agent.continue();
+      await this.agent.waitForIdle();
+    } finally {
+      this.providerRetryInProgress = false;
+    }
   }
 
   private result(
@@ -363,14 +448,23 @@ export class SubagentRun {
       case "message_start": {
         if (event.message.role !== "assistant") break;
         const content = assistantContent((event.message as AssistantMessage).content);
+        const retryingAssistant = this.providerRetryInProgress
+          ? this.currentAssistant
+          : undefined;
         this.currentAssistant = {
-          ...this.newAssistantRow(),
+          ...(retryingAssistant ?? this.newAssistantRow()),
           content: content.text,
           ...(content.hasThinking && content.thinking
             ? { thinking: content.thinking }
             : {}),
+          status: "streaming",
         };
-        this.emit({ type: "message_start", message: this.currentAssistant });
+        if (retryingAssistant) {
+          this.providerRetryInProgress = false;
+          this.emit({ type: "message_update", message: this.currentAssistant });
+        } else {
+          this.emit({ type: "message_start", message: this.currentAssistant });
+        }
         break;
       }
       case "message_update": {
@@ -412,16 +506,23 @@ export class SubagentRun {
         const content = assistantContent(message.content);
         const stopReason = message.stopReason as string | undefined;
         const failed = stopReason === "error";
+        let classifiedError: ReturnType<typeof classifyAgentError> | undefined;
+        let retryAttempt: number | undefined;
         if (failed) {
           const raw =
             typeof (message as { errorMessage?: unknown }).errorMessage === "string"
               ? ((message as { errorMessage?: string }).errorMessage as string)
               : "provider stream failed";
-          const classified = classifyAgentError(raw);
-          this.streamError = {
-            code: classified.code,
-            message: classified.message,
-          };
+          classifiedError = classifyAgentError(raw);
+          retryAttempt = this.claimProviderRetry(classifiedError, "stream");
+          if (retryAttempt !== undefined) {
+            this.pendingProviderRetry = classifiedError;
+          } else {
+            this.streamError = {
+              code: classifiedError.code,
+              message: classifiedError.message,
+            };
+          }
         }
         const messageUsage = usageFromPi(message.usage);
         this.usage = addUsage(this.usage, messageUsage);
@@ -429,6 +530,21 @@ export class SubagentRun {
         // must not clear the text an earlier turn already produced.
         if (content.hasText && content.text.trim() && !failed) {
           this.lastReportText = content.text;
+        }
+        if (retryAttempt !== undefined) {
+          this.currentAssistant = {
+            ...(this.currentAssistant ?? this.newAssistantRow()),
+            content: content.hasText
+              ? content.text
+              : (this.currentAssistant?.content ?? ""),
+            ...(content.hasThinking && content.thinking
+              ? { thinking: content.thinking }
+              : {}),
+            status: "streaming",
+            ...(messageUsage ? { usage: messageUsage } : {}),
+          };
+          this.emit({ type: "message_update", message: this.currentAssistant });
+          break;
         }
         const row: UiMessage = {
           ...(this.currentAssistant ?? this.newAssistantRow()),

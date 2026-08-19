@@ -3115,10 +3115,10 @@ Each scenario is documented in this format:
     lifecycle event. Available details include phase, stream timing, provider
     status, and `retryAttempt`, without credentials or an unrestricted provider
     body.
-  - A mid-stream HTTP 429 is classified as `PROVIDER_RATE_LIMITED` and follows
-    the same bounded path (E2E-149).
+  - A mid-stream HTTP 429 is covered by E2E-149's separate five-retry path;
+    it is not charged to this one-retry non-429 scenario.
   - Authentication, model-selection, context, and malformed-request failures
-    do not enter this same-turn stream replay path.
+    do not enter either provider replay path.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `03-runtime/02-agent-runtime.md`, `03-runtime/08-error-codes.md`,
   `08-meta/decisions-log.md` (D186), ADR 0050
@@ -3127,36 +3127,58 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`agent-errors.test.ts`, `runtime.test.ts`); full
   provider/UI journey Draft
 
-#### E2E-149: Recover one mid-stream rate-limit (429) in place
+#### E2E-149: Recover provider rate limits (429) silently in place
 
-- **Preconditions**: A project-bound Agent session uses a deterministic
-  provider fixture that emits a partial assistant stream, then fails the
-  stream with HTTP 429 once and succeeds on the next request; a second fixture
-  run fails with 429 twice; timing logs are enabled.
+- **Preconditions**: A project-bound Agent session uses deterministic provider
+  fixtures for a setup HTTP 429 and a mid-stream HTTP 429. Each fixture can
+  succeed after a retry and can return six consecutive 429 responses. Fixtures
+  cover `retry-after-ms`, `retry-after` seconds, and HTTP-date headers, expose
+  timing logs, and support aborting during the wait. A builtin subagent uses a
+  fixture with the same responses.
 - **Steps**:
-  1. Start an Agent turn with the one-429 fixture and observe the partial
-     assistant response.
-  2. Wait for the bounded retry and inspect the transcript, session state, and
-     model timing log after recovery.
-  3. Repeat with the two-429 fixture and inspect the terminal error
-     message/event and its diagnostic details.
+  1. Start an Agent turn with a setup-429 fixture whose next request succeeds.
+  2. Repeat with a mid-stream-429 fixture whose next request succeeds.
+  3. Inspect the transcript, lifecycle events, request count, and timing log
+     for both recoveries.
+  4. Repeat with six consecutive 429 responses, then inspect the terminal
+     assistant error and diagnostic details.
+  5. Start the subagent fixture, then repeat the persistent six-429 case.
+  6. Start another 429 turn and abort while it is waiting; inspect that no
+     later provider request or terminal retry is started.
+  7. Repeat with authentication, model-selection, malformed-request, and
+     context-error fixtures.
 - **Expected**:
-  - The 429 is classified as retryable `PROVIDER_RATE_LIMITED` with
-    `providerStatus: 429`.
-  - The first mid-stream 429 waits for one abortable bounded backoff, removes
-    the failed assistant from model context, and retries once without a
-    duplicate assistant bubble or terminal error notification.
-  - The recovered turn emits one terminal lifecycle and keeps the same visible
-    assistant message id. The timing log records `outcome=retry` with
-    `errorCode=PROVIDER_RATE_LIMITED` and `retryAttempt=1`.
-  - A second 429 emits one terminal `PROVIDER_RATE_LIMITED` assistant error and
-    lifecycle event with `retryAttempt: 1` in the details; no further
-    automatic retry occurs.
-- **Specs linked**: `03-runtime/02-agent-runtime.md` (D186 amended),
-  `03-runtime/08-error-codes.md`, `08-meta/decisions-log.md` (D233), ADR 0091
+  - Every 429 is classified as retryable `PROVIDER_RATE_LIMITED`, including a
+    response body that omits rate-limit wording when the captured HTTP status
+    is 429. Diagnostics retain `providerStatus: 429`.
+  - Setup and mid-stream failures share one budget of five retries after the
+    initial attempt. A persistent fixture therefore makes six provider
+    attempts, never multiplies attempts through nested pi-ai retries, and
+    emits no intermediate assistant error, lifecycle `error`, `turn_end`, or
+    `agent_end`.
+  - A recovered attempt removes the failed assistant from model context and
+    reuses its visible assistant message id. The transcript has one assistant
+    bubble and one terminal lifecycle; the timing log records each retry with
+    its phase, delay, and attempt number.
+  - Delay precedence is `retry-after-ms`, `retry-after` seconds, HTTP-date,
+    then exponential backoff with positive jitter. Server and fallback waits
+    are capped at 30 seconds and the wait is abortable.
+  - Exhaustion emits one terminal `PROVIDER_RATE_LIMITED` assistant error and
+    lifecycle event with `retryAttempt: 5` and `providerStatus: 429`; no sixth
+    retry occurs. The error remains retriable for the manual UI action.
+  - The subagent uses the same five-retry budget and one visible child bubble;
+    its final report is failed only after the budget is exhausted, while
+    intermediate 429s never become a parent-visible error report.
+  - Aborting during a backoff cancels the pending timer and starts no later
+    provider request. Authentication, model-selection, malformed-request, and
+    context fixtures make no automatic retry.
+- **Specs linked**: `03-runtime/02-agent-runtime.md` (D245),
+  `03-runtime/08-error-codes.md`, `08-meta/decisions-log.md` (D245), ADR 0091
 - **Acceptance**: C (chat & stream), H (diagnostics), Quality
 - **Milestone**: M5
-- **Status**: Unit-covered (`runtime.test.ts`); full provider/UI journey Draft
+- **Status**: Unit-covered (`provider-retry.test.ts`, `runtime.test.ts`,
+  `subagent.test.ts`); full provider/UI journey Draft
+
 ## 7A. M6 Plan and shell scenarios
 
 #### E2E-104: Legacy contract values migrate to schema v11
