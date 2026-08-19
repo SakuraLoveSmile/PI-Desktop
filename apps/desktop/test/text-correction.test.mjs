@@ -34,7 +34,7 @@ test("primary editable surfaces disable browser text correction", async () => {
     "../src/pages/SettingsPage.tsx",
     "../src/pages/ProjectsPage.tsx",
     "../src/pages/PluginsPage.tsx",
-    "../src/components/settings/ProviderDialog.tsx",
+    "../src/components/settings/ModelCombobox.tsx",
   ];
 
   for (const rel of files) {

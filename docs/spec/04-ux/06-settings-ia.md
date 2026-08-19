@@ -126,8 +126,11 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     OAuth credential and provider row, clears or repairs the global default when
     needed, and leaves other accounts from the same vendor untouched
   - Edit account opens a compact dialog for the account name and default model;
-    saving updates the OAuth provider row and keeps the global default model in
-    sync when that account is selected
+    the default-model field is an app-owned searchable combobox with aligned
+    model IDs and display names, keyboard selection, and free-form model IDs;
+    its suggestion list stays within the dialog layout instead of covering the
+    action row. Saving updates the OAuth provider row and keeps the global
+    default model in sync when that account is selected
   - Test connection resolves the account's OAuth authorization and reports a
     transient success or failure without probing the provider with an API key
 - **Providers** studio:

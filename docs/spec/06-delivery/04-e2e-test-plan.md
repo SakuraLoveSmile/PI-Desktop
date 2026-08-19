@@ -4237,8 +4237,13 @@ Each scenario is documented in this format:
   the first account, change its display name and default model, save, and
   confirm the row shows the account label once while the Defaults selector
   reflects the edited model and each option shows only one provider name,
-  without an appended account label or model ID. Press Test
-  connection and confirm the result resolves the edited account. 5) Resolve
+  without an appended account label or model ID. Before saving, focus the
+  default-model field and confirm the authenticated suggestions open as an
+  app-styled list with aligned model IDs/display names, that typing filters it,
+  ArrowDown/ArrowUp plus Enter selects an option, Escape closes it, and the
+  list does not cover the dialog actions. Confirm a custom model ID can still
+  be entered. Press Test connection and confirm the result resolves the edited
+  account. 5) Resolve
   and use each account separately, including model discovery and one streamed
   turn per account. 6) Start the device-code login on a second vendor, then
   press Cancel while the dialog is polling; confirm no row or credential is

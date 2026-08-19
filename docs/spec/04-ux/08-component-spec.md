@@ -2209,7 +2209,7 @@ surface, while model parameters remain owned by pi-ai.
 |---|---|
 | Empty | Defaults shows No default; empty panels expose their primary add actions |
 | Populated | Accounts and AI services list their rows; add/edit flows open modal dialogs |
-| Account editor | Name and default model are editable; model suggestions come from the authenticated account catalog when available |
+| Account editor | Name and default model are editable; model suggestions come from the authenticated account catalog when available, using the shared searchable combobox with aligned IDs/display names, keyboard selection, and a layout that keeps suggestions clear of the action row |
 | Default provider | Card gets subtle accent wash + default badge; Make default hidden |
 | Secret missing | Warning badge "No API key"; test may fail closed |
 | Busy row | Test/update/delete actions disabled for that card |
