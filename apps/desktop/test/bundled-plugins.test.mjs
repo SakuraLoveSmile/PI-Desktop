@@ -56,8 +56,8 @@ test("the host no longer offers Files as a built-in tool", () => {
   // Review left the launcher too, in the other direction: it is an artifact
   // panel, opened by the conversation's Write/Edit records rather than picked.
   assert.doesNotMatch(tools, /kind: "review"/);
-  // Terminal stayed built in: a plugin PTY is arbitrary execution as the user.
-  assert.match(tools, /kind: "terminal"/);
+  // The built-in interactive terminal is removed; Browser is the only host tool.
+  assert.doesNotMatch(tools, /kind: "terminal"/);
   assert.match(tools, /kind: "browser"/);
   // Both absent kinds still render: they are live tabs, just not launchable.
   assert.match(panelSource, /activeTab\?\.kind === "file"/);

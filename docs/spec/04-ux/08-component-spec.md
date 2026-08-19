@@ -569,12 +569,12 @@ Primary chat area containing ChatTranscript and Composer. Scrollable, center of 
 ### 5.1 Purpose
 
 Docked right work column for inspecting and steering the agent's workspace.
-Two host tools are launchable — Terminal (interactive PTY) and Browser
-(embedded preview) — alongside the views installed plugins contribute
-(ADR 0104), including the bundled `pi.files` plugin that browsing the project
-now goes through. Review and `file:<path>` are *artifact* surfaces: the host
-renders them, but the conversation opens them, so they are absent from the tool
-list (ADR 0105). Codex-parity surface.
+One host tool is launchable — Browser (embedded preview) — alongside the
+views installed plugins contribute (ADR 0104), including the bundled `pi.files`
+plugin that browsing the project now goes through. Review and `file:<path>` are
+*artifact* surfaces: the host renders them, but the conversation opens them, so
+they are absent from the tool list. There is no interactive terminal surface;
+agent Bash output remains in the transcript.
 
 ### 5.2 Anatomy
 
@@ -583,7 +583,6 @@ list (ADR 0105). Codex-parity surface.
 | ◫ App.tsx ⌄        drag      | [×][>] |  header, 46px
 +---------------------------------------+
 | Tools                       ¦ menu    |
-|  ▌> Terminal            •   ¦         |
 |   ◎ Browser                 ¦         |
 |  ------------------------   ¦         |
 | Plugin views                ¦         |
@@ -596,7 +595,6 @@ list (ADR 0105). Codex-parity surface.
 +---------------------------------------+
 | Active resource body                  |
 |  Review: recorded changes + diff      |
-|  Terminal: xterm host                 |
 |  Browser: URL bar + preview           |
 |  File: viewer for a transcript file   |
 |  Plugin view: the plugin's own page   |
@@ -619,9 +617,8 @@ copy — followed by the same entries the header menu lists, as plain rows:
 +---------------------------------------+
 |              ( ◫ )                    |  38px tiled icon
 |         No resource open              |  title
-|   Open a file, command, or link from   |  body
-|   the conversation — or pick a tool.   |
-|        > Terminal                      |  28px rows, hover fill only
+|   Open a file or link from             |  body
+|   the conversation — or pick a view.   |
 |        ◎ Browser                       |
 |        ▤ Files (plugin view)           |
 +---------------------------------------+
@@ -632,7 +629,7 @@ copy — followed by the same entries the header menu lists, as plain rows:
 - Panel body uses quiet inset paper (`#fafafa`); the 46px header band and tool
   chrome (review toolbar, browser chrome, file viewer header) stay white
 - The header exposes one unified context trigger. Its menu lists the built-in
-  tools (Terminal, Browser) in a fixed order first — each row
+  host tools (Browser) first — each row
   showing its own open state and, once open, its own close control — then, after
   a divider, the plugin-contributed views in declared order, and after a second
   divider only the further resources the transcript opened. No entry appears
@@ -668,18 +665,18 @@ copy — followed by the same entries the header menu lists, as plain rows:
 | Session switch | The destination session's retained open state, tabs, active tab, and Browser resource replace the previous session's panel context atomically; neither context is deleted |
 | Resizing | The left divider follows anchored pointer delta or keyboard input. Pointer changes preview once per animation frame and commit width plus reservation only on release; Escape, pointer cancellation, or lost capture restores both. Native window-edge resize changes MainChat only. |
 | No workspace | Each tab renders its own "open a project" empty state |
-| Open with no resource | `Cmd/Ctrl + J` reveals the panel without creating a tab, so the body renders the no-resource empty state: title, one line of copy, and the four tools as entry rows. Activating a row is equivalent to the same tool in the header menu — it creates or selects that singleton tab (D224). The body is not a `role="tabpanel"` here because no tab labels it. |
+| Open with no resource | `Cmd/Ctrl + J` reveals the panel without creating a tab, so the body renders the no-resource empty state: title, one line of copy, and the available Browser/plugin-view entries. Activating an entry creates or selects that singleton view. The body is not a `role="tabpanel"` here because no tab labels it. |
 | Constrained work area | The panel stays at its committed width; MainChat reflows to absorb it and may fall below its 360px target on small windows (ADR 0033) |
 | Plugin view active | The body hosts the plugin's own isolated page as a native `WebContentsView`, positioned from the measured surface rect. It is hidden whenever the tab is inactive, the panel is animating or being resized, or a blocking overlay is open — the same rule the Browser preview follows, since both composite above renderer content. A view whose plugin is disabled, uninstalled, reloaded, or crashed is destroyed; the tab stays and re-opens the page on the next lifecycle event (ADR 0104) |
 | Plugin out of scope | A view contributed by a plugin that is not active in the current project disappears from the menu when the project changes. Unlike contributed themes, which are one global setting and stay unfiltered, a view is scoped work |
 
 ### 5.4 Interactions
 
-- Trigger: file/URL references, BrowserPreview, and completed-command artifacts
-  create/activate their resource tab in the originating session's runtime
-  context. BrowserPreview events carry `sessionId`, and the renderer retains
-  that session's preview path/URL as its Browser resource. Successful workspace
-  Write/Edit artifacts create/activate Review in the originating session.
+- Trigger: file/URL references and BrowserPreview create/activate their
+  resource tab in the originating session's runtime context. BrowserPreview
+  events carry `sessionId`, and the renderer retains that session's preview
+  path/URL as its Browser resource. Successful workspace Write/Edit artifacts
+  create/activate Review in the originating session.
   `Cmd/Ctrl + J` toggles the active session's retained panel context: it
   reveals the panel without creating a resource and collapses the visible panel
   without deleting one. With no active session it does nothing. The shortcut is
@@ -705,22 +702,23 @@ copy — followed by the same entries the header menu lists, as plain rows:
 - Unified context menu: while the panel is visible, one context trigger in the
   header opens a single dropdown. Its top section lists the open resources in
   first-open order (rows select a resource and retain per-resource close
-  controls); a divider separates it from the create-new section listing Review,
-  Terminal, Browser, and Files as stable items. Activating a closed tool creates
-  it through `openWorkPanelTab`; activating an open tool selects its singleton
-  tab. The active tool combines a neutral fill with a 2px edge marker, and open
-  inactive tools show a small status dot. The trigger disappears with the panel
-  and remains available after `Cmd/Ctrl + J` reveals the panel. Artifact
-  triggers still create and activate resources atomically; the shortcut only
-  reveals the existing context.
-- Empty-body tool list: the four entry rows appear only while the body has no
-  tab at all, and disappear as soon as one exists. Each row calls the same
-  create-or-select path as its header-menu counterpart, so a closed tool gets a
-  new singleton tab and an already-open one is selected rather than duplicated.
-  `Cmd/Ctrl + J` itself still creates nothing — the rows are the user's choice,
-  not the shortcut's side effect. The "open a project" empty states carry no
-  action button: opening a project resets the panel context and hides the panel,
-  so the button would undo the surface that offered it (D224).
+  divider separates it from the create-new section listing Browser and
+  in-scope plugin views. Activating a closed view creates it through
+  `openWorkPanelTab`; activating an open view selects its singleton tab. The
+  active view combines a neutral fill with a 2px edge marker, and open inactive
+  views show a small status dot. The trigger disappears with the panel and
+  remains available after `Cmd/Ctrl + J` reveals the panel. Artifact triggers
+  still create and activate resources atomically; the shortcut only reveals the
+  existing context.
+- Empty-body view list: the available Browser and in-scope plugin-view rows
+  appear only while the body has no tab at all, and disappear as soon as one
+  exists. Each row calls the same create-or-select path as its header-menu
+  counterpart, so a closed view gets a new singleton tab and an already-open
+  one is selected rather than duplicated. `Cmd/Ctrl + J` itself still creates
+  nothing — the rows are the user's choice, not the shortcut's side effect.
+  The "open a project" empty states carry no action button: opening a project
+  resets the panel context and hides the panel, so the button would undo the
+  surface that offered it (D224).
 - Resource header: the 46px header shows the active resource icon and
   ellipsized label. Its context chevron opens the bounded unified menu described
   above; the header's trailing close button closes the current resource
@@ -730,8 +728,6 @@ copy — followed by the same entries the header menu lists, as plain rows:
   closing the last tab hides the panel. The panel-level collapse control lives
   in the session pane top-right (not the work-panel content header) and hides the
   panel without deleting the runtime tab set; a later artifact reopens it.
-  Terminal mounts only after its first command artifact and stays mounted while
-  its tab exists so the PTY and scrollback survive switches.
 - Context change: selecting another session atomically projects that session's
   retained `{open, tabs, activeTabId, browserResource}` state. The previous
   session's context remains in renderer memory and is restored when selected

@@ -1652,10 +1652,11 @@ Each scenario is documented in this format:
   and context menu, then press it again to confirm the shortcut collapses the
   panel and no tab is created or deleted; a third press must restore the same
   context. 2) Open two distinct file artifacts, the same first file again,
-  a URL preview, and a completed command artifact. 3) Open the header's unified
-  context menu: verify the four tools appear once, in a fixed order, with active,
+  a URL preview, and a completed Bash row. 3) Open the header's unified
+  context menu: verify Browser and in-scope plugin views appear once, with active,
   open-inactive, and closed states, and that transcript-opened resources appear
-  only in the second section. Open/select each tool with pointer and keyboard,
+  only in the second section. Open/select each available view with pointer
+  and keyboard,
   reopen a Browser that already has a URL and confirm the URL survives, walk the
   rows with ArrowDown/ArrowUp/Home/End (focus must skip the close buttons), close
   an inactive row with Delete and confirm the menu stays open with focus on the
@@ -1698,8 +1699,8 @@ Each scenario is documented in this format:
   Opening the panel, collapsing it, or committing a divider resize never
   changes the OS window size — only MainChat reflows inside
   the fixed client area (ADR 0033). Once the panel is open, a single unified
-  context trigger opens one dropdown that lists the four tools first, in a fixed
-  order, with a fill plus 2px edge marker for the active row and a dot for open
+  context trigger opens one dropdown that lists Browser and in-scope plugin
+  views, with a fill plus 2px edge marker for the active row and a dot for open
   inactive ones, each open row carrying its own close control in an
   always-reserved trailing slot; a second section appears after a divider only
   for transcript-opened resources (full-path tooltips, per-item close), so no
@@ -1803,25 +1804,32 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`chat-review-entry.test.mjs`); full UI scenario Draft
 
-#### E2E-058: Interactive terminal session lifecycle
+#### E2E-058: Built-in interactive terminal is absent
 
-- **Preconditions**: A workspace is open; a successful completed-command
-  artifact exists.
-- **Steps**: 1) Activate the completed command artifact to create Terminal,
-  then run `pwd` and `ls`. 2) Switch to another artifact tab and back. 3)
-  Collapse and reopen via another command artifact. 4) Drag-resize the
-  panel and toggle light/dark theme. 5) Run `exit`. 6) Restart via the
-  overlay button. 7) Quit the app and check for orphan shells.
-- **Expected**: The shell starts in the workspace directory as a login
-  shell with 256-color TERM; output/scrollback survive tab switches and
-  panel close (same PTY reattached); resize refits columns without garbling;
-  theme switch recolors the terminal; `exit` shows the ended-session
-  overlay whose restart starts a fresh shell; app quit kills all PTYs; with
-  no workspace the tab shows its empty state and no PTY spawns.
-- **Specs linked**: `03-runtime/01-ipc-protocol.md` §13a, ADR 0019
+- **Preconditions**: A workspace is open and the Agent has completed a Bash
+  tool call.
+- **Steps**: 1) Open the work panel with Cmd/Ctrl+J and inspect the empty
+  state and context menu. 2) Confirm there is no Terminal tab, launcher row,
+  terminal-specific panel copy, or terminal IPC surface. 3) Confirm the
+  completed Bash row still shows its command, output, status, and copy action,
+  and that its `IconTerminal` presentation remains available. 4) Verify an
+  interactive shell is opened in the user's external terminal instead of the
+  work panel. 5) Build/package the desktop app and inspect the dependency and
+  unpacked-resource lists.
+- **Expected**: The work panel offers Browser and in-scope plugin views plus
+  transcript-opened Review/file resources; no PTY is created and no terminal
+  tab can be opened. Agent Bash remains non-interactive and fully visible in
+  the transcript. Interactive shell work is performed by the external
+  terminal. Desktop packaging has no PTY/xterm dependency, terminal-specific
+  IPC, or native terminal payload, while generic lifecycle `terminal` values
+  continue to work.
+- **Specs linked**: `02-architecture/02-tech-stack.md`,
+  `03-runtime/01-ipc-protocol.md` §13a, `04-ux/08-component-spec.md` §5,
+  ADR 0108
 - **Acceptance**: D (workspace), Quality
 - **Milestone**: M5
-- **Status**: Draft (manual)
+- **Status**: Unit-covered (`work-panel.test.mjs`, `packaging-footprint.test.mjs`);
+  full UI scenario Draft
 
 #### E2E-059: Embedded browser preview isolation and overlays
 
@@ -3040,7 +3048,7 @@ Each scenario is documented in this format:
   built from clean release-host directories; a clean application profile;
   English and zh-CN available; external network access can be disabled while
   loopback remains available; a deterministic loopback OpenAI-compatible
-  fixture provider returns code, KaTeX, Mermaid, and a terminal command.
+  fixture provider returns code, KaTeX, Mermaid, and a Bash command.
 - **Steps**:
   1. Record every compressed artifact format plus the unpacked application,
      ASAR, Electron runtime, locale, and unpacked-native sizes on each native
@@ -3052,10 +3060,10 @@ Each scenario is documented in this format:
      launch from a clean profile. Switch between English and Simplified
      Chinese, request the deterministic response, render common
      JavaScript/TypeScript, Python, Rust, shell, Mermaid, and unknown-language
-     fences plus KaTeX and a Mermaid diagram, open Terminal, and verify host
-     and agent-sidecar health.
+     fences plus KaTeX and a Mermaid diagram, run the Bash fixture, and verify
+     host and agent-sidecar health.
 - **Expected**: The package contains exactly one bundled agent sidecar, the
-  target-native Rust host and `node-pty`, and only configured Chromium locale
+  target-native Rust host, and only configured Chromium locale
   packs. Renderer dependencies exist through Vite output rather than duplicate
   raw `node_modules`; dependency source maps, tests, examples, declarations,
   a second agent-runtime tree, and reliably excludable non-target native assets
@@ -5350,44 +5358,38 @@ This test plan spec is accepted when:
 - **Milestone**: M5+
 - **Status**: Documented
 
-#### E2E-128: Revealed work panel with no resource offers the four tools
+#### E2E-128: Revealed work panel with no resource offers available views
 
 - **Preconditions**: App running with a project open and an active conversation
-  that has produced no file, command, or preview artifact, so the session's
-  work panel context holds no tabs.
+  that has produced no file, URL, or review artifact, so the session's work
+  panel context holds no tabs.
 - **Steps**:
   1) Press `Cmd/Ctrl + J` and confirm the panel appears with an empty body that
      shows a tiled icon, the title "No resource open", one line of supporting
-     copy, and four tool rows (Review, Terminal, Browser, Files) — not a blank
-     area below the title bar.
-  2) Tab into the tool rows and confirm each takes a visible focus ring and
-     that hovering a row shows only a background fill.
-  3) Activate Terminal and confirm a Terminal tab is created and selected, the
-     empty body and its tool list disappear, and the header label reads
-     Terminal.
-  4) Open the header context menu, activate Terminal again, and confirm it
+     copy, and Browser/in-scope plugin-view rows — not a blank area below the
+     title bar.
+  2) Tab into the available rows and confirm each takes a visible focus ring
+     and that hovering a row shows only a background fill.
+  3) Activate Browser or a plugin view and confirm its singleton tab is created
+     and selected; the empty body and its view list disappear.
+  4) Open the header context menu, activate the same view again, and confirm it
      selects the existing tab rather than creating a second one.
-  5) Close the Terminal tab and confirm the panel hides (last-tab close), then
-     press `Cmd/Ctrl + J` again and confirm the empty body returns.
-  6) Switch to a project with no Git changes, open Review from the empty body,
-     and confirm the Review tab's own empty state uses the same treatment —
-     tiled icon, title, muted supporting line — with no action button.
-  7) Repeat step 1 in Chinese and in both light and dark themes, and at the
+  5) Close the view tab and confirm the panel hides when it was the last tab,
+     then press `Cmd/Ctrl + J` again and confirm the empty body returns.
+  6) Repeat step 1 in Chinese and in both light and dark themes, and at the
      244px panel minimum, confirming the copy wraps rather than clipping.
 - **Expected**: `Cmd/Ctrl + J` reveals the panel without creating a tab, and the
-  no-resource body explains the panel and lists the same four tools the header
-  menu offers; a row creates or selects that tool's singleton tab exactly as the
-  menu does, and the rows exist only while no tab does. The empty body is not
-  exposed as a `tabpanel`; its rows are buttons in a `role="group"` labelled
-  Tools. Panel empty states — the no-resource body and each tab's own — share
-  the app's empty-state proportions (38px tiled icon, title, muted copy wrapping
-  at 34ch), with no action button in the "open a project" states because opening
-  a project resets the panel context.
+  no-resource body lists the same Browser/plugin-view entries as the header
+  menu; a row creates or selects that singleton view exactly as the menu does.
+  The empty body is not exposed as a `tabpanel`; its rows are buttons in a
+  `role="group"` labelled Tools. Panel empty states share the app's empty-state
+  proportions with no action button in the "open a project" states.
 - **Specs linked**: `04-ux/08-component-spec.md` §5.2, §5.2.1, §5.3, §5.4, §5.5,
-  `04-ux/07-ui-design-system.md`
+  `04-ux/07-ui-design-system.md`, ADR 0108
 - **Acceptance**: A (core shell), H (localization)
 - **Milestone**: M5+
 - **Status**: Documented
+
 
 #### E2E-129: A run row shows its command once and copies it from the head
 

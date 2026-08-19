@@ -51,9 +51,6 @@ import type {
   Result,
   SessionDetail,
   SessionSummary,
-  TerminalCreateResult,
-  TerminalDataEvent,
-  TerminalExitEvent,
   ToolPermissionResolution,
   UserSkillInput,
   UserSkillRecord,
@@ -602,14 +599,6 @@ export const api = {
     sessionId: string;
     snapshotId: string;
   }) => invoke<ReviewRollbackResult>(IPC.invoke.workspaceReviewRollback, input),
-  terminalCreate: (input: { cwd: string; cols?: number; rows?: number }) =>
-    invoke<TerminalCreateResult>(IPC.invoke.terminalCreate, input),
-  terminalWrite: (termId: string, data: string) =>
-    invoke(IPC.invoke.terminalWrite, { termId, data }),
-  terminalResize: (termId: string, cols: number, rows: number) =>
-    invoke(IPC.invoke.terminalResize, { termId, cols, rows }),
-  terminalDispose: (termId: string) =>
-    invoke(IPC.invoke.terminalDispose, { termId }),
   browserNavigate: (url: string, sessionId?: string) =>
     invoke<BrowserState>(IPC.invoke.browserNavigate, { url, sessionId }),
   browserAction: (action: BrowserAction) =>
@@ -670,18 +659,6 @@ export const api = {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.menuCommand, (payload) =>
       listener((payload as { command: AppMenuCommand }).command),
-    );
-  },
-  onTerminalData: (listener: (event: TerminalDataEvent) => void) => {
-    if (!window.piDesktop?.on) return () => undefined;
-    return window.piDesktop.on(IPC.event.terminalData, (payload) =>
-      listener(payload as TerminalDataEvent),
-    );
-  },
-  onTerminalExit: (listener: (event: TerminalExitEvent) => void) => {
-    if (!window.piDesktop?.on) return () => undefined;
-    return window.piDesktop.on(IPC.event.terminalExit, (payload) =>
-      listener(payload as TerminalExitEvent),
     );
   },
   onBrowserState: (listener: (state: BrowserState) => void) => {

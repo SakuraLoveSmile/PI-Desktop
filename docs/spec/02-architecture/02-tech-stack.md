@@ -21,7 +21,6 @@
 | Node runtime | Node.js | `>= 22.19` | pi requirement |
 | DB | SQLite | Rust host-core via `rusqlite` | sessions/settings |
 | Packaging | electron-builder | stable | macOS arm64, Windows x64, and Linux x64 release lanes |
-| Terminal | node-pty (main) + @xterm/xterm (renderer) | stable, N-API | work panel PTY (ADR 0019); allowBuilds + asarUnpack + install-app-deps |
 | Package manager | pnpm | 11.18.x | JS monorepo |
 | Lint/test | style-token checker (`scripts/check-style-tokens.mjs`) + vitest + cargo test; general JS linter still open (biome vs oxlint) | stable | dual stack quality |
 | Schema (TS) | typebox | frozen (D011) | shared contracts |
@@ -71,13 +70,12 @@
   bundles their runtime code and lazy assets into `out/renderer`.
 - Electron Main bundles pure-JS workspace packages. Packages that require
   runtime module resolution or a native ABI remain production dependencies;
-  the current external set includes `electron-updater` and `node-pty`.
+  the current external set includes only `electron-updater`.
 - `Resources/agent-runtime/sidecar.js` is the only independent pi sidecar
   bundle. The complete `@pi-desktop/agent-runtime` package tree must not be
   copied into ASAR as a second runtime.
-- Native dependencies are rebuilt on the target runner. `node-pty` ships that
-  target `build/Release` output rather than its cross-platform prebuild catalog
-  or build-only `node-addon-api` package.
+- The desktop package has no interactive PTY dependency. Agent Bash remains a
+  non-interactive runtime capability owned by the agent sidecar.
 - Dependency source maps, tests, examples, and declarations are build inputs,
   not release assets. License and notice files remain distributable.
 - Lazy renderer capabilities such as Mermaid, KaTeX, and Shiki remain local

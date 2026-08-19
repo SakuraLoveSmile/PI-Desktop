@@ -62,9 +62,6 @@ when macOS `iconutil` is available, without overwriting the canonical source.
 - `Resources/app.asar` — Electron Main, preload, renderer output, and only the
   runtime-resolved production modules. Renderer libraries are already present
   in Vite output and are not copied again as raw package trees.
-- Target-native `node-pty` assets under `app.asar.unpacked`; other platform and
-  architecture prebuilds are excluded when the package layout supports a
-  reliable target filter.
 - Chromium locale packs for English and Simplified Chinese only. Product
   `en`/`zh-CN` catalogs remain bundled independently of Chromium locales.
 - App icon `build/icon.icns` (derived from canonical `build/icon_1024.png` by
@@ -179,8 +176,6 @@ The package inventory must confirm:
 - required third-party license and notice files remain in ASAR or
   `Resources/licenses` when their non-runtime package trees are pruned
 - only the configured English and Simplified Chinese Chromium locale packs
-- a loadable target-native `node-pty` binary and no reliably excludable
-  non-target prebuilds
 
 The first audited optimized package establishes the platform baseline. Keep
 per-platform measurements rather than applying one budget to different
@@ -223,8 +218,9 @@ Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
    and `agent/`; timing records are in `host/timing.log` and
    `agent/timing.log`.
 8. With network access disabled, the shell still starts; English/Chinese
-   switching, syntax highlighting, KaTeX, Mermaid fallback/rendering, terminal,
-   host health, and sidecar health continue to use packaged local assets.
+   switching, syntax highlighting, shell highlighting, KaTeX, Mermaid
+   fallback/rendering, host health, and sidecar health continue to use packaged
+   local assets.
 
 ## 6. Windows/Linux release packages
 
@@ -239,10 +235,9 @@ Linux:   pnpm --filter @pi-desktop/desktop dist:linux
 ```
 
 The Windows package includes `bin/pi-desktop-host-core.exe`; Linux includes
-`bin/pi-desktop-host-core`. `node-pty` must also be rebuilt by
-electron-builder on the native runner. Signing, rollback, and installer
-upgrade qualification remain release hardening work; publication itself is
-active under D126.
+`bin/pi-desktop-host-core`. The Rust host is built on the native runner before
+packaging. Signing, rollback, and installer upgrade qualification remain release
+hardening work; publication itself is active under D126.
 
 Native-runner output matrix:
 

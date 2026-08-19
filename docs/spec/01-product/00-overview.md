@@ -69,7 +69,7 @@ PI-Desktop =
    Markdown checkpoint
 6. Approve or reject the checkpoint and choose the execution permission mode
 7. Approve local tool execution when required
-8. Review diffs, terminal output, browser previews, and files in the work panel
+8. Review diffs, command output in the transcript, browser previews, and files in the work panel
 9. Restart the app; interrupted contract work is not replayed
 
 ## Quality principles

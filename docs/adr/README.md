@@ -38,7 +38,7 @@ Each ADR includes:
 | 0016 | Organize the sidebar around retained multi-project tabs | Accepted |
 | 0017 | Remove composer workspace context rail | Accepted |
 | 0018 | Carry thinking mode through the complete session pipeline | Accepted |
-| 0019 | Work panel subsystems (PTY terminal, embedded browser, git review, file browsing) | Accepted |
+| 0019 | Work panel subsystems (embedded browser, git review, file browsing) | Superseded in part by 0108 |
 | 0020 | Configuration provider studio | Accepted |
 | 0021 | Platform application chrome | Superseded in part by 0025 |
 | 0022 | Application update delivery | Accepted |
@@ -121,6 +121,7 @@ Each ADR includes:
 | 0102 | Publisher-owned plugin source with a Git-hosted artifact store | Accepted for implementation (supersedes 0006) |
 | 0103 | Compact context usage summary | Accepted (amends 0047) |
 | 0104 | Let plugins contribute work panel views | Accepted |
-| 0105 | Ship Files as a bundled plugin; keep Review and Terminal in the host | Accepted |
+| 0105 | Ship Files as a bundled plugin; keep Review in the host | Accepted (Terminal clause superseded by 0108) |
 | 0106 | Keep only five core builtin commands | Accepted |
 | 0107 | Make current-session task notification suppression atomic | Accepted |
+| 0108 | Remove the built-in interactive terminal | Accepted |

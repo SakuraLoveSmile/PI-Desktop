@@ -55,7 +55,6 @@ The app channel uses these categories:
 - `persistence` — transcript and outbox persistence failures
 - `updater` — electron-updater diagnostics
 - `diagnostics` — blocked navigation, menu, and template diagnostics
-- `terminal` — terminal attachments
 - `runtime` — host/sidecar lifecycle events
 
 Host and agent stderr is classified into the same categories when the line

@@ -69,15 +69,14 @@ destination, chat as the home surface, tools and permissions inline.
   notification action; the durable local inbox opens from the sidebar footer
   bell instead (D130/D117).
 - **Work panel**: docked right column (not an overlay) opened by an artifact
-  or `Cmd/Ctrl + J`. File, URL, browser-preview, successful-command, and
-  successful workspace-edit artifacts create their resources atomically. A
-  combined create trigger keeps Review, Terminal, Browser, and
-  Files one click away while the panel is visible; opened-but-inactive tools show a quiet
-  dot and the active tool has a restrained edge marker. The 46px content header
-  names the
+  or `Cmd/Ctrl + J`. File, URL, browser-preview, and successful workspace-edit
+  artifacts create their resources atomically. A combined panel entry keeps
+  Browser and in-scope plugin views available while
+  the panel is visible; opened-but-inactive views show a quiet dot and the active
+  resource has a restrained edge marker. The 46px content header names the
   current resource, closes it directly, and opens a compact switcher for all
   current session resources. File paths stay distinct in that switcher while
-  Review, Terminal, and Browser deduplicate by kind. `Cmd/Ctrl + J` toggles the
+  plugin views deduplicate by view reference. `Cmd/Ctrl + J` toggles the
   active session's retained panel context — revealing it without creating a
   resource tab and collapsing it without discarding one; the create trigger
   remains unavailable while the panel is closed. A

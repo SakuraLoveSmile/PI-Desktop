@@ -31,7 +31,7 @@ There is no account, no subscription, and no cloud in the middle: you connect th
 - **Any model, your keys.** Anthropic, OpenAI, or anything that speaks an OpenAI-compatible API — hosted relays as well as local gateways like Ollama or LM Studio. Model IDs are free-form (no hardcoded allowlist), with per-model context window, output limit, temperature, and thinking-mode controls.
 - **Agent, Plan, and Goal modes.** Agent mode reads, edits, and runs commands to get things done. Plan has the same agent inspect the project and submit an immutable implementation checkpoint for approval. Goal lets the agent agree on an outcome and acceptance criteria, then continue autonomously after approval.
 - **You approve every change.** File writes and shell commands ask first, with session-scoped grants and a configurable default policy. Unanswered prompts deny by default.
-- **A real workbench.** Review the agent's edits as message-scoped diffs with guarded rollback, open a terminal, preview a local app in a browser, and browse project files — all in a side panel, without leaving the conversation.
+- **A real workbench.** Review the agent's edits as message-scoped diffs with guarded rollback, inspect command output in the transcript, preview a local app in a browser, and browse project files — all in a side panel, without leaving the conversation.
 - **Projects and sessions.** Sessions are grouped by project in a multi-project sidebar, with pinning, archiving, sorting, branching, notifications, and throwaway scratch sessions.
 - **Local-first and private.** Transcripts live on disk as plain JSONL with a SQLite index — easy to back up, grep, or delete. API keys go into the OS keychain. Logs stay local; there is no telemetry.
 - **Extensions beyond plugins.** Manage standalone MCP servers, Skills, and Subagents from the Extensions page, with global or project-scoped activation. Plugins can add commands, panels, agent tools, skills, themes, MCP servers, resident services, and a message bus; the local/official marketplace and `.piplug` package workflow are available today.
@@ -90,7 +90,7 @@ Packaged builds check GitHub Releases for new versions and show an in-app update
 
 PI-Desktop keeps renderer privileges narrow and separates the agent loop from the desktop UI:
 
-- **Electron shell** — a sandboxed React renderer plus the main/preload bridge for desktop-only services such as panels, terminal, browser preview, updates, and supervision.
+- **Electron shell** — a sandboxed React renderer plus the main/preload bridge for desktop-only services such as panels, browser preview, updates, and supervision.
 - **Rust host core** — owns SQLite, transcript persistence, secrets, permissions, and workspace access over stdio JSON-RPC.
 - **pi agent sidecar** — a Node process running the pi agent engine (`pi-ai` + `pi-agent-core`) for the actual agent loop.
 
@@ -166,7 +166,6 @@ PI-Desktop is built with and informed by these open-source projects:
   [Vite](https://github.com/vitejs/vite),
   [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss),
   [Lucide](https://github.com/lucide-icons/lucide),
-  [xterm.js](https://github.com/xtermjs/xterm.js),
   [Shiki](https://github.com/shikijs/shiki),
   [Mermaid](https://github.com/mermaid-js/mermaid),
   [KaTeX](https://github.com/KaTeX/KaTeX),

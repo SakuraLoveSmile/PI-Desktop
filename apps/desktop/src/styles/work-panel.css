@@ -1,9 +1,9 @@
 /*
-  Work panel — dock, header and tab switcher, plus the review (diff), terminal,
-  browser, and files tabs.
+  Work panel — dock, header and tab switcher, plus the review (diff), browser,
+  files, and plugin-contributed views.
 */
 
-/* ---------- Work panel (review / terminal / browser / files) ---------- */
+/* ---------- Work panel (review / browser / files / plugin views) ---------- */
 
 .work-panel {
   position: relative;
@@ -638,53 +638,6 @@
   background: color-mix(in oklab, var(--ds-text-primary) 4%, transparent);
   color: var(--ds-text-muted);
   font-size: var(--text-2xs);
-}
-
-/* Work panel — terminal tab */
-
-.work-terminal {
-  position: relative;
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  background: var(--ds-bg-primary);
-}
-
-.work-terminal-host {
-  min-height: 0;
-  flex: 1;
-  padding: 6px 4px 6px 10px;
-}
-
-.work-terminal-xterm {
-  height: 100%;
-  width: 100%;
-}
-
-.work-terminal-xterm .xterm,
-.work-terminal-xterm .xterm-viewport,
-.work-terminal-xterm .xterm-screen {
-  height: 100%;
-}
-
-.work-terminal-xterm .xterm-viewport {
-  background: transparent !important;
-}
-
-.work-terminal-exited {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px;
-  font-size: var(--text-sm);
-  color: var(--ds-text-muted);
-  background: color-mix(in oklab, var(--ds-bg-primary) 88%, transparent);
-  border-top: 1px solid var(--ds-border-subtle);
 }
 
 /* Work panel — browser tab */

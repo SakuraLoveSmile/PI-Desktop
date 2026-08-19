@@ -217,7 +217,6 @@ export const zhCN = {
     errorModel: "模型",
     previewFile: "在侧边面板预览",
     previewUrl: "在侧边浏览器中打开",
-    openTerminal: "在终端中查看输出",
     retry: "重新生成",
     forkResponse: "从此回复创建分支",
     editMessage: "编辑并重新发送",
@@ -873,7 +872,6 @@ export const zhCN = {
     closeTab: "关闭{{name}}",
     tabs: {
       review: "审阅",
-      terminal: "终端",
       browser: "浏览器",
       file: "文件",
       plugin: "插件视图",
@@ -913,13 +911,6 @@ export const zhCN = {
         renamed: "重命名",
         untracked: "新文件",
       },
-    },
-    terminal: {
-      noWorkspace: "打开项目后即可使用终端",
-      noWorkspaceHint: "终端会在项目目录中启动。",
-      exited: "终端会话已结束",
-      restart: "重新启动",
-      startFailed: "无法启动终端",
     },
     browser: {
       emptyTitle: "预览页面",

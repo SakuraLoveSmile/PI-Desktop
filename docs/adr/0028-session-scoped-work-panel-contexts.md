@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-27
+- Amended in part by: [ADR 0108](0108-remove-built-in-interactive-terminal.md)
 
 ## Context
 
@@ -56,8 +57,8 @@ unchanged.
 - The embedded browser remains one hardened Main-process WebContentsView. Its
   visible resource follows the selected conversation rather than allowing a
   background preview to navigate the foreground view.
-- Terminal process/cache ownership remains workspace-scoped under ADR 0019;
-  only the tab's presentation context becomes conversation-scoped.
+- The former interactive terminal process/cache is no longer part of the
+  work-panel runtime; Browser remains the Main-owned native resource.
 
 ## Alternatives
 
@@ -74,9 +75,9 @@ improving the reported in-process workflow.
 
 ### Key every backend panel subsystem by conversation
 
-Rejected for this change. Review is workspace truth and Terminal intentionally
-remains workspace-scoped under ADR 0019. Conversation ownership is required for
-the visible tab context and BrowserPreview routing, not every backend resource.
+Rejected for this change. Conversation ownership is required for the visible
+tab context and BrowserPreview routing; it does not make every backend resource
+durable.
 
 ## References
 

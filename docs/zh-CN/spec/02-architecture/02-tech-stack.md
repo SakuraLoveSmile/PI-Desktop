@@ -24,7 +24,6 @@
 | Node 运行时 | Node.js | `>= 22.19` | 圆周率要求 |
 | 数据库 | SQLite | Rust host-core 通过 `rusqlite` | sessions/settings |
 | 包装 | 电子制造商 | 稳定 | macOS arm64、Windows x64 和 Linux x64 释放通道 |
-| 终端 | node-pty（主）+ @xterm/xterm（渲染器） | 稳定，N-API | 工作面板 PTY (ADR 0019)； allowBuilds + asarUnpack + install-app-deps |
 | 包管理器 | PNPM | 11.18.x | JS 单一仓库 |
 | Lint/test | 样式令牌检查器（`scripts/check-style-tokens.mjs`）+ vitest + 货物测试；一般 JS linter 仍然打开（biome vs oxlint） | 稳定 | 双堆栈质量 |
 | 架构 (TS) | 打字机 | 冷冻（D011） | 共享合约 |
@@ -74,13 +73,12 @@
   将其运行时代码和惰性资产捆绑到 `out/renderer` 中。
 - Electron 主要捆绑纯 JS 工作区包。需要的包
   运行时模块解析或本机 ABI 仍然是生产依赖项；
-  当前外部设置包括 `electron-updater` 和 `node-pty`。
+  当前外部设置仅包括 `electron-updater`。
 - `Resources/agent-runtime/sidecar.js`是唯一独立的pi sidecar
   捆绑。完整的 `@pi-desktop/agent-runtime` 包树不能是
   复制到 ASAR 作为第二个运行时。
-- 在目标运行器上重建本机依赖项。 `node-pty` 运送
-  目标 `build/Release` 输出而不是其跨平台预构建目录
-  或仅构建 `node-addon-api` 包。
+- 桌面包不再包含交互式 PTY 依赖；Agent Bash 仍是由 agent sidecar
+  所有的非交互式运行时能力。
 - 依赖源映射、测试、示例和声明是构建输入，
   不释放资产。许可证和通知文件仍然可分发。
 - Mermaid、KaTeX 和 Shiki 等惰性渲染器功能仍保留在本地

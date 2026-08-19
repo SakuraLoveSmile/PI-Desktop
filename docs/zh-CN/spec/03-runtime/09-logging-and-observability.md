@@ -58,7 +58,6 @@
 - `persistence` — 成绩单和发件箱持久性失败
 - `updater` — 电子更新器诊断
 - `diagnostics` — 阻止导航、菜单和模板诊断
-- `terminal` — 终端附件
 - `runtime` — host/sidecar 生命周期事件
 
 主机和代理stderr在线路时被归为同一类别

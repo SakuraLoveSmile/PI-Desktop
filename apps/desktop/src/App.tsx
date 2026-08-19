@@ -669,7 +669,7 @@ function AppShell() {
       showToast: (message: string, opts?: ToastOptions) =>
         useAppStore.getState().showToast(message, opts),
       openWorkPanelArtifact: (
-        kind: "review" | "terminal" | "browser" | "file",
+        kind: "review" | "browser" | "file",
         resource?: string,
       ) => {
         if (!(window as any).__PI_CAPTURE__) return;

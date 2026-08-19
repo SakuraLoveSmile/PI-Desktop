@@ -6,8 +6,12 @@ const {
   closeWorkPanelTabState,
   emptyWorkPanelContext,
   fileWorkPanelTab,
+  isKnownWorkPanelTab,
+  isToolWorkPanelTab,
   normalizeWorkPanelFilePath,
   openWorkPanelTabState,
+  pluginWorkPanelTab,
+  sanitizeWorkPanelTabsState,
   shouldOpenReviewArtifact,
   switchWorkPanelContextState,
   toolWorkPanelTab,
@@ -68,6 +72,30 @@ test("activation ignores stale tab ids", () => {
   assert.equal(activateWorkPanelTabState(state, "missing"), state);
 });
 
+test("unknown retained tabs are discarded without losing a known selection", () => {
+  const stale = { id: "removed", kind: "removed" };
+  const selected = sanitizeWorkPanelTabsState({
+    tabs: [stale, toolWorkPanelTab("browser"), toolWorkPanelTab("review")],
+    activeTabId: "browser",
+  });
+  const staleSelected = sanitizeWorkPanelTabsState({
+    tabs: [toolWorkPanelTab("browser"), stale, toolWorkPanelTab("review")],
+    activeTabId: "removed",
+  });
+
+  assert.equal(isKnownWorkPanelTab(stale), false);
+  assert.deepEqual(selected.tabs.map((tab) => tab.id), ["browser", "review"]);
+  assert.equal(selected.activeTabId, "browser");
+  assert.equal(staleSelected.activeTabId, "review");
+});
+
+test("only Browser and plugin views are launchable tools", () => {
+  assert.equal(isToolWorkPanelTab(toolWorkPanelTab("browser")), true);
+  assert.equal(isToolWorkPanelTab(toolWorkPanelTab("review")), false);
+  assert.equal(isToolWorkPanelTab(fileWorkPanelTab("README.md")), false);
+  assert.equal(isToolWorkPanelTab(pluginWorkPanelTab("pi.files", "files")), true);
+});
+
 test("review artifacts are recognized independently of the visible session", () => {
   const base = {
     toolName: "Write",
@@ -100,7 +128,7 @@ test("empty work panel context has no visible or retained resource state", () =>
 test("switching work panel contexts isolates session tabs and visible state", () => {
   const sessionA = {
     open: true,
-    tabs: [toolWorkPanelTab("terminal"), fileWorkPanelTab("src/App.tsx")],
+    tabs: [toolWorkPanelTab("browser"), fileWorkPanelTab("src/App.tsx")],
     activeTabId: "file:src/App.tsx",
     fileRequest: { path: "src/App.tsx", seq: 4 },
   };

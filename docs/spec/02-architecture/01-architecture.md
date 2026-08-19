@@ -164,8 +164,8 @@ Desktop package must ship:
   by the Electron binary with `ELECTRON_RUN_AS_NODE=1`
 - English and Simplified Chinese product locale catalogs, plus only the
   Chromium locale packs needed for those product languages
-- target-native runtime modules that cannot be bundled safely, including
-  `node-pty`
+- target-native runtime modules only when a retained capability cannot be
+  bundled safely
 
 Renderer-only libraries are build inputs. Vite must emit their executable
 code and lazy assets under `out/renderer`; electron-builder must not also copy

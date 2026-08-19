@@ -48,7 +48,7 @@ the steps.
 
 ### G. Daily workflow support
 Import sessions from other local agents, prepare file references in the
-composer, use the work panel for review/terminal/browser/files, manage
+composer, use the work panel for review/browser/files, manage
 notifications, and run scheduled prompts manually or on a remembered cadence.
 
 ## 4. Current shipped scope
@@ -65,7 +65,7 @@ notifications, and run scheduled prompts manually or on a remembered cadence.
 - Permission confirmations
 - JSONL transcript persistence with a SQLite index
 - Agent / Plan / Goal operating contracts with host-owned approval artifacts
-- Work panel: Review, Terminal, Browser, and Files
+- Work panel: Review artifacts, Browser previews, transcript-linked files, and the bundled Files view
 - Project archive, multi-project sidebar, session fork/import, and notifications
 - Extensions page: local plugins, marketplace packages, MCP, Skills, and
   Subagents with activation scopes

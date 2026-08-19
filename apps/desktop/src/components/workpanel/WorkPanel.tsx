@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import type { PluginViewMeta } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import {
+  isKnownWorkPanelTab,
   isToolWorkPanelTab,
   parsePluginViewRef,
   pluginWorkPanelTab,
@@ -28,10 +29,8 @@ import {
   IconGlobe,
   IconPanel,
   IconPlug,
-  IconTerminal,
 } from "../icons";
 import { ReviewTab } from "./ReviewTab";
-import { TerminalTab } from "./TerminalTab";
 import { BrowserTab } from "./BrowserTab";
 import { FilesTab } from "./FilesTab";
 import { PluginViewTab } from "./PluginViewTab";
@@ -46,7 +45,6 @@ import {
 
 const TAB_ICONS = {
   review: IconDiff,
-  terminal: IconTerminal,
   browser: IconGlobe,
   file: IconFileText,
   plugin: IconPlug,
@@ -55,26 +53,19 @@ const TAB_ICONS = {
 /**
  * Tools the host itself provides — the panel's manually launchable surfaces.
  *
- * The list settled at two (ADR 0104, amended):
+ * The host provides one built-in tool and two artifact/resource surfaces:
  *
- * - **Files left** for the bundled `pi.files` plugin, reaching the panel over
- *   the same `contributes.views` channel a third-party plugin uses.
- * - **Review left** in the other direction: it is an *artifact* panel, not a
- *   tool. It shows what the conversation's Write/Edit calls recorded, so it is
- *   opened by those artifacts exactly as a `file:<path>` tab is opened by a
- *   file link — never picked from a launcher. Its records are message-owned
- *   (ADR 0043), which is also why it could not become a plugin without moving
- *   that ownership into the host.
- * - **Terminal stayed** because handing a plugin a PTY means arbitrary
- *   execution as the user, a wider trust boundary than this buys back.
+ * - **Browser** opens a live preview surface for agent-generated HTML or a URL.
+ * - **Files** is supplied by the bundled `pi.files` plugin through the same
+ *   `contributes.views` channel a third-party plugin uses.
+ * - **Review** is an *artifact* panel, opened by the conversation's Write/Edit
+ *   records rather than picked from a launcher; its records remain
+ *   message-owned (ADR 0043).
  *
- * Both `review` and `file` therefore remain live tab *kinds* while being absent
- * from this list; see the panel body below.
+ * `review` and `file` therefore remain live tab *kinds* while only `browser`
+ * appears in this launcher list; see the panel body below.
  */
-const HEADER_TOOLS = [
-  { kind: "terminal", Icon: IconTerminal },
-  { kind: "browser", Icon: IconGlobe },
-] as const;
+const HEADER_TOOLS = [{ kind: "browser", Icon: IconGlobe }] as const;
 
 type HeaderToolKind = (typeof HEADER_TOOLS)[number]["kind"];
 
@@ -120,7 +111,8 @@ export function WorkPanel({
   onExitAnimationEnd?: () => void;
 }) {
   const { t } = useTranslation();
-  const tabs = useAppStore((s) => s.workPanelTabs);
+  const rawTabs = useAppStore((s) => s.workPanelTabs);
+  const tabs = rawTabs.filter(isKnownWorkPanelTab);
   const activeTabId = useAppStore((s) => s.activeWorkPanelTabId);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const pluginViews = useAppStore((s) => s.pluginViews);
@@ -130,7 +122,6 @@ export function WorkPanel({
   const openWorkPanelTab = useAppStore((s) => s.openWorkPanelTab);
   const setWidth = useAppStore((s) => s.setWorkPanelWidth);
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null;
-  const terminalOpen = tabs.some((tab) => tab.kind === "terminal");
   /** Resources opened from the transcript; tools and plugin views list above. */
   const resourceTabs = tabs.filter((tab) => !isToolWorkPanelTab(tab));
 
@@ -737,21 +728,6 @@ export function WorkPanel({
               <ReviewTab />
             </div>
           )}
-          {/* The terminal mounts only after a command artifact opens it, then
-              survives tab switches so its PTY and scrollback stay intact. */}
-          {terminalOpen && (
-            <div
-              id="work-panel-surface-terminal"
-              className={cx(
-                "work-panel-tabpane",
-                activeTab?.kind !== "terminal" && "is-hidden",
-              )}
-              role="tabpanel"
-              aria-labelledby="work-panel-title-terminal"
-            >
-              <TerminalTab active={activeTab?.kind === "terminal"} />
-            </div>
-          )}
           {activeTab?.kind === "browser" && (
             <div
               key={`${activeSessionId ?? "none"}:${activeTab.id}`}
@@ -812,8 +788,7 @@ export function WorkPanel({
               body can be empty. No tab exists to label a tabpanel here; the
               same entries the header menu offers — built-in tools first, then
               plugin views — are listed inline so the revealed panel is not a
-              dead end. An empty tab set also means the terminal cannot be
-              mounted, so this never hides a live PTY. */}
+              dead end. */}
           {!activeTab && (
             <div className="work-panel-tabpane" data-testid="work-panel-empty">
               <WorkTabEmpty

@@ -327,20 +327,20 @@ may be retained while exactly one workspace supplies the visible shell context.
   resource tab, and collapses the visible panel through the same path as the
   header collapse control, retaining tabs, active resource, and committed
   width. It is a no-op without an active session or while Settings is the
-  active page. The panel's context trigger can then create one of the four tool
-  resources.
+  active page. The panel's context trigger can then create Browser or an
+  in-scope plugin view.
 - An artifact trigger atomically creates or reuses its resource, activates it,
   and opens the panel. Background artifacts never open the visible panel.
-- File resources use normalized paths as identity. Review, Terminal, and
-  Browser are singletons; repeated triggers preserve resource order and
-  activate the existing resource.
+- File resources use normalized paths as identity. Browser and plugin views
+  are singletons; repeated triggers preserve resource order and activate the
+  existing resource.
 - Once open, the panel's unified context trigger anchors the left of the header
-  and opens a single dropdown. Its top section lists the four tools — Review,
-  Terminal, Browser, Files — in a fixed order, each row carrying its own open
-  state and, once open, its own close control. A second section appears after a
-  divider only when the transcript opened further resources, so no entry is ever
-  listed twice. The right action cluster is pinned to the header's right edge
-  behind a divider and never shifts with the label length (D173).
+  and opens a single dropdown. Its top section lists Browser and in-scope
+  plugin views, each row carrying its own open state and, once open, its own
+  close control. A second section appears after a divider only when the
+  transcript opened further resources, so no entry is ever listed twice. The
+  right action cluster is pinned to the header's right edge behind a divider
+  and never shifts with the label length (D173).
 - Menu rows own DOM focus. Opening with the trigger's ArrowDown/ArrowUp lands on
   the active row or the last row respectively; Arrow/Home/End then walk rows
   only, never their trailing close buttons. Delete/Backspace closes the focused
@@ -379,8 +379,6 @@ may be retained while exactly one workspace supplies the visible shell context.
   after that session is selected; its event never renders in the currently
   visible session. Successful workspace artifacts may still create or
   activate the singleton Review tab.
-- Terminal mounts only after a command artifact opens it and remains mounted
-  across tab switches while that tab exists.
 - Each session retains `{open, tabs, activeTabId, browserResource}` in renderer
   memory. Selecting another session swaps the visible context atomically and
   switching back restores it; selecting a workspace without an active

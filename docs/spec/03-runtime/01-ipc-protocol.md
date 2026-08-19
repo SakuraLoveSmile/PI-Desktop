@@ -28,7 +28,6 @@ Principles:
 | `plugin` | Plugin install/enable-disable/query/permissions |
 | `commandPalette` | Command palette search and execution |
 | `workspace` | Workspace selection and legacy working-tree diagnostics |
-| `terminal` | Work panel PTY create/write/resize/dispose + data/exit events |
 | `browser` | Work panel embedded preview navigation/bounds/visibility + state events |
 | `fs` | Work panel workspace file listing/reading/reveal (read-only) |
 | `window` | Frameless window state, controls, and bounded work-panel width reservation |
@@ -1041,14 +1040,6 @@ visible session's workspace.
   `ReviewRollbackResult`. The host verifies the current post-tool hash before
   restoring the snapshot; it returns `rolledBack`, `alreadyRolledBack`,
   `conflict`, or `unavailable` and never overwrites a conflicting later edit.
-
-### terminal (D099)
-
-- `terminal/create({cwd, cols?, rows?})` → `{termId, replay}` — one PTY per
-  workspace path, reused while alive; `replay` restores recent scrollback.
-- `terminal/write({termId, data})`, `terminal/resize({termId, cols, rows})`,
-  `terminal/dispose({termId})`
-- events: `terminal/event/data {termId, data}`, `terminal/event/exit {termId, exitCode}`
 
 ### browser (D100)
 

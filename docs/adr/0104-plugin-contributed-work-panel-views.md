@@ -8,15 +8,17 @@
   [ADR 0081](0081-host-owned-plugin-panel-chrome.md) ·
   [ADR 0092](0092-plugin-owned-panel-surface.md) ·
   [ADR 0105](0105-files-as-a-bundled-plugin.md) ·
+  [ADR 0108](0108-remove-built-in-interactive-terminal.md) ·
   [07-plugins](../spec/07-plugins/README.md) ·
   [04-ux/08-component-spec §5](../spec/04-ux/08-component-spec.md)
 
 ## Context
 
-The right work panel exposes four capabilities — Review, Terminal, Browser,
-Files (ADR 0019) — as a hard-coded list in the renderer: a `HEADER_TOOLS`
-constant, a closed `WorkPanelTabKind` union, and a four-way branch on tab kind
-in the panel body. Adding any new surface means changing host code.
+Before ADR 0108 removed the interactive terminal, the right work panel
+exposed four capabilities — Review, Terminal, Browser, Files (ADR 0019) — as a
+hard-coded list in the renderer: a `HEADER_TOOLS` constant, a closed
+`WorkPanelTabKind` union, and a four-way branch on tab kind in the panel body.
+Adding any new surface meant changing host code.
 
 Plugins already have a mature and strictly bounded UI channel, but it only
 produces a **separate window**: `ui.panel` opens a frameless `BrowserWindow`

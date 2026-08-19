@@ -1375,7 +1375,7 @@ export type ScheduledTask = {
   lastRunAt?: string;
 };
 
-// --- Work panel (review / terminal / browser / files) ---
+// --- Work panel (review / browser / files / plugin views) ---
 
 export type DiffLineType = "add" | "del" | "context";
 
@@ -1454,22 +1454,6 @@ export type WorkspaceDiff = {
   files: DiffFile[];
   /** File list hit the cap; more changes exist than listed. */
   truncated?: boolean;
-};
-
-export type TerminalCreateResult = {
-  termId: string;
-  /** Recent output replayed so a reopened panel restores scrollback. */
-  replay: string;
-};
-
-export type TerminalDataEvent = {
-  termId: string;
-  data: string;
-};
-
-export type TerminalExitEvent = {
-  termId: string;
-  exitCode: number | null;
 };
 
 export type BrowserAction = "back" | "forward" | "reload" | "stop";

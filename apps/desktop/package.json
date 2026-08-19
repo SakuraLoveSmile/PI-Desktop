@@ -30,8 +30,7 @@
     "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --linux --publish never"
   },
   "dependencies": {
-    "electron-updater": "^6.8.9",
-    "node-pty": "^1.1.0"
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "0.84.2",
@@ -44,8 +43,6 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^4.6.0",
-    "@xterm/addon-fit": "^0.11.0",
-    "@xterm/xterm": "^6.0.0",
     "dompurify": "^3.4.13",
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3",
@@ -90,13 +87,9 @@
       "!**/*.map",
       "!**/node_modules/*/{test,tests,__tests__,powered-test,example,examples}/**",
       "!**/node_modules/**/*.{test,spec}.{js,cjs,mjs}",
-      "!**/node_modules/node-pty/{deps,prebuilds,scripts,src,typings}/**",
       "!**/node_modules/node-addon-api/tools/**",
       "!**/node_modules/node-addon-api/*.{c,gyp,gypi,h,js,json}",
       "!**/node_modules/node-addon-api/README.md"
-    ],
-    "asarUnpack": [
-      "**/node_modules/node-pty/build/{Release,Debug}/**"
     ],
     "electronLanguages": [
       "en-US",
@@ -119,10 +112,6 @@
       {
         "from": "resources/plugins",
         "to": "plugins"
-      },
-      {
-        "from": "node_modules/node-pty/deps/winpty/LICENSE",
-        "to": "licenses/node-pty-winpty.LICENSE"
       }
     ],
     "mac": {

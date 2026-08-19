@@ -222,7 +222,6 @@ export const en = {
     errorModel: "Model",
     previewFile: "Preview in the side panel",
     previewUrl: "Open in the side browser",
-    openTerminal: "Open output in Terminal",
     retry: "Regenerate",
     forkResponse: "Branch from this reply",
     editMessage: "Edit and resend",
@@ -884,7 +883,6 @@ export const en = {
     closeTab: "Close {{name}}",
     tabs: {
       review: "Review",
-      terminal: "Terminal",
       browser: "Browser",
       file: "Files",
       plugin: "Plugin view",
@@ -924,13 +922,6 @@ export const en = {
         renamed: "Renamed",
         untracked: "New",
       },
-    },
-    terminal: {
-      noWorkspace: "Open a project to start a terminal",
-      noWorkspaceHint: "Terminal sessions run inside the project folder.",
-      exited: "Terminal session ended",
-      restart: "Restart",
-      startFailed: "Couldn't start the terminal",
     },
     browser: {
       emptyTitle: "Preview a page",

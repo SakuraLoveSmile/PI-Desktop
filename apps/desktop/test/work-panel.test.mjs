@@ -344,21 +344,14 @@ test("Electron enforces the responsive shell minimum", () => {
   assert.match(mainSource, /minHeight:\s*WINDOW_MIN_HEIGHT/);
 });
 
-test("terminal mounts on demand and survives switches while its tab stays open", () => {
-  assert.match(panelSource, /terminalOpen && \(/);
-  assert.match(panelSource, /activeTab\?\.kind !== "terminal" && "is-hidden"/);
-  assert.match(
-    panelSource,
-    /<TerminalTab active=\{activeTab\?\.kind === "terminal"\} \/>/,
-  );
-  assert.match(
-    transcriptSource,
-    /action === "run" && status === "success"/,
-  );
-  assert.doesNotMatch(
-    transcriptSource,
-    /action === "run" && status !== "running"/,
-  );
+test("built-in terminal is absent while the work panel keeps its other surfaces", () => {
+  assert.doesNotMatch(panelSource, /TerminalTab|terminalOpen|kind: "terminal"/);
+  assert.doesNotMatch(panelSource, /work-panel-surface-terminal|activeTab\?\.kind !== "terminal"/);
+  assert.match(panelSource, /activeTab\?\.kind === "review"/);
+  assert.match(panelSource, /activeTab\?\.kind === "browser"/);
+  assert.match(panelSource, /activeTab\?\.kind === "file"/);
+  assert.match(transcriptSource, /action === "run"/);
+  assert.doesNotMatch(transcriptSource, /openTerminal|terminalArtifact|chat\.openTerminal/);
 });
 
 test("workspace artifacts attach review to their originating session", () => {

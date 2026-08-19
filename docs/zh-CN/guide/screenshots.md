@@ -45,8 +45,6 @@ Composer 的模型 × 推理芯片切换当前会话使用的模型。在输入�
 
 ![审阅面板](/screenshots/app/zh/panel-review.webp)
 
-![终端面板](/screenshots/app/zh/panel-terminal.webp)
-
 ![浏览器预览面板](/screenshots/app/zh/panel-browser.webp)
 
 ![文件浏览面板](/screenshots/app/zh/panel-files.webp)

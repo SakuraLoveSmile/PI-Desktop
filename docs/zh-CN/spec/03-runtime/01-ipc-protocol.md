@@ -31,7 +31,6 @@
 | `plugin` | 插件 install/enable-disable/query/permissions |
 | `commandPalette` | 命令面板搜索和执行 |
 | `workspace` | 工作区选择和遗留工作树诊断 |
-| `terminal` | 工作面板 PTY create/write/resize/dispose + data/exit 事件 |
 | `browser` | 工作面板嵌入预览 navigation/bounds/visibility + 状态事件 |
 | `fs` | 工作面板工作区文件 listing/reading/reveal（只读） |
 | `window` | 无框窗口状态、控件和有界工作面板宽度预留 |
@@ -1010,14 +1009,6 @@ type ActivationScope = {
   `ReviewRollbackResult`。主机在之前验证当前的后工具哈希
   恢复快照；它返回 `rolledBack`、`alreadyRolledBack`、
   `conflict` 或 `unavailable` 并且永远不会覆盖冲突的后续编辑。
-
-### 终端 (D099)
-
-- `terminal/create({cwd, cols?, rows?})` → `{termId, replay}` — 每一个 PTY
-  工作空间路径，活着时重用； `replay` 恢复最近的回滚。
-- `terminal/write({termId, data})`、`terminal/resize({termId, cols, rows})`、
-  `terminal/dispose({termId})`
-- 事件：`terminal/event/data {termId, data}`、`terminal/event/exit {termId, exitCode}`
 
 ### 浏览器 (D100)
 

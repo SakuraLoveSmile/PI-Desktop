@@ -48,7 +48,6 @@ SCENES = (
     "composer-at",
     # Work panels
     "panel-review",
-    "panel-terminal",
     "panel-browser",
     "panel-files",
     "panel-menu",

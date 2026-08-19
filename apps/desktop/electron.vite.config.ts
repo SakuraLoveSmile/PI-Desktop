@@ -26,7 +26,7 @@ export default defineConfig({
       rollupOptions: {
         // Bundle JS workspace packages into Main. Only runtime modules that
         // must resolve from the packaged node_modules stay external.
-        external: ["electron-updater", "node-pty"],
+        external: ["electron-updater"],
         input: {
           index: resolve(__dirname, "electron/main/index.ts"),
           // Forked per plugin by PluginRuntime (ADR 0008); must stay a

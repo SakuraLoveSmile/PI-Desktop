@@ -31,7 +31,7 @@ PI-Desktop 把 AI 编程智能体装进原生桌面应用：打开一个项目�
 - **任意模型，自带密钥。** Anthropic、OpenAI，或任何兼容 OpenAI API 的服务——托管中转站可以，Ollama、LM Studio 这类本地网关也可以。模型 ID 自由填写（没有硬编码白名单），并支持按模型配置上下文窗口、输出上限、温度和思考模式。
 - **智能体、规划与目标三种模式。** 智能体模式可以读写文件、执行命令，把事情做完；规划模式让同一个智能体检查项目并提交不可变实施检查点供你审批；目标模式让智能体先确认目标与验收标准，批准后自主推进直到完成或遇到边界。
 - **每一次改动都由你批准。** 文件写入和 shell 命令先询问再执行，支持会话级授权和可配置的默认策略；超时未回应一律拒绝。
-- **真正的工作台。** 在侧边工作面板中查看消息级 diff、谨慎回滚改动、打开终端、用浏览器预览、浏览项目文件——全程不用离开对话。
+- **真正的工作台。** 在侧边工作面板中查看消息级 diff、谨慎回滚改动、在对话中查看命令输出、用浏览器预览、浏览项目文件——全程不用离开对话。
 - **项目与会话。** 侧边栏按项目组织会话，支持多项目、置顶、归档、排序、分支、通知，还有用完即弃的临时会话。
 - **本地优先，注重隐私。** 会话记录以 JSONL 纯文本存盘并配 SQLite 索引，随时备份、检索或删除；API 密钥存入系统钥匙串；日志只留在本地，没有任何遥测上报。
 - **不止插件的扩展能力。** 在“扩展”页面管理独立 MCP 服务器、Skills 与 Subagents，并按全局或项目范围启用；插件可添加命令、面板、智能体工具、技能、主题、MCP、常驻服务和消息总线。`.piplug` 包、本地加载和官方插件市场目前都可用。
@@ -90,7 +90,7 @@ PI-Desktop 把 AI 编程智能体装进原生桌面应用：打开一个项目�
 
 PI-Desktop 保持渲染进程权限最小化，并把智能体循环与桌面 UI 分开：
 
-- **Electron 外壳** — 沙箱化的 React 渲染进程，以及负责面板、终端、浏览器预览、更新和进程监管等桌面服务的主进程 / preload 桥。
+- **Electron 外壳** — 沙箱化的 React 渲染进程，以及负责面板、浏览器预览、更新和进程监管等桌面服务的主进程 / preload 桥。
 - **Rust 宿主核心** — 通过 stdio JSON-RPC 独占管理 SQLite、会话存储、密钥、权限与工作区访问。
 - **pi 智能体 sidecar** — 独立 Node 进程，运行 pi 引擎（`pi-ai` + `pi-agent-core`），承载真正的智能体循环。
 
@@ -163,7 +163,6 @@ PI-Desktop 的构建和设计参考了以下开源项目：
   [Vite](https://github.com/vitejs/vite)、
   [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss)、
   [Lucide](https://github.com/lucide-icons/lucide)、
-  [xterm.js](https://github.com/xtermjs/xterm.js)、
   [Shiki](https://github.com/shikijs/shiki)、
   [Mermaid](https://github.com/mermaid-js/mermaid)、
   [KaTeX](https://github.com/KaTeX/KaTeX)、

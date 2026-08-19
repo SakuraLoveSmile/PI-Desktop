@@ -65,9 +65,6 @@ PNG 通过 `BrandLogo`。 PNG 是规范的；
 - `Resources/app.asar` — Electron Main、preload、渲染器输出以及仅
   运行时解析的生产模块。 Renderer 库已存在
   在 Vite 输出中，并且不会再次复制为原始包树。
-- `app.asar.unpacked` 下的目标原生 `node-pty` 资产；其他平台和
-当包布局支持时，架构预构建被排除
-  可靠的目标过滤器。
 - Chromium 语言环境包仅适用于英语和简体中文。产品展示
   `en`/`zh-CN` 目录保持捆绑状态，独立于 Chromium 区域设置。
 - 应用程序图标 `build/icon.icns`（源自规范 `build/icon_1024.png`，作者：
@@ -177,8 +174,6 @@ ASAR 中的树
 - 所需的第三方许可和通知文件保留在 ASAR 中或
   `Resources/licenses` 当其非运行时包树被修剪时
 - 仅配置的英语和简体中文 Chromium 语言环境包
-- 可加载的目标本地 `node-pty` 二进制文件，并且没有可靠的排他性
-  非目标预构建
 
 第一个经过审核的优化包建立了平台基线。保留
 针对每个平台进行测量，而不是将一项预算应用于不同的平台
@@ -221,7 +216,7 @@ project/Temporary 使用消息加会话图标创建控件。
    和 `agent/`；计时记录位于 `host/timing.log` 和
    `agent/timing.log`。
 8. 禁用网络访问后，shell 仍然启动； English/Chinese
-   切换、语法高亮、KaTeX、Mermaid fallback/rendering、终端、
+   切换、语法高亮、shell 高亮、KaTeX、Mermaid fallback/rendering、
    主机运行状况和 sidecar 运行状况继续使用打包的本地资产。
 
 ## 6. Windows/Linux 发布包
@@ -236,11 +231,10 @@ Windows: pnpm --filter @pi-desktop/desktop dist:win
 Linux:   pnpm --filter @pi-desktop/desktop dist:linux
 ```
 
-Windows 软件包包括 `bin/pi-desktop-host-core.exe`； Linux 包括
-`bin/pi-desktop-host-core`。 `node-pty` 还必须通过以下方式重建
-原生运行器上的电子构建器。签名、回滚和安装程序
-升级资质仍保持发布硬化工作；出版物本身是
-在 D126 下有效。
+Windows 软件包包括 `bin/pi-desktop-host-core.exe`；Linux 包括
+`bin/pi-desktop-host-core`。Rust 主机必须在原生运行器上构建后再打包。
+签名、回滚和安装程序升级资质仍保持发布硬化工作；出版物本身在
+D126 下有效。
 
 Native-runner 输出矩阵：
 

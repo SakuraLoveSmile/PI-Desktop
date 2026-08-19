@@ -129,7 +129,6 @@ import { PluginViewHost, pluginViewKey } from "./plugin-view-host";
 import type { PluginAppearance } from "../shared/plugin-panel-chrome";
 import { Logger } from "./logger";
 import { collectWorkspaceDiff } from "./git-diff";
-import { PtyManager } from "./terminal";
 import { BrowserPane, resolveLocalFile } from "./browser-view";
 import { discoverProviderModels } from "./model-discovery";
 import { OAUTH_AUTH_KIND, VendorOAuth } from "./oauth";
@@ -444,12 +443,6 @@ const plugins = new PluginRuntime({
     pluginViews.closePlugin(pluginId);
     sendToRenderer(IPC.event.pluginChanged, { reason: "reload", pluginId });
   },
-});
-const ptys = new PtyManager({
-  onData: (termId, data) =>
-    sendToRenderer(IPC.event.terminalData, { termId, data }),
-  onExit: (termId, exitCode) =>
-    sendToRenderer(IPC.event.terminalExit, { termId, exitCode }),
 });
 const userMcp = new UserMcpRuntime({
   createClient: (config) => new McpServerClient(config),
@@ -2847,10 +2840,6 @@ async function createWindow() {
               `void window.__PI_DESKTOP__?.seedRunRows?.(0)`,
             );
             await new Promise((r) => setTimeout(r, 250));
-            await openPanelArtifact("terminal");
-            // The PTY needs a beat for the login shell prompt to settle.
-            await new Promise((r) => setTimeout(r, 1200));
-            await shot("pi-panel-terminal");
             await openPanelArtifact("browser");
             await new Promise((r) => setTimeout(r, 400));
             await shot("pi-panel-browser");
@@ -5822,51 +5811,6 @@ function registerIpc() {
   );
 
   handle(
-    IPC.invoke.terminalCreate,
-    async (input: { cwd?: string; cols?: number; rows?: number } = {}) => {
-      if (!host) throw new Error("host unavailable");
-      const res = (await host.call("workspace.get")) as {
-        workspace: { path: string } | null;
-      };
-      // The workspace root is the only allowed cwd: the renderer's value is
-      // advisory and never trusted with arbitrary paths.
-      const cwd = res.workspace?.path;
-      if (!cwd || (input.cwd && input.cwd !== cwd)) {
-        throw Object.assign(new Error("workspace required"), {
-          errorCode: ErrorCodes.INVALID_ARGUMENT,
-        });
-      }
-      const created = await ptys.create({
-        cwd,
-        cols: input.cols,
-        rows: input.rows,
-      });
-      logger.app("terminal", "info", "terminal session attached", {
-        data: { termId: created.termId },
-      });
-      return created;
-    },
-  );
-
-  handle(IPC.invoke.terminalWrite, async (input: { termId: string; data: string }) => {
-    ptys.write(String(input?.termId ?? ""), String(input?.data ?? ""));
-    return { ok: true };
-  });
-
-  handle(
-    IPC.invoke.terminalResize,
-    async (input: { termId: string; cols: number; rows: number }) => {
-      ptys.resize(String(input?.termId ?? ""), Number(input?.cols), Number(input?.rows));
-      return { ok: true };
-    },
-  );
-
-  handle(IPC.invoke.terminalDispose, async (input: { termId: string }) => {
-    ptys.dispose(String(input?.termId ?? ""));
-    return { ok: true };
-  });
-
-  handle(
     IPC.invoke.browserNavigate,
     async (input: { url?: string; sessionId?: string } = {}) => {
       // Workspace root gates file previews (agent-generated HTML); http(s)
@@ -7611,7 +7555,6 @@ app.on("before-quit", (event) => {
     const pluginPanelShutdown = pluginPanels.closeAll();
     updater.dispose();
     logger.app("lifecycle", "info", "app shutdown");
-    ptys.disposeAll();
     plugins.disposeWatchers();
     userMcp.disposeAll();
     browserPane.dispose();

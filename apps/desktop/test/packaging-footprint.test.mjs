@@ -10,10 +10,9 @@ const viteConfigSource = await readFile(
   "utf8",
 );
 
-test("packaging installs only native PTY and updater runtime dependencies", () => {
+test("packaging installs only the updater runtime dependency", () => {
   assert.deepEqual(Object.keys(packageJson.dependencies).sort(), [
     "electron-updater",
-    "node-pty",
   ]);
 
   for (const dependency of [
@@ -35,10 +34,9 @@ test("packaging installs only native PTY and updater runtime dependencies", () =
 
 test("main bundles JavaScript dependencies and externalizes only runtime modules", () => {
   assert.doesNotMatch(viteConfigSource, /externalizeDepsPlugin\s*\(/);
-  assert.match(
-    viteConfigSource,
-    /external:\s*\["electron-updater",\s*"node-pty"\]/,
-  );
+  assert.match(viteConfigSource, /external:\s*\["electron-updater"\]/);
+  assert.doesNotMatch(viteConfigSource, /node-pty/);
+  assert.doesNotMatch(JSON.stringify(packageJson.dependencies), /node-pty/);
 });
 
 test("packaging keeps only shipped locales and excludes non-runtime artifacts", () => {
@@ -57,11 +55,6 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
   assert.ok(
     packageJson.build.files.includes(
       "!**/node_modules/**/*.{test,spec}.{js,cjs,mjs}",
-    ),
-  );
-  assert.ok(
-    packageJson.build.files.includes(
-      "!**/node_modules/node-pty/{deps,prebuilds,scripts,src,typings}/**",
     ),
   );
   assert.ok(
@@ -109,16 +102,13 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
       from: "resources/plugins",
       to: "plugins",
     },
-    {
-      from: "node_modules/node-pty/deps/winpty/LICENSE",
-      to: "licenses/node-pty-winpty.LICENSE",
-    },
   ]);
+  assert.doesNotMatch(JSON.stringify(packageJson.build), /node-pty/);
 });
 
-test("node-pty unpacks native payloads without unpacking its full source tree", () => {
+test("packaging does not include removed PTY native payload configuration", () => {
   assert.deepEqual(packageJson.build.asar, { smartUnpack: false });
-  assert.deepEqual(packageJson.build.asarUnpack, [
-    "**/node_modules/node-pty/build/{Release,Debug}/**",
-  ]);
+  assert.equal(packageJson.build.asarUnpack, undefined);
+  assert.doesNotMatch(JSON.stringify(packageJson.build.files), /node-pty/);
+  assert.doesNotMatch(JSON.stringify(packageJson.build.extraResources), /node-pty/);
 });

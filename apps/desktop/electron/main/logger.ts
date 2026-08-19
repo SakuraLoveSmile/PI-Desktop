@@ -27,7 +27,6 @@ export type LogCategory =
   | "diagnostics"
   | "runtime"
   | "timing"
-  | "terminal";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 

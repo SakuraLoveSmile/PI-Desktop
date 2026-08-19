@@ -52,8 +52,6 @@ the state a conversation starts in.
 
 ![The review panel](/screenshots/app/en/panel-review.webp)
 
-![The terminal panel](/screenshots/app/en/panel-terminal.webp)
-
 ![The browser preview panel](/screenshots/app/en/panel-browser.webp)
 
 ![The file browser panel](/screenshots/app/en/panel-files.webp)

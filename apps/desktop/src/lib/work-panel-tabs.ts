@@ -1,6 +1,5 @@
 export type WorkPanelTabKind =
   | "review"
-  | "terminal"
   | "browser"
   | "file"
   | "plugin";
@@ -37,18 +36,26 @@ export function switchWorkPanelContextState(
   currentVisible: WorkPanelContext,
   nextSessionId: string | undefined,
 ): { contexts: Record<string, WorkPanelContext>; visible: WorkPanelContext } {
+  const sanitizeContext = (context: WorkPanelContext): WorkPanelContext => {
+    const sanitized = sanitizeWorkPanelTabsState(context);
+    return {
+      ...context,
+      tabs: sanitized.tabs,
+      activeTabId: sanitized.activeTabId,
+    };
+  };
   // A background artifact can update the retained context while an async
   // session selection still renders the older projection. Retained state wins.
   const retainedCurrent = currentSessionId
-    ? contexts[currentSessionId] ?? currentVisible
-    : currentVisible;
+    ? sanitizeContext(contexts[currentSessionId] ?? currentVisible)
+    : sanitizeContext(currentVisible);
   const nextContexts = currentSessionId
     ? { ...contexts, [currentSessionId]: retainedCurrent }
     : contexts;
   return {
     contexts: nextContexts,
     visible: nextSessionId
-      ? nextContexts[nextSessionId] ?? emptyWorkPanelContext()
+      ? sanitizeContext(nextContexts[nextSessionId] ?? emptyWorkPanelContext())
       : emptyWorkPanelContext(),
   };
 }
@@ -87,14 +94,49 @@ export function parsePluginViewRef(
 }
 
 /**
- * Tools are the panel's stable entry points; everything else is a resource the
- * transcript opened. Tool singletons are keyed by kind; a plugin view is also a
- * tool, so it belongs in the tools half of the menu rather than under "open
- * resources" — its id carries a resource only because that is how it is
- * addressed.
+ * Runtime state can briefly outlive a renderer update. Unknown tab kinds must
+ * be ignored rather than handed to a component lookup that expects a known
+ * icon and renderer.
+ */
+export function isKnownWorkPanelTab(tab: WorkPanelTab): boolean {
+  return (
+    Boolean(tab) &&
+    (tab.kind === "review" ||
+      tab.kind === "browser" ||
+      tab.kind === "file" ||
+      tab.kind === "plugin")
+  );
+}
+
+export function sanitizeWorkPanelTabsState(
+  state: WorkPanelTabsState,
+): WorkPanelTabsState {
+  const tabs = state.tabs.filter(isKnownWorkPanelTab);
+  if (tabs.length === state.tabs.length) return state;
+  if (
+    state.activeTabId === null ||
+    tabs.some((tab) => tab.id === state.activeTabId)
+  ) {
+    return { tabs, activeTabId: state.activeTabId };
+  }
+
+  const activeIndex = state.tabs.findIndex(
+    (tab) => tab.id === state.activeTabId,
+  );
+  return {
+    tabs,
+    activeTabId:
+      tabs[Math.min(Math.max(activeIndex, 0), tabs.length - 1)]?.id ?? null,
+  };
+}
+
+/**
+ * Only Browser and plugin-contributed views are launchable tools. Review and
+ * file tabs are transcript resources even though their tab ids are singleton-
+ * shaped, so they remain visible in the opened-resource section.
  */
 export function isToolWorkPanelTab(tab: WorkPanelTab): boolean {
-  return tab.id === tab.kind || tab.kind === "plugin";
+  return tab.kind === "browser" || tab.kind === "plugin";
 }
 
 export function normalizeWorkPanelFilePath(path: string): string {

@@ -24,7 +24,8 @@ requested behavior.
 
 Investigation showed the window expansion was only a *room-making* mechanism:
 
-- The terminal tab is renderer-based (`@xterm/xterm`); it needs no native view.
+- The former interactive terminal tab did not use a native view; ADR 0108
+  removes that surface entirely.
 - Only the **browser** tab uses a native `WebContentsView`, and it is already
   positioned from the **renderer-measured** panel rect via `browserSetBounds`
   (see `BrowserPane.setBounds` and `BrowserTab`). The view composites above

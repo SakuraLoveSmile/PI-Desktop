@@ -74,6 +74,7 @@ import {
   emptyWorkPanelContext,
   fileWorkPanelTab,
   openWorkPanelTabState,
+  sanitizeWorkPanelTabsState,
   shouldOpenReviewArtifact,
   switchWorkPanelContextState,
   toolWorkPanelTab,
@@ -596,8 +597,6 @@ export type AppState = {
   openFileInWorkPanel: (path: string) => void;
   /** Open a URL in the work panel browser tab. */
   openUrlInWorkPanel: (url: string) => void;
-  /** Open the interactive terminal from a completed command artifact. */
-  openTerminalInWorkPanel: () => void;
 };
 
 function openPlanArtifact(
@@ -616,10 +615,14 @@ const initialSidebarPreferences = loadSidebarPreferences();
 const initialWorkPanelWidth = loadWorkPanelWidth();
 
 function currentWorkPanelContext(state: AppState): WorkPanelContext {
-  return {
-    open: state.workPanelOpen,
+  const tabs = sanitizeWorkPanelTabsState({
     tabs: state.workPanelTabs,
     activeTabId: state.activeWorkPanelTabId,
+  });
+  return {
+    open: state.workPanelOpen,
+    tabs: tabs.tabs,
+    activeTabId: tabs.activeTabId,
     fileRequest: state.workPanelFileRequest,
   };
 }
@@ -3360,9 +3363,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   openUrlInWorkPanel: (url) => {
     get().openWorkPanelTab({ ...toolWorkPanelTab("browser"), resource: url });
-  },
-  openTerminalInWorkPanel: () => {
-    get().openWorkPanelTab(toolWorkPanelTab("terminal"));
   },
 
   clearComposerPrefill: () => set({ composerPrefill: null }),

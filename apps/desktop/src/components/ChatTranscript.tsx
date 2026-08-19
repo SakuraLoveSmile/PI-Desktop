@@ -788,7 +788,6 @@ function ToolRow({
   const detailsId = useId();
   const root = useAppStore((s) => s.workspace?.path);
   const openTarget = useOpenPreviewTarget();
-  const openTerminal = useAppStore((s) => s.openTerminalInWorkPanel);
   const status = message.toolStatus;
   const action = getToolAction(message.toolName);
   // A run row states what the command did, not what the call around it did: an
@@ -805,7 +804,6 @@ function ToolRow({
   const previewTarget = PREVIEWABLE_ACTIONS.has(action)
     ? getToolPreviewTarget(message.toolArgs, root)
     : null;
-  const terminalArtifact = action === "run" && status === "success";
   // A run row keeps its command in the head and only its output in the body, so
   // the head carries the two things the body no longer offers: a copy of the
   // command, and the outcome (D226).
@@ -961,23 +959,20 @@ function ToolRow({
             ) : null}
             {summary ? (
               <span
-                className={`tool-row-summary${previewTarget || terminalArtifact ? " linked" : ""}`}
+                className={`tool-row-summary${previewTarget ? " linked" : ""}`}
                 title={
                   previewTarget
                     ? previewTarget.kind === "file"
                       ? t("chat.previewFile")
                       : t("chat.previewUrl")
-                    : terminalArtifact
-                      ? t("chat.openTerminal")
-                      : undefined
+                    : undefined
                 }
                 onClick={
-                  previewTarget || terminalArtifact
+                  previewTarget
                     ? (e) => {
-                        // Open the produced surface instead of toggling details.
+                        // Open the preview target instead of toggling details.
                         e.stopPropagation();
-                        if (previewTarget) openTarget(previewTarget);
-                        else openTerminal();
+                        openTarget(previewTarget);
                       }
                     : undefined
                 }

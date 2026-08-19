@@ -169,7 +169,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 |---|---|---|---|
 | D097 | Docked work panel replaces context panel | **The right side hosts a docked, drag-resizable (320–min(720px, 60vw)) work panel with Review / Terminal / Browser / Files tabs, toggled by the titlebar button or Cmd/Ctrl+J; `{open, tab, width}` persist in localStorage. The former ContextPanel overlay and its `context.*` copy are removed; workspace/model/status live in composer chips and Settings.** | Codex-parity working surface for inspecting agent output; the info-only overlay duplicated data available elsewhere |
 | D098 | Review tab reads the git working tree *(superseded by D180)* | **Historical decision: Review rendered the workspace's uncommitted state through the git CLI.** | Superseded because commits erased message-level evidence and could not support safe per-message rollback |
-| D099 | Terminal tab is a real PTY | **Terminal runs an interactive login shell in the active workspace via node-pty in the Electron main process with xterm.js in the renderer; sessions are keyed per workspace, survive tab switches and panel close through a main-side replay ring, and die with the app.** | Codex parity requires a usable terminal, not a command replay; PTY ownership stays in main so the sandboxed renderer never touches processes |
+| D099 | Terminal tab is a real PTY *(superseded by D251)* | **Historical decision: the former work panel exposed an interactive shell as a session-scoped terminal tab.** | The current product removes that separate shell surface; Agent Bash remains non-interactive and transcript-owned |
 | D100 | Browser tab embeds a WebContentsView | **The preview browser is a main-process WebContentsView with renderer-driven bounds sync, hardened (deny popups→external, deny permission requests, http(s)-only navigation, isolated persist partition); it hides while blocking overlays (palette, permission dialog, settings) are open. The user drives it; the agent does not.** | Recommended modern embedding without webview-tag caveats; hide rules resolve its compositor z-order over renderer overlays |
 | D138 | Session-scoped inline permission requests | **Tool approval is an inline PermissionCard owned by its originating `sessionId`, never a global dialog. Different sessions retain independent pending requests and absolute timeout deadlines; background message/tool/permission events update only scoped state and never activate, cover, or focus another conversation. Resolution and cleanup match both session and request identity. This supersedes only D100's permission-dialog overlay/hide clause; palette, search, settings, and other blocking surfaces retain their existing browser hide behavior.** | Concurrent agents must not steal the active workflow or overwrite each other's approval requests; the existing protocol already carries the required session/request identity. |
 | D139 | Navigation intent and shortcut event guards | **Every explicit session, project, page, fork, or history navigation begins or reuses one renderer navigation intent; asynchronous work commits visible state only while that intent remains current. Global shortcuts ignore modifier-only and IME composition events, while history navigation also ignores key-repeat events.** | Late session/project loads and incomplete keyboard events must not cause unexplained page or history jumps. |
@@ -2125,32 +2125,6 @@ D193, and D194.
   `07-plugins/13-plugin-permissions-matrix.md` §2,
   `04-ux/08-component-spec.md` §5, and E2E-153.
 
-## 2026-08-19 — The panel's built-in tools settle at Terminal and Browser
-
-- Decision D249 amends D247 / ADR 0105 and closes the migration it opened. Two
-  of the three planned moves are cancelled on their merits; Files stays
-  migrated.
-- **Terminal stays a host built-in.** Making it a plugin requires a
-  `terminal.pty` permission, and shipping that means any third-party plugin may
-  request arbitrary execution as the user. That is a wider trust boundary than
-  routing the terminal through the public channel buys back, and a
-  bundled-plugins-only PTY channel was rejected as the private back door D247
-  forbids. No such permission is introduced.
-- **Review stays host-owned and is reclassified as an artifact panel.** Its data
-  is message-owned by ADR 0043 — each successful workspace Write/Edit carries
-  its own bounded `details.review` record, held with the transcript — so
-  migrating it would move that ownership into the host purely to hand it back
-  over a bridge. Applying D248's tool-versus-artifact split instead puts Review
-  where it already behaved: created and re-created by Write/Edit artifacts, like
-  a `file:<path>` tab is created by a file link.
-- Review therefore leaves the tool launcher, because the launcher is for
-  surfaces a user picks, while remaining a live tab kind the host renders.
-  Closing it loses nothing: the per-change inline cards stay in the transcript.
-- `HEADER_TOOLS` is now Terminal and Browser. Files is a bundled plugin, Review
-  and `file:<path>` are artifact surfaces, and plugin-contributed views list
-  beside the tools.
-- See ADR 0105, `04-ux/08-component-spec.md` §5, and E2E-153.
-
 ## 2026-08-19 — The builtin command surface is reduced to five core entries
 
 - Decision D250 freezes the first-party registry at `builtin.session.new`,
@@ -2167,3 +2141,18 @@ D193, and D194.
   no longer supported builtin contracts.
 - See ADR 0106, `04-ux/04-builtin-commands.md`, ADR 0024, ADR 0034, and
   E2E-117.
+
+## 2026-08-19 — The panel's built-in interactive terminal is removed
+
+- Decision D251 supersedes D249 and the terminal clauses of ADR 0019/0105.
+  The work panel no longer owns an interactive shell; users use an external
+  terminal for interactive shell work.
+- Browser remains the host-built work-panel tool. Files remains a bundled
+  plugin, Review and `file:<path>` remain artifact surfaces, and contributed
+  plugin views remain available beside them.
+- Agent Bash stays non-interactive and transcript-owned: command, output,
+  status, copy behavior, and its terminal icon remain unchanged. The removal
+  deletes only terminal-specific PTY UI, IPC, types, dependencies, packaging,
+  and tests; the desktop protocol version does not change.
+- No plugin PTY permission or bundled-plugin replacement is introduced.
+- See ADR 0108, `04-ux/08-component-spec.md` §5, and E2E-058.
