@@ -331,6 +331,10 @@ const plugins = new PluginRuntime({
   openExternal: async (url) => {
     await shell.openExternal(url);
   },
+  openPath: async (fullPath) => {
+    const error = await shell.openPath(fullPath);
+    if (error) throw new Error(error);
+  },
   readClipboard: async () => {
     const { clipboard } = await import("electron");
     return clipboard.readText();

@@ -176,6 +176,8 @@ export type PluginHostServices = {
     input: PluginNativeNotificationInput,
   ) => Promise<PluginNativeNotificationResult>;
   openExternal: (url: string) => Promise<void>;
+  /** Open one already-authorized file with the OS-associated application. */
+  openPath: (fullPath: string) => Promise<void>;
   readClipboard: () => Promise<string>;
   writeClipboard: (text: string) => Promise<void>;
   openPanel: (request: PluginPanelRequest) => Promise<void>;
@@ -252,6 +254,7 @@ const HOST_API_ALLOWLIST = new Set([
   "ui.showNativeNotification",
   "workspace.get",
   "fs.readText",
+  "fs.openDefault",
   "fs.writeText",
   "fs.glob",
   "fs.list",
@@ -568,6 +571,9 @@ export class PluginRuntime {
       }),
       openExternal: async () => {
         throw apiError("UNSUPPORTED", "openExternal service missing");
+      },
+      openPath: async () => {
+        throw apiError("UNSUPPORTED", "openPath service missing");
       },
       readClipboard: async () => "",
       writeClipboard: async () => undefined,
@@ -1049,6 +1055,9 @@ export class PluginRuntime {
         return { ok: true };
       case "fs.readText":
         return api.fs.readText(String(payload?.path ?? ""));
+      case "fs.openDefault":
+        await api.fs.openDefault(String(payload?.path ?? ""));
+        return { ok: true };
       case "fs.writeText":
         await api.fs.writeText(String(payload?.path ?? ""), String(payload?.content ?? ""));
         return { ok: true };
@@ -2455,6 +2464,44 @@ export class PluginRuntime {
             path: rel,
           });
           return content;
+        },
+        openDefault: async (pathFromRoot: string) => {
+          const { full, rel } = await this.resolveFsRequest(
+            loaded,
+            "read",
+            pathFromRoot,
+          );
+          if (!statSync(full).isFile()) {
+            this.services.audit?.({
+              pluginId,
+              api: "fs.openDefault",
+              ok: false,
+              errorCode: "INVALID_ARGUMENT",
+              ts: Date.now(),
+              path: rel,
+            });
+            throw apiError("INVALID_ARGUMENT", "only files can be opened with the default app");
+          }
+          try {
+            await this.services.openPath(full);
+          } catch (error) {
+            this.services.audit?.({
+              pluginId,
+              api: "fs.openDefault",
+              ok: false,
+              errorCode: "OPEN_FAILED",
+              ts: Date.now(),
+              path: rel,
+            });
+            throw apiError("OPEN_FAILED", error instanceof Error ? error.message : String(error));
+          }
+          this.services.audit?.({
+            pluginId,
+            api: "fs.openDefault",
+            ok: true,
+            ts: Date.now(),
+            path: rel,
+          });
         },
         /**
          * One directory's entries, so a plugin can walk a tree lazily instead

@@ -196,7 +196,9 @@ Plan 是代理工具的附加主机策略边界：
 ## 8. 网络和外部链接
 
 - 默认情况下不授予 `net.fetch`
-- `openExternal` 应确认
+- `openExternal` 应确认。`fs.openDefault` 是独立能力：只接受已经通过插件
+  `fs.read` 策略检查的现有 root-relative 文件，用于明确的文件查看操作，不允许任意
+  URL 或绝对路径打开。
 - 禁止插件静默下载和执行二进制文件（MVP 中根本没有这样做）
 
 ### 8.0 出网白名单

@@ -4407,10 +4407,13 @@ Each scenario is documented in this format:
      and keyboard; confirm rows expose expanded state, folders appear before
      files, and a failed directory offers an inline Retry.
   5. Click a text file. Confirm the focused viewer shows Back, the relative path,
-     file size, line numbers, and bounded text; click the binary file and confirm
-     it reports as binary rather than printing replacement characters. Switch the
-     app to Simplified Chinese and confirm the Files toolbar, empty/loading/error,
-     and viewer states are localized.
+     file size, line numbers, bounded text, and **Open with default app**. Click
+     that action and confirm the file opens in the operating system's associated
+     application. Click the binary file and confirm it reports as binary rather
+     than printing replacement characters; the same action still opens it with
+     its associated application. Switch the app to Simplified Chinese and confirm
+     the Files toolbar, empty/loading/error, viewer, and open-action states are
+     localized.
   6. Click a file path in the conversation. Confirm it still opens a host
      `file:<path>` tab under Open resources — transcript artifacts did not move
      to the plugin.
@@ -4424,11 +4427,11 @@ Each scenario is documented in this format:
   deny-lists.
 - **Specs linked**: `07-plugins/03-plugin-api.md` §3,
   `07-plugins/13-plugin-permissions-matrix.md` §2,
-  `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0105
+  `04-ux/08-component-spec.md` §5, ADR 0104, ADR 0105, ADR 0109
 - **Acceptance**: G (plugins), D (workspace), Security, Quality
 - **Milestone**: M6+
 - **Status**: Unit coverage in `apps/desktop/test/bundled-plugins.test.mjs`,
-  `apps/desktop/test/plugin-fs-scope.test.mjs` (`fs.list` guards), and host-core
+  `apps/desktop/test/plugin-fs-scope.test.mjs` (`fs.list` and `fs.openDefault` guards), and host-core
   `bundled_plugins_refresh_from_disk_but_keep_user_state`; the packaged journey
   is Draft (do not run E2E locally unless explicitly requested)
 
