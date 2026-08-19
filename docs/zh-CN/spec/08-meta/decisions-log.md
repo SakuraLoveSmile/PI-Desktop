@@ -1962,3 +1962,15 @@ D193 和 D194。
 - `HEADER_TOOLS` 现为终端与浏览器。文件是内置插件，审阅与 `file:<path>` 属于产物
   表面，插件贡献的视图并列显示在工具旁。
 - 参见 ADR 0105、`04-ux/08-component-spec.md` §5 与 E2E-153。
+
+## 2026-08-19 —— 内置命令面精简为核心五条
+
+- 决策 D250 将第一方 registry 冻结为 `builtin.session.new`、
+  `builtin.agent.compact` 和三个 `builtin.mode.*` 条目。对应的内置输入框别名
+  只有 `/new`、`/compact`、`/agent-mode`、`/plan-mode` 和 `/goal-mode`。
+- 会话删除、中止、项目、设置、插件、日志、重命名、命令面板、窗口重载和 DevTools
+  条目从 registry 与渲染器 dispatch 中移除；遗留的 `newChat`、`openProject`、
+  `openSettings` 别名也一并移除。专用界面工作流和插件命令不受影响。
+- 模式别名保留一次性 `/mode <prompt>` 行为：先切换模式，再将剩余文本作为可见用户
+  回合发送。旧别名不再是受支持的内置契约。
+- 参见 ADR 0106、`04-ux/04-builtin-commands.md`、ADR 0024、ADR 0034 和 E2E-117。

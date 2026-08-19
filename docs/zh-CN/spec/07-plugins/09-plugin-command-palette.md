@@ -39,11 +39,10 @@ type PaletteCommand = {
 ## 4. 命令来源
 
 1. 内置命令
- - 新会话
- - 打开设置
- - 打开项目
- - 切换模式
-2.插件`contributes.commands`
+ - 新建任务
+ - 压缩对话上下文
+ - 切换到 Agent / Plan / Goal
+2. 插件 `contributes.commands`
 3.后期：技能快捷键/市场搜索入口
 
 ## 5. 搜索规则
@@ -83,7 +82,7 @@ open global search (Commands section)
 -------------------------------------------------
 Commands
  New Task
- Open Project
+ Compact Conversation Context
 Demo
  Hello: Open Panel
 Tools

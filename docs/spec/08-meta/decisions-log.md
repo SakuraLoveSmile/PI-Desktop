@@ -2150,3 +2150,20 @@ D193, and D194.
   and `file:<path>` are artifact surfaces, and plugin-contributed views list
   beside the tools.
 - See ADR 0105, `04-ux/08-component-spec.md` §5, and E2E-153.
+
+## 2026-08-19 — The builtin command surface is reduced to five core entries
+
+- Decision D250 freezes the first-party registry at `builtin.session.new`,
+  `builtin.agent.compact`, and the three `builtin.mode.*` entries. Their only
+  builtin composer aliases are `/new`, `/compact`, `/agent-mode`, `/plan-mode`,
+  and `/goal-mode`.
+- Session deletion, abort, project, settings, plugin, log, rename, command
+  palette, reload-window, and DevTools entries are removed from the registry
+  and renderer dispatch. The legacy `newChat`, `openProject`, and
+  `openSettings` aliases are removed as well. Dedicated UI workflows and plugin
+  commands are unaffected.
+- Mode aliases keep the one-shot `/mode <prompt>` behavior: mode changes first,
+  then the remaining text is sent as the visible user turn. Former aliases are
+  no longer supported builtin contracts.
+- See ADR 0106, `04-ux/04-builtin-commands.md`, ADR 0024, ADR 0034, and
+  E2E-117.

@@ -3270,23 +3270,21 @@ IPC 请求无法关闭。
 
 #### E2E-117：Agent/Plan/Goal UX 和区域设置不包含聊天控件
 
-- **先决条件**：应用程序可以在空闲会话下以英语和中文运行，
-  Plan 工件夹具、外壳设置和命令选项板可用。
-- **步骤**：1) 检查 Agent/Plan/Goal、权限、工件批准和 shell
-  英文控制。 2) 输入Plan并检查planning/approval/queue/
-  渲染器保持活动状态时处于终端状态。 3) 批准和拒绝
-  提案，确认主办后批准面消失
-  确认。 4) 使用命令面板和 `/plan-mode` / `/agent-mode`
-  斜杠别名用于切换活动空闲会话，确认 Composer 芯片
-立即改变。在同一草稿中的任一别名后键入提示，然后
-  发送；确认模式更改并且提示仍为可见用户
-  转。单独发送别名并确认它仍然是本地模式开关，无需
-  创建一个空的转录回合。如果提示发送失败，请确认
-  完整的草稿仍然可以编辑。 5) 终端提议后重新加载并检查
-  会话，同时断言 Electron 主进程和主机进程身份已执行
-  不改变。 6) 在 zh-CN 中重复。 7) 搜索已删除的可见命令
-  聊天模式和请求更改控件。 Host/app重启恢复是
-  由E2E-108和E2E-109分别执行。
+- **先决条件**：应用程序可以在空闲会话下以英语和 zh-CN 运行，
+  Plan 工件夹具、shell 设置和全局搜索的“命令”部分可用。
+- **步骤**：1) 检查英文 Agent/Plan/Goal、权限、工件批准和 shell 控件。
+  2) 进入 Plan，检查规划、审批、队列和终端状态，同时保持渲染器运行。
+  3) 批准并拒绝提案，确认主机确认后审批界面消失。4) 检查“命令”部分，
+  确认其中恰好包含 `builtin.session.new`、`builtin.agent.compact` 和三个
+  `builtin.mode.*` 命令；内置 `/` 分组只有 `/new`、`/compact`、`/agent-mode`、
+  `/plan-mode`、`/goal-mode`。确认被移除的命令 ID 以及 `newChat` / `openProject` /
+  `openSettings` dispatch 别名不存在。使用 `/plan-mode` / `/agent-mode` 斜杠别名
+  切换活动空闲会话，确认 Composer 芯片立即改变。在同一草稿中的任一别名后键入
+  提示并发送；确认模式改变且提示仍是可见的用户回合。单独发送别名并确认它仍是
+  本地模式切换，不会创建空的转录回合。如果提示发送失败，确认完整草稿仍可编辑。
+  5) 终端提议后重新加载并检查会话，同时断言 Electron Main 和 Host 进程身份没有
+  改变。6) 在 zh-CN 中重复。7) 搜索可见命令，确认没有 Chat 模式和 request-changes
+  控件。Host/app 重启恢复由 E2E-108 和 E2E-109 分别执行。
 - **预期**：Agent 是默认值；输入左侧的 Composer 芯片是
   唯一的活动会话 Agent/Plan/Goal 控制； Plan 和 Goal 展示
   Ask/Accept edits/Auto，提交的标题，工件开启器，

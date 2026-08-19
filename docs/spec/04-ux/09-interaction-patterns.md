@@ -513,7 +513,6 @@ may be retained while exactly one workspace supplies the visible shell context.
 
 - Topbar abort button (visible during running state)
 - Keyboard shortcut: `Cmd/Ctrl + .`
-- Command palette: `builtin.agent.abort`
 
 ### 3.2 Abort behavior
 

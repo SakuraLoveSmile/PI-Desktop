@@ -3512,22 +3512,28 @@ Each scenario is documented in this format:
 #### E2E-117: Agent/Plan/Goal UX and locales contain no Chat controls
 
 - **Preconditions**: App can run in English and zh-CN with an idle session,
-  Plan artifact fixture, shell settings, and command palette available.
+  Plan artifact fixture, shell settings, and global search's Commands section
+  available.
 - **Steps**: 1) Inspect Agent/Plan/Goal, permission, artifact approval, and shell
   controls in English. 2) Enter Plan and inspect planning/approval/queue/
   terminal states while the renderer remains alive. 3) Approve and reject a
   proposal, confirming that the approval surface disappears after host
-  confirmation. 4) Use the command palette and `/plan-mode` / `/agent-mode`
-  slash aliases to switch the active idle session, confirming the Composer chip
-  changes immediately. Type a prompt after either alias in the same draft and
-  send it; confirm the mode changes and the prompt remains as a visible user
-  turn. Send an alias alone and confirm it remains a local mode switch without
-  creating an empty transcript turn. If prompt dispatch fails, confirm the
-  complete draft remains editable. 5) Reload after a terminal proposal and inspect the
-  session while asserting that Electron Main and Host process identities did
-  not change. 6) Repeat in zh-CN. 7) Search visible commands for the removed
-  Chat mode and request-changes controls. Host/app restart recovery is
-  exercised separately by E2E-108 and E2E-109.
+  confirmation. 4) Inspect the Commands section and confirm it contains exactly
+  `builtin.session.new`, `builtin.agent.compact`, and the three
+  `builtin.mode.*` commands, with only `/new`, `/compact`, `/agent-mode`,
+  `/plan-mode`, and `/goal-mode` in the builtin `/` group. Confirm the removed
+  command IDs and `newChat` / `openProject` / `openSettings` dispatch aliases are
+  absent. Use `/plan-mode` / `/agent-mode` slash aliases to switch the active
+  idle session, confirming the Composer chip changes immediately. Type a prompt
+  after either alias in the same draft and send it; confirm the mode changes and
+  the prompt remains as a visible user turn. Send an alias alone and confirm it
+  remains a local mode switch without creating an empty transcript turn. If
+  prompt dispatch fails, confirm the complete draft remains editable. 5) Reload
+  after a terminal proposal and inspect the session while asserting that
+  Electron Main and Host process identities did not change. 6) Repeat in
+  zh-CN. 7) Search visible commands for the removed Chat mode and
+  request-changes controls. Host/app restart recovery is exercised separately
+  by E2E-108 and E2E-109.
 - **Expected**: Agent is the default; the left-of-input Composer chip is the
   sole active-session Agent/Plan/Goal control; Plan and Goal show
   Ask/Accept edits/Auto, the submitted title, an artifact opener,

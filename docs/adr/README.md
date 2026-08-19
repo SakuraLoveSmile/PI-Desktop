@@ -122,3 +122,4 @@ Each ADR includes:
 | 0103 | Compact context usage summary | Accepted (amends 0047) |
 | 0104 | Let plugins contribute work panel views | Accepted |
 | 0105 | Ship Files as a bundled plugin; keep Review and Terminal in the host | Accepted |
+| 0106 | Keep only five core builtin commands | Accepted |

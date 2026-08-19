@@ -36,10 +36,9 @@ type PaletteCommand = {
 ## 4. Command sources
 
 1. Built-in commands
- - New session
- - Open settings
- - Open project
- - Switch mode
+ - New task
+ - Compact conversation context
+ - Switch to Agent / Plan / Goal
 2. Plugin `contributes.commands`
 3. Later: skill shortcuts / marketplace search entry
 
@@ -80,7 +79,7 @@ If the command needs a permission:
 -------------------------------------------------
 Commands
  New Task
- Open Project
+ Compact Conversation Context
 Demo
  Hello: Open Panel
 Tools

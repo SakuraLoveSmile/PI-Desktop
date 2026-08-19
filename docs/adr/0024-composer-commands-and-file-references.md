@@ -3,7 +3,7 @@
 - Status: Accepted
 - Date: 2026-07-27
 - Deciders: PI-Desktop core
-- Related: D123, D124, D125, D197, D209, ADR 0019 (work panel subsystems), ADR 0059 (clipboard file paste), ADR 0070 (compact reference display), D114 (scratch dir), D119 (transcript file store)
+- Related: D123, D124, D125, D197, D209, D250, ADR 0019 (work panel subsystems), ADR 0059 (clipboard file paste), ADR 0070 (compact reference display), ADR 0106 (core five builtin commands), D114 (scratch dir), D119 (transcript file store)
 
 ## Context
 
@@ -34,8 +34,9 @@ exported by the installed package and directly reusable.
    the builtin command-palette registry (slash aliases defined in
    `electron/main/builtin-commands.ts`, executed by the existing
    renderer-side switch), and plugin palette commands (executed via
-   `commandPalette/execute`). Unknown `/foo` is sent as literal text (pi CLI
-   parity).
+   `commandPalette/execute`). The builtin registry is intentionally limited to
+   the five core entries defined by ADR 0106. Unknown `/foo` is sent as literal
+   text (pi CLI parity).
 2. **Template expansion happens in the Electron main `agent/prompt`
    handler, before persistence.** The persisted user message stores
    `content = expanded text` plus a new optional `command` field holding the

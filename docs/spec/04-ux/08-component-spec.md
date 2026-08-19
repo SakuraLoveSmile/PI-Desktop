@@ -851,7 +851,7 @@ SESSIONS                                      [msg+][↕]
   capped for narrow viewports. This includes the Sessions sort menu,
   session/project overflow menus, and section create menus.
 - Keyboard: arrow up/down, Enter to select
-- Delete: row menu or command palette `builtin.session.delete`
+- Delete: row menu
 
 ### 6.5 Accessibility
 
@@ -1945,7 +1945,7 @@ Control in Topbar showing current workspace. Allows opening or clearing a projec
 
 - Click path: opens system file dialog to select folder
 - "Open folder": same action, explicit button
-- "Clear project": command palette `builtin.project.clear`
+- "Clear project": explicit clear button
 
 ### 13.5 Accessibility
 
