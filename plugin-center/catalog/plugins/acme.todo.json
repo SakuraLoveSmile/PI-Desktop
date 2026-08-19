@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 2,
+  "artifactBaseUrl": "https://github.com/vastsa/pi-plugin-center/releases/download",
+  "plugin": {
+    "id": "acme.todo",
+    "name": "Todo",
+    "description": "A worked example of a registry entry. Not a real plugin; the digest below belongs to no artifact.",
+    "author": "Acme",
+    "publisherId": "acme",
+    "trust": "community",
+    "verified": false,
+    "categories": [
+      "productivity"
+    ],
+    "homepage": "https://github.com/acme/pi-plugin-todo",
+    "repository": "https://github.com/acme/pi-plugin-todo",
+    "safetyNotes": "Reads and writes one notes file inside the current workspace.",
+    "versions": [
+      {
+        "version": "1.1.0",
+        "publishedAt": "2026-08-10T10:00:00Z",
+        "changelog": "Adds a second panel.",
+        "permissions": [
+          "ui.panel",
+          "fs.read"
+        ],
+        "yanked": true,
+        "yankedReason": "The bundle shipped a build-time token. Use 1.0.0 until 1.1.1 is published.",
+        "provenance": {
+          "sourceRepository": "https://github.com/acme/pi-plugin-todo",
+          "sourceRef": "refs/tags/v1.1.0",
+          "sourceCommit": "abcdef1234567890abcdef1234567890abcdef12"
+        }
+      },
+      {
+        "version": "1.0.0",
+        "publishedAt": "2026-08-01T10:00:00Z",
+        "changelog": "First published release.",
+        "minPiDesktop": "0.8.0",
+        "shasum": "1111111111111111111111111111111111111111111111111111111111111111",
+        "url": "acme.todo@1.0.0/acme.todo-1.0.0.piplug",
+        "sizeBytes": 20480,
+        "permissions": [
+          "ui.panel",
+          "fs.read"
+        ],
+        "provenance": {
+          "sourceRepository": "https://github.com/acme/pi-plugin-todo",
+          "sourceRef": "refs/tags/v1.0.0",
+          "sourceCommit": "1234567890abcdef1234567890abcdef12345678",
+          "sourcePath": ".",
+          "builder": "pi-plugin-center-builder@1.0.0",
+          "builtAt": "2026-08-01T09:58:00Z"
+        },
+        "review": {
+          "decision": "approved",
+          "risk": "low",
+          "policyVersion": "2026.08.1",
+          "reviewedAt": "2026-08-01T09:59:00Z"
+        }
+      }
+    ]
+  }
+}

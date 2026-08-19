@@ -139,6 +139,45 @@ If a malicious plugin version is discovered:
 - The host rejects it during checkUpdates / install
 - Users who already installed it get a risk warning and one-click disable
 
+### 10.1 Yank semantics (catalog v2)
+
+`yanked: true` on a catalog version is a distribution-side withdrawal, not a
+deletion. The host must:
+
+1. Exclude the version from install selection, including an explicit version pick.
+2. Exclude it from update selection, so a yanked release is never offered or
+   applied by an automatic update.
+3. Keep it in version history with `yankedReason`, so a user can understand why
+   the version they hold is no longer offered.
+4. Mark an installed copy of a yanked version as needing attention. The host does
+   not uninstall or disable it on the user's behalf; withdrawal is a distribution
+   signal, and removing a working plugin without consent is a worse failure than
+   a warning.
+
+If the newest non-yanked version is older than the installed one, the plugin has
+no update available. The host never presents a downgrade as an update.
+
+## 10.2 Provenance
+
+Catalog v2 binds each version to the source that produced it:
+
+```ts
+type PluginProvenance = {
+  sourceRepository: string   // canonical https repository URL
+  sourceRef: string          // refs/tags/<tag> or a 40-hex commit
+  sourceCommit: string       // resolved 40-hex commit
+  sourcePath?: string        // plugin directory inside the repository
+  builder?: string           // builder identity and version
+  builtAt?: string
+}
+```
+
+The host stores provenance with the installed plugin and the detail sheet shows
+repository and commit before install. Provenance is evidence for a human
+decision, not an integrity control: it is only as trustworthy as the catalog it
+came from, and the checksum remains the mechanism that decides whether bytes are
+accepted.
+
 ## 11. Acceptance
 
 1. A mismatched checksum cannot be installed

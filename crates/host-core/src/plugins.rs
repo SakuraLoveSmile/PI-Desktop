@@ -7,7 +7,8 @@ use std::cmp::Ordering;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::activation::ActivationScope;
 
@@ -112,6 +113,12 @@ pub struct PluginSummary {
     pub auto_update: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub update_available: Option<PluginUpdateInfo>,
+    /// Set when the catalog has withdrawn the exact version installed here.
+    /// The host surfaces it and leaves the plugin running: withdrawal is a
+    /// distribution signal, and silently disabling working software is a worse
+    /// failure than a warning the user can act on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub yanked: Option<PluginYankNotice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ui: Option<PluginUiMeta>,
     /// `manifest.fs`, passed through verbatim: which files each mode may touch.
@@ -132,6 +139,23 @@ pub struct PluginMarketplaceMeta {
     pub shasum: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub publisher_id: Option<String>,
+    /// Trust tier recorded at install time. Kept with the install so the
+    /// Plugins page can show what the user actually accepted, even after the
+    /// catalog changes or becomes unreachable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trust: Option<String>,
+    /// Source pin of the installed version (catalog v2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<MarketProvenance>,
+}
+
+/// Distribution-side withdrawal of the exact version a user has installed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginYankNotice {
+    pub version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -199,6 +223,12 @@ pub struct MarketPluginSummary {
     pub permission_summary: Vec<String>,
     #[serde(default)]
     pub verified: bool,
+    /// Catalog v2 trust tier as the client is willing to render it:
+    /// `verified`, `community`, or `unknown`.
+    #[serde(default = "unknown_trust")]
+    pub trust: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publisher_id: Option<String>,
     #[serde(default)]
     pub installed: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -210,6 +240,13 @@ pub struct MarketPluginSummary {
     /// row stays visible for discovery but must not offer an install action.
     #[serde(default)]
     pub installable: bool,
+    /// True when every catalog version of this plugin has been withdrawn.
+    #[serde(default)]
+    pub yanked: bool,
+}
+
+fn unknown_trust() -> String {
+    "unknown".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -231,7 +268,7 @@ pub struct MarketPluginDetail {
     pub safety_notes: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MarketVersion {
     pub version: String,
@@ -250,7 +287,59 @@ pub struct MarketVersion {
     #[serde(default)]
     pub size_bytes: u64,
     pub permissions: Vec<String>,
+    /// Catalog v2: the distribution side withdrew this version. It stays in
+    /// version history so a user holding it can see why, and it is excluded
+    /// from every install and update path.
+    #[serde(default)]
+    pub yanked: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub yanked_reason: Option<String>,
+    /// Catalog v2: which source produced these bytes. Evidence for a human
+    /// decision, never an integrity control — the checksum decides acceptance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<MarketProvenance>,
+    /// Catalog v2: the center's publish verdict for this version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review: Option<MarketReview>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature_alg: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_id: Option<String>,
 }
+
+/// Source pin recorded by the plugin center for a published version.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketProvenance {
+    pub source_repository: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_commit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub builder: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub built_at: Option<String>,
+}
+
+/// Publish verdict issued by the center's policy evaluator.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarketReview {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub risk: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewed_at: Option<String>,
+}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -268,9 +357,15 @@ pub struct MarketDownloadInfo {
     pub permissions: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub changelog: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<MarketProvenance>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trust: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publisher_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct MarketCatalogEntry {
     id: String,
     name: String,
@@ -282,6 +377,12 @@ struct MarketCatalogEntry {
     categories: Vec<String>,
     #[serde(default)]
     verified: bool,
+    /// Catalog v2 trust tier, issued by the center. `verified` is only honoured
+    /// from the official/mirror source; see `resolve_trust`.
+    #[serde(default)]
+    trust: Option<String>,
+    #[serde(default)]
+    publisher_id: Option<String>,
     #[serde(default)]
     downloads: Option<u64>,
     #[serde(default)]
@@ -295,10 +396,16 @@ struct MarketCatalogEntry {
     versions: Vec<MarketVersion>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct MarketCatalogFile {
+    /// Absent or 1 means the v1 schema. v2 adds provenance, review verdicts,
+    /// yank state, and a declared artifact base.
+    #[serde(default = "default_schema_version")]
+    schema_version: u32,
     #[serde(default = "default_provider_id")]
     provider_id: String,
+    #[serde(default)]
+    catalog_id: Option<String>,
     #[serde(default)]
     name: Option<String>,
     #[serde(default)]
@@ -306,12 +413,25 @@ struct MarketCatalogFile {
     #[serde(default)]
     updated_at: Option<String>,
     #[serde(default)]
+    generated_at: Option<String>,
+    #[serde(default)]
+    policy_version: Option<String>,
+    /// Base a relative package URL resolves against. A mirror declares its own
+    /// base, so switching source never sends a download to another provider.
+    #[serde(default)]
+    artifact_base_url: Option<String>,
+    #[serde(default)]
     plugins: Vec<MarketCatalogEntry>,
 }
 
 fn default_provider_id() -> String {
     "official".into()
 }
+
+fn default_schema_version() -> u32 {
+    1
+}
+
 
 #[derive(Debug, Clone)]
 pub struct InstallOptions {
@@ -505,6 +625,7 @@ impl PluginManager {
             marketplace: None,
             auto_update: Some(false),
             update_available: None,
+            yanked: None,
             ui: manifest.ui.clone(),
             fs: manifest.fs.clone(),
             settings: derive_settings(&manifest),
@@ -641,6 +762,7 @@ impl PluginManager {
                             .unwrap_or(false),
                 ),
                 update_available: None,
+                yanked: None,
                 ui: manifest.ui.clone(),
                 fs: manifest.fs.clone(),
                 settings: derive_settings(&manifest),
@@ -835,32 +957,53 @@ impl PluginManager {
         Ok(())
     }
 
-    fn resolve_package_url(catalog_url: &str, package_url: &str) -> String {
+    /// Turn a catalog package URL into the absolute URL the host will fetch.
+    ///
+    /// A relative path resolves against the catalog's declared
+    /// `artifactBaseUrl` when it has one (catalog v2), and otherwise against
+    /// the catalog URL's own directory (catalog v1). Keeping both anchored to
+    /// the catalog that carried them is what makes a mirror switch safe: the
+    /// mirror declares its own base, so a download never crosses back to the
+    /// provider the user just switched away from, and the checksum being
+    /// verified is unchanged.
+    fn resolve_package_url(
+        catalog_url: &str,
+        artifact_base_url: Option<&str>,
+        package_url: &str,
+    ) -> String {
         if package_url.starts_with("http://")
             || package_url.starts_with("https://")
             || package_url.starts_with("file://")
         {
             return package_url.to_string();
         }
-        // Relative package paths resolve against the catalog URL directory.
-        if let Some(idx) = catalog_url.rfind('/') {
-            format!(
-                "{}{}",
-                &catalog_url[..=idx],
-                package_url.trim_start_matches('/')
-            )
-        } else {
-            package_url.to_string()
-        }
+        let base = match artifact_base_url.map(str::trim).filter(|b| !b.is_empty()) {
+            // A declared base is a prefix, not a directory: a trailing slash is
+            // supplied here so `.../download` and `.../download/` agree.
+            Some(base) => {
+                if base.ends_with('/') {
+                    base.to_string()
+                } else {
+                    format!("{base}/")
+                }
+            }
+            None => match catalog_url.rfind('/') {
+                Some(idx) => catalog_url[..=idx].to_string(),
+                None => return package_url.to_string(),
+            },
+        };
+        format!("{base}{}", package_url.trim_start_matches('/'))
     }
 
     fn rewrite_catalog_urls(
         catalog_url: &str,
         mut catalog: MarketCatalogFile,
     ) -> MarketCatalogFile {
+        let base = catalog.artifact_base_url.clone();
         for plugin in &mut catalog.plugins {
             for version in &mut plugin.versions {
-                version.url = Self::resolve_package_url(catalog_url, &version.url);
+                version.url =
+                    Self::resolve_package_url(catalog_url, base.as_deref(), &version.url);
             }
         }
         catalog
@@ -1083,10 +1226,33 @@ impl PluginManager {
             latest_market_version(&entry.versions).cloned()
         }
         .ok_or_else(|| anyhow!("PLUGIN_NOT_FOUND: version missing"))?;
+        // An explicit version pick reaches here without passing through
+        // `latest_market_version`, so a withdrawn release has to be refused
+        // again rather than relying on the selection helper.
+        if selected.yanked {
+            let reason = selected
+                .yanked_reason
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("withdrawn by the publisher");
+            bail!(
+                "PLUGIN_MARKET_YANKED: version {} was withdrawn: {reason}",
+                selected.version
+            );
+        }
         if !has_package_metadata(&selected) {
             bail!(
                 "PLUGIN_MARKET_INVALID: version {} is missing package download metadata",
                 selected.version
+            );
+        }
+        if !host_supports_version(&selected) {
+            bail!(
+                "PLUGIN_HOST_TOO_OLD: version {} requires PI-Desktop {} or newer, this host is {}",
+                selected.version,
+                selected.min_pi_desktop.as_deref().unwrap_or("newer"),
+                crate::state::HOST_VERSION
             );
         }
         Ok(MarketDownloadInfo {
@@ -1095,11 +1261,14 @@ impl PluginManager {
             url: selected.url,
             size_bytes: selected.size_bytes,
             shasum: selected.shasum,
-            signature: None,
-            signature_alg: None,
+            signature: selected.signature,
+            signature_alg: selected.signature_alg,
             published_at: selected.published_at,
             permissions: selected.permissions,
             changelog: selected.changelog,
+            provenance: selected.provenance,
+            trust: Some(self.resolve_trust(entry)),
+            publisher_id: entry.publisher_id.clone(),
         })
     }
 
@@ -1120,13 +1289,31 @@ impl PluginManager {
         for plugin in self.runtime.iter_mut() {
             let Some(entry) = catalog.plugins.iter().find(|p| p.id == plugin.id) else {
                 plugin.update_available = None;
+                plugin.yanked = None;
                 continue;
             };
+            // A withdrawal applies to the version the user is holding, not to
+            // whether a newer one exists, so it is resolved independently of
+            // the update decision below.
+            plugin.yanked = entry
+                .versions
+                .iter()
+                .find(|v| v.version == plugin.version && v.yanked)
+                .map(|v| PluginYankNotice {
+                    version: v.version.clone(),
+                    reason: v.yanked_reason.clone(),
+                });
             let Some(latest) = latest_market_version(&entry.versions) else {
                 plugin.update_available = None;
                 continue;
             };
             if compare_plugin_versions(&latest.version, &plugin.version) != Ordering::Greater {
+                plugin.update_available = None;
+                continue;
+            }
+            // Offering an update this host cannot install would turn every
+            // update check into a failed download.
+            if !host_supports_version(latest) {
                 plugin.update_available = None;
                 continue;
             }
@@ -1155,16 +1342,26 @@ impl PluginManager {
     ) -> Result<InstallResult> {
         let info = self.market_download_info(plugin_id, version)?;
         let package_path = self.download_market_package(&info)?;
+        let marketplace = PluginMarketplaceMeta {
+            provider_id: "official".into(),
+            shasum: Some(info.shasum.clone()),
+            // Record the publisher the catalog named. Falling back to the
+            // project keeps registries written before publisher-owned sources
+            // readable, but a v2 entry must not be relabelled as ours.
+            publisher_id: Some(
+                info.publisher_id
+                    .clone()
+                    .unwrap_or_else(|| "pi-desktop".into()),
+            ),
+            trust: info.trust.clone(),
+            provenance: info.provenance.clone(),
+        };
         let result = self.install_from_path(
             &package_path.to_string_lossy(),
             InstallOptions {
                 source: "marketplace".into(),
                 enable,
-                marketplace: Some(PluginMarketplaceMeta {
-                    provider_id: "official".into(),
-                    shasum: Some(info.shasum.clone()),
-                    publisher_id: Some("pi-desktop".into()),
-                }),
+                marketplace: Some(marketplace),
                 expected_shasum: Some(info.shasum),
                 auto_update,
                 granted_permissions,
@@ -1235,7 +1432,11 @@ impl PluginManager {
         let bytes = if let Some(path) = info.url.strip_prefix("file://") {
             fs::read(path).with_context(|| format!("read market package {path}"))?
         } else if info.url.starts_with("http://") || info.url.starts_with("https://") {
-            download_url(&info.url)?
+            // Refuse an off-allowlist host before any request leaves the
+            // machine, then hold the redirect chain to the same rule.
+            let catalog_url = self.market_source_url();
+            package_host_allowed(&info.url, &catalog_url)?;
+            download_url_guarded(&info.url, Some(&catalog_url))?
         } else {
             // Allow bare local paths in catalogs.
             fs::read(&info.url).with_context(|| format!("read market package {}", info.url))?
@@ -1257,6 +1458,7 @@ impl PluginManager {
             .map(|v| v.version.clone())
             .unwrap_or_else(|| "0.0.0".into());
         let installed = self.get(&entry.id);
+        let catalog_url = self.market_source_url();
         MarketPluginSummary {
             id: entry.id.clone(),
             name: entry.name.clone(),
@@ -1273,15 +1475,84 @@ impl PluginManager {
                 .map(|v| v.permissions.clone())
                 .unwrap_or_default(),
             verified: entry.verified,
+            trust: self.resolve_trust(entry),
+            publisher_id: entry.publisher_id.clone(),
             installed: installed.is_some(),
             installed_version: installed.as_ref().map(|p| p.version.clone()),
             update_available: installed
                 .as_ref()
                 .map(|p| p.version != latest)
                 .unwrap_or(false),
-            installable: latest_version.map(has_package_metadata).unwrap_or(false),
+            // An install the host would refuse must not be offered. That
+            // covers an announced-but-unpublished version, a version pinned to
+            // a newer app, and a package URL on a host the host will not fetch.
+            installable: latest_version
+                .map(|version| {
+                    has_package_metadata(version)
+                        && host_supports_version(version)
+                        && (is_local_package_url(&version.url)
+                            || package_host_allowed(&version.url, &catalog_url).is_ok())
+                })
+                .unwrap_or(false),
+            // Every version withdrawn leaves nothing to offer, which is worth
+            // showing as a withdrawal rather than as an empty version list.
+            yanked: !entry.versions.is_empty() && latest_version.is_none(),
         }
     }
+
+    /// Trust tier the client is willing to render for a catalog entry.
+    ///
+    /// `verified` is a claim about a publisher that only the plugin center can
+    /// make, so it is honoured only from the source the user has configured as
+    /// official or its mirror. A custom or enterprise catalog can describe its
+    /// own plugins but cannot promote itself, and an entry that asserts an
+    /// unrecognised tier falls back to `unknown` rather than being trusted.
+    fn resolve_trust(&self, entry: &MarketCatalogEntry) -> String {
+        let declared = entry
+            .trust
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_ascii_lowercase)
+            // A v1 catalog has no tier; its boolean is maintainer-written and
+            // keeps its existing meaning.
+            .unwrap_or_else(|| {
+                if entry.verified {
+                    "verified".into()
+                } else {
+                    "community".into()
+                }
+            });
+        match declared.as_str() {
+            "verified" if self.is_official_market_source() => "verified".into(),
+            "verified" => "community".into(),
+            "community" => "community".into(),
+            _ => "unknown".into(),
+        }
+    }
+
+    /// Whether the catalog in effect is the project's own source or its mirror.
+    fn is_official_market_source(&self) -> bool {
+        let url = self.market_source_url();
+        url == OFFICIAL_MARKET_CATALOG_URL || url == MIRROR_MARKET_CATALOG_URL
+    }
+}
+
+/// Whether the running host is new enough for a catalog version.
+///
+/// `minPiDesktop` is a publisher statement that older hosts cannot run the
+/// release. Enforcing it before download turns "installed and immediately
+/// broken" into a refusal the user can act on. An unparseable bound is ignored
+/// rather than treated as blocking: a malformed catalog field should not make
+/// a plugin uninstallable.
+fn host_supports_version(version: &MarketVersion) -> bool {
+    let Some(required) = version.min_pi_desktop.as_deref().map(str::trim) else {
+        return true;
+    };
+    if required.is_empty() || ParsedPluginVersion::parse(required).is_none() {
+        return true;
+    }
+    compare_plugin_versions(crate::state::HOST_VERSION, required) != Ordering::Less
 }
 
 /// Whether a catalog version carries everything an install needs.
@@ -1294,15 +1565,22 @@ fn has_package_metadata(version: &MarketVersion) -> bool {
     !version.shasum.trim().is_empty() && !version.url.trim().is_empty()
 }
 
-/// Return the highest semantic version in a marketplace entry.
+/// Return the highest offerable semantic version in a marketplace entry.
 ///
 /// Catalog producers are not required to preserve ordering, and older
 /// catalogs did not consistently put the newest release first. Keep the
 /// ordering rule in the host so search, detail, install, and update checks all
 /// agree on the same release.
+///
+/// Yanked versions are skipped here rather than at each call site: every
+/// caller of this function is choosing a version to offer, and a withdrawn
+/// release must not be presented as the latest, downloaded, or applied as an
+/// update. Detail responses keep the unfiltered list so version history still
+/// shows what was withdrawn and why.
 fn latest_market_version<'a>(versions: &'a [MarketVersion]) -> Option<&'a MarketVersion> {
     versions
         .iter()
+        .filter(|version| !version.yanked)
         .max_by(|a, b| compare_plugin_versions(&a.version, &b.version))
 }
 
@@ -1406,10 +1684,17 @@ fn built_in_catalog() -> MarketCatalogFile {
     let hello_bytes = bundled_package_bytes("demo.hello", "0.2.0").unwrap_or_default();
     let notes_bytes = bundled_package_bytes("demo.workspace-notes", "0.1.0").unwrap_or_default();
     MarketCatalogFile {
+        schema_version: 1,
         provider_id: "official".into(),
+        catalog_id: None,
         name: Some("PI-Desktop Official Plugins (bundled fallback)".into()),
         homepage: Some("https://github.com/vastsa/pi-desktop-plugins".into()),
         updated_at: Some("2026-07-28T00:00:00Z".into()),
+        generated_at: None,
+        policy_version: None,
+        // The bundled fallback materializes packages next to the catalog, so
+        // its URLs are already absolute `file://` paths.
+        artifact_base_url: None,
         plugins: vec![
             MarketCatalogEntry {
                 id: "demo.hello".into(),
@@ -1439,7 +1724,9 @@ fn built_in_catalog() -> MarketCatalogFile {
                         "agent.tool.register".into(),
                         "notify".into(),
                     ],
+                    ..Default::default()
                 }],
+                ..Default::default()
             },
             MarketCatalogEntry {
                 id: "demo.workspace-notes".into(),
@@ -1477,7 +1764,9 @@ fn built_in_catalog() -> MarketCatalogFile {
                         "notify".into(),
                         "agent.tool.register".into(),
                     ],
+                    ..Default::default()
                 }],
+                ..Default::default()
             },
         ],
     }
@@ -2494,6 +2783,90 @@ fn is_loopback_host(host: &str) -> bool {
     host == "localhost" || host == "::1" || host == "0:0:0:0:0:0:0:1" || host.starts_with("127.")
 }
 
+/// Hosts a marketplace package may be downloaded from.
+///
+/// A v1 catalog kept every package under one repository, so the checksum was
+/// the only control that mattered. Catalog v2 package URLs describe a
+/// publisher-influenced release, so the host also has to constrain where the
+/// request goes. Matching is exact or dot-suffix, which covers
+/// `objects.githubusercontent.com`, `release-assets.githubusercontent.com`,
+/// and `codeload.github.com` without needing a client release each time
+/// GitHub rotates a release-asset host.
+const PACKAGE_HOST_ALLOWLIST: &[&str] = &["github.com", "githubusercontent.com", "cnb.cool"];
+
+fn host_matches_allowlist_entry(host: &str, allowed: &str) -> bool {
+    host == allowed || host.ends_with(&format!(".{allowed}"))
+}
+
+/// Lowercase host of an `http(s)` URL, rejecting embedded credentials.
+///
+/// Credentials in a package URL would let a catalog entry aim an
+/// authenticated request at a host the user never chose, so they are refused
+/// rather than stripped.
+fn package_url_host(url: &str) -> Result<(String, bool)> {
+    let trimmed = url.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    let (rest, plain_http) = if let Some(rest) = lower.strip_prefix("https://") {
+        (rest, false)
+    } else if let Some(rest) = lower.strip_prefix("http://") {
+        (rest, true)
+    } else {
+        bail!("PLUGIN_MARKET_UNTRUSTED_HOST: package url must use https");
+    };
+    let authority_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let authority = &rest[..authority_end];
+    if authority.contains('@') {
+        bail!("PLUGIN_MARKET_UNTRUSTED_HOST: package url must not embed credentials");
+    }
+    let host = if let Some(stripped) = authority.strip_prefix('[') {
+        match stripped.find(']') {
+            Some(close) => &stripped[..close],
+            None => bail!("PLUGIN_MARKET_UNTRUSTED_HOST: package url host is malformed"),
+        }
+    } else {
+        authority.split(':').next().unwrap_or(authority)
+    };
+    if host.is_empty() {
+        bail!("PLUGIN_MARKET_UNTRUSTED_HOST: package url is missing a host");
+    }
+    Ok((host.to_string(), plain_http))
+}
+
+/// Whether a package URL is one the host is willing to fetch.
+///
+/// Allowed: the distribution hosts above, and the host that served the
+/// catalog currently in effect — a private or enterprise catalog is trusted
+/// for its own packages, and pointing the client at one does not widen the
+/// allowlist for third-party hosts. Plain `http` is refused outside loopback,
+/// which keeps local development catalogs working.
+fn package_host_allowed(package_url: &str, catalog_url: &str) -> Result<()> {
+    let (host, plain_http) = package_url_host(package_url)?;
+    if plain_http && !is_loopback_host(&host) {
+        bail!("PLUGIN_MARKET_UNTRUSTED_HOST: {host} must be reached over https");
+    }
+    if PACKAGE_HOST_ALLOWLIST
+        .iter()
+        .any(|allowed| host_matches_allowlist_entry(&host, allowed))
+    {
+        return Ok(());
+    }
+    if let Ok((catalog_host, _)) = package_url_host(catalog_url) {
+        if host == catalog_host {
+            return Ok(());
+        }
+    }
+    bail!("PLUGIN_MARKET_UNTRUSTED_HOST: {host} is not an allowed package host")
+}
+
+/// Whether a package URL needs the network at all.
+///
+/// `file://` and bare local paths serve the built-in offline catalog and local
+/// development catalogs. They cannot reach another host, so the allowlist does
+/// not apply to them.
+fn is_local_package_url(url: &str) -> bool {
+    !url.starts_with("http://") && !url.starts_with("https://")
+}
+
 fn permission_diff(old: &[String], new: &[String]) -> Vec<String> {
     new.iter()
         .filter(|p| !old.iter().any(|o| o == *p))
@@ -2546,30 +2919,99 @@ fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {
 }
 
 fn download_url(url: &str) -> Result<Vec<u8>> {
+    download_url_guarded(url, None)
+}
+
+/// Unique scratch path for one guarded download.
+///
+/// curl writes the body to a file so stdout can carry only the effective URL;
+/// mixing them would corrupt a binary package.
+fn download_scratch_path() -> PathBuf {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let seq = COUNTER.fetch_add(1, AtomicOrdering::Relaxed);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    std::env::temp_dir().join(format!(
+        "pi-desktop-download-{}-{seq}-{nanos}.bin",
+        std::process::id()
+    ))
+}
+
+/// Fetch a URL, optionally holding every redirect hop inside the package host
+/// allowlist.
+///
+/// `package_guard` carries the catalog URL in effect when the download is a
+/// marketplace package. A GitHub release asset always redirects to a storage
+/// host, so the initial URL passing the allowlist is not sufficient on its
+/// own: redirects are restricted to HTTPS and the effective URL is re-checked
+/// under the same rule before the bytes are accepted.
+fn download_url_guarded(url: &str, package_guard: Option<&str>) -> Result<Vec<u8>> {
     if let Some(path) = url.strip_prefix("file://") {
         return fs::read(path).with_context(|| format!("read local url {path}"));
     }
 
     // Prefer curl for robust HTTPS support on developer and CI machines.
-    if let Ok(output) = std::process::Command::new("curl")
-        .args([
-            "--silent",
-            "--show-error",
-            "--location",
-            "--fail",
-            "--max-time",
-            "30",
-            "--user-agent",
-            "pi-desktop-host-core",
-            url,
-        ])
-        .output()
-    {
+    let scratch = package_guard.map(|_| download_scratch_path());
+    let max_filesize = MAX_PACKAGE_BYTES.to_string();
+    let mut args: Vec<String> = vec![
+        "--silent".into(),
+        "--show-error".into(),
+        "--location".into(),
+        "--fail".into(),
+        "--max-time".into(),
+        "30".into(),
+        "--max-redirs".into(),
+        "5".into(),
+        "--max-filesize".into(),
+        max_filesize,
+        "--user-agent".into(),
+        "pi-desktop-host-core".into(),
+    ];
+    if package_guard.is_some() && url.starts_with("https://") {
+        // Downgrading to plain HTTP mid-redirect would take the request off
+        // the host the allowlist approved.
+        args.push("--proto".into());
+        args.push("=https".into());
+        args.push("--proto-redir".into());
+        args.push("=https".into());
+    }
+    if let Some(scratch) = scratch.as_ref() {
+        args.push("--output".into());
+        args.push(scratch.to_string_lossy().into_owned());
+        args.push("--write-out".into());
+        args.push("%{url_effective}".into());
+    }
+    args.push(url.to_string());
+
+    let outcome = std::process::Command::new("curl").args(&args).output();
+    if let Ok(output) = outcome {
         if output.status.success() {
-            if output.stdout.len() as u64 > MAX_PACKAGE_BYTES {
+            let body = match scratch.as_ref() {
+                Some(scratch) => {
+                    let effective = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    let guard_result = match package_guard {
+                        Some(catalog_url) if !effective.is_empty() => {
+                            package_host_allowed(&effective, catalog_url)
+                        }
+                        _ => Ok(()),
+                    };
+                    let body = guard_result.and_then(|()| {
+                        fs::read(scratch).with_context(|| format!("read download {url}"))
+                    });
+                    let _ = fs::remove_file(scratch);
+                    body?
+                }
+                None => output.stdout,
+            };
+            if body.len() as u64 > MAX_PACKAGE_BYTES {
                 bail!("PLUGIN_INVALID: package exceeds 50MB limit");
             }
-            return Ok(output.stdout);
+            return Ok(body);
+        }
+        if let Some(scratch) = scratch.as_ref() {
+            let _ = fs::remove_file(scratch);
         }
         let err = String::from_utf8_lossy(&output.stderr);
         // Fall through to raw HTTP only for http:// URLs.
@@ -2765,6 +3207,7 @@ mod tests {
                         url: "old.piplug".into(),
                         size_bytes: 1,
                         permissions: vec!["ui.panel".into()],
+                        ..Default::default()
                     },
                     MarketVersion {
                         version: "0.5.1".into(),
@@ -2775,8 +3218,10 @@ mod tests {
                         url: "new.piplug".into(),
                         size_bytes: 1,
                         permissions: vec!["ui.panel".into(), "notify".into()],
+                        ..Default::default()
                     },
                 ],
+                ..Default::default()
             };
 
             let summary = mgr.to_market_summary(&entry);
@@ -2818,6 +3263,7 @@ mod tests {
                 url: String::new(),
                 size_bytes: 0,
                 permissions: catalog.plugins[0].versions[0].permissions.clone(),
+                ..Default::default()
             };
             catalog.plugins[0].versions.push(announced);
             fs::write(
@@ -2972,6 +3418,7 @@ mod tests {
     fn resolve_relative_package_urls_against_catalog() {
         let resolved = PluginManager::resolve_package_url(
             "https://raw.githubusercontent.com/vastsa/pi-desktop-plugins/main/catalog.json",
+            None,
             "packages/demo.hello-0.2.0.piplug",
         );
         assert_eq!(
@@ -3458,6 +3905,235 @@ mod tests {
 
         unsafe {
             std::env::remove_var("PI_DESKTOP_DATA_DIR");
+        }
+    }
+
+    /// Build a catalog v2 entry with one live and one withdrawn version.
+    fn v2_entry() -> MarketCatalogEntry {
+        MarketCatalogEntry {
+            id: "acme.todo".into(),
+            name: "Todo".into(),
+            description: "Publisher-owned plugin".into(),
+            author: "acme".into(),
+            publisher_id: Some("acme".into()),
+            trust: Some("verified".into()),
+            repository: Some("https://github.com/acme/pi-plugin-todo".into()),
+            versions: vec![
+                MarketVersion {
+                    version: "1.0.0".into(),
+                    published_at: "2026-08-01T00:00:00Z".into(),
+                    shasum: "a".repeat(64),
+                    url: "acme.todo@1.0.0/acme.todo-1.0.0.piplug".into(),
+                    size_bytes: 2048,
+                    permissions: vec!["ui.panel".into()],
+                    ..Default::default()
+                },
+                MarketVersion {
+                    version: "1.1.0".into(),
+                    published_at: "2026-08-10T00:00:00Z".into(),
+                    shasum: "b".repeat(64),
+                    url: "acme.todo@1.1.0/acme.todo-1.1.0.piplug".into(),
+                    size_bytes: 2048,
+                    permissions: vec!["ui.panel".into()],
+                    yanked: true,
+                    yanked_reason: Some("leaked a token in the bundle".into()),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        }
+    }
+
+    fn v2_catalog(entry: MarketCatalogEntry) -> MarketCatalogFile {
+        MarketCatalogFile {
+            schema_version: 2,
+            provider_id: "official".into(),
+            artifact_base_url: Some(
+                "https://github.com/vastsa/pi-plugin-center/releases/download".into(),
+            ),
+            plugins: vec![entry],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn package_downloads_are_restricted_to_distribution_hosts() {
+        let catalog = "https://raw.githubusercontent.com/vastsa/pi-plugin-center/main/catalog.json";
+        // GitHub release entry point and the storage hosts it redirects to.
+        for url in [
+            "https://github.com/vastsa/pi-plugin-center/releases/download/acme.todo@1.0.0/acme.todo-1.0.0.piplug",
+            "https://objects.githubusercontent.com/github-production-release-asset/1",
+            "https://release-assets.githubusercontent.com/github-production-release-asset/1",
+            "https://codeload.github.com/acme/pi-plugin-todo/zip/refs/tags/v1.0.0",
+            "https://cnb.cool/aixk/pi-plugin-center/-/releases/download/x.piplug",
+        ] {
+            package_host_allowed(url, catalog).unwrap_or_else(|e| panic!("{url}: {e}"));
+        }
+
+        // A publisher-supplied URL cannot send the request anywhere else, and a
+        // near-miss domain must not satisfy the suffix rule.
+        for url in [
+            "https://evil.test/acme.todo-1.0.0.piplug",
+            "https://notgithub.com/x.piplug",
+            "https://github.com.evil.test/x.piplug",
+            "https://cnb.cool.evil.test/x.piplug",
+        ] {
+            let err = package_host_allowed(url, catalog).unwrap_err().to_string();
+            assert!(err.contains("PLUGIN_MARKET_UNTRUSTED_HOST"), "{url}: {err}");
+        }
+    }
+
+    #[test]
+    fn a_private_catalog_is_trusted_only_for_its_own_host() {
+        let catalog = "https://plugins.company.local/catalog.json";
+        package_host_allowed("https://plugins.company.local/a.piplug", catalog).unwrap();
+        assert!(package_host_allowed("https://other.company.local/a.piplug", catalog).is_err());
+    }
+
+    #[test]
+    fn package_urls_reject_credentials_and_plain_http() {
+        let catalog = "https://raw.githubusercontent.com/vastsa/pi-plugin-center/main/catalog.json";
+        let err = package_host_allowed("https://user:pass@github.com/a.piplug", catalog)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("must not embed credentials"), "{err}");
+
+        assert!(package_host_allowed("http://github.com/a.piplug", catalog).is_err());
+        // A loopback development catalog stays usable.
+        package_host_allowed("http://127.0.0.1:8080/a.piplug", "http://127.0.0.1:8080/catalog.json")
+            .unwrap();
+    }
+
+    #[test]
+    fn relative_package_urls_resolve_against_the_declared_artifact_base() {
+        let catalog = "https://raw.githubusercontent.com/vastsa/pi-plugin-center/main/catalog.json";
+        // v2: the declared base wins, so a release asset is reachable even
+        // though it does not live under the catalog directory.
+        assert_eq!(
+            PluginManager::resolve_package_url(
+                catalog,
+                Some("https://github.com/vastsa/pi-plugin-center/releases/download"),
+                "acme.todo@1.0.0/acme.todo-1.0.0.piplug",
+            ),
+            "https://github.com/vastsa/pi-plugin-center/releases/download/acme.todo@1.0.0/acme.todo-1.0.0.piplug"
+        );
+        // v1: no declared base, so the catalog directory still anchors it.
+        assert_eq!(
+            PluginManager::resolve_package_url(catalog, None, "packages/x.piplug"),
+            "https://raw.githubusercontent.com/vastsa/pi-plugin-center/main/packages/x.piplug"
+        );
+        // An absolute URL is passed through for the host allowlist to judge.
+        assert_eq!(
+            PluginManager::resolve_package_url(catalog, Some("https://base.test/"), "https://cnb.cool/x.piplug"),
+            "https://cnb.cool/x.piplug"
+        );
+    }
+
+    #[test]
+    fn a_yanked_version_is_never_offered_or_installed() {
+        with_local_market(|| {
+            let dir = tempdir().unwrap();
+            let mgr = PluginManager::new(dir.path(), None);
+            let entry = v2_entry();
+
+            // 1.1.0 is newer but withdrawn, so the offered version is 1.0.0.
+            assert_eq!(
+                latest_market_version(&entry.versions).expect("live version").version,
+                "1.0.0"
+            );
+            let summary = mgr.to_market_summary(&entry);
+            assert_eq!(summary.latest_version, "1.0.0");
+
+            // An explicit pick of the withdrawn version is refused with its reason.
+            let catalog = v2_catalog(entry);
+            let err = mgr
+                .market_download_info_from_catalog(&catalog, "acme.todo", Some("1.1.0"))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("PLUGIN_MARKET_YANKED"), "{err}");
+            assert!(err.contains("leaked a token"), "{err}");
+
+            // The live version still resolves, carrying its source pin.
+            let info = mgr
+                .market_download_info_from_catalog(&catalog, "acme.todo", None)
+                .unwrap();
+            assert_eq!(info.version, "1.0.0");
+            assert_eq!(info.publisher_id.as_deref(), Some("acme"));
+        });
+    }
+
+    #[test]
+    fn a_version_requiring_a_newer_host_is_not_installable() {
+        with_local_market(|| {
+            let dir = tempdir().unwrap();
+            let mgr = PluginManager::new(dir.path(), None);
+            let mut entry = v2_entry();
+            entry.versions.retain(|v| !v.yanked);
+            entry.versions[0].min_pi_desktop = Some("999.0.0".into());
+
+            assert!(!mgr.to_market_summary(&entry).installable);
+            let catalog = v2_catalog(entry.clone());
+            let err = mgr
+                .market_download_info_from_catalog(&catalog, "acme.todo", None)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("PLUGIN_HOST_TOO_OLD"), "{err}");
+
+            // A range expression is not a version bound this host can evaluate,
+            // and an unreadable bound must not make a plugin uninstallable.
+            entry.versions[0].min_pi_desktop = Some(">=0.2.0".into());
+            assert!(mgr.to_market_summary(&entry).installable);
+        });
+    }
+
+    #[test]
+    fn a_package_url_off_the_allowlist_is_not_offered_for_install() {
+        with_local_market(|| {
+            let dir = tempdir().unwrap();
+            let mgr = PluginManager::new(dir.path(), None);
+            let mut entry = v2_entry();
+            entry.versions.retain(|v| !v.yanked);
+            entry.versions[0].url = "https://evil.test/acme.todo-1.0.0.piplug".into();
+            assert!(!mgr.to_market_summary(&entry).installable);
+        });
+    }
+
+    #[test]
+    fn verified_trust_is_honoured_only_from_the_official_source() {
+        let _guard = lock_market_env();
+        let dir = tempdir().unwrap();
+
+        // A catalog already on disk keeps manager construction offline.
+        let catalog_path = dir.path().join("plugins/market/catalog.json");
+        fs::create_dir_all(catalog_path.parent().unwrap()).unwrap();
+        fs::write(&catalog_path, serde_json::to_string(&built_in_catalog()).unwrap()).unwrap();
+
+        // Safety: test-only process env mutation, serialized by the market lock.
+        unsafe {
+            std::env::set_var("PI_DESKTOP_PLUGIN_MARKET_URL", OFFICIAL_MARKET_CATALOG_URL);
+        }
+        let official = PluginManager::new(dir.path(), None);
+        assert_eq!(official.resolve_trust(&v2_entry()), "verified");
+
+        // The same claim from a source the user pointed at themselves cannot
+        // promote itself past community.
+        unsafe {
+            std::env::set_var("PI_DESKTOP_PLUGIN_MARKET_URL", "https://plugins.company.local/catalog.json");
+        }
+        let custom = PluginManager::new(dir.path(), None);
+        assert_eq!(custom.resolve_trust(&v2_entry()), "community");
+
+        // An unrecognised tier is not trusted, and a v1 entry keeps its meaning.
+        let mut odd = v2_entry();
+        odd.trust = Some("platinum".into());
+        assert_eq!(custom.resolve_trust(&odd), "unknown");
+        let mut v1 = v2_entry();
+        v1.trust = None;
+        v1.verified = false;
+        assert_eq!(custom.resolve_trust(&v1), "community");
+
+        unsafe {
+            std::env::remove_var("PI_DESKTOP_PLUGIN_MARKET_URL");
         }
     }
 }

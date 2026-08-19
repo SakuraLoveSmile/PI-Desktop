@@ -147,9 +147,66 @@ test("marketplace blocks install for a version with no published package", () =>
 
   const hostSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins.rs"), "utf8");
   assert.match(hostSrc, /fn has_package_metadata\(version: &MarketVersion\) -> bool/);
-  assert.match(hostSrc, /installable: latest_version\.map\(has_package_metadata\)/);
+  // `installable` is the single answer every install affordance reads, so it
+  // has to cover every reason the host would refuse the download: no package
+  // yet, a host too old for the version, or a package URL off the allowlist.
+  assert.match(hostSrc, /installable: latest_version\s*\n\s*\.map\(\|version\| \{/);
+  assert.match(hostSrc, /has_package_metadata\(version\)\s*\n\s*&& host_supports_version\(version\)/);
+  assert.match(hostSrc, /package_host_allowed\(&version\.url, &catalog_url\)\.is_ok\(\)/);
   for (const catalog of [en, zhCN]) {
     assert.equal(typeof catalog.plugins.packagePending, "string");
     assert.equal(typeof catalog.plugins.packagePendingHint, "string");
   }
+});
+
+// Plugin source now lives in publisher repositories, so a package URL is no
+// longer guaranteed to sit under one repository the project controls. The
+// download boundary is what keeps a catalog entry from aiming a request
+// anywhere it likes.
+test("marketplace package downloads stay inside the host allowlist", () => {
+  const hostSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins.rs"), "utf8");
+  assert.match(
+    hostSrc,
+    /const PACKAGE_HOST_ALLOWLIST: &\[&str\] = &\["github\.com", "githubusercontent\.com", "cnb\.cool"\]/,
+  );
+  assert.match(hostSrc, /fn package_host_allowed\(package_url: &str, catalog_url: &str\) -> Result<\(\)>/);
+  // Refuse before the request leaves the machine, then hold the redirect
+  // chain to the same rule: a release asset always redirects.
+  assert.match(hostSrc, /package_host_allowed\(&info\.url, &catalog_url\)\?;/);
+  assert.match(hostSrc, /download_url_guarded\(&info\.url, Some\(&catalog_url\)\)/);
+  assert.match(hostSrc, /"--proto-redir"\.into\(\)/);
+  assert.match(hostSrc, /"%\{url_effective\}"\.into\(\)/);
+  assert.match(hostSrc, /must not embed credentials/);
+});
+
+// A withdrawn version is a distribution signal, not permission to disable
+// software somebody is relying on.
+test("a withdrawn version is never offered and never silently disabled", () => {
+  const hostSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins.rs"), "utf8");
+  assert.match(hostSrc, /\.filter\(\|version\| !version\.yanked\)/);
+  assert.match(hostSrc, /PLUGIN_MARKET_YANKED/);
+  assert.match(hostSrc, /PLUGIN_HOST_TOO_OLD/);
+  assert.match(hostSrc, /pub struct PluginYankNotice/);
+
+  assert.match(pageSrc, /function versionWithdrawn\(/);
+  assert.match(pageSrc, /const detailWithdrawn = versionWithdrawn\(activeVersion\)/);
+  assert.match(pageSrc, /t\("plugins\.withdrawnHint", \{ version: installTarget \}\)/);
+  for (const catalog of [en, zhCN]) {
+    assert.equal(typeof catalog.plugins.withdrawn, "string");
+    assert.equal(typeof catalog.plugins.withdrawnHint, "string");
+    assert.equal(typeof catalog.plugins.withdrawnReason, "string");
+  }
+});
+
+// The verified shield is a claim about a publisher, so it must come from the
+// center rather than from text a publisher can write.
+test("verified trust is not something a catalog entry can grant itself", () => {
+  const hostSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins.rs"), "utf8");
+  assert.match(hostSrc, /fn resolve_trust\(&self, entry: &MarketCatalogEntry\) -> String/);
+  assert.match(hostSrc, /"verified" if self\.is_official_market_source\(\) => "verified"/);
+  assert.match(hostSrc, /"verified" => "community"/);
+
+  assert.match(pageSrc, /function showsVerifiedBadge\(/);
+  assert.match(pageSrc, /\{showsVerifiedBadge\(item\) \?/);
+  assert.match(pageSrc, /\{showsVerifiedBadge\(detail\) \?/);
 });

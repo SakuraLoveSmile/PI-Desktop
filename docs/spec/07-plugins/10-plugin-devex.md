@@ -83,7 +83,20 @@ pnpm pi-plugin check .
 pnpm pi-plugin pack .
 
 # outputs dist/demo.hello-0.1.0.piplug
+
+# pack and pin the version to the commit that produced it
+pnpm pi-plugin publish .
+
+# also writes dist/demo.hello-0.1.0.submission.json
 ```
+
+`publish` is for distributing through the plugin center. It packs, then records
+the canonical repository URL, the tag or commit ref, the resolved commit, and
+the plugin subdirectory alongside the package checksum, so the artifact and the
+source it claims to come from describe one moment. It refuses a dirty worktree
+and a git remote carrying credentials, and warns when no tag points at HEAD.
+The center re-resolves everything itself; a submission is a claim to be checked.
+See [15-plugin-center.md](15-plugin-center.md).
 
 `check` reproduces every rule the installer enforces, so `check` passing implies
 install will pass. It reports errors — a missing or unparseable `manifest.json`,

@@ -14,6 +14,14 @@ export {
 } from "./check.js";
 export { pack, type PackOptions, type PackResult } from "./pack.js";
 export {
+  canonicalRepositoryUrl,
+  publish,
+  type PublishOptions,
+  type PublishResult,
+  type SubmissionPayload,
+  type SubmissionSource,
+} from "./publish.js";
+export {
   IGNORED_DIR_NAMES,
   MAX_PACKAGE_BYTES,
   MAX_PACKAGE_FILES,

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pi-plugin-center.dev/schema/submission.schema.json",
+  "title": "Plugin submission",
+  "description": "What a publisher sends to the center. Every field is a claim to be re-resolved against the forge, not a value to be trusted: the worker fetches the commit, tree, and archive itself and compares.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "pluginId", "version", "source", "artifact", "idempotencyKey"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "pluginId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9-]*$" },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "channel": { "enum": ["stable", "beta"], "default": "stable" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "ref", "path"],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^https://[^\\s?#@]+$",
+          "description": "Canonical HTTPS URL. No query, fragment, credentials, or non-forge host."
+        },
+        "ref": {
+          "type": "string",
+          "pattern": "^(?:refs/tags/[^\\s]+|[a-f0-9]{40})$",
+          "description": "A full commit SHA or refs/tags/<tag>. An annotated tag is resolved through to its commit."
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$",
+          "description": "What the ref resolved to locally. Compared against the forge, never used in its place."
+        },
+        "path": { "type": "string", "default": "." }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["publisher-release", "center-build"],
+          "description": "publisher-release verifies and re-hosts the publisher's own bytes; center-build ignores them and builds from the pin."
+        },
+        "fileName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._@-]*\\.piplug$" },
+        "assetUrl": { "type": "string", "pattern": "^https://" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sizeBytes": { "type": "integer", "minimum": 1, "maximum": 52428800 }
+      },
+      "allOf": [
+        {
+          "description": "A publisher-supplied artifact is only usable if its bytes can be identified before download.",
+          "if": { "properties": { "mode": { "const": "publisher-release" } } },
+          "then": { "required": ["sha256", "sizeBytes"] }
+        }
+      ]
+    },
+    "permissions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Declared for the permission diff. The packaged manifest is authoritative and overrides a disagreement."
+    },
+    "runtimeProfile": {
+      "enum": ["sandboxed-js", "sandboxed-panel", "declarative-mcp"],
+      "default": "sandboxed-js"
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 200,
+      "description": "Stable per (plugin, version, commit, artifact). A redelivered submission must not create a second release."
+    }
+  }
+}

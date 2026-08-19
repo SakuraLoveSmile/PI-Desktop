@@ -22,3 +22,4 @@ this directory define the normative contracts and implementation boundaries.
 | [12-plugin-ipc-and-host-services.md](12-plugin-ipc-and-host-services.md) | Host services & IPC |
 | [13-plugin-permissions-matrix.md](13-plugin-permissions-matrix.md) | Permissions matrix |
 | [14-plugin-roadmap.md](14-plugin-roadmap.md) | Plugin roadmap |
+| [15-plugin-center.md](15-plugin-center.md) | Plugin center (publishing side) |

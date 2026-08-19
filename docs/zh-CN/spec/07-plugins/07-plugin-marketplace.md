@@ -71,6 +71,12 @@
 - 自动更新策略+实施权限差异门控
 - 评级/强制签名仍在计划中
 
+### D 阶段（进行中）
+
+插件源码迁移到发布者自己的仓库，目录升级到 schema v2（ADR 0102）。客户端用
+同一条代码路径读取 v1 和 v2；v2 增加源码溯源、审查结论、撤回状态和显式声明的
+制品基址。发布侧见 [15-plugin-center.md](15-plugin-center.md)。
+
 ## 3. 市场提供商抽象
 
 ```ts
@@ -89,6 +95,76 @@ interface MarketProvider {
 - `local-mock`（开发）
 
 ## 4. 数据模型
+
+### 目录 schema v2
+
+没有 `schemaVersion` 的目录即 v1，含义不变。`schemaVersion: 2` 增加下列字段；
+它们全部可选，因此 v1 目录解析行为完全不变，而客户端把缺失字段当作"未声明"，
+不会当成默认放行。
+
+```jsonc
+{
+  "schemaVersion": 2,
+  "providerId": "official",
+  "catalogId": "pi-plugin-center",
+  "generatedAt": "2026-08-18T02:00:00Z",
+  "policyVersion": "2026.08.1",
+  // 相对包 URL 以此为基址解析，而不是目录文件所在目录。
+  // 镜像声明自己的基址，因此切换源不会跨提供方下载。
+  "artifactBaseUrl": "https://github.com/vastsa/pi-plugin-center/releases/download/",
+  "plugins": [
+    {
+      "id": "acme.todo",
+      "publisherId": "acme",
+      "trust": "verified | community | unknown",
+      "repository": "https://github.com/acme/pi-plugin-todo",
+      "versions": [
+        {
+          "version": "1.2.0",
+          "url": "acme.todo@1.2.0/acme.todo-1.2.0.piplug",
+          "shasum": "<sha256 hex>",
+          "sizeBytes": 40960,
+          "permissions": ["fs.read"],
+          "minPiDesktop": "0.8.0",
+          "yanked": false,
+          "yankedReason": null,
+          "provenance": {
+            "sourceRepository": "https://github.com/acme/pi-plugin-todo",
+            "sourceRef": "refs/tags/v1.2.0",
+            "sourceCommit": "<40 位 commit>",
+            "sourcePath": ".",
+            "builder": "pi-plugin-center-builder@1.0.0",
+            "builtAt": "2026-08-18T01:55:00Z"
+          },
+          "review": {
+            "decision": "approved",
+            "risk": "low",
+            "policyVersion": "2026.08.1",
+            "reviewedAt": "2026-08-18T01:58:00Z"
+          },
+          "signature": "<base64>",
+          "signatureAlg": "ed25519",
+          "keyId": "pi-center-2026"
+        }
+      ]
+    }
+  ]
+}
+```
+
+v2 的客户端规则：
+
+- 解析相对包 URL 时 `artifactBaseUrl` 优先于目录文件所在目录。绝对 URL 按原样
+  使用，但仍须通过下载域名白名单。
+- `trust` 仅用于展示，绝不从发布者提供的文本推导。客户端无法归因到已配置官方源
+  的取值一律显示为 `unknown`。见 [15-plugin-center.md](15-plugin-center.md) 第 11 节。
+- `yanked: true` 的版本从安装和更新选择中移除，但保留在版本历史里并附带原因；
+  已安装该版本的插件会被标记为需要注意。
+- `minPiDesktop` 高于当前应用版本时，在下载前就拒绝安装。
+- `provenance` 随已安装插件一起保存并在详情面板展示，因此可以追溯到具体仓库和
+  commit。
+- `signature` 校验规则见 [08-plugin-signing-updates.md](08-plugin-signing-updates.md)，
+  在插件中心签名阶段落地前保持可选。无法验证的签名绝不当作有效签名。
 
 ### MarketPluginSummary
 ```ts
@@ -174,6 +250,34 @@ browse/search
 
 任何验证失败时：中止并可选择清理缓存。
 
+### 下载域名白名单
+
+v1 目录把所有安装包都放在同一个仓库下，因此校验和是唯一需要的控制。目录 v2 的包
+URL 描述的是一个受发布者影响的 release，所以宿主还必须约束**请求发往哪里**，而不
+只是约束收到什么。
+
+在下载市场安装包之前，host-core 解析该 URL，并在不满足下列全部条件时拒绝：
+
+1. 协议是 `https`，本地开发目录可以是 `file://`。
+2. URL 不携带内嵌凭证。
+3. 主机在下表白名单中，或者就是当前生效目录的来源主机。
+
+| 主机 | 用途 |
+| --- | --- |
+| `github.com` | release 资产下载入口 |
+| `objects.githubusercontent.com` | GitHub 重定向 release 资产的去处 |
+| `release-assets.githubusercontent.com` | 当前的 release 资产源站 |
+| `raw.githubusercontent.com` | 目录文件与仓库内托管的安装包 |
+| `codeload.github.com` | 仓库归档下载 |
+| `cnb.cool` | 镜像目录与镜像资产 |
+
+重定向被限制为 HTTPS 并重新校验：跳转后的最终 URL 必须满足与初始 URL 相同的规则。
+自定义或企业目录只被信任其自身主机——把客户端指向一个私有目录，并不会为任意第三方
+主机放宽白名单。
+
+白名单之外的包 URL 在任何网络请求发出之前就以 `PLUGIN_MARKET_UNTRUSTED_HOST` 失败，
+错误信息会指出被拒绝的主机，便于运维区分配置错误的私有源和恶意目录条目。
+
 `.piplug` 软件包现在可以在本地生产：`pnpm pi-plugin pack <dir>`
 （同样，`PluginPack` 代理工具）写入 `dist/<id>-<version>.piplug` 和
 打印其 sha256，插件页面通过相同的方式安装该文件
@@ -258,6 +362,11 @@ Extensions
 UI 必须使信任级别可见。
 社区不得伪装成经过验证的。
 
+在目录 v2 下，级别由插件中心签发，而不是发布者自行声明。客户端把任何无法归因到
+已配置官方源的条目显示为 `unknown`，也绝不因为目录里这么写就提升级别。v1 目录的
+布尔 `verified` 仍按原义映射为 `verified` / `community`，因为 v1 目录只有市场
+维护者能写入。
+
 ## 9. 私人来源（面向企业）
 
 支持配置：
@@ -322,6 +431,8 @@ UI 必须使信任级别可见。
 
 ## 13. 官方市场存储库
 
+### 当前源（目录 v1）
+
 存储库：[vastsa/pi-desktop-plugins](https://github.com/vastsa/pi-desktop-plugins)
 
 ```text
@@ -339,6 +450,22 @@ scripts/rebuild_catalog.py
 3.`python3 scripts/rebuild_catalog.py`
 4. 提交 + 推送至 `main`
 5. PI-Desktop 通过 `market.refresh`/市场 UI 刷新
+
+该仓库把插件源码、安装包和目录放在一起。在插件中心的目录 v2 接管之前（ADR 0102
+迁移第 3 阶段），它仍是默认源；之后仍可作为自定义源选用。
+
+### 目标源（目录 v2）
+
+存储库：[vastsa/pi-plugin-center](https://github.com/vastsa/pi-plugin-center)
+
+插件源码位于发布者自己的仓库。插件中心保存固定的构建输入，把校验通过的 `.piplug`
+以 `<pluginId>@<version>` 标签转存为 release 资产，镜像到 CNB，并生成
+`catalog.json`。发布者提交的是仓库坐标，而不是源码。
+
+由于目录和制品都是 GitHub 与 CNB 上的静态文件，即使插件中心的 API 不可用，浏览、
+安装和更新依然可用。
+
+见 [15-plugin-center.md](15-plugin-center.md)。
 
 使用 env 覆盖目录 URL：
 

@@ -1,0 +1,107 @@
+name: Publish release artifact
+
+# Re-host a verified plugin package as a release asset of this repository.
+#
+# This is the step that replaces object storage. The publisher's own release is
+# where the bytes come from; this repository is where clients download from, so
+# a publisher deleting or replacing their release cannot change what an already
+# published version resolves to.
+on:
+  workflow_dispatch:
+    inputs:
+      pluginId:
+        description: "Plugin id, e.g. acme.todo"
+        required: true
+      version:
+        description: "Version being published, e.g. 1.0.0"
+        required: true
+      assetUrl:
+        description: "HTTPS URL of the publisher's .piplug release asset"
+        required: true
+      sha256:
+        description: "Expected SHA-256 of the package, as recorded in the registry"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  rehost:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Refuse a source host we do not accept
+        env:
+          ASSET_URL: ${{ inputs.assetUrl }}
+        run: |
+          node -e '
+            const url = new URL(process.env.ASSET_URL);
+            const allow = ["github.com", "githubusercontent.com", "cnb.cool"];
+            const ok = url.protocol === "https:"
+              && !url.username && !url.password
+              && allow.some((a) => url.hostname === a || url.hostname.endsWith("." + a));
+            if (!ok) {
+              console.error(`refusing asset host ${url.hostname}`);
+              process.exit(1);
+            }
+          '
+
+      - name: Download and verify the publisher artifact
+        env:
+          ASSET_URL: ${{ inputs.assetUrl }}
+          EXPECTED: ${{ inputs.sha256 }}
+          FILE: ${{ inputs.pluginId }}-${{ inputs.version }}.piplug
+        run: |
+          curl --silent --show-error --fail --location \
+            --proto '=https' --proto-redir '=https' --max-redirs 5 \
+            --max-filesize 52428800 --max-time 120 \
+            --output "$FILE" "$ASSET_URL"
+          ACTUAL="$(sha256sum "$FILE" | cut -d' ' -f1)"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::digest mismatch: expected $EXPECTED, got $ACTUAL"
+            exit 1
+          fi
+          sha256sum "$FILE" > "$FILE.sha256"
+          echo "verified $FILE ($ACTUAL)"
+
+      - name: Confirm the registry already records this exact artifact
+        # Publishing bytes the registry has not committed to would break the
+        # tamper-evidence chain: Git history is one of the three independent
+        # records that make a swapped asset detectable.
+        env:
+          PLUGIN_ID: ${{ inputs.pluginId }}
+          VERSION: ${{ inputs.version }}
+          EXPECTED: ${{ inputs.sha256 }}
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const entry = JSON.parse(fs.readFileSync(`registry/${process.env.PLUGIN_ID}.json`, "utf8"));
+            const release = (entry.releases ?? []).find((r) => r.version === process.env.VERSION);
+            if (!release) throw new Error(`registry has no ${process.env.PLUGIN_ID}@${process.env.VERSION}`);
+            if (release.yanked) throw new Error("refusing to publish a withdrawn release");
+            if (release.artifact.sha256 !== process.env.EXPECTED) {
+              throw new Error(`registry records ${release.artifact.sha256}, not ${process.env.EXPECTED}`);
+            }
+          '
+
+      - name: Create the immutable release
+        # One tag per published version, never moved and never reused. `--verify-tag`
+        # is not used because the tag is created here; re-running for an existing
+        # tag fails rather than replacing its assets.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.pluginId }}@${{ inputs.version }}
+          FILE: ${{ inputs.pluginId }}-${{ inputs.version }}.piplug
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::release $TAG already exists; a published version is never republished"
+            exit 1
+          fi
+          gh release create "$TAG" "$FILE" "$FILE.sha256" \
+            --title "$TAG" \
+            --notes "Package for ${{ inputs.pluginId }} ${{ inputs.version }}. sha256 ${{ inputs.sha256 }}. Source of truth: the publisher's repository."

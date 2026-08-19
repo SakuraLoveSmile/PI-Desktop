@@ -1,0 +1,41 @@
+name: Verify published artifacts
+
+# Scheduled tamper detection.
+#
+# GitHub release assets can be deleted and re-uploaded by a repository admin,
+# so "published" is not the same as "immutable". This job re-downloads every
+# live artifact and compares it against the digest the registry committed. A
+# mismatch is an incident, not a data-entry error: the fix is to yank the
+# version, never to update the recorded digest.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - id: verify
+        continue-on-error: true
+        run: node scripts/verify-artifact.mjs | tee /tmp/verify.log
+
+      - name: Open an incident when an artifact no longer matches
+        if: steps.verify.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "Artifact verification failed on $(date -u +%Y-%m-%d)" \
+            --label incident \
+            --body "$(printf 'A published artifact no longer matches the digest recorded in the registry and in Git history.\n\n```\n%s\n```\n\nDo not update the recorded digest. Yank the affected version and publish a new one.\n' "$(cat /tmp/verify.log)")"
+          exit 1
