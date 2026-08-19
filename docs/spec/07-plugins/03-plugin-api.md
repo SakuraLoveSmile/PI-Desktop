@@ -267,7 +267,7 @@ window.pluginBridge.on(event, handler)
 ```
 
 The same bridge serves both plugin surfaces: a detached `ui.panel` window and a
-`contributes.views` surface docked in the work panel (ADR 0103). The channel
+`contributes.views` surface docked in the work panel (ADR 0104). The channel
 list, the permission gate, and the preload are identical, so one HTML entry
 works in either placement. The only difference is chrome: a docked view has no
 window-control capsule and no drag band, and its

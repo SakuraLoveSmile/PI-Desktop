@@ -1,4 +1,4 @@
-# ADR 0103: Plugin-contributed work panel views
+# ADR 0104: Plugin-contributed work panel views
 
 - Status: Accepted
 - Date: 2026-08-19
@@ -7,7 +7,7 @@
   [ADR 0033](0033-internal-dock-work-panel.md) ·
   [ADR 0081](0081-host-owned-plugin-panel-chrome.md) ·
   [ADR 0092](0092-plugin-owned-panel-surface.md) ·
-  [ADR 0104](0104-builtin-work-panel-tools-as-bundled-plugins.md) ·
+  [ADR 0105](0105-files-as-a-bundled-plugin.md) ·
   [07-plugins](../spec/07-plugins/README.md) ·
   [04-ux/08-component-spec §5](../spec/04-ux/08-component-spec.md)
 

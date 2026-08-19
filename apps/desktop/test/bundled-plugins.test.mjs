@@ -53,11 +53,22 @@ test("the host no longer offers Files as a built-in tool", () => {
     panelSource.indexOf("] as const;", panelSource.indexOf("const HEADER_TOOLS = [")),
   );
   assert.doesNotMatch(tools, /kind: "file"/);
-  // Review and Terminal are still built in; this migration is sequenced.
+  // Review left the launcher too, in the other direction: it is an artifact
+  // panel, opened by the conversation's Write/Edit records rather than picked.
+  assert.doesNotMatch(tools, /kind: "review"/);
+  // Terminal stayed built in: a plugin PTY is arbitrary execution as the user.
+  assert.match(tools, /kind: "terminal"/);
   assert.match(tools, /kind: "browser"/);
-  // The `file` kind survives: a `file:<path>` tab is a transcript artifact
-  // (a file link or plan checkpoint), not an entry in the tool launcher.
+  // Both absent kinds still render: they are live tabs, just not launchable.
   assert.match(panelSource, /activeTab\?\.kind === "file"/);
+  assert.match(panelSource, /activeTab\?\.kind === "review"/);
+});
+
+test("Review still opens itself from workspace edit artifacts", () => {
+  // Removing the launcher entry must not remove the way Review appears at all.
+  const storeSource = read("src/stores/app-store.ts");
+  assert.match(storeSource, /shouldOpenReviewArtifact\(\{/);
+  assert.match(storeSource, /toolWorkPanelTab\("review"\)/);
 });
 
 test("bundled plugins are packaged and located at runtime", () => {

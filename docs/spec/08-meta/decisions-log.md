@@ -2061,7 +2061,7 @@ D193, and D194.
   `pi.review.*` and `pi.terminal.*` APIs; `terminal.pty` is classified critical
   because a PTY is arbitrary execution as the user, and it is accepted
   deliberately rather than sidestepped with private first-party privileges.
-- See ADR 0103, ADR 0104, `07-plugins/02-plugin-manifest-schema.md` §4/§5/§7,
+- See ADR 0104, ADR 0105, `07-plugins/02-plugin-manifest-schema.md` §4/§5/§7,
   `07-plugins/03-plugin-api.md` §6, `07-plugins/13-plugin-permissions-matrix.md`
   §2/§3, `04-ux/08-component-spec.md` §5, and E2E-152.
 ## 2026-08-18 — Compact context usage summary
@@ -2121,6 +2121,32 @@ D193, and D194.
   same guards as `glob` — declared scope, deny-list, protected paths, skipped
   heavy directories — because a listing is a read; directories are always
   returned so a narrow scope still yields a navigable tree.
-- See ADR 0104, `07-plugins/03-plugin-api.md` §3/§6,
+- See ADR 0105, `07-plugins/03-plugin-api.md` §3/§6,
   `07-plugins/13-plugin-permissions-matrix.md` §2,
   `04-ux/08-component-spec.md` §5, and E2E-153.
+
+## 2026-08-19 — The panel's built-in tools settle at Terminal and Browser
+
+- Decision D249 amends D247 / ADR 0105 and closes the migration it opened. Two
+  of the three planned moves are cancelled on their merits; Files stays
+  migrated.
+- **Terminal stays a host built-in.** Making it a plugin requires a
+  `terminal.pty` permission, and shipping that means any third-party plugin may
+  request arbitrary execution as the user. That is a wider trust boundary than
+  routing the terminal through the public channel buys back, and a
+  bundled-plugins-only PTY channel was rejected as the private back door D247
+  forbids. No such permission is introduced.
+- **Review stays host-owned and is reclassified as an artifact panel.** Its data
+  is message-owned by ADR 0043 — each successful workspace Write/Edit carries
+  its own bounded `details.review` record, held with the transcript — so
+  migrating it would move that ownership into the host purely to hand it back
+  over a bridge. Applying D248's tool-versus-artifact split instead puts Review
+  where it already behaved: created and re-created by Write/Edit artifacts, like
+  a `file:<path>` tab is created by a file link.
+- Review therefore leaves the tool launcher, because the launcher is for
+  surfaces a user picks, while remaining a live tab kind the host renders.
+  Closing it loses nothing: the per-change inline cards stay in the transcript.
+- `HEADER_TOOLS` is now Terminal and Browser. Files is a bundled plugin, Review
+  and `file:<path>` are artifact surfaces, and plugin-contributed views list
+  beside the tools.
+- See ADR 0105, `04-ux/08-component-spec.md` §5, and E2E-153.
