@@ -535,7 +535,7 @@ export const api = {
   listPluginServices: () => invoke<PluginServiceStatus[]>(IPC.invoke.pluginServices),
   /**
    * Work panel views, already filtered by permission, activation scope, and
-   * entry existence, with titles resolved for the active locale (ADR 0101).
+   * entry existence, with titles resolved for the active locale (ADR 0102).
    */
   listPluginViews: () => invoke<PluginViewMeta[]>(IPC.invoke.pluginViews),
   /** Create or reuse the view's web contents. Does not show it. */

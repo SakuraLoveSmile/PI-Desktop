@@ -14,7 +14,7 @@ import {
 } from "../shared/plugin-panel-chrome";
 
 /**
- * Plugin-contributed work panel views (ADR 0101).
+ * Plugin-contributed work panel views (ADR 0102).
  *
  * A view is the same isolated web page as a `ui.panel` window — sandboxed
  * preload, per-plugin persisted partition, `net.domains` egress allowlist — but

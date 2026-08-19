@@ -760,7 +760,7 @@
   background: var(--ds-bg-primary);
 }
 
-/* Work panel — plugin views (ADR 0101)
+/* Work panel — plugin views (ADR 0102)
 
    The page itself is a native WebContentsView composited above the renderer,
    so this is only the rect it is positioned against. It still paints a

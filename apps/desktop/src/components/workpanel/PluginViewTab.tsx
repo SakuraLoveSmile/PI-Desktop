@@ -6,7 +6,7 @@ import { IconPlug } from "../icons";
 import { WorkTabEmpty } from "./WorkTabEmpty";
 
 /**
- * A plugin-contributed work panel view (ADR 0101).
+ * A plugin-contributed work panel view (ADR 0102).
  *
  * The surface itself is a main-process `WebContentsView`, the same isolated
  * page a `ui.panel` window hosts; this component renders nothing into it. It
