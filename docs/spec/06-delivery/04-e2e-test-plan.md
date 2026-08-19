@@ -1925,44 +1925,36 @@ Each scenario is documented in this format:
 - **Milestone**: M5
 - **Status**: Unit-covered (`transcript-style.test.mjs`); full visual scenario Draft
 
-#### E2E-060d: Assistant meta chips, context inspector, and retry action
+#### E2E-060d: Assistant meta chips, compact context summary, and retry action
 
 - **Preconditions**: A completed assistant message includes modelId and token
   usage; another completed assistant message has content but no usage.
 - **Steps**: 1) Open the session. 2) Hover the completed assistant turn that has
   usage, confirm the panel stays closed, then click its Context inspector
-  trigger. 3) Inspect
-  the panel's remaining-token header, used percentage and meter, the
-  pi-ai-resolved model context-window size, exact input/output/cache/reasoning
-  breakdown, cache hit rate when cache-read metadata is reported, completed
-  generation tokens/s value, source badges, and each
-  unique tool type's aggregated call count and estimated argument/result token
-  allocation. 4)
-  Scroll the transcript until the trigger is close to the top, bottom, and
-  right viewport edges, and resize the window while the panel is open. 5) Move
-  the pointer away from the panel, then dismiss it by clicking the trigger
-  again, clicking outside it, and pressing Escape from the keyboard. 6) Click
-  Retry on that turn while idle. 7) Confirm a turn without usage still offers
-  Retry and omits the inspector.
+  trigger. 3) Inspect the compact remaining-token header, used/window counts,
+  unboxed turn/speed values, one inline provider-usage summary, and one
+  aggregate tool-usage summary. 4) Scroll the transcript until the trigger is
+  close to the top, bottom, and right viewport edges, and resize the window
+  while the panel is open. 5) Move the pointer away from the panel, then
+  dismiss it by clicking the trigger again, clicking outside it, and pressing
+  Escape from the keyboard. 6) Click Retry on that turn while idle. 7) Confirm
+  a turn without usage still offers Retry and omits the inspector.
 - **Expected**: Model badge and compact Context inspector appear under completed
   assistant answers when data exists; the trigger shows remaining capacity and
   low-space warning/error states, and click or keyboard activation toggles the
-  same complete token panel while pointer hover alone never opens or closes it.
-  An open panel survives the pointer leaving it and closes on a second trigger
+  same compact summary while pointer hover alone never opens or closes it. An
+  open panel survives the pointer leaving it and closes on a second trigger
   activation, an outside click, or Escape, which returns focus to the trigger.
-  The panel's exact provider and estimated tool
-  sources are visibly distinguished, and its cache hit rate uses cached prompt
-  tokens divided by all reported prompt tokens (cached plus uncached); when
-  cache-read metadata is absent, the rate is omitted rather than inferred. Its
-  context-window total matches the model metadata used by the agent runtime;
-  tool rows show each unique tool type in first-seen order, aggregate repeated
-  calls, include call counts and cumulative duration, and explicitly mark their
-  estimates. The generation
-  rate remains a completed-turn value and does not update during streaming;
-  Retry re-sends the nearest preceding user prompt and is disabled while a turn
-  is running; the portaled panel remains fully visible within the viewport,
-  never clipped by transcript scrolling, and follows the trigger after
-  scrolling or resize; Copy still excludes thinking text.
+  Provider values remain exact, tool values remain visibly approximate through
+  the `~` aggregate total, and no per-tool list, source badge, progress bar, or
+  explanatory estimate paragraph is rendered. The cache hit rate is omitted
+  when cache-read metadata is absent rather than inferred. The context-window
+  total matches the model metadata used by the agent runtime. Generation rate
+  remains a completed-turn value and does not update during streaming; Retry
+  re-sends the nearest preceding user prompt and is disabled while a turn is
+  running; the portaled panel remains fully visible within the viewport, never
+  clipped by transcript scrolling, and follows the trigger after scrolling or
+  resize; Copy still excludes thinking text.
 - **Specs linked**: `04-ux/08-component-spec.md`,
   `04-ux/10-workbuddy-benchmark-ux.md`, `03-runtime/01-ipc-protocol.md`
 - **Acceptance**: C (chat stream), Quality
@@ -4852,15 +4844,14 @@ This test plan spec is accepted when:
 - Click Retry and expect the existing retry path to resend the latest prompt.
 
 
-### US-UI-61 Assistant context inspector + retry (D103, D184)
+### US-UI-61 Assistant context summary + retry (D103, D184, D244)
 - Complete an assistant turn that reports usage.
 - Expect a model badge and compact Context inspector under the answer. The
   trigger shows the remaining context percentage; clicking it (or activating it
-  from the keyboard) shows
-  used/remaining/window tokens, exact input/output/cache/reasoning usage,
-  generation tokens/s, and each unique tool type's aggregated call count,
-  argument/result footprint, share, and duration. The panel labels provider
-  totals as reported and tool rows as estimates.
+  from the keyboard) shows used/remaining/window tokens, two unboxed turn/speed
+  values, one inline exact provider-usage summary, and one aggregate tool-usage
+  summary with types, calls, and approximate tokens. Per-tool rows, bars,
+  badges, and explanatory estimate copy are not shown.
 - Hovering the trigger changes nothing; the open panel closes on a second
   activation, an outside click, or Escape.
 - Move the trigger near each viewport edge and scroll or resize while the panel

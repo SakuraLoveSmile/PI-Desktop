@@ -118,3 +118,4 @@ Each ADR includes:
 | 0099 | Add titled visual clusters to the Settings directory | Accepted |
 | 0100 | Make builtin subagents inherit the parent permission mode | Accepted |
 | 0102 | Publisher-owned plugin source with a Git-hosted artifact store | Accepted for implementation (supersedes 0006) |
+| 0103 | Compact context usage summary | Accepted (amends 0047) |

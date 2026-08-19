@@ -237,17 +237,18 @@ test("message toolbars are icon-only with hover tooltips", () => {
   assert.match(transcriptSource, /withLabel/);
 });
 
-test("assistant context inspector and retry action are wired", () => {
+test("assistant context inspector keeps a compact summary and retry action wired", () => {
   assert.match(transcriptSource, /function MessageMeta/);
   assert.match(transcriptSource, /message-meta-chip/);
   assert.match(transcriptSource, /function ContextUsageInspector/);
   assert.match(transcriptSource, /className="context-inspector"/);
   assert.match(transcriptSource, /chat\.usageTools/);
   assert.match(transcriptSource, /aggregateToolTokenUsage/);
-  assert.match(transcriptSource, /chat\.usageToolCalls/);
-  assert.match(transcriptSource, /context-inspector-source-badge exact/);
-  assert.match(transcriptSource, /context-inspector-source-badge estimated/);
-  assert.match(transcriptSource, /context-inspector-tool-meta-main/);
+  assert.match(transcriptSource, /context-inspector-summary/);
+  assert.match(transcriptSource, /context-inspector-summary-row/);
+  assert.match(transcriptSource, /chat\.usageToolsSummary/);
+  assert.match(transcriptSource, /context-inspector-kpis/);
+  assert.match(transcriptSource, /context-inspector-window-percent/);
   assert.match(transcriptSource, /chat\.usageContextRemaining/);
   assert.match(transcriptSource, /chat\.usageThroughput/);
   assert.match(transcriptSource, /calculateCacheRate/);
@@ -264,9 +265,13 @@ test("assistant context inspector and retry action are wired", () => {
   assert.match(transcriptSource, /retryAssistantMessage/);
   assert.match(transcriptSource, /chat\.retry/);
   assert.match(stylesSource, /\.context-inspector-ring-progress/);
-  assert.match(stylesSource, /\.context-inspector-status-dot/);
-  assert.match(stylesSource, /\.context-inspector-source-badge\.estimated/);
-  assert.match(stylesSource, /\.context-inspector-tool-meta-main/);
+  assert.match(stylesSource, /\.context-inspector-summary/);
+  assert.match(stylesSource, /\.context-inspector-summary-values/);
+  assert.doesNotMatch(transcriptSource, /context-inspector-source-badge/);
+  assert.doesNotMatch(transcriptSource, /context-inspector-tool-meta/);
+  assert.doesNotMatch(stylesSource, /\.context-inspector-meter\s*\{/);
+  assert.doesNotMatch(stylesSource, /\.context-inspector-source-badge/);
+  assert.doesNotMatch(stylesSource, /\.context-inspector-tool-/);
   assert.match(
     stylesSource,
     /\.context-inspector-popover\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?z-index:\s*60;/,
