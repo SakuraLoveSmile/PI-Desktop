@@ -4398,9 +4398,11 @@ Each scenario is documented in this format:
      Open resources — it is an artifact surface, not a launcher entry.
   3. Open the Files view. Confirm the tree lists the project, expands
      directories lazily, and omits `node_modules`, `.git`, and `.env`.
-  4. Confirm the toolbar shows the project name and Refresh action. Expand a
-     directory with the mouse and keyboard; confirm rows expose expanded state,
-     folders appear before files, and a failed directory offers an inline Retry.
+  4. Confirm the toolbar shows the project name and Refresh action. Trigger
+     Refresh and confirm the button locks with a restrained spinner until the
+     root and expanded folders finish loading. Expand a directory with the mouse
+     and keyboard; confirm rows expose expanded state, folders appear before
+     files, and a failed directory offers an inline Retry.
   5. Click a text file. Confirm the focused viewer shows Back, the relative path,
      file size, line numbers, and bounded text; click the binary file and confirm
      it reports as binary rather than printing replacement characters. Switch the

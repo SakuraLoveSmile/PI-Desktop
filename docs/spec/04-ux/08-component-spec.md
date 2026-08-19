@@ -661,7 +661,9 @@ The bundled `pi.files` view keeps the former Files tool's focused browsing
 workflow while rendering entirely inside the plugin's isolated page:
 
 - The compact toolbar identifies the active project and offers one explicit
-  refresh action. The tree loads one directory at a time, keeps directories
+  refresh action. Refresh disables itself and shows the same restrained spinner
+  language used by the host while the root and expanded folders are reloaded.
+  The tree loads one directory at a time, keeps directories
   above files, preserves expanded folders, and shows file sizes without
   walking the whole workspace up front.
 - Directory rows use `role="treeitem"` with `aria-expanded`; Enter/Space opens
@@ -678,8 +680,10 @@ workflow while rendering entirely inside the plugin's isolated page:
   `workspace.get`, `fs.list`, and `fs.readText` bridge, so the richer surface
   does not add host-only capabilities. Text previews are capped at 5,000 lines;
   images are reported as unavailable rather than sending binary data through a
-  text-only channel. A long-lived view rechecks `workspace.get` so switching
-  projects cannot leave the previous project's tree visible.
+  text-only channel. The palette stays monochrome like the main app rather than
+  introducing a plugin-specific blue accent. A long-lived view rechecks
+  `workspace.get` so switching projects cannot leave the previous project's tree
+  visible.
 
 ### 5.3 States
 
