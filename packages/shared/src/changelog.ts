@@ -23,6 +23,18 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.9.1",
+    date: "2026-08-20",
+    highlights: [
+      "Make pinned project icons distinct so they are easier to recognize in the sidebar.",
+      "Keep subagent activity from remaining stuck on Running after it finishes.",
+      "Align plugin pages and panels more closely with the rest of the app chrome.",
+      "Reduce typing and send latency in the composer.",
+      "Make long transcripts scroll more smoothly and avoid a flash while switching sessions.",
+      "Restore the empty-home supporting line and bottom-aligned composer layout.",
+    ],
+  },
+  {
     version: "0.9.0",
     date: "2026-08-20",
     highlights: [
@@ -358,6 +370,18 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.9.1",
+    date: "2026-08-20",
+    highlights: [
+      "让置顶项目在侧边栏中使用不同图标，更容易识别。",
+      "修复子代理完成后活动状态仍卡在“运行中”的问题。",
+      "让插件页面和面板的界面风格更贴合应用其余部分。",
+      "降低输入框打字和发送消息时的延迟。",
+      "让长对话滚动更流畅，并避免切换会话时闪烁。",
+      "恢复空白首页的说明文字和底部对齐的输入框布局。",
+    ],
+  },
   {
     version: "0.9.0",
     date: "2026-08-20",
