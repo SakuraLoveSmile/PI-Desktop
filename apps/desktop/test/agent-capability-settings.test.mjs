@@ -53,8 +53,8 @@ test("skills and MCP use global/project columns with a selectable project", () =
 });
 
 test("capability lists keep a fixed height and render disabled rows", () => {
-  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?height:\s*430px/);
-  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?min-height:\s*430px/);
+  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?height:\s*412px/);
+  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?min-height:\s*412px/);
   assert.match(styles, /\.agent-capability-row\.is-off\s*\{[\s\S]*?opacity:/);
   assert.match(layout, /agent-capability-empty/);
 });

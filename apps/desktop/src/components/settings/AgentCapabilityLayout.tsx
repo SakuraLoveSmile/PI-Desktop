@@ -168,7 +168,10 @@ export function AgentCapabilityColumn({
   className?: string;
 }) {
   return (
-    <section className={cx("agent-capability-column", className)}>
+    <section
+      className={cx("agent-capability-column", scope && `is-${scope}`, className)}
+      data-scope={scope}
+    >
       <header className="agent-capability-column-head">
         <div className="agent-capability-column-title">
           <div className="agent-capability-column-title-line">
@@ -180,7 +183,7 @@ export function AgentCapabilityColumn({
             ) : null}
             <span className="agent-capability-column-label">{title}</span>
           </div>
-          <code>{path}</code>
+          <code title={path}>{path}</code>
         </div>
         <div className="agent-capability-column-actions">
           {action}

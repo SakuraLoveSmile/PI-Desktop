@@ -155,6 +155,28 @@ confirmation only: Ask and Accept edits prompt, while Auto may run a mutating
 Bash command without confirmation. The AI Defaults card must describe that both
 contract modes are intent boundaries, not strict read-only security profiles.
 
+### Agent capability destinations (Skills / MCP / Subagents)
+
+Skills, MCP servers, and user-owned Subagents remain three independent
+destinations under the Agent group. They share a capability-management visual
+system while preserving their different data ownership:
+
+- Skills and MCP render a responsive two-column layout for Global and Project
+  scope. Each scope is a single elevated surface with a clear scope marker,
+  resolved `.agents` path, item count, and actions in its header. Project scope
+  includes the selected-project picker; Subagents has no project picker because
+  it is global-only.
+- The list viewport has a fixed height so changing projects, toggling a row, or
+  showing an empty state does not make the page jump. Rows use a compact icon,
+  name, optional source/transport/status badges, description, and an always
+  visible enablement switch. MCP rows also keep Edit visible as an icon action.
+- The intro line calls out project-over-global precedence. Empty states are
+  centered inside the same surface and use the capability icon plus localized
+  next-step copy. Light and dark themes use the shared settings surface and
+  accent tokens; no capability page introduces a separate color system.
+- At narrow widths the two surfaces stack, and scope actions wrap below the
+  header without reducing the switch or edit hit targets.
+
 ### Instructions (`instructions` tab)
 - Edit the global instruction Markdown used by every PI-Desktop Agent session.
 - Show the resolved instruction-file path and save through the host-backed

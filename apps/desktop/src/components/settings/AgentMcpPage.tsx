@@ -85,7 +85,7 @@ function McpRow({
       <div className="agent-capability-row-actions">
         <button
           type="button"
-          className="plugins-icon-btn"
+          className="plugins-icon-btn agent-capability-edit"
           aria-label={t("settings.editMcpOf", { name })}
           title={t("settings.editMcp")}
           onClick={onEdit}

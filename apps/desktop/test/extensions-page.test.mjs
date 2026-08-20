@@ -140,7 +140,7 @@ test("Settings exposes three independent Agent capability destinations", () => {
 });
 
 test("capability columns keep a fixed-height empty-state viewport", () => {
-  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?height:\s*430px;[\s\S]*?min-height:\s*430px;/);
+  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?height:\s*412px;[\s\S]*?min-height:\s*412px;/);
   assert.match(styles, /\.agent-capability-empty\s*\{[\s\S]*?min-height:\s*100%;/);
   assert.match(settingsComponents.get("AgentCapabilityLayout.tsx"), /loading \? \(/);
 });
