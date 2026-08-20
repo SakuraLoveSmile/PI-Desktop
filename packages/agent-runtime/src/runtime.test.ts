@@ -301,8 +301,9 @@ describe("DesktopAgentRuntime configuration matching", () => {
       "prefer the Read, Grep, and Glob tools over shell",
     );
     expect(prompt).toContain("`outputMode`");
+    expect(prompt).toContain("always reports `totalLines`");
     expect(prompt).toContain(
-      "paginates any supported text file, however large",
+      "paginates any supported text file however large",
     );
     expect(prompt).toContain(
       "Read accepts only an existing regular text file, never a directory",
