@@ -1,13 +1,14 @@
 # ADR 0058: Extensions Page Density and Theme-Readable Button Surfaces
 
-- **Status:** Accepted
+- **Status:** Accepted (IA amended by ADR 0112)
 - **Date:** 2026-08-05
 - **Decision:** D196
 
 ## Context
 
-The Extensions destination grew from a two-tab plugin surface into four
-distinct surfaces: Installed, MCP, Skills, and Marketplace. The four-number
+The Extensions destination is a focused two-tab plugin surface: Installed and
+Marketplace. MCP, Skills, and Subagents are managed independently under
+Settings > Agent. The four-number
 overview band retained derived counts that were already represented by tab,
 group, and update states, consuming vertical space without adding a decision
 point. The shared button primitive also relied on gray-scale aliases and
@@ -17,8 +18,8 @@ too weak in dark mode.
 ## Decision
 
 1. Remove the numeric overview band and its four derived counters from the
-   Extensions page. Keep the four tabs, relevant tab counts, installed state
-   groups, and pending-update alert as the actionable information hierarchy.
+   Extensions page. Keep the two tabs, Installed and Marketplace, with relevant counts, installed
+   state groups, and pending-update alerts as the actionable hierarchy.
 2. Define shared primary and secondary buttons with semantic theme tokens:
    primary buttons use `--ds-accent` and `--ds-bg-primary`; secondary buttons
    use `--ds-bg-secondary`, `--ds-text-primary`, and `--ds-border-default`.

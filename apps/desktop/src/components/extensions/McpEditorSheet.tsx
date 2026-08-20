@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   GLOBAL_SCOPE,
   isLoopbackMcpUrl,
+  type AgentCapabilityLevel,
   resolveScope,
   type ActivationScope,
   type McpServerInput,
@@ -114,9 +115,14 @@ export function mcpIdFromLabel(label: string): string {
   return /^[a-z]/.test(cleaned) ? cleaned : "";
 }
 
-export function draftToInput(draft: McpDraft): McpServerInput {
+export function draftToInput(
+  draft: McpDraft,
+  context?: { level?: AgentCapabilityLevel; projectPath?: string },
+): McpServerInput {
   const base = {
     id: draft.id.trim(),
+    ...(context?.level ? { level: context.level } : {}),
+    ...(context?.projectPath ? { projectPath: context.projectPath } : {}),
     label: draft.label.trim() || draft.id.trim(),
     description: draft.description.trim() || undefined,
     enabled: draft.enabled,
@@ -137,6 +143,46 @@ export function draftToInput(draft: McpDraft): McpServerInput {
     args: splitArgs(draft.args),
     env: pairsToRecord(draft.env),
   };
+}
+
+function ManagementScope({
+  draft,
+  setDraft,
+  level,
+  projectName,
+}: {
+  draft: McpDraft;
+  setDraft: (next: McpDraft) => void;
+  level: AgentCapabilityLevel;
+  projectName?: string;
+}) {
+  const { t } = useTranslation();
+  const label =
+    level === "global"
+      ? t("settings.globalScope")
+      : t("settings.projectScope", { project: projectName || t("settings.currentProject") });
+  return (
+    <div className="agent-mcp-scope">
+      <div className="agent-mcp-scope-copy">
+        <span className="agent-mcp-scope-label">{label}</span>
+        <span className="agent-mcp-scope-hint">
+          {level === "global"
+            ? t("settings.globalScopeHint")
+            : t("settings.projectScopeHint")}
+        </span>
+      </div>
+      <button
+        type="button"
+        className={cx("settings-toggle", draft.enabled && "on")}
+        role="switch"
+        aria-checked={draft.enabled}
+        aria-label={t("settings.enableCapability", { name: draft.label || draft.id })}
+        onClick={() => setDraft({ ...draft, enabled: !draft.enabled })}
+      >
+        <span className="settings-toggle-thumb" />
+      </button>
+    </div>
+  );
 }
 
 /** Client-side mirror of host-core's rules, so the form can explain itself. */
@@ -173,6 +219,8 @@ export function McpEditorSheet({
   onClose,
   onSave,
   onTest,
+  managementLevel,
+  managementProjectName,
 }: {
   draft: McpDraft;
   setDraft: (next: McpDraft) => void;
@@ -186,6 +234,9 @@ export function McpEditorSheet({
   onClose: () => void;
   onSave: () => void;
   onTest: () => void;
+  /** When set, render the compact global/project scope instead of ScopeControl. */
+  managementLevel?: AgentCapabilityLevel;
+  managementProjectName?: string;
 }) {
   const { t } = useTranslation();
   const [idTouched, setIdTouched] = useState(!!editing);
@@ -257,7 +308,11 @@ export function McpEditorSheet({
             <h3 id="mcp-sheet-title" className="ext-sheet-title">
               {editing ? t("extensions.mcp.editTitle") : t("extensions.mcp.addTitle")}
             </h3>
-            <p className="ext-sheet-sub">{t("extensions.mcp.sheetSubtitle")}</p>
+            <p className="ext-sheet-sub">
+              {managementLevel === "project" && managementProjectName
+                ? t("settings.mcpProjectSubtitle", { project: managementProjectName })
+                : t("extensions.mcp.sheetSubtitle")}
+            </p>
           </div>
           <button
             type="button"
@@ -377,16 +432,29 @@ export function McpEditorSheet({
           </Field>
 
           <div className="ext-field-group">
-            <div className="ext-field-label">{t("extensions.scope.title")}</div>
-            <p className="ext-field-hint">{t("extensions.scope.sheetHint")}</p>
-            <ScopeControl
-              target={{ enabled: draft.enabled, scope: draft.scope }}
-              label={draft.label || draft.id || t("extensions.mcp.thisServer")}
-              projects={projects}
-              currentProjectPath={currentProjectPath}
-              onSetEnabled={(enabled) => set("enabled", enabled)}
-              onSetScope={(scope) => setDraft({ ...draft, scope, enabled: true })}
-            />
+            <div className="ext-field-label">
+              {managementLevel ? t("settings.scope") : t("extensions.scope.title")}
+            </div>
+            <p className="ext-field-hint">
+              {managementLevel ? t("settings.scopeHint") : t("extensions.scope.sheetHint")}
+            </p>
+            {managementLevel ? (
+              <ManagementScope
+                draft={draft}
+                setDraft={setDraft}
+                level={managementLevel}
+                projectName={managementProjectName}
+              />
+            ) : (
+              <ScopeControl
+                target={{ enabled: draft.enabled, scope: draft.scope }}
+                label={draft.label || draft.id || t("extensions.mcp.thisServer")}
+                projects={projects}
+                currentProjectPath={currentProjectPath}
+                onSetEnabled={(enabled) => set("enabled", enabled)}
+                onSetScope={(scope) => setDraft({ ...draft, scope, enabled: true })}
+              />
+            )}
           </div>
 
           {status && status.state !== "idle" ? (

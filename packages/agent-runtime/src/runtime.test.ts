@@ -4105,8 +4105,8 @@ describe("DesktopAgentRuntime subagents", () => {
     model: { providerId: "remote", modelId: "remote-model" },
     maxTurns: 4,
     prompt: "Review the change.",
-    source: "project",
-    filePath: "/work/.pi/agents/reviewer.md",
+    source: "user",
+    filePath: "/home/.agents/subagents/reviewer.md",
   };
 
   function taskTool(runtime: DesktopAgentRuntime) {

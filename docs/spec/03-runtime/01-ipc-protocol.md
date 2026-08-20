@@ -920,19 +920,24 @@ type PluginSummary = {
 
 ## 12a. User MCP server API (D193)
 
-Servers the user configured with no plugin around them. host-core owns the
-records (`<data>/mcp/servers.json`); Electron main owns the connections.
+User-owned MCP configuration is stored as one JSON file per id under
+`~/.agents/servers/<id>.json` or `<project>/.agents/servers/<id>.json`.
+Enablement is not written to those files; host-core stores it in the
+application-local `<data>/agent-capabilities/mcp.json` state file.
 
-- `mcp/list` → `{ servers: McpServerRecord[]; statuses: McpServerStatus[] }`
-- `mcp/upsert(server)` — the id decides create vs replace
-- `mcp/remove(id)`
-- `mcp/setEnabled(id, enabled)`
-- `mcp/setScope(id, scope)`
-- `mcp/test(id)` → `{ status }` — forces one handshake and keeps it
-- `mcp/import({ text })` → `{ imported, failed: [{ id, reason }] }`
+- `mcp.list({ level, projectPath? })` → `{ servers: McpServerRecord[]; statuses: McpServerStatus[] }`
+- `mcp.active({ projectPath? })` → the effective runtime list
+- `mcp.upsert(server)` — creates or replaces the file at the requested level
+- `mcp.remove({ id, level, projectPath? })`
+- `mcp.setEnabled({ id, enabled, level, projectPath? })`
+- `mcp.setScope` remains a compatibility-shaped call; the Settings page uses
+  the explicit capability level and local state instead
 
-`import` accepts a pasted `mcpServers` block; a malformed entry is reported in
-`failed`, never fatal for the rest of the paste.
+A project-level request without `projectPath` is invalid. `mcp.active` removes
+project records from the global set by id or case-insensitive label before it
+filters disabled records, so a disabled project record still shadows a global
+one. The desktop-only `mcp/test` IPC action forces one connection test and
+returns its status to the MCP editor.
 
 ```ts
 type McpServerStatus = {
@@ -950,67 +955,61 @@ bridge's `plugin_` namespace (D015).
 
 ## 12b. User skill API (D194)
 
-One Markdown document each, under `<data>/skills/<id>/SKILL.md`.
+User skills are Markdown documents scanned from `~/.agents/skills` and
+`<project>/.agents/skills`. Both direct Markdown files and the conventional
+`<skill>/SKILL.md` shape are accepted. Enablement is stored in
+`<data>/agent-capabilities/skills.json`, never in the document.
 
-- `skill/list` → `{ skills: UserSkillRecord[] }`
-- `skill/create(skill)`
-- `skill/import()` — native picker; `{ canceled: true }` when backed out
-- `skill/update(id, skill)`
-- `skill/read(id)` → `{ skill, body }` — the only call that returns the document
-- `skill/remove(id)`
-- `skill/setEnabled(id, enabled)`
-- `skill/setScope(id, scope)`
-- `skill/reveal(id)`
+- `skills.list({ level, projectPath? })` → `{ skills: UserSkillRecord[] }`
+- `skills.active({ projectPath? })` → the effective runtime list
+- `skills.create(skill)`
+- `skills.import({ path, level, projectPath? })` — one source file is physically
+  copied into the selected `.agents/skills` directory
+- `skills.update({ id, ...skill })`
+- `skills.read({ id, level?, projectPath? })` → `{ skill, body }`
+- `skills.remove({ id, level?, projectPath? })`
+- `skills.setEnabled({ id, enabled, level, projectPath? })`
 
-The body is not in `list`: only the description enters the prompt, and the
-document is fetched when the model invokes `Skill` (D174).
+The list contains frontmatter-derived `name` and `description`, not the body.
+Only the description enters the prompt, and the body is fetched when the model
+invokes `Skill` (D174). A missing file is removed from the list and its local
+state is pruned during the next scan.
 
 ## 12c. Subagent API (D202)
 
-One Markdown document each, under `<data>/agents/<id>.md`, where the id is the
-name the model passes to `Task`. Registry records mirror `UserSkillRecord` and
-add the frontmatter the editor owns: `tools`, `model`, `thinkingLevel`,
-`maxTurns`.
+User-owned subagents are global-only Markdown documents under
+`~/.agents/subagents/<id>.md`. There is no project-level subagent directory.
+Enablement is stored in `<data>/agent-capabilities/subagents.json` and is never
+written into the Markdown file.
 
-- `subagent/list` → `{ subagents: UserSubagentRecord[] }`
-- `subagent/create(subagent)` — a duplicate name fails with `SUBAGENT_INVALID`
-- `subagent/update(id, subagent)` — `model: ""` clears a pin, `maxTurns: 0`
-  clears the override
-- `subagent/read(id)` → `{ subagent, body }` — the only call that returns the
-  document
-- `subagent/remove(id)`
-- `subagent/setEnabled(id, enabled)`
-- `subagent/setScope(id, scope)`
-- `subagent/reveal({ id })` / `subagent/reveal({ path })`
-- `subagent/catalog()` → `{ subagents: SubagentDefinition[], diagnostics,
-  projectPath }`
+- `agents.list` → `{ subagents: UserSubagentRecord[] }`
+- `agents.active` → enabled global documents
+- `agents.create(subagent)` — duplicate names fail with `SUBAGENT_INVALID`
+- `agents.update(id, subagent)`
+- `agents.read(id)` → `{ subagent, body }`
+- `agents.remove(id)`
+- `agents.setEnabled(id, enabled)`
 
-`catalog` is the one channel that is not a registry call: Electron main runs the
-real loader for the active project, so the result is the merged effective
-catalog — project, then user registry, then builtin — and is what renders the
-read-only builtin/project rows and supplies the body for "copy as my
-definition". Merge and precedence are never re-implemented in the renderer.
+Electron's `subagent/list` IPC channel exposes the same global-only list to
+Settings > Agent > Subagents. The runtime catalog combines these global user
+documents with its builtins; it does not scan `.pi/agents` or any project
+capability directory.
 
-Every mutation emits `pluginChanged` with `reason: "subagent"`, which is the
-refresh signal the extensions page already listens to.
+## 12d. Capability level and local activation
 
-## 12d. Activation scope (D192)
-
-Every `setScope` call above takes the same shape, and `PluginSummary`,
-`McpServerRecord`, `UserSkillRecord` and `UserSubagentRecord` all carry it
-beside `enabled`:
+Skills and MCP management calls use:
 
 ```ts
-type ActivationScope = {
- mode: "global" | "projects"
- /** Absolute paths; read only in "projects" mode, kept across mode changes. */
- projects: string[]
+type AgentCapabilityQuery = {
+ level: "global" | "project"
+ projectPath?: string
 }
 ```
 
-Matching is case-insensitive, trailing-separator-insensitive, and includes
-subdirectories of a scoped path. A missing scope means global. A `projects`-mode
-extension is inactive in a session with no project.
+Global records default to enabled and may have a per-project override. Project
+records have state for their owning project. The host prunes state for deleted
+files while scanning; deleting a global file removes all of its project
+overrides. These records are independent from plugin `ActivationScope`.
 
 ## 13. Command Palette API
 

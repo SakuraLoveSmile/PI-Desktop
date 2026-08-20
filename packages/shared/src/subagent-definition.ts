@@ -17,10 +17,10 @@
 import { THINKING_LEVELS, type ThinkingLevel } from "./types.js";
 
 /**
- * Where a definition came from. Later sources shadow earlier ones by name:
- * a project document beats the user's own, which beats a builtin (D202).
+ * Where a definition came from. User-owned global documents shadow builtins by
+ * name; project workspaces do not provide subagent definitions (D202).
  */
-export type SubagentSource = "builtin" | "user" | "project";
+export type SubagentSource = "builtin" | "user";
 
 /** Provider/model pin declared by a definition (resolved in Electron main). */
 export type SubagentModelPin = {
@@ -51,7 +51,7 @@ export type SubagentDefinition = {
   /** Markdown body used as the delegate's system prompt. */
   prompt: string;
   source: SubagentSource;
-  /** Absolute path of the document, for project definitions. */
+  /** Absolute path of a user-owned global document. */
   filePath?: string;
 };
 
@@ -105,13 +105,7 @@ export function isSubagentPermission(value: unknown): value is SubagentPermissio
   );
 }
 
-/**
- * Sources whose documents may declare a `permission` scope. Builtins ship with
- * the app and user documents live in the user's own config directory, so both
- * express a choice the user already made. Project documents arrive with the
- * repository — cloning a repo must not hand it a permission upgrade — so their
- * delegates always resolve under the session's effective mode (ADR 0089).
- */
+/** Builtins and global user documents may declare a permission scope. */
 export const PERMISSION_DECLARING_SOURCES: ReadonlySet<SubagentSource> = new Set(
   ["builtin", "user"] as const,
 );
@@ -312,17 +306,8 @@ export function parseSubagentDefinition(
       );
     } else if (
       candidate !== DEFAULT_SUBAGENT_PERMISSION &&
-      !PERMISSION_DECLARING_SOURCES.has(options.source)
+      PERMISSION_DECLARING_SOURCES.has(options.source)
     ) {
-      // A project definition arrives with the repository, so honoring its
-      // declared scope would let cloned code grant itself `auto` and write
-      // without a prompt. Project definitions always run under the session's
-      // effective mode; a user who wants the scope copies the document into
-      // their own agents directory, where declaring it is their own choice.
-      warnings.push(
-        `ignoring permission "${declaredPermission}": project definitions run under the session's permission mode`,
-      );
-    } else if (candidate !== DEFAULT_SUBAGENT_PERMISSION) {
       permission = candidate;
     }
   }
@@ -405,11 +390,10 @@ function parseMaxTurns(
 /**
  * Merge discovered definitions into the list the runtime offers.
  *
- * Precedence is project > user registry > builtin, so a committed document wins
- * over a definition the user keeps for themselves, and both retune a builtin
- * without renaming it. The result is capped: past `MAX_SUBAGENT_DEFINITIONS` the
- * catalog stops being a menu the model can reason about, and every extra entry
- * costs prompt tokens on every turn.
+ * Precedence is user registry > builtin, so a global document retunes a
+ * builtin without renaming it. The result is capped: past
+ * `MAX_SUBAGENT_DEFINITIONS` the catalog stops being a menu the model can
+ * reason about, and every extra entry costs prompt tokens on every turn.
  */
 export function mergeSubagentDefinitions(
   definitions: readonly SubagentDefinition[],
@@ -417,7 +401,6 @@ export function mergeSubagentDefinitions(
   const byName = new Map<string, SubagentDefinition>();
   // Highest-precedence source first, so the first entry for a name wins it.
   const ordered = [
-    ...definitions.filter((d) => d.source === "project"),
     ...definitions.filter((d) => d.source === "user"),
     ...definitions.filter((d) => d.source === "builtin"),
   ];

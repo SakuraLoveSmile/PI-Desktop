@@ -1,4 +1,5 @@
 mod activation;
+mod agent_capabilities;
 mod artifacts;
 mod audit;
 mod db;
@@ -63,8 +64,6 @@ async fn main() -> anyhow::Result<()> {
     std::fs::create_dir_all(data_dir.join("plugins/data"))?;
     std::fs::create_dir_all(data_dir.join("plugins/market"))?;
     std::fs::create_dir_all(data_dir.join("plugins/cache/download"))?;
-    std::fs::create_dir_all(data_dir.join("mcp"))?;
-    std::fs::create_dir_all(data_dir.join("skills"))?;
     std::fs::create_dir_all(data_dir.join("cache"))?;
     std::fs::create_dir_all(data_dir.join("scratch"))?;
 

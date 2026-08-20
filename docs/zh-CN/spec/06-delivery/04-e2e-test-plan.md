@@ -1040,7 +1040,7 @@ M5。
 - **先决条件**：应用程序运行时至少有一个已安装的扩展程序和一个
   可用的市场行动；提供深色和浅色主题。
 - **步骤**：1）在深色主题中打开扩展。 2) 确认标题并
-  已安装/MCP/技能/子代理/市场选项卡到达内容
+  仅有“已安装”和“市场”两个选项卡，且两者都能到达内容
   没有四卡数字概览带。 3) 确认安装行开始
   作为安静的两行摘要，然后展开一行上的详细信息并检查其
   功能、服务状态和权限。 4) 使用紧凑范围
@@ -3358,10 +3358,10 @@ IPC 请求无法关闭。
 
 #### E2E-119：并行子代理在不进入父级上下文的情况下报告
 
-- **先决条件**：项目绑定的 Agent 会话，其工作区包含
-  `.pi/agents/scout.md`（只读，无 `tools` 键）、`.pi/agents/fixer.md`
-  (`tools: Read, Edit`)、`.pi/agents/pinned.md` (`model:` 命名第二个
-  配置的提供程序）和 `.pi/agents/broken.md`（缺少 `name`）；提供商
+- **先决条件**：项目绑定的 Agent 会话，其用户主目录包含
+  `~/.agents/subagents/scout.md`（只读，无 `tools` 键）、`~/.agents/subagents/fixer.md`
+  (`tools: Read, Edit`)、`~/.agents/subagents/pinned.md` (`model:` 命名第二个
+  配置的提供程序）和 `~/.agents/subagents/broken.md`（缺少 `name`）；提供商
   可以驱动其流在一条辅助消息中发出两个 `Task` 调用；
   权限模式 `ask`，因此代表的 `Edit` 被门控；读取访问权限
   `<data_dir>/sessions/<id>.jsonl` 和 `messages` 索引。
@@ -3423,7 +3423,7 @@ IPC 请求无法关闭。
 - **状态**：由单元测试覆盖（2026-08-06）：`packages/shared`
   `subagent-definition.test.ts` 和 `packages/agent-runtime`
   `subagent-definitions.test.ts`（frontmatter、工具过滤、上限、格式错误
-  文档、项目阴影内置）； `subagent.test.ts`（报告边界，转
+  文档、全局用户覆盖内置）； `subagent.test.ts`（报告边界，转
   上限、中止、事件归因、提示框架）和 `path-lock.test.ts`
   （同路径排序、并发上限）；桌面 `permission-inline.test.mjs`
   （队列顺序、ID 匹配删除、工具调用删除、中止拒绝队列、
@@ -3733,53 +3733,43 @@ IPC 请求无法关闭。
   （`composer-file-reference-display.test.mjs`，`transcript-style.test.mjs`）；
   完整的 UI 旅程草案（除非明确要求，否则不要在本地运行 E2E）
 
-#### E2E-103：在 UI 中编写的子代理到达任务、范围和影子
+#### E2E-103：设置 > 智能体管理文件能力
 
-- **先决条件**：应用程序正在运行，并注册了两个项目 A 和 B，
-  以及每个中可用的 Agent 会话。这两个项目都没有
-  `.pi/agents/` 目录。记录应用程序数据目录。
+- **先决条件**：应用注册了项目 A、B，并且两者都有 Agent 会话。固定装置只使用
+  `~/.agents/skills`、`~/.agents/servers`、`~/.agents/subagents` 和两个项目的
+  `.agents` 目录；不存在 `.pi` 能力目录。
 - **步骤**：
-  1. 扩展 → 子代理 → 新建。将其命名为 `log-reader`，编写描述并
-     主体，授予 `Read, Grep, Bash`，然后保存。确认该行显示
-     `Task(log-reader)` 处理并将 `Bash` 着色为突变授权。
-  2. 在项目 A 的会话中（无需重新启动应用程序），要求客服人员
-     委托给 `log-reader` 并确认 `Task` 接受该名称。
-3. 将行的范围设置为仅项目 B。开始新的项目 A 并
-     确认 `Task` 不再提供 `log-reader` 并且该行报告它不是
-     在这里活跃；在项目 B 中重复并确认该项目已提供。
-  4. 将范围恢复为全局。在只读列表中，将 `explorer` 复制为您的
-     自己定义，保存不变，并确认出现注册表副本
-     而 `explorer` 不再作为内置项出现 — 副本就是 `Task`
-     会跑。重命名副本并确认两个条目均已列出。
-  5. 使用不同的描述写入 `<project A>/.pi/agents/log-reader.md`。
-     重新打开选项卡并确认注册表行将项目文档报告为
-     获胜者，并且只读列表显示项目定义。
-  6.从注册表中删除`log-reader`并确认`<data>/agents/`不再存在
-     在项目文档仍在加载时保留其文档。
+  1. 打开设置 > 智能体，确认技能、MCP、子代理是三个独立导航页面。打开扩展页，
+     确认只存在“已安装”和“市场”两个选项卡。
+  2. 打开技能页，确认全局栏显示 `~/.agents/skills`，项目栏显示项目 A 的
+     `.agents/skills`，两栏高度相同，并且项目选择器能切换项目。
+  3. 在选中项目 A 时关闭一个全局技能。确认行降低透明度、toast 指出技能名称，
+     且全局文档没有改变。切换到项目 B，确认全局技能在那里仍启用。
+  4. 在项目 A 放入同名项目技能并将其关闭。确认有效运行时目录不会回退到全局技能；
+     先遮蔽项目记录，再过滤关闭状态。
+  5. 使用项目栏“导入”选择一个 Markdown 文件。确认文件物理复制到
+     `<project A>/.agents/skills`，立即出现在列表中，并且同一次选择不能选择第二个文件。
+  6. 打开 MCP，新增项目服务器和全局服务器，编辑项目服务器并测试已有连接。确认
+     编辑时 ID 锁定，同级 ID 或 label 重复被拦截，连接成功/失败同时反映在行和 toast。
+  7. 在应用外删除技能或 MCP 文件，重新加载页面，确认行消失且本地状态没有孤儿项；
+     删除全局文件还会删除它的项目覆盖。
+  8. 打开子代理，确认它是以 `~/.agents/subagents` 为根的单个全局栏，没有项目选择器
+     或项目级控制。
 - **预期**：
-  - 创建、编辑、确定范围和删除定义绝不会写入
-    项目；除了文件之外，两个项目中的 `git status` 都保持干净
-    在步骤 5 中手写。
-  - 保存的编辑将在下一个提示时生效，无需重新启动，因为
-    每次启动都会重新读取目录。
-  - 使用 `SUBAGENT_INVALID` 拒绝重复的名称，而不是默默地拒绝
-    后缀，并且注册表不能超过 16 个定义。
-  - 内置和项目行不提供启用开关和范围控制；他们的
-    唯一的操作是显示（仅限项目）和复制。
-  - 优先级是项目 > 用户注册表 > 内置的所有报告。
-- **链接规格**：`03-runtime/01-ipc-protocol.md` §12c–§12d，
-`03-runtime/02-agent-runtime.md` §5f、`04-ux/01-ui-ia.md` §3.5、
-  `08-meta/decisions-log.md`（D192、D201、D202）、ADR 0062、ADR 0063
-- **接受**：E（工具和权限）、F（持久性）、质量
-- **里程碑**：M6
-- **状态**：部分自动化（`scripts/e2e-subagents.mjs` — 注册表
-  real host-core RPC，则其文件通过真实加载器：scope
-  双向过滤，16 个上限，项目 > 用户 > 内置优先级，以及
-  格式错误的文档降级为诊断）加上单元覆盖范围（host-core
-  `user_subagents` 测试、`packages/agent-runtime` 子代理定义测试、
-  `apps/desktop/test/extensions-page.test.mjs`，
-  `apps/desktop/test/subagent-wiring.test.mjs`); `Task` 的 UI 之旅
-  保持草稿状态（除非明确请求，否则不要在本地运行 E2E）
+  - 三个设置页面不使用 tabs 切换能力，空态和有数据状态保持同一列表高度，支持明暗
+    主题，并在说明文字中体现项目优先于全局。
+  - 能力文件只包含配置/frontmatter；启用状态存于应用本地 `agent-capabilities` 文件。
+  - 项目项即使关闭也会按 ID 或名称遮蔽全局项，下一次运行时激活与界面一致。
+  - 物理导入只复制一个文件且遵循级别，磁盘删除由扫描移除，不显示待清理行。
+- **关联规范**：`03-runtime/01-ipc-protocol.md` §12a–§12d、
+  `03-runtime/02-agent-runtime.md` §5f、`04-ux/01-ui-ia.md` §3.5–§3.6、
+  `07-plugins/01-plugin-system.md` §12.2–§12.3、
+  `08-meta/decisions-log.md`（D193、D194、D202）、ADR 0112
+- **验收**：D（工作区）、E（工具和权限）、F（持久性）、质量
+- **里程碑**：M6+
+- **状态**：由 `apps/desktop/test/agent-capability-settings.test.mjs`、
+  `apps/desktop/test/extensions-page.test.mjs` 和 host-core 能力测试覆盖源码/单元；
+  原生选择器、渲染模态框、项目切换和运行时完整旅程仍为 Draft（除非明确要求，不在本地运行 E2E）
 
 #### E2E-120：全局插件启动、下一回合编辑和停止吞吐量
 
@@ -5047,7 +5037,7 @@ IPC 请求无法关闭。
 
 - **先决条件**：一个绑定项目、权限模式可以在 `ask`、`accept-edits` 和 `auto`
   之间切换的 Agent 会话，其提供方的流可以被驱动；四个内置子代理（`explorer`、
-  `code-reviewer`、`test-runner`、`fixer`）以及一个项目级 `.pi/agents/readonly.md`
+  `code-reviewer`、`test-runner`、`fixer`）以及一个全局 `~/.agents/subagents/readonly.md`
   定义。内置定义使用默认的 `permission: inherit` 行为。
 - **步骤**：
   1. 提示一轮，其中助手在一条消息里发出两次 `Task` 调用 —— 一个 `explorer`
@@ -5070,7 +5060,7 @@ IPC 请求无法关闭。
      工具错误失败，并且 `TaskStop` 会释放一个名额，使第十一个委托得以启动。
   7. 重新加载会话；确认委托卡片、它的节点和 `TaskWait` 行都持久化并折叠重
      绘，并且 `TaskWait` 能按 id 重读已结算委托的报告而不重新运行它。
-  8. 把 `.pi/agents/readonly.md` 改成声明 `permission: auto` 并重新加载目录；
+  8. 把 `~/.agents/subagents/readonly.md` 改成声明 `permission: auto` 并重新加载目录；
      确认该定义仍然加载但带着一条警告，且它的委托仍在会话的有效模式下裁决
      （工作区内的 `Write` 依旧弹出权限卡片）。
 - **预期**：`Task` 立即带着 `delegationId` 返回，父级继续工作；`TaskWait`

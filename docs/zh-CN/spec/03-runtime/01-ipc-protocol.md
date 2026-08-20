@@ -889,19 +889,22 @@ type PluginSummary = {
 
 ## 12a。用户 MCP 服务器 API (D193)
 
-用户配置的服务器周围没有插件。 host-core 拥有
-记录（`<data>/mcp/servers.json`）； Electron 主要拥有连接。
+用户拥有的 MCP 配置按 ID 写入以下目录中的单个 JSON 文件：
+`~/.agents/servers/<id>.json` 或 `<project>/.agents/servers/<id>.json`。
+启用状态不写入这些文件，而是存放在应用本地的
+`<data>/agent-capabilities/mcp.json`。
 
-- `mcp/list` → `{ servers: McpServerRecord[]; statuses: McpServerStatus[] }`
-- `mcp/upsert(server)` — id 决定创建还是替换
-- `mcp/remove(id)`
-- `mcp/setEnabled(id, enabled)`
-- `mcp/setScope(id, scope)`
-- `mcp/test(id)` → `{ status }` — 强制一次握手并保留
-- `mcp/import({ text })` → `{ imported, failed: [{ id, reason }] }`
+- `mcp.list({ level, projectPath? })` → `{ servers: McpServerRecord[]; statuses: McpServerStatus[] }`
+- `mcp.active({ projectPath? })` → 当前项目的有效运行时列表
+- `mcp.upsert(server)` — 在请求的级别创建或替换文件
+- `mcp.remove({ id, level, projectPath? })`
+- `mcp.setEnabled({ id, enabled, level, projectPath? })`
+- `mcp.setScope` 保留为兼容形状；设置页改用显式能力级别和本地状态
 
-`import` 接受粘贴的 `mcpServers` 块；报告了格式错误的条目
-`failed`，对于粘贴的其余部分来说永远不会致命。
+项目级请求缺少 `projectPath` 时无效。`mcp.active` 会先按 ID 或不区分大小写
+的 label 让项目记录遮蔽全局记录，再过滤关闭项；因此关闭的项目记录仍然会
+遮蔽全局项。仅桌面的 `mcp/test` IPC 操作用于强制连接测试，并把状态返回
+MCP 编辑器。
 
 ```ts
 type McpServerStatus = {
@@ -914,72 +917,61 @@ type McpServerStatus = {
 }
 ```
 
-工具以 `mcp_<serverId>_<toolName>` 的形式到达代理，与插件分离
-桥的 `plugin_` 命名空间 (D015)。
+工具以 `mcp_<serverId>_<toolName>` 的形式到达代理，与插件桥的
+`plugin_` 命名空间分离 (D015)。
 
 ## 12b。用户技能 API (D194)
 
-每个 Markdown 文档位于 `<data>/skills/<id>/SKILL.md` 下。
+用户技能是从 `~/.agents/skills` 和 `<project>/.agents/skills` 扫描的 Markdown
+文档，同时接受直接 Markdown 文件和约定的 `<skill>/SKILL.md` 形状。启用状态
+位于 `<data>/agent-capabilities/skills.json`，绝不写回技能文档。
 
-- `skill/list` → `{ skills: UserSkillRecord[] }`
-- `skill/create(skill)`
-- `skill/import()` — 原生选择器；退出时的 `{ canceled: true }`
-- `skill/update(id, skill)`
-- `skill/read(id)` → `{ skill, body }` — 返回文档的唯一调用
-- `skill/remove(id)`
-- `skill/setEnabled(id, enabled)`
-- `skill/setScope(id, scope)`
-- `skill/reveal(id)`
+- `skills.list({ level, projectPath? })` → `{ skills: UserSkillRecord[] }`
+- `skills.active({ projectPath? })` → 当前项目的有效运行时列表
+- `skills.create(skill)`
+- `skills.import({ path, level, projectPath? })` — 将一个源文件物理复制到选定的
+  `.agents/skills` 目录
+- `skills.update({ id, ...skill })`
+- `skills.read({ id, level?, projectPath? })` → `{ skill, body }`
+- `skills.remove({ id, level?, projectPath? })`
+- `skills.setEnabled({ id, enabled, level, projectPath? })`
 
-正文不在 `list` 中：只有描述进入提示，并且
-当模型调用 `Skill` (D174) 时，会获取文档。
+列表包含由 frontmatter 得出的 `name` 和 `description`，不包含正文。只有描述
+进入提示，模型调用 `Skill` 时才读取正文 (D174)。缺失文件会在下一次扫描时
+从列表移除，并清理其本地状态。
 
 ## 12c。子代理 API (D202)
 
-每个 Markdown 文档位于 `<data>/agents/<id>.md` 下，其中 id 是
-模型的名称传递给 `Task`。注册表记录镜像 `UserSkillRecord` 和
-添加编辑器拥有的 frontmatter：`tools`、`model`、`thinkingLevel`，
-`maxTurns`。
+用户拥有的子代理仅是全局 Markdown 文档：`~/.agents/subagents/<id>.md`。
+没有项目级子代理目录。启用状态写在
+`<data>/agent-capabilities/subagents.json`，绝不写入 Markdown 文件。
 
-- `subagent/list` → `{ subagents: UserSubagentRecord[] }`
-- `subagent/create(subagent)` — 重复名称失败并显示 `SUBAGENT_INVALID`
-- `subagent/update(id, subagent)` — `model: ""` 清除引脚，`maxTurns: 0`
-  清除覆盖
-- `subagent/read(id)` → `{ subagent, body }` — 唯一返回
-  文件
-- `subagent/remove(id)`
-- `subagent/setEnabled(id, enabled)`
-- `subagent/setScope(id, scope)`
-- `subagent/reveal({ id })` / `subagent/reveal({ path })`
-- `subagent/catalog()` → `{ 子代理：SubagentDefinition[]，诊断，
-  项目路径 }`
+- `agents.list` → `{ subagents: UserSubagentRecord[] }`
+- `agents.active` → 已启用的全局文档
+- `agents.create(subagent)` — 重名返回 `SUBAGENT_INVALID`
+- `agents.update(id, subagent)`
+- `agents.read(id)` → `{ subagent, body }`
+- `agents.remove(id)`
+- `agents.setEnabled(id, enabled)`
 
-`catalog` 是一个不是注册表调用的通道： Electron main 运行
-活动项目的真实加载程序，因此结果是合并后的有效结果
-目录——项目，然后是用户注册表，然后是内置的——这就是呈现的内容
-只读 builtin/project 行并提供“复制为我的”的正文
-定义”。合并和优先级永远不会在渲染器中重新实现。
+Electron 的 `subagent/list` IPC 通道向设置 > 智能体 > 子代理暴露同一份全局
+列表。运行时目录把这些全局用户文档与内置定义合并；不会扫描 `.pi/agents`
+或任何项目能力目录。
 
-每个突变都会发出 `pluginChanged` 和 `reason: "subagent"`，这是
-扩展页面已经监听的刷新信号。
+## 12d。能力级别与本地启用状态
 
-## 12 天。激活范围（D192）
-
-上面的每个 `setScope` 调用都采用相同的形状，并且 `PluginSummary`，
-`McpServerRecord`、`UserSkillRecord` 和 `UserSubagentRecord` 都带有它
-`enabled` 旁边：
+技能和 MCP 管理调用使用：
 
 ```ts
-type ActivationScope = {
- mode: "global" | "projects"
- /** Absolute paths; read only in "projects" mode, kept across mode changes. */
- projects: string[]
+type AgentCapabilityQuery = {
+ level: "global" | "project"
+ projectPath?: string
 }
 ```
 
-匹配不区分大小写，不区分尾随分隔符，并且包括
-作用域路径的子目录。缺少范围意味着全局。 `projects` 模式
-扩展在没有项目的会话中处于非活动状态。
+全局项默认启用，并可在当前项目保存覆盖状态；项目项使用其所属项目的状态。
+扫描时会清理已删除文件的本地状态；删除全局文件会一并删除它的所有项目覆盖。
+这些记录独立于插件的 `ActivationScope`。
 
 ## 13. 命令面板 API
 

@@ -14,8 +14,8 @@ const hostSessionsSource = await readFile(
   new URL("../../../crates/host-core/src/sessions.rs", import.meta.url),
   "utf8",
 );
-const sectionSource = await readFile(
-  new URL("../src/components/extensions/SubagentsSection.tsx", import.meta.url),
+const pageSource = await readFile(
+  new URL("../src/components/settings/AgentSubagentsPage.tsx", import.meta.url),
   "utf8",
 );
 const hostProcessSource = await readFile(
@@ -83,7 +83,7 @@ test("a dead host transport degrades quietly instead of warning", () => {
   ]) {
     const start = mainSource.indexOf(`async function ${fn}(`);
     assert.notEqual(start, -1, fn);
-    const body = mainSource.slice(start, start + 700);
+    const body = mainSource.slice(start, start + 1800);
     assert.match(body, /if \(!host\?\.isAvailable\(\)\) return \[\];/, fn);
     // The guard only stops calls that have not started; one already in flight at
     // dispose is rejected too, so the catch has to classify it as well.
@@ -107,9 +107,9 @@ test("a dead host transport degrades quietly instead of warning", () => {
   assert.match(hostProcessSource, /errorCode: ErrorCodes\.HOST_UNAVAILABLE,/);
 });
 
-test("the subagents panel recovers when the host comes back", () => {
-  assert.match(sectionSource, /api\.onHostStatus\(\(status\) => \{\n\s+if \(status\.ok\) void load\(\);/);
+test("the subagents page recovers when the host comes back", () => {
+  assert.match(pageSource, /api\.onHostStatus\(\(status\) => \{\n\s+if \(status\.ok\) void load\(\);/);
   // Both subscriptions have to be released, so the effect returns a composed
   // cleanup rather than a single unsubscribe.
-  assert.match(sectionSource, /offPluginChanged\(\);\n\s+offHostStatus\(\);/);
+  assert.match(pageSource, /offPluginChanged\(\);\n\s+offHostStatus\(\);/);
 });

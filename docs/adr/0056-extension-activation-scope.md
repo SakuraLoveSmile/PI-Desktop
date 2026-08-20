@@ -1,6 +1,6 @@
 # ADR 0056: User-owned MCP servers and skills, with a shared activation scope
 
-- Status: Accepted
+- Status: Accepted (capability storage and UI portions superseded by ADR 0112)
 - Date: 2026-08-05
 
 ## Context
@@ -83,10 +83,11 @@ window's** project.
 
 ### 3. User MCP servers are a host-core registry, not plugins
 
-`crates/host-core/src/mcp_servers.rs` owns `McpServerRecord` values in
-`<data>/mcp/servers.json` — the same record shape ADR 0038 already defined for
-plugin-declared servers, minus the plugin. RPC: `mcp.list`, `mcp.active`,
-`mcp.upsert`, `mcp.remove`, `mcp.setEnabled`, `mcp.setScope`.
+`crates/host-core/src/mcp_servers.rs` owns one `McpServerRecord` JSON file
+under `~/.agents/servers` or `<project>/.agents/servers`, minus the plugin.
+Activation state is app-local under `<data>/agent-capabilities/mcp.json`.
+The level-aware RPCs are `mcp.list`, `mcp.active`, `mcp.upsert`, `mcp.remove`,
+and `mcp.setEnabled`; legacy scope-shaped inputs are compatibility fields.
 
 Electron main owns the processes and sockets in `UserMcpRuntime`, reusing
 `McpServerClient` from the plugin bridge rather than a second client:
@@ -126,10 +127,12 @@ paste with one bad entry should not be all-or-nothing.
 
 ### 5. User skills are one Markdown document each
 
-`crates/host-core/src/user_skills.rs` stores `<data>/skills/<id>/SKILL.md` with
-a `registry.json` index. RPC: `skills.list`, `skills.active`, `skills.create`,
-`skills.import`, `skills.update`, `skills.read`, `skills.remove`,
-`skills.setEnabled`, `skills.setScope`.
+`crates/host-core/src/user_skills.rs` scans Markdown documents under
+`~/.agents/skills` or `<project>/.agents/skills`. Activation state is app-local
+under `<data>/agent-capabilities/skills.json`; no registry or enabled field is
+written into a skill document. RPC: `skills.list`, `skills.active`,
+`skills.create`, `skills.import`, `skills.update`, `skills.read`,
+`skills.remove`, and `skills.setEnabled`.
 
 The delivery contract is D174's unchanged: the description is what enters the
 prompt, the body is fetched only when the model invokes `Skill`, and a document
@@ -147,9 +150,9 @@ namespaces stay separable with no registry lookup.
   a sheet. Neither involves a manifest, a package, or a signature.
 - Plugin `enabled` semantics are unchanged for anything that never sets a
   scope, so no migration is needed: an absent scope reads as global.
-- The Extensions page grows from two tabs to four (`installed`, `mcp`,
-  `skills`, `market`). Merging the new kinds into the installed list was
-  rejected — see below.
+- Extensions remains a two-tab (`installed`, `market`) plugin surface.
+  Capability management is now three independent Settings > Agent pages;
+  merging the new kinds into the installed list is still rejected.
 - A project-scoped extension contributes nothing to a session with no
   workspace. That is intended, and the scope control says so, but it is a
   behaviour a user can be surprised by once.
@@ -173,14 +176,13 @@ round trip through off, and every consumer would then have to remember that
 `projects` is meaningful in a mode named `off`. A separate boolean says the same
 thing without the trap.
 
-### One merged "Extensions" list across all four kinds
+### One merged "Extensions" list across all capability kinds
 
 Rejected. Plugins are installed, MCP servers are configured, skills are
-written. Their rows need genuinely different affordances — a connection light
-and a Test button, a byte counter and a body editor, a permissions matrix and an
-update lane — and a single list would have to hide all of that behind a
-lowest-common-denominator row. Four tabs sharing one scope control is the honest
-version of the commonality that does exist.
+written, and subagents are global prompt documents. Their rows need genuinely
+different affordances. Extensions therefore remains focused on installed
+plugins and the marketplace, while Settings > Agent owns three independent
+capability pages.
 
 ### Filter only the catalog, not dispatch
 

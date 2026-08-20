@@ -1,27 +1,19 @@
 use crate::activation::ActivationScope;
+use crate::agent_capabilities::{
+    capability_dir, file_timestamp, normalize_project_path, parse_front_matter, slugify,
+    sorted_files, CapabilityLevel, CapabilityState,
+};
 use anyhow::{bail, Context, Result};
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Skill documents the user owns.
-///
-/// Plugin skills (ADR 0039) proved the catalog-plus-`Skill`-tool path works; the
-/// gap was that writing one meant authoring a plugin. A user skill is the same
-/// document with no plugin around it: stored under `<data>/skills/<id>/SKILL.md`,
-/// listed in the same prompt section, and loaded through the same tool. Because
-/// it is the user's own text rather than third-party code, it needs no
-/// permission grant — only an activation scope deciding where it applies.
-const MAX_SKILLS: usize = 64;
-/// Matches the plugin skill body cap so a first-party and a third-party skill
-/// document have the same ceiling (D174).
+const MAX_SKILLS: usize = 128;
 pub const MAX_SKILL_BYTES: usize = 128 * 1024;
 const MAX_NAME_CHARS: usize = 120;
 const MAX_DESCRIPTION_CHARS: usize = 400;
-/// Files copied when importing a skill directory alongside its document.
-const MAX_IMPORT_FILES: usize = 64;
-const SKILL_FILE: &str = "SKILL.md";
+const SKILL_KIND: &str = "skills";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -29,13 +21,15 @@ pub struct UserSkillRecord {
     pub id: String,
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub enabled: bool,
     #[serde(default)]
     pub scope: ActivationScope,
-    /// `created` wrote a template; `imported` copied an existing document.
     pub source: String,
-    /// Absolute path of the document, so the UI can open or reveal it.
     pub path: String,
     #[serde(default)]
     pub size_bytes: u64,
@@ -46,42 +40,29 @@ pub struct UserSkillRecord {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UserSkillInput {
-    /// Omitted on create: the slug is derived from the name.
     pub id: Option<String>,
     pub name: Option<String>,
+    pub level: Option<String>,
+    pub project_path: Option<String>,
     pub description: Option<String>,
     pub body: Option<String>,
     pub enabled: Option<bool>,
+    /// Kept for protocol compatibility. Capability pages use directory level
+    /// instead of writing activation scope into a skill document.
+    #[allow(dead_code)]
     pub scope: Option<ActivationScope>,
 }
 
 pub struct UserSkillRegistry {
-    data_dir: PathBuf,
-    skills: Vec<UserSkillRecord>,
+    state: CapabilityState,
 }
 
-/// Slugify a name into a directory-safe id. The id is what the model types into
-/// the `Skill` tool, so it stays lowercase and hyphenated.
-pub fn slugify(value: &str) -> String {
-    let mut slug = String::new();
-    let mut last_dash = false;
-    for ch in value.trim().to_lowercase().chars() {
-        if ch.is_ascii_alphanumeric() {
-            slug.push(ch);
-            last_dash = false;
-        } else if !slug.is_empty() && !last_dash {
-            slug.push('-');
-            last_dash = true;
-        }
+fn clip(value: &str, max_chars: usize) -> String {
+    let trimmed = value.trim();
+    if trimmed.chars().count() <= max_chars {
+        return trimmed.to_string();
     }
-    while slug.ends_with('-') {
-        slug.pop();
-    }
-    slug.truncate(64);
-    while slug.ends_with('-') {
-        slug.pop();
-    }
-    slug
+    trimmed.chars().take(max_chars).collect()
 }
 
 fn valid_id(id: &str) -> bool {
@@ -93,54 +74,14 @@ fn valid_id(id: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
-/// Split the optional `---` front matter off a skill document. Mirrors
-/// `parseSkillFrontmatter` in the plugin SDK, which reads the same files in
-/// Electron main.
-fn parse_front_matter(raw: &str) -> (Option<String>, Option<String>, String) {
-    let text = raw.trim_start_matches('\u{feff}');
-    let Some(rest) = text.strip_prefix("---") else {
-        return (None, None, text.trim().to_string());
-    };
-    let rest = match rest.split_once('\n') {
-        Some((head, tail)) if head.trim().is_empty() => tail,
-        _ => return (None, None, text.trim().to_string()),
-    };
-    let mut name = None;
-    let mut description = None;
-    let mut consumed = 0usize;
-    let mut closed = false;
-    for line in rest.split_inclusive('\n') {
-        consumed += line.len();
-        let trimmed = line.trim_end_matches(['\n', '\r']).trim_end();
-        if trimmed.trim() == "---" {
-            closed = true;
-            break;
-        }
-        let Some((key, value)) = trimmed.split_once(':') else {
-            continue;
-        };
-        let value = value.trim().trim_matches('"').trim_matches('\'').trim();
-        if value.is_empty() {
-            continue;
-        }
-        match key.trim().to_lowercase().as_str() {
-            "name" => name = Some(value.to_string()),
-            "description" => description = Some(value.to_string()),
-            _ => {}
-        }
-    }
-    if !closed {
-        return (None, None, text.trim().to_string());
-    }
-    (name, description, rest[consumed..].trim().to_string())
-}
-
-/// Serialize a skill document: front matter the parser round-trips, then body.
 fn render_document(name: &str, description: Option<&str>, body: &str) -> String {
     let mut out = String::from("---\n");
     out.push_str(&format!("name: {}\n", name.replace('\n', " ")));
-    if let Some(description) = description.filter(|d| !d.trim().is_empty()) {
-        out.push_str(&format!("description: {}\n", description.replace('\n', " ")));
+    if let Some(description) = description.filter(|value| !value.trim().is_empty()) {
+        out.push_str(&format!(
+            "description: {}\n",
+            description.replace('\n', " ")
+        ));
     }
     out.push_str("---\n\n");
     out.push_str(body.trim());
@@ -149,302 +90,323 @@ fn render_document(name: &str, description: Option<&str>, body: &str) -> String 
 }
 
 fn default_body(name: &str) -> String {
-    format!(
-        "# {name}\n\nDescribe the steps the agent should follow when this skill applies.\n\n\
-         ## When to use\n\n- \n\n## Steps\n\n1. \n"
-    )
+    format!("# {name}\n\nDescribe the steps the agent should follow when this skill applies.\n")
 }
 
-fn clip(value: &str, max_chars: usize) -> String {
-    let trimmed = value.trim();
-    if trimmed.chars().count() <= max_chars {
-        return trimmed.to_string();
+fn level_and_project(input: &UserSkillInput) -> Result<(CapabilityLevel, Option<String>)> {
+    let level = CapabilityLevel::parse(input.level.as_deref())?;
+    let project_path = input
+        .project_path
+        .as_deref()
+        .map(normalize_project_path)
+        .filter(|value| !value.is_empty());
+    if level == CapabilityLevel::Project && project_path.is_none() {
+        bail!("CAPABILITY_INVALID: projectPath is required for project skills");
     }
-    trimmed.chars().take(max_chars).collect()
+    if level == CapabilityLevel::Global && project_path.is_some() {
+        // A project path on a global request is meaningful only for its local
+        // enabled override; the file still belongs to the global directory.
+        return Ok((level, project_path));
+    }
+    Ok((level, project_path))
+}
+
+fn merge_active_records(
+    global: Vec<UserSkillRecord>,
+    project: Vec<UserSkillRecord>,
+) -> Vec<UserSkillRecord> {
+    let mut result = global;
+    for record in project {
+        result.retain(|existing| {
+            existing.id != record.id && !existing.name.eq_ignore_ascii_case(&record.name)
+        });
+        if record.enabled {
+            result.push(record);
+        }
+    }
+    result.retain(|record| record.enabled);
+    result.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    result
 }
 
 impl UserSkillRegistry {
     pub fn new(data_dir: &Path) -> Self {
-        let mut registry = Self {
-            data_dir: data_dir.to_path_buf(),
-            skills: Vec::new(),
+        Self {
+            state: CapabilityState::new(data_dir, SKILL_KIND),
+        }
+    }
+
+    fn scan_level(
+        &mut self,
+        level: CapabilityLevel,
+        project_path: Option<&str>,
+        effective_project: Option<&str>,
+    ) -> Result<Vec<UserSkillRecord>> {
+        let directory = capability_dir(level, project_path, "skills")?;
+        let mut paths = sorted_files(&directory, "md");
+        // Support the conventional `<skill>/SKILL.md` shape without making a
+        // directory import necessary. Direct markdown files remain the shape
+        // produced by the single-file importer.
+        if let Ok(entries) = fs::read_dir(&directory) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let skill_file = path.join("SKILL.md");
+                    if skill_file.is_file() {
+                        paths.push(skill_file);
+                    }
+                }
+            }
+        }
+        paths.sort();
+
+        let owner_project_path = if level == CapabilityLevel::Project {
+            project_path.map(normalize_project_path)
+        } else {
+            None
         };
-        let _ = registry.reload_from_disk();
-        registry
-    }
-
-    fn registry_path(&self) -> PathBuf {
-        self.data_dir.join("skills/registry.json")
-    }
-
-    fn skill_dir(&self, id: &str) -> PathBuf {
-        self.data_dir.join("skills").join(id)
-    }
-
-    pub fn reload_from_disk(&mut self) -> Result<()> {
-        let path = self.registry_path();
-        if !path.exists() {
-            self.skills.clear();
-            return Ok(());
+        let mut records = Vec::new();
+        let mut seen = HashSet::new();
+        for path in paths {
+            let raw = match fs::read_to_string(&path) {
+                Ok(raw) if raw.len() <= MAX_SKILL_BYTES => raw,
+                _ => continue,
+            };
+            let (front, body) = parse_front_matter(&raw);
+            if body.trim().is_empty() {
+                continue;
+            }
+            let fallback = path
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .unwrap_or("skill");
+            let name = clip(
+                front.get("name").map(String::as_str).unwrap_or(fallback),
+                MAX_NAME_CHARS,
+            );
+            if name.is_empty() {
+                continue;
+            }
+            let id = slugify(&name, 64);
+            if !valid_id(&id) || !seen.insert(id.clone()) {
+                continue;
+            }
+            let scope = scope_for(level, owner_project_path.as_deref());
+            let enabled = self
+                .state
+                .enabled(SKILL_KIND, level, &id, effective_project);
+            let description = front
+                .get("description")
+                .map(|value| clip(value, MAX_DESCRIPTION_CHARS))
+                .filter(|value| !value.is_empty());
+            let updated_at = file_timestamp(&path);
+            records.push(UserSkillRecord {
+                id,
+                name,
+                level: Some(level.as_str().to_string()),
+                project_path: owner_project_path.clone(),
+                description,
+                enabled,
+                scope,
+                source: "imported".into(),
+                path: path.to_string_lossy().to_string(),
+                size_bytes: raw.len() as u64,
+                created_at: updated_at.clone(),
+                updated_at,
+            });
         }
-        let raw = fs::read_to_string(path)?;
-        self.skills = serde_json::from_str(&raw).unwrap_or_default();
-        Ok(())
-    }
-
-    fn save(&self) -> Result<()> {
-        let path = self.registry_path();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(path, serde_json::to_string_pretty(&self.skills)?)?;
-        Ok(())
-    }
-
-    pub fn list(&self) -> Vec<UserSkillRecord> {
-        let mut skills = self.skills.clone();
-        skills.sort_by(|a, b| {
+        let ids = records.iter().map(|record| record.id.clone()).collect();
+        self.state.prune(SKILL_KIND, level, project_path, &ids)?;
+        records.sort_by(|a, b| {
             a.name
                 .to_lowercase()
                 .cmp(&b.name.to_lowercase())
                 .then(a.id.cmp(&b.id))
         });
-        skills
+        Ok(records)
     }
 
-    pub fn get(&self, id: &str) -> Option<UserSkillRecord> {
-        self.skills.iter().find(|s| s.id == id).cloned()
+    pub fn list(
+        &mut self,
+        level: CapabilityLevel,
+        project_path: Option<&str>,
+    ) -> Result<Vec<UserSkillRecord>> {
+        let selected = project_path.map(normalize_project_path);
+        self.scan_level(level, project_path, selected.as_deref())
     }
 
-    /// Skills that apply to a session opened on `project_path`.
-    pub fn active_for(&self, project_path: Option<&str>) -> Vec<UserSkillRecord> {
-        self.list()
-            .into_iter()
-            .filter(|s| s.enabled && s.scope.matches(project_path))
-            .collect()
+    /// Return the effective user skill catalog. A project document shadows a
+    /// global document with the same normalized name.
+    pub fn active_for(&mut self, project_path: Option<&str>) -> Result<Vec<UserSkillRecord>> {
+        let selected = project_path.map(normalize_project_path);
+        let global = self.scan_level(CapabilityLevel::Global, None, selected.as_deref())?;
+        let project = selected
+            .as_deref()
+            .map(|path| self.scan_level(CapabilityLevel::Project, Some(path), Some(path)))
+            .transpose()?
+            .unwrap_or_default();
+        Ok(merge_active_records(global, project))
     }
 
-    /// Pick an id that is free both in the registry and on disk.
-    fn allocate_id(&self, preferred: &str) -> Result<String> {
-        let base = if valid_id(preferred) {
-            preferred.to_string()
-        } else {
-            slugify(preferred)
-        };
-        let base = if base.is_empty() { "skill".to_string() } else { base };
-        for suffix in 0..100 {
-            let candidate = if suffix == 0 {
-                base.clone()
-            } else {
-                format!("{base}-{suffix}")
-            };
-            if self.get(&candidate).is_none() && !self.skill_dir(&candidate).exists() {
-                return Ok(candidate);
+    fn find(
+        &mut self,
+        id: &str,
+        level: Option<CapabilityLevel>,
+        project_path: Option<&str>,
+    ) -> Result<Option<UserSkillRecord>> {
+        if let Some(level) = level {
+            return Ok(self
+                .list(level, project_path)?
+                .into_iter()
+                .find(|record| record.id == id));
+        }
+        if let Some(project) = project_path {
+            if let Some(record) = self
+                .list(CapabilityLevel::Project, Some(project))?
+                .into_iter()
+                .find(|record| record.id == id)
+            {
+                return Ok(Some(record));
             }
         }
-        bail!("SKILL_INVALID: could not allocate an id for \"{preferred}\"")
+        Ok(self
+            .list(CapabilityLevel::Global, project_path)?
+            .into_iter()
+            .find(|record| record.id == id))
     }
 
-    /// Write a new skill document from scratch.
     pub fn create(&mut self, input: UserSkillInput) -> Result<UserSkillRecord> {
-        if self.skills.len() >= MAX_SKILLS {
-            bail!("SKILL_INVALID: at most {MAX_SKILLS} skills");
-        }
+        let (level, project_path) = level_and_project(&input)?;
+        let directory = capability_dir(level, project_path.as_deref(), "skills")?;
         let name = clip(input.name.as_deref().unwrap_or_default(), MAX_NAME_CHARS);
         if name.is_empty() {
             bail!("SKILL_INVALID: name is required");
         }
-        let id = self.allocate_id(input.id.as_deref().unwrap_or(&name))?;
-        let description = input
-            .description
+        let id = input
+            .id
             .as_deref()
-            .map(|d| clip(d, MAX_DESCRIPTION_CHARS))
-            .filter(|d| !d.is_empty());
+            .filter(|value| valid_id(value))
+            .map(str::to_string)
+            .unwrap_or_else(|| slugify(&name, 64));
+        if !valid_id(&id) {
+            bail!("SKILL_INVALID: invalid id");
+        }
+        if self
+            .list(level, project_path.as_deref())?
+            .iter()
+            .any(|record| record.id == id || record.name.eq_ignore_ascii_case(&name))
+        {
+            bail!("SKILL_INVALID: a skill with this name already exists at this level");
+        }
+        if self.list(level, project_path.as_deref())?.len() >= MAX_SKILLS {
+            bail!("SKILL_INVALID: at most {MAX_SKILLS} skills");
+        }
         let body = input
             .body
             .as_deref()
+            .filter(|value| !value.trim().is_empty())
             .map(str::to_string)
-            .filter(|b| !b.trim().is_empty())
             .unwrap_or_else(|| default_body(&name));
-        let document = render_document(&name, description.as_deref(), &body);
-        if document.len() > MAX_SKILL_BYTES {
-            bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
-        }
-        let dir = self.skill_dir(&id);
-        fs::create_dir_all(&dir).with_context(|| format!("create {}", dir.display()))?;
-        let path = dir.join(SKILL_FILE);
-        fs::write(&path, &document)?;
-        let now = Utc::now().to_rfc3339();
-        let record = UserSkillRecord {
-            id,
-            name,
-            description,
-            enabled: input.enabled.unwrap_or(true),
-            scope: input.scope.unwrap_or_default().normalized(),
-            source: "created".into(),
-            path: path.to_string_lossy().to_string(),
-            size_bytes: document.len() as u64,
-            created_at: now.clone(),
-            updated_at: now,
-        };
-        self.skills.push(record.clone());
-        self.save()?;
-        Ok(record)
-    }
-
-    /// Copy an existing document — or a directory holding one — into the store.
-    ///
-    /// Importing a directory brings its sibling files along, because a skill
-    /// that references a checklist or a template is useless without them.
-    pub fn import(&mut self, source: &str, input: UserSkillInput) -> Result<UserSkillRecord> {
-        if self.skills.len() >= MAX_SKILLS {
-            bail!("SKILL_INVALID: at most {MAX_SKILLS} skills");
-        }
-        let source_path = PathBuf::from(source);
-        if !source_path.exists() {
-            bail!("SKILL_INVALID: {source} does not exist");
-        }
-        let is_dir = source_path.is_dir();
-        let document_path = if is_dir {
-            let direct = source_path.join(SKILL_FILE);
-            if direct.exists() {
-                direct
-            } else {
-                // A single-markdown folder is a common shape; accept it when
-                // there is exactly one candidate so the import is unambiguous.
-                let mut candidates: Vec<PathBuf> = fs::read_dir(&source_path)?
-                    .filter_map(|entry| entry.ok().map(|e| e.path()))
-                    .filter(|path| {
-                        path.is_file()
-                            && path
-                                .extension()
-                                .and_then(|e| e.to_str())
-                                .is_some_and(|ext| ext.eq_ignore_ascii_case("md"))
-                    })
-                    .collect();
-                candidates.sort();
-                match candidates.len() {
-                    1 => candidates.remove(0),
-                    0 => bail!("SKILL_INVALID: no SKILL.md or markdown file in {source}"),
-                    _ => bail!("SKILL_INVALID: {source} holds several markdown files; add a SKILL.md"),
-                }
-            }
-        } else {
-            source_path.clone()
-        };
-        let raw = fs::read_to_string(&document_path)
-            .with_context(|| format!("read {}", document_path.display()))?;
-        if raw.len() > MAX_SKILL_BYTES {
-            bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
-        }
-        let (front_name, front_description, body) = parse_front_matter(&raw);
-        if body.trim().is_empty() {
-            bail!("SKILL_INVALID: document is empty");
-        }
-        let fallback_name = document_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("skill")
-            .to_string();
-        let name = clip(
-            input
-                .name
-                .as_deref()
-                .filter(|n| !n.trim().is_empty())
-                .or(front_name.as_deref())
-                .unwrap_or(&fallback_name),
-            MAX_NAME_CHARS,
-        );
         let description = input
             .description
             .as_deref()
-            .or(front_description.as_deref())
-            .map(|d| clip(d, MAX_DESCRIPTION_CHARS))
-            .filter(|d| !d.is_empty());
-        let id = self.allocate_id(input.id.as_deref().unwrap_or(&name))?;
-        let dir = self.skill_dir(&id);
-        fs::create_dir_all(&dir)?;
+            .map(|value| clip(value, MAX_DESCRIPTION_CHARS))
+            .filter(|value| !value.is_empty());
         let document = render_document(&name, description.as_deref(), &body);
-        let target = dir.join(SKILL_FILE);
-        fs::write(&target, &document)?;
-        if is_dir {
-            self.copy_sidecar_files(&source_path, &document_path, &dir)?;
+        if document.len() > MAX_SKILL_BYTES {
+            bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
         }
-        let now = Utc::now().to_rfc3339();
-        let record = UserSkillRecord {
-            id,
-            name,
-            description,
-            enabled: input.enabled.unwrap_or(true),
-            scope: input.scope.unwrap_or_default().normalized(),
-            source: "imported".into(),
-            path: target.to_string_lossy().to_string(),
-            size_bytes: document.len() as u64,
-            created_at: now.clone(),
-            updated_at: now,
-        };
-        self.skills.push(record.clone());
-        self.save()?;
-        Ok(record)
+        fs::create_dir_all(&directory)?;
+        let path = directory.join(format!("{id}.md"));
+        fs::write(&path, &document).with_context(|| format!("write {}", path.display()))?;
+        if input.enabled == Some(false) {
+            self.state
+                .set_enabled(SKILL_KIND, level, &id, project_path.as_deref(), false)?;
+        }
+        self.find(&id, Some(level), project_path.as_deref())?
+            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: created skill was not found"))
     }
 
-    /// Copy the imported directory's other files, one level deep. Nested trees,
-    /// symlinks and oversized sets are skipped rather than followed: an import
-    /// should never become an unbounded copy of whatever the folder points at.
-    fn copy_sidecar_files(&self, source: &Path, document: &Path, target: &Path) -> Result<()> {
-        let mut copied = 0usize;
-        for entry in fs::read_dir(source)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path == document {
-                continue;
-            }
-            let metadata = entry.metadata()?;
-            if !metadata.is_file() {
-                continue;
-            }
-            if metadata.len() as usize > MAX_SKILL_BYTES {
-                continue;
-            }
-            let Some(name) = path.file_name() else { continue };
-            if name.to_string_lossy().starts_with('.') {
-                continue;
-            }
-            if copied >= MAX_IMPORT_FILES {
-                break;
-            }
-            fs::copy(&path, target.join(name))?;
-            copied += 1;
+    /// Import exactly one file and preserve its bytes. The native dialog is also
+    /// single-file; this guard prevents a caller from turning import into a
+    /// directory copy.
+    pub fn import(&mut self, source: &str, input: UserSkillInput) -> Result<UserSkillRecord> {
+        let source_path = PathBuf::from(source);
+        if !source_path.is_file() {
+            bail!("SKILL_INVALID: import requires one file");
         }
-        Ok(())
+        let raw = fs::read_to_string(&source_path)
+            .with_context(|| format!("read {}", source_path.display()))?;
+        if raw.len() > MAX_SKILL_BYTES {
+            bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
+        }
+        let (front, body) = parse_front_matter(&raw);
+        if body.trim().is_empty() {
+            bail!("SKILL_INVALID: document is empty");
+        }
+        let fallback = source_path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or("skill");
+        let name = clip(
+            front.get("name").map(String::as_str).unwrap_or(fallback),
+            MAX_NAME_CHARS,
+        );
+        let id = input
+            .id
+            .as_deref()
+            .filter(|value| valid_id(value))
+            .map(str::to_string)
+            .unwrap_or_else(|| slugify(&name, 64));
+        if !valid_id(&id) {
+            bail!("SKILL_INVALID: the file needs a name or a valid id");
+        }
+        let (level, project_path) = level_and_project(&input)?;
+        if self
+            .list(level, project_path.as_deref())?
+            .iter()
+            .any(|record| record.id == id || record.name.eq_ignore_ascii_case(&name))
+        {
+            bail!("SKILL_INVALID: a skill with this name already exists at this level");
+        }
+        let directory = capability_dir(level, project_path.as_deref(), "skills")?;
+        fs::create_dir_all(&directory)?;
+        let target = directory.join(format!("{id}.md"));
+        fs::copy(&source_path, &target)
+            .with_context(|| format!("copy {} to {}", source_path.display(), target.display()))?;
+        if input.enabled == Some(false) {
+            self.state
+                .set_enabled(SKILL_KIND, level, &id, project_path.as_deref(), false)?;
+        }
+        self.find(&id, Some(level), project_path.as_deref())?
+            .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: imported skill was not found"))
     }
 
-    /// Edit metadata and/or the body of a stored skill.
     pub fn update(&mut self, id: &str, input: UserSkillInput) -> Result<Option<UserSkillRecord>> {
-        let Some(index) = self.skills.iter().position(|s| s.id == id) else {
+        let level = input
+            .level
+            .as_deref()
+            .map(|value| CapabilityLevel::parse(Some(value)))
+            .transpose()?;
+        let record = self.find(id, level, input.project_path.as_deref())?;
+        let Some(record) = record else {
             return Ok(None);
         };
-        let current = self.skills[index].clone();
+        let raw = fs::read_to_string(&record.path)?;
+        let (front, old_body) = parse_front_matter(&raw);
         let name = input
             .name
             .as_deref()
-            .map(|n| clip(n, MAX_NAME_CHARS))
-            .filter(|n| !n.is_empty())
-            .unwrap_or(current.name.clone());
+            .map(|value| clip(value, MAX_NAME_CHARS))
+            .filter(|value| !value.is_empty())
+            .or_else(|| front.get("name").cloned())
+            .unwrap_or(record.name.clone());
         let description = match input.description.as_deref() {
-            // An explicit empty string clears the description; absent keeps it.
             Some(value) if value.trim().is_empty() => None,
             Some(value) => Some(clip(value, MAX_DESCRIPTION_CHARS)),
-            None => current.description.clone(),
+            None => record.description.clone(),
         };
-        let path = PathBuf::from(&current.path);
-        let body = match input.body.as_deref() {
-            Some(value) => value.to_string(),
-            None => {
-                let raw = fs::read_to_string(&path).unwrap_or_default();
-                parse_front_matter(&raw).2
-            }
-        };
+        let body = input.body.unwrap_or(old_body);
         if body.trim().is_empty() {
             bail!("SKILL_INVALID: document is empty");
         }
@@ -452,356 +414,221 @@ impl UserSkillRegistry {
         if document.len() > MAX_SKILL_BYTES {
             bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
         }
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+        fs::write(&record.path, document)?;
+        if let Some(enabled) = input.enabled {
+            self.state.set_enabled(
+                SKILL_KIND,
+                record
+                    .level
+                    .as_deref()
+                    .and_then(|value| CapabilityLevel::parse(Some(value)).ok())
+                    .unwrap_or(CapabilityLevel::Global),
+                id,
+                record.project_path.as_deref(),
+                enabled,
+            )?;
         }
-        fs::write(&path, &document)?;
-        let record = UserSkillRecord {
-            name,
-            description,
-            enabled: input.enabled.unwrap_or(current.enabled),
-            scope: input
-                .scope
-                .unwrap_or(current.scope.clone())
-                .normalized(),
-            size_bytes: document.len() as u64,
-            updated_at: Utc::now().to_rfc3339(),
-            ..current
-        };
-        self.skills[index] = record.clone();
-        self.save()?;
-        Ok(Some(record))
+        Ok(self.find(id, level, record.project_path.as_deref())?)
     }
 
-    /// Read a stored document back, front matter stripped.
-    pub fn read(&self, id: &str) -> Result<Option<(UserSkillRecord, String)>> {
-        let Some(record) = self.get(id) else {
+    pub fn read(
+        &mut self,
+        id: &str,
+        level: Option<CapabilityLevel>,
+        project_path: Option<&str>,
+    ) -> Result<Option<(UserSkillRecord, String)>> {
+        let Some(record) = self.find(id, level, project_path)? else {
             return Ok(None);
         };
-        let raw = fs::read_to_string(&record.path)
-            .with_context(|| format!("read {}", record.path))?;
+        let raw = fs::read_to_string(&record.path)?;
         if raw.len() > MAX_SKILL_BYTES {
             bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
         }
-        let (_, _, body) = parse_front_matter(&raw);
+        let (_, body) = parse_front_matter(&raw);
         Ok(Some((record, body)))
     }
 
-    pub fn remove(&mut self, id: &str) -> Result<bool> {
-        let Some(index) = self.skills.iter().position(|s| s.id == id) else {
+    pub fn remove(
+        &mut self,
+        id: &str,
+        level: Option<CapabilityLevel>,
+        project_path: Option<&str>,
+    ) -> Result<bool> {
+        let Some(record) = self.find(id, level, project_path)? else {
             return Ok(false);
         };
-        let record = self.skills.remove(index);
-        // Only ever delete inside the store, so a registry edited by hand cannot
-        // aim the removal at an arbitrary directory.
-        let dir = self.skill_dir(&record.id);
-        if dir.starts_with(self.data_dir.join("skills")) && dir.exists() {
-            let _ = fs::remove_dir_all(&dir);
-        }
-        self.save()?;
+        fs::remove_file(&record.path).ok();
+        let level = record
+            .level
+            .as_deref()
+            .map(|value| CapabilityLevel::parse(Some(value)))
+            .transpose()?
+            .unwrap_or(CapabilityLevel::Global);
+        let _ = self.find(id, Some(level), record.project_path.as_deref())?;
         Ok(true)
     }
 
-    pub fn set_enabled(&mut self, id: &str, enabled: bool) -> Result<Option<UserSkillRecord>> {
-        let Some(skill) = self.skills.iter_mut().find(|s| s.id == id) else {
+    pub fn set_enabled(
+        &mut self,
+        id: &str,
+        enabled: bool,
+        level: Option<CapabilityLevel>,
+        project_path: Option<&str>,
+    ) -> Result<Option<UserSkillRecord>> {
+        let Some(record) = self.find(id, level, project_path)? else {
             return Ok(None);
         };
-        skill.enabled = enabled;
-        skill.updated_at = Utc::now().to_rfc3339();
-        let updated = skill.clone();
-        self.save()?;
-        Ok(Some(updated))
+        let record_level = record
+            .level
+            .as_deref()
+            .map(|value| CapabilityLevel::parse(Some(value)))
+            .transpose()?
+            .unwrap_or(CapabilityLevel::Global);
+        self.state.set_enabled(
+            SKILL_KIND,
+            record_level,
+            &record.id,
+            project_path.or(record.project_path.as_deref()),
+            enabled,
+        )?;
+        self.find(
+            &record.id,
+            Some(record_level),
+            project_path.or(record.project_path.as_deref()),
+        )
     }
 
-    pub fn set_scope(&mut self, id: &str, scope: ActivationScope) -> Result<Option<UserSkillRecord>> {
-        let Some(skill) = self.skills.iter_mut().find(|s| s.id == id) else {
-            return Ok(None);
-        };
-        skill.scope = scope.normalized();
-        skill.updated_at = Utc::now().to_rfc3339();
-        let updated = skill.clone();
-        self.save()?;
-        Ok(Some(updated))
+    pub fn set_scope(
+        &mut self,
+        id: &str,
+        scope: ActivationScope,
+    ) -> Result<Option<UserSkillRecord>> {
+        // Scope is no longer persisted in capability files. Keep this RPC
+        // harmless for older callers and return the scanned record.
+        let _ = scope;
+        self.find(id, None, None)
+    }
+}
+
+fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationScope {
+    match level {
+        CapabilityLevel::Global => ActivationScope::default(),
+        CapabilityLevel::Project => ActivationScope {
+            mode: crate::activation::ActivationMode::Projects,
+            projects: project_path.into_iter().map(str::to_string).collect(),
+        },
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::activation::ActivationMode;
+    use tempfile::tempdir;
 
-    fn registry() -> (tempfile::TempDir, UserSkillRegistry) {
-        let dir = tempfile::tempdir().unwrap();
-        let registry = UserSkillRegistry::new(dir.path());
-        (dir, registry)
-    }
-
-    fn named(name: &str) -> UserSkillInput {
+    fn input(name: &str, level: &str, project_path: Option<&str>) -> UserSkillInput {
         UserSkillInput {
             name: Some(name.into()),
+            level: Some(level.into()),
+            project_path: project_path.map(str::to_string),
+            description: Some("Check the relevant files".into()),
+            body: Some("Do the thing.".into()),
             ..Default::default()
         }
     }
 
     #[test]
-    fn create_slugifies_the_name_and_writes_front_matter() {
-        let (_dir, mut registry) = registry();
+    fn imports_one_file_into_the_selected_agents_directory() {
+        let app = tempdir().unwrap();
+        let source = app.path().join("incoming.md");
+        let raw = "---\nname: Review\ndescription: Check code\n---\n\nDo it.\n";
+        fs::write(&source, raw).unwrap();
+        let mut registry = UserSkillRegistry::new(app.path());
         let record = registry
-            .create(UserSkillInput {
-                name: Some("Release Notes!".into()),
-                description: Some("Draft a release note".into()),
-                ..Default::default()
-            })
-            .unwrap();
-        assert_eq!(record.id, "release-notes");
-        let raw = fs::read_to_string(&record.path).unwrap();
-        assert!(raw.starts_with("---\nname: Release Notes!\n"));
-        assert!(raw.contains("description: Draft a release note"));
-        let (name, description, body) = parse_front_matter(&raw);
-        assert_eq!(name.as_deref(), Some("Release Notes!"));
-        assert_eq!(description.as_deref(), Some("Draft a release note"));
-        assert!(body.contains("Release Notes!"));
-    }
-
-    #[test]
-    fn create_requires_a_name() {
-        let (_dir, mut registry) = registry();
-        assert!(registry.create(UserSkillInput::default()).is_err());
-    }
-
-    #[test]
-    fn ids_never_collide() {
-        let (_dir, mut registry) = registry();
-        let first = registry.create(named("Review")).unwrap();
-        let second = registry.create(named("Review")).unwrap();
-        assert_eq!(first.id, "review");
-        assert_eq!(second.id, "review-1");
-    }
-
-    #[test]
-    fn update_rewrites_the_document_and_can_clear_the_description() {
-        let (_dir, mut registry) = registry();
-        let record = registry
-            .create(UserSkillInput {
-                name: Some("Review".into()),
-                description: Some("old".into()),
-                ..Default::default()
-            })
-            .unwrap();
-        let updated = registry
-            .update(
-                &record.id,
-                UserSkillInput {
-                    description: Some("".into()),
-                    body: Some("# New body".into()),
-                    ..Default::default()
-                },
+            .import(
+                source.to_str().unwrap(),
+                input("Ignored", "project", Some(app.path().to_str().unwrap())),
             )
-            .unwrap()
             .unwrap();
-        assert_eq!(updated.description, None);
-        let (_, body) = registry.read(&record.id).unwrap().unwrap();
-        assert_eq!(body, "# New body");
+        let target = app.path().join(".agents/skills/review.md");
+        assert_eq!(record.level.as_deref(), Some("project"));
+        assert_eq!(record.path, target.to_string_lossy());
+        assert_eq!(fs::read_to_string(target).unwrap(), raw);
+        assert!(source.is_file());
     }
 
     #[test]
-    fn update_without_a_body_keeps_the_existing_one() {
-        let (_dir, mut registry) = registry();
-        let record = registry.create(named("Review")).unwrap();
-        let (_, before) = registry.read(&record.id).unwrap().unwrap();
-        registry
-            .update(&record.id, named("Renamed Review"))
-            .unwrap()
-            .unwrap();
-        let (after_record, after) = registry.read(&record.id).unwrap().unwrap();
-        assert_eq!(after_record.name, "Renamed Review");
-        assert_eq!(after, before);
-    }
-
-    #[test]
-    fn import_a_file_reads_its_front_matter() {
-        let (dir, mut registry) = registry();
-        let source = dir.path().join("incoming.md");
+    fn project_skills_shadow_global_skills_by_name() {
+        let app = tempdir().unwrap();
+        let global = app.path().join("global");
+        let project = app.path().join("project");
+        fs::create_dir_all(global.join("skills")).unwrap();
+        fs::create_dir_all(project.join(".agents/skills")).unwrap();
         fs::write(
-            &source,
-            "---\nname: Imported\ndescription: From a file\n---\n\nDo the thing.\n",
+            global.join("skills/review.md"),
+            "---\nname: Review\n---\n\nGlobal\n",
         )
         .unwrap();
-        let record = registry
-            .import(source.to_str().unwrap(), UserSkillInput::default())
-            .unwrap();
-        assert_eq!(record.name, "Imported");
-        assert_eq!(record.description.as_deref(), Some("From a file"));
-        assert_eq!(record.source, "imported");
-        assert_eq!(record.id, "imported");
-        let (_, body) = registry.read(&record.id).unwrap().unwrap();
-        assert_eq!(body, "Do the thing.");
-    }
-
-    #[test]
-    fn import_a_file_without_front_matter_falls_back_to_the_file_name() {
-        let (dir, mut registry) = registry();
-        let source = dir.path().join("Deploy Steps.md");
-        fs::write(&source, "Step one.\n").unwrap();
-        let record = registry
-            .import(source.to_str().unwrap(), UserSkillInput::default())
-            .unwrap();
-        assert_eq!(record.name, "Deploy Steps");
-        assert_eq!(record.id, "deploy-steps");
-    }
-
-    #[test]
-    fn import_a_directory_brings_sidecar_files() {
-        let (dir, mut registry) = registry();
-        let source = dir.path().join("pack");
-        fs::create_dir_all(&source).unwrap();
-        fs::write(source.join(SKILL_FILE), "---\nname: Pack\n---\n\nUse the template.\n").unwrap();
-        fs::write(source.join("template.md"), "template").unwrap();
-        fs::write(source.join(".hidden"), "no").unwrap();
-        let record = registry
-            .import(source.to_str().unwrap(), UserSkillInput::default())
-            .unwrap();
-        let stored_dir = PathBuf::from(&record.path).parent().unwrap().to_path_buf();
-        assert!(stored_dir.join("template.md").exists());
-        assert!(!stored_dir.join(".hidden").exists());
-    }
-
-    #[test]
-    fn import_rejects_an_ambiguous_directory() {
-        let (dir, mut registry) = registry();
-        let source = dir.path().join("ambiguous");
-        fs::create_dir_all(&source).unwrap();
-        fs::write(source.join("a.md"), "a").unwrap();
-        fs::write(source.join("b.md"), "b").unwrap();
-        let err = registry
-            .import(source.to_str().unwrap(), UserSkillInput::default())
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("several markdown files"), "{err}");
-    }
-
-    #[test]
-    fn import_rejects_an_empty_document() {
-        let (dir, mut registry) = registry();
-        let source = dir.path().join("empty.md");
-        fs::write(&source, "---\nname: Empty\n---\n\n   \n").unwrap();
-        assert!(registry
-            .import(source.to_str().unwrap(), UserSkillInput::default())
-            .is_err());
-    }
-
-    #[test]
-    fn remove_deletes_the_stored_directory() {
-        let (_dir, mut registry) = registry();
-        let record = registry.create(named("Review")).unwrap();
-        let stored_dir = PathBuf::from(&record.path).parent().unwrap().to_path_buf();
-        assert!(registry.remove(&record.id).unwrap());
-        assert!(!stored_dir.exists());
-        assert!(!registry.remove(&record.id).unwrap());
-    }
-
-    #[test]
-    fn active_for_honours_enabled_and_scope() {
-        let (_dir, mut registry) = registry();
-        registry.create(named("Everywhere")).unwrap();
-        let scoped = registry.create(named("Scoped")).unwrap();
-        let off = registry.create(named("Off")).unwrap();
-        registry.set_enabled(&off.id, false).unwrap();
-        registry
-            .set_scope(
-                &scoped.id,
-                ActivationScope {
-                    mode: ActivationMode::Projects,
-                    projects: vec!["/repo".into()],
-                },
-            )
-            .unwrap();
-        let ids = |project: Option<&str>| {
-            registry
-                .active_for(project)
-                .into_iter()
-                .map(|s| s.id)
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(ids(Some("/repo/app")), vec!["everywhere", "scoped"]);
-        assert_eq!(ids(Some("/other")), vec!["everywhere"]);
-    }
-
-    #[test]
-    fn records_survive_a_reload() {
-        let dir = tempfile::tempdir().unwrap();
-        {
-            let mut registry = UserSkillRegistry::new(dir.path());
-            registry.create(named("Review")).unwrap();
-        }
-        let reopened = UserSkillRegistry::new(dir.path());
-        assert_eq!(reopened.list().len(), 1);
-        assert_eq!(reopened.get("review").unwrap().name, "Review");
-    }
-
-    #[test]
-    fn front_matter_without_a_closing_fence_is_body() {
-        let (name, description, body) = parse_front_matter("---\nname: X\n\nnot closed");
-        assert_eq!(name, None);
-        assert_eq!(description, None);
-        assert!(body.starts_with("---"));
-    }
-
-    #[test]
-    fn slugify_handles_unicode_and_punctuation() {
-        assert_eq!(slugify("  Hello, World!  "), "hello-world");
-        assert_eq!(slugify("发布说明"), "");
-        assert_eq!(slugify("v1.2 notes"), "v1-2-notes");
-    }
-
-    /// The cap is on the document, not the body the user typed, because the
-    /// document is what a `Skill` call has to carry back into the turn.
-    #[test]
-    fn an_oversized_document_is_refused_on_create_and_on_update() {
-        let (_dir, mut registry) = registry();
-        let huge = "x".repeat(MAX_SKILL_BYTES);
-
-        let err = registry
-            .create(UserSkillInput {
-                name: Some("Huge".into()),
-                body: Some(huge.clone()),
-                ..Default::default()
-            })
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("exceeds"), "{err}");
-        // A refused create leaves nothing half-written behind.
-        assert!(registry.list().is_empty());
-
-        let record = registry.create(named("Review")).unwrap();
-        let err = registry
-            .update(
-                &record.id,
-                UserSkillInput {
-                    body: Some(huge),
-                    ..Default::default()
-                },
-            )
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("exceeds"), "{err}");
-        // The document that was already there is still readable and intact.
-        let (_, body) = registry.read(&record.id).unwrap().unwrap();
-        assert!(body.len() < MAX_SKILL_BYTES);
-
-        // Just under the cap, front matter included, still goes through.
-        let front_matter = render_document("Review", None, "").len();
-        let fits = "y".repeat(MAX_SKILL_BYTES - front_matter);
-        assert!(
-            registry
-                .update(
-                    &record.id,
-                    UserSkillInput {
-                        body: Some(fits),
-                        ..Default::default()
-                    },
-                )
-                .is_ok()
+        fs::write(
+            project.join(".agents/skills/review.md"),
+            "---\nname: Review\n---\n\nProject\n",
+        )
+        .unwrap();
+        let (fields, body) = parse_front_matter(
+            &fs::read_to_string(project.join(".agents/skills/review.md")).unwrap(),
         );
+        assert_eq!(fields.get("name").map(String::as_str), Some("Review"));
+        assert_eq!(body, "Project");
+    }
+
+    #[test]
+    fn disabled_project_skill_shadows_global_skill() {
+        let global = UserSkillRecord {
+            id: "review".into(),
+            name: "Review".into(),
+            level: Some("global".into()),
+            project_path: None,
+            description: Some("Global".into()),
+            enabled: true,
+            scope: ActivationScope::default(),
+            source: "imported".into(),
+            path: "/global/review.md".into(),
+            size_bytes: 1,
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let mut project = global.clone();
+        project.level = Some("project".into());
+        project.project_path = Some("/repo".into());
+        project.enabled = false;
+
+        let active = merge_active_records(vec![global.clone()], vec![project]);
+        assert!(active.is_empty());
+
+        let mut project = global.clone();
+        project.level = Some("project".into());
+        project.project_path = Some("/repo".into());
+        project.path = "/repo/.agents/skills/review.md".into();
+        let active = merge_active_records(vec![global], vec![project.clone()]);
+        assert_eq!(active, vec![project]);
+    }
+
+    #[test]
+    fn capability_state_is_not_written_into_skill_documents() {
+        let app = tempdir().unwrap();
+        let mut state = CapabilityState::new(app.path(), SKILL_KIND);
+        state
+            .set_enabled(
+                SKILL_KIND,
+                CapabilityLevel::Project,
+                "review",
+                Some("/repo"),
+                false,
+            )
+            .unwrap();
+        assert!(!app
+            .path()
+            .join("agent-capabilities/skills.json")
+            .to_string_lossy()
+            .contains(".agents"));
     }
 }

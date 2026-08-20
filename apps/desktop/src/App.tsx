@@ -1037,8 +1037,8 @@ function AppShell() {
         useAppStore.setState({ plugins: samples.slice(0, count) });
       },
       seedExtensions: (count = 3) => {
-        // Capture-only fixture for the MCP, Skills and Subagents tabs. Those
-        // sections read
+        // Capture-only fixture for the Settings > Agent capability pages. Those
+        // pages read
         // straight from IPC into local state rather than the store, so the rig
         // has to stand in for the host rather than seed a slice; count 0 puts
         // the real calls back.
@@ -1085,6 +1085,7 @@ function AppShell() {
           {
             id: "context7",
             label: "Context7",
+            level: "global",
             description: "Up-to-date library documentation.",
             transport: "stdio",
             command: "npx",
@@ -1096,6 +1097,7 @@ function AppShell() {
           {
             id: "linear",
             label: "Linear",
+            level: "global",
             description: "Issues and cycles for the work tracker.",
             transport: "http",
             url: "https://mcp.linear.app/sse",
@@ -1106,6 +1108,8 @@ function AppShell() {
           {
             id: "postgres",
             label: "Postgres",
+            level: "project",
+            projectPath: "/Users/pi/work/api",
             description: "Runs read-only queries against the dev database.",
             transport: "stdio",
             command: "mcp-server-postgres",
@@ -1117,6 +1121,8 @@ function AppShell() {
           {
             id: "figma",
             label: "Figma",
+            level: "project",
+            projectPath: "/Users/pi/work/api",
             description: "Reads frames and design tokens from a file.",
             transport: "stdio",
             command: "figma-mcp",
@@ -1149,12 +1155,13 @@ function AppShell() {
           {
             id: "release-notes",
             name: "Release Notes",
+            level: "global",
             description:
               "Turn a range of commits into release notes grouped by user-visible change.",
             enabled: true,
             scope: { mode: "global", projects: [] },
             source: "created",
-            path: "/Users/pi/.pi-desktop/skills/release-notes/SKILL.md",
+            path: "/Users/pi/.agents/skills/release-notes/SKILL.md",
             sizeBytes: 2_412,
             createdAt: "2026-07-30T10:00:00.000Z",
             updatedAt: "2026-08-04T09:12:00.000Z",
@@ -1162,12 +1169,14 @@ function AppShell() {
           {
             id: "api-review",
             name: "API Review",
+            level: "project",
+            projectPath: "/Users/pi/work/api",
             description:
               "Check a handler against the house rules for pagination, errors, and auth.",
             enabled: true,
             scope: { mode: "projects", projects: ["/Users/pi/work/api"] },
             source: "created",
-            path: "/Users/pi/.pi-desktop/skills/api-review/SKILL.md",
+            path: "/Users/pi/.agents/skills/api-review/SKILL.md",
             sizeBytes: 7_940,
             createdAt: "2026-07-12T10:00:00.000Z",
             updatedAt: "2026-08-01T16:30:00.000Z",
@@ -1175,29 +1184,31 @@ function AppShell() {
           {
             id: "incident-writeup",
             name: "Incident Writeup",
+            level: "global",
             description: "Draft a blameless postmortem from a timeline of events.",
             enabled: false,
             scope: { mode: "global", projects: [] },
             source: "imported",
-            path: "/Users/pi/.pi-desktop/skills/incident-writeup/SKILL.md",
+            path: "/Users/pi/.agents/skills/incident-writeup/SKILL.md",
             sizeBytes: 118_400,
             createdAt: "2026-06-02T10:00:00.000Z",
             updatedAt: "2026-06-02T10:00:00.000Z",
           },
         ];
-        // One registry definition per state the row can report: active, scoped
-        // elsewhere, shadowed by a project document, and turned off.
+        // One global definition per state the row can report: active, customized,
+        // builtin replacement, and turned off.
         const subagents: UserSubagentRecord[] = [
           {
             id: "log-reader",
             name: "log-reader",
+            level: "global",
             description:
               "Read a build log end to end and report the first real failure with its file and line.",
             enabled: true,
             scope: { mode: "global", projects: [] },
             tools: ["Read", "Grep", "Bash"],
             maxTurns: 12,
-            path: "/Users/pi/.pi-desktop/agents/log-reader.md",
+            path: "/Users/pi/.agents/subagents/log-reader.md",
             sizeBytes: 1_840,
             createdAt: "2026-08-05T09:00:00.000Z",
             updatedAt: "2026-08-06T11:20:00.000Z",
@@ -1205,14 +1216,15 @@ function AppShell() {
           {
             id: "schema-diff",
             name: "schema-diff",
+            level: "global",
             description:
               "Compare the migration files on a branch against the committed schema and list what drifted.",
             enabled: true,
-            scope: { mode: "projects", projects: ["/Users/pi/work/api"] },
+            scope: { mode: "global", projects: [] },
             tools: ["Read", "Glob", "Grep"],
             model: "anthropic/claude-haiku-4-5",
             thinkingLevel: "low",
-            path: "/Users/pi/.pi-desktop/agents/schema-diff.md",
+            path: "/Users/pi/.agents/subagents/schema-diff.md",
             sizeBytes: 3_120,
             createdAt: "2026-07-28T09:00:00.000Z",
             updatedAt: "2026-08-02T14:05:00.000Z",
@@ -1220,12 +1232,13 @@ function AppShell() {
           {
             id: "explorer",
             name: "explorer",
+            level: "global",
             description: "My own explorer, with the repository's layout written into the prompt.",
             enabled: true,
             scope: { mode: "global", projects: [] },
             tools: ["Read", "Glob", "Grep"],
             maxTurns: 30,
-            path: "/Users/pi/.pi-desktop/agents/explorer.md",
+            path: "/Users/pi/.agents/subagents/explorer.md",
             sizeBytes: 2_260,
             createdAt: "2026-08-01T09:00:00.000Z",
             updatedAt: "2026-08-01T09:00:00.000Z",
@@ -1233,28 +1246,28 @@ function AppShell() {
           {
             id: "release-drafter",
             name: "release-drafter",
+            level: "global",
             description: "Draft the release notes for a tag range, grouped by user-visible change.",
             enabled: false,
             scope: { mode: "global", projects: [] },
             tools: ["Read", "Grep"],
-            path: "/Users/pi/.pi-desktop/agents/release-drafter.md",
+            path: "/Users/pi/.agents/subagents/release-drafter.md",
             sizeBytes: 980,
             createdAt: "2026-06-20T09:00:00.000Z",
             updatedAt: "2026-06-20T09:00:00.000Z",
           },
         ];
-        // The effective catalog main would compute: the registry copy of
-        // `explorer` has replaced the builtin, `log-reader` is owned by a project
-        // document, and the other two builtins are untouched.
+        // The effective catalog main would compute: global user documents replace
+        // builtins by name, and the other builtins remain available.
         const catalog: SubagentDefinition[] = [
           {
             name: "log-reader",
-            description: "The project's own log reader, tuned for its CI output.",
+            description: "A user-owned log reader, tuned for its CI output.",
             prompt: "You are log-reader.\n",
             tools: ["Read", "Grep"],
             maxTurns: 12,
-            source: "project",
-            filePath: "/Users/pi/work/api/.pi/agents/log-reader.md",
+            source: "user",
+            filePath: "/Users/pi/.agents/subagents/log-reader.md",
           },
           {
             name: "explorer",
@@ -1263,7 +1276,7 @@ function AppShell() {
             tools: ["Read", "Glob", "Grep"],
             maxTurns: 30,
             source: "user",
-            filePath: "/Users/pi/.pi-desktop/agents/explorer.md",
+            filePath: "/Users/pi/.agents/subagents/explorer.md",
           },
           {
             name: "code-reviewer",
@@ -1283,9 +1296,26 @@ function AppShell() {
             source: "builtin",
           },
         ];
+        const rowsForQuery = <T extends { level?: string; projectPath?: string }>(
+          rows: readonly T[],
+          query: { level?: string; projectPath?: string } = {},
+        ) =>
+          rows.filter(
+            (row) =>
+              (!query.level || row.level === query.level) &&
+              (!query.projectPath || !row.projectPath || row.projectPath === query.projectPath),
+          );
         (api as any).listProjects = async () => ({ projects });
-        (api as any).listMcpServers = async () => ({ servers, statuses });
-        (api as any).listUserSkills = async () => ({ skills: skills.slice(0, count) });
+        (api as any).listMcpServers = async (query: { level?: string; projectPath?: string } = {}) => {
+          const filtered = rowsForQuery(servers, query);
+          return {
+            servers: filtered,
+            statuses: statuses.filter((status) => filtered.some((server) => server.id === status.serverId)),
+          };
+        };
+        (api as any).listUserSkills = async (query: { level?: string; projectPath?: string } = {}) => ({
+          skills: rowsForQuery(skills, query).slice(0, count),
+        });
         (api as any).listUserSubagents = async () => ({ subagents });
         (api as any).subagentCatalog = async () => ({
           subagents: catalog,

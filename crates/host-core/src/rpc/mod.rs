@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::sync::{mpsc, oneshot, Mutex, Semaphore};
 
+use crate::agent_capabilities::CapabilityLevel;
 use crate::artifacts;
 use crate::audit;
 use crate::notifications;
@@ -755,11 +756,19 @@ fn plugin_err(err: impl ToString) -> JsonRpcError {
     }
 }
 
+/// Capability query failures have their own code so callers can distinguish
+/// a missing project context from a malformed MCP or skill document.
+fn capability_err(message: impl Into<String>) -> JsonRpcError {
+    rpc_err(1018, message, "CAPABILITY_INVALID")
+}
+
 /// Validation failures from the user-owned MCP registry are the user's typo,
 /// not an internal fault, so they get a distinct code the UI can show inline.
 fn scope_err(err: impl ToString) -> JsonRpcError {
     let msg = err.to_string();
-    if msg.contains("MCP_INVALID") {
+    if msg.contains("CAPABILITY_INVALID") {
+        capability_err(msg)
+    } else if msg.contains("MCP_INVALID") {
         rpc_err(1015, msg, "MCP_INVALID")
     } else {
         rpc_err(1000, msg, "INTERNAL")
@@ -768,7 +777,9 @@ fn scope_err(err: impl ToString) -> JsonRpcError {
 
 fn skill_err(err: impl ToString) -> JsonRpcError {
     let msg = err.to_string();
-    if msg.contains("SKILL_INVALID") {
+    if msg.contains("CAPABILITY_INVALID") {
+        capability_err(msg)
+    } else if msg.contains("SKILL_INVALID") {
         rpc_err(1016, msg, "SKILL_INVALID")
     } else {
         rpc_err(1000, msg, "INTERNAL")
@@ -825,6 +836,24 @@ fn parse_scope(params: &Value) -> Result<crate::activation::ActivationScope, Jso
         }),
     };
     serde_json::from_value(raw).map_err(|e| rpc_err(1002, e.to_string(), "INVALID_PARAMS"))
+}
+
+fn parse_capability_query(
+    params: &Value,
+) -> Result<(CapabilityLevel, Option<String>), JsonRpcError> {
+    let level = CapabilityLevel::parse(params.get("level").and_then(Value::as_str))
+        .map_err(|error| capability_err(error.to_string()))?;
+    let project_path = params
+        .get("projectPath")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .filter(|value| !value.trim().is_empty());
+    if level == CapabilityLevel::Project && project_path.is_none() {
+        return Err(capability_err(
+            "projectPath required for project capability queries",
+        ));
+    }
+    Ok((level, project_path))
 }
 
 async fn handle_request(
@@ -2152,8 +2181,7 @@ async fn handle_request(
                     };
                     let effective_pm = match p.permission_scope.as_deref() {
                         Some(scope)
-                            if sessions::is_valid_permission_mode(scope)
-                                && scope != "inherit" =>
+                            if sessions::is_valid_permission_mode(scope) && scope != "inherit" =>
                         {
                             scope.to_string()
                         }
@@ -2968,14 +2996,19 @@ async fn handle_request(
         }
 
         "mcp.list" => {
-            let st = state.lock().await;
-            Ok(json!({ "servers": st.mcp_servers.list() }))
+            let (level, project_path) = parse_capability_query(&params)?;
+            let mut st = state.lock().await;
+            let servers = st
+                .mcp_servers
+                .list(level, project_path.as_deref())
+                .map_err(scope_err)?;
+            Ok(json!({ "servers": servers, "statuses": [] }))
         }
         "mcp.active" => {
-            // The agent-facing view: what a session on this project may reach.
-            let project_path = params.get("projectPath").and_then(|v| v.as_str());
-            let st = state.lock().await;
-            Ok(json!({ "servers": st.mcp_servers.active_for(project_path) }))
+            let project_path = params.get("projectPath").and_then(Value::as_str);
+            let mut st = state.lock().await;
+            let servers = st.mcp_servers.active_for(project_path).map_err(scope_err)?;
+            Ok(json!({ "servers": servers, "statuses": [] }))
         }
         "mcp.upsert" => {
             let input: crate::mcp_servers::McpServerInput =
@@ -2987,45 +3020,50 @@ async fn handle_request(
         }
         "mcp.remove" => {
             let id = require_id(&params)?;
+            let (level, project_path) = parse_capability_query(&params)?;
             let mut st = state.lock().await;
             let ok = st
                 .mcp_servers
-                .remove(&id)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                .remove(&id, Some(level), project_path.as_deref())
+                .map_err(scope_err)?;
             Ok(json!({ "ok": ok }))
         }
         "mcp.setEnabled" => {
             let id = require_id(&params)?;
             let enabled = params
                 .get("enabled")
-                .and_then(|v| v.as_bool())
+                .and_then(Value::as_bool)
                 .unwrap_or(false);
+            let (level, project_path) = parse_capability_query(&params)?;
             let mut st = state.lock().await;
             let server = st
                 .mcp_servers
-                .set_enabled(&id, enabled)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                .set_enabled(&id, enabled, Some(level), project_path.as_deref())
+                .map_err(scope_err)?;
             Ok(json!({ "server": server }))
         }
         "mcp.setScope" => {
             let id = require_id(&params)?;
             let scope = parse_scope(&params)?;
             let mut st = state.lock().await;
-            let server = st
-                .mcp_servers
-                .set_scope(&id, scope)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let server = st.mcp_servers.set_scope(&id, scope).map_err(scope_err)?;
             Ok(json!({ "server": server }))
         }
 
         "skills.list" => {
-            let st = state.lock().await;
-            Ok(json!({ "skills": st.user_skills.list() }))
+            let (level, project_path) = parse_capability_query(&params)?;
+            let mut st = state.lock().await;
+            let skills = st
+                .user_skills
+                .list(level, project_path.as_deref())
+                .map_err(skill_err)?;
+            Ok(json!({ "skills": skills }))
         }
         "skills.active" => {
-            let project_path = params.get("projectPath").and_then(|v| v.as_str());
-            let st = state.lock().await;
-            Ok(json!({ "skills": st.user_skills.active_for(project_path) }))
+            let project_path = params.get("projectPath").and_then(Value::as_str);
+            let mut st = state.lock().await;
+            let skills = st.user_skills.active_for(project_path).map_err(skill_err)?;
+            Ok(json!({ "skills": skills }))
         }
         "skills.create" => {
             let input = parse_skill_input(&params)?;
@@ -3036,7 +3074,7 @@ async fn handle_request(
         "skills.import" => {
             let source = params
                 .get("path")
-                .and_then(|v| v.as_str())
+                .and_then(Value::as_str)
                 .ok_or_else(|| rpc_err(1002, "path required", "INVALID_PARAMS"))?
                 .to_string();
             let input = parse_skill_input(&params)?;
@@ -3053,53 +3091,71 @@ async fn handle_request(
         }
         "skills.read" => {
             let id = require_id(&params)?;
-            let st = state.lock().await;
-            match st.user_skills.read(&id).map_err(skill_err)? {
+            let level = params
+                .get("level")
+                .and_then(Value::as_str)
+                .map(|value| CapabilityLevel::parse(Some(value)))
+                .transpose()
+                .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+            let project_path = params.get("projectPath").and_then(Value::as_str);
+            let mut st = state.lock().await;
+            match st
+                .user_skills
+                .read(&id, level, project_path)
+                .map_err(skill_err)?
+            {
                 Some((skill, body)) => Ok(json!({ "skill": skill, "body": body })),
                 None => Ok(json!({ "skill": null, "body": null })),
             }
         }
         "skills.remove" => {
             let id = require_id(&params)?;
+            let level = params
+                .get("level")
+                .and_then(Value::as_str)
+                .map(|value| CapabilityLevel::parse(Some(value)))
+                .transpose()
+                .map_err(|error| rpc_err(1002, error.to_string(), "INVALID_PARAMS"))?;
+            let project_path = params.get("projectPath").and_then(Value::as_str);
             let mut st = state.lock().await;
             let ok = st
                 .user_skills
-                .remove(&id)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                .remove(&id, level, project_path)
+                .map_err(skill_err)?;
             Ok(json!({ "ok": ok }))
         }
         "skills.setEnabled" => {
             let id = require_id(&params)?;
             let enabled = params
                 .get("enabled")
-                .and_then(|v| v.as_bool())
+                .and_then(Value::as_bool)
                 .unwrap_or(false);
+            let (level, project_path) = parse_capability_query(&params)?;
             let mut st = state.lock().await;
             let skill = st
                 .user_skills
-                .set_enabled(&id, enabled)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                .set_enabled(&id, enabled, Some(level), project_path.as_deref())
+                .map_err(skill_err)?;
             Ok(json!({ "skill": skill }))
         }
         "skills.setScope" => {
             let id = require_id(&params)?;
             let scope = parse_scope(&params)?;
             let mut st = state.lock().await;
-            let skill = st
-                .user_skills
-                .set_scope(&id, scope)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let skill = st.user_skills.set_scope(&id, scope).map_err(skill_err)?;
             Ok(json!({ "skill": skill }))
         }
 
         "agents.list" => {
-            let st = state.lock().await;
-            Ok(json!({ "subagents": st.user_subagents.list() }))
+            let mut st = state.lock().await;
+            Ok(json!({ "subagents": st.user_subagents.list().map_err(subagent_err)? }))
         }
         "agents.active" => {
-            let project_path = params.get("projectPath").and_then(|v| v.as_str());
-            let st = state.lock().await;
-            Ok(json!({ "subagents": st.user_subagents.active_for(project_path) }))
+            let project_path = params.get("projectPath").and_then(Value::as_str);
+            let mut st = state.lock().await;
+            Ok(
+                json!({ "subagents": st.user_subagents.active_for(project_path).map_err(subagent_err)? }),
+            )
         }
         "agents.create" => {
             let input = parse_subagent_input(&params)?;
@@ -3111,15 +3167,12 @@ async fn handle_request(
             let id = require_id(&params)?;
             let input = parse_subagent_input(&params)?;
             let mut st = state.lock().await;
-            let subagent = st
-                .user_subagents
-                .update(&id, input)
-                .map_err(subagent_err)?;
+            let subagent = st.user_subagents.update(&id, input).map_err(subagent_err)?;
             Ok(json!({ "subagent": subagent }))
         }
         "agents.read" => {
             let id = require_id(&params)?;
-            let st = state.lock().await;
+            let mut st = state.lock().await;
             match st.user_subagents.read(&id).map_err(subagent_err)? {
                 Some((subagent, body)) => Ok(json!({ "subagent": subagent, "body": body })),
                 None => Ok(json!({ "subagent": null, "body": null })),
@@ -3128,23 +3181,20 @@ async fn handle_request(
         "agents.remove" => {
             let id = require_id(&params)?;
             let mut st = state.lock().await;
-            let ok = st
-                .user_subagents
-                .remove(&id)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+            let ok = st.user_subagents.remove(&id).map_err(subagent_err)?;
             Ok(json!({ "ok": ok }))
         }
         "agents.setEnabled" => {
             let id = require_id(&params)?;
             let enabled = params
                 .get("enabled")
-                .and_then(|v| v.as_bool())
+                .and_then(Value::as_bool)
                 .unwrap_or(false);
             let mut st = state.lock().await;
             let subagent = st
                 .user_subagents
                 .set_enabled(&id, enabled)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                .map_err(subagent_err)?;
             Ok(json!({ "subagent": subagent }))
         }
         "agents.setScope" => {
@@ -3154,7 +3204,7 @@ async fn handle_request(
             let subagent = st
                 .user_subagents
                 .set_scope(&id, scope)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
+                .map_err(subagent_err)?;
             Ok(json!({ "subagent": subagent }))
         }
 
@@ -3301,11 +3351,31 @@ mod tests {
     use serde_json::{json, Value};
     use tokio::sync::{mpsc, Mutex};
 
-    use super::{handle_request, resolve_tool_workspace};
+    use super::{
+        capability_err, handle_request, parse_capability_query, resolve_tool_workspace, scope_err,
+        skill_err,
+    };
     use crate::plans::{PlanResolveParams, PlanSubmitParams};
     use crate::scheduled;
     use crate::sessions;
     use crate::state::AppState;
+
+    #[test]
+    fn capability_errors_keep_their_protocol_code() {
+        let missing_project = parse_capability_query(&json!({ "level": "project" }))
+            .expect_err("project queries require a project path");
+        assert_eq!(
+            missing_project.data.unwrap()["errorCode"],
+            "CAPABILITY_INVALID"
+        );
+
+        let unknown_level = parse_capability_query(&json!({ "level": "workspace" }))
+            .expect_err("unknown capability levels are invalid");
+        assert_eq!(unknown_level.data.unwrap()["errorCode"], "CAPABILITY_INVALID");
+        assert_eq!(scope_err("CAPABILITY_INVALID: missing project").data.unwrap()["errorCode"], "CAPABILITY_INVALID");
+        assert_eq!(skill_err("CAPABILITY_INVALID: missing project").data.unwrap()["errorCode"], "CAPABILITY_INVALID");
+        assert_eq!(capability_err("missing project").data.unwrap()["errorCode"], "CAPABILITY_INVALID");
+    }
 
     fn available_test_shell_id() -> Option<String> {
         crate::tools::shell::catalog(None)
@@ -4667,9 +4737,10 @@ mod tests {
             let state = Arc::new(Mutex::new(app_state));
             let (tx, _rx) = mpsc::unbounded_channel();
 
-            let error = handle_request(state.clone(), "scheduled.run", json!({ "id": task.id }), tx)
-                .await
-                .unwrap_err();
+            let error =
+                handle_request(state.clone(), "scheduled.run", json!({ "id": task.id }), tx)
+                    .await
+                    .unwrap_err();
             assert_eq!(
                 error.data.unwrap()["errorCode"],
                 "PLAN_REQUIRES_INTERACTIVE_SESSION",
@@ -5036,8 +5107,8 @@ mod tests {
         assert_eq!(allowed["content"]["root"], "workspace");
         // No permission request may arrive: the scope auto-allowed the write.
         // The channel is dropped with the request, so Ok(None) counts as clean.
-        let stray = tokio::time::timeout(std::time::Duration::from_millis(100), notify_rx.recv())
-            .await;
+        let stray =
+            tokio::time::timeout(std::time::Duration::from_millis(100), notify_rx.recv()).await;
         match stray {
             Err(_) | Ok(None) => {}
             Ok(Some(text)) => {
@@ -5185,11 +5256,8 @@ mod tests {
             json!(canonical_outside_file.to_string_lossy()),
         );
 
-        let stray = tokio::time::timeout(
-            std::time::Duration::from_millis(100),
-            notify_rx.recv(),
-        )
-        .await;
+        let stray =
+            tokio::time::timeout(std::time::Duration::from_millis(100), notify_rx.recv()).await;
         match stray {
             Err(_) | Ok(None) => {}
             Ok(Some(text)) => {

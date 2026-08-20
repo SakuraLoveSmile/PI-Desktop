@@ -1051,3 +1051,334 @@
   font-size: var(--text-sm);
   text-align: center;
 }
+
+/* -------------------------------------------------------------------------
+ * Settings > Agent capability management.
+ * The lists deliberately have a fixed viewport: empty states and project
+ * changes never move the page or make the two columns disagree in height.
+ */
+.agent-capability-page {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.agent-capability-intro {
+  max-width: 78ch;
+  margin: -12px 0 4px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+}
+
+.agent-capability-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+
+.agent-capability-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agent-capability-column-wide {
+  width: 100%;
+}
+
+.agent-capability-column-head {
+  display: flex;
+  min-height: 48px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.agent-capability-column-title {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.agent-capability-column-label {
+  color: var(--ds-text-primary);
+  font-size: var(--text-md-plus);
+  font-weight: var(--font-weight-strong);
+}
+
+.agent-capability-column-title code,
+.agent-capability-command,
+.agent-capability-meta code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ds-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs-plus);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-capability-column-actions {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.agent-capability-project-picker {
+  position: relative;
+  display: inline-flex;
+  min-width: 132px;
+  max-width: 190px;
+  align-items: center;
+  gap: 5px;
+  color: var(--ds-text-muted);
+}
+
+.agent-capability-project-picker select {
+  min-width: 0;
+  width: 100%;
+  height: 28px;
+  appearance: none;
+  border: 1px solid var(--ds-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--ds-bg-secondary);
+  padding: 0 25px 0 25px;
+  color: var(--ds-text-primary);
+  font-size: var(--text-xs-plus);
+  outline: none;
+}
+
+.agent-capability-project-picker > svg:first-of-type {
+  position: absolute;
+  left: 8px;
+  pointer-events: none;
+}
+
+.agent-capability-project-picker > svg:last-of-type {
+  position: absolute;
+  right: 7px;
+  pointer-events: none;
+}
+
+.agent-capability-project-picker select:focus {
+  border-color: var(--ds-border-strong);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 20%, transparent);
+}
+
+.agent-capability-list {
+  display: flex;
+  height: 430px;
+  min-height: 430px;
+  flex-direction: column;
+  overflow: auto;
+  border-radius: var(--radius-lg);
+  background: var(--ds-bg-secondary);
+  box-shadow: 0 0 0 0.5px var(--ds-border-default);
+}
+
+:root[data-theme="light"] .agent-capability-list {
+  background: #ffffff;
+  box-shadow: 0 0 0 0.5px color-mix(in oklab, #1a1c1f 9%, transparent);
+}
+
+:root[data-theme="dark"] .agent-capability-list {
+  background: #212121;
+}
+
+.agent-capability-empty {
+  display: flex;
+  min-height: 100%;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm-plus);
+  text-align: center;
+}
+
+.agent-capability-row {
+  display: flex;
+  min-height: 92px;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px;
+  border-bottom: 1px solid var(--ds-border-subtle);
+}
+
+.agent-capability-row:last-child {
+  border-bottom: 0;
+}
+
+.agent-capability-row.is-off {
+  opacity: 0.5;
+}
+
+.agent-capability-glyph {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  color: var(--ds-text-secondary);
+}
+
+.agent-capability-glyph.is-ready {
+  background: color-mix(in oklab, var(--ds-success) 14%, transparent);
+  color: var(--ds-success);
+}
+
+.agent-capability-glyph.is-connecting {
+  background: color-mix(in oklab, var(--ds-warning) 14%, transparent);
+  color: var(--ds-warning);
+}
+
+.agent-capability-glyph.is-failed {
+  background: color-mix(in oklab, var(--ds-error) 14%, transparent);
+  color: var(--ds-error);
+}
+
+.agent-capability-glyph-agent {
+  background: color-mix(in oklab, var(--ds-text-primary) 10%, transparent);
+}
+
+.agent-capability-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-capability-row-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.agent-capability-name {
+  overflow: hidden;
+  color: var(--ds-text-primary);
+  font-size: var(--text-md-plus);
+  font-weight: var(--font-weight-medium-plus);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-capability-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
+  padding: 2px 7px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-normal);
+}
+
+.agent-capability-badge.is-ready {
+  background: color-mix(in oklab, var(--ds-success) 14%, transparent);
+  color: var(--ds-success);
+}
+
+.agent-capability-badge.is-failed {
+  background: color-mix(in oklab, var(--ds-error) 14%, transparent);
+  color: var(--ds-error);
+}
+
+.agent-capability-description {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+  line-height: var(--leading-body);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.agent-capability-command {
+  max-width: 100%;
+}
+
+.agent-capability-meta {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.agent-capability-meta code {
+  border-radius: var(--radius-xs);
+  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  padding: 2px 6px;
+}
+
+.agent-capability-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding-top: 1px;
+}
+
+.agent-mcp-scope {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+  padding: 10px 12px;
+}
+
+.agent-mcp-scope-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.agent-mcp-scope-label {
+  color: var(--ds-text-primary);
+  font-size: var(--text-sm-plus);
+  font-weight: var(--font-weight-medium-plus);
+}
+
+.agent-mcp-scope-hint {
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs-plus);
+}
+
+@media (max-width: 980px) {
+  .agent-capability-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .agent-capability-list {
+    height: 430px;
+    min-height: 430px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-capability-row,
+  .agent-capability-project-picker select {
+    transition: none;
+  }
+}

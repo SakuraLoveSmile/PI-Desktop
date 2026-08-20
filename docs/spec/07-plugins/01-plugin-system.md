@@ -428,18 +428,15 @@ Failure policy:
 The app shell's dedicated **Extensions** destination owns everything a user adds
 to the app. Do not duplicate any of it in Settings.
 
-Four tabs, because the three kinds are created in completely different ways —
-installed, configured, written — and one merged list would have to hide that
-behind a lowest-common-denominator row:
+The Extensions destination has two tabs because it is a plugin surface:
 
 | Tab | Contents |
 |---|---|
 | Installed | Plugins, grouped: needs attention, updates, active, disabled |
-| MCP | The user's own MCP servers (D193) |
-| Skills | The user's own skill documents (D194) |
 | Marketplace | Browse and install |
 
-Plugin features:
+MCP, Skills, and Subagents are managed in the three independent Settings > Agent
+pages. They are not duplicated in Extensions. Plugin features remain:
 - Local install (choose directory / zip)
 - Developer load (path)
 - Activation scope (off / this project / everywhere)
@@ -454,6 +451,7 @@ Status indicators:
 - error
 - dev-loaded
 
+### 12.1 The activation-scope control
 ### 12.1 The activation-scope control
 
 One control serves all three kinds (D192). It is a three-segment track ordered
@@ -471,21 +469,23 @@ Rules the control encodes:
 - A project-scoped extension with an empty list warns instead of silently doing
   nothing.
 
-### 12.2 MCP tab
+### 12.2 MCP management in Settings > Agent
 
-- **Import from JSON** is the primary action: a pasted `mcpServers` block is what
-  users have on hand. Bad entries are listed with a reason, not fatal (D193).
-- Each row's leading glyph doubles as the connection light — idle, connecting,
-  ready, failed — so "is this working" is the first thing read.
-- The editor sheet has stdio and HTTP transport cards, key/value rows for env or
-  headers, and a **Test connection** button that reports the tool names it found.
+- The MCP page has independent global and selected-project columns rooted at
+  `~/.agents/servers` and `<project>/.agents/servers`.
+- Add and Edit reuse `McpEditorSheet`, including stdio/HTTP transport cards,
+  environment/header rows, validation, duplicate checks, and Test connection.
+- Enablement is app-local and project records shadow global records before the
+  active runtime filters disabled rows.
 
-### 12.3 Skills tab
+### 12.3 Skills management in Settings > Agent
 
-- Create writes `SKILL.md`; import copies an existing document in.
-- The description is required and sits above the body, because it is the only
-  part that enters the prompt (D174, D194).
-- A live byte counter against the 128KB document cap.
+- The Skills page has independent global and selected-project columns rooted at
+  `~/.agents/skills` and `<project>/.agents/skills`.
+- Each column has one native single-file Import action; the host physically
+  copies the selected file and scans its frontmatter.
+- The description is the catalog summary and the body is fetched only when the
+  model invokes `Skill` (D174, D194).
 
 ## 13. Developer experience
 

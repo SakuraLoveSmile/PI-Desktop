@@ -1046,6 +1046,15 @@ export type PluginSummary = {
   settings?: PluginSettingDefinition[];
 };
 
+/** The filesystem level that owns an agent capability. */
+export type AgentCapabilityLevel = "global" | "project";
+
+/** A settings-page query for one capability column. */
+export type AgentCapabilityQuery = {
+  level: AgentCapabilityLevel;
+  projectPath?: string;
+};
+
 /** Transport of an MCP server the user configured themselves. */
 export type McpTransport = "stdio" | "http";
 
@@ -1061,6 +1070,12 @@ export type McpTransport = "stdio" | "http";
 export type McpServerRecord = {
   id: string;
   label: string;
+  /** Filesystem ownership, present for the Agent settings management page. */
+  level?: AgentCapabilityLevel;
+  /** Project root when `level === "project"`. */
+  projectPath?: string;
+  /** Absolute config path; never used for activation state. */
+  path?: string;
   description?: string;
   transport: McpTransport;
   /** stdio: executable name or absolute path. */
@@ -1080,6 +1095,8 @@ export type McpServerRecord = {
 export type McpServerInput = {
   id: string;
   label?: string;
+  level?: AgentCapabilityLevel;
+  projectPath?: string;
   description?: string;
   transport: McpTransport;
   command?: string;
@@ -1110,7 +1127,8 @@ export type McpServerView = McpServerRecord & {
 };
 
 /**
- * A skill document the user owns, stored under `<data>/skills/<id>/SKILL.md`.
+ * A skill document the user owns, stored under `~/.agents/skills` or a
+ * project's `.agents/skills` directory.
  *
  * Reaches the model through the same catalog-plus-`Skill`-tool path as built-in
  * and plugin skills (D174), so the three are indistinguishable once loaded.
@@ -1119,6 +1137,10 @@ export type UserSkillRecord = {
   /** Slug used both as the directory name and as the id the model passes. */
   id: string;
   name: string;
+  /** Filesystem ownership, present for the Agent settings management page. */
+  level?: AgentCapabilityLevel;
+  /** Project root when `level === "project"`. */
+  projectPath?: string;
   description?: string;
   enabled: boolean;
   scope?: ActivationScope;
@@ -1135,6 +1157,8 @@ export type UserSkillRecord = {
 export type UserSkillInput = {
   id?: string;
   name: string;
+  level?: AgentCapabilityLevel;
+  projectPath?: string;
   description?: string;
   body?: string;
   enabled?: boolean;
@@ -1142,17 +1166,18 @@ export type UserSkillInput = {
 };
 
 /**
- * A subagent definition the user owns, stored as `<data>/agents/<id>.md` with
- * its metadata in `<data>/agents/registry.json` (D202, ADR 0063).
+ * A global subagent definition the user owns, stored as `~/.agents/subagents/<id>.md`
+ * (D202, ADR 0063). Project roots do not provide subagent definitions.
  *
- * The same filename shape a project uses, so a definition can be copied between
- * the two unchanged. `id` and `name` are deliberately the same string: the name
+ * `id` and `name` are deliberately the same string: the name
  * is the handle the model passes to `Task`, and keeping the document named after
  * it is what lets the UI tell which source won a name.
  */
 export type UserSubagentRecord = {
   id: string;
   name: string;
+  /** Subagents are global-only; the level is explicit for the settings API. */
+  level?: "global";
   description: string;
   enabled: boolean;
   scope?: ActivationScope;

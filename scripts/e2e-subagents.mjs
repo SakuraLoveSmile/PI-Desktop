@@ -1,15 +1,21 @@
-#!/usr/bin/env node
 /**
  * PI-Desktop subagent registry e2e (headless protocol-level, D202).
  * Drives the real host-core binary over its NDJSON RPC pipe against a throwaway
- * data dir, then feeds the documents it wrote through the real loader — the two
- * halves the unit suites cover separately and never together.
+ * data dir and temporary HOME, then feeds the global documents it wrote through
+ * the real loader. This script is intentionally not run by local validation.
  *
  * Env:
  *  PI_DESKTOP_HOST_BIN (optional)
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readdirSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,24 +42,30 @@ if (!hostBin) {
 }
 
 const dataDir = mkdtempSync(join(tmpdir(), "pi-subagent-data-"));
+const homeDir = mkdtempSync(join(tmpdir(), "pi-subagent-home-"));
 const projectA = mkdtempSync(join(tmpdir(), "pi-project-a-"));
 const projectB = mkdtempSync(join(tmpdir(), "pi-project-b-"));
+const agentsDir = join(homeDir, ".agents", "subagents");
+const previousHome = process.env.HOME;
+const previousUserProfile = process.env.USERPROFILE;
+// host-core's dirs::home_dir and the runtime's homedir() must resolve to the
+// throwaway home, otherwise this protocol test could touch the real account.
+process.env.HOME = homeDir;
+process.env.USERPROFILE = homeDir;
 
 const host = spawn(hostBin, [], {
-  env: { ...process.env, PI_DESKTOP_DATA_DIR: dataDir, RUST_LOG: "error" },
+  env: {
+    ...process.env,
+    HOME: homeDir,
+    USERPROFILE: homeDir,
+    PI_DESKTOP_DATA_DIR: dataDir,
+    RUST_LOG: "error",
+  },
   stdio: ["pipe", "pipe", "pipe"],
 });
 host.stderr.on("data", (chunk) => {
   const text = String(chunk).trim();
   if (text) console.error("[host]", text);
-});
-// A debug host-core takes seconds to boot, so a call issued at t=0 waits on it;
-// failing the whole run fast when it dies beats waiting out every timeout.
-host.on("exit", (code, signal) => {
-  for (const [id, { reject }] of pending) {
-    pending.delete(id);
-    reject(new Error(`host exited code=${code} signal=${signal}`));
-  }
 });
 
 let seq = 0;
@@ -79,6 +91,12 @@ host.stdout.on("data", (chunk) => {
     }
   }
 });
+host.on("exit", (code, signal) => {
+  for (const [id, { reject }] of pending) {
+    pending.delete(id);
+    reject(new Error(`host exited code=${code} signal=${signal}`));
+  }
+});
 
 const call = (method, params = {}) =>
   new Promise((settle, reject) => {
@@ -100,7 +118,6 @@ const check = (label, ok, detail = "") => {
 };
 
 try {
-  // 0. Handshake — every other method answers UNAUTHORIZED without it.
   const hello = await call("app.handshake", { protocolVersion: PROTOCOL_VERSION });
   check(
     "handshake accepted",
@@ -108,7 +125,6 @@ try {
     `host ${hello.result?.version}`,
   );
 
-  // 1. Create.
   const created = await call("agents.create", {
     name: "Log Reader",
     description: "Read build logs and report the first real failure.",
@@ -117,8 +133,6 @@ try {
   });
   const record = created.result?.subagent;
   check("agents.create returns a record", !!record, JSON.stringify(record?.id));
-  // id == name == slug: the name is the handle the model passes to Task, so a
-  // display name that differed from the handle would be a second identity.
   check(
     "the name is slugified into the Task handle",
     record?.id === "log-reader" && record?.name === "log-reader",
@@ -130,12 +144,10 @@ try {
     JSON.stringify(record?.tools),
   );
 
-  // 2. Documents on disk.
-  const agentsDir = join(dataDir, "agents");
   const entries = readdirSync(agentsDir).sort();
   check(
-    "the registry writes a flat <id>.md beside registry.json",
-    entries.includes("log-reader.md") && entries.includes("registry.json"),
+    "the global registry writes ~/.agents/subagents/<id>.md",
+    entries.includes("log-reader.md") && !entries.includes("registry.json"),
     entries.join(", "),
   );
   const document = readFileSync(join(agentsDir, "log-reader.md"), "utf8");
@@ -147,7 +159,6 @@ try {
     JSON.stringify(document.split("\n").slice(0, 6).join(" | ")),
   );
 
-  // 3. Duplicate names are refused, not suffixed.
   const dup = await call("agents.create", {
     name: "log-reader",
     description: "A second one.",
@@ -159,43 +170,23 @@ try {
     `${dup.error?.code}/${dup.error?.data?.errorCode}: ${dup.error?.message}`,
   );
 
-  // 4. Scope filtering.
-  const before = await call("agents.active", { projectPath: projectA });
+  const activeA = await call("agents.active", { projectPath: projectA });
+  const activeB = await call("agents.active", { projectPath: projectB });
   check(
-    "a global definition is active in any project",
-    before.result?.subagents?.length === 1,
-    `${before.result?.subagents?.length} active`,
+    "one global definition is active in every project",
+    activeA.result?.subagents?.length === 1 && activeB.result?.subagents?.length === 1,
+    `A=${activeA.result?.subagents?.length} B=${activeB.result?.subagents?.length}`,
   );
-  await call("agents.setScope", {
-    id: "log-reader",
-    scope: { mode: "projects", projects: [projectB] },
-  });
-  const inA = await call("agents.active", { projectPath: projectA });
-  const inB = await call("agents.active", { projectPath: projectB });
-  check(
-    "scoping to one project removes it from the other",
-    inA.result?.subagents?.length === 0 && inB.result?.subagents?.length === 1,
-    `A=${inA.result?.subagents?.length} B=${inB.result?.subagents?.length}`,
-  );
-  const listed = await call("agents.list");
-  check(
-    "list still shows it, so the UI can report it as inactive here",
-    listed.result?.subagents?.length === 1,
-    `${listed.result?.subagents?.length} listed`,
-  );
-  await call("agents.setScope", { id: "log-reader", scope: { mode: "global", projects: [] } });
 
-  // 5. Disabled records leave the active set.
   await call("agents.setEnabled", { id: "log-reader", enabled: false });
   const off = await call("agents.active", { projectPath: projectA });
   check(
-    "a disabled definition is not active anywhere",
+    "a disabled global definition is not active anywhere",
     off.result?.subagents?.length === 0,
     `${off.result?.subagents?.length} active`,
   );
   await call("agents.setEnabled", { id: "log-reader", enabled: true });
 
-  // 6. Read returns the body the editor sheet loads.
   const read = await call("agents.read", { id: "log-reader" });
   check(
     "read returns the body for the editor",
@@ -203,10 +194,10 @@ try {
     JSON.stringify((read.result?.body ?? "").slice(0, 40)),
   );
 
-  // 7. The cap matches MAX_SUBAGENT_DEFINITIONS, so the UI cannot store a
-  // definition the loader would then drop.
+  // The registry allows 64 user documents; the runtime catalog remains capped
+  // separately at 16 definitions when it builds the model-facing menu.
   let capError = null;
-  for (let i = 0; i < 20; i += 1) {
+  for (let i = 0; i < 64; i += 1) {
     const extra = await call("agents.create", {
       name: `filler-${i}`,
       description: "Filler.",
@@ -219,22 +210,19 @@ try {
   }
   const full = await call("agents.list");
   check(
-    "the registry caps at 16 definitions",
-    full.result?.subagents?.length === 16 && capError?.at === 15,
-    `${full.result?.subagents?.length} stored, refused on the ${capError?.at}th filler: ${capError?.error?.message}`,
+    "the global registry caps at 64 documents",
+    full.result?.subagents?.length === 64 && capError?.at === 63,
+    `${full.result?.subagents?.length} stored, refused on filler ${capError?.at}: ${capError?.error?.message}`,
   );
 
-  // 8. Remove.
-  for (let i = 0; i < 15; i += 1) await call("agents.remove", { id: `filler-${i}` });
+  for (let i = 0; i < 63; i += 1) await call("agents.remove", { id: `filler-${i}` });
   const trimmed = await call("agents.list");
   check(
     "remove deletes the record and its document",
-    trimmed.result?.subagents?.length === 1 &&
-      !readdirSync(agentsDir).includes("filler-0.md"),
+    trimmed.result?.subagents?.length === 1 && !readdirSync(agentsDir).includes("filler-0.md"),
     readdirSync(agentsDir).join(", "),
   );
 
-  // 9. Precedence through the real loader.
   const { loadSubagentDefinitions } = await import(
     join(root, "packages", "agent-runtime", "dist", "index.js")
   );
@@ -248,15 +236,15 @@ try {
   };
   const userDocuments = await readActive(projectA);
   const merged = await loadSubagentDefinitions(projectA, { userDocuments });
-  const byName = new Map(merged.definitions.map((d) => [d.name, d]));
+  const byName = new Map(merged.definitions.map((definition) => [definition.name, definition]));
   check(
-    "the registry document reaches the loader as a user definition",
+    "the global registry document reaches the loader as a user definition",
     byName.get("log-reader")?.source === "user",
     `source=${byName.get("log-reader")?.source}`,
   );
   check(
-    "the three builtins are still there beside it",
-    ["explorer", "code-reviewer", "test-runner"].every(
+    "the four builtins remain available beside it",
+    ["explorer", "code-reviewer", "test-runner", "fixer"].every(
       (name) => byName.get(name)?.source === "builtin",
     ),
     [...byName.keys()].join(", "),
@@ -268,29 +256,6 @@ try {
     JSON.stringify(byName.get("log-reader")?.tools),
   );
 
-  // A project document of the same name must win: the registry is a user-level
-  // layer, not a replacement for a committed .pi/agents document.
-  mkdirSync(join(projectA, ".pi", "agents"), { recursive: true });
-  writeFileSync(
-    join(projectA, ".pi", "agents", "log-reader.md"),
-    "---\nname: log-reader\ndescription: The project's own log reader.\ntools: Read\n---\n\nProject body.\n",
-  );
-  const shadowed = await loadSubagentDefinitions(projectA, { userDocuments });
-  const winner = shadowed.definitions.find((d) => d.name === "log-reader");
-  check(
-    "a project document shadows the registry entry",
-    winner?.source === "project" &&
-      winner?.description === "The project's own log reader.",
-    `source=${winner?.source} description=${winner?.description}`,
-  );
-  check(
-    "shadowing does not duplicate the name",
-    shadowed.definitions.filter((d) => d.name === "log-reader").length === 1,
-    `${shadowed.definitions.filter((d) => d.name === "log-reader").length} entries`,
-  );
-
-  // A registry definition named after a builtin must win over it — that is what
-  // "copy as my definition" is for.
   await call("agents.create", {
     name: "explorer",
     description: "My own explorer.",
@@ -300,9 +265,9 @@ try {
   const merged2 = await loadSubagentDefinitions(projectB, {
     userDocuments: await readActive(projectB),
   });
-  const explorer = merged2.definitions.find((d) => d.name === "explorer");
+  const explorer = merged2.definitions.find((definition) => definition.name === "explorer");
   check(
-    "a registry copy of a builtin outranks the builtin",
+    "a global user copy of a builtin outranks the builtin",
     explorer?.source === "user" && explorer?.description === "My own explorer.",
     `source=${explorer?.source}`,
   );
@@ -312,13 +277,12 @@ try {
     merged2.diagnostics.join(" / "),
   );
 
-  // 10. A malformed registry document degrades to a diagnostic.
-  const broken = await loadSubagentDefinitions(projectB, {
+  const broken = await loadSubagentDefinitions(null, {
     userDocuments: [{ id: "broken", document: "no frontmatter at all\n" }],
   });
   check(
-    "a malformed document becomes a diagnostic without losing the builtins",
-    broken.diagnostics.length === 1 && broken.definitions.length === 3,
+    "a malformed user document becomes a diagnostic without losing builtins",
+    broken.diagnostics.length === 1 && broken.definitions.length === 4,
     `${broken.diagnostics.length} diagnostic(s), ${broken.definitions.length} definitions: ${broken.diagnostics[0]}`,
   );
 } catch (error) {
@@ -326,11 +290,15 @@ try {
 } finally {
   host.stdin.end();
   host.kill();
-  for (const dir of [dataDir, projectA, projectB]) {
+  for (const dir of [dataDir, homeDir, projectA, projectB]) {
     rmSync(dir, { recursive: true, force: true });
   }
+  if (previousHome === undefined) delete process.env.HOME;
+  else process.env.HOME = previousHome;
+  if (previousUserProfile === undefined) delete process.env.USERPROFILE;
+  else process.env.USERPROFILE = previousUserProfile;
 }
 
-const failed = results.filter((r) => !r.ok);
+const failed = results.filter((result) => !result.ok);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
 process.exit(failed.length ? 1 : 0);

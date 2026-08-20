@@ -194,44 +194,19 @@ The user must explicitly switch it to Agent before enabling unattended
 execution.
 
 ### 3.5 Extensions
-The Extensions destination uses a compact, two-tier tool header: a quiet 24px
-extension mark and an 18px page title share the first row with the contextual
-primary action and a 30px overflow menu; the five-part segmented control —
-Installed / MCP / Skills / Subagents / Marketplace — with relevant tab counts;
-it does not render a separate numeric overview band (D202 amends D196, which
-amends D169). The title row and segmented row use hairline separators and
-restrained control heights so the Windows frameless titlebar remains visually
-separate from the page controls; the top-right action rail must remain below
-the native window control band, retain its no-drag hit area, and expose a
-visible keyboard focus ring.
-Installed groups rows by state — Needs attention / Updates available / Active /
-Turned off — inside one hairline-separated panel. Each row stays to a two-line
-summary: plugin glyph, name, optional Local marker, id, and version. The group
-heading carries the state, while errors remain inline. Capabilities, resident
-service status, and risk-tinted permission chips are behind a native Details
-disclosure so the default list stays quiet without hiding them. The activation
-scope is one current-state trigger; its compact menu exposes Off / This project
-/ Everywhere and the selected-project picker without adding a second segmented
-toolbar. Icon actions remain visible at rest (open panel, overflow menu with
-auto-update and Uninstall), with visible hover/focus labels. MCP,
-Skills and Subagents provide their own scoped configuration and authoring
-surfaces. Subagents lists the registry definitions the user owns — each with an
-activation scope, an editor sheet, reveal and delete — above a read-only list of
-the effective delegate catalog (builtins and project `.pi/agents` documents),
-whose only actions are reveal and "copy as my definition" (D202).
-Marketplace is a card grid with category chips and skeleton placeholders.
-Development-only marketplace fixtures whose IDs begin with `demo.` are
-filtered from the client cards and search results; installed copies remain
-manageable in Installed.
-Details open in a right-side sheet (about, links, safety notes, risk-labeled
-permissions, version picker, readme). Installing opens a permission dialog
-that groups requests by risk tier and marks permissions new to an upgrade.
+
+The Extensions destination is a focused plugin surface with a compact header and
+only two tabs: **Installed** and **Marketplace**. Installed groups plugin rows
+by state — Needs attention / Updates available / Active / Turned off — inside
+one hairline-separated panel. Marketplace remains the browse/install card grid.
+MCP, Skills, and Subagents are not tabs or sections of Extensions.
 
 ### 3.6 Settings (full-page takeover)
-Settings replaces the whole shell (D063): back-to-app + search + a compact
-eight-destination rail in the exact order Basics / 全局 AI / Shortcuts /
-Instructions / Model configuration / Import / Project archive / Info, with
-elevated content cards.
+### 3.6 Settings (full-page takeover)
+Settings replaces the whole shell (D063): back-to-app + search + a grouped
+settings rail. The Agent group contains independent Skills, MCP, and Subagents
+destinations alongside Instructions and Model configuration; selecting one
+changes the page destination rather than a tab inside a shared capability panel.
 Appearance lives inside Basics; global AI behavior (permissions and context
 management) lives inside 全局 AI; keyboard shortcuts and global/project
 instructions have their own destinations; provider management lives inside
@@ -243,7 +218,22 @@ with all groups collapsed. Project archive owns the durable D086 Projects index
 archived records. Opening or switching a project retains a sidebar tab, selects
 that project as the active workspace, and returns to chat. Other retained tabs
 stay open. Extension management remains solely on the app shell's independent
-Extensions destination described in §3.5.
+Extensions destination described in §3.5. Settings > Agent has the following
+shared capability contract:
+
+- Skills and MCP use fixed-height global/project columns. The project column
+  shows a recent-project picker, directory path, empty-state placeholder, and
+  one local list of rows; project records take precedence over global records.
+- Skills have one native **Import** action per column. It accepts exactly one
+  file and physically copies it into the selected `.agents/skills` directory.
+- MCP has one **Add** action per column. Add and Edit open the existing
+  `McpEditorSheet` as a modal overlay with stdio/HTTP branches, validation,
+  duplicate checks, locked edit ids, scope text, and Test connection feedback.
+- Subagents use one full-width global column under `~/.agents/subagents`; they
+  have no project picker, project column, or project-level toggle.
+- All three lists keep a constant height, render an empty state in that space,
+  dim disabled rows, and store enablement in app-local state rather than
+  capability files.
 
 ## 4. Overlays
 

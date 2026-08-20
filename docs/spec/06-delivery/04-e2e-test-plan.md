@@ -1179,8 +1179,7 @@ Each scenario is documented in this format:
   available marketplace action; dark and light themes available.
 - **Steps**: 1) Open Extensions in dark theme. 2) On Windows/Linux, confirm
   the compact two-tier header presents the extension mark/title and contextual
-  action rail below the native window-control band, then confirm the Installed /
-  MCP / Skills / Subagents / Marketplace tabs reach the content
+  action rail below the native window-control band, then confirm the Installed and Marketplace tabs are the only tabs and both reach the content
   without a four-card numeric overview band or explanatory header/section
   paragraphs. 3) Confirm installed rows begin
   as a quiet two-line summary, then expand Details on one row and inspect its
@@ -3631,10 +3630,10 @@ Each scenario is documented in this format:
 
 #### E2E-119: Parallel subagents report back without entering the parent's context
 
-- **Preconditions**: A project-bound Agent session with a workspace containing
-  `.pi/agents/scout.md` (read-only, no `tools` key), `.pi/agents/fixer.md`
-  (`tools: Read, Edit`), `.pi/agents/pinned.md` (`model:` naming a second
-  configured provider) and `.pi/agents/broken.md` (missing `name`); a provider
+- **Preconditions**: A project-bound Agent session with the user home containing
+  `~/.agents/subagents/scout.md` (read-only, no `tools` key), `~/.agents/subagents/fixer.md`
+  (`tools: Read, Edit`), `~/.agents/subagents/pinned.md` (`model:` naming a second
+  configured provider) and `~/.agents/subagents/broken.md` (missing `name`); a provider
   whose stream can be driven to emit two `Task` calls in one assistant message;
   permission mode `ask` so a delegate's `Edit` is gated; read access to
   `<data_dir>/sessions/<id>.jsonl` and the `messages` index.
@@ -3696,7 +3695,7 @@ Each scenario is documented in this format:
 - **Status**: Covered by unit tests (2026-08-06): `packages/shared`
   `subagent-definition.test.ts` and `packages/agent-runtime`
   `subagent-definitions.test.ts` (frontmatter, tool filtering, caps, malformed
-  documents, project-shadows-builtin); `subagent.test.ts` (report bounding, turn
+  documents, global-user-shadows-builtin); `subagent.test.ts` (report bounding, turn
   cap, abort, event attribution, prompt framing) and `path-lock.test.ts`
   (same-path ordering, concurrency cap); desktop `permission-inline.test.mjs`
   (queue order, id-matched removal, tool-call removal, abort denying the queue,
@@ -4099,53 +4098,59 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`model-capabilities.test.ts`); provider/UI journey
   Draft (do not run E2E locally unless explicitly requested)
 
-#### E2E-103: A subagent written in the UI reaches Task, scoped and shadowed
+#### E2E-103: Settings Agent pages manage file-backed capabilities
 
-- **Preconditions**: The app is running with two projects registered, A and B,
-  and an Agent session available in each. Neither project has a
-  `.pi/agents/` directory. Record the app data directory.
+- **Preconditions**: The app is running with two registered projects, A and B,
+  and an Agent session available in each. The fixtures use only
+  `~/.agents/skills`, `~/.agents/servers`, `~/.agents/subagents`, and the two
+  projects' `.agents` directories; no `.pi` capability directory exists.
 - **Steps**:
-  1. Extensions → Subagents → New. Name it `log-reader`, write a description and
-     a body, grant `Read, Grep, Bash`, and save. Confirm the row shows the
-     `Task(log-reader)` handle and tints `Bash` as a mutating grant.
-  2. In a session in project A — without restarting the app — ask the agent to
-     delegate to `log-reader` and confirm `Task` accepts the name.
-  3. Set the row's scope to project B only. Start a new turn in project A and
-     confirm `Task` no longer offers `log-reader` and the row reports it is not
-     active here; repeat in project B and confirm it is offered there.
-  4. Return the scope to global. In the read-only list, copy `explorer` as your
-     own definition, save it unchanged, and confirm the registry copy appears
-     while `explorer` no longer appears as a builtin — the copy is what `Task`
-     would run. Rename the copy and confirm both entries are then listed.
-  5. Write `<project A>/.pi/agents/log-reader.md` with a different description.
-     Reopen the tab and confirm the registry row reports the project document as
-     the winner, and that the read-only list shows the project definition.
-  6. Delete `log-reader` from the registry and confirm `<data>/agents/` no longer
-     holds its document while the project document still loads.
+  1. Open Settings > Agent and verify Skills, MCP, and Subagents are three
+     independent navigation destinations. Open Extensions and verify that only
+     Installed and Marketplace tabs are present.
+  2. Open Skills. Confirm the global column shows `~/.agents/skills`, the project
+     column shows project A's `.agents/skills`, both lists have the same fixed
+     height, and the project picker changes the selected project.
+  3. Toggle a global skill off while project A is selected. Confirm the row is
+     dimmed, a toast names the skill, and the global document remains unchanged.
+     Switch to project B and confirm the global skill remains enabled there.
+  4. Put a same-name project skill in A and disable it. Confirm the effective
+     runtime catalog does not fall back to the global skill; the project record
+     shadows first and filtering happens second.
+  5. Use the project Import action to choose exactly one Markdown file. Confirm
+     it is physically copied to `<project A>/.agents/skills`, appears immediately,
+     and a second file cannot be selected in the same picker invocation.
+  6. Open MCP. Add a project server and a global server, edit the project server,
+     and test an existing connection. Confirm the modal locks the id while
+     editing, rejects a same-level duplicate id or label, and reports ready or
+     failed through the row and toast.
+  7. Delete a skill or MCP file outside the app, reload its page, and confirm the
+     row disappears and its local state has no orphaned entry. Confirm deleting
+     a global file also removes its project overrides.
+  8. Open Subagents. Confirm it is one global-only column rooted at
+     `~/.agents/subagents`, with no project picker or project-level controls.
 - **Expected**:
-  - Creating, editing, scoping and deleting a definition never writes into a
-    project; `git status` in both projects stays clean except for the file
-    written by hand in step 5.
-  - A saved edit takes effect on the next prompt with no restart, because the
-    catalog is re-read per launch.
-  - A duplicate name is refused with `SUBAGENT_INVALID` rather than silently
-    suffixed, and the registry cannot exceed 16 definitions.
-  - Builtin and project rows offer no enable switch and no scope control; their
-    only actions are reveal (project only) and copy.
-  - Precedence is project > user registry > builtin everywhere it is reported.
-- **Specs linked**: `03-runtime/01-ipc-protocol.md` §12c–§12d,
-  `03-runtime/02-agent-runtime.md` §5f, `04-ux/01-ui-ia.md` §3.5,
-  `08-meta/decisions-log.md` (D192, D201, D202), ADR 0062, ADR 0063
-- **Acceptance**: E (tools & permissions), F (persistence), Quality
-- **Milestone**: M6
-- **Status**: Partly automated (`scripts/e2e-subagents.mjs` — the registry over
-  real host-core RPC, then its documents through the real loader: scope
-  filtering both ways, the 16 cap, project > user > builtin precedence, and a
-  malformed document degrading to a diagnostic) plus unit coverage (host-core
-  `user_subagents` tests, `packages/agent-runtime` subagent definition tests,
-  `apps/desktop/test/extensions-page.test.mjs`,
-  `apps/desktop/test/subagent-wiring.test.mjs`); the UI journey through `Task`
-  stays Draft (do not run E2E locally unless explicitly requested)
+  - The three Settings pages use no tabs for switching capabilities, preserve
+    list height for empty and populated states, support dark and light themes,
+    and show project-over-global priority in their explanatory copy.
+  - Capability files contain configuration/frontmatter only; enablement is
+    persisted in the app-local `agent-capabilities` state files.
+  - Project records shadow global records by id or name even when disabled,
+    and the next runtime activation reflects the same result as the UI.
+  - Physical import is single-file and level-specific, and disk deletion is
+    removed by scanning rather than represented as a pending row.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §12a–§12d,
+  `03-runtime/02-agent-runtime.md` §5f, `04-ux/01-ui-ia.md` §3.5–§3.6,
+  `07-plugins/01-plugin-system.md` §12.2–§12.3,
+  `08-meta/decisions-log.md` (D193, D194, D202), ADR 0112
+- **Acceptance**: D (workspace), E (tools & permissions), F (persistence),
+  Quality
+- **Milestone**: M6+
+- **Status**: Source/unit covered by
+  `apps/desktop/test/agent-capability-settings.test.mjs`,
+  `apps/desktop/test/extensions-page.test.mjs`, and host-core capability tests;
+  full native-picker, rendered modal, project-switch, and runtime journey remain
+  Draft (do not run E2E locally unless explicitly requested)
 
 #### E2E-120: Global plugin launch, next-turn editing, and stopped throughput
 
@@ -5793,8 +5798,8 @@ This test plan spec is accepted when:
 - **Preconditions**: A project-bound Agent session whose permission mode can be
   switched between `ask`, `accept-edits`, and `auto`, with a provider whose
   stream can be driven; the four builtin subagents (`explorer`,
-  `code-reviewer`, `test-runner`, `fixer`) and a project
-  `.pi/agents/readonly.md` definition. Builtins use the default
+  `code-reviewer`, `test-runner`, `fixer`) and a global
+  `~/.agents/subagents/readonly.md` definition. Builtins use the default
   `permission: inherit` behavior.
 - **Steps**:
   1. Prompt a turn in which the assistant emits two `Task` calls — `explorer`
@@ -5828,7 +5833,7 @@ This test plan spec is accepted when:
      text before calling TaskWait (so Task and TaskWait land in different
      activity parts); confirm the topology card shows "completed" status on
      both nodes once TaskWait returns, not stuck at "running".
-  9. Edit `.pi/agents/readonly.md` to declare `permission: auto` and reload the
+  9. Edit `~/.agents/subagents/readonly.md` to declare `permission: auto` and reload the
      catalog; confirm the definition still loads but carries a warning, and
      that its delegate still resolves under the session's effective mode (a
      `Write` inside the workspace still raises a permission card).
@@ -5837,7 +5842,7 @@ This test plan spec is accepted when:
   `TaskList`/`TaskStop` drive the lifecycle; builtin `fixer` inherits the
   selected session permission mode, so `auto` also covers explicit external
   paths without a duplicate authorization prompt while `ask` and
-  `accept-edits` retain their approval boundaries; a project definition's
+  `accept-edits` retain their approval boundaries; a global definition's
   declared scope is dropped; the per-session running cap of 10 is enforced; no
   delegate outlives its turn; reloaded transcripts keep their delegation
   topology.

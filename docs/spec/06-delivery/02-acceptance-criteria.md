@@ -103,9 +103,10 @@ MVP passes when:
   E2E-112–E2E-116 + host-core fallback test
 
 ### M6+ Current product increment
-- [x] Extensions page manages installed plugins, standalone MCP servers,
-  Skills, and Subagents with global/project activation scopes — unit/source
-  contracts plus E2E-100–E2E-103
+- [x] Extensions keeps only Installed and Marketplace tabs; Settings > Agent
+  provides independent Skills, MCP, and global-only Subagents pages with fixed
+  columns, local enablement, project selection, and source scanning —
+  unit/source contracts plus E2E-100–E2E-103
 - [x] Session import, scheduled task records, composer file references and
   clipboard files, global plugin launcher, and next-turn configuration are
   represented by the current E2E catalog — E2E-036, E2E-059, E2E-102,

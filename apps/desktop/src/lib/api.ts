@@ -1,5 +1,6 @@
 import type {
   ActivationScope,
+  AgentCapabilityQuery,
   AgentEventEnvelope,
   AgentCompactRequest,
   AgentCompactResponse,
@@ -455,19 +456,28 @@ export const api = {
     invoke<{ plugin?: PluginSummary }>(IPC.invoke.pluginSetScope, { id, scope }),
 
   // --- MCP servers the user owns -------------------------------------------
-  listMcpServers: () =>
-    invoke<{ servers: McpServerRecord[]; statuses: McpServerStatus[] }>(IPC.invoke.mcpList),
-  /** Create or replace a server; the id decides which. */
+  listMcpServers: (query?: AgentCapabilityQuery) =>
+    invoke<{ servers: McpServerRecord[]; statuses: McpServerStatus[] }>(
+      IPC.invoke.mcpList,
+      query,
+    ),
+  /** Create or replace a server; the id decides which level-local file. */
   upsertMcpServer: (server: McpServerInput) =>
     invoke<{ server: McpServerRecord }>(IPC.invoke.mcpUpsert, server),
-  removeMcpServer: (id: string) => invoke(IPC.invoke.mcpRemove, id),
-  setMcpServerEnabled: (id: string, enabled: boolean) =>
-    invoke(IPC.invoke.mcpSetEnabled, { id, enabled }),
+  removeMcpServer: (
+    id: string,
+    query?: Partial<AgentCapabilityQuery>,
+  ) => invoke(IPC.invoke.mcpRemove, { id, ...query }),
+  setMcpServerEnabled: (
+    id: string,
+    enabled: boolean,
+    query?: Partial<AgentCapabilityQuery>,
+  ) => invoke(IPC.invoke.mcpSetEnabled, { id, enabled, ...query }),
   setMcpServerScope: (id: string, scope: ActivationScope) =>
     invoke(IPC.invoke.mcpSetScope, { id, scope }),
   /** Force one handshake and report what happened, for the editor's test button. */
-  testMcpServer: (id: string) =>
-    invoke<{ status: McpServerStatus }>(IPC.invoke.mcpTest, id),
+  testMcpServer: (id: string, query?: Partial<AgentCapabilityQuery>) =>
+    invoke<{ status: McpServerStatus }>(IPC.invoke.mcpTest, { id, ...query }),
   /** Accept a pasted `mcpServers` block; bad entries are reported, not fatal. */
   importMcpServers: (text: string) =>
     invoke<{
@@ -476,27 +486,35 @@ export const api = {
     }>(IPC.invoke.mcpImport, { text }),
 
   // --- Skills the user owns -------------------------------------------------
-  listUserSkills: () => invoke<{ skills: UserSkillRecord[] }>(IPC.invoke.skillList),
+  listUserSkills: (query?: AgentCapabilityQuery) =>
+    invoke<{ skills: UserSkillRecord[] }>(IPC.invoke.skillList, query),
   createUserSkill: (skill: UserSkillInput) =>
     invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillCreate, skill),
-  /** Opens a native picker; `canceled` when the user backed out. */
-  importUserSkill: () =>
-    invoke<{ canceled?: boolean; skill?: UserSkillRecord }>(IPC.invoke.skillImport),
+  /** Opens a native picker for one file; `canceled` when the user backed out. */
+  importUserSkill: (query?: AgentCapabilityQuery) =>
+    invoke<{ canceled?: boolean; skill?: UserSkillRecord }>(IPC.invoke.skillImport, query),
   updateUserSkill: (id: string, skill: Omit<UserSkillInput, "id">) =>
     invoke<{ skill: UserSkillRecord }>(IPC.invoke.skillUpdate, { id, ...skill }),
   /** The record plus the document body, for the editor. */
-  readUserSkill: (id: string) =>
-    invoke<{ skill: UserSkillRecord | null; body?: string }>(IPC.invoke.skillRead, id),
-  removeUserSkill: (id: string) => invoke(IPC.invoke.skillRemove, id),
-  setUserSkillEnabled: (id: string, enabled: boolean) =>
-    invoke(IPC.invoke.skillSetEnabled, { id, enabled }),
+  readUserSkill: (id: string, query?: Partial<AgentCapabilityQuery>) =>
+    invoke<{ skill: UserSkillRecord | null; body?: string }>(IPC.invoke.skillRead, {
+      id,
+      ...query,
+    }),
+  removeUserSkill: (id: string, query?: Partial<AgentCapabilityQuery>) =>
+    invoke(IPC.invoke.skillRemove, { id, ...query }),
+  setUserSkillEnabled: (
+    id: string,
+    enabled: boolean,
+    query?: Partial<AgentCapabilityQuery>,
+  ) => invoke(IPC.invoke.skillSetEnabled, { id, enabled, ...query }),
   setUserSkillScope: (id: string, scope: ActivationScope) =>
     invoke(IPC.invoke.skillSetScope, { id, scope }),
   revealUserSkill: (id: string) => invoke(IPC.invoke.skillReveal, id),
 
   // --- Subagents the user owns ----------------------------------------------
-  listUserSubagents: () =>
-    invoke<{ subagents: UserSubagentRecord[] }>(IPC.invoke.subagentList),
+  listUserSubagents: (query?: Pick<AgentCapabilityQuery, "level">) =>
+    invoke<{ subagents: UserSubagentRecord[] }>(IPC.invoke.subagentList, query),
   /** What `Task` would offer right now, merged across all three sources. */
   subagentCatalog: () =>
     invoke<{

@@ -34,7 +34,7 @@ There is no account, no subscription, and no cloud in the middle: you connect th
 - **A real workbench.** Review the agent's edits as message-scoped diffs with guarded rollback, inspect command output in the transcript, preview a local app in a browser, and browse project files — all in a side panel, without leaving the conversation.
 - **Projects and sessions.** Sessions are grouped by project in a multi-project sidebar, with pinning, archiving, sorting, branching, notifications, and throwaway scratch sessions.
 - **Local-first and private.** Transcripts live on disk as plain JSONL with a SQLite index — easy to back up, grep, or delete. API keys go into the OS keychain. Logs stay local; there is no telemetry.
-- **Extensions beyond plugins.** Manage standalone MCP servers, Skills, and Subagents from the Extensions page, with global or project-scoped activation. Plugins can add commands, panels, agent tools, skills, themes, MCP servers, resident services, and a message bus; the local/official marketplace and `.piplug` package workflow are available today.
+- **Agent capabilities beyond plugins.** Manage standalone MCP servers, Skills, and global Subagents from Settings → Agent, with project-scoped Skills and MCP overrides. The Extensions page is reserved for installed plugins and the marketplace. Plugins can add commands, panels, agent tools, skills, themes, MCP servers, resident services, and a message bus; the local/official marketplace and `.piplug` package workflow are available today.
 - **A fast daily workflow.** Use slash commands and `@` file references, paste files into session scratch, stage the next turn while an answer streams, search plugins globally with Option/Alt+Space, and create manual or recurring task prompts.
 - **Comfortable to live in.** English and 简体中文, light/dark/system and plugin themes, command palette, onboarding checklist, local notifications, context checkpoints, and update notifications for packaged builds.
 
@@ -84,7 +84,7 @@ Packaged builds check GitHub Releases for new versions and show an in-app update
 1. **Add a model provider.** Open **Settings → Model configuration → Add provider**: pick the API style, paste the base URL and your API key, then choose or type a model ID. The key is stored in your OS keychain and never shown again.
 2. **Open a project.** Add a project folder from the sidebar — sessions, tools, and permissions are scoped to it.
 3. **Describe the task.** Start in Agent mode to make changes, switch to Plan for an approval checkpoint, or use Goal when you want to approve an outcome rather than prescribe the steps. Review work in the **Review** diff panel before you commit anything.
-4. **Extend the workspace when needed.** Open **Extensions** to add an MCP server, a Skill, a Subagent, or a plugin. Use **Settings → Import** to bring in local sessions from Claude Code, OpenCode, Codex, or Pi.
+4. **Extend the workspace when needed.** Open **Settings → Agent** to manage Skills, MCP servers, and global Subagents; open **Extensions** for installed plugins and the marketplace. Use **Settings → Import** to bring in local sessions from Claude Code, OpenCode, Codex, or Pi.
 
 ## How it works
 
@@ -98,7 +98,7 @@ The full picture lives in the [architecture spec](docs/spec/02-architecture/01-a
 
 ## Status & roadmap
 
-PI-Desktop is an early preview under active development. The current 0.5.x line ships the app shell, streaming agent runtime, Agent/Plan/Goal contracts, workspace tools with permissions, the workbench, projects and sessions, imports, extensions (plugins/MCP/Skills/Subagents), context checkpoints, notifications, and cross-platform packaging with update checks.
+PI-Desktop is an early preview under active development. The current 0.5.x line ships the app shell, streaming agent runtime, Agent/Plan/Goal contracts, workspace tools with permissions, the workbench, projects and sessions, imports, agent capability management (MCP/Skills/Subagents), extensions (plugins), context checkpoints, notifications, and cross-platform packaging with update checks.
 
 Still in progress: signed and notarized macOS builds, native Windows/Linux qualification, a stronger plugin sandbox and publisher-signature path, and full UI-driven E2E coverage. See the [milestones](docs/spec/06-delivery/01-mvp-milestones.md) and the [project board](docs/project/BOARD.md).
 

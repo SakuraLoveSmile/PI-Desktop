@@ -11,6 +11,9 @@ export type SettingsTabId =
   | "shortcuts"
   | "instructions"
   | "agent"
+  | "skills"
+  | "mcp"
+  | "subagents"
   | "import"
   | "projects"
   | "about";
@@ -96,6 +99,38 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.apiKey",
       "settings.baseUrl",
       "settings.apiStyle",
+    ],
+  },
+  {
+    id: "skills",
+    labelKey: "settings.skills",
+    group: "agent",
+    keywordKeys: [
+      "settings.skillsGlobalPath",
+      "settings.skillsProjectPath",
+      "settings.capabilityPriority",
+      "settings.importSkill",
+    ],
+  },
+  {
+    id: "mcp",
+    labelKey: "settings.mcp",
+    group: "agent",
+    keywordKeys: [
+      "settings.mcpGlobalPath",
+      "settings.mcpProjectPath",
+      "settings.addMcp",
+      "settings.editMcp",
+      "settings.transport",
+    ],
+  },
+  {
+    id: "subagents",
+    labelKey: "settings.subagents",
+    group: "agent",
+    keywordKeys: [
+      "settings.subagentsGlobalPath",
+      "settings.subagentsOnlyGlobal",
     ],
   },
   {

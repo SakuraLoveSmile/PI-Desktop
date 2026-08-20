@@ -24,9 +24,6 @@ import {
 } from "../components/icons";
 import { Markdown } from "../components/Markdown";
 import { ScopeControl } from "../components/extensions/ScopeControl";
-import { McpSection } from "../components/extensions/McpSection";
-import { SkillsSection } from "../components/extensions/SkillsSection";
-import { SubagentsSection } from "../components/extensions/SubagentsSection";
 import { MarketplaceSourceSettings } from "../components/plugins/MarketplaceSourceSettings";
 import { PluginSettingsSheet } from "../components/plugins/PluginSettingsSheet";
 import type {
@@ -41,13 +38,8 @@ import type {
   ProjectWorkspace,
 } from "@pi-desktop/shared";
 
-/**
- * The things a user extends the app with. Plugins, MCP servers, skills and
- * subagents are separate tabs rather than one merged list because they are
- * created in completely different ways — installed, configured, written — and a
- * single list would have to hide that behind a lowest-common-denominator row.
- */
-type TabId = "installed" | "mcp" | "skills" | "subagents" | "market";
+/** Plugins has two tabs only; agent capabilities live under Settings > Agent. */
+type TabId = "installed" | "market";
 
 /**
  * Always-visible sections of the installed index. Broken plugins come first and
@@ -509,8 +501,6 @@ export function PluginsPage() {
 
   const [tab, setTab] = useState<TabId>("installed");
   const [installedQuery, setInstalledQuery] = useState("");
-  /** Shared by the MCP, Skills and Subagents tabs; each list is short enough to filter live. */
-  const [extQuery, setExtQuery] = useState("");
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
@@ -1005,7 +995,7 @@ export function PluginsPage() {
           </div>
         </div>
 
-        {stats.updates > 0 && tab !== "mcp" && tab !== "skills" ? (
+        {stats.updates > 0 ? (
           <div className="plugins-alert" role="status">
             <span className="plugins-alert-icon" aria-hidden>
               <IconCloudDown size={15} />
@@ -1034,39 +1024,6 @@ export function PluginsPage() {
             >
               {t("plugins.tabInstalled")}
               <span className="plugins-segment-count">{stats.total}</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="plugins-tab-mcp"
-              aria-selected={tab === "mcp"}
-              aria-controls="plugins-panel-mcp"
-              className={cx("plugins-segment-btn", tab === "mcp" && "active")}
-              onClick={() => setTab("mcp")}
-            >
-              {t("extensions.tabMcp")}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="plugins-tab-skills"
-              aria-selected={tab === "skills"}
-              aria-controls="plugins-panel-skills"
-              className={cx("plugins-segment-btn", tab === "skills" && "active")}
-              onClick={() => setTab("skills")}
-            >
-              {t("extensions.tabSkills")}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="plugins-tab-subagents"
-              aria-selected={tab === "subagents"}
-              aria-controls="plugins-panel-subagents"
-              className={cx("plugins-segment-btn", tab === "subagents" && "active")}
-              onClick={() => setTab("subagents")}
-            >
-              {t("extensions.tabSubagents")}
             </button>
             <button
               type="button"
@@ -1101,7 +1058,7 @@ export function PluginsPage() {
                 />
               </div>
             ) : null
-          ) : tab === "market" ? (
+          ) : (
             <div className="plugins-toolbar-end">
               {marketLoading ? (
                 <span className="plugins-result-count" aria-live="polite">
@@ -1114,63 +1071,10 @@ export function PluginsPage() {
                 placeholder={t("plugins.marketSearchPlaceholder")}
               />
             </div>
-          ) : (
-            <div className="plugins-toolbar-end">
-              <SearchField
-                value={extQuery}
-                onChange={setExtQuery}
-                placeholder={
-                  tab === "mcp"
-                    ? t("extensions.mcp.searchPlaceholder")
-                    : tab === "subagents"
-                      ? t("extensions.subagents.searchPlaceholder")
-                      : t("extensions.skills.searchPlaceholder")
-                }
-              />
-            </div>
           )}
         </div>
 
-        {tab === "mcp" ? (
-          <div
-            id="plugins-panel-mcp"
-            role="tabpanel"
-            aria-labelledby="plugins-tab-mcp"
-            className="plugins-panel"
-          >
-            <McpSection
-              projects={projects}
-              currentProjectPath={currentProjectPath}
-              query={extQuery}
-            />
-          </div>
-        ) : tab === "skills" ? (
-          <div
-            id="plugins-panel-skills"
-            role="tabpanel"
-            aria-labelledby="plugins-tab-skills"
-            className="plugins-panel"
-          >
-            <SkillsSection
-              projects={projects}
-              currentProjectPath={currentProjectPath}
-              query={extQuery}
-            />
-          </div>
-        ) : tab === "subagents" ? (
-          <div
-            id="plugins-panel-subagents"
-            role="tabpanel"
-            aria-labelledby="plugins-tab-subagents"
-            className="plugins-panel"
-          >
-            <SubagentsSection
-              projects={projects}
-              currentProjectPath={currentProjectPath}
-              query={extQuery}
-            />
-          </div>
-        ) : tab === "installed" ? (
+        {tab === "installed" ? (
           <div
             id="plugins-panel-installed"
             role="tabpanel"

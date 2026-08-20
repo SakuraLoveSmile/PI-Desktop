@@ -13,7 +13,7 @@ import {
 } from "./subagent-definition.js";
 
 function parse(raw: string, fallbackName = "reviewer") {
-  return parseSubagentDefinition(raw, { source: "project", fallbackName });
+  return parseSubagentDefinition(raw, { source: "user", fallbackName });
 }
 
 function definition(
@@ -25,7 +25,7 @@ function definition(
     tools: ["Read"],
     maxTurns: DEFAULT_SUBAGENT_MAX_TURNS,
     prompt: "Review it.",
-    source: "project",
+    source: "user",
     ...overrides,
   };
 }
@@ -55,7 +55,7 @@ Review the diff and report only defects you can point at a line for.
       maxTurns: 12,
       prompt:
         "Review the diff and report only defects you can point at a line for.",
-      source: "project",
+      source: "user",
     });
     expect(result.warnings).toEqual([]);
   });
@@ -100,9 +100,7 @@ Explain it.`);
     expect(inherited.definition.permission).toBeUndefined();
   });
 
-  it("refuses a permission scope declared by a project document", () => {
-    // A project document ships with the repository, so honoring its scope
-    // would let cloned code grant itself unprompted writes.
+  it("accepts a permission scope declared by a global user document", () => {
     for (const declared of ["auto", "accept-edits", "ask"]) {
       const result = parse(`---
 description: Writes a feature.
@@ -112,21 +110,19 @@ permission: ${declared}
 Implement it.`);
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.definition.permission).toBeUndefined();
-      expect(result.warnings.join("\n")).toContain(
-        "project definitions run under the session's permission mode",
-      );
+      expect(result.definition.permission).toBe(declared);
+      expect(result.warnings).toEqual([]);
     }
 
-    // `inherit` is what a project document gets anyway, so it stays silent.
-    const explicit = parse(`---
+    const inherited = parse(`---
 description: Explains a subsystem.
 permission: inherit
 ---
 Explain it.`);
-    expect(explicit.ok).toBe(true);
-    if (!explicit.ok) return;
-    expect(explicit.warnings).toEqual([]);
+    expect(inherited.ok).toBe(true);
+    if (!inherited.ok) return;
+    expect(inherited.definition.permission).toBeUndefined();
+    expect(inherited.warnings).toEqual([]);
   });
 
   it("warns on an unknown permission scope", () => {
@@ -304,7 +300,7 @@ name: Code Reviewer!
 description: Reviews a diff.
 ---
 Review it.`,
-      { source: "project" },
+      { source: "user" },
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -320,7 +316,7 @@ Review it.`,
 
 describe("normalizeSubagentName", () => {
   it("turns a file path into a Task argument", () => {
-    expect(normalizeSubagentName("/w/.pi/agents/Code_Reviewer.md")).toBe(
+    expect(normalizeSubagentName("/home/.agents/subagents/Code_Reviewer.md")).toBe(
       "code-reviewer",
     );
     expect(normalizeSubagentName("reviewer")).toBe("reviewer");
@@ -328,34 +324,30 @@ describe("normalizeSubagentName", () => {
 });
 
 describe("mergeSubagentDefinitions", () => {
-  it("lets a project document shadow the builtin of the same name", () => {
+  it("lets a global user document shadow the builtin of the same name", () => {
     const merged = mergeSubagentDefinitions([
       definition({ name: "reviewer", source: "builtin", prompt: "builtin" }),
-      definition({ name: "reviewer", source: "project", prompt: "project" }),
+      definition({ name: "reviewer", source: "user", prompt: "user" }),
       definition({ name: "explorer", source: "builtin" }),
     ]);
 
     expect(merged.definitions).toHaveLength(2);
     const reviewer = merged.definitions.find((d) => d.name === "reviewer");
-    expect(reviewer?.source).toBe("project");
-    expect(reviewer?.prompt).toBe("project");
+    expect(reviewer?.source).toBe("user");
+    expect(reviewer?.prompt).toBe("user");
     expect(merged.dropped).toEqual([]);
   });
 
-  it("ranks project over the user's own registry over builtin", () => {
+  it("ranks the user's own registry over builtin", () => {
     const merged = mergeSubagentDefinitions([
       definition({ name: "reviewer", source: "builtin", prompt: "builtin" }),
       definition({ name: "reviewer", source: "user", prompt: "user" }),
-      definition({ name: "reviewer", source: "project", prompt: "project" }),
       definition({ name: "explorer", source: "builtin", prompt: "builtin" }),
       definition({ name: "explorer", source: "user", prompt: "user" }),
     ]);
 
     expect(merged.definitions).toHaveLength(2);
-    expect(merged.definitions.find((d) => d.name === "reviewer")?.prompt).toBe(
-      "project",
-    );
-    // With no project document, the user's own definition retunes the builtin.
+    expect(merged.definitions.find((d) => d.name === "reviewer")?.prompt).toBe("user");
     expect(merged.definitions.find((d) => d.name === "explorer")?.prompt).toBe("user");
     expect(merged.dropped).toEqual([]);
   });

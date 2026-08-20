@@ -1465,7 +1465,7 @@ Delegation rules:
       // changes the catalog digest, which retires the runtime and its stale
       // prompt. Bodies are excluded: the Skill tool always reads them fresh.
       pluginSkillsDigest(this.pluginSkills) === pluginSkillsDigest(requestedPluginSkills) &&
-      // Editing `.pi/agents/*.md` must reach the next prompt. Definition
+      // Editing `~/.agents/subagents/*.md` must reach the next prompt. Definition
       // bodies are part of the `Task` tool's behavior, so unlike skills they
       // are compared in full.
       safeJson(this.subagents) === safeJson(config.subagents ?? []) &&

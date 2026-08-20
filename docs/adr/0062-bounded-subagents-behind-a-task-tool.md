@@ -1,12 +1,12 @@
 # ADR 0062: Bounded Subagents Behind a Task Tool
 
-- Status: Accepted for implementation
+- Status: Accepted for implementation (definition roots amended by ADR 0112)
 - Date: 2026-08-06
 - Deciders: PI-Desktop core
 - Related: D201, ADR 0041 (persistence outbox), ADR 0048 (lazy per-turn tool
   activation), ADR 0053 (plan checkpoint and execution epoch), D123 (prompt
   template documents), D138 (session-scoped inline permission requests),
-  D198 (contract modes)
+  D198 (contract modes), ADR 0112 (capability roots and Settings IA)
 
 ## Context
 
@@ -25,21 +25,20 @@ happens when several delegates want the user's attention at once.
 
 ## Decision
 
-### 1. Definitions are Markdown documents, builtin plus per-project
+### 1. Definitions are Markdown documents, builtin plus global user documents
 
 A subagent definition is frontmatter plus a Markdown body that becomes the
 delegate's system prompt, mirroring prompt templates (D123):
 
 ```text
-<workspace>/.pi/agents/<name>.md
+~/.agents/subagents/<name>.md
 ```
 
 PI-Desktop ships three builtins inline in `agent-runtime` (`explorer`,
-`code-reviewer`, `test-runner`). Project documents shadow builtins by name, so a
-workspace retunes a bundled delegate without renaming it. ADR 0063 adds a
-user-level registry under `<data>/agents/` as a third source, making the order
-**project > user registry > builtin**; the project source keeps its precedence
-and stays the place a team's delegates live. The catalog is re-read
+`code-reviewer`, `test-runner`). User documents under `~/.agents/subagents`
+are combined with the builtins by name. There is no project-level subagent
+capability source; the global user catalog is the only user-managed layer.
+The catalog is re-read
 on every session launch, capped at `MAX_SUBAGENT_DEFINITIONS` (16), and a
 malformed document degrades to a launch diagnostic — it never costs the session
 its other delegates or its turn.
@@ -175,16 +174,16 @@ many requests wait behind it.
 - **Feed delegate messages back into the parent's context.** Rejected: it is
   precisely the cost delegation removes.
 - **Definitions in settings/SQLite.** Rejected: definitions are prompts and
-  belong in the project, reviewable in git next to the code they describe. ADR
-  0063 adds a user-level source for delegates that follow the user across
-  repositories, but they stay Markdown documents on disk for the same reason.
+  remain Markdown documents on disk. ADR 0112 places user-managed
+  definitions under `~/.agents/subagents` so they follow the user across
+  repositories without introducing a project capability directory.
 
 ## Consequences
 
 - Wide searches, reviews and command runs move out of the session's context at
   the price of one report each.
-- A project can add a delegate by committing a Markdown file; no rebuild, no
-  settings change, effective on the next prompt.
+- A user can add a delegate under `~/.agents/subagents`; no rebuild, no
+  settings change, effective on the next prompt when enabled locally.
 - Two capability surfaces now exist for the same tools: the session's mode and a
   definition's `tools` list. A delegate can be strictly weaker than its session,
   never stronger.

@@ -399,19 +399,14 @@ Goal 批准所承诺的内容与 Plan 批准所承诺的内容完全相同：`mo
 会话 Agent 可以把可拆分的工作交给在独立上下文中后台运行的委托，
 并按需取回报告。
 
-**目录。** 定义是来自三个来源的 Markdown 文档：四个
-`agent-runtime` 中内嵌的内置函数（`explorer`、`code-reviewer`、
-`test-runner`、`fixer`)，host-core 在 `<data>/agents/` (D202) 下拥有的用户注册表，
-和 `<workspace>/.pi/agents/*.md`。优先级是 **项目 > 用户注册表 >
-内置**，因此提交的项目文档会重新调整注册表定义或
-内置而不重命名它。注册表文档通过 `enabled` 进行过滤，
-它们在到达加载器之前的激活范围，因此定义范围为
-另一个项目根本不在目录中。 Electron 主要加载目录
-每次发射和通过
-`subagents` / `subagentProviders` 在 sidecar 参数中，因此编辑定义
-在下一个提示时生效。目录上限为
-`MAX_SUBAGENT_DEFINITIONS` (16);格式错误或不可读的文档将成为
-启动诊断并且永远不会使启动失败。
+**目录。** 定义是来自两个来源的 Markdown 文档：`agent-runtime` 中内嵌的四个
+内置函数（`explorer`、`code-reviewer`、`test-runner`、`fixer`），以及
+`~/.agents/subagents/*.md` 下的全局用户文档。没有项目级子代理目录，`.pi/agents`
+不会作为能力来源被扫描。用户文档在进入加载器前会根据应用本地启用状态过滤。
+Electron main 每次启动加载全局目录，并在 sidecar 参数中传递
+`subagents` / `subagentProviders`，因此编辑定义会在下一次提示时生效。目录上限
+为 `MAX_SUBAGENT_DEFINITIONS`（16）；格式错误或不可读文档只产生启动诊断，
+不会让启动失败。
 
 Frontmatter 新增 `permission: inherit | ask | accept-edits | auto`（默认
 `inherit`）。使用默认的 `inherit`（包括所有内置定义）时，sidecar 不附加覆盖，

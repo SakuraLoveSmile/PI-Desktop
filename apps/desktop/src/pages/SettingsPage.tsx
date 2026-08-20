@@ -28,6 +28,7 @@ import {
 } from "../lib/settings-search";
 import {
   IconArchive,
+  IconBookOpen,
   IconBot,
   IconChevronLeft,
   IconCircleCheck,
@@ -40,6 +41,7 @@ import {
   IconMoon,
   IconPalette,
   IconSearch,
+  IconServer,
   IconSliders,
   IconSparkles,
   IconSun,
@@ -49,6 +51,9 @@ import { KeyboardShortcutsSection } from "../components/settings/KeyboardShortcu
 import { FontFamilyRow } from "../components/settings/FontFamilyRow";
 import { ReleaseNotesDialog } from "../components/ReleaseNotesDialog";
 import { ProjectsPage } from "./ProjectsPage";
+import { AgentSkillsPage } from "../components/settings/AgentSkillsPage";
+import { AgentMcpPage } from "../components/settings/AgentMcpPage";
+import { AgentSubagentsPage } from "../components/settings/AgentSubagentsPage";
 
 type SettingsTab = ReturnType<typeof useAppStore.getState>["settingsTab"];
 
@@ -851,6 +856,9 @@ export function SettingsPage() {
       shortcuts: <IconKeyboard size={14} />,
       instructions: <IconFileText size={14} />,
       agent: <IconBot size={14} />,
+      skills: <IconBookOpen size={14} />,
+      mcp: <IconServer size={14} />,
+      subagents: <IconBot size={14} />,
       import: <IconDownload size={14} />,
       projects: <IconArchive size={14} />,
       about: <IconInfo size={14} />,
@@ -1225,6 +1233,12 @@ export function SettingsPage() {
           )}
 
           {tab === "agent" && <ProvidersSection />}
+
+          {tab === "skills" && <AgentSkillsPage />}
+
+          {tab === "mcp" && <AgentMcpPage />}
+
+          {tab === "subagents" && <AgentSubagentsPage />}
 
           {tab === "instructions" && <AgentInstructionsSection />}
 

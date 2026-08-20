@@ -50,6 +50,7 @@ import {
   ok,
   parseMcpImport,
   type ActivationScope,
+  type AgentCapabilityQuery,
   type ComposerPasteFile,
   type PluginViewMeta,
   normalizeMode,
@@ -68,6 +69,7 @@ import {
   type KeybindingOverrides,
   type McpServerInput,
   type McpServerRecord,
+  type McpServerStatus,
   type Mode,
   type NativeMenuAction,
   type OAuthRespondInput,
@@ -948,7 +950,9 @@ function isHostUnavailable(error: unknown): boolean {
 }
 
 /** Pull the user's MCP server records from host-core into the local runtime. */
-async function refreshUserMcp(): Promise<McpServerRecord[]> {
+async function refreshUserMcp(
+  projectPath: string | null | undefined = currentWorkspacePath(),
+): Promise<McpServerRecord[]> {
   // A dead transport is expected during shutdown and between supervised
   // restarts, and it rejects every call — warning about it would file the
   // routine case under the same log line as a registry that cannot be read.
@@ -956,13 +960,15 @@ async function refreshUserMcp(): Promise<McpServerRecord[]> {
   // already in flight when the transport closed.
   if (!host?.isAvailable()) return [];
   try {
-    const result = await host.call<{ servers: McpServerRecord[] }>("mcp.list");
+    const result = await host.call<{ servers: McpServerRecord[] }>("mcp.active", {
+      projectPath: projectPath ?? null,
+    });
     const servers = result.servers ?? [];
     userMcp.setRecords(servers);
     return servers;
   } catch (error) {
     if (!isHostUnavailable(error)) {
-      logger.app("plugin", "warn", "mcp list failed", { data: String(error) });
+      logger.app("plugin", "warn", "mcp active list failed", { data: String(error) });
     }
     return [];
   }
@@ -1047,7 +1053,7 @@ async function loadUserSkillBody(
   const result = await host.call<{
     skill: UserSkillRecord | null;
     body: string | null;
-  }>("skills.read", { id });
+  }>("skills.read", { id, projectPath });
   const skill = result.skill;
   if (!skill || typeof result.body !== "string") return null;
   if (!isActiveInProject(skill, projectPath)) {
@@ -1162,6 +1168,7 @@ async function resolveAgentRuntimeLaunch(
   // other one — not merely refused when called, since a tool the model can see
   // is a tool it will try.
   const userSkills = await activeUserSkills(projectPath);
+  await refreshUserMcp(projectPath);
   const userMcpTools = await userMcp.toolsForProject(projectPath ?? null);
   // Skill catalog (D174): only id/name/description cross to the sidecar; the
   // document body is fetched on demand through the local `Skill` tool. Host
@@ -1188,7 +1195,7 @@ async function resolveAgentRuntimeLaunch(
     })),
   ];
   // Subagents (ADR 0062): definitions are re-read per launch so editing
-  // `.pi/agents` or the registry takes effect on the next prompt, and every
+  // `~/.agents/subagents` or the registry takes effect on the next prompt, and every
   // pinned model is resolved here because credentials and the pi catalog live on
   // this side. The user's own definitions (D202) are scope-filtered like the
   // skills above; a delegate the model can see is one it will try to call.
@@ -6874,33 +6881,43 @@ function registerIpc() {
   // host-core persists and validates; this side owns the connections, so every
   // mutation is followed by a refresh that drops stale ones.
 
-  handle(IPC.invoke.mcpList, async () => {
-    const servers = await refreshUserMcp();
-    return { servers, statuses: userMcp.listStatuses() };
+  handle(IPC.invoke.mcpList, async (query: Partial<AgentCapabilityQuery> = {}) => {
+    if (!host) throw new Error("host unavailable");
+    const result = await host.call<{ servers: McpServerRecord[]; statuses?: McpServerStatus[] }>(
+      "mcp.list",
+      query,
+    );
+    // Status belongs to the currently open project's active runtime, while the
+    // list itself must include disabled records for the settings page.
+    await refreshUserMcp(currentWorkspacePath());
+    return { servers: result.servers ?? [], statuses: userMcp.listStatuses() };
   });
 
   handle(IPC.invoke.mcpUpsert, async (server: McpServerInput) => {
     if (!host) throw new Error("host unavailable");
     const res = await host.call<{ server: McpServerRecord }>("mcp.upsert", { server });
-    await refreshUserMcp();
+    await refreshUserMcp(currentWorkspacePath());
     sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: res.server?.id });
     return res;
   });
 
-  handle(IPC.invoke.mcpRemove, async (id: string) => {
-    if (!host) throw new Error("host unavailable");
-    const res = await host.call("mcp.remove", { id });
-    await refreshUserMcp();
-    sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: id });
-    return res;
-  });
+  handle(
+    IPC.invoke.mcpRemove,
+    async (payload: { id: string } & Partial<AgentCapabilityQuery>) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call("mcp.remove", payload);
+      await refreshUserMcp(currentWorkspacePath());
+      sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: payload.id });
+      return res;
+    },
+  );
 
   handle(
     IPC.invoke.mcpSetEnabled,
-    async (payload: { id: string; enabled: boolean }) => {
+    async (payload: { id: string; enabled: boolean } & Partial<AgentCapabilityQuery>) => {
       if (!host) throw new Error("host unavailable");
       const res = await host.call("mcp.setEnabled", payload);
-      await refreshUserMcp();
+      await refreshUserMcp(currentWorkspacePath());
       sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: payload.id });
       return res;
     },
@@ -6911,18 +6928,34 @@ function registerIpc() {
     async (payload: { id: string; scope: ActivationScope }) => {
       if (!host) throw new Error("host unavailable");
       const res = await host.call("mcp.setScope", payload);
-      await refreshUserMcp();
+      await refreshUserMcp(currentWorkspacePath());
       sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: payload.id });
       return res;
     },
   );
 
-  handle(IPC.invoke.mcpTest, async (id: string) => {
-    await refreshUserMcp();
-    const status = await userMcp.test(id);
-    sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: id });
-    return { status };
-  });
+  handle(
+    IPC.invoke.mcpTest,
+    async (payload: { id: string } & Partial<AgentCapabilityQuery>) => {
+      if (!host) throw new Error("host unavailable");
+      const query = {
+        ...(payload.level ? { level: payload.level } : {}),
+        ...(payload.projectPath ? { projectPath: payload.projectPath } : {}),
+      } satisfies Partial<AgentCapabilityQuery>;
+      const listed = await host.call<{ servers: McpServerRecord[] }>("mcp.list", query);
+      // Test may target a project different from the current session. Keep the
+      // requested record long enough for the handshake, then restore the
+      // current project's active runtime below.
+      userMcp.setRecords([
+        ...userMcp.listRecords().filter((record) => !listed.servers.some((item) => item.id === record.id)),
+        ...(listed.servers ?? []),
+      ]);
+      const status = await userMcp.test(payload.id);
+      await refreshUserMcp(currentWorkspacePath());
+      sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: payload.id });
+      return { status };
+    },
+  );
 
   /**
    * Import a pasted MCP configuration. Servers are saved one at a time so a
@@ -6941,7 +6974,7 @@ function registerIpc() {
         failed.push({ id: server.id, reason: describeError(error) });
       }
     }
-    await refreshUserMcp();
+    await refreshUserMcp(currentWorkspacePath());
     if (imported.length) {
       sendToRenderer(IPC.event.pluginChanged, { reason: "mcp" });
     }
@@ -6950,9 +6983,9 @@ function registerIpc() {
 
   // --- Skills the user owns -------------------------------------------------
 
-  handle(IPC.invoke.skillList, async () => {
+  handle(IPC.invoke.skillList, async (query: Partial<AgentCapabilityQuery> = {}) => {
     if (!host) throw new Error("host unavailable");
-    return host.call("skills.list");
+    return host.call("skills.list", query);
   });
 
   handle(IPC.invoke.skillCreate, async (skill: Record<string, unknown>) => {
@@ -6962,16 +6995,19 @@ function registerIpc() {
     return res;
   });
 
-  /** Import a `SKILL.md`, any markdown file, or a folder holding one. */
-  handle(IPC.invoke.skillImport, async () => {
+  /** Import exactly one markdown file into the selected capability directory. */
+  handle(IPC.invoke.skillImport, async (query: Partial<AgentCapabilityQuery> = {}) => {
     if (!host) throw new Error("host unavailable");
     const picked = await dialog.showOpenDialog({
       title: "Import skill",
-      properties: ["openFile", "openDirectory"],
+      properties: ["openFile"],
       filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
     });
     if (picked.canceled || !picked.filePaths[0]) return { canceled: true };
-    const res = await host.call("skills.import", { path: picked.filePaths[0] });
+    const res = await host.call("skills.import", {
+      path: picked.filePaths[0],
+      ...query,
+    });
     sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
     return res;
   });
@@ -6987,21 +7023,29 @@ function registerIpc() {
     },
   );
 
-  handle(IPC.invoke.skillRead, async (id: string) => {
-    if (!host) throw new Error("host unavailable");
-    return host.call("skills.read", { id });
-  });
+  handle(
+    IPC.invoke.skillRead,
+    async (payload: string | ({ id: string } & Partial<AgentCapabilityQuery>)) => {
+      if (!host) throw new Error("host unavailable");
+      const request = typeof payload === "string" ? { id: payload } : payload;
+      return host.call("skills.read", request);
+    },
+  );
 
-  handle(IPC.invoke.skillRemove, async (id: string) => {
-    if (!host) throw new Error("host unavailable");
-    const res = await host.call("skills.remove", { id });
-    sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
-    return res;
-  });
+  handle(
+    IPC.invoke.skillRemove,
+    async (payload: string | ({ id: string } & Partial<AgentCapabilityQuery>)) => {
+      if (!host) throw new Error("host unavailable");
+      const request = typeof payload === "string" ? { id: payload } : payload;
+      const res = await host.call("skills.remove", request);
+      sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      return res;
+    },
+  );
 
   handle(
     IPC.invoke.skillSetEnabled,
-    async (payload: { id: string; enabled: boolean }) => {
+    async (payload: { id: string; enabled: boolean } & Partial<AgentCapabilityQuery>) => {
       if (!host) throw new Error("host unavailable");
       const res = await host.call("skills.setEnabled", payload);
       sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });

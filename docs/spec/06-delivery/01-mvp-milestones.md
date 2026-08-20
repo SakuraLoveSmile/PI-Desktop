@@ -161,8 +161,9 @@ E2E-108/E2E-109 cover Host restart interruption and no replay.
 Implemented after the M6 Plan checkpoint:
 
 - Goal contracts and autonomous post-approval execution
-- standalone MCP and Skills management with global/project activation scopes
-- bounded Subagents with project, user, and builtin definition sources
+- Settings > Agent Skills and MCP management with global/project `.agents` roots,
+  project-over-global shadowing, single-file physical import, and local enablement
+- Settings > Agent global-only Subagent management from `~/.agents/subagents`
 - plugin marketplace installation/update review and global plugin launcher
 - session import, scheduled task records, notifications, clipboard file paste,
   slash commands, `@` file references, and next-turn composer configuration

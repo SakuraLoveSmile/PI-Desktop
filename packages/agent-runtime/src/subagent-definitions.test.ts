@@ -1,5 +1,5 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_SUBAGENT_PROVIDERS, type SubagentDefinition } from "@pi-desktop/shared";
@@ -53,10 +53,10 @@ describe("loadSubagentDefinitions", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("puts project definitions first and lets them shadow a builtin", async () => {
+  it("loads global definitions and lets them shadow a builtin", async () => {
     await writeFile(
       join(dir, "explorer.md"),
-      "---\ndescription: Project explorer.\ntools: [Read]\n---\nSearch our way.\n",
+      "---\ndescription: Global explorer.\ntools: [Read]\n---\nSearch our way.\n",
       "utf8",
     );
     await writeFile(
@@ -73,7 +73,7 @@ describe("loadSubagentDefinitions", () => {
       "migrator",
     ]);
     const explorer = definitions.find((d) => d.name === "explorer")!;
-    expect(explorer.source).toBe("project");
+    expect(explorer.source).toBe("user");
     expect(explorer.tools).toEqual(["Read"]);
     expect(definitions.filter((d) => d.name === "explorer")).toHaveLength(1);
     // The shadowed builtin is gone, the other builtins stay.
@@ -96,52 +96,49 @@ describe("loadSubagentDefinitions", () => {
     expect(diagnostics.join("\n")).toContain('ignoring unknown tool "Nope"');
   });
 
-  it("falls back to builtins when the workspace has no agents directory", async () => {
-    const { definitions, diagnostics } = await loadSubagentDefinitions(dir);
+  it("does not read project directories and falls back to builtins", async () => {
+    await writeFile(
+      join(dir, "project-only.md"),
+      "---\ndescription: Must not load.\ntools: [Read]\n---\nIgnore me.\n",
+      "utf8",
+    );
+    const { definitions, diagnostics } = await loadSubagentDefinitions(null);
 
-    expect(subagentDefinitionDir(dir)).toBe(join(dir, ".pi", "agents"));
+    expect(subagentDefinitionDir(dir)).toBe(join(homedir(), ".agents", "subagents"));
     expect(definitions.every((d) => d.source === "builtin")).toBe(true);
+    expect(definitions.map((d) => d.name)).not.toContain("project-only");
     expect(diagnostics).toEqual([]);
   });
 
-  it("orders the user's own definitions between project and builtin", async () => {
-    await writeFile(
-      join(dir, "explorer.md"),
-      "---\ndescription: Project explorer.\ntools: [Read]\n---\nSearch our way.\n",
-      "utf8",
-    );
-
+  it("orders global documents before builtins without project sources", async () => {
     const { definitions, diagnostics } = await loadSubagentDefinitions(null, {
-      overrideDir: dir,
       userDocuments: [
         {
-          // Shadowed by the project document of the same name.
           id: "explorer",
           document:
             "---\nname: explorer\ndescription: My explorer.\ntools: [Read, Grep]\n---\nMine.\n",
-          filePath: "/data/agents/explorer.md",
+          filePath: "/home/.agents/subagents/explorer.md",
         },
         {
-          // Shadows a builtin, because nothing in the project claims the name.
           id: "test-runner",
           document:
             "---\nname: test-runner\ndescription: My runner.\ntools: [Bash]\n---\nRun it.\n",
-          filePath: "/data/agents/test-runner.md",
+          filePath: "/home/.agents/subagents/test-runner.md",
         },
         {
           id: "note-taker",
           document:
             "---\nname: note-taker\ndescription: Take notes.\ntools: [Read, Write]\n---\nWrite notes.\n",
-          filePath: "/data/agents/note-taker.md",
+          filePath: "/home/.agents/subagents/note-taker.md",
         },
       ],
     });
 
     expect(diagnostics).toEqual([]);
     const byName = new Map(definitions.map((d) => [d.name, d]));
-    expect(byName.get("explorer")!.source).toBe("project");
+    expect(byName.get("explorer")!.source).toBe("user");
     expect(byName.get("test-runner")!.source).toBe("user");
-    expect(byName.get("test-runner")!.filePath).toBe("/data/agents/test-runner.md");
+    expect(byName.get("test-runner")!.filePath).toBe("/home/.agents/subagents/test-runner.md");
     expect(byName.get("note-taker")!.tools).toEqual(["Read", "Write"]);
     expect(byName.get("code-reviewer")!.source).toBe("builtin");
     expect(definitions.filter((d) => d.name === "explorer")).toHaveLength(1);
@@ -197,7 +194,7 @@ describe("resolveSubagentProviders", () => {
       ...(pin ? { model: pin } : {}),
       maxTurns: 4,
       prompt: "Do the thing.",
-      source: "project",
+      source: "user",
     };
   }
 

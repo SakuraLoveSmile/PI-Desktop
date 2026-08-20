@@ -432,19 +432,17 @@ criterion-by-criterion report of what was met and the evidence observed.
 The session Agent can hand separable pieces of work to delegates that run in
 their own context, in the background, and report back on demand.
 
-**Catalog.** Definitions are Markdown documents from three sources: four
+**Catalog.** Definitions are Markdown documents from two sources: the four
 builtins shipped inline in `agent-runtime` (`explorer`, `code-reviewer`,
-`test-runner`, `fixer`), the user registry host-core owns under
-`<data>/agents/` (D202), and `<workspace>/.pi/agents/*.md`. Precedence is
-**project > user registry > builtin**, so a committed project document retunes
-a registry definition or a builtin without renaming it. Registry documents are
-filtered by `enabled` and their activation scope before they reach the loader,
-so a definition scoped to another project is not in the catalog at all.
-Electron main loads the catalog on every launch and passes
-`subagents` / `subagentProviders` in the sidecar params, so editing a
-definition takes effect on the next prompt. The catalog is capped at
-`MAX_SUBAGENT_DEFINITIONS` (16); a malformed or unreadable document becomes a
-launch diagnostic and never fails the launch.
+`test-runner`, `fixer`) and the global user documents under
+`~/.agents/subagents/*.md`. There is no project-level subagent directory and
+`.pi/agents` is not scanned for capabilities. User documents are filtered by
+the app-local enabled state before they reach the loader. Electron main loads
+the global catalog on every launch and passes `subagents` /
+`subagentProviders` in the sidecar params, so editing a definition takes effect
+on the next prompt. The catalog is capped at `MAX_SUBAGENT_DEFINITIONS` (16);
+a malformed or unreadable document becomes a launch diagnostic and never fails
+the launch.
 
 Frontmatter adds `permission: inherit | ask | accept-edits | auto` (default
 `inherit`): a scope the delegate's tool calls resolve under instead of the
