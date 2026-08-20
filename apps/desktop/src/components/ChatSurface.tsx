@@ -46,7 +46,6 @@ export const ChatSurface = memo(function ChatSurface() {
   const error = useAppStore((state) => state.error);
   const errorCode = useAppStore((state) => state.errorCode);
   const errorRetriable = useAppStore((state) => state.errorRetriable);
-  const composerPrefill = useAppStore((state) => state.composerPrefill);
 
   // Permission queue for the active session.
   const activePermission = useAppStore((state) =>
@@ -183,12 +182,13 @@ export const ChatSurface = memo(function ChatSurface() {
                     t("chat.emptyTitle")
                   )}
                 </h1>
+                <p className="empty-hero-subtitle">{t("chat.emptySubtitle")}</p>
               </div>
               <OnboardingChecklist />
-              <div className="home-composer-wrap">
-                <StableComposer variant="home" prefill={composerPrefill} />
-              </div>
             </div>
+          </div>
+          <div className="home-composer-wrap">
+            <StableComposer variant="home" />
           </div>
         </div>
       ) : (
@@ -202,7 +202,7 @@ export const ChatSurface = memo(function ChatSurface() {
             askPending={transcriptView.askPending}
             planningState={transcriptView.planningState}
           />
-          <StableComposer variant="docked" prefill={composerPrefill} />
+          <StableComposer variant="docked" />
         </>
       )}
 
