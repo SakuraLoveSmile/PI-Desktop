@@ -23,6 +23,16 @@ test("shipped catalogs have identical keys and interpolation variables", () => {
   }
 });
 
+test("settings subagent empty-state copy uses a non-conflicting key", () => {
+  const english = flattenCatalog(en);
+  const chinese = flattenCatalog(zhCN);
+
+  assert.equal(english["settings.subagentsEmpty"], "No subagents of your own yet");
+  assert.equal(chinese["settings.subagentsEmpty"], "还没有你自己的子智能体");
+  assert.equal(typeof english["settings.subagents"], "string");
+  assert.equal(typeof english["extensions.subagents.empty"], "string");
+});
+
 test("import, project, and temporary-session copy is catalog-backed", () => {
   const english = flattenCatalog(en);
   for (const key of [

@@ -119,7 +119,7 @@ export function AgentSubagentsPage() {
         className="agent-capability-column-wide"
       >
         {subagents.length === 0 ? (
-          <CapabilityEmpty message={t("subagents.empty")} icon={<IconBot size={18} />} />
+          <CapabilityEmpty message={t("settings.subagentsEmpty")} icon={<IconBot size={18} />} />
         ) : (
           subagents.map((subagent) => (
             <SubagentRow

@@ -537,6 +537,7 @@ export const zhCN = {
     imported: "已导入",
     skillImported: "已导入 {{name}}",
     skillsEmpty: "此目录中没有技能",
+    subagentsEmpty: "还没有你自己的子智能体",
     addMcp: "新增",
     editMcp: "编辑",
     editMcpOf: "编辑 {{name}}",

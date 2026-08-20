@@ -4130,8 +4130,8 @@ Each scenario is documented in this format:
   8. Open Subagents. Confirm it is one global-only column rooted at
      `~/.agents/subagents`, with no project picker or project-level controls.
      Confirm the column header has the global scope marker and item count, and
-     an empty directory resolves `subagents.empty` to localized empty-state
-     copy rather than displaying a raw translation key.
+     an empty directory resolves `settings.subagentsEmpty` to localized
+     empty-state copy rather than displaying a raw translation key.
 - **Expected**:
   - The three Settings pages use no tabs for switching capabilities, preserve
     list height for empty and populated states, support dark and light themes,

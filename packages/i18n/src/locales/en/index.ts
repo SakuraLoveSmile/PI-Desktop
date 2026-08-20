@@ -542,6 +542,7 @@ export const en = {
     imported: "Imported",
     skillImported: "Imported {{name}}",
     skillsEmpty: "No skills in this folder",
+    subagentsEmpty: "No subagents of your own yet",
     addMcp: "Add",
     editMcp: "Edit",
     editMcpOf: "Edit {{name}}",
