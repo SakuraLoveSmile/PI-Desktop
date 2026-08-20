@@ -1686,6 +1686,11 @@ reasoning-level control.
   row and its submenu; selecting a model or level returns to the two-entry root
   without closing the popover. The menu is `min(300px, 100vw - 24px)`, uses the
   large radius/dialog shadow tokens, and enters with a short upward fade.
+- The Model submenu establishes a clear provider → model hierarchy: sticky
+  provider headings use the stronger `--text-md` section treatment, while
+  indented model options use normal-weight `--text-sm` text. In zh-CN, provider
+  headings remove uppercase transformation and wide tracking so localized labels
+  remain readable.
 - Width: Home and thread-docked composers share one `24px` horizontal gutter
   and a `768px` maximum content envelope. The left-edge conversation minimap
   is absolutely positioned outside that envelope, so its appearance or

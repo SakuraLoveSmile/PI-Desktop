@@ -4654,6 +4654,10 @@ This test plan spec is accepted when:
   reasoning level. Its menu starts with only Model and Reasoning level entries;
   Model opens the searchable provider-group list and Reasoning level opens the
   capability-filtered radio list in the same popover.
+- In the searchable provider-group list, expect each provider heading to
+  read as the visual parent: its `--text-md` treatment is stronger than the
+  indented model rows' normal-weight `--text-sm` treatment. In zh-CN, headings
+  must not force uppercase or wide Latin tracking.
 - Select provider B/model B, send a prompt, and expect the main-to-sidecar
   `agent.prompt` payload and pi runtime to use B for that session.
 - Switch away and back; expect B and its clamped reasoning level to remain

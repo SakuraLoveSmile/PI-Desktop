@@ -260,17 +260,25 @@
   z-index: 1;
   padding: 7px 10px 3px;
   background: var(--ds-bg-elevated-opaque);
-  color: var(--ds-text-muted);
-  font-size: var(--text-xs-plus);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-md);
   font-weight: var(--font-weight-strong);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
+:lang(zh-CN) .composer-model-group-label {
+  letter-spacing: var(--tracking-normal);
+  text-transform: none;
+}
+
 /* Model rows sit at one tab stop below their provider heading, so groups keep
-   a clear parent → child hierarchy without changing the option's label. */
+   a clear parent → child hierarchy without changing the option's label. The
+   smaller normal-weight text keeps the provider heading as the visual anchor. */
 .composer-model-group .composer-model-option {
   padding-left: 22px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-normal);
 }
 
 .composer-thinking-list .composer-plus-item > span {

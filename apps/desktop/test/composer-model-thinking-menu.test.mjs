@@ -50,3 +50,18 @@ test("model options are visually nested under their provider heading", () => {
     /\.composer-model-group \.composer-model-option\s*\{[\s\S]*?padding-left:\s*22px/,
   );
 });
+
+test("provider headings establish a stronger type level than model rows", () => {
+  assert.match(
+    stylesSource,
+    /\.composer-model-group-label\s*\{[\s\S]*?font-size:\s*var\(--text-md\)/,
+  );
+  assert.match(
+    stylesSource,
+    /\.composer-model-group \.composer-model-option\s*\{[\s\S]*?font-size:\s*var\(--text-sm\)[\s\S]*?font-weight:\s*var\(--font-weight-normal\)/,
+  );
+  assert.match(
+    stylesSource,
+    /:lang\(zh-CN\) \.composer-model-group-label\s*\{[\s\S]*?text-transform:\s*none/,
+  );
+});
