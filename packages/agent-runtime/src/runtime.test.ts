@@ -2467,9 +2467,10 @@ describe("DesktopAgentRuntime assistant thinking events", () => {
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
       },
       stopReason: "error",
-      errorMessage: '429: {"error":{"type":"rate_limit_error"}}',
+      errorMessage: "upstream unavailable",
       timestamp: 2,
     };
+    (runtime as any).providerResponseStatus = 429;
     const successfulMessage = {
       role: "assistant",
       content: [{ type: "text", text: "recovered response" }],

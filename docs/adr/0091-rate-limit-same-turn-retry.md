@@ -34,7 +34,10 @@ OpenCode or multiplying retries through pi-ai's own wrapper.
 3. A 429 before streaming is retried by the provider stream adapter. A 429
    after streaming starts is replayed by the runtime after removing the failed
    assistant from model context. Both paths use the same controller and the
-   same budget. The main session and every builtin subagent use this policy.
+   same budget. The captured response status is applied before classifying the
+   provider message in both phases, so a generic 429 body still enters the 429
+   budget while known non-retryable classifications remain terminal. The main
+   session and every builtin subagent use this policy.
 4. Intermediate assistant errors, lifecycle end events, and duplicate
    assistant bubbles are suppressed. A recovered attempt reuses the original
    visible assistant message id and emits one terminal lifecycle. The failed

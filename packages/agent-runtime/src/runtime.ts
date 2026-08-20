@@ -121,6 +121,7 @@ import { pluginSkillsDigest } from "./plugin-skills.js";
 import { logTiming } from "./timing.js";
 import {
   captureProviderResponse,
+  classifyProviderError,
   createProviderRetryStream,
   delayWithAbort,
   PROVIDER_RATE_LIMIT_MAX_RETRIES,
@@ -4422,7 +4423,7 @@ Delegation rules:
                   retriable: false,
                 }
             : errorMessage
-              ? classifyAgentError(errorMessage)
+              ? classifyProviderError(errorMessage, this.providerResponseStatus)
               : undefined;
           const nextText = content.hasText
             ? content.text

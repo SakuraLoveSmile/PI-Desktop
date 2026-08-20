@@ -5,6 +5,7 @@ import {
 } from "@earendil-works/pi-ai";
 import {
   captureProviderResponse,
+  classifyProviderError,
   createProviderRetryStream,
   delayWithAbort,
   providerRateLimitDelayMs,
@@ -73,6 +74,18 @@ function successfulStream(): ReturnType<typeof createAssistantMessageEventStream
 }
 
 describe("provider rate-limit retry", () => {
+  it("uses a captured 429 status when the provider body is generic", () => {
+    expect(classifyProviderError("upstream unavailable", 429)).toMatchObject({
+      code: "PROVIDER_RATE_LIMITED",
+      retriable: true,
+      details: { providerStatus: 429 },
+    });
+    expect(classifyProviderError("authentication failed", 429)).toMatchObject({
+      code: "PROVIDER_UNAUTHORIZED",
+      retriable: false,
+    });
+  });
+
   it("prefers retry headers and bounds exponential fallback", () => {
     expect(providerRateLimitDelayMs(1, { "retry-after-ms": "1250" }, 0, 0)).toBe(1250);
     expect(providerRateLimitDelayMs(1, { "retry-after": "2" }, 0, 0)).toBe(2000);

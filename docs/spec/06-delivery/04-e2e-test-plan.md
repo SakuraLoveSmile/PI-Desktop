@@ -3186,9 +3186,10 @@ Each scenario is documented in this format:
   7. Repeat with authentication, model-selection, malformed-request, and
      context-error fixtures.
 - **Expected**:
-  - Every 429 is classified as retryable `PROVIDER_RATE_LIMITED`, including a
-    response body that omits rate-limit wording when the captured HTTP status
-    is 429. Diagnostics retain `providerStatus: 429`.
+  - Every 429 is classified as retryable `PROVIDER_RATE_LIMITED` in both setup
+    and post-start recovery, including a response body that omits rate-limit
+    wording when the captured HTTP status is 429. Diagnostics retain
+    `providerStatus: 429`.
   - Setup and mid-stream failures share one budget of five retries after the
     initial attempt. A persistent fixture therefore makes six provider
     attempts, never multiplies attempts through nested pi-ai retries, and

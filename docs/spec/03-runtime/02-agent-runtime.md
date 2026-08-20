@@ -97,8 +97,10 @@ attempt, for six provider attempts total. A setup 429 is retried inside the
 provider stream adapter. A mid-stream 429 removes the failed assistant from
 the next model context and calls `continue()` in the same turn. Both phases
 claim the same counter, so a setup 429 followed by a stream 429 cannot reset or
-multiply the budget. The main session and builtin subagents use the same
-controller and policy.
+multiply the budget. The captured response status is applied before classifying
+the provider message in both phases, so a generic 429 body still enters the
+429 budget while known non-retryable classifications remain terminal. The main
+session and builtin subagents use the same controller and policy.
 
 429 retries are silent: no intermediate assistant error, lifecycle `error`,
 `turn_end`, `agent_end`, or duplicate assistant bubble reaches the UI. The

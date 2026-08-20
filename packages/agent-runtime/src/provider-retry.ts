@@ -50,6 +50,35 @@ export type ProviderRetryController = {
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 };
 
+/**
+ * Apply a captured HTTP 429 before relying on provider error wording. Some
+ * adapters return a generic body (or `fetch failed`) even though the response
+ * status is rate limiting. Keep explicit non-retryable classifications such as
+ * auth and context errors terminal.
+ */
+export function classifyProviderError(
+  error: unknown,
+  providerStatus?: number,
+): ClassifiedAgentError {
+  const classified = classifyAgentError(error);
+  if (
+    providerStatus === 429 &&
+    classified.code !== "PROVIDER_RATE_LIMITED" &&
+    classified.retriable
+  ) {
+    return {
+      ...classified,
+      code: "PROVIDER_RATE_LIMITED",
+      retriable: true,
+      details: {
+        ...classified.details,
+        providerStatus,
+      },
+    };
+  }
+  return classified;
+}
+
 function headerValue(
   headers: Readonly<Record<string, string>> | undefined,
   name: string,
@@ -238,22 +267,10 @@ export function createProviderRetryStream(
             typeof event.error.errorMessage === "string"
               ? event.error.errorMessage
               : event.error;
-          const classified = classifyAgentError(errorMessage);
-          const providerStatus = controller.status?.();
-          const error =
-            providerStatus === 429 &&
-            classified.code !== "PROVIDER_RATE_LIMITED" &&
-            classified.retriable
-              ? {
-                  ...classified,
-                  code: "PROVIDER_RATE_LIMITED",
-                  retriable: true,
-                  details: {
-                    ...classified.details,
-                    providerStatus,
-                  },
-                }
-              : classified;
+          const error = classifyProviderError(
+            errorMessage,
+            controller.status?.(),
+          );
           const attempt = controller.claim(error, "request");
           if (attempt !== undefined) {
             retry = { error, attempt };

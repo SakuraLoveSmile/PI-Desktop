@@ -53,6 +53,7 @@ import {
 } from "./provider-binding.js";
 import {
   captureProviderResponse,
+  classifyProviderError,
   createProviderRetryStream,
   delayWithAbort,
   PROVIDER_RATE_LIMIT_MAX_RETRIES,
@@ -513,7 +514,7 @@ export class SubagentRun {
             typeof (message as { errorMessage?: unknown }).errorMessage === "string"
               ? ((message as { errorMessage?: string }).errorMessage as string)
               : "provider stream failed";
-          classifiedError = classifyAgentError(raw);
+          classifiedError = classifyProviderError(raw, this.providerResponseStatus);
           retryAttempt = this.claimProviderRetry(classifiedError, "stream");
           if (retryAttempt !== undefined) {
             this.pendingProviderRetry = classifiedError;

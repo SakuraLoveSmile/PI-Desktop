@@ -244,8 +244,9 @@ describe("SubagentRun provider rate-limit recovery", () => {
         content: [{ type: "text", text: "partial" }],
         stopReason: "error",
       }),
-      errorMessage: "429: too many requests",
+      errorMessage: "upstream unavailable",
     };
+    run.providerResponseStatus = 429;
     const state = {
       messages: [] as Array<Record<string, unknown>>,
     };
