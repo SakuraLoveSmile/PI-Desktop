@@ -47,7 +47,7 @@ function SubagentRow({
       </div>
       <CapabilityToggle
         checked={subagent.enabled}
-        disabled={busy}
+        busy={busy}
         label={t("settings.toggleCapability", { name })}
         onChange={onToggle}
       />
@@ -125,7 +125,7 @@ export function AgentSubagentsPage() {
             <SubagentRow
               key={subagent.id}
               subagent={subagent}
-              busy={busyId === subagent.id}
+              busy={loading || busyId !== null}
               onToggle={() => void toggle(subagent)}
             />
           ))

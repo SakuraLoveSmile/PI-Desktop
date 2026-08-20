@@ -46,12 +46,14 @@ function McpRow({
   onEdit,
   onToggle,
   busy,
+  disabled,
 }: {
   server: McpServerRecord;
   status?: McpServerStatus;
   onEdit: () => void;
   onToggle: () => void;
   busy: boolean;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const name = server.label || server.id;
@@ -88,13 +90,14 @@ function McpRow({
           className="plugins-icon-btn agent-capability-edit"
           aria-label={t("settings.editMcpOf", { name })}
           title={t("settings.editMcp")}
+          disabled={disabled || busy}
           onClick={onEdit}
         >
           <IconPencil size={15} />
         </button>
         <CapabilityToggle
           checked={server.enabled}
-          disabled={busy}
+          busy={busy}
           label={t("settings.toggleCapability", { name })}
           onChange={onToggle}
         />
@@ -276,7 +279,8 @@ export function AgentMcpPage() {
           key={server.id}
           server={server}
           status={statusFor(statuses, server)}
-          busy={busyKey === `${level}:${server.id}`}
+          busy={loading || busyKey !== null}
+          disabled={loading || busyKey !== null}
           onEdit={() => openEdit(server, level)}
           onToggle={() => void toggle(server, level)}
         />
@@ -300,7 +304,12 @@ export function AgentMcpPage() {
           scope="global"
           count={globalServers.length}
           action={
-            <CapabilityButton onClick={() => openCreate("global")} variant="primary">
+            <CapabilityButton
+              variant="primary"
+              disabled={loading}
+              busy={busyKey !== null}
+              onClick={() => openCreate("global")}
+            >
               <IconPlus size={14} />
               {t("settings.addMcp")}
             </CapabilityButton>
@@ -317,18 +326,24 @@ export function AgentMcpPage() {
           scope="project"
           count={projectServers.length}
           action={
-            <div className="agent-capability-column-actions">
+            <>
               <AgentProjectPicker
                 value={selectedProjectPath}
                 options={options}
                 label={t("settings.selectProject")}
+                disabled={loading || busyKey !== null}
                 onChange={setSelectedProjectPath}
               />
-              <CapabilityButton onClick={() => openCreate("project")} variant="primary">
+              <CapabilityButton
+                variant="primary"
+                disabled={!selectedProjectPath || loading}
+                busy={busyKey !== null}
+                onClick={() => openCreate("project")}
+              >
                 <IconPlus size={14} />
                 {t("settings.addMcp")}
               </CapabilityButton>
-            </div>
+            </>
           }
           loading={loading}
           empty={t("settings.loadingCapabilities")}

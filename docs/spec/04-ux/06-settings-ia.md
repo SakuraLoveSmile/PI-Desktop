@@ -172,6 +172,12 @@ system while preserving their different data ownership:
   always visible enablement switch. MCP rows also keep Edit visible as an icon
   action. Empty states use an inset dashed surface rather than leaving the
   entire viewport visually blank.
+- Initial loads and project changes keep that same viewport stable with a
+  lightweight loading treatment; scope actions and row controls are disabled
+  while the capability state is being refreshed so a second click cannot race
+  the host update. The count remains available to assistive technology, and
+  pending switches retain a busy state until the refresh replaces them with
+  the latest result.
 - Scope labels stay on one line. When a capability surface is narrow, its
   actions move below the scope title so project controls cannot squeeze or
   wrap the title.

@@ -49,7 +49,7 @@ function SkillRow({
       </div>
       <CapabilityToggle
         checked={skill.enabled}
-        disabled={busy}
+        busy={busy}
         label={t("settings.toggleCapability", { name })}
         onChange={onToggle}
       />
@@ -155,7 +155,11 @@ export function AgentSkillsPage() {
   };
 
   const importButton = (level: "global" | "project") => (
-    <CapabilityButton onClick={() => void importSkill(level)}>
+    <CapabilityButton
+      disabled={loading}
+      busy={busyKey !== null}
+      onClick={() => void importSkill(level)}
+    >
       <IconDownload size={14} />
       {t("settings.importSkill")}
     </CapabilityButton>
@@ -181,7 +185,7 @@ export function AgentSkillsPage() {
               <SkillRow
                 key={skill.id}
                 skill={skill}
-                busy={busyKey === `global:${skill.id}`}
+                busy={loading || busyKey !== null}
                 onToggle={() => void toggle(skill, "global")}
               />
             ))
@@ -194,15 +198,16 @@ export function AgentSkillsPage() {
           scope="project"
           count={projectSkills.length}
           action={
-            <div className="agent-capability-column-actions">
+            <>
               <AgentProjectPicker
                 value={selectedProjectPath}
                 options={options}
                 label={t("settings.selectProject")}
+                disabled={loading || busyKey !== null}
                 onChange={setSelectedProjectPath}
               />
               {importButton("project")}
-            </div>
+            </>
           }
           loading={loading}
           empty={t("settings.loadingCapabilities")}
@@ -216,7 +221,7 @@ export function AgentSkillsPage() {
               <SkillRow
                 key={skill.id}
                 skill={skill}
-                busy={busyKey === `project:${skill.id}`}
+                busy={loading || busyKey !== null}
                 onToggle={() => void toggle(skill, "project")}
               />
             ))

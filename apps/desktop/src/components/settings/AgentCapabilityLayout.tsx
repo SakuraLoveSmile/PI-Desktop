@@ -87,11 +87,13 @@ export function AgentProjectPicker({
   value,
   options,
   label,
+  disabled,
   onChange,
 }: {
   value: string | null;
   options: readonly AgentProjectOption[];
   label: string;
+  disabled?: boolean;
   onChange: (path: string) => void;
 }) {
   const { t } = useTranslation();
@@ -102,7 +104,7 @@ export function AgentProjectPicker({
       <Select
         value={value ?? ""}
         aria-label={label}
-        disabled={options.length === 0}
+        disabled={disabled || options.length === 0}
         onChange={(event) => onChange(event.target.value)}
       >
         {options.length === 0 ? (
@@ -124,21 +126,24 @@ export function CapabilityToggle({
   checked,
   label,
   disabled,
+  busy,
   onChange,
 }: {
   checked: boolean;
   label: string;
   disabled?: boolean;
+  busy?: boolean;
   onChange: () => void;
 }) {
   return (
     <button
       type="button"
-      className={cx("settings-toggle", checked && "on")}
+      className={cx("settings-toggle", checked && "on", busy && "is-busy")}
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      disabled={disabled}
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
       onClick={onChange}
     >
       <span className="settings-toggle-thumb" />
@@ -167,6 +172,7 @@ export function AgentCapabilityColumn({
   children: ReactNode;
   className?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <section
       className={cx("agent-capability-column", scope && `is-${scope}`, className)}
@@ -188,17 +194,25 @@ export function AgentCapabilityColumn({
         <div className="agent-capability-column-actions">
           {action}
           {count !== undefined ? (
-            <span className="agent-capability-count" aria-hidden="true">
-              {count}
+            <span
+              className="agent-capability-count"
+              title={t("settings.capabilityCount", { count })}
+            >
+              <span aria-hidden="true">{count}</span>
+              <span className="sr-only">
+                {t("settings.capabilityCount", { count })}
+              </span>
             </span>
           ) : null}
         </div>
       </header>
       <div className="agent-capability-list" role="list" aria-busy={loading}>
         {loading ? (
-          <div className="agent-capability-empty" role="status">
-            <IconFolderOpen size={18} aria-hidden="true" />
-            <span>{empty}</span>
+          <div className="agent-capability-loading" role="status" aria-live="polite">
+            <span className="agent-capability-loading-label">{empty}</span>
+            <span className="agent-capability-loading-line" aria-hidden="true" />
+            <span className="agent-capability-loading-line is-short" aria-hidden="true" />
+            <span className="agent-capability-loading-line is-medium" aria-hidden="true" />
           </div>
         ) : children}
       </div>
@@ -219,13 +233,23 @@ export function CapabilityButton({
   children,
   onClick,
   variant = "secondary",
+  disabled,
+  busy,
 }: {
   children: ReactNode;
   onClick: () => void;
   variant?: "primary" | "secondary";
+  disabled?: boolean;
+  busy?: boolean;
 }) {
   return (
-    <Button variant={variant} size="sm" onClick={onClick}>
+    <Button
+      variant={variant}
+      size="sm"
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      onClick={onClick}
+    >
       {children}
     </Button>
   );

@@ -4110,7 +4110,9 @@ Each scenario is documented in this format:
      Installed and Marketplace tabs are present.
   2. Open Skills. Confirm the global column shows `~/.agents/skills`, the project
      column shows project A's `.agents/skills`, both lists have the same fixed
-     height, and the project picker changes the selected project.
+     height, and the project picker changes the selected project. While the
+     project data refreshes, confirm the viewport shows a loading treatment and
+     the picker/import/switch controls cannot be activated a second time.
   3. Toggle a global skill off while project A is selected. Confirm the row is
      dimmed, a toast names the skill, and the global document remains unchanged.
      Switch to project B and confirm the global skill remains enabled there.
@@ -4141,9 +4143,12 @@ Each scenario is documented in this format:
     the header;
     scope labels remain single-line, with actions moving below the title when a
     surface is narrow. The rows use compact capability icons, localized badges,
-    descriptions, and persistent enablement switches. Empty states stay
-    centered inside an inset dashed surface, and the two surfaces stack with
-    wrapped actions at narrow widths.
+    descriptions, and persistent enablement switches. Loading uses a separate
+    stable treatment, pending updates keep a busy switch state and disable
+    competing controls until the host refresh completes, and counts are
+    exposed to assistive technology.
+    Empty states stay centered inside an inset dashed surface, and the two
+    surfaces stack with wrapped actions at narrow widths.
   - Capability files contain configuration/frontmatter only; enablement is
     persisted in the app-local `agent-capabilities` state files.
   - Project records shadow global records by id or name even when disabled,

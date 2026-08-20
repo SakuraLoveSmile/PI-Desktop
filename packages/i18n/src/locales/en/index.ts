@@ -527,6 +527,7 @@ export const en = {
     subagentsGlobalPath: "Global subagents path",
     subagentsOnlyGlobal: "Subagents are global-only. Project definitions are not supported.",
     capabilityPriority: "Project capabilities take precedence over global capabilities with the same name.",
+    capabilityCount: "{{count}} capabilities",
     globalLevel: "Global",
     projectLevel: "Project",
     globalOnly: "Global only",
