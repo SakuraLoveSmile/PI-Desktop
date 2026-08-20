@@ -4136,13 +4136,14 @@ Each scenario is documented in this format:
   - The three Settings pages use no tabs for switching capabilities, preserve
     list height for empty and populated states, support dark and light themes,
     and show project-over-global priority in their explanatory copy. Each
-    global/project scope is presented as an elevated surface with its scope
-    marker, resolved `.agents` path, count, and actions grouped in the header;
+    global/project scope is presented as a compact elevated surface with a
+    scope marker, resolved `.agents` path chip, count, and actions grouped in
+    the header;
     scope labels remain single-line, with actions moving below the title when a
-    surface is narrow;
-    the rows use compact capability icons, localized badges, descriptions, and
-    persistent enablement switches. Empty states stay centered inside the same
-    surface, and the two surfaces stack with wrapped actions at narrow widths.
+    surface is narrow. The rows use compact capability icons, localized badges,
+    descriptions, and persistent enablement switches. Empty states stay
+    centered inside an inset dashed surface, and the two surfaces stack with
+    wrapped actions at narrow widths.
   - Capability files contain configuration/frontmatter only; enablement is
     persisted in the app-local `agent-capabilities` state files.
   - Project records shadow global records by id or name even when disabled,

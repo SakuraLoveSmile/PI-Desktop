@@ -166,10 +166,12 @@ system while preserving their different data ownership:
   resolved `.agents` path, item count, and actions in its header. Project scope
   includes the selected-project picker; Subagents has no project picker because
   it is global-only.
-- The list viewport has a fixed height so changing projects, toggling a row, or
-  showing an empty state does not make the page jump. Rows use a compact icon,
-  name, optional source/transport/status badges, description, and an always
-  visible enablement switch. MCP rows also keep Edit visible as an icon action.
+- The list viewport has a compact fixed height so changing projects, toggling a
+  row, or showing an empty state does not make the page jump. Rows use a compact
+  icon, name, optional source/transport/status badges, description, and an
+  always visible enablement switch. MCP rows also keep Edit visible as an icon
+  action. Empty states use an inset dashed surface rather than leaving the
+  entire viewport visually blank.
 - Scope labels stay on one line. When a capability surface is narrow, its
   actions move below the scope title so project controls cannot squeeze or
   wrap the title.

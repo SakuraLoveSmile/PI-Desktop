@@ -53,10 +53,17 @@ test("skills and MCP use global/project columns with a selectable project", () =
 });
 
 test("capability lists keep a fixed height and render disabled rows", () => {
-  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?height:\s*412px/);
-  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?min-height:\s*412px/);
+  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?height:\s*360px/);
+  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?min-height:\s*360px/);
   assert.match(styles, /\.agent-capability-row\.is-off\s*\{[\s\S]*?opacity:/);
   assert.match(layout, /agent-capability-empty/);
+});
+
+test("capability surfaces use the compact studio hierarchy", () => {
+  assert.match(styles, /\.agent-capability-intro\s*\{[\s\S]*?border-left:\s*3px solid var\(--ds-accent\)/);
+  assert.match(styles, /\.agent-capability-column\s*\{[\s\S]*?border-radius:\s*var\(--radius-md-plus\)/);
+  assert.match(styles, /\.agent-capability-column-title code\s*\{[\s\S]*?background:/);
+  assert.match(styles, /\.agent-capability-empty\s*\{[\s\S]*?border:\s*1px dashed/);
 });
 
 test("capability scope labels stay intact when a column narrows", () => {
