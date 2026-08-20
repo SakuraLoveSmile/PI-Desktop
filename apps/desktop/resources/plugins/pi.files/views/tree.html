@@ -442,8 +442,8 @@
             </button>
             <span class="viewer-path" id="viewer-path" title=""></span>
             <span class="viewer-meta" id="viewer-meta"></span>
-            <button class="icon-button" id="open-default" type="button" title="Open with default app" aria-label="Open with default app" disabled>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H11"/></svg>
+            <button class="icon-button" id="reveal" type="button" title="Show in folder" aria-label="Show in folder" disabled>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.5h6l2 2h9l-2 9a1.5 1.5 0 0 1-1.5 1.2h-14a1.5 1.5 0 0 1-1.5-1.8z"/><path d="M3.5 7.5V5A1.5 1.5 0 0 1 5 3.5h4l2 2h6"/></svg>
             </button>
           </header>
           <div class="viewer-body" id="viewer-body"></div>
@@ -461,7 +461,7 @@
       const viewerMeta = document.getElementById("viewer-meta");
       const viewerBody = document.getElementById("viewer-body");
       const refreshButton = document.getElementById("refresh");
-      const openDefaultButton = document.getElementById("open-default");
+      const revealButton = document.getElementById("reveal");
       const toolbarName = document.getElementById("toolbar-name");
       const toolbarSubtitle = document.getElementById("toolbar-subtitle");
 
@@ -476,7 +476,7 @@
       let workspaceRevision = 0;
       let locale = "en";
       let isRefreshing = false;
-      let isOpeningDefault = false;
+      let isRevealing = false;
       let viewerState = null;
 
       const copy = {
@@ -497,9 +497,9 @@
           image: "Image preview is not available in the plugin view.",
           tooLarge: "This file is too large to preview.",
           readError: "Could not read this file.",
-          openDefault: "Open with default app",
-          openingDefault: "Opening…",
-          openError: "Could not open this file with the default app.",
+          reveal: "Show in folder",
+          revealing: "Showing…",
+          revealError: "Could not show this file in its folder.",
           truncated: "Preview truncated after {count} lines.",
           folder: "folder",
           file: "file",
@@ -521,9 +521,9 @@
           image: "插件视图暂不支持图片预览。",
           tooLarge: "此文件过大，无法预览。",
           readError: "无法读取此文件。",
-          openDefault: "使用默认应用打开",
-          openingDefault: "打开中…",
-          openError: "无法使用默认应用打开此文件。",
+          reveal: "在文件夹中显示",
+          revealing: "显示中…",
+          revealError: "无法在文件夹中显示此文件。",
           truncated: "预览已截断，仅显示前 {count} 行。",
           folder: "文件夹",
           file: "文件",
@@ -570,8 +570,8 @@
         refreshButton.setAttribute("aria-label", t("refresh"));
         document.getElementById("back").title = t("back");
         document.getElementById("back").setAttribute("aria-label", t("back"));
-        openDefaultButton.title = t("openDefault");
-        openDefaultButton.setAttribute("aria-label", t("openDefault"));
+        revealButton.title = t("reveal");
+        revealButton.setAttribute("aria-label", t("reveal"));
         if (!viewerView.hidden && selected) viewerPath.title = selected;
         renderTree();
         if (!viewerView.hidden && viewerState) {
@@ -593,14 +593,14 @@
         refreshButton.setAttribute("aria-busy", String(loading));
       };
 
-      const updateOpenDefaultButton = () => {
+      const updateRevealButton = () => {
         const active = !viewerView.hidden && Boolean(selected);
-        openDefaultButton.disabled = !active || isOpeningDefault;
-        openDefaultButton.dataset.loading = String(isOpeningDefault);
-        const label = isOpeningDefault ? t("openingDefault") : t("openDefault");
-        openDefaultButton.title = label;
-        openDefaultButton.setAttribute("aria-label", label);
-        openDefaultButton.setAttribute("aria-busy", String(isOpeningDefault));
+        revealButton.disabled = !active || isRevealing;
+        revealButton.dataset.loading = String(isRevealing);
+        const label = isRevealing ? t("revealing") : t("reveal");
+        revealButton.title = label;
+        revealButton.setAttribute("aria-label", label);
+        revealButton.setAttribute("aria-busy", String(isRevealing));
       };
 
       async function loadDirectory(path, force = false) {
@@ -734,7 +734,7 @@
       const showTree = () => {
         viewerView.hidden = true;
         treeView.hidden = false;
-        updateOpenDefaultButton();
+        updateRevealButton();
         const row = selected && document.querySelector(`.tree-row[data-path="${CSS.escape(selected)}"]`);
         row?.focus();
       };
@@ -755,7 +755,7 @@
         loading.append(spinner, document.createTextNode(t("loading")));
         loading.setAttribute("role", "status");
         viewerBody.append(loading);
-        updateOpenDefaultButton();
+        updateRevealButton();
       };
 
       const showViewerMessage = (messageKey) => {
@@ -819,20 +819,20 @@
         }
       }
 
-      openDefaultButton.addEventListener("click", async () => {
-        if (!selected || isOpeningDefault) return;
-        isOpeningDefault = true;
-        updateOpenDefaultButton();
+      revealButton.addEventListener("click", async () => {
+        if (!selected || isRevealing) return;
+        isRevealing = true;
+        updateRevealButton();
         try {
-          await bridge.invoke("fs.openDefault", { path: selected });
+          await bridge.invoke("fs.reveal", { path: selected });
         } catch {
           await bridge.invoke("ui.showToast", {
-            message: t("openError"),
+            message: t("revealError"),
             level: "error",
           }).catch(() => {});
         } finally {
-          isOpeningDefault = false;
-          updateOpenDefaultButton();
+          isRevealing = false;
+          updateRevealButton();
         }
       });
 
@@ -910,7 +910,7 @@
         viewerState = null;
         viewerView.hidden = true;
         treeView.hidden = false;
-        updateOpenDefaultButton();
+        updateRevealButton();
         renderTree();
         if (workspace) await loadDirectory("");
       }

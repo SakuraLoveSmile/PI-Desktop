@@ -103,6 +103,7 @@ pi.workspace.get(): Promise<{ path: string; name: string } | null>
 
 pi.fs.readText(pathFromRoot: string): Promise<string>
 pi.fs.openDefault(pathFromRoot: string): Promise<void>
+pi.fs.reveal(pathFromRoot: string): Promise<void>
 pi.fs.writeText(pathFromRoot: string, content: string): Promise<void>
 pi.fs.glob(pattern: string): Promise<string[]>
 pi.fs.list(pathFromRoot: string): Promise<Array<{
@@ -119,6 +120,11 @@ pi.fs.requestDirectory(): Promise<{ path: string; name: string } | null>
 associated application. It uses the same `fs.read` root, symlink, protected-path,
 deny-list, and scope checks as `fs.readText`; directories are rejected. The
 host audits the operation and never accepts an absolute path from the plugin.
+
+`fs.reveal` reveals one existing readable file in the operating system's file
+manager and selects it when the platform supports that behavior. It uses the
+same `fs.read` checks, rejects directories, and audits both success and failure.
+The plugin receives and supplies only the root-relative path.
 
 Paths are relative to the mode's root — the workspace, or the directory the user
 picked through `requestDirectory()` when the mode declares
@@ -292,7 +298,7 @@ The host-owned preload forwards only fixed channels to the plugin runtime:
 | `ui.notify` | `notify` |
 | `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | `notify` |
 | `plugin.getSettings`, `workspace.get`, `app.getAppearance` | None |
-| `fs.readText`, `fs.openDefault`, `fs.glob`, `fs.list` | `fs.read` |
+| `fs.readText`, `fs.openDefault`, `fs.reveal`, `fs.glob`, `fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |
 | `clipboard.readText` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |
@@ -322,6 +328,7 @@ Any of the following calls must be logged for audit:
 - fs.remove, fs.requestDirectory, and every refused fs call (with its path and
   `errorCode`), plus each consent answer and why it was asked (`scope` / `rate`)
 - fs.openDefault (with its root-relative path and whether the OS open succeeded)
+- fs.reveal (with its root-relative path and whether the file manager reveal succeeded)
 - execute after agent.registerTool (including tools discovered from a plugin's
   MCP servers)
 - net.fetch
@@ -349,8 +356,8 @@ Log fields:
 The desktop plugin runtime now implements the MVP host API surface used by local and marketplace plugins:
 
 - `app.*`, `plugin.*`, `commands.*`, `ui.*`, `workspace.*`
-- `fs.readText` / `fs.openDefault` / `fs.writeText` / `fs.glob` / `fs.remove` /
-  `fs.requestDirectory`, bounded by `manifest.fs` (ADR 0088)
+- `fs.readText` / `fs.openDefault` / `fs.reveal` / `fs.writeText` / `fs.glob` /
+  `fs.remove` / `fs.requestDirectory`, bounded by `manifest.fs` (ADR 0088)
 - `agent.registerTool` / `unregisterTool`
 - `clipboard.*`, `shell.openExternal`, `net.fetch`
 - `services.register` / `unregister`, `bus.publish` / `subscribe`, `events.on` / `off`

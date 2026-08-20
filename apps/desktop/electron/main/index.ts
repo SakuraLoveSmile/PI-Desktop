@@ -335,6 +335,9 @@ const plugins = new PluginRuntime({
     const error = await shell.openPath(fullPath);
     if (error) throw new Error(error);
   },
+  revealPath: async (fullPath) => {
+    shell.showItemInFolder(fullPath);
+  },
   readClipboard: async () => {
     const { clipboard } = await import("electron");
     return clipboard.readText();

@@ -119,6 +119,7 @@ async function harness(t, { id, permissions, fs: fsPolicy, workspace, granted, c
   const consents = [];
   const trashed = [];
   const opened = [];
+  const revealed = [];
   const answers = [...(consent ?? [])];
   const runtime = new PluginRuntime({
     hostEntry: hostProcessEntry,
@@ -127,6 +128,7 @@ async function harness(t, { id, permissions, fs: fsPolicy, workspace, granted, c
     audit: (entry) => audits.push(entry),
     trashItem: async (fullPath) => trashed.push(fullPath),
     openPath: async (fullPath) => opened.push(fullPath),
+    revealPath: async (fullPath) => revealed.push(fullPath),
     ...(protectedPaths ? { protectedPaths: () => protectedPaths } : {}),
     ...(consent
       ? {
@@ -142,7 +144,7 @@ async function harness(t, { id, permissions, fs: fsPolicy, workspace, granted, c
   });
   const dir = writePlugin({ id, permissions, fs: fsPolicy });
   await runtime.loadFromPath(dir, granted);
-  return { runtime, ws, audits, consents, trashed, opened, dir };
+  return { runtime, ws, audits, consents, trashed, opened, revealed, dir };
 }
 
 function refused(t, promise, code, pattern) {
@@ -360,6 +362,39 @@ test("default-app opening reuses the readable file scope", async (t) => {
     runtime.invokePanelBridge("fs.open-default.scoped", "fs.openDefault", {
       path: "notes.txt",
     }),
+    "PERMISSION_DENIED",
+    /outside manifest\.fs\.read\.scope/,
+  );
+});
+
+test("file reveal reuses the readable file scope", async (t) => {
+  const { runtime, ws, revealed, audits } = await harness(t, {
+    id: "fs.reveal.scoped",
+    permissions: ["fs.read"],
+    fs: { read: { scope: ["docs/**", "docs"] } },
+  });
+
+  assert.deepEqual(
+    await runtime.invokePanelBridge("fs.reveal.scoped", "fs.reveal", {
+      path: "docs/a.md",
+    }),
+    { ok: true },
+  );
+  assert.deepEqual(revealed, [realpathSync(join(ws, "docs/a.md"))]);
+  assert.ok(
+    audits.some((entry) => entry.api === "fs.reveal" && entry.ok === true),
+    "revealing a file is audited",
+  );
+
+  await refused(
+    t,
+    runtime.invokePanelBridge("fs.reveal.scoped", "fs.reveal", { path: "docs" }),
+    "INVALID_ARGUMENT",
+    /only files can be revealed/,
+  );
+  await refused(
+    t,
+    runtime.invokePanelBridge("fs.reveal.scoped", "fs.reveal", { path: "notes.txt" }),
     "PERMISSION_DENIED",
     /outside manifest\.fs\.read\.scope/,
   );

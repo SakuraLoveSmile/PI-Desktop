@@ -136,6 +136,7 @@ function buildApi() {
     fs: {
       readText: (path) => call("fs.readText", [path]),
       openDefault: (path) => call("fs.openDefault", [path]),
+      reveal: (path) => call("fs.reveal", [path]),
       writeText: (path, content) => call("fs.writeText", [path, content]),
       glob: (pattern) => call("fs.glob", [pattern]),
       remove: (path) => call("fs.remove", [path]),

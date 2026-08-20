@@ -37,7 +37,7 @@ test("the Files view uses only public bridge channels", () => {
   for (const channel of [
     "fs.list",
     "fs.readText",
-    "fs.openDefault",
+    "fs.reveal",
     "workspace.get",
     "app.getAppearance",
   ]) {
@@ -63,7 +63,7 @@ test("the Files view keeps the former browser workflow while staying plugin-owne
     'id="refresh"',
     'id="back"',
     'id="viewer-body"',
-    'id="open-default"',
+    'id="reveal"',
     'role="tree"',
     'role", "treeitem"',
     'aria-expanded',
@@ -73,7 +73,7 @@ test("the Files view keeps the former browser workflow while staying plugin-owne
     assert.ok(view.includes(marker), `expected Files view marker: ${marker}`);
   }
   assert.match(view, /fs\.readText/);
-  assert.match(view, /fs\.openDefault/);
+  assert.match(view, /fs\.reveal/);
   assert.match(view, /text\.includes\("\\0"\)/);
   assert.match(view, /appearance:changed/);
   assert.match(view, /locale.*startsWith\("zh"\)/);

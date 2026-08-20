@@ -261,6 +261,7 @@ Host Main (PI-Desktop)
 - `pi.workspace.get()`
 - `pi.fs.readText(path)`
 - `pi.fs.openDefault(path)` // 使用系统关联应用打开选中的文件
+- `pi.fs.reveal(path)` // 在系统文件管理器中显示选中的文件
 - `pi.fs.writeText(path, content)` // 高风险
 - `pi.fs.glob(pattern)`
 

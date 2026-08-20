@@ -22,6 +22,7 @@ test("plugin runtime exposes gated high-risk host APIs", () => {
     "fs.write",
     "fs.delete",
     "fs.openDefault",
+    "fs.reveal",
     "net.fetch",
     "shell.openExternal",
     "clipboard.read",

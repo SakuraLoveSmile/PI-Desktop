@@ -267,6 +267,7 @@ Namespace: `pi.plugin.*`
 - `pi.workspace.get()`
 - `pi.fs.readText(path)`
 - `pi.fs.openDefault(path)` // open the selected file with the OS-associated app
+- `pi.fs.reveal(path)` // show the selected file in the OS file manager
 - `pi.fs.writeText(path, content)` // high risk
 - `pi.fs.glob(pattern)`
 

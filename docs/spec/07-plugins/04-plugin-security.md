@@ -204,10 +204,11 @@ Plan is an additional host policy boundary for agent tools:
 ## 8. Network and external links
 
 - `net.fetch` is not granted by default
-- `openExternal` should confirm. `fs.openDefault` is separate: it accepts only
-  an existing root-relative file that already passes the plugin's `fs.read`
-  policy, and is intended for an explicit file-view action rather than arbitrary
-  URL or absolute-path opening.
+- `openExternal` should confirm. `fs.openDefault` and `fs.reveal` are separate:
+  each accepts only an existing root-relative file that already passes the
+  plugin's `fs.read` policy. They are intended for explicit file-view actions,
+  not arbitrary URL or absolute-path opening; `fs.reveal` only asks the OS file
+  manager to select the file.
 - Plugins are forbidden from silently downloading and executing binaries (not done at all in MVP)
 
 ### 8.0 Egress allowlist

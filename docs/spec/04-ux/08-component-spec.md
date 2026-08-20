@@ -672,15 +672,14 @@ workflow while rendering entirely inside the plugin's isolated page:
   the hierarchy instead of emoji or text glyphs.
 - Selecting a file switches to a focused viewer with a Back action, the
   root-relative path, file size, line numbers, and a bounded preview. The viewer
-  also offers **Open with default app**, which sends the selected existing file
-  to the operating system's associated application through the scoped plugin
-  bridge. Loading,
+  also offers **Show in folder**, which reveals the selected existing file in the
+  operating system's file manager through the scoped plugin bridge. Loading,
   read failures, binary content, image content, empty folders, and folders
   that fail to load each have a distinct localized state; a failed directory
   can be retried in place.
 - The page follows `app.getAppearance` and `appearance:changed` for base theme
   and English/Simplified Chinese copy. Its only data access remains the public
-  `workspace.get`, `fs.list`, `fs.readText`, and `fs.openDefault` bridge, so the richer surface
+  `workspace.get`, `fs.list`, `fs.readText`, and `fs.reveal` bridge, so the richer surface
   does not add host-only capabilities. Text previews are capped at 5,000 lines;
   images are reported as unavailable rather than sending binary data through a
   text-only channel. The palette stays monochrome like the main app rather than

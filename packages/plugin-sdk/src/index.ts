@@ -327,6 +327,8 @@ export type PluginHostApi = {
     readText: (pathFromRoot: string) => Promise<string>;
     /** Open an existing readable file with the operating system's default app. */
     openDefault: (pathFromRoot: string) => Promise<void>;
+    /** Reveal an existing readable file in the operating system's file manager. */
+    reveal: (pathFromRoot: string) => Promise<void>;
     writeText: (pathFromRoot: string, content: string) => Promise<void>;
     glob: (pattern: string) => Promise<string[]>;
     /**

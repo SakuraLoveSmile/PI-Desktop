@@ -178,6 +178,8 @@ export type PluginHostServices = {
   openExternal: (url: string) => Promise<void>;
   /** Open one already-authorized file with the OS-associated application. */
   openPath: (fullPath: string) => Promise<void>;
+  /** Reveal one already-authorized file in the OS file manager. */
+  revealPath?: (fullPath: string) => Promise<void>;
   readClipboard: () => Promise<string>;
   writeClipboard: (text: string) => Promise<void>;
   openPanel: (request: PluginPanelRequest) => Promise<void>;
@@ -255,6 +257,7 @@ const HOST_API_ALLOWLIST = new Set([
   "workspace.get",
   "fs.readText",
   "fs.openDefault",
+  "fs.reveal",
   "fs.writeText",
   "fs.glob",
   "fs.list",
@@ -1057,6 +1060,9 @@ export class PluginRuntime {
         return api.fs.readText(String(payload?.path ?? ""));
       case "fs.openDefault":
         await api.fs.openDefault(String(payload?.path ?? ""));
+        return { ok: true };
+      case "fs.reveal":
+        await api.fs.reveal(String(payload?.path ?? ""));
         return { ok: true };
       case "fs.writeText":
         await api.fs.writeText(String(payload?.path ?? ""), String(payload?.content ?? ""));
@@ -2498,6 +2504,55 @@ export class PluginRuntime {
           this.services.audit?.({
             pluginId,
             api: "fs.openDefault",
+            ok: true,
+            ts: Date.now(),
+            path: rel,
+          });
+        },
+        reveal: async (pathFromRoot: string) => {
+          const { full, rel } = await this.resolveFsRequest(
+            loaded,
+            "read",
+            pathFromRoot,
+          );
+          if (!statSync(full).isFile()) {
+            this.services.audit?.({
+              pluginId,
+              api: "fs.reveal",
+              ok: false,
+              errorCode: "INVALID_ARGUMENT",
+              ts: Date.now(),
+              path: rel,
+            });
+            throw apiError("INVALID_ARGUMENT", "only files can be revealed in the file manager");
+          }
+          if (!this.services.revealPath) {
+            this.services.audit?.({
+              pluginId,
+              api: "fs.reveal",
+              ok: false,
+              errorCode: "UNSUPPORTED",
+              ts: Date.now(),
+              path: rel,
+            });
+            throw apiError("UNSUPPORTED", "revealPath service missing");
+          }
+          try {
+            await this.services.revealPath(full);
+          } catch (error) {
+            this.services.audit?.({
+              pluginId,
+              api: "fs.reveal",
+              ok: false,
+              errorCode: "REVEAL_FAILED",
+              ts: Date.now(),
+              path: rel,
+            });
+            throw apiError("REVEAL_FAILED", error instanceof Error ? error.message : String(error));
+          }
+          this.services.audit?.({
+            pluginId,
+            api: "fs.reveal",
             ok: true,
             ts: Date.now(),
             path: rel,
