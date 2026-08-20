@@ -1106,6 +1106,28 @@
   gap: 3px;
 }
 
+.agent-capability-column-title-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-capability-column-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-full);
+}
+
+.agent-capability-column-dot.is-global {
+  background: var(--ds-text-muted);
+}
+
+.agent-capability-column-dot.is-project {
+  background: var(--ds-accent);
+}
+
 .agent-capability-column-label {
   color: var(--ds-text-primary);
   font-size: var(--text-md-plus);
@@ -1131,6 +1153,20 @@
   align-items: center;
   justify-content: flex-end;
   gap: 7px;
+}
+
+.agent-capability-count {
+  display: inline-flex;
+  min-width: 24px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--ds-bg-active);
+  padding: 0 7px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
 }
 
 .agent-capability-project-picker {

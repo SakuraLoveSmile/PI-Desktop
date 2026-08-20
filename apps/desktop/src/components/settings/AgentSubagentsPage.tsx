@@ -112,12 +112,14 @@ export function AgentSubagentsPage() {
       <AgentCapabilityColumn
         title={t("settings.globalLevel")}
         path={GLOBAL_SUBAGENTS_PATH}
+        scope="global"
+        count={subagents.length}
         loading={loading}
         empty={t("settings.loadingCapabilities")}
         className="agent-capability-column-wide"
       >
         {subagents.length === 0 ? (
-          <CapabilityEmpty message={t("settings.subagentsEmpty")} icon={<IconBot size={18} />} />
+          <CapabilityEmpty message={t("settings.subagents.empty")} icon={<IconBot size={18} />} />
         ) : (
           subagents.map((subagent) => (
             <SubagentRow

@@ -297,6 +297,8 @@ export function AgentMcpPage() {
         <AgentCapabilityColumn
           title={t("settings.globalLevel")}
           path={GLOBAL_MCP_PATH}
+          scope="global"
+          count={globalServers.length}
           action={
             <CapabilityButton onClick={() => openCreate("global")} variant="primary">
               <IconPlus size={14} />
@@ -312,6 +314,8 @@ export function AgentMcpPage() {
         <AgentCapabilityColumn
           title={t("settings.projectLevel")}
           path={projectMcpPath(selectedProjectPath)}
+          scope="project"
+          count={projectServers.length}
           action={
             <div className="agent-capability-column-actions">
               <AgentProjectPicker

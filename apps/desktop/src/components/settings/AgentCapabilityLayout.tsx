@@ -149,6 +149,8 @@ export function CapabilityToggle({
 export function AgentCapabilityColumn({
   title,
   path,
+  scope,
+  count,
   action,
   loading,
   empty,
@@ -157,6 +159,8 @@ export function AgentCapabilityColumn({
 }: {
   title: string;
   path: string;
+  scope?: "global" | "project";
+  count?: number;
   action?: ReactNode;
   loading: boolean;
   empty: string;
@@ -167,10 +171,25 @@ export function AgentCapabilityColumn({
     <section className={cx("agent-capability-column", className)}>
       <header className="agent-capability-column-head">
         <div className="agent-capability-column-title">
-          <span className="agent-capability-column-label">{title}</span>
+          <div className="agent-capability-column-title-line">
+            {scope ? (
+              <span
+                className={cx("agent-capability-column-dot", `is-${scope}`)}
+                aria-hidden="true"
+              />
+            ) : null}
+            <span className="agent-capability-column-label">{title}</span>
+          </div>
           <code>{path}</code>
         </div>
-        {action}
+        <div className="agent-capability-column-actions">
+          {action}
+          {count !== undefined ? (
+            <span className="agent-capability-count" aria-hidden="true">
+              {count}
+            </span>
+          ) : null}
+        </div>
       </header>
       <div className="agent-capability-list" role="list" aria-busy={loading}>
         {loading ? (

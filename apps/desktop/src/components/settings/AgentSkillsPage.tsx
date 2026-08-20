@@ -168,6 +168,8 @@ export function AgentSkillsPage() {
         <AgentCapabilityColumn
           title={t("settings.globalLevel")}
           path={GLOBAL_SKILLS_PATH}
+          scope="global"
+          count={globalSkills.length}
           action={importButton("global")}
           loading={loading}
           empty={t("settings.loadingCapabilities")}
@@ -189,6 +191,8 @@ export function AgentSkillsPage() {
         <AgentCapabilityColumn
           title={t("settings.projectLevel")}
           path={projectSkillsPath(selectedProjectPath)}
+          scope="project"
+          count={projectSkills.length}
           action={
             <div className="agent-capability-column-actions">
               <AgentProjectPicker

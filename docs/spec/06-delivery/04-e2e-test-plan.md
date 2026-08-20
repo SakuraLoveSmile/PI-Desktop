@@ -4129,6 +4129,9 @@ Each scenario is documented in this format:
      a global file also removes its project overrides.
   8. Open Subagents. Confirm it is one global-only column rooted at
      `~/.agents/subagents`, with no project picker or project-level controls.
+     Confirm the column header has the global scope marker and item count, and
+     an empty directory shows localized empty-state copy rather than a raw
+     translation key.
 - **Expected**:
   - The three Settings pages use no tabs for switching capabilities, preserve
     list height for empty and populated states, support dark and light themes,
