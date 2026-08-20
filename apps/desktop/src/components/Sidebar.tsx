@@ -54,7 +54,7 @@ import {
   IconArchive,
   IconArchiveRestore,
   IconArrowUpDown,
-  IconAt,
+  IconPlug,
   IconBranch,
   IconCheck,
   IconChevronDown,
@@ -1548,7 +1548,7 @@ export function Sidebar({
               aria-label={t("nav.plugins")}
               onClick={() => setPage("plugins")}
             >
-              <IconAt size={14} aria-hidden />
+              <IconPlug size={14} aria-hidden />
             </button>
             <NotificationCenter onBeforeOpen={() => closeMenus(false)} />
           </div>

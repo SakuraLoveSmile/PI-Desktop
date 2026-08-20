@@ -35,6 +35,10 @@ test("footer exposes settings, plugins and notifications in one row", () => {
   assert.match(sidebarSource, /className="footer-actions"/);
   assert.match(sidebarSource, /data-nav="settings"/);
   assert.match(sidebarSource, /data-nav="plugins"/);
+  const pluginsAction = sidebarSource.match(
+    /<button[\s\S]*?data-nav="plugins"[\s\S]*?<\/button>/,
+  )?.[0] ?? "";
+  assert.match(pluginsAction, /<IconPlug size=\{14\} aria-hidden \/>/);
   assert.doesNotMatch(sidebarSource, /data-nav="theme"/);
   assert.match(
     sidebarSource,

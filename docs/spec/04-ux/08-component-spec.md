@@ -250,7 +250,7 @@ Expanded (~275px, D034/D070):
 |   • Project session      |
 | project-B      [>] [+] … |
 |                           |
-| [⚙][@][bell]          [version]|
+| [⚙][plug][bell]          [version]|
 +---------------------------+
 
 Collapsed (48px):
@@ -259,7 +259,7 @@ Collapsed (48px):
 | ses |
 | ses |
 | ──  |
-| [⚙][@][☾][bell] |
+| [⚙][plug][☾][bell] |
 +----+
 ```
 

@@ -4528,8 +4528,9 @@ This test plan spec is accepted when:
 ### US-UI-03 Sidebar destinations
 - Expect the expanded home sidebar to show Sessions and Projects without
   standalone Plugins, Pull requests, or Scheduled rows.
-- Click the Plugins icon in the sidebar footer, immediately to the right of
-  Settings, and expect it to replace the main pane with a dedicated page.
+- Click the plug-shaped Plugins icon in the sidebar footer, immediately to the
+  right of Settings, and expect it to replace the main pane with a dedicated
+  page.
 - Open Settings → Project archive and use it to open, switch, and close a local
   folder workspace.
 
@@ -4541,8 +4542,8 @@ This test plan spec is accepted when:
 
 ### US-UI-05 Locale chrome
 - On a zh-CN system locale, sidebar labels render in Chinese (项目 / 临时会话),
-  without 拉取请求 or 已安排 entries. The footer Plugins icon exposes the
-  localized accessible name 插件.
+  without 拉取请求 or 已安排 entries. The footer plug-shaped Plugins icon
+  exposes the localized accessible name 插件.
 - Empty-thread hero and supporting line are localized Chinese copy; project
   name remains a dotted-underline action when a workspace is open.
 - Composer omits the 本地 workspace label and shows Agent/Plan/Goal plus the

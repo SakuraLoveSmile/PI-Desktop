@@ -25,7 +25,7 @@ destination, chat as the home surface, tools and permissions inline.
 |  Projects      + |                                | ◫ | App.tsx  ⌄ × |
 |   Project A      |                                | > |              |
 |   Project B      |                                | ◎ | Active       |
-| Footer [⚙][@][☾][bell] |  Floating composer (chat) |   | resource     |
+| Footer [⚙][plug][☾][bell] |  Floating composer (chat) |   | resource     |
 +------------------+--------------------------------+------------------+
 ```
 
