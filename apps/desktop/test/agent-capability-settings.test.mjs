@@ -59,6 +59,12 @@ test("capability lists keep a fixed height and render disabled rows", () => {
   assert.match(layout, /agent-capability-empty/);
 });
 
+test("capability scope labels stay intact when a column narrows", () => {
+  assert.match(styles, /\.agent-capability-column\s*\{[\s\S]*?container-type:\s*inline-size/);
+  assert.match(styles, /\.agent-capability-column-label\s*\{[\s\S]*?white-space:\s*nowrap/);
+  assert.match(styles, /@container\s*\(max-width:\s*600px\)[\s\S]*?\.agent-capability-column-head[\s\S]*?flex-direction:\s*column/);
+});
+
 test("skill import is one native file and is copied through the host", () => {
   assert.notEqual(skillImport, "", "skill import handler should be present");
   assert.match(skillImport, /properties:\s*\["openFile"\]/);

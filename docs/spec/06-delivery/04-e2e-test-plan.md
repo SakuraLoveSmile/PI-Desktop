@@ -4138,6 +4138,8 @@ Each scenario is documented in this format:
     and show project-over-global priority in their explanatory copy. Each
     global/project scope is presented as an elevated surface with its scope
     marker, resolved `.agents` path, count, and actions grouped in the header;
+    scope labels remain single-line, with actions moving below the title when a
+    surface is narrow;
     the rows use compact capability icons, localized badges, descriptions, and
     persistent enablement switches. Empty states stay centered inside the same
     surface, and the two surfaces stack with wrapped actions at narrow widths.

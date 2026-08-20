@@ -170,6 +170,9 @@ system while preserving their different data ownership:
   showing an empty state does not make the page jump. Rows use a compact icon,
   name, optional source/transport/status badges, description, and an always
   visible enablement switch. MCP rows also keep Edit visible as an icon action.
+- Scope labels stay on one line. When a capability surface is narrow, its
+  actions move below the scope title so project controls cannot squeeze or
+  wrap the title.
 - The intro line calls out project-over-global precedence. Empty states are
   centered inside the same surface and use the capability icon plus localized
   next-step copy. Light and dark themes use the shared settings surface and
