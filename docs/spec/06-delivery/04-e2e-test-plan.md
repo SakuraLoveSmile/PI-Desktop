@@ -5818,7 +5818,11 @@ This test plan spec is accepted when:
   7. Reload the session; confirm the delegation card, its nodes, and the
      `TaskWait` rows persist and re-render collapsed, and that `TaskWait`
      re-reads a settled delegation's report by id without re-running it.
-  8. Edit `.pi/agents/readonly.md` to declare `permission: auto` and reload the
+  8. Prompt a turn where the agent starts two Task calls and then emits visible
+     text before calling TaskWait (so Task and TaskWait land in different
+     activity parts); confirm the topology card shows "completed" status on
+     both nodes once TaskWait returns, not stuck at "running".
+  9. Edit `.pi/agents/readonly.md` to declare `permission: auto` and reload the
      catalog; confirm the definition still loads but carries a warning, and
      that its delegate still resolves under the session's effective mode (a
      `Write` inside the workspace still raises a permission card).
