@@ -48,6 +48,12 @@ export const ConversationMinimap = memo(function ConversationMinimap({
   const markerEls = useRef(new Map<string, HTMLButtonElement>());
   const moveRaf = useRef(0);
 
+  /* Cached offsets to avoid O(n) DOM queries on every scroll frame. */
+  const cachedOffsetsRef = useRef<{ id: string; offset: number }[]>([]);
+  /* Guards to skip setState when value hasn't changed. */
+  const activeIdRef = useRef<string | null>(null);
+  const overflowsRef = useRef(false);
+
   const markers = useMemo(
     () => buildConversationMinimapMarkers(messages),
     [messages],
@@ -59,7 +65,28 @@ export const ConversationMinimap = memo(function ConversationMinimap({
   const markersRef = useRef(markers);
   markersRef.current = markers;
 
-  /* Message positions inside the scroll content, for jump + active tracking. */
+  /* Recompute cached offsets from DOM. Called on resize / marker changes only. */
+  const recomputeOffsets = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) {
+      cachedOffsetsRef.current = [];
+      return;
+    }
+    const baseTop = el.getBoundingClientRect().top;
+    const markerIds = new Set(markersRef.current.map((marker) => marker.id));
+    const out: { id: string; offset: number }[] = [];
+    el.querySelectorAll<HTMLElement>("[data-minimap-id]").forEach((node) => {
+      const id = node.dataset.minimapId || "";
+      if (!markerIds.has(id)) return;
+      out.push({
+        id,
+        offset: node.getBoundingClientRect().top - baseTop + el.scrollTop,
+      });
+    });
+    cachedOffsetsRef.current = out;
+  }, [scrollRef]);
+
+  /* Fresh offset query used only by jumpTo (needs pixel-accurate data). */
   const getOffsets = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return [];
@@ -77,33 +104,49 @@ export const ConversationMinimap = memo(function ConversationMinimap({
     return out;
   }, [scrollRef]);
 
+  /* Use cached offsets + binary search for O(log n) active tracking. */
   const updateActive = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const offsets = getOffsets();
+    const offsets = cachedOffsetsRef.current;
     if (offsets.length === 0) return;
     const anchor = el.scrollTop + el.clientHeight * 0.3;
-    let current = offsets[0];
-    for (const entry of offsets) {
-      if (entry.offset <= anchor) current = entry;
-      else break;
+    // Binary search for the last offset <= anchor
+    let lo = 0;
+    let hi = offsets.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >>> 1;
+      if (offsets[mid].offset <= anchor) lo = mid;
+      else hi = mid - 1;
     }
-    setActiveId(current.id);
-  }, [scrollRef, getOffsets]);
+    const id = offsets[lo].id;
+    if (id !== activeIdRef.current) {
+      activeIdRef.current = id;
+      setActiveId(id);
+    }
+  }, [scrollRef]);
 
   const updateOverflow = useCallback(() => {
     const el = scrollRef.current;
     if (!el) {
-      setOverflows(false);
+      if (overflowsRef.current) {
+        overflowsRef.current = false;
+        setOverflows(false);
+      }
       return;
     }
     // One-page content has no scroll range; the rail is only useful when overflowing.
-    setOverflows(el.scrollHeight - el.clientHeight > OVERFLOW_EPSILON_PX);
+    const nowOverflows = el.scrollHeight - el.clientHeight > OVERFLOW_EPSILON_PX;
+    if (nowOverflows !== overflowsRef.current) {
+      overflowsRef.current = nowOverflows;
+      setOverflows(nowOverflows);
+    }
   }, [scrollRef]);
 
   useEffect(() => {
+    recomputeOffsets();
     updateOverflow();
-  }, [markerIdentity, updateOverflow]);
+  }, [markerIdentity, recomputeOffsets, updateOverflow]);
 
   useEffect(() => {
     updateActive();
@@ -123,8 +166,14 @@ export const ConversationMinimap = memo(function ConversationMinimap({
     };
     const scheduleResize = () => {
       cancelAnimationFrame(resizeRaf);
-      resizeRaf = requestAnimationFrame(updateOverflow);
+      resizeRaf = requestAnimationFrame(() => {
+        recomputeOffsets();
+        updateActive();
+        updateOverflow();
+      });
     };
+    // Initial offset computation
+    recomputeOffsets();
     el.addEventListener("scroll", scheduleScroll, { passive: true });
     // Streamed content can change layout between marker identity changes.
     const content = el.firstElementChild;
@@ -134,15 +183,15 @@ export const ConversationMinimap = memo(function ConversationMinimap({
         : null;
     if (ro && content) ro.observe(content);
     // Viewport resizes can create or remove overflow without content changes.
-    window.addEventListener("resize", scheduleScroll);
+    window.addEventListener("resize", scheduleResize);
     return () => {
       el.removeEventListener("scroll", scheduleScroll);
       ro?.disconnect();
       cancelAnimationFrame(scrollRaf);
       cancelAnimationFrame(resizeRaf);
-      window.removeEventListener("resize", scheduleScroll);
+      window.removeEventListener("resize", scheduleResize);
     };
-  }, [scrollRef, updateActive, updateOverflow]);
+  }, [scrollRef, updateActive, updateOverflow, recomputeOffsets]);
 
   const jumpTo = useCallback(
     (id: string) => {

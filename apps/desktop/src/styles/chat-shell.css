@@ -141,6 +141,8 @@
 }
 
 .thread-scroll {
+  /* Promote to own compositing layer for smooth scrolling */
+  will-change: scroll-position;
   min-height: 0;
   flex: 1;
   overflow: auto;

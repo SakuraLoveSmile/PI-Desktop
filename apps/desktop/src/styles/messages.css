@@ -10,7 +10,7 @@
   padding: 12px 0;
   /* Skip layout/paint for far-offscreen rows in long transcripts. */
   content-visibility: auto;
-  contain-intrinsic-size: auto 60px;
+  contain-intrinsic-size: auto 140px;
 }
 
 .message-row.user {

@@ -1831,7 +1831,7 @@ function transcriptEntryEqual(
   return false;
 }
 
-function TranscriptEntryView({
+const TranscriptEntryView = memo(function TranscriptEntryView({
   entry,
   isRunning,
   isActive,
@@ -1847,7 +1847,11 @@ function TranscriptEntryView({
     return <CompactionRow mark={entry.mark} />;
   }
   return <MessageRow message={entry.message} isRunning={isRunning} />;
-}
+}, (prev, next) =>
+  prev.isRunning === next.isRunning &&
+  prev.isActive === next.isActive &&
+  transcriptEntryEqual(prev.entry, next.entry)
+);
 
 function transcriptEntryKey(entry: TranscriptEntry): string {
   if (entry.kind === "compaction") return entry.mark.id;
@@ -2127,6 +2131,7 @@ export const ChatTranscript = memo(function ChatTranscript({
   const wasRunningRef = useRef(isRunning);
   const followFrameRef = useRef(0);
   const [showJump, setShowJump] = useState(false);
+  const showJumpRef = useRef(false);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
     const el = scrollRef.current;
@@ -2202,7 +2207,7 @@ export const ChatTranscript = memo(function ChatTranscript({
   useLayoutEffect(() => {
     cancelFollowScroll();
     pinnedRef.current = true;
-    setShowJump(false);
+    if (showJumpRef.current) { showJumpRef.current = false; setShowJump(false); }
     scrollToBottom();
   }, [cancelFollowScroll, sessionId, scrollToBottom]);
 
@@ -2231,31 +2236,27 @@ export const ChatTranscript = memo(function ChatTranscript({
     });
     lastScrollTopRef.current = el.scrollTop;
     if (transition.releasedFollow) cancelFollowScroll();
-    // Only a real gesture (wheel / trackpad / touch / scrollbar / keyboard)
-    // releases follow. When the composer collapses or an indicator row
-    // unmounts right after send, the browser clamps scrollTop and emits a
-    // scroll event that looks like an upward gesture; without this guard it
-    // would cancel follow and leave the transcript stuck above the new turn.
     const released =
       transition.releasedFollow &&
       isRecentScrollGesture(
         performance.now(),
         lastScrollGestureAtRef.current,
       );
+    let nextShowJump: boolean;
     if (released) {
       pinnedRef.current = false;
-      setShowJump(true);
+      nextShowJump = true;
     } else if (transition.releasedFollow) {
-      // Programmatic / layout noise: re-baseline the observed position and
-      // keep the follow state unchanged instead of treating it as a user
-      // gesture. A pinned transcript re-asserts the bottom; an unpinned one
-      // stays unpinned.
       pinnedRef.current = wasPinned;
-      setShowJump(!wasPinned);
+      nextShowJump = !wasPinned;
       scheduleFollowScroll();
     } else {
       pinnedRef.current = transition.pinned;
-      setShowJump(transition.showJump);
+      nextShowJump = transition.showJump;
+    }
+    if (nextShowJump !== showJumpRef.current) {
+      showJumpRef.current = nextShowJump;
+      setShowJump(nextShowJump);
     }
   }, [cancelFollowScroll, scheduleFollowScroll]);
 
@@ -2270,7 +2271,7 @@ export const ChatTranscript = memo(function ChatTranscript({
     if (!turnStarted) return;
     cancelFollowScroll();
     pinnedRef.current = true;
-    setShowJump(false);
+    if (showJumpRef.current) { showJumpRef.current = false; setShowJump(false); }
     scrollToBottom();
     scheduleFollowScroll();
   }, [
@@ -2312,7 +2313,7 @@ export const ChatTranscript = memo(function ChatTranscript({
     () => buildTranscriptEntries(renderedMessages, renderedCompactions),
     [renderedMessages, renderedCompactions],
   );
-  const historyEntries = entries.slice(0, -1);
+  const historyEntries = useMemo(() => entries.slice(0, -1), [entries]);
   const tailEntry = entries.at(-1);
   const lastEntry = entries[entries.length - 1];
   const lastTurnPart =
@@ -2380,6 +2381,7 @@ export const ChatTranscript = memo(function ChatTranscript({
           title={t("chat.scrollToBottom")}
           onClick={() => {
             pinnedRef.current = true;
+            showJumpRef.current = false;
             setShowJump(false);
             scrollToBottom(
               window.matchMedia("(prefers-reduced-motion: reduce)").matches
