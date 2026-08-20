@@ -2199,14 +2199,12 @@ export const ChatTranscript = memo(function ChatTranscript({
   // A newly activated session must paint at its latest record. Reset any
   // manual-scroll state inherited from the previous session and position the
   // updated DOM during layout so no top-of-transcript frame can flash first.
-  // Including renderedMessages ensures the scroll fires in the same layout
-  // pass as the new content commit, preventing a flash of the old transcript.
   useLayoutEffect(() => {
     cancelFollowScroll();
     pinnedRef.current = true;
     setShowJump(false);
     scrollToBottom();
-  }, [cancelFollowScroll, sessionId, renderedMessages, scrollToBottom]);
+  }, [cancelFollowScroll, sessionId, scrollToBottom]);
 
   const scheduleFollowScroll = useCallback(() => {
     if (!pinnedRef.current || followFrameRef.current !== 0) return;
