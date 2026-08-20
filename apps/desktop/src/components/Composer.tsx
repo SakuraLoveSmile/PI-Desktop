@@ -1,5 +1,7 @@
 import {
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ClipboardEvent,
@@ -319,12 +321,20 @@ export function Composer({
     return () => window.clearInterval(timer);
   }, [placeholderPaused, variant]);
 
+  // Keep a live ref so the draft cache can snapshot the latest value without
+  // re-running a serialization effect on every keystroke.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const fileReferencesRef = useRef(fileReferences);
+  fileReferencesRef.current = fileReferences;
+
   useEffect(() => {
     const previousKey = draftKeyRef.current;
     if (previousKey !== draftKey) {
+      // Persist the outgoing draft before switching.
       draftCacheRef.current.set(previousKey, {
-        text: value,
-        fileReferences: fileReferences
+        text: valueRef.current,
+        fileReferences: fileReferencesRef.current
           .filter((fileReference) => fileReference.sessionId === previousKey)
           .map(({ path, name, kind, mimeType }) => ({
             path,
@@ -350,9 +360,15 @@ export function Composer({
       setCursor(nextDraft?.text.length ?? 0);
       return;
     }
+    // For the current draftKey the cache is updated lazily (on switch or
+    // snapshot) via valueRef/fileReferencesRef; no per-keystroke serialization.
+  }, [draftKey, referenceSessionId]);
 
+  // Keep the draft cache warm on file-reference changes (infrequent) while
+  // skipping the expensive serialization on plain text edits.
+  useEffect(() => {
     draftCacheRef.current.set(draftKey, {
-      text: value,
+      text: valueRef.current,
       fileReferences: fileReferences
         .filter((fileReference) => fileReference.sessionId === referenceSessionId)
         .map(({ path, name, kind, mimeType }) => ({
@@ -362,7 +378,7 @@ export function Composer({
           ...(mimeType ? { mimeType } : {}),
         })),
     });
-  }, [draftKey, fileReferences, referenceSessionId, value]);
+  }, [draftKey, fileReferences, referenceSessionId]);
 
   useEffect(() => {
     const sessionIds = new Set(sessions.map((session) => session.id));
@@ -425,21 +441,33 @@ export function Composer({
     });
   }, [prefill]);
 
-  useEffect(() => {
+  const textareaMetricsRef = useRef<{ lineHeight: number; verticalChrome: number } | null>(null);
+  // Invalidate cached metrics when the variant changes or a theme switch
+  // alters CSS custom properties (font-size, line-height, padding).
+  useEffect(() => { textareaMetricsRef.current = null; }, [variant]);
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     // Measure wrapped visual lines, not newline characters. The draft starts
     // at one optical row, grows through seven rows, then scrolls internally.
     el.style.height = "auto";
-    const style = window.getComputedStyle(el);
-    const lineHeight = cssPixels(style.lineHeight) || COMPOSER_MIN_HEIGHT_PX;
-    const verticalChrome =
-      cssPixels(style.paddingTop) +
-      cssPixels(style.paddingBottom) +
-      cssPixels(style.borderTopWidth) +
-      cssPixels(style.borderBottomWidth);
+    // Cache line-height and vertical chrome — they change only with CSS, never
+    // during normal typing.
+    let metrics = textareaMetricsRef.current;
+    if (!metrics) {
+      const style = window.getComputedStyle(el);
+      metrics = {
+        lineHeight: cssPixels(style.lineHeight) || COMPOSER_MIN_HEIGHT_PX,
+        verticalChrome:
+          cssPixels(style.paddingTop) +
+          cssPixels(style.paddingBottom) +
+          cssPixels(style.borderTopWidth) +
+          cssPixels(style.borderBottomWidth),
+      };
+      textareaMetricsRef.current = metrics;
+    }
     const maxHeight = Math.ceil(
-      lineHeight * COMPOSER_MAX_VISIBLE_ROWS + verticalChrome,
+      metrics.lineHeight * COMPOSER_MAX_VISIBLE_ROWS + metrics.verticalChrome,
     );
     const next = Math.max(
       COMPOSER_MIN_HEIGHT_PX,
@@ -563,7 +591,7 @@ export function Composer({
   const thinkingMenuLevels: ThinkingLevel[] = availableThinkingLevels.length
     ? availableThinkingLevels
     : ["off"];
-  const modelGroups = providers
+  const modelGroups = useMemo(() => providers
     .filter(
       (candidate) =>
         candidate.enabled &&
@@ -590,9 +618,9 @@ export function Composer({
             : [...models, { modelId, displayName: modelId }],
       };
     })
-    .filter((group) => group.models.length > 0);
+    .filter((group) => group.models.length > 0), [providers, providerModels, provider?.id, modelId]);
   const modelQueryNeedle = modelQuery.trim().toLowerCase();
-  const filteredModelGroups = modelQueryNeedle
+  const filteredModelGroups = useMemo(() => modelQueryNeedle
     ? modelGroups
         .map((group) => ({
           ...group,
@@ -604,16 +632,16 @@ export function Composer({
           ),
         }))
         .filter((group) => group.models.length > 0)
-    : modelGroups;
-  const flatModels = filteredModelGroups.flatMap((group) =>
+    : modelGroups, [modelGroups, modelQueryNeedle]);
+  const flatModels = useMemo(() => filteredModelGroups.flatMap((group) =>
     group.models.map((model) => ({ provider: group.provider, model })),
-  );
-  const flatModelsKey = flatModels
+  ), [filteredModelGroups]);
+  const flatModelsKey = useMemo(() => flatModels
     .map((entry) => `${entry.provider.id}:${entry.model.modelId}`)
-    .join("|");
-  const activeFlatIndex = flatModels.findIndex(
+    .join("|"), [flatModels]);
+  const activeFlatIndex = useMemo(() => flatModels.findIndex(
     (entry) => entry.provider.id === provider?.id && entry.model.modelId === modelId,
-  );
+  ), [flatModels, provider?.id, modelId]);
   const modelReady =
     !!provider &&
     provider.enabled &&

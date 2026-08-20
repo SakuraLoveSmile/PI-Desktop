@@ -1447,12 +1447,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (isDefaultSessionTitle(current?.title)) {
         const nextTitle =
           content.trim().replace(/\s+/g, " ").slice(0, 48) || untitledTaskTitle();
-        try {
-          await api.renameSession(sessionId, nextTitle);
-          await get().refreshSessions();
-        } catch {
-          // non-fatal
-        }
+        // Fire-and-forget: renaming the sidebar title must not delay the prompt
+        // reaching the agent runtime — removes visible lag after pressing Enter.
+        api.renameSession(sessionId, nextTitle)
+          .then(() => get().refreshSessions())
+          .catch(() => { /* non-fatal */ });
       }
       if (get().pendingPlans[sessionId]?.status === "pending") {
         submittedComposerDrafts.delete(startedIn);
