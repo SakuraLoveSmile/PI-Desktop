@@ -337,7 +337,7 @@ test("conversation minimap hides until content overflows one viewport", () => {
   );
   assert.match(
     minimapSource,
-    /window\.addEventListener\("resize", scheduleScroll\)/,
+    /window\.addEventListener\("resize", scheduleResize\)/,
   );
   assert.match(minimapSource, /new ResizeObserver\(scheduleResize\)/);
   assert.match(minimapSource, /updateOverflow/);

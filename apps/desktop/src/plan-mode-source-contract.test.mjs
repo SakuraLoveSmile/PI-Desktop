@@ -64,7 +64,7 @@ test("only pending proposals form the renderer approval gate", () => {
   );
   assert.match(storeSource, /planCheckpoints: latestPlanCheckpoints/);
   assert.match(composerSource, /planCheckpoint\?\.status === "pending"/);
-  assert.match(surfaceSource, /planCheckpoint\?\.status === "pending"/);
+  assert.doesNotMatch(surfaceSource, /planCheckpoint\?\.status === "pending"/);
   assert.match(transcriptSource, /pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.match(composerSource, /planCheckpoint\?\.status === "pending"/);
   assert.match(composerSource, /disabled=\{controlsBlocked\}/);
@@ -147,7 +147,8 @@ test("plan approval sends exact identities and waits for host confirmation", () 
   assert.match(barSource, /PLAN_APPROVAL_DEFAULT_MODE/);
   assert.doesNotMatch(barSource, /planApprovalPermissionMode|feedback|changes_requested/);
   assert.match(barSource, /ArrowDown.*ArrowUp.*Home.*End/s);
-  assert.match(surfaceSource, /approvalPending: planCheckpoint\?\.status === "pending"/);
+  assert.match(transcriptSource, /const approvalPending = useAppStore/);
+  assert.match(transcriptSource, /pendingPlans\[sessionId\]\?\.status === "pending"/);
   assert.doesNotMatch(transcriptSource, /PlanApprovalCard|plan-approval-card/);
   assert.doesNotMatch(transcriptSource, /\bpendingPlan\b/);
   assert.match(storeSource, /openPlanArtifact/);

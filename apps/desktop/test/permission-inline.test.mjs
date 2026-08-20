@@ -148,7 +148,7 @@ test("asktool card is a stepwise, non-expiring composer question surface", () =>
   assert.match(composerSource, /<AskToolCard/);
   assert.match(composerSource, /headAsk\(s\.pendingAsks/);
   assert.doesNotMatch(transcriptSource, /AskToolCard/);
-  assert.match(chatSurfaceSource, /askPending=\{Boolean\(transcriptView\.pendingAsk\)\}/);
+  assert.match(chatSurfaceSource, /askPending=\{transcriptView\.askPending\}/);
   assert.match(storeSource, /event\.type === "asktool_request"/);
   assert.match(askCardSource, /current\.multiSelect/);
   assert.match(askCardSource, /customOption/);
@@ -191,7 +191,8 @@ test("permission approval is an inline transcript card, never a global dialog", 
 });
 
 test("the card names the delegate that asked and how many wait behind it", () => {
-  assert.match(chatSurfaceSource, /queuedPermissionCount\(/);
+  assert.match(chatSurfaceSource, /sessionPermissions\(/);
+  assert.match(chatSurfaceSource, /Math\.max\(0, queue\.length - 1\)/);
   assert.match(
     chatSurfaceSource,
     /queuedPermissions=\{transcriptView\.queuedPermissions\}/,

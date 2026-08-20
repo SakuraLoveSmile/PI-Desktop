@@ -158,7 +158,8 @@ test("minimap separates resize checks from message-position measurement", () => 
   assert.match(minimap, /buildConversationMinimapMarkers\(messages\)/);
   assert.match(minimap, /const markerIdentity = useMemo/);
   assert.match(minimap, /new ResizeObserver\(scheduleResize\)/);
-  assert.match(minimap, /resizeRaf = requestAnimationFrame\(updateOverflow\)/);
+  assert.match(minimap, /resizeRaf = requestAnimationFrame\(\(\) => \{/);
+  assert.match(minimap, /recomputeOffsets\(\);[\s\S]*?updateOverflow\(\);/);
   assert.match(minimap, /addEventListener\("scroll", scheduleScroll/);
   assert.match(minimap, /behavior: reduceMotion \? "auto" : "smooth"/);
 });
