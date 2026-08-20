@@ -3804,8 +3804,8 @@ Each scenario is documented in this format:
   - Every description carries its parameters and the real limit numbers.
   - No single tool result exceeds its budget: 48 KB for Read/Glob/Grep, 96 KB
     for Bash. Read reports `offset`, `lineCount`, `fileBytes`, and a next-offset
-    `notice`; the second read continues without overlap and reports `totalLines`
-    once the end is reached.
+    `notice`; the second read continues without overlap; `totalLines` is always
+    reported from the first read so the model knows the file scale upfront.
   - No file size is ever refused. Lines from the bundle and the `.map` arrive
     clipped at 2000 chars and the clip count appears in `notice`, so one line
     cannot consume the result.

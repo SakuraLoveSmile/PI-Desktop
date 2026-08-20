@@ -514,7 +514,7 @@ pub const SPILL_MAX_BYTES: usize = 512 * 1024;
 pub const MAX_LINE_CHARS: usize = 2000;
 
 /// Read window when the caller does not ask for one.
-const DEFAULT_READ_LINES: usize = 2000;
+const DEFAULT_READ_LINES: usize = 500;
 
 /// Grep hits returned when the caller does not ask for a limit.
 const GREP_DEFAULT_HEAD_LIMIT: usize = 200;
@@ -896,6 +896,38 @@ fn clip_chars(text: String, max_chars: usize) -> (String, bool) {
     }
 }
 
+/// Fast line count without parsing content — counts newline bytes in 64KB
+/// chunks. The cost is one sequential pass (~2ms for 10MB on SSD). A trailing
+/// line without a final newline still counts as one line.
+fn count_lines_fast(path: &Path) -> std::io::Result<usize> {
+    let file = File::open(path)?;
+    let mut reader = BufReader::with_capacity(64 * 1024, file);
+    let mut count = 0_usize;
+    let mut last_byte = 0_u8;
+    let mut saw_any = false;
+    loop {
+        let buf = reader.fill_buf()?;
+        if buf.is_empty() {
+            break;
+        }
+        saw_any = true;
+        count += buf.iter().filter(|&&b| b == b'\n').count();
+        last_byte = buf[buf.len() - 1];
+        let len = buf.len();
+        reader.consume(len);
+    }
+    if !saw_any {
+        // Empty file: 0 lines.
+        Ok(0)
+    } else if last_byte != b'\n' {
+        // File does not end with a newline — the trailing content is one more line.
+        Ok(count + 1)
+    } else {
+        // Each \n terminates exactly one line.
+        Ok(count)
+    }
+}
+
 /// Tools host-core gates but does not run itself: the plugin bridge and the
 /// user's MCP servers both live in Electron main, so both are forwarded over
 /// `plugins.execute` instead of being executed here.
@@ -1154,6 +1186,11 @@ fn tool_read(
         ));
     }
 
+    // Pre-scan total line count so the model always knows the file's scale
+    // and can decide whether to grep-first or read sequentially.
+    let total_line_count = count_lines_fast(&resolved)
+        .map_err(|e| ("TOOL_FAILED".into(), format!("read failed: {e}")))?;
+
     let read_error = |e: std::io::Error| ("TOOL_FAILED".to_string(), format!("read failed: {e}"));
     let mut eof = false;
     let mut skipped = 0_usize;
@@ -1194,19 +1231,15 @@ fn tool_read(
     if !eof && !budget_capped {
         match reader.next_line(1).map_err(read_error)? {
             Some(_) => has_more = true,
-            None => eof = true,
+            None => {}
         }
     }
 
-    let next_offset = skipped + kept.len();
-    let total_lines = eof.then_some(next_offset);
     let mut notes: Vec<String> = Vec::new();
-    if let Some(total) = total_lines {
-        if kept.is_empty() && offset > 0 {
-            notes.push(format!(
-                "offset {offset} is past the end of the file ({total} lines total)"
-            ));
-        }
+    if kept.is_empty() && offset > 0 {
+        notes.push(format!(
+            "offset {offset} is past the end of the file ({total_line_count} lines total)"
+        ));
     }
     if budget_capped {
         notes.push(format!(
@@ -1216,10 +1249,10 @@ fn tool_read(
     }
     if has_more {
         notes.push(format!(
-            "more lines remain; read again with offset={next_offset}"
+            "{total_line_count} lines total; use Grep to locate content, then Read with offset/limit"
         ));
-    } else if let Some(total) = total_lines {
-        notes.push(format!("end of file ({total} lines total)"));
+    } else {
+        notes.push(format!("end of file ({total_line_count} lines total)"));
     }
     if clipped_lines > 0 {
         notes.push(format!(
@@ -1238,11 +1271,9 @@ fn tool_read(
         "truncated": has_more || clipped_lines > 0,
         "offset": offset,
         "lineCount": kept.len(),
+        "totalLines": total_line_count,
         "fileBytes": meta.len(),
     });
-    if let Some(total) = total_lines {
-        out["totalLines"] = json!(total);
-    }
     if !notes.is_empty() {
         out["notice"] = json!(notes.join("; "));
     }
@@ -2390,8 +2421,9 @@ pub fn builtin_tool_defs() -> Value {
                 "Read a window of an existing regular text file inside the workspace or the session scratch directory. \
                  Read never accepts a directory; activate and use Glob when a directory must be listed or the file name is uncertain. \
                  Returns at most {} lines ({}KB) starting at `offset`; lines longer than {} characters are cut. \
-                 Prefer this over `cat`/`sed`/`head` in Bash. Paginate with `offset` instead of dumping whole files — \
-                 the `notice` field tells you the next offset when more remains.",
+                 `totalLines` is always reported so you know the file scale upfront. \
+                 For large files use Grep to locate the target content first, then Read the relevant range with offset/limit. \
+                 Prefer this over `cat`/`sed`/`head` in Bash.",
                 DEFAULT_READ_LINES,
                 BUDGET_SEARCH.max_bytes / 1024,
                 MAX_LINE_CHARS
@@ -2689,17 +2721,17 @@ mod tests {
         )
         .await;
         assert!(first.ok, "read failed: {:?}", first.content);
-        assert_eq!(first.content["lineCount"].as_u64(), Some(2000));
-        assert!(first.content["totalLines"].is_null(), "total unknown yet");
+        assert_eq!(first.content["lineCount"].as_u64(), Some(500));
+        assert_eq!(first.content["totalLines"].as_u64(), Some(70_000));
         let content = first.content["content"].as_str().unwrap();
         assert!(content.starts_with("line 1\nline 2\n"));
-        assert!(content.ends_with("line 2000"));
+        assert!(content.ends_with("line 500"));
         assert!(content.len() <= BUDGET_SEARCH.max_bytes);
         assert_eq!(first.content["truncated"].as_bool(), Some(true));
         assert!(first.content["notice"]
             .as_str()
             .unwrap()
-            .contains("offset=2000"));
+            .contains("70000 lines total"));
 
         let tail = execute_tool(
             Some(dir.path()),
@@ -3219,7 +3251,7 @@ mod tests {
             );
         }
         assert!(by_name("Glob")["parameters"]["properties"]["limit"].is_object());
-        assert!(read["description"].as_str().unwrap().contains("2000 lines"));
+        assert!(read["description"].as_str().unwrap().contains("500 lines"));
         assert!(read["description"]
             .as_str()
             .unwrap()

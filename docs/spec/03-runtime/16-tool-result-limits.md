@@ -26,7 +26,7 @@ copy could never be fuller than the excerpt it exists to back.
 | Bash stdout (`BUDGET_SHELL`) | 96 KB, 4000 lines, head | truncate + marker + spill |
 | Bash stderr (`BUDGET_SHELL_ERR`) | 96 KB, 4000 lines, **tail** | truncate + marker + spill |
 | any single line (`MAX_LINE_CHARS`) | 2000 chars | clip, count it in `notice` |
-| Read window | 2000 lines default, `offset`/`limit` | paginate; never refuse on file size |
+| Read window | 500 lines default (max 2000), `offset`/`limit`; `totalLines` always reported | paginate; never refuse on file size |
 | Grep matches (`headLimit`) | 200 default | stop with `truncated: true` |
 | Glob entries (`limit`) | 100 default, 1000 max | stop with `truncated: true` |
 | Bash capture retention (`CAPTURE_MAX_BYTES` / `CAPTURE_MAX_LINES`) | 512 KB, 200000 lines | stop retaining; report omitted bytes and lines |
@@ -128,7 +128,7 @@ type ReadResult = {
   content: string          // "[path#TAG]" header + "N:"-prefixed window
   tag: string              // 4 hex, whole-file; the Edit anchor
   offset: number; lineCount: number
-  totalLines?: number      // present only once end of file was reached
+  totalLines: number       // always reported via fast pre-scan
   fileBytes: number
   truncated: boolean
   notice?: string          // next offset, budget stop, clipped-line count
