@@ -1437,7 +1437,7 @@ export function Composer({
                                           type="button"
                                           data-model-index={index}
                                           title={optionTitle}
-                                          className={`composer-plus-item ${
+                                          className={`composer-plus-item composer-model-option ${
                                             active ? "active" : ""
                                           } ${
                                             modelHighlight === index ? "kb-active" : ""

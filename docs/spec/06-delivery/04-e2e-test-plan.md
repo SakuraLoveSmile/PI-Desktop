@@ -510,7 +510,8 @@ Each scenario is documented in this format:
   provider/model, and return to the root. 4) Enter Reasoning level and select a
   supported level. 5) Open Settings from the command palette or application menu.
 - **Expected**: The root shows only Model and Reasoning level entries; the Model
-  submenu lists enabled runnable providers with a default model and the
+  submenu lists enabled runnable providers with a default model, with each
+  model row visibly indented beneath its provider heading, and the
   Reasoning level submenu lists only the selected model's published levels.
   Selecting updates the active session model/reasoning configuration without
   dismissing the menu; Settings opens from the command palette/menu. The

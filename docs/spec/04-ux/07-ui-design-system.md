@@ -718,7 +718,9 @@ The composer renders only controls connected to the active pi session:
   popover opens above the trigger at `bottom: calc(100% + 8px)` and starts with
   exactly two current-value entries. Each entry replaces the menu contents
   in-place with a back row and its submenu. The Model submenu contains search
-  plus sticky provider groups; the Reasoning submenu contains only the selected
+  plus sticky provider groups. Each model row begins at one tab stop beneath
+  its provider heading, making the provider → model hierarchy legible without
+  altering the model label. The Reasoning submenu contains only the selected
   provider's real `supportedThinkingLevels` with a selected-row check. Selecting
   either value returns to the root without dismissing the popover.
 - While the active session is running, the draft and runtime controls stay

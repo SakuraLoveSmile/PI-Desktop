@@ -267,6 +267,12 @@
   text-transform: uppercase;
 }
 
+/* Model rows sit at one tab stop below their provider heading, so groups keep
+   a clear parent → child hierarchy without changing the option's label. */
+.composer-model-group .composer-model-option {
+  padding-left: 22px;
+}
+
 .composer-thinking-list .composer-plus-item > span {
   overflow: hidden;
   text-overflow: ellipsis;

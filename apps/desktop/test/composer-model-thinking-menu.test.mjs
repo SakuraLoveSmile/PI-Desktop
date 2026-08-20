@@ -42,3 +42,11 @@ test("the combined chip and menu meet the compact accessible visual contract", (
   assert.match(stylesSource, /\.composer-model-thinking-icon\.is-off\s*\{[\s\S]*?opacity:\s*0\.3/);
   assert.match(stylesSource, /@media \(prefers-reduced-motion: reduce\)/);
 });
+
+test("model options are visually nested under their provider heading", () => {
+  assert.match(composerSource, /composer-plus-item composer-model-option/);
+  assert.match(
+    stylesSource,
+    /\.composer-model-group \.composer-model-option\s*\{[\s\S]*?padding-left:\s*22px/,
+  );
+});
