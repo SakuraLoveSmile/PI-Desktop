@@ -41,7 +41,7 @@ test("a delegation card reads its outcome from the lifecycle rows", () => {
   assert.match(topologySource, /if \(isDelegationActivityItem\(item\)\) continue;/);
   assert.match(
     transcriptSource,
-    /const delegationStatuses = collectDelegationStatuses\(items\);/,
+    /const delegationStatuses = turnDelegationStatuses \?\? collectDelegationStatuses\(items\)/,
   );
 });
 

@@ -1272,6 +1272,8 @@ type ActivityGroupProps = {
   items: ActivityItem[];
   isActive: boolean;
   endedAt?: string;
+  /** Delegation statuses from the entire assistant turn (cross-activity-part). */
+  turnDelegationStatuses?: ReadonlyMap<string, SubagentOutcome>;
 };
 
 /** Whether two activity items render identically, delegate rows included. */
@@ -1295,7 +1297,8 @@ function activityGroupPropsEqual(
   if (
     previous.isActive !== next.isActive ||
     previous.endedAt !== next.endedAt ||
-    previous.items.length !== next.items.length
+    previous.items.length !== next.items.length ||
+    previous.turnDelegationStatuses !== next.turnDelegationStatuses
   ) {
     return false;
   }
@@ -1308,14 +1311,18 @@ const ActivityGroup = memo(function ActivityGroup({
   items,
   isActive,
   endedAt,
+  turnDelegationStatuses,
 }: ActivityGroupProps) {
   const { t } = useTranslation();
   const detailsId = useId();
   const delegateItems = items.filter(isDelegationActivityItem);
   const hasSubagentTopology = delegateItems.length > 1;
   // `Task` rows only ever say "running"; the turn's TaskWait/TaskList/TaskStop
-  // rows carry how each delegate actually ended (ADR 0089).
-  const delegationStatuses = collectDelegationStatuses(items);
+  // rows carry how each delegate actually ended (ADR 0089). When the lifecycle
+  // tool is in a different activity part (the agent emitted text between Task
+  // and TaskWait), the turn-level statuses computed by the parent give us the
+  // cross-part view we need.
+  const delegationStatuses = turnDelegationStatuses ?? collectDelegationStatuses(items);
   const subagentSummary = summarizeSubagentActivity(
     delegateItems,
     delegationStatuses,
@@ -1955,6 +1962,20 @@ const AssistantTurn = memo(function AssistantTurn({
   const streaming =
     isActive && messages.some((message) => message.status === "streaming");
 
+  // Collect delegation statuses across ALL activity parts of this turn so that
+  // a TaskWait in one part can inform the Task cards in a different part.
+  const turnAllActivityItems = useMemo(
+    () =>
+      entry.parts.flatMap((part) =>
+        part.kind === "activity" ? part.items : [],
+      ),
+    [entry.parts],
+  );
+  const turnDelegationStatuses = useMemo(
+    () => collectDelegationStatuses(turnAllActivityItems),
+    [turnAllActivityItems],
+  );
+
   return (
     <div
       className={`message-row assistant assistant-turn${streaming ? " streaming" : ""}`}
@@ -1970,6 +1991,7 @@ const AssistantTurn = memo(function AssistantTurn({
               items={part.items}
               endedAt={part.endedAt}
               isActive={isActive && index === entry.parts.length - 1}
+              turnDelegationStatuses={turnDelegationStatuses}
             />
           ) : (
             <div
@@ -2177,12 +2199,14 @@ export const ChatTranscript = memo(function ChatTranscript({
   // A newly activated session must paint at its latest record. Reset any
   // manual-scroll state inherited from the previous session and position the
   // updated DOM during layout so no top-of-transcript frame can flash first.
+  // Including renderedMessages ensures the scroll fires in the same layout
+  // pass as the new content commit, preventing a flash of the old transcript.
   useLayoutEffect(() => {
     cancelFollowScroll();
     pinnedRef.current = true;
     setShowJump(false);
     scrollToBottom();
-  }, [cancelFollowScroll, sessionId, scrollToBottom]);
+  }, [cancelFollowScroll, sessionId, renderedMessages, scrollToBottom]);
 
   const scheduleFollowScroll = useCallback(() => {
     if (!pinnedRef.current || followFrameRef.current !== 0) return;
@@ -2280,18 +2304,47 @@ export const ChatTranscript = memo(function ChatTranscript({
     return () => ro.disconnect();
   }, [scheduleFollowScroll]);
 
-  // Store updates are intentionally immediate for controls and status, but a
-  // streamed token should not force the full historical transcript tree to
-  // rebuild at the same priority. React keeps the latest tail responsive and
-  // schedules this heavier projection between paints.
-  const renderedMessages = useDeferredValue(messages);
-  const renderedCompactions = useDeferredValue(compactions);
+  // Streaming tokens are deferred so the full historical transcript tree does
+  // not rebuild at the same priority as the tail. However, session switches
+  // must paint the new messages immediately in the same commit as the sessionId
+  // change — otherwise the old content flashes for one deferred frame (D247).
+  const prevSessionIdRef = useRef(sessionId);
+  const sessionSwitched = prevSessionIdRef.current !== sessionId;
+  prevSessionIdRef.current = sessionId;
+  const deferredMessages = useDeferredValue(messages);
+  const deferredCompactions = useDeferredValue(compactions);
+  // On session switch use messages directly; during streaming use deferred.
+  const renderedMessages = sessionSwitched ? messages : deferredMessages;
+  const renderedCompactions = sessionSwitched ? compactions : deferredCompactions;
   const { entries, visible } = useMemo(
     () => buildTranscriptEntries(renderedMessages, renderedCompactions),
     [renderedMessages, renderedCompactions],
   );
-  const historyEntries = entries.slice(0, -1);
+  const allHistoryEntries = entries.slice(0, -1);
   const tailEntry = entries.at(-1);
+
+  // Progressive hydration (D247): on session switch, mount only the bottom
+  // portion of the transcript in the first frame (what fits the viewport),
+  // then expand to the full history after paint. This keeps first-paint fast
+  // for long conversations while a spacer preserves scroll height.
+  const INITIAL_RENDER_BUDGET = 15;
+  const [hydrated, setHydrated] = useState(true);
+
+  useLayoutEffect(() => {
+    if (sessionSwitched && allHistoryEntries.length > INITIAL_RENDER_BUDGET) {
+      setHydrated(false);
+    }
+  }, [sessionSwitched, allHistoryEntries.length]);
+
+  useEffect(() => {
+    if (hydrated) return;
+    const frame = requestAnimationFrame(() => setHydrated(true));
+    return () => cancelAnimationFrame(frame);
+  }, [hydrated]);
+
+  const historyEntries = hydrated
+    ? allHistoryEntries
+    : allHistoryEntries.slice(-INITIAL_RENDER_BUDGET);
   const lastEntry = entries[entries.length - 1];
   const lastTurnPart =
     lastEntry?.kind === "assistant-turn" ? lastEntry.parts.at(-1) : undefined;
@@ -2328,6 +2381,13 @@ export const ChatTranscript = memo(function ChatTranscript({
         aria-live="polite"
       >
         <div className="thread-content" ref={contentRef}>
+          {!hydrated && allHistoryEntries.length > INITIAL_RENDER_BUDGET ? (
+            <div
+              className="transcript-hydration-spacer"
+              aria-hidden
+              style={{ minHeight: `${(allHistoryEntries.length - INITIAL_RENDER_BUDGET) * 60}px` }}
+            />
+          ) : null}
           <TranscriptHistory entries={historyEntries} isRunning={isRunning} />
           {tailEntry ? (
             <TranscriptTail

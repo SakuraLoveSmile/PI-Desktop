@@ -1460,6 +1460,9 @@
   width: 100%;
   min-width: 0;
   margin: 7px 0;
+  /* Skip layout/paint for collapsed groups far offscreen (D247). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 40px;
 }
 
 .tool-activity-header {

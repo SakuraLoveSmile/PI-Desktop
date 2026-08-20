@@ -13,7 +13,7 @@ const [store, sidebar, chatSurface, styles] = await Promise.all([
 ]);
 
 test("session reads are coalesced, bounded, and never globally serialized", () => {
-  assert.match(store, /const SESSION_TRANSCRIPT_CACHE_LIMIT = 5/);
+  assert.match(store, /const SESSION_TRANSCRIPT_CACHE_LIMIT = 20/);
   assert.match(store, /const sessionDetailLoads = new Map/);
   assert.match(store, /const active = sessionDetailLoads\.get\(id\)/);
   assert.match(store, /const detailPromise = loadSessionDetail\(id\)/);

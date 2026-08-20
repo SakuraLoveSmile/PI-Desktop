@@ -195,7 +195,7 @@ export type AgentTurnResult = {
 export type PendingPlanRefreshResult = "pending" | "terminal" | "unavailable";
 
 const WORK_PANEL_STORAGE_KEY = "pi.desktop.workPanel";
-const SESSION_TRANSCRIPT_CACHE_LIMIT = 5;
+const SESSION_TRANSCRIPT_CACHE_LIMIT = 20;
 // Preserve the original 320px tool-content minimum beside the 44px activity rail.
 export { WORK_PANEL_DEFAULT_WIDTH, WORK_PANEL_MIN_WIDTH };
 

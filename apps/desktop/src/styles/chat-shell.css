@@ -90,6 +90,11 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .session-switch-progress > span {
+    animation: none;
+  }
+}
 .route-pending {
   display: flex;
   min-width: 0;

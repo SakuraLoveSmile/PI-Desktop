@@ -53,7 +53,7 @@ test("stream rendering avoids duplicate frame state and coalesces following", ()
   assert.doesNotMatch(transcript, /setVisibleLen/);
   assert.match(transcript, /const scheduleFollowScroll = useCallback/);
   assert.match(transcript, /followFrameRef\.current !== 0/);
-  assert.match(transcript, /const renderedMessages = useDeferredValue\(messages\)/);
+  assert.match(transcript, /const renderedMessages = sessionSwitched \? messages : deferredMessages/);
   assert.match(transcript, /const \{ entries, visible \} = useMemo/);
   assert.match(
     transcript,
@@ -62,7 +62,7 @@ test("stream rendering avoids duplicate frame state and coalesces following", ()
   assert.match(transcript, /const TranscriptHistory = memo/);
   assert.match(transcript, /const TranscriptTail = memo/);
   assert.match(transcript, /function transcriptEntryEqual/);
-  assert.match(transcript, /const historyEntries = entries\.slice\(0, -1\)/);
+  assert.match(transcript, /const allHistoryEntries = entries\.slice\(0, -1\)/);
   assert.match(transcript, /<TranscriptHistory entries=\{historyEntries\}/);
   assert.match(transcript, /<TranscriptTail[\s\S]*?entry=\{tailEntry\}/);
   assert.match(transcript, /activityGroupPropsEqual/);
@@ -144,7 +144,7 @@ test("session activation pins the latest record before the first paint", () => {
   assert.match(chatSurface, /useDeferredValue\(activeSessionId\)/);
 
   const activationEffect = transcript.match(
-    /useLayoutEffect\(\(\) => \{([\s\S]*?)\n  \}, \[cancelFollowScroll, sessionId, scrollToBottom\]\);/,
+    /useLayoutEffect\(\(\) => \{([\s\S]*?)\n  \}, \[cancelFollowScroll, sessionId, renderedMessages, scrollToBottom\]\);/,
   )?.[1];
   assert.ok(activationEffect);
   assert.match(activationEffect, /cancelFollowScroll\(\)/);
