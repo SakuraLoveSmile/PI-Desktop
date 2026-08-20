@@ -141,6 +141,17 @@ test("sidebar project and session lists stay coordinated with the global type sc
   );
 });
 
+test("pinned project rows replace the folder glyph with a filled star", () => {
+  assert.match(
+    sidebarSource,
+    /entry\.meta\.pinned \? \([\s\S]*?<IconStar\s+size=\{13\}\s+fill="currentColor"[\s\S]*?className="sidebar-project-pin"[\s\S]*?\) : \([\s\S]*?<IconFolder size=\{13\} aria-hidden \/>/,
+  );
+  assert.match(
+    globalStyles,
+    /\.sidebar-project-pin\s*\{[^}]*flex:\s*0 0 auto;[^}]*color:\s*var\(--ds-accent\);/s,
+  );
+});
+
 test("sidebar section toolbars open create actions from context menus", () => {
   assert.match(sidebarSource, /data-sidebar-section=\"sessions\"/);
   assert.match(sidebarSource, /data-sidebar-section=\"projects\"/);

@@ -68,6 +68,7 @@ import {
   IconSearch,
   IconSidebar,
   IconSettings,
+  IconStar,
   IconX,
 } from "./icons";
 
@@ -1052,7 +1053,16 @@ export function Sidebar({
               size={13}
               className={`sidebar-disclosure-icon ${collapsedProject ? "collapsed" : ""}`}
             />
-            <IconFolder size={13} />
+            {entry.meta.pinned ? (
+              <IconStar
+                size={13}
+                fill="currentColor"
+                className="sidebar-project-pin"
+                aria-hidden
+              />
+            ) : (
+              <IconFolder size={13} aria-hidden />
+            )}
             <span>{entry.name}</span>
             {entry.active ? <span className="sidebar-project-active-dot" aria-label={t("project.active", { defaultValue: "Active" })} /> : null}
           </button>

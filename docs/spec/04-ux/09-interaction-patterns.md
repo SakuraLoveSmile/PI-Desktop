@@ -173,7 +173,9 @@ may be retained while exactly one workspace supplies the visible shell context.
 #### Organization actions
 
 - **Pin** toggles presentation priority. Pinned projects/conversations appear
-  before unpinned rows within the selected secondary order.
+  before unpinned rows within the selected secondary order. In the sidebar, a
+  pinned project replaces its Folder glyph with a filled accent Star so its
+  state remains recognizable without opening its overflow menu.
 - **Archive** is non-destructive. Archived rows are hidden by default,
   available through Show archived, and restorable. Archiving does not cancel
   a turn or delete a transcript.

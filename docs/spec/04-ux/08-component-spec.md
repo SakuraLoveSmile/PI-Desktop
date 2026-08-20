@@ -836,6 +836,8 @@ Groups and session items:
 ```text
 [folder] current-project                         [+]
            Session title
+[star] pinned-project                             [+]
+           Session title
 [folder] another-project                         [+]
            Session title
 SESSIONS                                      [msg+][↕]
@@ -852,7 +854,8 @@ SESSIONS                                      [msg+][↕]
 | In progress | warning-orange breathing dot; no motion under reduced-motion |
 | Completed | success-green check mark |
 | Failed | error-red circled alert mark |
-| Pinned | ordered before unpinned rows within the selected sort |
+| Pinned project | filled accent Star replaces the Folder glyph; ordered before unpinned projects within the selected sort |
+| Pinned conversation | ordered before unpinned rows within the selected sort |
 | Archived | omitted by default; shown only when archived view is enabled |
 
 ### 6.4 Interactions

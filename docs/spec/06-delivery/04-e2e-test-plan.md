@@ -1466,9 +1466,9 @@ Each scenario is documented in this format:
   right without flipping left, and
   session/project/section body-level menus use the same right-side rule with a
   narrow-viewport width cap. Pinned rows remain ahead
-  of unpinned rows under every selected secondary order; pinned project rows use
-  a filled Star in the colored glyph while unpinned rows retain Folder, and the
-  localized pinned tag remains visible beside the project name. Each sort
+  of unpinned rows under every selected secondary order; in the sidebar, pinned
+  project rows replace the Folder with a filled accent Star while unpinned rows
+  retain Folder. Each sort
   produces the documented stable order; archived rows disappear from the default view but
   retain transcripts/project records and reappear in Show archived; restore
   returns them to the selected order; archiving the active row selects a visible

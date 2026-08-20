@@ -251,6 +251,11 @@
   color: var(--ds-accent);
 }
 
+.sidebar-project-pin {
+  flex: 0 0 auto;
+  color: var(--ds-accent);
+}
+
 .sidebar-row-actions,
 .sidebar-menu-wrap {
   position: relative;
