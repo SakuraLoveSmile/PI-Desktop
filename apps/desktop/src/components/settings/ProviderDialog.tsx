@@ -1,15 +1,36 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ProviderPublic } from "@pi-desktop/shared";
+import type { ModelInfo, ProviderPublic, ThinkingLevel } from "@pi-desktop/shared";
+import { THINKING_LEVELS } from "@pi-desktop/shared";
 import { Button, Field, Input, Select } from "../ui";
-import { IconClose } from "../icons";
-import { ModelCombobox } from "./ModelCombobox";
+import { IconClose, IconPlus } from "../icons";
+import { ModelConfigCard } from "./ModelConfigCard";
+import { ModelMultiSelect } from "./ModelMultiSelect";
 import {
   CUSTOM_API_STYLE_OPTIONS,
+  fallbackModelDraft,
+  modelDraftFromInfo,
   type ApiStyle,
   type ProviderForm,
+  type ProviderModelDraft,
 } from "./provider-form";
 import { useProviderModels } from "./useProviderModels";
+
+function modelInfoForDraft(draft: ProviderModelDraft, discovered: ModelInfo[]): ModelInfo {
+  return (
+    discovered.find((model) => model.modelId === draft.id) ?? {
+      modelId: draft.id,
+      displayName: draft.id,
+      providerId: "",
+      contextWindow: draft.contextWindow,
+      maxTokens: draft.maxTokens,
+      reasoning: draft.thinkingLevels.length > 0,
+      supportedThinkingLevels: draft.thinkingLevels,
+      source: draft.source === "catalog" ? "bundled" : "user",
+      capabilities: draft.thinkingLevels.length > 0 ? ["text", "reasoning"] : ["text"],
+    }
+  );
+}
 
 export function ProviderDialog({
   editingProvider,
@@ -29,6 +50,13 @@ export function ProviderDialog({
   const { t } = useTranslation();
   const models = useProviderModels(true, form, editingProvider);
   const discovered = "models" in models ? models.models : [];
+  const [customModelId, setCustomModelId] = useState("");
+  const [customModelError, setCustomModelError] = useState("");
+  const [customModelIds, setCustomModelIds] = useState<string[]>(() =>
+    form.models
+      .filter((model) => model.source !== "catalog")
+      .map((model) => model.id),
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -38,6 +66,90 @@ export function ProviderDialog({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [saving, onClose]);
+
+  const selectedIds = form.models.map((model) => model.id);
+  const discoveredById = useMemo(
+    () => new Map(discovered.map((model) => [model.modelId, model])),
+    [discovered],
+  );
+  const customIds = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...customModelIds.filter(
+            (id) => discoveredById.get(id)?.source !== "bundled",
+          ),
+          ...form.models
+            .filter(
+              (model) =>
+                model.source !== "catalog" &&
+                discoveredById.get(model.id)?.source !== "bundled",
+            )
+            .map((model) => model.id),
+        ]),
+      ),
+    [customModelIds, discoveredById, form.models],
+  );
+  const optionModels = useMemo(() => {
+    const byId = new Map<string, ModelInfo>();
+    for (const id of customIds) {
+      byId.set(
+        id,
+        discoveredById.get(id) ?? modelInfoForDraft(fallbackModelDraft(id), []),
+      );
+    }
+    for (const model of discovered) {
+      if (!byId.has(model.modelId)) byId.set(model.modelId, model);
+    }
+    for (const draft of form.models) {
+      if (!byId.has(draft.id)) byId.set(draft.id, modelInfoForDraft(draft, []));
+    }
+    return [...byId.values()];
+  }, [customIds, discovered, form.models]);
+
+  const updateModels = (next: ProviderModelDraft[]) => setField("models", next);
+
+  const toggleModel = (model: ModelInfo) => {
+    const selected = form.models.some((item) => item.id === model.modelId);
+    updateModels(
+      selected
+        ? form.models.filter((item) => item.id !== model.modelId)
+        : [...form.models, modelDraftFromInfo(model)],
+    );
+  };
+
+  const updateModel = (id: string, update: Partial<ProviderModelDraft>) => {
+    updateModels(
+      form.models.map((model) => (model.id === id ? { ...model, ...update } : model)),
+    );
+  };
+
+  const addCustomModel = () => {
+    const id = customModelId.trim();
+    if (!id) {
+      setCustomModelError(t("settings.customModelRequired"));
+      return;
+    }
+    if (optionModels.some((model) => model.modelId.toLowerCase() === id.toLowerCase())) {
+      setCustomModelError(t("settings.modelAlreadyAdded"));
+      return;
+    }
+    setCustomModelIds((current) => [...current, id]);
+    updateModels([...form.models, fallbackModelDraft(id)]);
+    setCustomModelId("");
+    setCustomModelError("");
+  };
+
+  const levelLabels = THINKING_LEVELS.reduce(
+    (labels, level) => {
+      labels[level] = t(`thinkingLevel.${level}`);
+      return labels;
+    },
+    {} as Record<ThinkingLevel, string>,
+  );
+
+  const modelsStatusHint =
+    models.status === "error" ? t("settings.modelsFetchHint") : undefined;
 
   return (
     <div
@@ -57,9 +169,7 @@ export function ProviderDialog({
       >
         <div className="provider-dialog-head">
           <h3 id="provider-dialog-title" className="provider-dialog-title">
-            {editingProvider
-              ? t("settings.editProviderTitle")
-              : t("settings.addProviderTitle")}
+            {editingProvider ? t("settings.editProviderTitle") : t("settings.addProviderTitle")}
           </h3>
           <button
             type="button"
@@ -76,14 +186,14 @@ export function ProviderDialog({
           <Field label={t("settings.name")}>
             <Input
               value={form.name}
-              onChange={(e) => setField("name", e.target.value)}
+              onChange={(event) => setField("name", event.target.value)}
               autoFocus
             />
           </Field>
           <Field label={t("settings.apiStyle")} hint={t("settings.apiStyleDesc")}>
             <Select
               value={form.apiStyle}
-              onChange={(e) => setField("apiStyle", e.target.value as ApiStyle)}
+              onChange={(event) => setField("apiStyle", event.target.value as ApiStyle)}
             >
               {CUSTOM_API_STYLE_OPTIONS.map(([value, labelKey]) => (
                 <option key={value} value={value}>
@@ -95,26 +205,9 @@ export function ProviderDialog({
           <Field label={t("settings.baseUrl")}>
             <Input
               value={form.baseUrl}
-              onChange={(e) => setField("baseUrl", e.target.value)}
+              onChange={(event) => setField("baseUrl", event.target.value)}
               className="font-mono text-sm-plus"
               placeholder="https://api.example.com/v1"
-            />
-          </Field>
-          <Field
-            label={t("settings.modelId")}
-            hint={
-              models.status === "error"
-                ? t("settings.modelsFetchHint")
-                : undefined
-            }
-          >
-            <ModelCombobox
-              value={form.modelId}
-              models={discovered}
-              loading={models.status === "loading"}
-              loadingLabel={t("settings.modelsLoading")}
-              placeholder={t("settings.searchOrEnterModel")}
-              onChange={(modelId) => setField("modelId", modelId)}
             />
           </Field>
           <Field
@@ -128,13 +221,92 @@ export function ProviderDialog({
             <Input
               type="password"
               value={form.apiKey}
-              onChange={(e) => setField("apiKey", e.target.value)}
+              onChange={(event) => setField("apiKey", event.target.value)}
               placeholder="sk-…"
               className="font-mono text-sm-plus"
               autoComplete="off"
             />
           </Field>
+          <Field label={t("settings.selectModels")} hint={modelsStatusHint}>
+            <ModelMultiSelect
+              models={optionModels}
+              selectedIds={selectedIds}
+              customModelIds={customIds}
+              loading={models.status === "loading"}
+              placeholder={t("settings.selectModelsPlaceholder")}
+              selectedLabel={(count) => t("settings.nModelsSelected", { n: count })}
+              searchPlaceholder={t("settings.searchModelId")}
+              emptyHint={t("settings.modelsEmptyHint")}
+              fetchingLabel={t("settings.modelsFetching")}
+              customLabel={t("settings.customModel")}
+              reasoningLabel={t("settings.reasoning")}
+              onToggle={toggleModel}
+            />
+          </Field>
+          <Field label={t("settings.customModel")} hint={customModelError || undefined}>
+            <div className="provider-custom-model-row">
+              <Input
+                value={customModelId}
+                onChange={(event) => {
+                  setCustomModelId(event.target.value);
+                  if (customModelError) setCustomModelError("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addCustomModel();
+                  }
+                }}
+                placeholder={t("settings.customModelPlaceholder")}
+                className="font-mono text-sm-plus"
+                spellCheck={false}
+              />
+              <Button variant="secondary" onClick={addCustomModel}>
+                <IconPlus size={14} />
+                {t("settings.addCustomModel")}
+              </Button>
+            </div>
+          </Field>
         </div>
+
+        {form.models.length > 0 ? (
+          <section className="provider-model-config-section" aria-labelledby="provider-model-config-title">
+            <div className="provider-model-config-heading">
+              <div>
+                <h4 id="provider-model-config-title">{t("settings.modelConfigurations")}</h4>
+                <p>{t("settings.modelConfigurationsDesc")}</p>
+              </div>
+              <span className="provider-model-config-count">{form.models.length}</span>
+            </div>
+            <div className="provider-model-card-list">
+              {form.models.map((binding) => {
+                const metadata = discoveredById.get(binding.id);
+                const source = metadata?.source === "bundled" || binding.source === "catalog" ? "catalog" : "custom";
+                return (
+                  <ModelConfigCard
+                    key={binding.id}
+                    binding={binding}
+                    source={source}
+                    sourceLabel={t("settings.builtInCatalog")}
+                    customSourceLabel={t("settings.customModel")}
+                    contextWindowLabel={t("settings.contextWindow")}
+                    maxOutputLabel={t("settings.maxOutput")}
+                    supportedThinkingLabel={t("settings.supportedThinkingLevels")}
+                    defaultThinkingLabel={t("settings.defaultThinkingLevel")}
+                    disabledThinkingLabel={t("settings.notSupported")}
+                    disabledThinkingHint={t("settings.thinkingDisabledHint")}
+                    defaultsHint={t("settings.cardDefaultsHint")}
+                    customDefaultsHint={t("settings.cardCustomDefaultsHint")}
+                    levelLabels={levelLabels}
+                    removeLabel={t("settings.removeModel")}
+                    onChange={(update) => updateModel(binding.id, update)}
+                    onRemove={() => toggleModel(modelInfoForDraft(binding, discovered))}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
 
         <div className="provider-dialog-actions">
           <Button variant="ghost" disabled={saving} onClick={onClose}>
@@ -142,12 +314,7 @@ export function ProviderDialog({
           </Button>
           <Button
             variant="primary"
-            disabled={
-              saving ||
-              !form.name.trim() ||
-              !form.baseUrl.trim() ||
-              !form.modelId.trim()
-            }
+            disabled={saving || !form.name.trim() || !form.baseUrl.trim() || form.models.length === 0}
             onClick={onSave}
           >
             {saving ? t("settings.saving") : t("settings.saveProvider")}

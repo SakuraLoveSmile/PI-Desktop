@@ -188,12 +188,14 @@ test("thinking-only assistant streams open the transcript surface", () => {
   assert.match(appSource, /hasContent \|\| hasThinking/);
 });
 
-test("provider settings do not override pi-owned model parameters", () => {
-  assert.doesNotMatch(settingsSource, /thinkingMode/);
-  assert.doesNotMatch(settingsSource, /supportedThinkingLevels/);
-  assert.doesNotMatch(settingsSource, /contextWindow/);
-  assert.doesNotMatch(settingsSource, /maxOutputTokens/);
-  assert.doesNotMatch(settingsSource, /temperature/);
+test("provider settings persist model-local limits and thinking configuration", () => {
+  assert.match(settingsSource, /ModelMultiSelect/);
+  assert.match(settingsSource, /ModelConfigCard/);
+  assert.match(settingsSource, /supportedThinkingLevels/);
+  assert.match(settingsSource, /contextWindow/);
+  assert.match(settingsSource, /maxTokens/);
+  assert.match(settingsSource, /defaultThinkingLevel/);
+  assert.match(settingsSource, /models/);
 });
 
 test("main forwards the complete pi model record to the sidecar", () => {

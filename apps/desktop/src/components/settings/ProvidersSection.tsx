@@ -76,7 +76,7 @@ export function ProvidersSection() {
 
   const providerReady = (p: ProviderPublic) =>
     p.enabled &&
-    !!p.defaultModelId &&
+    !!(p.models?.[0]?.id ?? p.defaultModelId) &&
     (p.hasSecret || p.hasOauth || p.authKind === "none");
   const aiProviders = providers.filter((p) => p.authKind !== OAUTH_AUTH_KIND);
   const setField = <K extends keyof ProviderForm>(key: K, value: ProviderForm[K]) =>
@@ -97,6 +97,9 @@ export function ProvidersSection() {
 
   const saveProvider = async () => {
     if (!form.name.trim()) return;
+    const models = form.models.map(({ source: _source, ...binding }) => binding);
+    const defaultModelId = models[0]?.id;
+    if (!defaultModelId) return;
     setSaving(true);
     try {
       if (editingProvider) {
@@ -104,7 +107,8 @@ export function ProvidersSection() {
           id: editingProvider.id,
           name: form.name.trim(),
           baseUrl: form.baseUrl.trim(),
-          defaultModelId: form.modelId.trim(),
+          defaultModelId,
+          models,
           apiStyle: form.apiStyle,
           ...(form.apiKey ? { secretValue: form.apiKey } : {}),
         });
@@ -112,7 +116,7 @@ export function ProvidersSection() {
         if (settings.defaultProviderId === editingProvider.id) {
           await api.setSettings({
             ...settings,
-            defaultModelId: form.modelId.trim() || settings.defaultModelId,
+            defaultModelId: defaultModelId || settings.defaultModelId,
           });
         }
         showToast(t("settings.providerUpdated"), { variant: "success" });
@@ -124,14 +128,15 @@ export function ProvidersSection() {
           protocol: "openai_compatible",
           baseUrl: form.baseUrl.trim(),
           authKind: "api_key_and_base_url",
-          defaultModelId: form.modelId.trim(),
+          defaultModelId,
+          models,
           secretValue: form.apiKey || undefined,
           apiStyle: form.apiStyle,
         });
         await api.setSettings({
           ...settings,
           defaultProviderId: created.provider.id,
-          defaultModelId: form.modelId.trim() || settings.defaultModelId,
+          defaultModelId: defaultModelId || settings.defaultModelId,
         });
         showToast(t("settings.providerSaved"), { variant: "success" });
       }
@@ -169,7 +174,7 @@ export function ProvidersSection() {
     await api.setSettings({
       ...settings,
       defaultProviderId: provider.id,
-      defaultModelId: provider.defaultModelId || settings.defaultModelId,
+      defaultModelId: provider.models?.[0]?.id || provider.defaultModelId || settings.defaultModelId,
     });
     await refreshProviders();
   };
@@ -180,7 +185,7 @@ export function ProvidersSection() {
       await api.setSettings({
         ...settings,
         defaultProviderId: provider.id,
-        defaultModelId: provider.defaultModelId || settings.defaultModelId,
+        defaultModelId: provider.models?.[0]?.id || provider.defaultModelId || settings.defaultModelId,
       });
       await refreshProviders();
       showToast(t("settings.defaultUpdated"), { variant: "success" });
@@ -344,7 +349,7 @@ export function ProvidersSection() {
                           ·
                         </span>
                         <span className="font-mono">
-                          {provider.defaultModelId || t("settings.noModel")}
+                          {provider.models?.[0]?.id || provider.defaultModelId || t("settings.noModel")}
                         </span>
                         {styleLabelKey ? (
                           <>
