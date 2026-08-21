@@ -23,6 +23,20 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.10.0",
+    date: "2026-08-21",
+    highlights: [
+      "Configure multiple models per provider and switch between them directly from the composer.",
+      "Manage agent capabilities in a redesigned Settings studio with clearer scope blocks and menus.",
+      "Expose host clipboard history to plugins as a new capability.",
+      "Keep empty sessions durable so they can be shown and reused after relaunch.",
+      "Make the model picker easier to use with a clearer provider hierarchy and steady scrolling.",
+      "Always report total line counts in Read results so large files can be paged reliably.",
+      "Recover rate-limited streams more reliably across retries.",
+      "Reveal selected files in the file manager when opening them from the Files panel.",
+    ],
+  },
+  {
     version: "0.9.1",
     date: "2026-08-20",
     highlights: [
@@ -370,6 +384,20 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.10.0",
+    date: "2026-08-21",
+    highlights: [
+      "支持为每个供应商配置多个模型，并在输入框中直接切换。",
+      "在重新设计的设置工作室中管理代理能力，作用域分组和菜单更清晰。",
+      "向插件开放主机剪贴板历史能力。",
+      "让空会话持久保留，重启后可以继续显示和复用。",
+      "优化模型选择菜单：供应商层级更清晰，滚动时保持稳定。",
+      "Read 工具始终返回文件总行数，可靠地分页读取大文件。",
+      "更可靠地在流式恢复与重试中识别限流错误。",
+      "从 Files 面板打开文件时，在文件管理器中显示选中的文件。",
+    ],
+  },
   {
     version: "0.9.1",
     date: "2026-08-20",
