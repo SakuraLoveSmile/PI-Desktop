@@ -137,12 +137,21 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
 - **Providers** studio:
   - OpenAI-compatible and custom-service add-provider dialog (opened from Add
     provider / empty-state CTA)
-  - provider cards with host, default model, secret status,
+  - provider cards with host, first configured model, secret status,
     and test / make-default / delete actions
   - Add account and Add provider use the same primary button treatment
-  - the add/edit dialog configures connection identity only (name, endpoint,
-    API style, model id, and secret); model parameters come from pi-ai and are
-    not editable here
+  - the add/edit dialog configures connection identity (name, endpoint, API
+    style, and secret), then selects one or more models from a searchable
+    multi-select catalog. Each selected model has an independent configuration
+    card for context window, max output, supported thinking levels, and the
+    default thinking level. Built-in model metadata pre-fills the card; custom
+    models use the runtime fallback values and remain editable.
+  - model discovery is debounced after the endpoint, key, or API style changes;
+    the picker remains usable with free-form custom model IDs when discovery is
+    unavailable
+  - thinking chips follow canonical order. Removing the current default falls
+    back to the first enabled level; no enabled levels disable the default
+    selector and show the model's thinking-disabled hint
   - empty state with primary add action
   - API keys are never shown raw after save
   - vendor-account rows are not rendered in the AI services list; a connected

@@ -178,7 +178,7 @@ type ProviderConfig = {
     supportedThinkingLevels?: ThinkingLevel[]
   }
   defaultModelId?: string
-  models?: UserModelConfig[]    // optional user-defined models
+  models: ModelBinding[]        // selected models and per-model settings
   createdAt: string
   updatedAt: string
 }
@@ -192,6 +192,14 @@ type UserModelConfig = {
   capabilities?: Array<"text" | "tools" | "vision" | "reasoning" | "json">
   pricingHint?: string
   hidden?: boolean
+}
+
+type ModelBinding = {
+  id: string
+  contextWindow: number
+  maxTokens: number
+  thinkingLevels: ThinkingLevel[]
+  defaultThinkingLevel: ThinkingLevel | null
 }
 
 type SelectedModelRef = {
@@ -214,6 +222,13 @@ surface for older clients. PI-Desktop no longer reads them as runtime model
 overrides. Reasoning support and supported thinking levels come from the
 resolved pi-ai model record; unknown free-form ids expose no inferred
 reasoning capability.
+
+The provider dialog persists one `ModelBinding` for every selected model. The
+first binding is the effective model for current conversations and legacy
+runtime consumers. Conversation-level model switching and routing across the
+array remain future work. A legacy provider with only `defaultModelId` is
+materialized as one fallback binding on host read and upgraded to `models` on
+the next provider write.
 
 ## 8. Secrets
 

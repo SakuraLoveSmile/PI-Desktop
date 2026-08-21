@@ -2271,10 +2271,12 @@ surface, while model parameters remain owned by pi-ai.
 3. **Providers head** — section title + primary Add provider action; its
    button treatment matches Add account
 4. **Dialogs** — vendor-account edit dialog with name/default model, plus the
-   provider dialog with connection fields (name, base URL, model id, API style,
-   API key); no reasoning, thinking-level, context, output, temperature, or
-   compatibility controls
-5. **Provider cards** — avatar initials, badges (default / secret state), host + model, Test / Make default / Delete
+   provider dialog with connection fields (name, base URL, API style, API key),
+   a fixed-position searchable multi-select model picker, free-form custom
+   model entry, and one configuration card per selected model. Cards expose
+   context window, max output, seven thinking-level chips, and a constrained
+   default-thinking select.
+5. **Provider cards** — avatar initials, badges (default / secret state), host + first model, Test / Make default / Delete
 
 ### 19.3 States
 | State | Presentation |
@@ -2288,11 +2290,24 @@ surface, while model parameters remain owned by pi-ai.
 
 ### 19.4 Interactions
 - Add provider opens a modal dialog; Cancel/close resets fields and dismisses the dialog
-- Save creates the provider, stores the secret, sets it as default when successful, and refreshes the list
+- The model picker searches and toggles multiple models without using a native
+  multiple select. Its portaled menu closes on outside press, Escape, scroll,
+  and resize; model selection immediately adds or removes its configuration
+  card.
+- Adding a custom model validates non-empty and duplicate IDs, adds it to the
+  top-level option list, selects it, and applies 128,000 context / 8,192 max
+  output / no thinking defaults. Removing its selection does not delete the
+  custom option.
+- Save creates or updates the provider with `models: ModelBinding[]`, stores
+  the secret, sets the first configured model as the legacy/default model for
+  older consumers, and refreshes the list
 - Test connection calls `providers.testConnection` and toasts success/failure
 - Edit account saves `oauthAccountLabel` and `defaultModelId` through `providers.update`; when the account is the global default, its model selection updates with it
 - Test connection on an account resolves that account's OAuth authorization and toasts success/failure
-- Thinking preset updates persist through `providers.update` with D102 semantics
+- Context, output, thinking-level, and default-thinking edits persist per model
+  through `providers.create` / `providers.update`; runtime callers continue to
+  use the first configured model until multi-model conversation selection is
+  implemented
 - Make default updates `defaultProviderId` / `defaultModelId` only
 
 ### 19.5 Accessibility

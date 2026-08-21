@@ -73,6 +73,27 @@ Tables (canonical DDL in [04-data-storage](04-data-storage.md) §4.3–4.4, §4.
       }
     },
     "defaultModelId": { "type": "string" },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "contextWindow", "maxTokens", "thinkingLevels", "defaultThinkingLevel"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "contextWindow": { "type": "integer", "minimum": 1 },
+          "maxTokens": { "type": "integer", "minimum": 1 },
+          "thinkingLevels": {
+            "type": "array",
+            "items": { "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max"] },
+            "uniqueItems": true
+          },
+          "defaultThinkingLevel": {
+            "type": ["string", "null"],
+            "enum": ["off", "minimal", "low", "medium", "high", "xhigh", "max", null]
+          }
+        }
+      }
+    },
     "createdAt": { "type": "string" },
     "updatedAt": { "type": "string" }
   }
@@ -104,6 +125,14 @@ catalog exposes these rows as an `accounts` array with `providerId`, an optional
 non-secret `accountLabel`, and a `connected` flag. The custom-provider dialog
 does not edit or delete OAuth rows; the Vendor accounts card calls
 `providers.delete` for the selected row.
+
+`models` is the provider's selected model binding array. Each binding owns its
+context/output limits and thinking configuration. `defaultModelId` remains a
+read compatibility field and is kept equal to the first binding when a new
+provider is saved. When an older record has only `defaultModelId`, the host
+materializes one binding on read with a 128,000 context window, 8,192 max
+output, no enabled thinking levels, and a null default. The next write stores
+the binding array in `config_json.models`.
 
 ## 3. Built-in vendor presets
 
@@ -217,7 +246,8 @@ The canonical DDL lives in [04-data-storage](04-data-storage.md) (D086). Summary
 ### `providers.create` / `providers.update`
 - in: provider fields + optional `secretValue` + optional `oauthAccountLabel`
   (merged into `config_json.oauth`, cleared with an empty string); legacy
-  clients may still send `supportsReasoning` / `supportedThinkingLevels`
+  clients may still send `supportsReasoning` / `supportedThinkingLevels`; new
+  clients send `models: ModelBinding[]`
 - behavior: persist config; if secretValue present, write secret store and set
   `secretRef`; legacy thinking fields may remain in
   `config_json.compatibility` but do not affect runtime resolution

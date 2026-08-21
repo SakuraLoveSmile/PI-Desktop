@@ -181,12 +181,22 @@ Each scenario is documented in this format:
 #### E2E-005: Add a provider and save API key
 
 - **Preconditions**: App running; no provider configured.
-- **Steps**: 1) Open Settings → Agent. 2) Open the add-provider dialog. 3) Enter name, base URL, model id, and API key. 4) Save.
-- **Expected**: Provider appears as an AI service row with secret badge; key stored securely (not in plaintext config); the default selector can use the saved model.
-- **Specs linked**: `03-runtime/12-provider-config-schema.md`, `03-runtime/14-secrets-storage.md`
-- **Acceptance**: B (add provider, save key)
+- **Steps**: 1) Open Settings → Model configuration and open the add-provider dialog. 2) Enter a name, base URL, API key, and API format. 3) Wait for model discovery, open the custom multi-select picker, search for a returned model, and select two models. 4) Confirm two configuration cards appear with independent context/output fields and source badges. 5) Add a free-form model ID; confirm it is inserted into the option list, selected automatically, and uses 128,000 / 8,192 / no-thinking defaults. 6) Deselect and reselect the custom option; confirm the option remains available. 7) Change one card's numeric fields, blur them, and confirm thousands separators. 8) Select several thinking chips, change the default, remove the default chip, and confirm fallback to the canonical first remaining level. Remove every chip and confirm the default select is disabled with the thinking-disabled hint; select one chip and confirm it re-enables. 9) Save.
+- **Expected**: The picker supports search, live count, external/Escape/scroll/resize dismissal, and immediate card add/remove. The provider appears as an AI service row with secret badge; key stored securely (not in plaintext config); `models` contains both selected bindings and the first binding remains the current default for existing conversation flows.
+- **Specs linked**: `03-runtime/11-provider-model-system.md`, `03-runtime/12-provider-config-schema.md`, `03-runtime/14-secrets-storage.md`, `04-ux/06-settings-ia.md`
+- **Acceptance**: B (multi-model provider configuration, save key)
 - **Milestone**: M2
-- **Status**: Automated (protocol smoke: provider create + secret, no plaintext echo)
+- **Status**: Manual UI + automated protocol smoke (provider create + secret, no plaintext echo)
+
+#### E2E-005A: Edit provider model bindings and migrate a legacy model
+
+- **Preconditions**: One provider saved with two model bindings; one fixture provider row exists with only the legacy `default_model_id` and no `config_json.models`.
+- **Steps**: 1) Reopen the saved provider. 2) Confirm both models are preselected and both cards retain their limits, thinking chips, and defaults. 3) Edit one card and save. 4) Reopen the fixture provider. 5) Confirm it displays one fallback card for the legacy model with 128,000 context, 8,192 max output, no enabled thinking, and a disabled “Not supported” default select. 6) Save the fixture provider without changing the model.
+- **Expected**: Editing never drops an unmodified binding. Legacy read materializes one binding without losing the old model ID; the subsequent write stores `config_json.models` and keeps `defaultModelId` equal to the first binding for older readers.
+- **Specs linked**: `03-runtime/11-provider-model-system.md`, `03-runtime/12-provider-config-schema.md`, ADR 0113
+- **Acceptance**: F (provider persistence and migration)
+- **Milestone**: M2
+- **Status**: Unit-covered host migration; manual UI journey
 
 #### E2E-006: Key survives restart
 
