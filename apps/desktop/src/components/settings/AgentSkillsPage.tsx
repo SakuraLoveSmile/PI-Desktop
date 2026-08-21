@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import {
   AgentCapabilityColumn,
+  AgentCapabilityIntro,
   AgentProjectPicker,
   CapabilityButton,
   CapabilityEmpty,
@@ -167,12 +168,16 @@ export function AgentSkillsPage() {
 
   return (
     <div className="agent-capability-page">
-      <p className="agent-capability-intro">{t("settings.capabilityPriority")}</p>
+      <AgentCapabilityIntro
+        description={t("settings.skillsDescription")}
+        note={t("settings.capabilityPriority")}
+      />
       <div className="agent-capability-columns">
         <AgentCapabilityColumn
           title={t("settings.globalLevel")}
           path={GLOBAL_SKILLS_PATH}
           scope="global"
+          description={t("settings.globalScopeDescription")}
           count={globalSkills.length}
           action={importButton("global")}
           loading={loading}
@@ -196,6 +201,7 @@ export function AgentSkillsPage() {
           title={t("settings.projectLevel")}
           path={projectSkillsPath(selectedProjectPath)}
           scope="project"
+          description={t("settings.projectScopeDescription")}
           count={projectSkills.length}
           action={
             <>

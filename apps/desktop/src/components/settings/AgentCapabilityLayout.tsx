@@ -151,10 +151,26 @@ export function CapabilityToggle({
   );
 }
 
+export function AgentCapabilityIntro({
+  description,
+  note,
+}: {
+  description: string;
+  note?: string;
+}) {
+  return (
+    <div className="agent-capability-intro">
+      <p className="agent-capability-intro-description">{description}</p>
+      {note ? <p className="agent-capability-intro-note">{note}</p> : null}
+    </div>
+  );
+}
+
 export function AgentCapabilityColumn({
   title,
   path,
   scope,
+  description,
   count,
   action,
   loading,
@@ -165,6 +181,7 @@ export function AgentCapabilityColumn({
   title: string;
   path: string;
   scope?: "global" | "project";
+  description?: string;
   count?: number;
   action?: ReactNode;
   loading: boolean;
@@ -175,7 +192,11 @@ export function AgentCapabilityColumn({
   const { t } = useTranslation();
   return (
     <section
-      className={cx("agent-capability-column", scope && `is-${scope}`, className)}
+      className={cx(
+        "settings-panel agent-capability-column",
+        scope && `is-${scope}`,
+        className,
+      )}
       data-scope={scope}
     >
       <header className="agent-capability-column-head">
@@ -189,21 +210,21 @@ export function AgentCapabilityColumn({
             ) : null}
             <span className="agent-capability-column-label">{title}</span>
           </div>
+          {description ? (
+            <p className="agent-capability-column-description">{description}</p>
+          ) : null}
           <code title={path}>{path}</code>
         </div>
         <div className="agent-capability-column-actions">
-          {action}
           {count !== undefined ? (
             <span
               className="agent-capability-count"
               title={t("settings.capabilityCount", { count })}
             >
-              <span aria-hidden="true">{count}</span>
-              <span className="sr-only">
-                {t("settings.capabilityCount", { count })}
-              </span>
+              {t("settings.capabilityCount", { count })}
             </span>
           ) : null}
+          {action}
         </div>
       </header>
       <div className="agent-capability-list" role="list" aria-busy={loading}>

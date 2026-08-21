@@ -161,32 +161,32 @@ Skills, MCP servers, and user-owned Subagents remain three independent
 destinations under the Agent group. They share a capability-management visual
 system while preserving their different data ownership:
 
+- Each capability page starts with a quiet, page-specific description and a
+  short scope note rather than a decorative hero or alert. Light and dark
+  themes use the shared Settings surface, typography, borders, and semantic
+  tokens; capability pages do not introduce a separate color system.
 - Skills and MCP render a responsive two-column layout for Global and Project
-  scope. Each scope is a single elevated surface with a clear scope marker,
-  resolved `.agents` path, item count, and actions in its header. Project scope
-  includes the selected-project picker; Subagents has no project picker because
-  it is global-only.
+  scope. Each scope is one standard elevated Settings surface with a compact
+  scope marker, resolved `.agents` path, scope description, localized item
+  count, and actions grouped in its header. Project scope includes the
+  selected-project picker; Subagents has no project picker because it is
+  global-only and uses one full-width surface.
 - The list viewport has a compact fixed height so changing projects, toggling a
   row, or showing an empty state does not make the page jump. Rows use a compact
   icon, name, optional source/transport/status badges, description, and an
-  always visible enablement switch. MCP rows also keep Edit visible as an icon
-  action. Empty states use an inset dashed surface rather than leaving the
-  entire viewport visually blank.
+  always visible enablement switch. MCP rows also keep Edit visible as a
+  Settings icon action. Empty states use an inset dashed surface rather than
+  leaving the entire viewport visually blank.
 - Initial loads and project changes keep that same viewport stable with a
   lightweight loading treatment; scope actions and row controls are disabled
   while the capability state is being refreshed so a second click cannot race
-  the host update. The count remains available to assistive technology, and
-  pending switches retain a busy state until the refresh replaces them with
-  the latest result.
+  the host update. The localized count remains available to assistive
+  technology, and pending switches retain a busy state until the refresh
+  replaces them with the latest result.
 - Scope labels stay on one line. When a capability surface is narrow, its
   actions move below the scope title so project controls cannot squeeze or
-  wrap the title.
-- The intro line calls out project-over-global precedence. Empty states are
-  centered inside the same surface and use the capability icon plus localized
-  next-step copy. Light and dark themes use the shared settings surface and
-  accent tokens; no capability page introduces a separate color system.
-- At narrow widths the two surfaces stack, and scope actions wrap below the
-  header without reducing the switch or edit hit targets.
+  wrap the title. At narrow widths the two surfaces stack without reducing
+  switch or edit hit targets.
 
 ### Instructions (`instructions` tab)
 - Edit the global instruction Markdown used by every PI-Desktop Agent session.

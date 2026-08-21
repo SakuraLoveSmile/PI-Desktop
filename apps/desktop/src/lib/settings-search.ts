@@ -106,8 +106,11 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     labelKey: "settings.skills",
     group: "agent",
     keywordKeys: [
+      "settings.skillsDescription",
       "settings.skillsGlobalPath",
       "settings.skillsProjectPath",
+      "settings.globalScopeDescription",
+      "settings.projectScopeDescription",
       "settings.capabilityPriority",
       "settings.importSkill",
     ],
@@ -117,8 +120,11 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     labelKey: "settings.mcp",
     group: "agent",
     keywordKeys: [
+      "settings.mcpDescription",
       "settings.mcpGlobalPath",
       "settings.mcpProjectPath",
+      "settings.globalScopeDescription",
+      "settings.projectScopeDescription",
       "settings.addMcp",
       "settings.editMcp",
       "settings.transport",
@@ -129,8 +135,10 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
     labelKey: "settings.subagents",
     group: "agent",
     keywordKeys: [
+      "settings.subagentsDescription",
       "settings.subagentsGlobalPath",
       "settings.subagentsOnlyGlobal",
+      "settings.globalScopeDescription",
     ],
   },
   {

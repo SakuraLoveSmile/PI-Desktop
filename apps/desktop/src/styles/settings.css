@@ -1065,46 +1065,58 @@
 
 /* -------------------------------------------------------------------------
  * Settings > Agent capability management.
- * The lists deliberately have a fixed viewport: empty states and project
- * changes never move the page or make the two columns disagree in height.
+ * Capability pages share the same quiet, elevated surfaces as the rest of
+ * Settings while keeping a stable viewport for loading, empty, and populated
+ * states.
  */
 .agent-capability-page {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
 .agent-capability-intro {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: none;
-  margin: -10px 0 0;
-  border: 1px solid var(--ds-border-subtle);
-  border-left: 3px solid var(--ds-accent);
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--ds-accent) 5%, var(--ds-bg-secondary));
-  padding: 9px 12px;
+  max-width: 72ch;
+  flex-direction: column;
+  gap: 4px;
+  margin: -12px 0 -2px;
+  padding: 0 2px;
   color: var(--ds-text-secondary);
-  font-size: var(--text-sm);
+}
+
+.agent-capability-intro-description,
+.agent-capability-intro-note {
+  margin: 0;
   line-height: var(--leading-body);
 }
 
-.agent-capability-intro::before {
-  width: 7px;
-  height: 7px;
+.agent-capability-intro-description {
+  font-size: var(--text-md);
+}
+
+.agent-capability-intro-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ds-text-muted);
+  font-size: var(--text-sm);
+}
+
+.agent-capability-intro-note::before {
+  width: 5px;
+  height: 5px;
   flex: 0 0 auto;
   border-radius: var(--radius-full);
-  background: var(--ds-accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ds-accent) 12%, transparent);
+  background: var(--ds-text-muted);
   content: "";
 }
 
 .agent-capability-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 18px;
   min-width: 0;
 }
 
@@ -1116,24 +1128,13 @@
   container-type: inline-size;
   overflow: hidden;
   border: 1px solid var(--ds-border-default);
-  border-radius: var(--radius-md-plus);
+  border-radius: var(--radius-lg);
   background: var(--ds-bg-elevated-opaque);
   box-shadow: var(--ds-elevation-stroke);
 }
 
 .agent-capability-column::before {
-  position: absolute;
-  top: -1px;
-  right: 18px;
-  left: 18px;
-  height: 2px;
-  border-radius: 0 0 var(--radius-full) var(--radius-full);
-  background: var(--ds-text-muted);
-  content: "";
-}
-
-.agent-capability-column.is-project::before {
-  background: var(--ds-accent);
+  display: none;
 }
 
 .agent-capability-column-wide {
@@ -1142,21 +1143,21 @@
 
 .agent-capability-column-head {
   display: flex;
-  min-height: 68px;
+  min-height: 84px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   min-width: 0;
-  padding: 12px 14px 11px 16px;
+  padding: 14px 16px 13px;
   border-bottom: 1px solid var(--ds-border-subtle);
-  background: color-mix(in oklab, var(--ds-text-primary) 2%, transparent);
+  background: color-mix(in oklab, var(--ds-text-primary) 1.5%, transparent);
 }
 
 .agent-capability-column-title {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .agent-capability-column-title-line {
@@ -1168,11 +1169,12 @@
 }
 
 .agent-capability-column-dot {
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   flex: 0 0 auto;
   border-radius: var(--radius-full);
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--ds-text-muted) 10%, transparent);
+  background: var(--ds-text-muted);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
 }
 
 .agent-capability-column-dot.is-global {
@@ -1181,7 +1183,7 @@
 
 .agent-capability-column-dot.is-project {
   background: var(--ds-accent);
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--ds-accent) 12%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ds-accent) 12%, transparent);
 }
 
 .agent-capability-column-label {
@@ -1189,6 +1191,16 @@
   font-size: var(--text-md-plus);
   font-weight: var(--font-weight-strong);
   letter-spacing: var(--tracking-tight);
+  white-space: nowrap;
+}
+
+.agent-capability-column-description {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1207,8 +1219,9 @@
 .agent-capability-column-title code {
   display: inline-block;
   max-width: min(38ch, 32vw);
+  border: 1px solid var(--ds-border-subtle);
   border-radius: var(--radius-xs);
-  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+  background: var(--ds-bg-inset);
   padding: 3px 6px;
 }
 
@@ -1227,19 +1240,16 @@
 
 .agent-capability-count {
   display: inline-flex;
-  min-width: 24px;
-  height: 24px;
+  min-width: 0;
   align-items: center;
-  justify-content: center;
   border-radius: var(--radius-full);
-  border: 1px solid color-mix(in oklab, var(--ds-accent) 18%, transparent);
-  background: color-mix(in oklab, var(--ds-accent) 9%, transparent);
-  padding: 0 7px;
-  color: var(--ds-accent);
+  background: var(--ds-bg-inset);
+  padding: 3px 8px;
+  color: var(--ds-text-muted);
   font-size: var(--text-xs);
-  font-weight: var(--font-weight-strong);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-normal);
+  white-space: nowrap;
 }
 
 .agent-capability-project-picker {
@@ -1259,8 +1269,8 @@
   appearance: none;
   border: 1px solid var(--ds-border-default);
   border-radius: var(--radius-md);
-  background: var(--ds-bg-primary);
-  padding: 0 25px 0 25px;
+  background: var(--ds-bg-inset);
+  padding: 0 25px;
   color: var(--ds-text-primary);
   cursor: pointer;
   font-size: var(--text-xs-plus);
@@ -1294,7 +1304,7 @@
   min-height: 360px;
   flex-direction: column;
   overflow: auto;
-  background: transparent;
+  background: var(--ds-bg-secondary);
 }
 
 .agent-capability-loading {
@@ -1319,7 +1329,7 @@
   display: block;
   align-self: center;
   width: 84%;
-  height: 8px;
+  height: 7px;
   border-radius: var(--radius-full);
   background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
   animation: agent-capability-loading-pulse 1.2s ease-in-out infinite alternate;
@@ -1344,7 +1354,7 @@
   margin: 12px;
   border: 1px dashed var(--ds-border-default);
   border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--ds-text-primary) 2%, transparent);
+  background: var(--ds-bg-inset);
   padding: 20px;
   color: var(--ds-text-muted);
   font-size: var(--text-sm-plus);
@@ -1356,22 +1366,22 @@
   height: 30px;
   padding: 7px;
   border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--ds-accent) 10%, transparent);
-  color: var(--ds-accent);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  color: var(--ds-text-secondary);
 }
 
 .agent-capability-row {
   display: flex;
   min-height: 76px;
   align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px 12px 16px;
+  gap: 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--ds-border-subtle);
   transition: background var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .agent-capability-row:hover {
-  background: color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
+  background: var(--ds-bg-hover);
 }
 
 .agent-capability-row:last-child {
@@ -1384,13 +1394,13 @@
 
 .agent-capability-glyph {
   display: inline-flex;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in oklab, var(--ds-text-primary) 9%, transparent);
-  border-radius: var(--radius-md-plus);
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
   color: var(--ds-text-secondary);
 }
@@ -1412,8 +1422,8 @@
 }
 
 .agent-capability-glyph-agent {
-  border-color: color-mix(in oklab, var(--ds-accent) 18%, transparent);
-  background: color-mix(in oklab, var(--ds-text-primary) 10%, transparent);
+  border-color: var(--ds-border-default);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
 }
 
 .agent-capability-copy {
@@ -1446,8 +1456,8 @@
   flex: 0 0 auto;
   align-items: center;
   border-radius: var(--radius-full);
-  background: color-mix(in oklab, var(--ds-text-primary) 8%, transparent);
-  border: 1px solid color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  background: color-mix(in oklab, var(--ds-text-primary) 7%, transparent);
+  border: 1px solid var(--ds-border-subtle);
   padding: 2px 7px;
   color: var(--ds-text-secondary);
   font-size: var(--text-3xs);
@@ -1486,8 +1496,9 @@
 }
 
 .agent-capability-meta code {
+  border: 1px solid var(--ds-border-subtle);
   border-radius: var(--radius-xs);
-  background: color-mix(in oklab, var(--ds-text-primary) 6%, transparent);
+  background: var(--ds-bg-inset);
   padding: 2px 6px;
 }
 
@@ -1499,19 +1510,32 @@
   padding-top: 1px;
 }
 
-.agent-capability-edit {
+.settings-icon-button {
+  display: inline-flex;
   width: 30px;
   height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ds-text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    border-color var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
 }
 
-.agent-capability-edit:hover,
-.agent-capability-edit:focus-visible {
+.settings-icon-button:hover:not(:disabled),
+.settings-icon-button:focus-visible {
   border-color: var(--ds-border-default);
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
 }
 
-.agent-capability-edit:focus-visible {
+.settings-icon-button:focus-visible {
   box-shadow: 0 0 0 2px color-mix(in oklab, var(--ds-accent) 20%, transparent);
 }
 
@@ -1521,7 +1545,7 @@
   justify-content: space-between;
   gap: 12px;
   border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--ds-text-primary) 5%, transparent);
+  background: var(--ds-bg-inset);
   padding: 10px 12px;
 }
 

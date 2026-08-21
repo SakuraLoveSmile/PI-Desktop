@@ -4137,10 +4137,10 @@ Each scenario is documented in this format:
 - **Expected**:
   - The three Settings pages use no tabs for switching capabilities, preserve
     list height for empty and populated states, support dark and light themes,
-    and show project-over-global priority in their explanatory copy. Each
-    global/project scope is presented as a compact elevated surface with a
-    scope marker, resolved `.agents` path chip, count, and actions grouped in
-    the header;
+    and begin with quiet page-specific descriptions plus project-over-global
+    scope copy where relevant. Each global/project scope is presented as a
+    standard Settings surface with a scope marker, resolved `.agents` path,
+    scope description, localized count, and actions grouped in the header;
     scope labels remain single-line, with actions moving below the title when a
     surface is narrow. The rows use compact capability icons, localized badges,
     descriptions, and persistent enablement switches. Loading uses a separate
@@ -4148,7 +4148,8 @@ Each scenario is documented in this format:
     competing controls until the host refresh completes, and counts are
     exposed to assistive technology.
     Empty states stay centered inside an inset dashed surface, and the two
-    surfaces stack with wrapped actions at narrow widths.
+    surfaces stack with wrapped actions at narrow widths without introducing a
+    capability-specific color system.
   - Capability files contain configuration/frontmatter only; enablement is
     persisted in the app-local `agent-capabilities` state files.
   - Project records shadow global records by id or name even when disabled,

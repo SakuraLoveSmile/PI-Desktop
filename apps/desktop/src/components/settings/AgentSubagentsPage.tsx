@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import {
   AgentCapabilityColumn,
+  AgentCapabilityIntro,
   CapabilityEmpty,
   CapabilityToggle,
 } from "./AgentCapabilityLayout";
@@ -108,11 +109,15 @@ export function AgentSubagentsPage() {
 
   return (
     <div className="agent-capability-page agent-subagents-page">
-      <p className="agent-capability-intro">{t("settings.subagentsOnlyGlobal")}</p>
+      <AgentCapabilityIntro
+        description={t("settings.subagentsDescription")}
+        note={t("settings.subagentsOnlyGlobal")}
+      />
       <AgentCapabilityColumn
         title={t("settings.globalLevel")}
         path={GLOBAL_SUBAGENTS_PATH}
         scope="global"
+        description={t("settings.globalScopeDescription")}
         count={subagents.length}
         loading={loading}
         empty={t("settings.loadingCapabilities")}

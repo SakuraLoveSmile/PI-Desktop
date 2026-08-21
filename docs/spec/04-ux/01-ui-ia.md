@@ -221,19 +221,25 @@ stay open. Extension management remains solely on the app shell's independent
 Extensions destination described in §3.5. Settings > Agent has the following
 shared capability contract:
 
-- Skills and MCP use fixed-height global/project columns. The project column
-  shows a recent-project picker, directory path, empty-state placeholder, and
-  one local list of rows; project records take precedence over global records.
-- Skills have one native **Import** action per column. It accepts exactly one
+- Each capability destination starts with a quiet localized description and
+  scope note, then uses the same neutral elevated Settings surface as the other
+  destinations; no capability page has a decorative hero, colored top bar, or
+  separate visual theme.
+- Skills and MCP use fixed-height global/project surfaces. Each header shows a
+  scope marker, resolved `.agents` path, scope description, localized count,
+  and its actions. The project surface shows a recent-project picker;
+  project records take precedence over global records.
+- Skills have one native **Import** action per surface. It accepts exactly one
   file and physically copies it into the selected `.agents/skills` directory.
-- MCP has one **Add** action per column. Add and Edit open the existing
+- MCP has one **Add** action per surface. Add and Edit open the existing
   `McpEditorSheet` as a modal overlay with stdio/HTTP branches, validation,
   duplicate checks, locked edit ids, scope text, and Test connection feedback.
-- Subagents use one full-width global column under `~/.agents/subagents`; they
-  have no project picker, project column, or project-level toggle.
-- All three lists keep a constant height, render an empty state in that space,
-  dim disabled rows, and store enablement in app-local state rather than
-  capability files.
+- Subagents use one full-width global surface under `~/.agents/subagents`; they
+  have no project picker, project surface, or project-level toggle.
+- All three lists keep a constant height, render an inset dashed empty state in
+  that space, dim disabled rows, and store enablement in app-local state rather
+  than capability files. Loading and project changes preserve the viewport and
+  disable competing controls until the host refresh completes.
 
 ## 4. Overlays
 

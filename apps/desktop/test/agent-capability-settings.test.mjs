@@ -61,11 +61,14 @@ test("capability lists keep a fixed height and render disabled rows", () => {
   assert.match(layout, /agent-capability-empty/);
 });
 
-test("capability surfaces use the compact studio hierarchy", () => {
-  assert.match(styles, /\.agent-capability-intro\s*\{[\s\S]*?border-left:\s*3px solid var\(--ds-accent\)/);
-  assert.match(styles, /\.agent-capability-column\s*\{[\s\S]*?border-radius:\s*var\(--radius-md-plus\)/);
-  assert.match(styles, /\.agent-capability-column-title code\s*\{[\s\S]*?background:/);
+test("capability surfaces use the shared settings hierarchy", () => {
+  assert.match(layout, /AgentCapabilityIntro/);
+  assert.match(styles, /\.agent-capability-intro-description\s*\{/);
+  assert.match(styles, /\.agent-capability-intro-note\s*\{/);
+  assert.match(styles, /\.agent-capability-column\s*\{[\s\S]*?border-radius:\s*var\(--radius-lg\)/);
+  assert.match(styles, /\.agent-capability-column-title code\s*\{[\s\S]*?background:\s*var\(--ds-bg-inset\)/);
   assert.match(styles, /\.agent-capability-empty\s*\{[\s\S]*?border:\s*1px dashed/);
+  assert.match(styles, /\.settings-icon-button\s*\{/);
 });
 
 test("capability scope labels stay intact when a column narrows", () => {

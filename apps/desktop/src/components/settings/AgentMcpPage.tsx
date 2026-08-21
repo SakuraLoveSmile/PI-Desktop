@@ -10,6 +10,7 @@ import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import {
   AgentCapabilityColumn,
+  AgentCapabilityIntro,
   AgentProjectPicker,
   CapabilityButton,
   CapabilityEmpty,
@@ -87,7 +88,7 @@ function McpRow({
       <div className="agent-capability-row-actions">
         <button
           type="button"
-          className="plugins-icon-btn agent-capability-edit"
+          className="settings-icon-button agent-capability-edit"
           aria-label={t("settings.editMcpOf", { name })}
           title={t("settings.editMcp")}
           disabled={disabled || busy}
@@ -296,12 +297,16 @@ export function AgentMcpPage() {
 
   return (
     <div className="agent-capability-page">
-      <p className="agent-capability-intro">{t("settings.capabilityPriority")}</p>
+      <AgentCapabilityIntro
+        description={t("settings.mcpDescription")}
+        note={t("settings.capabilityPriority")}
+      />
       <div className="agent-capability-columns">
         <AgentCapabilityColumn
           title={t("settings.globalLevel")}
           path={GLOBAL_MCP_PATH}
           scope="global"
+          description={t("settings.globalScopeDescription")}
           count={globalServers.length}
           action={
             <CapabilityButton
@@ -324,6 +329,7 @@ export function AgentMcpPage() {
           title={t("settings.projectLevel")}
           path={projectMcpPath(selectedProjectPath)}
           scope="project"
+          description={t("settings.projectScopeDescription")}
           count={projectServers.length}
           action={
             <>
