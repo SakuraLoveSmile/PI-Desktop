@@ -68,6 +68,26 @@ function settle(message) {
   entry.reject(error);
 }
 
+function asUint8Array(value) {
+  if (value instanceof Uint8Array) return value;
+  if (Array.isArray(value)) return Uint8Array.from(value);
+  if (!value || typeof value !== "object") return new Uint8Array();
+  const bytes = Object.entries(value)
+    .filter(([key]) => /^\d+$/.test(key))
+    .sort(([left], [right]) => Number(left) - Number(right))
+    .map(([, byte]) => Number(byte));
+  return Uint8Array.from(bytes);
+}
+
+function normalizeClipboardHistory(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) =>
+    entry?.type === "image"
+      ? { ...entry, data: asUint8Array(entry.data) }
+      : entry,
+  );
+}
+
 // Contribution points registered by this plugin. The callable half stays here;
 // the broker only ever holds the descriptor plus a proxy back into this process.
 const commands = new Map();
@@ -219,6 +239,7 @@ function buildApi() {
     clipboard: {
       readText: () => call("clipboard.readText"),
       writeText: (text) => call("clipboard.writeText", [text]),
+      getHistory: () => call("clipboard.getHistory").then(normalizeClipboardHistory),
     },
     shell: {
       openExternal: (url) => call("shell.openExternal", [url]),

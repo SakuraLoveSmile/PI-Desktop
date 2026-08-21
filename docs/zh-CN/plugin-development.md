@@ -379,7 +379,7 @@ const dataPath = await pi.plugin.getDataPath();
 | `fs.read` | `pi.fs.readText`、`pi.fs.glob`、`pi.fs.requestDirectory` | `fs.readText`、`fs.glob` |
 | `fs.write` | `pi.fs.writeText` | `fs.writeText` |
 | `fs.delete` | `pi.fs.remove` | 没有暴露 |
-| `clipboard.read` | `pi.clipboard.readText` | `clipboard.readText` |
+| `clipboard.read` | `pi.clipboard.readText`、`pi.clipboard.getHistory` | `clipboard.readText`、`clipboard.getHistory` |
 | `clipboard.write` | `pi.clipboard.writeText` | `clipboard.writeText` |
 | `net.fetch` | `pi.net.fetch` | `net.fetch` |
 | `shell.openExternal` | `pi.shell.openExternal` | `shell.openExternal` |

@@ -33,6 +33,7 @@ import {
   resolvePluginLocalizedString,
   validateManifest,
   validateMcpServer,
+  type ClipboardHistoryEntry,
   type PluginFsMode,
   type PluginFsPolicy,
   type PluginFsRule,
@@ -182,6 +183,7 @@ export type PluginHostServices = {
   revealPath?: (fullPath: string) => Promise<void>;
   readClipboard: () => Promise<string>;
   writeClipboard: (text: string) => Promise<void>;
+  readClipboardHistory: () => Promise<ClipboardHistoryEntry[]>;
   openPanel: (request: PluginPanelRequest) => Promise<void>;
   closePanel: (pluginId: string) => Promise<void>;
   fetch?: (input: {
@@ -265,6 +267,7 @@ const HOST_API_ALLOWLIST = new Set([
   "fs.requestDirectory",
   "clipboard.readText",
   "clipboard.writeText",
+  "clipboard.getHistory",
   "shell.openExternal",
   "net.fetch",
   "bus.publish",
@@ -580,6 +583,7 @@ export class PluginRuntime {
       },
       readClipboard: async () => "",
       writeClipboard: async () => undefined,
+      readClipboardHistory: async () => [],
       openPanel: async (request) => {
         this.toasts.push({ message: `Opened panel for ${request.pluginId}` });
       },
@@ -1080,6 +1084,8 @@ export class PluginRuntime {
       case "clipboard.writeText":
         await api.clipboard.writeText(String(payload?.text ?? ""));
         return { ok: true };
+      case "clipboard.getHistory":
+        return api.clipboard.getHistory();
       case "shell.openExternal":
         await api.shell.openExternal(String(payload?.url ?? ""));
         return { ok: true };
@@ -2795,6 +2801,29 @@ export class PluginRuntime {
             ok: true,
             ts: Date.now(),
           });
+        },
+        getHistory: async () => {
+          this.assertPermission(loaded, "clipboard.read");
+          try {
+            const history = await this.services.readClipboardHistory();
+            this.services.audit?.({
+              pluginId,
+              api: "clipboard.getHistory",
+              ok: true,
+              entryCount: history.length,
+              ts: Date.now(),
+            });
+            return history;
+          } catch (error) {
+            this.services.audit?.({
+              pluginId,
+              api: "clipboard.getHistory",
+              ok: false,
+              errorCode: (error as PluginApiError).code ?? "INTERNAL",
+              ts: Date.now(),
+            });
+            throw error;
+          }
         },
       },
       shell: {

@@ -105,7 +105,8 @@ The panel receives `window.pluginBridge`, not `pi`. Use the fixed bridge channel
 `ui.showToast`, `ui.closePanel`, `ui.getNotificationPermission`,
 `ui.requestNotificationPermission`, `ui.showNativeNotification`, `plugin.getSettings`,
 `workspace.get`, `fs.readText`, `fs.writeText`, `fs.glob`, `clipboard.readText`,
-`clipboard.writeText`, `shell.openExternal`, and `net.fetch`. Arbitrary Electron IPC and
+`clipboard.getHistory`, `clipboard.writeText`, `shell.openExternal`, and `net.fetch`.
+Arbitrary Electron IPC and
 general custom panel RPC are not exposed.
 
 ## Permissions

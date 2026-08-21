@@ -118,6 +118,7 @@ import {
 import { PersistenceOutbox } from "./persistence-outbox";
 import { AgentSidecar } from "./agent-sidecar";
 import { PluginRuntime } from "./plugin-runtime";
+import { ClipboardHistory, type ClipboardCapture } from "./clipboard-history";
 import { createFsConsentService } from "./plugin-fs-consent";
 import { UserMcpRuntime } from "./user-mcp";
 import {
@@ -303,6 +304,30 @@ async function requestPluginNotificationPermission(): Promise<PluginNotification
   return result.permission;
 }
 
+async function readSystemClipboard(): Promise<ClipboardCapture | null> {
+  const { clipboard } = await import("electron");
+  const hasImage = clipboard.availableFormats().some((format) => /^image\//i.test(format));
+  if (hasImage) {
+    const image = clipboard.readImage();
+    if (!image.isEmpty()) {
+      const size = image.getSize();
+      return {
+        type: "image",
+        // NativeImage provides a stable cross-platform PNG representation even
+        // when the source clipboard format is JPEG, WebP, or OS-native data.
+        format: "png",
+        data: new Uint8Array(image.toPNG()),
+        width: size.width,
+        height: size.height,
+      };
+    }
+  }
+  const text = clipboard.readText();
+  return text ? { type: "text", text } : null;
+}
+
+const clipboardHistory = new ClipboardHistory({ read: readSystemClipboard });
+
 const pluginPanels = new PluginPanelHost(
   async (pluginId, channel, payload) =>
     plugins.invokePanelBridge(pluginId, channel, payload),
@@ -348,7 +373,9 @@ const plugins = new PluginRuntime({
   writeClipboard: async (value) => {
     const { clipboard } = await import("electron");
     clipboard.writeText(value);
+    clipboardHistory.recordText(value);
   },
+  readClipboardHistory: async () => clipboardHistory.getHistory(),
   getLocale: () => updaterLocale,
   getAppearance: () => resolveAppearance(),
   openPanel: async (request) => {
@@ -7485,6 +7512,13 @@ app.whenReady().then(async () => {
   // create a window, a tray, or a child process on top of the running app.
   if (!hasSingleInstanceLock) return;
   applyDevelopmentBranding();
+  try {
+    await clipboardHistory.start();
+  } catch (error) {
+    logger.app("plugin", "warn", "clipboard history sampling unavailable", {
+      data: String(error),
+    });
+  }
   // Load the close-behavior preference before the first window exists: the
   // close handler reads `closeBehavior` synchronously, and a window created
   // while it still held the "ask" default would prompt a user who already
@@ -7648,6 +7682,7 @@ app.on("before-quit", (event) => {
   if (shutdownPromise) return;
 
   quitting = true;
+  clipboardHistory.stop();
   tray?.destroy();
   tray = null;
   if (pluginLauncherAccelerator) {

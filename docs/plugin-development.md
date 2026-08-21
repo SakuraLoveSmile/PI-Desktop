@@ -382,7 +382,7 @@ These APIs require explicit permissions:
 | `fs.read` | `pi.fs.readText`, `pi.fs.glob`, `pi.fs.list`, `pi.fs.requestDirectory` | `fs.readText`, `fs.glob`, `fs.list` |
 | `fs.write` | `pi.fs.writeText` | `fs.writeText` |
 | `fs.delete` | `pi.fs.remove` | Not exposed |
-| `clipboard.read` | `pi.clipboard.readText` | `clipboard.readText` |
+| `clipboard.read` | `pi.clipboard.readText`, `pi.clipboard.getHistory` | `clipboard.readText`, `clipboard.getHistory` |
 | `clipboard.write` | `pi.clipboard.writeText` | `clipboard.writeText` |
 | `net.fetch` | `pi.net.fetch` | `net.fetch` |
 | `shell.openExternal` | `pi.shell.openExternal` | `shell.openExternal` |

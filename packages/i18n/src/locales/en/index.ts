@@ -1210,7 +1210,7 @@ export const en = {
       "This plugin declares file permissions from before scopes existed, so its reach has been reduced. Update it to restore full function.",
     permissions: {
       "ui.panel": "Show a plugin panel",
-      "clipboard.read": "Read the clipboard",
+      "clipboard.read": "Read the clipboard and its history",
       "clipboard.write": "Write to the clipboard",
       notify: "Show in-app and native notifications",
       "fs.read": "Read files",
@@ -1234,7 +1234,8 @@ export const en = {
     },
     permissionHelp: {
       "ui.panel": "Lets the plugin show its own panel inside the app.",
-      "clipboard.read": "May read whatever is currently on your clipboard.",
+      "clipboard.read":
+        "May read whatever is currently on your clipboard and retained clipboard history.",
       "clipboard.write": "May replace whatever is currently on your clipboard.",
       notify: "Can show in-app Toasts and best-effort native notifications.",
       "fs.read":

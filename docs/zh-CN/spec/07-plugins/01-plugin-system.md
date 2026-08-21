@@ -289,6 +289,7 @@ Host Main (PI-Desktop)
 
 ### 剪贴板/系统（需要许可）
 - `pi.clipboard.readText()`
+- `pi.clipboard.getHistory()` // 文本和图片，最新优先
 - `pi.clipboard.writeText(text)`
 - `pi.shell.openExternal(url)` // 默认确认
 - `pi.net.fetch(input)`
@@ -318,7 +319,7 @@ Electron 主进程通知 API 并共享清单 `notify`
 | `ui.panel` | 低 | 显示面板 |
 | `ui.view` | 低 | 贡献工作面板视图 |
 | `ui.theme` | 低 | 贡献主题 CSS 文件 |
-| `clipboard.read` | 中等 | 读取剪贴板 |
+| `clipboard.read` | 中等 | 读取当前剪贴板和主机保留的剪贴板历史 |
 | `clipboard.write` | 中等 | 写入剪贴板 |
 | `notify` | 低 | 系统通知 |
 | `fs.read` | 中等 | 读取 `manifest.fs.read` 列出的路径 |

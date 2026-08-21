@@ -62,6 +62,11 @@ dependency-free and Node-free. It provides:
 - manifest validation function
 - test helper (mock host)
 
+The SDK's clipboard surface includes `pi.clipboard.getHistory()`, which
+returns bounded, newest-first text and image entries through the existing
+`clipboard.read` permission. Plugin authors should use it for clipboard-history
+features instead of polling `readText()` and maintaining a second store.
+
 `@pi-desktop/plugin-devkit` is tooling, not runtime, and may use Node. It owns
 `scaffold` / `check` / `pack` and the `pi-plugin` CLI. All three developer
 surfaces (CLI, agent tools, plugins page) call it, so a rule enforced once holds

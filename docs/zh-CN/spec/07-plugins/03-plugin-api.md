@@ -167,8 +167,27 @@ type ToolExecContext = {
 ```ts
 pi.clipboard.readText(): Promise<string>
 pi.clipboard.writeText(text: string): Promise<void>
+pi.clipboard.getHistory(): Promise<ClipboardHistoryEntry[]>
+
+type ClipboardHistoryEntry =
+  | { type: "text"; text: string; capturedAt: string }
+  | {
+      type: "image"
+      format: "png" | "jpeg" | "webp"
+      data: Uint8Array
+      width: number
+      height: number
+      capturedAt: string
+    }
 pi.shell.openExternal(url: string): Promise<void>
 ```
+
+`getHistory` 返回主机在应用运行期间捕获的条目，按最新优先排列，文本和图片按捕获
+时间混排。启动后的第一次采样只建立基线，不会把启动前的内容加入历史；通过
+`writeText` 写入的内容会立即记录。连续相同内容会合并并刷新时间戳。历史只保留在
+内存中，最多保留 30 天、500 条和 256 MiB；单条文本最多 100 KiB UTF-8 字节，图片
+最多 50 MiB。图片统一返回 PNG 字节及像素尺寸。Electron 没有跨平台的剪贴板变化事件，
+因此由主机在运行期间采样。
 
 ### 服务（需要 `background.service`）
 ```ts
@@ -286,7 +305,7 @@ window.pluginBridge.on(event, handler)
 | `plugin.getSettings`、`workspace.get`、`app.getAppearance` | 无 |
 | `fs.readText`、`fs.openDefault`、`fs.reveal`、`fs.glob`、`fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |
-| `clipboard.readText` | `clipboard.read` |
+| `clipboard.readText`、`clipboard.getHistory` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |
 | `shell.openExternal` | `shell.openExternal` |
 | `net.fetch` | `net.fetch` |
@@ -320,6 +339,7 @@ window.pluginBridge.on(event, handler)
 - 网络获取
 - shell.openExternal
 - clipboard.read/write（可能是样品）
+- clipboard.getHistory（记录返回的条目数）
 -bus.publish/bus.subscribe/bus.unsubscribe（带有主题和扇出大小）
 - 服务启动/停止/重新启动
 

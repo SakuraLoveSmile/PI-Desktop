@@ -295,6 +295,7 @@ manifest declared it and the permission was granted, and supervises restarts.
 
 ### Clipboard / system (requires permission)
 - `pi.clipboard.readText()`
+- `pi.clipboard.getHistory()` // text and images, newest first
 - `pi.clipboard.writeText(text)`
 - `pi.shell.openExternal(url)` // confirmation by default
 - `pi.net.fetch(input)`
@@ -324,7 +325,7 @@ therefore applies only to brokered APIs until runtime sandboxing is delivered.
 | `ui.panel` | low | Show panel |
 | `ui.view` | low | Contribute work panel views |
 | `ui.theme` | low | Contribute a theme CSS file |
-| `clipboard.read` | medium | Read clipboard |
+| `clipboard.read` | medium | Read the current clipboard and host-retained clipboard history |
 | `clipboard.write` | medium | Write clipboard |
 | `notify` | low | System notification |
 | `fs.read` | medium | Read the paths `manifest.fs.read` lists |

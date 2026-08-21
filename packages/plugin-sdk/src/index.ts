@@ -278,6 +278,21 @@ export type PluginNativeNotificationResult = {
   permission: PluginNotificationPermission;
 };
 
+export type ClipboardHistoryEntry =
+  | {
+      type: "text";
+      text: string;
+      capturedAt: string;
+    }
+  | {
+      type: "image";
+      format: "png" | "jpeg" | "webp";
+      data: Uint8Array;
+      width: number;
+      height: number;
+      capturedAt: string;
+    };
+
 /** One entry returned by `fs.list`, relative to the rule's root. */
 export type PluginFsEntry = {
   name: string;
@@ -370,6 +385,7 @@ export type PluginHostApi = {
   clipboard: {
     readText: () => Promise<string>;
     writeText: (text: string) => Promise<void>;
+    getHistory: () => Promise<ClipboardHistoryEntry[]>;
   };
   shell: {
     openExternal: (url: string) => Promise<void>;

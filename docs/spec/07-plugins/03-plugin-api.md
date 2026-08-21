@@ -174,8 +174,31 @@ type ToolExecContext = {
 ```ts
 pi.clipboard.readText(): Promise<string>
 pi.clipboard.writeText(text: string): Promise<void>
+pi.clipboard.getHistory(): Promise<ClipboardHistoryEntry[]>
+
+type ClipboardHistoryEntry =
+  | { type: "text"; text: string; capturedAt: string }
+  | {
+      type: "image"
+      format: "png" | "jpeg" | "webp"
+      data: Uint8Array
+      width: number
+      height: number
+      capturedAt: string
+    }
 pi.shell.openExternal(url: string): Promise<void>
 ```
+
+`getHistory` returns newest-first entries captured by the host while the app is
+running, with text and images interleaved in capture order. The first clipboard
+sample after startup establishes a baseline and is not added; content written
+through `writeText` is captured immediately. Consecutive identical content is
+collapsed and refreshes its timestamp. History is in-memory only and is
+bounded to 30 days, 500 entries, and 256 MiB total payload; individual entries
+are limited to 100 KiB of UTF-8 text or 50 MiB of image bytes. Images are
+returned as PNG bytes with their pixel dimensions, regardless of the source OS
+clipboard representation. The host samples for changes because Electron has
+no cross-platform clipboard-changed event.
 
 ### services (requires `background.service`)
 ```ts
@@ -300,7 +323,7 @@ The host-owned preload forwards only fixed channels to the plugin runtime:
 | `plugin.getSettings`, `workspace.get`, `app.getAppearance` | None |
 | `fs.readText`, `fs.openDefault`, `fs.reveal`, `fs.glob`, `fs.list` | `fs.read` |
 | `fs.writeText` | `fs.write` |
-| `clipboard.readText` | `clipboard.read` |
+| `clipboard.readText`, `clipboard.getHistory` | `clipboard.read` |
 | `clipboard.writeText` | `clipboard.write` |
 | `shell.openExternal` | `shell.openExternal` |
 | `net.fetch` | `net.fetch` |
@@ -334,6 +357,7 @@ Any of the following calls must be logged for audit:
 - net.fetch
 - shell.openExternal
 - clipboard.read/write (may be sampled)
+- clipboard.getHistory (with the returned entry count)
 - bus.publish / bus.subscribe / bus.unsubscribe (with the topic and fan-out size)
 - service start / stop / restart
 

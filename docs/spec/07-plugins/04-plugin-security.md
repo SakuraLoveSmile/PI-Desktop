@@ -29,6 +29,13 @@ Main risks:
 3. The secret store is not open to plugins
 4. The plugin-private data directory is separate from the host core library
 
+Clipboard history is host-owned and remains in the Electron main process only.
+It is never written to the plugin data directory or the host database. A plugin
+can read it only through `clipboard.read`, which is also the permission used by
+`readText`; every `getHistory` call is audited with its returned entry count.
+The bounded in-memory retention limits the privacy exposure to the current app
+run and is cleared on exit.
+
 ### Goals
 1. Plugin main runs in a separate process
 2. Crash isolation

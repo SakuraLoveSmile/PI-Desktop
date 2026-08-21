@@ -11,7 +11,7 @@ Provide a permission–capability–risk–default-policy reference table for re
 | `ui.panel` | low | Open the plugin panel | Granted at install | Needed by almost all UI plugins |
 | `ui.view` | low | `contributes.views` are listed in the work panel and may be opened | Granted at install | Same isolation as a panel window: sandboxed page, per-plugin partition, `net.domains` egress. Filtered by activation scope |
 | `ui.theme` | low | `contributes.themes` CSS is loaded and offered in Settings | Granted at install | CSS is sanitized by the host; it cannot script |
-| `clipboard.read` | medium | `clipboard.readText` | Confirm on first use | May read sensitive information |
+| `clipboard.read` | medium | `clipboard.readText`, `clipboard.getHistory` | Confirm on first use | May read sensitive information and retained clipboard history |
 | `clipboard.write` | medium | `clipboard.writeText` | Confirm on first use | Prevents clipboard pollution |
 | `notify` | low | `ui.notify`, `ui.getNotificationPermission`, `ui.requestNotificationPermission`, `ui.showNativeNotification` | Can be granted by default | Native delivery is OS-controlled; avoid notification-spam abuse |
 | `fs.read` | medium | `fs.readText` / `fs.openDefault` / `fs.reveal` / `fs.glob` / `fs.list` / `fs.requestDirectory` | Granted at install, bounded by `manifest.fs.read` | `fs.openDefault` and `fs.reveal` are limited to an explicit file and the same read scope; all file calls remain root- and deny-list-checked |
@@ -101,6 +101,7 @@ so "Modify the files it lists" is followed by the list.
 | Permission | English copy | zh-CN example |
 |---|---|---|
 | `fs.read` | Read the files it lists | 读取它列出的文件 |
+| `clipboard.read` | Read the current clipboard and retained history | 读取当前剪贴板和保留的历史 |
 | `fs.write` | Modify the files it lists | 修改它列出的文件 |
 | `fs.delete` | Delete the files it lists, to the trash | 删除它列出的文件（进回收站） |
 | `notify` | Show in-app and native notifications | 显示应用内和系统通知 |

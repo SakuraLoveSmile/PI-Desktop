@@ -1197,7 +1197,7 @@ export const zhCN = {
     legacyFsDowngraded: "此插件声明的是旧版文件权限，实际范围已被收窄。更新插件可恢复完整功能。",
     permissions: {
       "ui.panel": "显示插件面板",
-      "clipboard.read": "读取剪贴板",
+      "clipboard.read": "读取剪贴板及其历史",
       "clipboard.write": "写入剪贴板",
       notify: "显示应用内和系统通知",
       "fs.read": "读取文件",
@@ -1221,7 +1221,7 @@ export const zhCN = {
     },
     permissionHelp: {
       "ui.panel": "允许插件在应用内显示独立面板。",
-      "clipboard.read": "可能读取当前剪贴板中的内容。",
+      "clipboard.read": "可能读取当前剪贴板内容以及应用运行期间保留的剪贴板历史。",
       "clipboard.write": "可能覆盖当前剪贴板中的内容。",
       notify: "可显示应用内提示和尽力而为的系统通知。",
       "fs.read": "只读，且仅限插件声明的路径；凭据与仓库内部文件始终不可读。",
