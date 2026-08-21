@@ -123,7 +123,7 @@ test("switching to a provider without reasoning resets the session level", () =>
 test("new sessions default to the strongest level of a reasoning model", () => {
   const materializeSource =
     storeSource.match(
-      /export async function materializeDraftSession[\s\S]*?\n  return sessionId;\n}\n/,
+      /async function persistSessionAndSelect[\s\S]*?\n  return sessionId;\n}\n/,
     )?.[0] ?? "";
   assert.ok(
     materializeSource.length > 0,

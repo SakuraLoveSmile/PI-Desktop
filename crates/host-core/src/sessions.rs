@@ -88,6 +88,10 @@ fn validate_thinking_level(level: &str) -> Result<()> {
 pub struct SessionSummary {
     pub id: String,
     pub title: String,
+    /// Number of messages in the current canonical transcript. This is the
+    /// current value of the session's last_seq allocator after rewrites.
+    #[serde(default)]
+    pub message_count: i64,
     pub project_path: Option<String>,
     pub model_id: Option<String>,
     pub provider_id: Option<String>,
@@ -725,7 +729,8 @@ fn session_created_at(db: &Database, session_id: &str) -> Result<String> {
         .ok_or_else(|| anyhow!("session not found: {session_id}"))
 }
 
-const SUMMARY_SELECT: &str = "SELECT s.id, s.title, p.path, s.model_id, s.provider_id, s.mode,
+const SUMMARY_SELECT: &str =
+    "SELECT s.id, s.title, s.last_seq, p.path, s.model_id, s.provider_id, s.mode,
             s.thinking_level, s.permission_mode, s.updated_at, s.created_at
      FROM sessions s LEFT JOIN projects p ON p.id = s.project_id";
 
@@ -733,14 +738,15 @@ fn summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SessionSummary>
     Ok(SessionSummary {
         id: row.get(0)?,
         title: row.get(1)?,
-        project_path: row.get(2)?,
-        model_id: row.get(3)?,
-        provider_id: row.get(4)?,
-        mode: row.get(5)?,
-        thinking_level: row.get(6)?,
-        permission_mode: row.get(7)?,
-        updated_at: ms_to_ts(row.get(8)?),
-        created_at: ms_to_ts(row.get(9)?),
+        message_count: row.get(2)?,
+        project_path: row.get(3)?,
+        model_id: row.get(4)?,
+        provider_id: row.get(5)?,
+        mode: row.get(6)?,
+        thinking_level: row.get(7)?,
+        permission_mode: row.get(8)?,
+        updated_at: ms_to_ts(row.get(9)?),
+        created_at: ms_to_ts(row.get(10)?),
     })
 }
 
@@ -848,6 +854,7 @@ pub fn create_session_with_thinking(
     Ok(SessionSummary {
         id,
         title,
+        message_count: 0,
         project_path,
         model_id,
         provider_id,
@@ -1004,6 +1011,7 @@ pub fn fork_session_through(
     let summary = SessionSummary {
         id,
         title,
+        message_count: records.len() as i64,
         project_path: source.summary.project_path,
         model_id: source.summary.model_id,
         provider_id: source.summary.provider_id,
@@ -2112,6 +2120,7 @@ mod tests {
         let summary = SessionSummary {
             id: "import-claude-code-abc".into(),
             title: "Imported".into(),
+            message_count: 1,
             project_path: Some("/tmp/proj".into()),
             model_id: None,
             provider_id: None,
@@ -2161,6 +2170,7 @@ mod tests {
         let base = SessionSummary {
             id: "import-codex-one".into(),
             title: "Imported".into(),
+            message_count: 0,
             project_path: Some("/tmp/project/".into()),
             model_id: None,
             provider_id: None,
@@ -2236,6 +2246,7 @@ mod tests {
     fn append_and_roundtrip_tool_message() {
         let db = test_db();
         let session = create_session(&db, None, None, None, None, Some("/tmp/x".into())).unwrap();
+        assert_eq!(session.message_count, 0);
         append_message(
             &db,
             &session.id,
@@ -2278,6 +2289,7 @@ mod tests {
 
         let detail = get_session(&db, &session.id).unwrap().unwrap();
         assert_eq!(detail.messages.len(), 2);
+        assert_eq!(detail.summary.message_count, 2);
         let m2 = &detail.messages[1];
         assert_eq!(m2.role, "tool");
         assert_eq!(m2.tool_name.as_deref(), Some("Write"));
@@ -2317,6 +2329,7 @@ mod tests {
             update_tool_review_state(&db, &session.id, "m2", "snapshot-1", "rolledBack",).unwrap()
         );
         let updated = get_session(&db, &session.id).unwrap().unwrap();
+        assert_eq!(updated.summary.message_count, 2);
         assert_eq!(
             updated.messages[1].tool_result,
             Some(json!({
@@ -2482,6 +2495,7 @@ mod tests {
         let summary = SessionSummary {
             id: "thinking-import".into(),
             title: "Thinking".into(),
+            message_count: 0,
             project_path: None,
             model_id: None,
             provider_id: None,

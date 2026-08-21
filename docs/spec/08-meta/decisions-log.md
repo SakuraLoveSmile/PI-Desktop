@@ -1593,6 +1593,24 @@ D193, and D194.
   v9, host RPC, and storage schema v11 are unchanged; the change is confined
   to the renderer store, Composer, and Sidebar.
 
+## 2026-08-21 — New Task creates an immediate durable empty slot
+
+- New Task now resolves the current project or Temporary group by its most
+  recent non-archived session. An empty latest session is selected and reused;
+  a non-empty latest session causes one real empty session to be created,
+  refreshed into the sidebar, and selected before the first prompt.
+- The renderer serializes same-group New Task requests so rapid repeated clicks
+  cannot race multiple empty-session inserts. The rule is shared by project
+  groups and path-less Temporary sessions; an older empty row is intentionally
+  untouched when a newer non-empty session is the latest.
+- `SessionSummary.messageCount` is derived by host-core from `sessions.last_seq`
+  and replaces title heuristics as the empty predicate. Empty rows are visible;
+  title localization and manual renaming remain presentation concerns.
+- Decision D252 supersedes D220 and ADR 0084. The startup home remains an
+  unpersisted renderer draft, but explicit New Task is eager and durable.
+  `messageCount` is additive inside protocol v9; storage schema v11 is
+  unchanged. See ADR 0113 and E2E-011b / E2E-011d / E2E-011e.
+
 ## 2026-08-14 — The work panel shortcut toggles instead of only opening
 
 - `Cmd/Ctrl + J` (`openWorkPanel`) now collapses the visible work panel as well

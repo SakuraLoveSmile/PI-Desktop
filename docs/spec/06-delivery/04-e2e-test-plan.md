@@ -348,14 +348,15 @@ Each scenario is documented in this format:
   project conversation to load. 3) Type a prompt and inspect the Send control.
   4) Send without clicking New session again.
 - **Expected**: Project activation commits as one renderer navigation flow and
-  the destination opens as an unpersisted draft (D220). The composer becomes
-  editable with the Send control enabled as soon as a valid draft and model
-  are present; an earlier project's background turn cannot leave it disabled.
-  The sidebar history shows no new row until the first prompt is sent, after
-  which the session appears titled with the prompt, and the prompt is accepted
-  on the first send attempt.
-- **Specs linked**: `04-ux/09-interaction-patterns.md` (§1.6),
-  `04-ux/08-component-spec.md` (§11.4)
+  the destination first refreshes the group's latest session using the host
+  `messageCount`. If that session is empty, the existing row is selected; if it
+  is non-empty, one durable empty session is created and appears in the
+  sidebar before the first prompt. The composer becomes editable with the Send
+  control enabled as soon as the destination is selected; an earlier project's
+  background turn cannot leave it disabled. Repeating the click while the slot
+  is empty selects the same row and creates no duplicate.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `04-ux/09-interaction-patterns.md` (§1.6), `04-ux/08-component-spec.md` (§11.4)
 - **Acceptance**: C (project session creation and send readiness)
 - **Milestone**: M2
 - **Status**: Source-level regression covered (`app-store-sidebar.test.mjs`);
@@ -382,27 +383,46 @@ Each scenario is documented in this format:
 - **Status**: Source-level regression covered
   (`composer-draft-cache.test.mjs`); full UI scenario Draft
 
-#### E2E-011d: New task without input adds no history row
+#### E2E-011d: New task creates an immediate durable empty slot
 
 - **Preconditions**: Provider configured; at least one real session exists so
   the sidebar history is non-empty.
 - **Steps**: 1) Invoke New Task from the sidebar, the top bar, or Cmd/Ctrl+N
   inside a retained project and in the temporary scope. 2) Inspect the sidebar
-  history and the composer. 3) Type a message and send it. 4) Inspect the
-  sidebar history again. 5) Invoke New Task again, type nothing, and switch to
-  another session before sending.
-- **Expected**: Before any message, the sidebar history shows no new row and
-  no row is highlighted; the home empty state with an editable composer is
-  visible. After the first send, exactly one history row appears titled with
-  the message. A New Task draft abandoned without sending leaves no history
-  row behind.
-- **Specs linked**: `04-ux/08-component-spec.md` (§11),
-  `04-ux/01-ui-ia.md` (§5)
-- **Acceptance**: C (history integrity)
+  history and the composer. 3) Click the same group's New Task control several
+  times quickly. 4) Type a message and send it. 5) Inspect the sidebar history
+  again and repeat in a different project group.
+- **Expected**: When the group's latest session is non-empty, one new row is
+  persisted and visible immediately with the empty-session title, and it is
+  selected before the first send. Once that row is the group's latest empty
+  session, repeated clicks select it (or do nothing when already selected) and
+  create no duplicate. Sending updates the same row's title and message count;
+  the project and temporary groups keep independent slots.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`,
+  `04-ux/08-component-spec.md` (§11), `04-ux/01-ui-ia.md` (§5)
+- **Acceptance**: C (history integrity and group-scoped creation)
 - **Milestone**: M2
 - **Status**: Source-level regression covered
   (`app-store-sidebar.test.mjs`, `composer-send-state.test.mjs`); full UI
   scenario Draft
+
+#### E2E-011e: Empty-session reuse is scoped to the latest session
+
+- **Preconditions**: One project group contains an older empty session and a
+  newer session with messages; a separate project and the Temporary group are
+  available.
+- **Steps**: 1) Click New Task in the first project group. 2) Confirm the new
+  row is created even though the older empty session remains. 3) Click New Task
+  again before sending. 4) Repeat in the second project and Temporary group.
+- **Expected**: The first click creates a new durable row because only the
+  latest session is considered and it is non-empty. The second click reuses
+  that newly created empty row. The older empty row remains untouched, while
+  each other group gets its own independent empty-slot decision.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md`, `04-ux/01-ui-ia.md`,
+  `04-ux/08-component-spec.md`
+- **Acceptance**: C (session creation and grouping), F (persistence)
+- **Milestone**: M2
+- **Status**: Source-level regression covered; full UI scenario Draft
 
 ### Conversation Top Bar
 
@@ -465,12 +485,11 @@ Each scenario is documented in this format:
   mode and select Auto. 5) Inspect the destination session
   after navigation completes.
 - **Expected**: None of the idle configuration triggers is disabled merely
-  because the destination session has not been projected yet. The first
-  configuration action retains the selected value on the unpersisted draft,
-  and the created session reflects it after the first message is sent; no
-  second click is required and no history row is created by the configuration
-  action alone. Running turns and pending approvals still disable the
-  controls.
+  because the destination session has not been projected yet. New Task has
+  already selected or created the durable empty row, and the first
+  configuration action applies to that session without waiting for a message;
+  no second click is required. Running turns and pending approvals still
+  disable the controls.
 - **Specs linked**: `04-ux/08-component-spec.md` (§11),
   `04-ux/09-interaction-patterns.md` (§5A)
 - **Acceptance**: C (new project/session composer)
@@ -2628,8 +2647,8 @@ Each scenario is documented in this format:
   5. Choose the single create item and cancel or complete the project picker.
   6. Right-click empty chrome in the project list (outside any project group).
 - **Expected**:
-  - Sessions context menus open a path-less unpersisted draft and focus the
-    composer; the draft creates its session on the first message.
+  - Sessions context menus apply the temporary-group empty-session reuse rule
+    and focus the composer; a new durable row is visible before any message.
   - Projects context menus open the same folder picker as the heading
     folder-plus control.
   - Existing row context menus and heading glyph buttons remain available; the
@@ -4468,7 +4487,7 @@ Each scenario is documented in this format:
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150 |
 | B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151 |
-| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-147, E2E-151 |
+| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-147, E2E-151 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078, E2E-153 |
 | E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-148, E2E-151 |
@@ -4480,7 +4499,7 @@ Each scenario is documented in this format:
 | Milestone | Scenarios |
 |---|---|
 | M1 | E2E-001, E2E-002, E2E-003, E2E-028, E2E-029 |
-| M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-144 |
+| M2 | E2E-004, E2E-005, E2E-006, E2E-007, E2E-008, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-020, E2E-021, E2E-027, E2E-031, E2E-036, E2E-037, E2E-042, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-144 |
 | M3 | E2E-012, E2E-013, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-040 |
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
 | M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-147 |

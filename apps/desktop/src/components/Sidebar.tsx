@@ -444,9 +444,10 @@ export function Sidebar({
       : sessions.filter(
           (session) => !sessionArchived(session, sessionMeta[session.id]),
         );
-    // New-task drafts stay out of history until they carry input: sessions
-    // with only a default title (including legacy empty drafts) never render.
-    return candidates.filter((session) => !isDefaultSessionTitle(session.title));
+    // Empty sessions are durable sidebar rows now. Their message count, not
+    // their title, controls New Task reuse, so a manual rename never changes
+    // the empty-slot behavior.
+    return candidates;
   }, [sessions, showArchived, sessionMeta]);
 
   const compareSessions = useCallback((a: SessionSummary, b: SessionSummary) => {
@@ -724,8 +725,8 @@ export function Sidebar({
         return;
       }
       if (wasActive) {
-        // Archive first so an empty active draft is not reused as its own
-        // replacement. Restore it if creating the fallback draft fails.
+        // Archive first so an empty active slot is not reused as its own
+        // replacement. Restore it if creating the fallback slot fails.
         archiveSessionAction(session.id);
         try {
           await newSession({ projectPath: session.projectPath ?? null });

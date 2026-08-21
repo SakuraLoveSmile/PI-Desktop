@@ -334,15 +334,15 @@ visually distinct from list content.
   retain the selected project
 - Right-click the `Projects` heading or empty project-list chrome: open a
   single-item create menu that runs the same new-project picker action
-- Click project `+`: activate that project and open an unpersisted draft bound
-  to its exact path
-- Click the `Sessions` heading message-plus action: clear the workspace and
-  open a path-less unpersisted draft
+- Click project `+`: activate that project, then select its most recent empty
+  session or create a durable empty session bound to its exact path
+- Click the `Sessions` heading message-plus action: clear the workspace, then
+  select the most recent empty temporary session or create a durable empty one
 - Sessions and Projects heading actions reveal together when their toolbar is
   hovered or keyboard-focused; the controls remain keyboard-reachable while
   visually hidden at rest
 - Right-click the `Sessions` heading or empty standalone-list chrome: open a
-  single-item create menu that opens a path-less unpersisted draft
+  single-item create menu that applies the same temporary-group reuse rule
 - Project overflow: switch, open folder, pin/unpin, archive/restore, close
   retained tab. Open folder reveals the project directory in the system file
   manager for the selected project row.
@@ -1716,7 +1716,7 @@ reasoning-level control.
 |---|---|---|
 | Idle (no model) | textarea active, send button disabled + tooltip "Configure a model first" | Agent link remains available in model menu |
 | Idle (ready) | textarea active, send button enabled | Send active |
-| Home/new-session initialization | textarea and mode/model × reasoning/permission triggers remain available while no active session is projected; the first configuration selection is retained on the unpersisted draft and applied when the first message creates the session | Configure the draft, then send |
+| Home/new-session initialization | textarea and mode/model × reasoning/permission triggers remain available while the durable empty session is loading; the session row is already present and the first configuration selection applies to that session | Configure the session, then send |
 | New session (reasoning model) | Combined model × reasoning chip shows the model and its highest published level | User may select any published level, including Off when supported |
 | New session / switch while another session is running | textarea active, send button enabled for the destination session's own run state | Send active, Abort hidden unless the destination session itself is running |
 | Running | textarea and mode/model × reasoning/permission controls remain editable for the next turn; abort button visible | Abort active, Send hidden; configuration is queued |
@@ -1779,11 +1779,10 @@ reasoning-level control.
   action card.
 - During project or session navigation, the home composer may briefly have no
   `activeSessionId`. Its idle mode, model × reasoning, and permission triggers remain
-  enabled; the first configuration action retains the selection on the
-  unpersisted draft, and the mode, thinking level, or permission mode is
-  applied when the first message creates the session. A new task therefore
-  never appears in the sidebar history before it carries input (D220). A
-  running turn or pending approval still gates those controls.
+  enabled while the durable empty session is loading; once selected, the
+  configuration applies directly to that session. A new task appears in the
+  sidebar before it carries input, and a running turn or pending approval still
+  gates those controls.
 - A new session whose inherited default model supports reasoning starts with
   Thinking enabled at that model's highest published level. Non-reasoning
   models and missing capability metadata start at `off`; reopening or reusing
@@ -1915,9 +1914,9 @@ Anatomy:
   selected pi-ai model accepts images and the 20 MiB inline bound is met;
   otherwise it appends a safe `@path` fallback. Removing a chip does not delete
   scratch bytes. Pasting files counts as input, so the home composer
-  materializes the unpersisted draft into a durable session before saving
-  (D220). The scratch lifecycle removes pasted files with the session and
-  never dirties the workspace git tree.
+  materializes the startup-only home draft into a durable session before saving
+  when no active session is available. The scratch lifecycle removes pasted
+  files with the session and never dirties the workspace git tree.
 - Reference chips wrap within the prompt area, expose the canonical path in
   their tooltip and accessible name, and provide a focus-visible localized
   remove button that restores textarea focus. Duplicate leaf labels remain

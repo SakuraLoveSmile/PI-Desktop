@@ -529,6 +529,7 @@ process loss clear the hint before any later terminal event is evaluated.
 type SessionSummary = {
  id: string;
  title: string;
+ messageCount: number;
  projectPath?: string;
  modelId?: string;
  providerId?: string;
@@ -572,6 +573,11 @@ type SessionDetail = SessionSummary & {
  messages: UiMessage[];
 };
 ```
+
+`messageCount` is the host-authoritative count of messages in the current
+canonical transcript. The renderer uses it to distinguish an empty durable
+session from a session whose title still looks untitled; title text is not a
+session-state signal.
 
 Electron main enriches session list/get/create/fork/configure results with
 effective reasoning capability from pi-ai's model record for that session's

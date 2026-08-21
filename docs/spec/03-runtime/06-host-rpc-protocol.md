@@ -211,7 +211,8 @@ reach this protocol — see [14-secrets-storage](14-secrets-storage.md) §10.
 - `settings.set`
 
 ### Sessions
-- `session.list`
+- `session.list` — returns summaries with host-authoritative `messageCount`
+  alongside the existing session metadata
 - `session.create` — accepts optional `thinkingLevel`; missing/null defaults
   to `off`
 - `session.fork` — accepts `sessionId`, an optional caller-provided display
