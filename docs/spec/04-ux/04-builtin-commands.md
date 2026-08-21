@@ -22,7 +22,7 @@ builtin command contracts.
 
 | id | title | keywords | category | risk | behavior |
 |---|---|---|---|---|---|
-| `builtin.session.new` | New Task | new, chat, task | Session | low | open an unpersisted draft and focus the composer |
+| `builtin.session.new` | New Task | new, chat, task | Session | low | reuse the latest empty session in the current group or create a durable empty session, then focus the composer |
 | `builtin.agent.compact` | Compact Conversation Context | compact, context, tokens | Session | low | create a model-context checkpoint for the idle active session |
 | `builtin.mode.agent` | Switch to Agent | mode, agent | Session | low | set the idle session mode to Agent |
 | `builtin.mode.plan` | Switch to Plan | mode, plan, planning | Session | low | set the idle session mode to Plan |
@@ -33,7 +33,10 @@ builtin command contracts.
 - The five IDs are the complete first-party registry. Removed IDs are not
   palette results and are not renderer dispatch cases; plugin commands remain
   independently discoverable.
-- `New Task` opens an unpersisted draft. The first message materializes it.
+- `New Task` uses the current project or temporary group. It selects the
+  group's most recent empty session when present; otherwise it creates the
+  durable empty session before focusing the composer. The action is idempotent
+  within a group.
 - `Compact Conversation Context` is available while the active session is idle;
   an active turn or checkpoint remains busy according to the existing compaction
   contract.

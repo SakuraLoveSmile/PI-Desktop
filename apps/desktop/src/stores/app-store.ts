@@ -203,6 +203,7 @@ let workPanelFileRequestSeq = 0;
 const navigationIntents = createNavigationIntentController();
 let pendingSessionSelection: { id: string; intent: number } | null = null;
 let sessionWorkspaceQueue: Promise<void> = Promise.resolve();
+const pendingNewSessionRequests = new Map<string, Promise<void>>();
 const sessionTranscriptCache = new Map<string, UiMessage[]>();
 const planResolutionRequests = new Map<string, Promise<PlanResolutionResult>>();
 const planSyncGenerations = new Map<string, number>();
@@ -241,6 +242,27 @@ function beginNavigationIntent() {
 
 function navigationIntentIsCurrent(intent: number) {
   return navigationIntents.isCurrent(intent);
+}
+
+function newSessionScopeKey(projectPath?: string | null): string {
+  return normalizeProjectPath(projectPath) ?? "<temporary>";
+}
+
+function latestSessionInScope(
+  sessions: SessionSummary[],
+  projectPath: string | null,
+  sessionMeta: Record<string, SessionMeta>,
+): SessionSummary | undefined {
+  return sessions
+    .filter((session) => sessionMatchesProject(session, projectPath))
+    .sort((a, b) => {
+      const aUpdated = Date.parse(a.updatedAt);
+      const bUpdated = Date.parse(b.updatedAt);
+      const aTime = Number.isFinite(aUpdated) ? aUpdated : 0;
+      const bTime = Number.isFinite(bUpdated) ? bUpdated : 0;
+      return bTime - aTime || b.id.localeCompare(a.id);
+    })
+    .find((session) => !sessionIsArchived(session.id, sessionMeta));
 }
 
 function cacheSessionTranscript(id: string, messages: UiMessage[]) {
@@ -973,7 +995,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (livePlanSessionId) {
         await get().selectSession(livePlanSessionId);
       } else {
-        await get().newSession();
+        // App startup keeps the home composer unpersisted. Explicit New Task
+        // actions use the durable empty-session slot below, but launch itself
+        // must not create a history row merely because the app was opened.
+        set((s) => {
+          const stack = s.navStack.slice(0, s.navIndex + 1);
+          const nextStack = [...stack, { page: "chat" as const }].slice(-50);
+          return {
+            ...switchWorkPanelSession(s, undefined),
+            activeSessionId: undefined,
+            draftConfiguration: null,
+            messages: [],
+            page: "chat" as const,
+            navStack: nextStack,
+            navIndex: nextStack.length - 1,
+            isRunning: false,
+          };
+        });
       }
     } catch (e) {
       set({
@@ -1193,50 +1231,70 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   newSession: async (options) => {
-    const intent = beginNavigationIntent();
     const requestedProjectPath =
       options && "projectPath" in options
         ? options.projectPath ?? null
         : get().workspace?.path ?? null;
-    if (
-      requestedProjectPath &&
-      !sessionMatchesProject(
-        { projectPath: get().activeProjectPath },
+    const scopeKey = newSessionScopeKey(requestedProjectPath);
+    const pending = pendingNewSessionRequests.get(scopeKey);
+    if (pending) {
+      await pending;
+      return;
+    }
+
+    const intent = beginNavigationIntent();
+    const request = (async () => {
+      if (
+        requestedProjectPath &&
+        !sessionMatchesProject(
+          { projectPath: get().activeProjectPath },
+          requestedProjectPath,
+        )
+      ) {
+        const workspace = await get().activateProject(requestedProjectPath, {
+          navigationIntent: intent,
+        });
+        if (!navigationIntentIsCurrent(intent)) return;
+        if (!workspace) throw new Error("Unable to activate project workspace");
+      }
+      if (requestedProjectPath === null && get().workspace) {
+        await get().clearProject({ navigationIntent: intent });
+        if (!navigationIntentIsCurrent(intent)) return;
+      }
+
+      // Refresh before deciding: a session may have received its first user
+      // message while its turn is still streaming, before the next normal
+      // sidebar refresh at agent_end.
+      await get().refreshSessions();
+      if (!navigationIntentIsCurrent(intent)) return;
+      const latest = latestSessionInScope(
+        get().sessions,
         requestedProjectPath,
-      )
-    ) {
-      const workspace = await get().activateProject(requestedProjectPath, {
-        navigationIntent: intent,
-      });
-      if (!navigationIntentIsCurrent(intent)) return;
-      if (!workspace) throw new Error("Unable to activate project workspace");
-    }
-    if (requestedProjectPath === null && get().workspace) {
-      await get().clearProject({ navigationIntent: intent });
-      if (!navigationIntentIsCurrent(intent)) return;
-    }
-    // New task starts as an unpersisted draft: no session is created and no
-    // sidebar history row appears until the first message materializes it.
-    // The draft stays within its requested project scope, if any.
-    set((s) => {
-      const stack = s.navStack.slice(0, s.navIndex + 1);
-      const nextStack = [...stack, { page: "chat" as const }].slice(-50);
-      return {
-        ...switchWorkPanelSession(s, undefined),
-        activeSessionId: undefined,
+        get().sessionMeta,
+      );
+      if (latest && latest.messageCount === 0) {
+        if (get().activeSessionId === latest.id && get().page === "chat") return;
+        await get().selectSession(latest.id, { navigationIntent: intent });
+        return;
+      }
+
+      // A New Task click is itself the materialization trigger now. The
+      // returned session is real immediately, so refreshSessions exposes its
+      // zero-message row before the transcript is selected.
+      await persistSessionAndSelect({
+        intent,
+        projectPath: requestedProjectPath,
         draftConfiguration: null,
-        messages: [],
-        page: "chat" as const,
-        navStack: nextStack,
-        navIndex: nextStack.length - 1,
-        // The composer follows the visible session's own run state: a turn
-        // still streaming in the previously selected session must not leave
-        // the fresh draft's send button stuck in the stop/abort state
-        // (the old session's agent_end is a cross-session event and never
-        // clears the active flag).
-        isRunning: false,
-      };
-    });
+      });
+    })();
+    pendingNewSessionRequests.set(scopeKey, request);
+    try {
+      await request;
+    } finally {
+      if (pendingNewSessionRequests.get(scopeKey) === request) {
+        pendingNewSessionRequests.delete(scopeKey);
+      }
+    }
   },
 
   forkSession: async (id) => {
@@ -3421,17 +3479,22 @@ function flushPendingSessionConfiguration(sessionId: string): Promise<void> {
   return flush;
 }
 
+type PersistSessionOptions = {
+  intent?: number;
+  projectPath?: string | null;
+  draftConfiguration?: DraftSessionConfiguration | null;
+};
+
 /**
- * Persist the unpersisted new-task draft: creates the session (and therefore
- * its sidebar history row) only when the user submits real input. Toolbar
- * choices retained on `draftConfiguration` are applied here and cleared once
- * the draft becomes a session. Returns the new session id, or null when the
- * owning navigation intent became stale before the session could be shown.
+ * Create a durable empty session and select it. The same path is used by an
+ * explicit New Task click and by the legacy home draft when its first message
+ * or pasted file needs a session. Returns null when navigation was superseded
+ * after the host mutation, leaving the refreshed session list authoritative.
  */
-export async function materializeDraftSession(
-  intent?: number,
+async function persistSessionAndSelect(
+  options: PersistSessionOptions = {},
 ): Promise<string | null> {
-  const active = intent ?? beginNavigationIntent();
+  const active = options.intent ?? beginNavigationIntent();
   const state = useAppStore.getState();
   const settings = state.settings;
   const defaultProvider = state.providers.find(
@@ -3446,7 +3509,14 @@ export async function materializeDraftSession(
   // sessions without an explicit pick resolve them at prompt time, so later
   // default-model changes apply everywhere. The Composer pins both onto the
   // session when the user chooses a model.
-  const draftConfig = state.draftConfiguration;
+  const projectPath =
+    options && "projectPath" in options
+      ? options.projectPath
+      : state.workspace?.path ?? null;
+  const draftConfig =
+    options && "draftConfiguration" in options
+      ? options.draftConfiguration
+      : state.draftConfiguration;
   const created = await api.createSession({
     title: untitledTaskTitle(),
     mode: draftConfig?.mode ?? normalizeMode(settings?.defaultMode),
@@ -3454,9 +3524,8 @@ export async function materializeDraftSession(
     permissionMode: draftConfig?.permissionMode,
     providerId: draftConfig?.providerId,
     modelId: draftConfig?.modelId,
-    projectPath: state.workspace?.path ?? undefined,
+    projectPath: projectPath ?? undefined,
   });
-  if (!navigationIntentIsCurrent(active)) return null;
   await useAppStore.getState().refreshSessions();
   if (!navigationIntentIsCurrent(active)) return null;
   const detail = await api.getSession(created.session.id);
@@ -3488,4 +3557,15 @@ export async function materializeDraftSession(
   });
   void useAppStore.getState().restorePendingPlan(sessionId);
   return sessionId;
+}
+
+/**
+ * Materialize the home draft when it receives its first real input. Explicit
+ * New Task actions call `persistSessionAndSelect` directly so they can reuse
+ * the most recent empty session in their requested project scope.
+ */
+export async function materializeDraftSession(
+  intent?: number,
+): Promise<string | null> {
+  return persistSessionAndSelect({ intent });
 }

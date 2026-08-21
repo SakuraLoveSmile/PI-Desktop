@@ -303,6 +303,8 @@ export type UiMessage = {
 export type SessionSummary = {
   id: string;
   title: string;
+  /** Number of messages in the current canonical transcript. */
+  messageCount: number;
   projectPath?: string;
   modelId?: string;
   providerId?: string;

@@ -328,7 +328,7 @@ CREATE TABLE sessions (
                 CHECK (permission_mode IN ('inherit', 'ask', 'accept-edits', 'auto')),
   source      TEXT,                            -- import origin: claude-code | codex | opencode | pi
   pinned      INTEGER NOT NULL DEFAULT 0,
-  last_seq    INTEGER NOT NULL DEFAULT 0,      -- message ordinal allocator
+  last_seq    INTEGER NOT NULL DEFAULT 0,      -- current message count / ordinal allocator
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );
@@ -345,6 +345,9 @@ CREATE INDEX idx_sessions_project ON sessions(project_id) WHERE project_id IS NO
 
 - `project_id` normalizes v1's free-text `project_path` (grouping, badges,
   hover-`+` new-session-in-project all become indexed lookups).
+- `last_seq` is exposed as `SessionSummary.messageCount`. Appends allocate the
+  next ordinal and full transcript rewrites reseat it to the current message
+  count, so zero is the durable empty-session predicate.
 - Import binds every non-empty normalized `projectPath` to `project_id`;
   path-less imports remain `NULL`. Re-importing a deterministic session id
   creates neither another session nor another project row.

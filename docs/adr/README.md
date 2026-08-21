@@ -128,4 +128,5 @@ Each ADR includes:
 | 0109 | Open Files entries with the OS-associated application | Accepted |
 | 0110 | Version the plugin panel chrome spacing contract | Accepted |
 | 0111 | Reveal Files in the OS file manager | Accepted |
-| 0113 | Persist provider model bindings and thinking configuration | Accepted |
+| 0113 | Persist the New Task empty slot immediately and deduplicate it by message count | Accepted |
+| 0114 | Persist provider model bindings and thinking configuration | Accepted |

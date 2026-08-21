@@ -265,9 +265,11 @@ shared capability contract:
 - Selecting a project-scoped thread activates its project before switching to
   `chat`. Selecting a temporary thread clears the visible active workspace
   before loading it.
-- New task opens an unpersisted draft: no session and no sidebar history row
-  exist until the first message creates the session in the current project or
-  temporary scope (D220; amends D088/D093's empty-draft stacking rule).
+- New task resolves the current project or temporary group by its most recent
+  session: if that session has `messageCount = 0`, it is selected and reused;
+  otherwise a durable empty session is created immediately and appears in the
+  sidebar. Repeated clicks therefore keep one empty slot per visible group;
+  an empty slot remains persisted until the user deletes or archives it.
 
 ## 6. Keyboard map (IA level)
 

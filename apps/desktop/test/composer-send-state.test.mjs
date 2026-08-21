@@ -38,26 +38,21 @@ test("running session configuration is queued for the next turn", () => {
   assert.match(store, /event\.type === "agent_end"[\s\S]*flushPendingSessionConfiguration\(envelope\.sessionId\)/);
 });
 
-test("new task stays unpersisted and its first message resets the run flag", () => {
+test("new task persists or reuses an empty session and keeps the run flag scoped", () => {
   const newSession = store.match(
     /newSession: async [\s\S]*?\n  forkSession: async/,
   )?.[0] ?? "";
   assert.ok(newSession.length > 0, "newSession implementation not found");
-  // New task opens an unpersisted draft: no session is created, so no
-  // sidebar history row appears until the user actually sends a message.
-  assert.match(
-    newSession,
-    /activeSessionId: undefined/,
-  );
-  assert.doesNotMatch(newSession, /api\.createSession/);
-  assert.doesNotMatch(newSession, /created\.session\.id/);
-  // The draft materializes on the first message; the committed session uses
-  // its own run state (false when not running), so a turn still streaming in
-  // the previous session cannot leave the new session stuck on the stop
+  assert.match(newSession, /latestSessionInScope/);
+  assert.match(newSession, /latest\.messageCount === 0/);
+  assert.match(newSession, /persistSessionAndSelect/);
+  assert.match(newSession, /pendingNewSessionRequests/);
+  // A newly selected empty session uses its own run state, so a turn still
+  // streaming in the previous session cannot leave it stuck on the stop
   // button.
   assert.match(
     store,
-    /export async function materializeDraftSession[\s\S]*?\n  return sessionId;\n}\n/,
+    /async function persistSessionAndSelect[\s\S]*?\n  return sessionId;\n}\n/,
   );
   assert.match(
     store,

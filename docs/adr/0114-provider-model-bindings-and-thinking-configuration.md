@@ -1,4 +1,4 @@
-# ADR 0113: Persist Provider Model Bindings and Thinking Configuration
+# ADR 0114: Persist Provider Model Bindings and Thinking Configuration
 
 - Status: Accepted
 - Date: 2026-08-21

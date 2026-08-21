@@ -684,11 +684,11 @@ control.
 
 During project or session initialization, the home composer can render before
 an `activeSessionId` is projected. Idle mode, Thinking, and permission
-controls remain usable in that interval; their first configuration action is
-retained on the unpersisted draft and applied when the first message creates
-the session (D220). A new task therefore adds no sidebar history row until it
-carries input. Running turns and pending approvals continue to gate the
-controls.
+controls remain usable in that interval; the durable empty session row is
+created or selected by the New Task action and the first configuration action
+applies to that session once it is projected. The startup-only home composer
+may still materialize a session when pasted input arrives before selection.
+Running turns and pending approvals continue to gate the controls.
 
 ## 6. Toast vs inline error
 
