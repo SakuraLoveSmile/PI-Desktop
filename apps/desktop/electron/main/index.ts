@@ -5653,13 +5653,26 @@ function registerIpc() {
             source?: "bundled" | "discovered" | "user";
           }>;
         }>("providers.listModels", { providerId: provider.id });
-        if (cached.models.length > 0) {
+        // Keep every configured binding visible when the endpoint cache is
+        // partial or empty. Decorating these ids through pi-ai preserves the
+        // per-model vision/reasoning state for offline editing too.
+        const cachedById = new Map(cached.models.map((model) => [model.modelId, model]));
+        for (const binding of provider.models ?? []) {
+          if (!cachedById.has(binding.id)) {
+            cachedById.set(binding.id, {
+              modelId: binding.id,
+              displayName: binding.id,
+              source: "user" as const,
+            });
+          }
+        }
+        if (cachedById.size > 0) {
           return {
-            models: cached.models.map((model) => decorate(model)),
+            models: [...cachedById.values()].map((model) => decorate(model)),
             source: "cache" as const,
           };
         }
-        const fallbackModelId = provider.models?.[0]?.id ?? provider.defaultModelId;
+        const fallbackModelId = provider.defaultModelId;
         const fallback = fallbackModelId
           ? [decorate({
               modelId: fallbackModelId,

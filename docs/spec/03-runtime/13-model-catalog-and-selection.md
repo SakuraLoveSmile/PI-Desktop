@@ -97,6 +97,9 @@ If refresh fails / offline:
 - never clear an already-rendered cached list or flash an empty picker
 - allow custom model id
 - still allow providers with known model ids
+- when a saved provider cache is empty or partial, append every configured
+  model binding before applying pi-ai metadata decoration so multi-model
+  settings remain editable and per-model capability state stays aligned
 
 ## 8. Catalog item schema
 

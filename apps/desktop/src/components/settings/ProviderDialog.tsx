@@ -190,7 +190,7 @@ export function ProviderDialog({
               autoFocus
             />
           </Field>
-          <Field label={t("settings.apiStyle")} hint={t("settings.apiStyleDesc")}>
+          <Field label={t("settings.apiStyle")}>
             <Select
               value={form.apiStyle}
               onChange={(event) => setField("apiStyle", event.target.value as ApiStyle)}
@@ -210,14 +210,7 @@ export function ProviderDialog({
               placeholder="https://api.example.com/v1"
             />
           </Field>
-          <Field
-            label={t("settings.apiKey")}
-            hint={
-              editingProvider && editingProvider.hasSecret
-                ? t("settings.apiKeyKeepHint")
-                : t("settings.apiKeyHint")
-            }
-          >
+          <Field label={t("settings.apiKey")}>
             <Input
               type="password"
               value={form.apiKey}
@@ -240,6 +233,7 @@ export function ProviderDialog({
               fetchingLabel={t("settings.modelsFetching")}
               customLabel={t("settings.customModel")}
               reasoningLabel={t("settings.reasoning")}
+              visionLabel={t("settings.vision")}
               onToggle={toggleModel}
             />
           </Field>
@@ -274,7 +268,6 @@ export function ProviderDialog({
             <div className="provider-model-config-heading">
               <div>
                 <h4 id="provider-model-config-title">{t("settings.modelConfigurations")}</h4>
-                <p>{t("settings.modelConfigurationsDesc")}</p>
               </div>
               <span className="provider-model-config-count">{form.models.length}</span>
             </div>
@@ -286,17 +279,19 @@ export function ProviderDialog({
                   <ModelConfigCard
                     key={binding.id}
                     binding={binding}
+                    metadata={metadata}
                     source={source}
                     sourceLabel={t("settings.builtInCatalog")}
                     customSourceLabel={t("settings.customModel")}
+                    visionLabel={t("settings.vision")}
+                    textOnlyLabel={t("settings.textOnly")}
+                    reasoningLabel={t("settings.reasoning")}
                     contextWindowLabel={t("settings.contextWindow")}
                     maxOutputLabel={t("settings.maxOutput")}
                     supportedThinkingLabel={t("settings.supportedThinkingLevels")}
                     defaultThinkingLabel={t("settings.defaultThinkingLevel")}
                     disabledThinkingLabel={t("settings.notSupported")}
                     disabledThinkingHint={t("settings.thinkingDisabledHint")}
-                    defaultsHint={t("settings.cardDefaultsHint")}
-                    customDefaultsHint={t("settings.cardCustomDefaultsHint")}
                     levelLabels={levelLabels}
                     removeLabel={t("settings.removeModel")}
                     onChange={(update) => updateModel(binding.id, update)}

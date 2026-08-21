@@ -264,13 +264,13 @@
 }
 
 .provider-dialog {
-  width: min(100%, 720px);
-  max-height: min(86vh, 760px);
+  width: min(100%, 760px);
+  max-height: min(90vh, 780px);
   overflow: auto;
-  padding: 20px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .provider-dialog-head {
@@ -345,8 +345,9 @@
 .provider-model-config-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-top: 2px;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ds-border-subtle);
 }
 
 .provider-model-config-heading {
@@ -362,13 +363,6 @@
   font-size: var(--text-md-plus);
   font-weight: var(--font-weight-strong);
   line-height: var(--leading-compact);
-}
-
-.provider-model-config-heading p {
-  margin: 3px 0 0;
-  color: var(--ds-text-muted);
-  font-size: var(--text-xs-plus);
-  line-height: var(--leading-body);
 }
 
 .provider-model-config-count,
@@ -395,22 +389,20 @@
 .provider-model-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+  gap: 10px;
+  padding: 11px 12px;
   border: 1px solid var(--ds-border-default);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md-plus);
   background: color-mix(in oklab, var(--ds-text-primary) 2%, transparent);
   animation: provider-model-card-in var(--motion-duration-normal) var(--motion-ease-out) both;
   transition:
     border-color var(--motion-duration-fast) var(--motion-ease-out),
-    box-shadow var(--motion-duration-fast) var(--motion-ease-out),
-    transform var(--motion-duration-fast) var(--motion-ease-out);
+    background var(--motion-duration-fast) var(--motion-ease-out);
 }
 
 .provider-model-card:hover {
-  border-color: var(--ds-border-strong);
-  box-shadow: 0 6px 18px color-mix(in oklab, #000 12%, transparent);
-  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--ds-accent) 35%, var(--ds-border-default));
+  background: color-mix(in oklab, var(--ds-accent) 3%, var(--ds-bg-primary));
 }
 
 .provider-model-card-head,
@@ -428,7 +420,7 @@
 .provider-model-card-title-wrap {
   min-width: 0;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .provider-model-card-id {
@@ -439,6 +431,19 @@
   font-weight: var(--font-weight-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.provider-model-capabilities {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.provider-model-capabilities .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .provider-model-card-remove {
@@ -460,8 +465,8 @@
 
 .provider-model-card-limits {
   display: grid;
-  grid-template-columns: repeat(2, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 8px;
 }
 
 .provider-model-card-field,
@@ -483,7 +488,7 @@
 .provider-model-card-thinking {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
 }
 
 .provider-model-card-thinking-label {
@@ -505,8 +510,8 @@
 }
 
 .provider-thinking-chip {
-  min-height: 28px;
-  padding: 5px 9px;
+  min-height: 26px;
+  padding: 4px 8px;
   border: 1px solid var(--ds-border-default);
   border-radius: var(--radius-full);
   background: transparent;
@@ -546,10 +551,6 @@
   line-height: var(--leading-body);
 }
 
-.provider-model-card-footnote {
-  padding-top: 1px;
-}
-
 @keyframes provider-model-card-in {
   from {
     opacity: 0;
@@ -566,13 +567,13 @@
 .provider-model-multi-trigger {
   display: flex;
   width: 100%;
-  min-height: 36px;
+  min-height: 34px;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--ds-border-default);
   border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--ds-text-primary) 3%, transparent);
+  background: var(--ds-bg-primary);
   color: var(--ds-text-primary);
   text-align: left;
   cursor: pointer;
@@ -670,7 +671,7 @@
 .provider-model-multi-option {
   display: flex;
   width: 100%;
-  min-height: 35px;
+  min-height: 34px;
   align-items: center;
   gap: 8px;
   padding: 7px 8px;
@@ -731,6 +732,18 @@
   font-size: var(--text-xs);
   text-align: right;
   white-space: nowrap;
+}
+
+.provider-model-capability-badge {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: var(--radius-3xs);
+  background: color-mix(in oklab, var(--ds-accent) 12%, transparent);
+  color: var(--ds-accent);
 }
 
 @media (max-width: 680px) {

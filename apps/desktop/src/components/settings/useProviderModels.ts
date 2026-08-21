@@ -13,19 +13,15 @@ const FETCH_DEBOUNCE_MS = 600;
 
 function canDiscover(
   baseUrl: string,
-  apiKey: string,
-  editingProvider: ProviderPublic | null,
 ): boolean {
   try {
     new URL(baseUrl.trim());
   } catch {
     return false;
   }
-  return (
-    apiKey.trim().length > 0 ||
-    (!!editingProvider &&
-      (editingProvider.hasSecret || editingProvider.authKind === "none"))
-  );
+  // Discovery is also useful for local/no-auth gateways. A provider can
+  // still return an auth error and leave the custom-model path available.
+  return true;
 }
 
 /**
@@ -50,7 +46,7 @@ export function useProviderModels(
       setState({ status: "idle" });
       return;
     }
-    if (!canDiscover(baseUrl, apiKey, editingProvider)) {
+    if (!canDiscover(baseUrl)) {
       requestSeq.current += 1;
       setState({ status: "idle" });
       return;

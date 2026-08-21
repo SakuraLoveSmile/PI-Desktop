@@ -142,16 +142,24 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - Add account and Add provider use the same primary button treatment
   - the add/edit dialog configures connection identity (name, endpoint, API
     style, and secret), then selects one or more models from a searchable
-    multi-select catalog. Each selected model has an independent configuration
-    card for context window, max output, supported thinking levels, and the
-    default thinking level. Built-in model metadata pre-fills the card; custom
-    models use the runtime fallback values and remain editable.
-  - model discovery is debounced after the endpoint, key, or API style changes;
-    the picker remains usable with free-form custom model IDs when discovery is
-    unavailable
+    multi-select catalog. Each selected model has an independent, compact
+    configuration card for context window, max output, supported thinking
+    levels, and the default thinking level. Built-in model metadata from pi-ai
+    pre-fills the card; custom models use the runtime fallback values and
+    remain editable.
+  - each model option and configuration card shows a compact text/vision
+    capability state. Vision is derived from the exact pi-ai model record and
+    is display-only; discovery or a user-entered ID cannot promote an unknown
+    model to image transport.
+  - model discovery is debounced after a valid endpoint, key, or API style
+    change, including no-auth/local endpoints; the picker remains usable with
+    free-form custom model IDs when discovery is unavailable
   - thinking chips follow canonical order. Removing the current default falls
     back to the first enabled level; no enabled levels disable the default
     selector and show the model's thinking-disabled hint
+  - helper copy stays out of the model cards; labels, status badges, and the
+    empty/error state carry the necessary context without explanatory
+    paragraphs
   - empty state with primary add action
   - API keys are never shown raw after save
   - vendor-account rows are not rendered in the AI services list; a connected

@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import type { ModelInfo } from "@pi-desktop/shared";
-import { IconCheck, IconChevronDown, IconSearch } from "../icons";
+import { IconCheck, IconChevronDown, IconImage, IconSearch } from "../icons";
 import { cx } from "../ui";
 
 type MenuPosition = { top: number; left: number; width: number };
@@ -34,6 +34,7 @@ export function ModelMultiSelect({
   fetchingLabel,
   customLabel,
   reasoningLabel,
+  visionLabel,
   onToggle,
 }: {
   models: ModelInfo[];
@@ -47,6 +48,7 @@ export function ModelMultiSelect({
   fetchingLabel: string;
   customLabel: string;
   reasoningLabel: string;
+  visionLabel: string;
   onToggle: (model: ModelInfo) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -173,6 +175,7 @@ export function ModelMultiSelect({
             const isSelected = selected.has(model.modelId);
             const isCustom = custom.has(model.modelId) || model.source === "user";
             const context = compactContextWindow(model.contextWindow);
+            const supportsVision = model.capabilities.includes("vision");
             return (
               <button
                 key={model.modelId}
@@ -194,6 +197,12 @@ export function ModelMultiSelect({
                   {context ? `${context} · ` : ""}
                   {model.reasoning ? reasoningLabel : ""}
                 </span>
+                {supportsVision ? (
+                  <span className="provider-model-capability-badge" title={visionLabel}>
+                    <IconImage size={12} aria-hidden="true" />
+                    <span className="sr-only">{visionLabel}</span>
+                  </span>
+                ) : null}
               </button>
             );
           })

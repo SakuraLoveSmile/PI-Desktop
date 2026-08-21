@@ -26,6 +26,8 @@ test("saved provider discovery persists models in the host catalog", () => {
   );
   assert.match(mainSource, /usesSavedEndpoint/);
   assert.match(mainSource, /endpointStillCurrent/);
+  assert.match(mainSource, /for \(const binding of provider\.models \?\? \[\]\)/);
+  assert.match(mainSource, /per-model vision\/reasoning state/);
 });
 
 test("renderer hydrates cached models before refreshing the provider", () => {

@@ -1,7 +1,7 @@
-import type { ModelBinding, ThinkingLevel } from "@pi-desktop/shared";
+import type { ModelBinding, ModelInfo, ThinkingLevel } from "@pi-desktop/shared";
 import { THINKING_LEVELS } from "@pi-desktop/shared";
 import { Badge, Input, Select } from "../ui";
-import { IconClose } from "../icons";
+import { IconClose, IconImage, IconSparkles } from "../icons";
 
 function formatTokens(value: number): string {
   return value > 0 ? value.toLocaleString("en-US") : "";
@@ -18,40 +18,45 @@ function orderedLevels(levels: ThinkingLevel[]): ThinkingLevel[] {
 
 export function ModelConfigCard({
   binding,
+  metadata,
   source,
   sourceLabel,
   customSourceLabel,
+  visionLabel,
+  textOnlyLabel,
+  reasoningLabel,
   contextWindowLabel,
   maxOutputLabel,
   supportedThinkingLabel,
   defaultThinkingLabel,
   disabledThinkingLabel,
   disabledThinkingHint,
-  defaultsHint,
-  customDefaultsHint,
   levelLabels,
   removeLabel,
   onChange,
   onRemove,
 }: {
   binding: ModelBinding;
+  metadata?: ModelInfo | null;
   source: "catalog" | "custom";
   sourceLabel: string;
   customSourceLabel: string;
+  visionLabel: string;
+  textOnlyLabel: string;
+  reasoningLabel: string;
   contextWindowLabel: string;
   maxOutputLabel: string;
   supportedThinkingLabel: string;
   defaultThinkingLabel: string;
   disabledThinkingLabel: string;
   disabledThinkingHint: string;
-  defaultsHint: string;
-  customDefaultsHint: string;
   levelLabels: Record<ThinkingLevel, string>;
   removeLabel: string;
   onChange: (update: Partial<ModelBinding>) => void;
   onRemove: () => void;
 }) {
   const levels = orderedLevels(binding.thinkingLevels);
+  const supportsVision = metadata?.capabilities.includes("vision") === true;
 
   const toggleLevel = (level: ThinkingLevel) => {
     const next = levels.includes(level)
@@ -71,6 +76,18 @@ export function ModelConfigCard({
           <Badge tone={source === "custom" ? "warning" : "neutral"}>
             {source === "custom" ? customSourceLabel : sourceLabel}
           </Badge>
+          <div className="provider-model-capabilities" aria-label={`${binding.id} capabilities`}>
+            <Badge tone={supportsVision ? "success" : "neutral"}>
+              <IconImage size={12} aria-hidden="true" />
+              {supportsVision ? visionLabel : textOnlyLabel}
+            </Badge>
+            {levels.length > 0 ? (
+              <Badge tone="neutral">
+                <IconSparkles size={12} aria-hidden="true" />
+                {reasoningLabel}
+              </Badge>
+            ) : null}
+          </div>
         </div>
         <button
           type="button"
@@ -156,9 +173,6 @@ export function ModelConfigCard({
         ) : null}
       </div>
 
-      <div className="provider-model-card-footnote">
-        {source === "custom" ? customDefaultsHint : defaultsHint}
-      </div>
     </article>
   );
 }
