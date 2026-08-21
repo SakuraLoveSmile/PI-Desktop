@@ -127,7 +127,7 @@ test("Settings exposes three independent Agent capability destinations", () => {
   assert.match(settingsPageSrc, /tab === "skills" && <AgentSkillsPage \/>/);
   assert.match(settingsPageSrc, /tab === "mcp" && <AgentMcpPage \/>/);
   assert.match(settingsPageSrc, /tab === "subagents" && <AgentSubagentsPage \/>/);
-  assert.match(settingsComponents.get("AgentCapabilityLayout.tsx"), /AgentCapabilityColumn/);
+  assert.match(settingsComponents.get("AgentCapabilityLayout.tsx"), /AgentCapabilitySection/);
   assert.match(settingsComponents.get("AgentCapabilityLayout.tsx"), /agent-capability-list/);
   for (const name of ["AgentSkillsPage.tsx", "AgentMcpPage.tsx"]) {
     const source = settingsComponents.get(name);
@@ -139,10 +139,10 @@ test("Settings exposes three independent Agent capability destinations", () => {
   assert.doesNotMatch(settingsComponents.get("AgentSubagentsPage.tsx"), /AgentProjectPicker|projectPath/);
 });
 
-test("capability columns keep a fixed-height empty-state viewport", () => {
-  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?height:\s*360px;[\s\S]*?min-height:\s*360px;/);
-  assert.match(styles, /\.agent-capability-empty\s*\{[\s\S]*?min-height:\s*calc\(100% - 24px\);/);
-  assert.match(settingsComponents.get("AgentCapabilityLayout.tsx"), /loading \? \(/);
+test("capability sections flow at natural height with skeleton loading", () => {
+  assert.doesNotMatch(styles, /\.agent-capability-list\s*\{[^}]*?height:\s*\d+px/);
+  assert.match(styles, /\.agent-capability-skeleton\s*\{/);
+  assert.match(settingsComponents.get("AgentCapabilityLayout.tsx"), /loading \? </);
 });
 
 test("skill import is one native file and physically targets the selected level", () => {
@@ -199,7 +199,7 @@ test("capability implementation does not use legacy .pi capability roots", () =>
 });
 
 test("agent capability styling uses design tokens and supports reduced motion", () => {
-  const start = styles.indexOf("/* -------------------------------------------------------------------------\n * Settings > Agent capability management.");
+  const start = styles.indexOf("/* -------------------------------------------------------------------------\n * Settings > Agent capability destinations (Skills / MCP / Subagents).");
   assert.ok(start >= 0, "agent capability styles are missing");
   const section = styles.slice(start);
   assert.match(section, /var\(--ds-bg-/);

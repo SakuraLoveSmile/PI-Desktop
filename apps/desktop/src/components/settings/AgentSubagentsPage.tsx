@@ -4,8 +4,8 @@ import type { UserSubagentRecord } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import {
-  AgentCapabilityColumn,
   AgentCapabilityIntro,
+  AgentCapabilitySection,
   CapabilityEmpty,
   CapabilityToggle,
 } from "./AgentCapabilityLayout";
@@ -27,7 +27,7 @@ function SubagentRow({
   const name = subagent.name || subagent.id;
   return (
     <div className={cx("agent-capability-row", !subagent.enabled && "is-off")} role="listitem">
-      <span className="agent-capability-glyph agent-capability-glyph-agent" aria-hidden="true">
+      <span className="agent-capability-glyph" aria-hidden="true">
         <IconBot size={16} />
       </span>
       <div className="agent-capability-copy">
@@ -35,7 +35,10 @@ function SubagentRow({
           <span className="agent-capability-name">{name}</span>
           <span className="agent-capability-badge">{t("settings.globalOnly")}</span>
         </div>
-        <p className="agent-capability-description">
+        <p
+          className="agent-capability-description"
+          title={subagent.description || t("settings.noCapabilityDescription")}
+        >
           {subagent.description || t("settings.noCapabilityDescription")}
         </p>
         {subagent.tools?.length ? (
@@ -113,7 +116,7 @@ export function AgentSubagentsPage() {
         description={t("settings.subagentsDescription")}
         note={t("settings.subagentsOnlyGlobal")}
       />
-      <AgentCapabilityColumn
+      <AgentCapabilitySection
         title={t("settings.globalLevel")}
         path={GLOBAL_SUBAGENTS_PATH}
         scope="global"
@@ -135,7 +138,7 @@ export function AgentSubagentsPage() {
             />
           ))
         )}
-      </AgentCapabilityColumn>
+      </AgentCapabilitySection>
     </div>
   );
 }

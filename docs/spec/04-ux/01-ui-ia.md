@@ -225,10 +225,11 @@ shared capability contract:
   scope note, then uses the same neutral elevated Settings surface as the other
   destinations; no capability page has a decorative hero, colored top bar, or
   separate visual theme.
-- Skills and MCP use fixed-height global/project surfaces. Each header shows a
-  scope marker, resolved `.agents` path, scope description, localized count,
-  and its actions. The project surface shows a recent-project picker;
-  project records take precedence over global records.
+- Skills and MCP use stacked global/project card blocks in one column. Each
+  block has a quiet heading row with a scope title, scope description,
+  resolved `.agents` path, localized count, and its actions; the project
+  block shows a recent-project picker. Project records take precedence over
+  global records.
 - Skills have one native **Import** action per surface. It accepts exactly one
   file and physically copies it into the selected `.agents/skills` directory.
 - MCP has one **Add** action per surface. Add and Edit open the existing
@@ -236,10 +237,11 @@ shared capability contract:
   duplicate checks, locked edit ids, scope text, and Test connection feedback.
 - Subagents use one full-width global surface under `~/.agents/subagents`; they
   have no project picker, project surface, or project-level toggle.
-- All three lists keep a constant height, render an inset dashed empty state in
-  that space, dim disabled rows, and store enablement in app-local state rather
-  than capability files. Loading and project changes preserve the viewport and
-  disable competing controls until the host refresh completes.
+- All three lists flow at natural page height, render a quiet centered empty
+  state inside the panel, dim disabled rows, and store enablement in app-local
+  state rather than capability files. Loading and project changes render
+  skeleton rows with the same anatomy and disable competing controls until the
+  host refresh completes.
 
 ## 4. Overlays
 

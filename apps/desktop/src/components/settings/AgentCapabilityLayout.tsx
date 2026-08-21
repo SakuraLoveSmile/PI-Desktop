@@ -151,6 +151,7 @@ export function CapabilityToggle({
   );
 }
 
+/** One quiet line: page description plus the scope-priority note. */
 export function AgentCapabilityIntro({
   description,
   note,
@@ -166,7 +167,12 @@ export function AgentCapabilityIntro({
   );
 }
 
-export function AgentCapabilityColumn({
+/**
+ * One scope (global or project) rendered as a standard Settings card block:
+ * a quiet heading row above the shared elevated panel. Lists flow at natural
+ * height like every other Settings surface.
+ */
+export function AgentCapabilitySection({
   title,
   path,
   scope,
@@ -191,53 +197,53 @@ export function AgentCapabilityColumn({
 }) {
   const { t } = useTranslation();
   return (
-    <section
-      className={cx(
-        "settings-panel agent-capability-column",
-        scope && `is-${scope}`,
-        className,
-      )}
-      data-scope={scope}
-    >
-      <header className="agent-capability-column-head">
-        <div className="agent-capability-column-title">
-          <div className="agent-capability-column-title-line">
-            {scope ? (
-              <span
-                className={cx("agent-capability-column-dot", `is-${scope}`)}
-                aria-hidden="true"
-              />
+    <section className={cx("agent-scope", className)} data-scope={scope}>
+      <header className="agent-scope-head">
+        <div className="agent-scope-head-copy">
+          <div className="agent-scope-title-line">
+            <h3 className="agent-scope-title">{title}</h3>
+            {description ? (
+              <span className="agent-scope-desc">{description}</span>
             ) : null}
-            <span className="agent-capability-column-label">{title}</span>
           </div>
-          {description ? (
-            <p className="agent-capability-column-description">{description}</p>
-          ) : null}
-          <code title={path}>{path}</code>
+          <div className="agent-scope-meta">
+            <code title={path}>{path}</code>
+            {count !== undefined ? (
+              <span
+                className="agent-scope-count"
+                title={t("settings.capabilityCount", { count })}
+              >
+                {t("settings.capabilityCount", { count })}
+              </span>
+            ) : null}
+          </div>
         </div>
-        <div className="agent-capability-column-actions">
-          {count !== undefined ? (
-            <span
-              className="agent-capability-count"
-              title={t("settings.capabilityCount", { count })}
-            >
-              {t("settings.capabilityCount", { count })}
-            </span>
-          ) : null}
-          {action}
-        </div>
+        {action ? <div className="agent-scope-actions">{action}</div> : null}
       </header>
-      <div className="agent-capability-list" role="list" aria-busy={loading}>
-        {loading ? (
-          <div className="agent-capability-loading" role="status" aria-live="polite">
-            <span className="agent-capability-loading-label">{empty}</span>
-            <span className="agent-capability-loading-line" aria-hidden="true" />
-            <span className="agent-capability-loading-line is-short" aria-hidden="true" />
-            <span className="agent-capability-loading-line is-medium" aria-hidden="true" />
-          </div>
-        ) : children}
+      <div className="settings-panel agent-capability-panel">
+        <div className="agent-capability-list" role="list" aria-busy={loading || undefined}>
+          {loading ? <CapabilitySkeleton label={empty} /> : children}
+        </div>
       </div>
     </section>
+  );
+}
+
+/** Ghost rows that mirror the real row anatomy while the host responds. */
+export function CapabilitySkeleton({ label }: { label: string }) {
+  return (
+    <div className="agent-capability-skeleton" role="status" aria-live="polite">
+      <span className="sr-only">{label}</span>
+      {[0, 1, 2].map((row) => (
+        <div key={row} className="agent-capability-skeleton-row" aria-hidden="true">
+          <span className="agent-capability-skeleton-glyph" />
+          <span className="agent-capability-skeleton-lines">
+            <span className="agent-capability-skeleton-line is-title" />
+            <span className="agent-capability-skeleton-line is-desc" />
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 

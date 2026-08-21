@@ -4108,11 +4108,12 @@ Each scenario is documented in this format:
   1. Open Settings > Agent and verify Skills, MCP, and Subagents are three
      independent navigation destinations. Open Extensions and verify that only
      Installed and Marketplace tabs are present.
-  2. Open Skills. Confirm the global column shows `~/.agents/skills`, the project
-     column shows project A's `.agents/skills`, both lists have the same fixed
-     height, and the project picker changes the selected project. While the
-     project data refreshes, confirm the viewport shows a loading treatment and
-     the picker/import/switch controls cannot be activated a second time.
+  2. Open Skills. Confirm the global block shows `~/.agents/skills`, the project
+     block shows project A's `.agents/skills`, both blocks stack in one column
+     at natural page height, and the project picker changes the selected
+     project. While the project data refreshes, confirm the block shows
+     skeleton rows and the picker/import/switch controls cannot be activated a
+     second time.
   3. Toggle a global skill off while project A is selected. Confirm the row is
      dimmed, a toast names the skill, and the global document remains unchanged.
      Switch to project B and confirm the global skill remains enabled there.
@@ -4129,27 +4130,26 @@ Each scenario is documented in this format:
   7. Delete a skill or MCP file outside the app, reload its page, and confirm the
      row disappears and its local state has no orphaned entry. Confirm deleting
      a global file also removes its project overrides.
-  8. Open Subagents. Confirm it is one global-only column rooted at
+  8. Open Subagents. Confirm it is one global-only block rooted at
      `~/.agents/subagents`, with no project picker or project-level controls.
-     Confirm the column header has the global scope marker and item count, and
+     Confirm the block header has the global scope title and item count, and
      an empty directory resolves `settings.subagentsEmpty` to localized
      empty-state copy rather than displaying a raw translation key.
 - **Expected**:
-  - The three Settings pages use no tabs for switching capabilities, preserve
-    list height for empty and populated states, support dark and light themes,
-    and begin with quiet page-specific descriptions plus project-over-global
-    scope copy where relevant. Each global/project scope is presented as a
-    standard Settings surface with a scope marker, resolved `.agents` path,
-    scope description, localized count, and actions grouped in the header;
-    scope labels remain single-line, with actions moving below the title when a
-    surface is narrow. The rows use compact capability icons, localized badges,
-    descriptions, and persistent enablement switches. Loading uses a separate
-    stable treatment, pending updates keep a busy switch state and disable
-    competing controls until the host refresh completes, and counts are
-    exposed to assistive technology.
-    Empty states stay centered inside an inset dashed surface, and the two
-    surfaces stack with wrapped actions at narrow widths without introducing a
-    capability-specific color system.
+  - The three Settings pages use no tabs for switching capabilities, flow at
+    natural page height for empty and populated states, support dark and light
+    themes, and begin with quiet page-specific descriptions plus
+    project-over-global scope copy where relevant. Each global/project scope is
+    presented as a standard Settings card block with a scope title, resolved
+    `.agents` path, scope description, localized count, and actions grouped in
+    the heading row; scope labels remain single-line, with actions wrapping
+    below the title when the viewport is narrow. The rows use quiet capability
+    icons, localized badges, descriptions, and persistent enablement switches.
+    Loading renders skeleton rows with the same anatomy, pending updates keep a
+    busy switch state and disable competing controls until the host refresh
+    completes, and counts are exposed to assistive technology. Empty states
+    stay centered inside the panel without a decorative frame, and the blocks
+    stack in one column without introducing a capability-specific color system.
   - Capability files contain configuration/frontmatter only; enablement is
     persisted in the app-local `agent-capabilities` state files.
   - Project records shadow global records by id or name even when disabled,

@@ -9,8 +9,8 @@ import {
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import {
-  AgentCapabilityColumn,
   AgentCapabilityIntro,
+  AgentCapabilitySection,
   AgentProjectPicker,
   CapabilityButton,
   CapabilityEmpty,
@@ -73,15 +73,21 @@ function McpRow({
               : t("settings.transportStdio")}
           </span>
           {status && status.state !== "idle" ? (
-            <span className={cx("agent-capability-badge", `is-${status.state}`)}>
+            <span className={cx("agent-capability-badge", "is-status", `is-${status.state}`)}>
+              <span className="agent-capability-status-dot" aria-hidden="true" />
               {status.state === "ready"
                 ? t("extensions.mcp.toolCount", { count: status.toolCount })
                 : t(`extensions.mcp.state.${status.state}`)}
             </span>
           ) : null}
         </div>
-        <code className="agent-capability-command">{target || server.id}</code>
-        <p className="agent-capability-description">
+        <code className="agent-capability-command" title={target || server.id}>
+          {target || server.id}
+        </code>
+        <p
+          className="agent-capability-description"
+          title={server.description || t("settings.noCapabilityDescription")}
+        >
           {server.description || t("settings.noCapabilityDescription")}
         </p>
       </div>
@@ -301,66 +307,64 @@ export function AgentMcpPage() {
         description={t("settings.mcpDescription")}
         note={t("settings.capabilityPriority")}
       />
-      <div className="agent-capability-columns">
-        <AgentCapabilityColumn
-          title={t("settings.globalLevel")}
-          path={GLOBAL_MCP_PATH}
-          scope="global"
-          description={t("settings.globalScopeDescription")}
-          count={globalServers.length}
-          action={
+      <AgentCapabilitySection
+        title={t("settings.globalLevel")}
+        path={GLOBAL_MCP_PATH}
+        scope="global"
+        description={t("settings.globalScopeDescription")}
+        count={globalServers.length}
+        action={
+          <CapabilityButton
+            variant="primary"
+            disabled={loading}
+            busy={busyKey !== null}
+            onClick={() => openCreate("global")}
+          >
+            <IconPlus size={14} />
+            {t("settings.addMcp")}
+          </CapabilityButton>
+        }
+        loading={loading}
+        empty={t("settings.loadingCapabilities")}
+      >
+        {renderRows(globalServers, "global")}
+      </AgentCapabilitySection>
+
+      <AgentCapabilitySection
+        title={t("settings.projectLevel")}
+        path={projectMcpPath(selectedProjectPath)}
+        scope="project"
+        description={t("settings.projectScopeDescription")}
+        count={projectServers.length}
+        action={
+          <>
+            <AgentProjectPicker
+              value={selectedProjectPath}
+              options={options}
+              label={t("settings.selectProject")}
+              disabled={loading || busyKey !== null}
+              onChange={setSelectedProjectPath}
+            />
             <CapabilityButton
               variant="primary"
-              disabled={loading}
+              disabled={!selectedProjectPath || loading}
               busy={busyKey !== null}
-              onClick={() => openCreate("global")}
+              onClick={() => openCreate("project")}
             >
               <IconPlus size={14} />
               {t("settings.addMcp")}
             </CapabilityButton>
-          }
-          loading={loading}
-          empty={t("settings.loadingCapabilities")}
-        >
-          {renderRows(globalServers, "global")}
-        </AgentCapabilityColumn>
-
-        <AgentCapabilityColumn
-          title={t("settings.projectLevel")}
-          path={projectMcpPath(selectedProjectPath)}
-          scope="project"
-          description={t("settings.projectScopeDescription")}
-          count={projectServers.length}
-          action={
-            <>
-              <AgentProjectPicker
-                value={selectedProjectPath}
-                options={options}
-                label={t("settings.selectProject")}
-                disabled={loading || busyKey !== null}
-                onChange={setSelectedProjectPath}
-              />
-              <CapabilityButton
-                variant="primary"
-                disabled={!selectedProjectPath || loading}
-                busy={busyKey !== null}
-                onClick={() => openCreate("project")}
-              >
-                <IconPlus size={14} />
-                {t("settings.addMcp")}
-              </CapabilityButton>
-            </>
-          }
-          loading={loading}
-          empty={t("settings.loadingCapabilities")}
-        >
-          {!selectedProjectPath ? (
-            <CapabilityEmpty message={t("settings.selectProjectFirst")} />
-          ) : (
-            renderRows(projectServers, "project")
-          )}
-        </AgentCapabilityColumn>
-      </div>
+          </>
+        }
+        loading={loading}
+        empty={t("settings.loadingCapabilities")}
+      >
+        {!selectedProjectPath ? (
+          <CapabilityEmpty message={t("settings.selectProjectFirst")} />
+        ) : (
+          renderRows(projectServers, "project")
+        )}
+      </AgentCapabilitySection>
 
       {editor ? (
         <McpEditorSheet

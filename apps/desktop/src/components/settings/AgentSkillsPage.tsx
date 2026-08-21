@@ -4,8 +4,8 @@ import type { UserSkillRecord } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../stores/app-store";
 import {
-  AgentCapabilityColumn,
   AgentCapabilityIntro,
+  AgentCapabilitySection,
   AgentProjectPicker,
   CapabilityButton,
   CapabilityEmpty,
@@ -44,7 +44,10 @@ function SkillRow({
             <span className="agent-capability-badge">{t("settings.imported")}</span>
           ) : null}
         </div>
-        <p className="agent-capability-description">
+        <p
+          className="agent-capability-description"
+          title={skill.description || t("settings.noCapabilityDescription")}
+        >
           {skill.description || t("settings.noCapabilityDescription")}
         </p>
       </div>
@@ -172,68 +175,66 @@ export function AgentSkillsPage() {
         description={t("settings.skillsDescription")}
         note={t("settings.capabilityPriority")}
       />
-      <div className="agent-capability-columns">
-        <AgentCapabilityColumn
-          title={t("settings.globalLevel")}
-          path={GLOBAL_SKILLS_PATH}
-          scope="global"
-          description={t("settings.globalScopeDescription")}
-          count={globalSkills.length}
-          action={importButton("global")}
-          loading={loading}
-          empty={t("settings.loadingCapabilities")}
-        >
-          {globalSkills.length === 0 ? (
-            <CapabilityEmpty message={t("settings.skillsEmpty")} icon={<IconBookOpen size={18} />} />
-          ) : (
-            globalSkills.map((skill) => (
-              <SkillRow
-                key={skill.id}
-                skill={skill}
-                busy={loading || busyKey !== null}
-                onToggle={() => void toggle(skill, "global")}
-              />
-            ))
-          )}
-        </AgentCapabilityColumn>
+      <AgentCapabilitySection
+        title={t("settings.globalLevel")}
+        path={GLOBAL_SKILLS_PATH}
+        scope="global"
+        description={t("settings.globalScopeDescription")}
+        count={globalSkills.length}
+        action={importButton("global")}
+        loading={loading}
+        empty={t("settings.loadingCapabilities")}
+      >
+        {globalSkills.length === 0 ? (
+          <CapabilityEmpty message={t("settings.skillsEmpty")} icon={<IconBookOpen size={18} />} />
+        ) : (
+          globalSkills.map((skill) => (
+            <SkillRow
+              key={skill.id}
+              skill={skill}
+              busy={loading || busyKey !== null}
+              onToggle={() => void toggle(skill, "global")}
+            />
+          ))
+        )}
+      </AgentCapabilitySection>
 
-        <AgentCapabilityColumn
-          title={t("settings.projectLevel")}
-          path={projectSkillsPath(selectedProjectPath)}
-          scope="project"
-          description={t("settings.projectScopeDescription")}
-          count={projectSkills.length}
-          action={
-            <>
-              <AgentProjectPicker
-                value={selectedProjectPath}
-                options={options}
-                label={t("settings.selectProject")}
-                disabled={loading || busyKey !== null}
-                onChange={setSelectedProjectPath}
-              />
-              {importButton("project")}
-            </>
-          }
-          loading={loading}
-          empty={t("settings.loadingCapabilities")}
-        >
-          {!selectedProjectPath ? (
-            <CapabilityEmpty message={t("settings.selectProjectFirst")} />
-          ) : projectSkills.length === 0 ? (
-            <CapabilityEmpty message={t("settings.skillsEmpty")} icon={<IconBookOpen size={18} />} />
-          ) : (
-            projectSkills.map((skill) => (
-              <SkillRow
-                key={skill.id}
-                skill={skill}
-                busy={loading || busyKey !== null}
-                onToggle={() => void toggle(skill, "project")}
-              />
-            ))
-          )}
-        </AgentCapabilityColumn>
-      </div>
+      <AgentCapabilitySection
+        title={t("settings.projectLevel")}
+        path={projectSkillsPath(selectedProjectPath)}
+        scope="project"
+        description={t("settings.projectScopeDescription")}
+        count={projectSkills.length}
+        action={
+          <>
+            <AgentProjectPicker
+              value={selectedProjectPath}
+              options={options}
+              label={t("settings.selectProject")}
+              disabled={loading || busyKey !== null}
+              onChange={setSelectedProjectPath}
+            />
+            {importButton("project")}
+          </>
+        }
+        loading={loading}
+        empty={t("settings.loadingCapabilities")}
+      >
+        {!selectedProjectPath ? (
+          <CapabilityEmpty message={t("settings.selectProjectFirst")} />
+        ) : projectSkills.length === 0 ? (
+          <CapabilityEmpty message={t("settings.skillsEmpty")} icon={<IconBookOpen size={18} />} />
+        ) : (
+          projectSkills.map((skill) => (
+            <SkillRow
+              key={skill.id}
+              skill={skill}
+              busy={loading || busyKey !== null}
+              onToggle={() => void toggle(skill, "project")}
+            />
+          ))
+        )}
+      </AgentCapabilitySection>
     </div>
   );
 }

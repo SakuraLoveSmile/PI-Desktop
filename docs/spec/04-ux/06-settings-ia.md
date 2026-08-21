@@ -162,31 +162,36 @@ destinations under the Agent group. They share a capability-management visual
 system while preserving their different data ownership:
 
 - Each capability page starts with a quiet, page-specific description and a
-  short scope note rather than a decorative hero or alert. Light and dark
-  themes use the shared Settings surface, typography, borders, and semantic
-  tokens; capability pages do not introduce a separate color system.
-- Skills and MCP render a responsive two-column layout for Global and Project
-  scope. Each scope is one standard elevated Settings surface with a compact
-  scope marker, resolved `.agents` path, scope description, localized item
-  count, and actions grouped in its header. Project scope includes the
-  selected-project picker; Subagents has no project picker because it is
-  global-only and uses one full-width surface.
-- The list viewport has a compact fixed height so changing projects, toggling a
-  row, or showing an empty state does not make the page jump. Rows use a compact
-  icon, name, optional source/transport/status badges, description, and an
-  always visible enablement switch. MCP rows also keep Edit visible as a
-  Settings icon action. Empty states use an inset dashed surface rather than
-  leaving the entire viewport visually blank.
-- Initial loads and project changes keep that same viewport stable with a
-  lightweight loading treatment; scope actions and row controls are disabled
-  while the capability state is being refreshed so a second click cannot race
-  the host update. The localized count remains available to assistive
-  technology, and pending switches retain a busy state until the refresh
-  replaces them with the latest result.
-- Scope labels stay on one line. When a capability surface is narrow, its
-  actions move below the scope title so project controls cannot squeeze or
-  wrap the title. At narrow widths the two surfaces stack without reducing
-  switch or edit hit targets.
+  short scope note on one shared line rather than a decorative hero or alert.
+  Light and dark themes use the shared Settings surface, typography, borders,
+  and semantic tokens; capability pages do not introduce a separate color
+  system.
+- Skills and MCP render Global and Project scope as stacked Settings card
+  blocks in one column. Each block has a quiet heading row — scope title with
+  its scope description, then the resolved `.agents` path and localized count
+  as a muted meta line — above the standard elevated Settings panel. Actions
+  sit right-aligned in the heading row; Project scope also carries the
+  selected-project picker there. Subagents has no project picker because it is
+  global-only and uses one full-width block.
+- Lists flow at natural page height like every other Settings surface; the
+  page scrolls as one document instead of nesting fixed-height scroll wells.
+  Rows follow the provider-row rhythm: a quiet muted icon, name, optional
+  source/transport badges, single-line description, and an always visible
+  enablement switch. MCP rows keep the resolved command in mono between name
+  and description, keep Edit visible as a Settings icon action, and express
+  connection state only through a small status dot inside the state badge —
+  the only color on an otherwise monochrome row. Disabled rows dim their icon
+  and copy while keeping the switch fully legible.
+- Initial loads and project changes render skeleton rows that mirror the real
+  row anatomy; scope actions and row controls are disabled while the
+  capability state is being refreshed so a second click cannot race the host
+  update. The localized count remains available to assistive technology, and
+  pending switches retain a busy state until the refresh replaces them with
+  the latest result. Empty states are quiet centered glyph-and-copy blocks
+  inside the panel without a decorative frame.
+- Scope labels stay on one line. When the viewport is narrow, the heading row
+  stacks and actions wrap below the scope title so project controls cannot
+  squeeze or wrap the title.
 
 ### Instructions (`instructions` tab)
 - Edit the global instruction Markdown used by every PI-Desktop Agent session.

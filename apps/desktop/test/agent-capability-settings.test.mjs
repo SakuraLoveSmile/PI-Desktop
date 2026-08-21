@@ -34,16 +34,16 @@ test("agent settings have three independent destinations and extensions have two
   assert.doesNotMatch(pluginsPage, /plugins-(?:tab|panel)-(?:mcp|skills|subagents)/);
 });
 
-test("skills and MCP use global/project columns with a selectable project", () => {
+test("skills and MCP use stacked global/project sections with a selectable project", () => {
   for (const source of [skills, mcp]) {
     assert.match(source, /useAgentProjects\(\)/);
     assert.match(source, /AgentProjectPicker/);
     assert.match(source, /level: "global"/);
     assert.match(source, /level: "project"/);
   }
-  assert.match(layout, /AgentCapabilityColumn/);
+  assert.match(layout, /AgentCapabilitySection/);
+  assert.doesNotMatch(layout, /AgentCapabilityColumn/);
   assert.match(layout, /agent-capability-list/);
-  assert.match(layout, /agent-capability-column-dot/);
   assert.match(layout, /count !== undefined/);
   assert.doesNotMatch(subagents, /AgentProjectPicker|projectPath/);
   assert.match(subagents, /scope="global"/);
@@ -52,29 +52,36 @@ test("skills and MCP use global/project columns with a selectable project", () =
   assert.doesNotMatch(subagents, /settings\.subagents\.empty|t\("subagents\.empty"\)/);
 });
 
-test("capability lists keep a fixed height and render disabled rows", () => {
-  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?height:\s*360px/);
-  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?min-height:\s*360px/);
-  assert.match(styles, /\.agent-capability-row\.is-off\s*\{[\s\S]*?opacity:/);
-  assert.match(layout, /agent-capability-loading/);
-  assert.match(styles, /\.agent-capability-loading\s*\{[\s\S]*?min-height:\s*100%/);
+test("capability lists flow at natural height with skeleton loading", () => {
+  assert.doesNotMatch(styles, /\.agent-capability-list\s*\{[^}]*?height:\s*\d+px/);
+  assert.match(styles, /\.agent-capability-list\s*\{[\s\S]*?flex-direction:\s*column/);
+  assert.match(
+    styles,
+    /\.agent-capability-row\.is-off \.agent-capability-copy\s*\{[\s\S]*?opacity:/,
+  );
+  assert.match(layout, /CapabilitySkeleton/);
+  assert.match(styles, /\.agent-capability-skeleton-row\s*\{/);
+  assert.match(layout, /aria-busy=\{loading \|\| undefined\}/);
   assert.match(layout, /agent-capability-empty/);
 });
 
 test("capability surfaces use the shared settings hierarchy", () => {
   assert.match(layout, /AgentCapabilityIntro/);
+  assert.match(layout, /settings-panel agent-capability-panel/);
   assert.match(styles, /\.agent-capability-intro-description\s*\{/);
   assert.match(styles, /\.agent-capability-intro-note\s*\{/);
-  assert.match(styles, /\.agent-capability-column\s*\{[\s\S]*?border-radius:\s*var\(--radius-lg\)/);
-  assert.match(styles, /\.agent-capability-column-title code\s*\{[\s\S]*?background:\s*var\(--ds-bg-inset\)/);
-  assert.match(styles, /\.agent-capability-empty\s*\{[\s\S]*?border:\s*1px dashed/);
+  assert.match(styles, /\.agent-scope-title\s*\{[\s\S]*?font-weight:\s*var\(--font-weight-strong\)/);
+  assert.match(styles, /\.agent-scope-meta code\s*\{[\s\S]*?font-family:\s*var\(--font-mono\)/);
+  assert.doesNotMatch(styles, /\.agent-capability-empty\s*\{[\s\S]*?dashed/);
   assert.match(styles, /\.settings-icon-button\s*\{/);
 });
 
-test("capability scope labels stay intact when a column narrows", () => {
-  assert.match(styles, /\.agent-capability-column\s*\{[\s\S]*?container-type:\s*inline-size/);
-  assert.match(styles, /\.agent-capability-column-label\s*\{[\s\S]*?white-space:\s*nowrap/);
-  assert.match(styles, /@container\s*\(max-width:\s*600px\)[\s\S]*?\.agent-capability-column-head[\s\S]*?flex-direction:\s*column/);
+test("capability scope headers move actions below the title when narrow", () => {
+  assert.match(styles, /\.agent-scope-title\s*\{[\s\S]*?white-space:\s*nowrap/);
+  assert.match(
+    styles,
+    /@media \(max-width:\s*720px\)[\s\S]*?\.agent-scope-head[\s\S]*?flex-direction:\s*column/,
+  );
 });
 
 test("capability updates disable competing controls and expose state", () => {
