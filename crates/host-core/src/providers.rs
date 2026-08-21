@@ -29,6 +29,9 @@ pub struct ProviderPublic {
     /// name). Never carries a token.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oauth_account_label: Option<String>,
+    pub models: Vec<ModelBinding>,
+    /// Legacy default retained so older renderer/runtime clients can continue
+    /// reading a provider while they migrate to `models`.
     pub default_model_id: Option<String>,
     pub api_style: Option<String>,
     /// Explicit provider-level reasoning override.  `None` means the model
@@ -62,6 +65,8 @@ pub struct ProviderCreateInput {
     pub protocol: Option<String>,
     pub base_url: Option<String>,
     pub auth_kind: Option<String>,
+    #[serde(default)]
+    pub models: Option<Vec<ModelBinding>>,
     pub default_model_id: Option<String>,
     pub secret_value: Option<String>,
     pub api_style: Option<String>,
@@ -88,6 +93,8 @@ pub struct ProviderUpdateInput {
     pub protocol: Option<String>,
     pub base_url: Option<String>,
     pub auth_kind: Option<String>,
+    #[serde(default)]
+    pub models: Option<Vec<ModelBinding>>,
     pub default_model_id: Option<String>,
     pub secret_value: Option<String>,
     pub api_style: Option<String>,
@@ -102,6 +109,17 @@ pub struct ProviderUpdateInput {
     #[serde(default)]
     pub temperature: Option<f64>,
     pub enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelBinding {
+    pub id: String,
+    pub context_window: u32,
+    pub max_tokens: u32,
+    #[serde(default)]
+    pub thinking_levels: Vec<String>,
+    pub default_thinking_level: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -135,6 +153,8 @@ const PROVIDER_SELECT: &str =
 
 const CANONICAL_THINKING_LEVELS: &[&str] =
     &["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+const DEFAULT_CONTEXT_WINDOW: u32 = 128_000;
+const DEFAULT_MAX_TOKENS: u32 = 8_192;
 
 fn config_value(raw: &str) -> Option<serde_json::Value> {
     serde_json::from_str::<serde_json::Value>(raw).ok()
@@ -162,6 +182,78 @@ fn normalize_thinking_levels(levels: &[String]) -> Vec<String> {
         }
     }
     out
+}
+
+fn normalize_model_bindings(bindings: &[ModelBinding]) -> Vec<ModelBinding> {
+    bindings
+        .iter()
+        .filter_map(|binding| {
+            let id = binding.id.trim();
+            if id.is_empty() {
+                return None;
+            }
+            let thinking_levels = normalize_thinking_levels(&binding.thinking_levels);
+            let default_thinking_level = binding
+                .default_thinking_level
+                .as_deref()
+                .filter(|level| thinking_levels.iter().any(|item| item == level))
+                .map(str::to_string)
+                .or_else(|| thinking_levels.first().cloned());
+            Some(ModelBinding {
+                id: id.to_string(),
+                context_window: if binding.context_window == 0 {
+                    DEFAULT_CONTEXT_WINDOW
+                } else {
+                    binding.context_window
+                },
+                max_tokens: if binding.max_tokens == 0 {
+                    DEFAULT_MAX_TOKENS
+                } else {
+                    binding.max_tokens
+                },
+                thinking_levels,
+                default_thinking_level,
+            })
+        })
+        .collect()
+}
+
+fn legacy_model_binding(model_id: Option<String>) -> Vec<ModelBinding> {
+    model_id
+        .filter(|id| !id.trim().is_empty())
+        .map(|id| {
+            vec![ModelBinding {
+                id: id.trim().to_string(),
+                context_window: DEFAULT_CONTEXT_WINDOW,
+                max_tokens: DEFAULT_MAX_TOKENS,
+                thinking_levels: Vec::new(),
+                default_thinking_level: None,
+            }]
+        })
+        .unwrap_or_default()
+}
+
+fn config_model_bindings(raw: &str, legacy_model_id: Option<String>) -> Vec<ModelBinding> {
+    let legacy_model_id = legacy_model_id.or_else(|| {
+        config_value(raw)
+            .and_then(|value| value.get("modelId")?.as_str().map(str::to_string))
+    });
+    let parsed = config_value(raw)
+        .and_then(|value| value.get("models").cloned())
+        .and_then(|value| serde_json::from_value::<Vec<ModelBinding>>(value).ok())
+        .map(|bindings| normalize_model_bindings(&bindings))
+        .unwrap_or_default();
+    if parsed.is_empty() {
+        legacy_model_binding(legacy_model_id)
+    } else {
+        parsed
+    }
+}
+
+fn config_with_model_bindings(raw: &str, bindings: &[ModelBinding]) -> Result<String> {
+    let mut config = ensure_config_object(raw)?;
+    config["models"] = serde_json::to_value(normalize_model_bindings(bindings))?;
+    Ok(config.to_string())
 }
 
 fn config_thinking_levels_override(raw: &str) -> Option<Vec<String>> {
@@ -320,6 +412,7 @@ struct LimitOverrides {
 fn build_provider_config_json(
     supports_reasoning: Option<bool>,
     supported_thinking_levels: Option<&[String]>,
+    models: Option<&[ModelBinding]>,
     limits: &LimitOverrides,
 ) -> Result<String> {
     let mut config = serde_json::json!({});
@@ -335,6 +428,9 @@ fn build_provider_config_json(
                 serde_json::json!(normalized),
             );
         }
+    }
+    if let Some(bindings) = models {
+        config["models"] = serde_json::to_value(normalize_model_bindings(bindings))?;
     }
     if let Some(value) = limits.context_window.and_then(limit_u32_value) {
         limits_object(&mut config)?.insert("contextWindow".into(), value);
@@ -352,10 +448,12 @@ fn merge_provider_config_overrides(
     raw: &str,
     supports_reasoning: Option<bool>,
     supported_thinking_levels: Option<Option<Vec<String>>>,
+    models: Option<Option<Vec<ModelBinding>>>,
     limits: &LimitOverrides,
 ) -> Result<Option<String>> {
     if supports_reasoning.is_none()
         && supported_thinking_levels.is_none()
+        && models.is_none()
         && limits.context_window.is_none()
         && limits.max_output_tokens.is_none()
         && limits.temperature.is_none()
@@ -368,6 +466,9 @@ fn merge_provider_config_overrides(
     }
     if let Some(levels) = supported_thinking_levels {
         next = config_with_thinking_levels_override(&next, levels.as_deref())?;
+    }
+    if let Some(bindings) = models {
+        next = config_with_model_bindings(&next, bindings.as_deref().unwrap_or_default())?;
     }
     if let Some(value) = limits.context_window {
         next = config_with_limit(&next, "contextWindow", limit_u32_value(value))?;
@@ -387,6 +488,9 @@ fn provider_from_row(
 ) -> rusqlite::Result<ProviderPublic> {
     let secret_ref: Option<String> = row.get(8)?;
     let id: String = row.get(0)?;
+    let legacy_model_id: Option<String> = row.get(9)?;
+    let config_raw: String = row.get(11).unwrap_or_else(|_| "{}".to_string());
+    let models = config_model_bindings(&config_raw, legacy_model_id.clone());
     let has_api_key = secret_ref.as_ref().map(|r| secrets.has(r)).unwrap_or(false);
     let has_oauth = secrets.has(&secret_ref_for_provider_oauth(&id));
     Ok(ProviderPublic {
@@ -404,7 +508,11 @@ fn provider_from_row(
             .get::<_, String>(11)
             .ok()
             .and_then(|raw| config_oauth_account_label(&raw)),
-        default_model_id: row.get(9)?,
+        default_model_id: models
+            .first()
+            .map(|binding| binding.id.clone())
+            .or(legacy_model_id),
+        models,
         api_style: row.get(10)?,
         supports_reasoning: row
             .get::<_, String>(11)
@@ -578,6 +686,7 @@ pub fn create_provider(
     let config_json = build_provider_config_json(
         input.supports_reasoning,
         input.supported_thinking_levels.as_deref(),
+        input.models.as_deref(),
         &LimitOverrides {
             context_window: input.context_window,
             max_output_tokens: input.max_output_tokens,
@@ -610,7 +719,12 @@ pub fn create_provider(
                 None
             },
             input.api_style,
-            input.default_model_id,
+            input.default_model_id.or_else(|| {
+                input
+                    .models
+                    .as_ref()
+                    .and_then(|models| models.first().map(|model| model.id.clone()))
+            }),
             config_json.to_string(),
             now,
         ])?;
@@ -649,10 +763,12 @@ pub fn update_provider(
     } else {
         None
     };
+    let models_update = input.models.clone().map(Some);
     let config_json = merge_provider_config_overrides(
         &raw_config,
         input.supports_reasoning,
         levels_update,
+        models_update,
         &LimitOverrides {
             context_window: input.context_window,
             max_output_tokens: input.max_output_tokens,
@@ -692,7 +808,12 @@ pub fn update_provider(
             input.protocol,
             input.base_url,
             input.auth_kind,
-            input.default_model_id,
+            input.default_model_id.or_else(|| {
+                input
+                    .models
+                    .as_ref()
+                    .and_then(|models| models.first().map(|model| model.id.clone()))
+            }),
             input.api_style,
             input.enabled.map(|b| if b { 1 } else { 0 }),
             secret_ref,
@@ -779,6 +900,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: Some("none".into()),
+                models: None,
                 default_model_id: Some("model-1".into()),
                 secret_value: None,
                 api_style: None,
@@ -825,6 +947,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: None,
+                models: None,
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
@@ -875,6 +998,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: None,
+                models: None,
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
@@ -897,6 +1021,98 @@ mod tests {
     }
 
     #[test]
+    fn model_bindings_roundtrip_and_legacy_model_migrates_on_read() {
+        let (_dir, db, secrets) = test_context();
+        let provider = create_provider(
+            &db,
+            &secrets,
+            ProviderCreateInput {
+                name: "Multi-model".into(),
+                vendor_key: None,
+                provider_type: None,
+                protocol: None,
+                base_url: Some("https://example.test/v1".into()),
+                auth_kind: Some("none".into()),
+                models: Some(vec![
+                    ModelBinding {
+                        id: "reasoning-model".into(),
+                        context_window: 256_000,
+                        max_tokens: 16_000,
+                        thinking_levels: vec!["high".into(), "medium".into()],
+                        default_thinking_level: Some("medium".into()),
+                    },
+                    ModelBinding {
+                        id: "plain-model".into(),
+                        context_window: 128_000,
+                        max_tokens: 8_192,
+                        thinking_levels: vec![],
+                        default_thinking_level: None,
+                    },
+                ]),
+                default_model_id: None,
+                secret_value: None,
+                api_style: Some("chat_completions".into()),
+                oauth_account_label: None,
+                context_window: None,
+                max_output_tokens: None,
+                temperature: None,
+                supports_reasoning: None,
+                supported_thinking_levels: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(provider.default_model_id.as_deref(), Some("reasoning-model"));
+        assert_eq!(provider.models[0].context_window, 256_000);
+        assert_eq!(provider.models[0].default_thinking_level.as_deref(), Some("medium"));
+        assert_eq!(provider.models[1].default_thinking_level, None);
+
+        let raw: String = db
+            .conn()
+            .query_row(
+                "SELECT config_json FROM providers WHERE id = ?1",
+                params![provider.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let config: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(config["models"][0]["maxTokens"], 16_000);
+
+        let legacy = create_provider(
+            &db,
+            &secrets,
+            ProviderCreateInput {
+                name: "Legacy".into(),
+                vendor_key: None,
+                provider_type: None,
+                protocol: None,
+                base_url: None,
+                auth_kind: Some("none".into()),
+                models: None,
+                default_model_id: Some("legacy-model".into()),
+                secret_value: None,
+                api_style: None,
+                oauth_account_label: None,
+                context_window: None,
+                max_output_tokens: None,
+                temperature: None,
+                supports_reasoning: None,
+                supported_thinking_levels: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(legacy.models.len(), 1);
+        assert_eq!(legacy.models[0].id, "legacy-model");
+        assert_eq!(legacy.models[0].context_window, DEFAULT_CONTEXT_WINDOW);
+        assert_eq!(legacy.models[0].max_tokens, DEFAULT_MAX_TOKENS);
+        assert!(legacy.models[0].thinking_levels.is_empty());
+        assert_eq!(legacy.models[0].default_thinking_level, None);
+        assert_eq!(
+            config_model_bindings(r#"{"modelId":"config-legacy"}"#, None)[0].id,
+            "config-legacy"
+        );
+    }
+
+    #[test]
     fn limit_overrides_roundtrip_and_clear_with_zero() {
         let (_dir, db, secrets) = test_context();
         let provider = create_provider(
@@ -909,6 +1125,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: Some("none".into()),
+                models: None,
                 default_model_id: Some("model-1".into()),
                 secret_value: None,
                 api_style: None,
@@ -937,6 +1154,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: None,
+                models: None,
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
@@ -969,6 +1187,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: Some("none".into()),
+                models: None,
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
@@ -1001,6 +1220,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: Some("none".into()),
+                models: None,
                 default_model_id: Some("mimo-v2.5".into()),
                 secret_value: None,
                 api_style: None,
@@ -1035,6 +1255,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: None,
+                models: None,
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
@@ -1078,6 +1299,7 @@ mod tests {
                 protocol: None,
                 base_url: Some("http://localhost:11434/v1".into()),
                 auth_kind: Some("none".into()),
+                models: None,
                 default_model_id: Some("model-a".into()),
                 secret_value: None,
                 api_style: Some("chat_completions".into()),
@@ -1173,6 +1395,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: Some("oauth".into()),
+                models: None,
                 default_model_id: Some("claude-sonnet-4-5".into()),
                 secret_value: None,
                 api_style: Some("anthropic_messages".into()),
@@ -1214,6 +1437,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: None,
+                models: None,
                 default_model_id: None,
                 secret_value: None,
                 api_style: None,
@@ -1269,6 +1493,7 @@ mod tests {
                 protocol: None,
                 base_url: None,
                 auth_kind: Some("api_key_and_base_url".into()),
+                models: None,
                 default_model_id: None,
                 secret_value: Some("sk-ant-api".into()),
                 api_style: None,

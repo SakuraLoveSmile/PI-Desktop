@@ -184,6 +184,16 @@ export const THINKING_LEVELS = [
   "max",
 ] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+
+/** Provider-local model settings persisted with the provider configuration. */
+export type ModelBinding = {
+  id: string;
+  contextWindow: number;
+  maxTokens: number;
+  thinkingLevels: ThinkingLevel[];
+  defaultThinkingLevel: ThinkingLevel | null;
+};
+
 export type Risk = "low" | "medium" | "high";
 export type PermissionDecision = "allow-once" | "allow-session" | "deny";
 /** Permission mode (D115): how high-risk tool calls are approved.
@@ -624,6 +634,9 @@ export type ProviderPublic = {
   hasOauth?: boolean;
   /** Non-secret label for the signed-in account; never carries a token. */
   oauthAccountLabel?: string;
+  /** Per-model settings selected in the provider dialog. */
+  models: ModelBinding[];
+  /** @deprecated Use `models[0]?.id`; retained for older runtime consumers. */
   defaultModelId?: string;
   apiStyle?: string;
   /** Effective capability for the provider's current default model. */
@@ -648,6 +661,8 @@ export type ProviderCreateInput = {
   protocol?: string;
   baseUrl?: string;
   authKind?: string;
+  models?: ModelBinding[];
+  /** @deprecated Use `models[0]?.id`; retained for older callers. */
   defaultModelId?: string;
   secretValue?: string;
   apiStyle?: string;
@@ -767,6 +782,9 @@ export type ModelInfo = {
   displayName: string;
   providerId: string;
   contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: boolean;
+  thinkingLevelMap?: Partial<Record<ThinkingLevel, string | null>>;
   capabilities: Array<"text" | "tools" | "vision" | "reasoning" | "json">;
   supportedThinkingLevels?: ThinkingLevel[];
   source: "bundled" | "discovered" | "user";

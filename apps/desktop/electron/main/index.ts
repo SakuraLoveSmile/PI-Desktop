@@ -70,6 +70,7 @@ import {
   type McpServerInput,
   type McpServerRecord,
   type McpServerStatus,
+  type ModelBinding,
   type Mode,
   type NativeMenuAction,
   type OAuthRespondInput,
@@ -775,6 +776,7 @@ type RuntimeProvider = {
   vendorKey?: string;
   baseUrl?: string;
   modelId?: string;
+  models?: ModelBinding[];
   defaultModelId?: string;
   apiKey?: string;
   authKind?: string;
@@ -796,12 +798,18 @@ function enrichProvider<T extends RuntimeProvider>(
   selectedModelId?: string,
 ): T & ThinkingCapabilities & { supportsVision: boolean } {
   const modelId =
-    selectedModelId || provider.modelId || provider.defaultModelId || "";
-  const capabilities = resolveThinkingCapabilities({
-    vendorKey: provider.vendorKey || "custom",
-    modelId,
-    apiStyle: provider.apiStyle,
-  });
+    selectedModelId || provider.modelId || provider.models?.[0]?.id || provider.defaultModelId || "";
+  const storedModel = provider.models?.find((model) => model.id === modelId);
+  const capabilities = storedModel
+    ? {
+        supportsReasoning: storedModel.thinkingLevels.length > 0,
+        supportedThinkingLevels: [...storedModel.thinkingLevels],
+      }
+    : resolveThinkingCapabilities({
+        vendorKey: provider.vendorKey || "custom",
+        modelId,
+        apiStyle: provider.apiStyle,
+      });
   return {
     ...provider,
     ...capabilities,
@@ -876,11 +884,17 @@ function enrichSession<T extends RuntimeSession>(
       supportedThinkingLevels: ["off"],
     };
   }
-  const capabilities = resolveThinkingCapabilities({
-    vendorKey: provider.vendorKey || "custom",
-    modelId: session.modelId,
-    apiStyle: provider.apiStyle,
-  });
+  const storedModel = provider.models?.find((model) => model.id === session.modelId);
+  const capabilities = storedModel
+    ? {
+        supportsReasoning: storedModel.thinkingLevels.length > 0,
+        supportedThinkingLevels: [...storedModel.thinkingLevels],
+      }
+    : resolveThinkingCapabilities({
+        vendorKey: provider.vendorKey || "custom",
+        modelId: session.modelId,
+        apiStyle: provider.apiStyle,
+      });
   return {
     ...session,
     ...capabilities,
@@ -1122,6 +1136,7 @@ async function resolveAgentRuntimeLaunch(
     (provider.id === settings.defaultProviderId
       ? settings.defaultModelId
       : undefined) ||
+    provider.models?.[0]?.id ||
     provider.defaultModelId;
   if (!modelId) {
     throw Object.assign(new Error("No model selected for provider"), {
@@ -1142,13 +1157,13 @@ async function resolveAgentRuntimeLaunch(
       { errorCode: ErrorCodes.MODEL_NOT_CONFIGURED },
     );
   }
-  const thinkingCapabilities =
-    vendorBinding ?? enrichProvider(provider, modelId);
+  const thinkingCapabilities = vendorBinding ?? enrichProvider(provider, modelId);
+  const storedModel = provider.models?.find((model) => model.id === modelId);
   const thinkingLevel = clampThinkingLevel(
     thinkingCapabilities,
-    normalizeThinkingLevel(session.thinkingLevel),
+    normalizeThinkingLevel(session.thinkingLevel ?? storedModel?.defaultThinkingLevel),
   );
-  const modelConfig =
+  const resolvedModelConfig =
     vendorBinding?.modelConfig ??
     resolvePiModelConfig({
       vendorKey: provider.vendorKey || "custom",
@@ -1157,6 +1172,29 @@ async function resolveAgentRuntimeLaunch(
     });
   const apiStyle = vendorBinding?.apiStyle ?? provider.apiStyle;
   const baseUrl = vendorBinding?.baseUrl ?? provider.baseUrl;
+  const modelConfig = resolvedModelConfig
+    ? {
+        ...resolvedModelConfig,
+        ...(storedModel
+          ? {
+              contextWindow: storedModel.contextWindow,
+              maxTokens: storedModel.maxTokens,
+              reasoning: storedModel.thinkingLevels.length > 0,
+            }
+          : {}),
+      }
+    : storedModel
+      ? {
+          source: "pi" as const,
+          name: modelId,
+          baseUrl: baseUrl ?? "",
+          reasoning: storedModel.thinkingLevels.length > 0,
+          input: ["text"] as Array<"text" | "image">,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: storedModel.contextWindow,
+          maxTokens: storedModel.maxTokens,
+        }
+      : undefined;
   const projectPath =
     typeof session.projectPath === "string" && session.projectPath.trim()
       ? session.projectPath.trim()
@@ -5492,6 +5530,7 @@ function registerIpc() {
           capabilities?: string[];
           input?: readonly ("text" | "image")[];
           contextWindow?: number;
+          maxTokens?: number;
           source?: "bundled" | "discovered" | "user";
         },
         // Vendor accounts can span wire APIs, so a model may need a style of
@@ -5507,6 +5546,13 @@ function registerIpc() {
         };
         const piModel = resolvePiModelConfig(modelRef);
         const thinking = resolveThinkingCapabilities(modelRef);
+        const catalogThinkingLevels: ThinkingLevel[] = thinking.supportsReasoning
+          ? piModel?.thinkingLevelMap
+            ? THINKING_LEVELS.filter(
+                (level) => piModel.thinkingLevelMap?.[level] != null,
+              )
+            : ["low", "medium", "high"]
+          : [];
         if (thinking.supportsReasoning) capabilities.add("reasoning");
         else capabilities.delete("reasoning");
         // Renderer discovery is advisory. Only an authoritative pi-ai model
@@ -5529,8 +5575,13 @@ function registerIpc() {
           // often returns only ids, so its context window may be absent.
           contextWindow: piModel?.contextWindow ?? model.contextWindow,
           capabilities: [...capabilities],
-          supportedThinkingLevels: thinking.supportedThinkingLevels,
-          source: model.source ?? ("discovered" as const),
+          supportedThinkingLevels: catalogThinkingLevels,
+          maxTokens: piModel?.maxTokens,
+          reasoning: thinking.supportsReasoning,
+          ...(piModel?.thinkingLevelMap
+            ? { thinkingLevelMap: { ...piModel.thinkingLevelMap } }
+            : {}),
+          source: piModel ? ("bundled" as const) : model.source ?? ("discovered" as const),
         };
       };
 
@@ -5581,10 +5632,11 @@ function registerIpc() {
             source: "cache" as const,
           };
         }
-        const fallback = provider.defaultModelId
+        const fallbackModelId = provider.models?.[0]?.id ?? provider.defaultModelId;
+        const fallback = fallbackModelId
           ? [decorate({
-              modelId: provider.defaultModelId,
-              displayName: provider.defaultModelId,
+              modelId: fallbackModelId,
+              displayName: fallbackModelId,
               source: "user",
             })]
           : [];
@@ -5647,8 +5699,9 @@ function registerIpc() {
       }
       // Fallback: the provider's configured model, so pickers stay usable
       // for gateways without a /models endpoint.
-      const fallback = provider?.defaultModelId
-        ? [decorate({ modelId: provider.defaultModelId, displayName: provider.defaultModelId })]
+      const fallbackModelId = provider?.models?.[0]?.id ?? provider?.defaultModelId;
+      const fallback = fallbackModelId
+        ? [decorate({ modelId: fallbackModelId, displayName: fallbackModelId })]
         : [];
       return { models: fallback, source: "fallback", error: discoveryError };
     },
