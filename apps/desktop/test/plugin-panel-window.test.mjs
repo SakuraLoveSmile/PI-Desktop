@@ -91,6 +91,23 @@ test("plugin content is offset below the strict 46px host drag band", () => {
   assert.match(preloadSource, /prefers-reduced-motion: reduce/);
 });
 
+test("paint-through panels let page content draw and receive pointer events", () => {
+  assert.match(chromeSource, /PLUGIN_PANEL_CHROME_PAINT_THROUGH_VERSION = "v3"/);
+  assert.match(preloadSource, /type PluginPanelChromeMode = "legacy" \| "safe-area" \| "paint-through"/);
+  assert.match(preloadSource, /host\.dataset\.chromeMode = chromeMode/);
+  assert.match(
+    preloadSource,
+    /:host\(\[data-chrome-mode="paint-through"\]\) \.drag-region[\s\S]*-webkit-app-region: no-drag;[\s\S]*pointer-events: none;/,
+  );
+  assert.match(preloadSource, /className = "drag-segment"/);
+  assert.match(preloadSource, /data-pi-plugin-no-drag/);
+  assert.match(preloadSource, /installPaintThroughDragMap\(dragRegion\)/);
+  // The host capsule and computed empty-space segments remain in the shadow
+  // tree; holes in the segment map expose page controls to real pointer input.
+  assert.match(preloadSource, /className = "capsule"/);
+  assert.match(preloadSource, /controls\.append\(minimize, maximize, close\)/);
+});
+
 test("checked-in plugin panels follow the host chrome contract", () => {
   assert.equal(bundledPanelSources.length, 2);
   for (const panelSource of [examplePanelSource, ...bundledPanelSources]) {

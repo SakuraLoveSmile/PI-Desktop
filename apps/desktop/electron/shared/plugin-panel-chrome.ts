@@ -7,6 +7,12 @@ export const PLUGIN_PANEL_TITLEBAR_HEIGHT = 46;
  */
 export const PLUGIN_PANEL_CHROME_META_NAME = "pi-plugin-chrome";
 export const PLUGIN_PANEL_CHROME_VERSION = "v2";
+/**
+ * Opt-in mode for pages that draw through the transparent host drag band.
+ * The host keeps the capsule above the page, while the page owns hit testing
+ * and supplies its own drag/no-drag regions.
+ */
+export const PLUGIN_PANEL_CHROME_PAINT_THROUGH_VERSION = "v3";
 
 export type PluginPanelTheme = "light" | "dark";
 

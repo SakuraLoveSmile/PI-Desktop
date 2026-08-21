@@ -3,6 +3,7 @@ import {
   PLUGIN_PANEL_TITLEBAR_HEIGHT,
   PLUGIN_PANEL_CHROME_META_NAME,
   PLUGIN_PANEL_CHROME_VERSION,
+  PLUGIN_PANEL_CHROME_PAINT_THROUGH_VERSION,
   PLUGIN_PANEL_EMBEDDED_ARGUMENT,
   PLUGIN_PANEL_LOCALE_ARGUMENT_PREFIX,
   PLUGIN_PANEL_WINDOW_CONTROL_CHANNEL,
@@ -91,12 +92,192 @@ function publishTitlebarHeight(): void {
 }
 
 function pluginOwnsTitlebarSpacing(): boolean {
-  return (
-    document
-      .querySelector(`meta[name="${PLUGIN_PANEL_CHROME_META_NAME}"]`)
-      ?.getAttribute("content")
-      ?.trim() === PLUGIN_PANEL_CHROME_VERSION
-  );
+  return pluginChromeMode() !== "legacy";
+}
+
+type PluginPanelChromeMode = "legacy" | "safe-area" | "paint-through";
+
+function pluginChromeMode(): PluginPanelChromeMode {
+  const marker = document
+    .querySelector(`meta[name="${PLUGIN_PANEL_CHROME_META_NAME}"]`)
+    ?.getAttribute("content")
+    ?.trim();
+  if (marker === PLUGIN_PANEL_CHROME_PAINT_THROUGH_VERSION) return "paint-through";
+  if (marker === PLUGIN_PANEL_CHROME_VERSION) return "safe-area";
+  return "legacy";
+}
+
+/**
+ * v3 keeps the page visible through the 46px band. Only these page-owned
+ * elements need holes in the host drag map; ordinary empty space remains
+ * draggable. Plugins can opt custom controls into the same contract with
+ * `data-pi-plugin-no-drag`.
+ */
+const PAINT_THROUGH_NO_DRAG_SELECTOR = [
+  "a",
+  "button",
+  "input",
+  "label",
+  "select",
+  "summary",
+  "textarea",
+  "[contenteditable=\"true\"]",
+  "[contenteditable=\"plaintext-only\"]",
+  "[draggable=\"true\"]",
+  "[role=\"button\"]",
+  "[role=\"checkbox\"]",
+  "[role=\"link\"]",
+  "[role=\"radio\"]",
+  "[role=\"switch\"]",
+  "[role=\"tab\"]",
+  "[role=\"textbox\"]",
+  "[tabindex]",
+  "[data-pi-plugin-no-drag]",
+].join(",");
+
+type PaintThroughRect = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
+type PaintThroughDragSegment = PaintThroughRect;
+
+function isPaintThroughElementVisible(element: Element): boolean {
+  const style = window.getComputedStyle(element);
+  if (
+    style.display === "none" ||
+    style.visibility === "hidden" ||
+    style.pointerEvents === "none"
+  ) {
+    return false;
+  }
+  const opacity = Number.parseFloat(style.opacity);
+  return !Number.isFinite(opacity) || opacity > 0;
+}
+
+function paintThroughNoDragRects(): PaintThroughRect[] {
+  const rects: PaintThroughRect[] = [];
+  for (const element of document.querySelectorAll(
+    PAINT_THROUGH_NO_DRAG_SELECTOR,
+  )) {
+    if (!isPaintThroughElementVisible(element)) continue;
+    for (const rect of Array.from(element.getClientRects())) {
+      if (
+        !Number.isFinite(rect.left) ||
+        !Number.isFinite(rect.right) ||
+        !Number.isFinite(rect.top) ||
+        !Number.isFinite(rect.bottom) ||
+        rect.right <= rect.left ||
+        rect.bottom <= rect.top
+      ) {
+        continue;
+      }
+      rects.push({
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+      });
+    }
+  }
+  return rects;
+}
+
+function paintThroughDragSegments(
+  width: number,
+  height: number,
+  noDragRects: PaintThroughRect[],
+): PaintThroughDragSegment[] {
+  const clippedRects = noDragRects
+    .map((rect) => ({
+      left: Math.max(0, Math.min(width, rect.left)),
+      right: Math.max(0, Math.min(width, rect.right)),
+      top: Math.max(0, Math.min(height, rect.top)),
+      bottom: Math.max(0, Math.min(height, rect.bottom)),
+    }))
+    .filter((rect) => rect.right > rect.left && rect.bottom > rect.top);
+  const yEdges = [0, height];
+  for (const rect of clippedRects) {
+    yEdges.push(rect.top, rect.bottom);
+  }
+  const sortedYEdges = [...new Set(yEdges)].sort((a, b) => a - b);
+  const segments: PaintThroughDragSegment[] = [];
+
+  for (let index = 0; index < sortedYEdges.length - 1; index += 1) {
+    const top = sortedYEdges[index];
+    const bottom = sortedYEdges[index + 1];
+    if (bottom <= top) continue;
+
+    const covered = clippedRects
+      .filter((rect) => rect.top < bottom && rect.bottom > top)
+      .sort((a, b) => a.left - b.left || a.right - b.right);
+    let cursor = 0;
+    for (const rect of covered) {
+      if (rect.left > cursor) {
+        segments.push({ left: cursor, right: rect.left, top, bottom });
+      }
+      cursor = Math.max(cursor, rect.right);
+    }
+    if (cursor < width) {
+      segments.push({ left: cursor, right: width, top, bottom });
+    }
+  }
+  return segments;
+}
+
+function installPaintThroughDragMap(dragRegion: HTMLElement): void {
+  const sync = () => {
+    const width = Math.max(
+      1,
+      window.innerWidth,
+      document.documentElement?.clientWidth ?? 0,
+    );
+    const segments = paintThroughDragSegments(
+      width,
+      PLUGIN_PANEL_TITLEBAR_HEIGHT,
+      paintThroughNoDragRects(),
+    );
+    dragRegion.replaceChildren(
+      ...segments.map((segment) => {
+        const element = document.createElement("div");
+        element.className = "drag-segment";
+        element.setAttribute("aria-hidden", "true");
+        element.style.left = `${segment.left}px`;
+        element.style.top = `${segment.top}px`;
+        element.style.width = `${segment.right - segment.left}px`;
+        element.style.height = `${segment.bottom - segment.top}px`;
+        return element;
+      }),
+    );
+  };
+
+  let frame = 0;
+  const schedule = () => {
+    if (frame) return;
+    frame = window.requestAnimationFrame(() => {
+      frame = 0;
+      sync();
+    });
+  };
+
+  const observer = new MutationObserver(schedule);
+  observer.observe(document.body, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: [
+      "aria-hidden",
+      "class",
+      "data-pi-plugin-no-drag",
+      "hidden",
+      "style",
+    ],
+  });
+  window.addEventListener("resize", schedule, { passive: true });
+  window.addEventListener("scroll", schedule, { capture: true, passive: true });
+  sync();
 }
 
 function chromeLabels(): ChromeLabels {
@@ -176,8 +357,10 @@ function installPanelChrome(): void {
 
   const labels = chromeLabels();
   const theme = panelTheme();
+  const chromeMode = pluginChromeMode();
   const host = document.createElement("pi-plugin-panel-chrome");
   host.dataset.theme = theme;
+  host.dataset.chromeMode = chromeMode;
   const syncPageColors = () => {
     host.style.setProperty(
       "--pi-plugin-panel-page-background",
@@ -218,6 +401,23 @@ function installPanelChrome(): void {
       inset: 0;
       z-index: 0;
       height: ${PLUGIN_PANEL_TITLEBAR_HEIGHT}px;
+      user-select: none;
+    }
+    /* Paint-through pages replace the full drag rectangle with empty-space
+       segments. The gaps expose page controls instead of relying on
+       pointer-events alone, which does not override Electron's native
+       -webkit-app-region hit testing. */
+    :host([data-chrome-mode="paint-through"]) .drag-region {
+      -webkit-app-region: no-drag;
+      app-region: no-drag;
+      pointer-events: none;
+    }
+    .drag-segment {
+      -webkit-app-region: drag;
+      app-region: drag;
+      pointer-events: auto;
+      position: absolute;
+      z-index: 0;
       user-select: none;
     }
     .safe-area-hint {
@@ -358,7 +558,7 @@ function installPanelChrome(): void {
   dragRegion.className = "drag-region";
   dragRegion.setAttribute("aria-hidden", "true");
 
-  const safeAreaHint = isDevelopmentPanel()
+  const safeAreaHint = isDevelopmentPanel() && chromeMode === "safe-area"
     ? document.createElement("span")
     : null;
   if (safeAreaHint) {
@@ -433,6 +633,9 @@ function installPanelChrome(): void {
   chrome.append(controls);
   shadow.append(style, chrome);
   document.documentElement.append(host);
+  if (chromeMode === "paint-through") {
+    installPaintThroughDragMap(dragRegion);
+  }
 }
 
 // Pre-publish the value before page styles and DOMContentLoaded handlers run.

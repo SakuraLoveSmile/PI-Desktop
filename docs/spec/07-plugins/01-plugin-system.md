@@ -240,6 +240,13 @@ are reachable there) and CPU/memory limits.
   and use the published variable for their own top spacing. The host does not
   add padding to these pages, avoiding a duplicated safe band; pages without
   the marker retain the legacy additive offset for compatibility.
+- A panel that needs to paint a full-bleed surface beneath the host band may
+  opt into `<meta name="pi-plugin-chrome" content="v3">`. The host keeps the
+  same 46px capsule geometry but splits native dragging into empty-space
+  segments. Standard controls and elements marked with
+  `data-pi-plugin-no-drag` are holes in that map, so they can receive pointer
+  input while blank space remains draggable. The default `v2` contract remains
+  strict for existing panels.
 - The plugin owns its title, toolbar, and every other visible panel surface.
 - Render the host capsule in a closed preload-owned Shadow DOM so plugin CSS
   cannot restyle its controls
