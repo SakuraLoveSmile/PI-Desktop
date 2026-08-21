@@ -146,7 +146,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
     configuration card for context window, max output, supported thinking
     levels, and the default thinking level. Built-in model metadata from pi-ai
     pre-fills the card; custom models use the runtime fallback values and
-    remain editable.
+    remain editable. The portaled option list can scroll without dismissing
+    the picker; scrolling an outside settings container dismisses it before
+    the trigger can become detached.
   - each model option and configuration card shows a compact text/vision
     capability state. Vision is derived from the exact pi-ai model record and
     is display-only; discovery or a user-entered ID cannot promote an unknown

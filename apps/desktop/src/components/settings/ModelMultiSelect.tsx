@@ -112,17 +112,25 @@ export function ModelMultiSelect({
         close();
       }
     };
+    const onScroll = (event: Event) => {
+      // The option list is scrollable inside the portaled menu. Keep the
+      // picker open while that list moves; dismiss only when an outside
+      // container scrolls and the trigger would otherwise be left behind.
+      const target = event.target as Node | null;
+      if (target && menuRef.current?.contains(target)) return;
+      close();
+    };
     window.addEventListener("pointerdown", onPointerDown, true);
     window.addEventListener("keydown", onKeyDown, true);
     window.addEventListener("resize", close);
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       window.removeEventListener("pointerdown", onPointerDown, true);
       window.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("resize", close);
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScroll, true);
     };
-  }, [close, open, updatePosition]);
+  }, [close, open]);
 
   useEffect(() => {
     if (open) searchRef.current?.focus();

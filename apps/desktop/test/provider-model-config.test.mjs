@@ -32,6 +32,13 @@ test("model discovery also probes no-auth and local endpoints", () => {
   assert.doesNotMatch(hookSource, /apiKey\.trim\(\)\.length > 0/);
 });
 
+test("model picker stays open while its option list scrolls", () => {
+  assert.match(pickerSource, /const onScroll = \(event: Event\) =>/);
+  assert.match(pickerSource, /menuRef\.current\?\.contains\(target\)\) return;/);
+  assert.match(pickerSource, /addEventListener\("scroll", onScroll, true\)/);
+  assert.doesNotMatch(pickerSource, /addEventListener\("scroll", close, true\)/);
+});
+
 test("model settings keep a compact, non-floating card treatment", () => {
   assert.match(styles, /.provider-model-card\s*\{[\s\S]*?border-radius: var\(--radius-md-plus\)/);
   assert.match(styles, /.provider-model-capabilities\s*\{/);
