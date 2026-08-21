@@ -57,6 +57,7 @@ impl ActivationScope {
     ///
     /// A project-scoped extension stays inactive in a session with no project:
     /// "these projects" is a claim about projects, and no workspace is not one.
+    #[allow(dead_code)]
     pub fn matches(&self, project_path: Option<&str>) -> bool {
         match self.mode {
             ActivationMode::Global => true,
@@ -104,6 +105,7 @@ fn same_path(a: &str, b: &str) -> bool {
 
 /// True when `target` is the scoped directory or sits underneath it, so scoping
 /// to a monorepo root covers sessions opened on a package inside it.
+#[allow(dead_code)]
 pub fn project_path_matches(entry: &str, target: &str) -> bool {
     let scoped = normalize_project_path(entry);
     let target = normalize_project_path(target);
