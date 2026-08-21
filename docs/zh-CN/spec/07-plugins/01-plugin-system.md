@@ -235,6 +235,12 @@ Host Main (PI-Desktop)
   `top: var(--pi-plugin-titlebar-height, 46px)`，而不是 `top: 0`。
   插件自己的工具栏可以使用 `-webkit-app-region: drag`，其中的交互控件
   使用 `-webkit-app-region: no-drag`。
+- 需要全出血绘制到主机拖拽带下方的面板，可以声明
+  `<meta name="pi-plugin-chrome" content="v3">`。主机保留相同的 46px
+  胶囊几何尺寸，但只把页面空白区域切成原生拖拽片段；标准控件以及标记
+  `data-pi-plugin-no-drag` 的元素会在拖拽图中形成点击空洞，因此元素存在的
+  位置可正常接收指针，空白处仍可拖动窗口；既有面板继续使用严格的 `v2`
+  契约。
 - 插件负责自己的标题、工具栏以及所有其他可见面板界面
 - 在 preload 自己拥有的闭合 Shadow DOM 中渲染主机胶囊，防止插件 CSS 重写控件
 - 只能调用插件preload公开的安全API

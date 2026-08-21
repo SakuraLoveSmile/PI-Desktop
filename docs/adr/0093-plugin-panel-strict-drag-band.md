@@ -30,6 +30,17 @@ chrome. Development authors also need a visible reminder of the constraint.
    sender-validated window-control channel, localized labels, focus behavior,
    reduced-motion behavior, and `window.pluginBridge` remain unchanged.
 
+## Paint-through opt-in
+
+Panels that need a full-bleed surface may declare
+`<meta name="pi-plugin-chrome" content="v3">`. The host keeps the same 46px
+geometry and capsule, but replaces one full-width native drag rectangle with
+empty-space drag segments. Standard controls and elements marked with
+`data-pi-plugin-no-drag` create holes in that map, so the page can paint and
+receive pointer events wherever an element is present while blank space still
+drags the window. Existing `v2` panels retain the strict non-clickable band
+above for compatibility.
+
 ## Consequences
 
 - Plugin authors get a stable 46px layout and interaction contract on every
@@ -47,10 +58,12 @@ chrome. Development authors also need a visible reminder of the constraint.
 Rejected because a variable host band would change plugin layout and make the
 same panel differ across platforms or future chrome revisions.
 
-### Let plugin content receive clicks in the drag band
+### Let every plugin content receive clicks in the drag band by default
 
-Rejected because frameless window dragging would become unreliable and authors
-could mistake the top strip for ordinary interactive content.
+Rejected for the default because frameless window dragging would become
+unreliable and authors could mistake the top strip for ordinary interactive
+content. The `v3` opt-in is intentionally explicit and keeps the original
+`v2` behavior unchanged.
 
 ### Restore a host-rendered panel title
 
