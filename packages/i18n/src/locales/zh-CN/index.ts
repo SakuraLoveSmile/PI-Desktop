@@ -720,6 +720,7 @@ export const zhCN = {
     nModelsSelected: "已选 {{n}} 个模型",
     modelsEmptyHint: "填写地址即可获取模型列表。",
     modelsFetching: "正在加载模型…",
+    noModelMatches: "没有匹配的模型。",
     customModel: "自定义",
     addCustomModel: "添加自定义模型",
     customModelPlaceholder: "输入模型 ID，如 my-model-v2",

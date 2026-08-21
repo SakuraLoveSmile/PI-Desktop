@@ -731,6 +731,7 @@ export const en = {
     nModelsSelected: "{{n}} models selected",
     modelsEmptyHint: "Enter a base URL to load models.",
     modelsFetching: "Loading models…",
+    noModelMatches: "No matching models.",
     customModel: "Custom",
     addCustomModel: "Add custom model",
     customModelPlaceholder: "Enter a model ID, e.g. my-model-v2",

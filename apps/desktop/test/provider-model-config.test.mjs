@@ -39,6 +39,15 @@ test("model picker stays open while its option list scrolls", () => {
   assert.doesNotMatch(pickerSource, /addEventListener\("scroll", close, true\)/);
 });
 
+test("model picker exposes a clear empty state and focusable list contract", () => {
+  assert.match(pickerSource, /noMatchesHint: string/);
+  assert.match(pickerSource, /aria-autocomplete="list"/);
+  assert.match(pickerSource, /aria-controls=\{listId\}/);
+  assert.match(pickerSource, /title=\{model\.modelId\}/);
+  assert.match(styles, /\.provider-model-multi-option:focus-visible/);
+  assert.match(styles, /overscroll-behavior: contain/);
+});
+
 test("model settings keep a compact, non-floating card treatment", () => {
   assert.match(styles, /.provider-model-card\s*\{[\s\S]*?border-radius: var\(--radius-md-plus\)/);
   assert.match(styles, /.provider-model-capabilities\s*\{/);

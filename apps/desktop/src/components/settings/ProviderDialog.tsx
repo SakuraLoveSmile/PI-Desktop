@@ -229,6 +229,7 @@ export function ProviderDialog({
               placeholder={t("settings.selectModelsPlaceholder")}
               selectedLabel={(count) => t("settings.nModelsSelected", { n: count })}
               searchPlaceholder={t("settings.searchModelId")}
+              noMatchesHint={t("settings.noModelMatches")}
               emptyHint={t("settings.modelsEmptyHint")}
               fetchingLabel={t("settings.modelsFetching")}
               customLabel={t("settings.customModel")}

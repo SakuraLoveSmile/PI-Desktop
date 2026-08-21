@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -30,6 +31,7 @@ export function ModelMultiSelect({
   placeholder,
   selectedLabel,
   searchPlaceholder,
+  noMatchesHint,
   emptyHint,
   fetchingLabel,
   customLabel,
@@ -44,6 +46,7 @@ export function ModelMultiSelect({
   placeholder: string;
   selectedLabel: (count: number) => string;
   searchPlaceholder: string;
+  noMatchesHint: string;
   emptyHint: string;
   fetchingLabel: string;
   customLabel: string;
@@ -51,10 +54,12 @@ export function ModelMultiSelect({
   visionLabel: string;
   onToggle: (model: ModelInfo) => void;
 }) {
+  const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState<MenuPosition | null>(null);
   const anchorRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const selected = new Set(selectedIds);
@@ -73,6 +78,10 @@ export function ModelMultiSelect({
     setPosition(null);
     setQuery("");
   }, []);
+  const closeAndRestoreFocus = useCallback(() => {
+    close();
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  }, [close]);
 
   const updatePosition = useCallback(() => {
     const anchor = anchorRef.current;
@@ -109,7 +118,7 @@ export function ModelMultiSelect({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
-        close();
+        closeAndRestoreFocus();
       }
     };
     const onScroll = (event: Event) => {
@@ -130,7 +139,7 @@ export function ModelMultiSelect({
       window.removeEventListener("resize", close);
       window.removeEventListener("scroll", onScroll, true);
     };
-  }, [close, open]);
+  }, [close, closeAndRestoreFocus, open]);
 
   useEffect(() => {
     if (open) searchRef.current?.focus();
@@ -146,8 +155,6 @@ export function ModelMultiSelect({
     <div
       ref={menuRef}
       className={cx("provider-model-multi-menu", position && "is-open")}
-      role="listbox"
-      aria-multiselectable="true"
       style={
         position
           ? {
@@ -167,16 +174,24 @@ export function ModelMultiSelect({
           onChange={(event) => setQuery(event.target.value)}
           placeholder={searchPlaceholder}
           aria-label={searchPlaceholder}
+          aria-autocomplete="list"
+          aria-controls={listId}
           spellCheck={false}
           autoComplete="off"
         />
       </div>
-      <div className="provider-model-multi-list">
+      <div
+        className="provider-model-multi-list"
+        id={listId}
+        role="listbox"
+        aria-multiselectable="true"
+        aria-label={selected.size > 0 ? selectedLabel(selected.size) : placeholder}
+      >
         {loading ? (
           <div className="provider-model-empty">{fetchingLabel}</div>
         ) : filtered.length === 0 ? (
           <div className="provider-model-empty">
-            {models.length === 0 ? emptyHint : searchPlaceholder.replace("…", "")}
+            {models.length === 0 ? emptyHint : noMatchesHint}
           </div>
         ) : (
           filtered.map((model) => {
@@ -190,6 +205,7 @@ export function ModelMultiSelect({
                 type="button"
                 role="option"
                 aria-selected={isSelected}
+                title={model.modelId}
                 className={cx("provider-model-multi-option", isSelected && "selected")}
                 onMouseDown={(event) => {
                   event.preventDefault();
@@ -222,11 +238,13 @@ export function ModelMultiSelect({
   return (
     <div className="provider-model-multi" ref={anchorRef}>
       <button
+        ref={triggerRef}
         type="button"
         className={cx("provider-model-multi-trigger", open && "is-open")}
         role="combobox"
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-controls={open ? listId : undefined}
         onClick={() => setOpen((current) => !current)}
       >
         <span className={cx("provider-model-multi-trigger-copy", selected.size === 0 && "placeholder") }>
