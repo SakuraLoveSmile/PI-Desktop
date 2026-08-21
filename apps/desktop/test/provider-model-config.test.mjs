@@ -49,8 +49,14 @@ test("model picker exposes a clear empty state and focusable list contract", () 
 });
 
 test("model settings keep a compact, non-floating card treatment", () => {
-  assert.match(styles, /.provider-model-card\s*\{[\s\S]*?border-radius: var\(--radius-md-plus\)/);
+  assert.match(cardSource, /initiallyExpanded\?: boolean/);
+  assert.match(cardSource, /aria-expanded=\{expanded\}/);
+  assert.match(cardSource, /hidden=\{!expanded\}/);
+  assert.match(styles, /.provider-model-card-list\s*\{[\s\S]*?border-radius: var\(--radius-md-plus\)/);
+  assert.match(styles, /.provider-model-card-summary\s*\{/);
+  assert.match(styles, /.provider-model-card-details\s*\{/);
   assert.match(styles, /.provider-model-capabilities\s*\{/);
+  assert.match(styles, /.provider-thinking-chip\s*\{[\s\S]*?min-height: 24px/);
   assert.doesNotMatch(
     styles,
     /\.provider-model-card:hover\s*\{[^}]*transform:\s*translateY/,

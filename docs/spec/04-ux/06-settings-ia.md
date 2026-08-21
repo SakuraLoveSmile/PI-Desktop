@@ -143,14 +143,18 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   - the add/edit dialog configures connection identity (name, endpoint, API
     style, and secret), then selects one or more models from a searchable
     multi-select catalog. Each selected model has an independent, compact
-    configuration card for context window, max output, supported thinking
-    levels, and the default thinking level. Built-in model metadata from pi-ai
-    pre-fills the card; custom models use the runtime fallback values and
-    remain editable. The portaled option list can scroll without dismissing
-    the picker; scrolling an outside settings container dismisses it before
-    the trigger can become detached. Search results keep a dedicated
-    no-match state instead of reusing the search placeholder.
-  - each model option and configuration card shows a compact text/vision
+    configuration row for context window, max output, supported thinking
+    levels, and the default thinking level. The row keeps the model ID,
+    source, capabilities, and token limits visible at a glance, and expands
+    in place for edits. The first row starts expanded so the form remains
+    discoverable; additional rows stay collapsed to keep large model sets
+    scannable. Built-in model metadata from pi-ai pre-fills the row; custom
+    models use the runtime fallback values and remain editable. The portaled
+    option list can scroll without dismissing the picker; scrolling an
+    outside settings container dismisses it before the trigger can become
+    detached. Search results keep a dedicated no-match state instead of
+    reusing the search placeholder.
+  - each model option and configuration row shows a compact text/vision
     capability state. Vision is derived from the exact pi-ai model record and
     is display-only; discovery or a user-entered ID cannot promote an unknown
     model to image transport.

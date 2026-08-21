@@ -2272,9 +2272,12 @@ surface, while model parameters remain owned by pi-ai.
 4. **Dialogs** — vendor-account edit dialog with name/default model, plus the
    provider dialog with connection fields (name, base URL, API style, API key),
    a fixed-position searchable multi-select model picker, free-form custom
-   model entry, and one configuration card per selected model. Cards expose
-   context window, max output, seven thinking-level chips, and a constrained
-   default-thinking select.
+   model entry, and a compact configuration list. Each selected model is a
+   scannable row with its ID, source, capabilities, and token limits; the row
+   expands in place to expose context window, max output, seven thinking-level
+   chips, and a constrained default-thinking select. The first row starts
+   expanded and additional rows start collapsed so large model sets do not
+   become a wall of repeated forms.
 5. **Provider cards** — avatar initials, badges (default / secret state), host + first model, Test / Make default / Delete
 
 ### 19.3 States
@@ -2292,7 +2295,8 @@ surface, while model parameters remain owned by pi-ai.
 - The model picker searches and toggles multiple models without using a native
   multiple select. Its portaled menu closes on outside press, Escape, scroll,
   and resize; model selection immediately adds or removes its configuration
-  card.
+  row. Configuration rows stay compact until expanded; expanding one row does
+  not expand or collapse any other row.
 - Adding a custom model validates non-empty and duplicate IDs, adds it to the
   top-level option list, selects it, and applies 128,000 context / 8,192 max
   output / no thinking defaults. Removing its selection does not delete the
@@ -2312,6 +2316,8 @@ surface, while model parameters remain owned by pi-ai.
 ### 19.5 Accessibility
 - Segmented controls expose `aria-pressed`
 - Enter-to-send uses `role="switch"` + `aria-checked`
+- Model configuration rows expose `aria-expanded` and reference their details
+  with `aria-controls`; collapsed details are removed from the tab order
 - Card actions keep visible text labels; thinking select has an accessible name
 - Empty regions and account actions expose localized labels
 

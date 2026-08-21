@@ -273,7 +273,7 @@ export function ProviderDialog({
               <span className="provider-model-config-count">{form.models.length}</span>
             </div>
             <div className="provider-model-card-list">
-              {form.models.map((binding) => {
+              {form.models.map((binding, index) => {
                 const metadata = discoveredById.get(binding.id);
                 const source = metadata?.source === "bundled" || binding.source === "catalog" ? "catalog" : "custom";
                 return (
@@ -281,6 +281,7 @@ export function ProviderDialog({
                     key={binding.id}
                     binding={binding}
                     metadata={metadata}
+                    initiallyExpanded={index === 0}
                     source={source}
                     sourceLabel={t("settings.builtInCatalog")}
                     customSourceLabel={t("settings.customModel")}
@@ -288,7 +289,9 @@ export function ProviderDialog({
                     textOnlyLabel={t("settings.textOnly")}
                     reasoningLabel={t("settings.reasoning")}
                     contextWindowLabel={t("settings.contextWindow")}
+                    contextWindowShortLabel={t("settings.contextWindowShort")}
                     maxOutputLabel={t("settings.maxOutput")}
+                    maxOutputShortLabel={t("settings.maxOutputShort")}
                     supportedThinkingLabel={t("settings.supportedThinkingLevels")}
                     defaultThinkingLabel={t("settings.defaultThinkingLevel")}
                     disabledThinkingLabel={t("settings.notSupported")}
