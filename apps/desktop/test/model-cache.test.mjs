@@ -20,9 +20,10 @@ test("saved provider discovery persists models in the host catalog", () => {
   assert.match(mainSource, /"providers\.listModels"/);
   assert.match(mainSource, /"providers\.cacheModels"/);
   assert.match(mainSource, /const piModel = resolvePiModelConfig\(modelRef\)/);
+  assert.match(mainSource, /const draftModel = resolvePiModelConfigForModelDraft\(modelRef\)/);
   assert.match(
     mainSource,
-    /contextWindow: piModel\?\.contextWindow \?\? model\.contextWindow/,
+    /contextWindow: draftModel\?\.contextWindow/,
   );
   assert.match(mainSource, /usesSavedEndpoint/);
   assert.match(mainSource, /endpointStillCurrent/);

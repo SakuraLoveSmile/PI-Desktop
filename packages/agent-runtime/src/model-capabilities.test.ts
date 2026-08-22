@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   clampThinkingLevel,
   resolvePiModelConfig,
+  resolvePiModelConfigForModelDraft,
   resolveThinkingCapabilities,
   resolveVisionCapability,
   type ModelCapabilities,
@@ -84,6 +85,77 @@ describe("pi-ai model resolution", () => {
       contextWindow: 272_000,
       maxTokens: 128_000,
     });
+  });
+
+  it("prefills a chat-compatible gateway from the official OpenAI record", () => {
+    const input = {
+      vendorKey: "custom",
+      modelId: "GPT-5.6-LUNA",
+      apiStyle: "chat_completions",
+    };
+    const draftModel = resolvePiModelConfigForModelDraft(input);
+
+    expect(draftModel).toMatchObject({
+      source: "pi",
+      name: "GPT-5.6 Luna",
+      reasoning: true,
+      contextWindow: 272_000,
+      maxTokens: 128_000,
+      thinkingLevelMap: {
+        off: "none",
+        low: "low",
+        medium: "medium",
+        high: "high",
+      },
+    });
+    expect(resolvePiModelConfig(input)).toBeUndefined();
+    expect(resolveThinkingCapabilities(input)).toEqual({
+      supportsReasoning: false,
+      supportedThinkingLevels: ["off"],
+    });
+
+    expect(
+      resolvePiModelConfigForModelDraft({
+        vendorKey: "custom",
+        modelId: "gpt-5.6-luna-custom",
+        apiStyle: "chat_completions",
+      }),
+    ).toMatchObject({
+      contextWindow: 272_000,
+      maxTokens: 128_000,
+    });
+  });
+
+  it("prefills DeepSeek metadata without requiring its catalog api", () => {
+    const model = resolvePiModelConfigForModelDraft({
+      vendorKey: "custom",
+      modelId: "deepseek-v4-flash",
+      apiStyle: "chat_completions",
+    });
+
+    expect(model).toMatchObject({
+      name: "DeepSeek V4 Flash",
+      reasoning: true,
+      contextWindow: 1_000_000,
+      maxTokens: 384_000,
+    });
+  });
+
+  it("does not use gateway-only catalog records for settings defaults", () => {
+    expect(
+      resolvePiModelConfigForModelDraft({
+        vendorKey: "openrouter",
+        modelId: "ai21/jamba-large-1.7",
+        apiStyle: "chat_completions",
+      }),
+    ).toBeUndefined();
+    expect(
+      resolvePiModelConfigForModelDraft({
+        vendorKey: "custom",
+        modelId: "unknown-model",
+        apiStyle: "chat_completions",
+      }),
+    ).toBeUndefined();
   });
 
   it("matches gateway alias ids by a separator boundary", () => {

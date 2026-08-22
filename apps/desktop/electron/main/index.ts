@@ -91,6 +91,7 @@ import {
 import {
   clampThinkingLevel,
   resolvePiModelConfig,
+  resolvePiModelConfigForModelDraft,
   resolveVisionCapability,
   resolveThinkingCapabilities,
   expandSlashInvocation,
@@ -5572,13 +5573,28 @@ function registerIpc() {
           apiStyle: modelApiStyle,
         };
         const piModel = resolvePiModelConfig(modelRef);
-        const thinking = resolveThinkingCapabilities(modelRef);
+        // Settings model additions may use a different wire style from the
+        // vendor's first-party catalog record. Use only the official vendor
+        // metadata for those defaults; runtime resolution above remains
+        // api-aware and is intentionally unchanged.
+        const draftModel = resolvePiModelConfigForModelDraft(modelRef);
+        const thinking = draftModel
+          ? {
+              supportsReasoning: draftModel.reasoning,
+              supportedThinkingLevels: draftModel.reasoning
+                ? draftModel.thinkingLevelMap
+                  ? THINKING_LEVELS.filter(
+                      (level) => draftModel.thinkingLevelMap?.[level] != null,
+                    )
+                  : (["low", "medium", "high"] as ThinkingLevel[])
+                : (["off"] as ThinkingLevel[]),
+            }
+          : {
+              supportsReasoning: false,
+              supportedThinkingLevels: ["off"] as ThinkingLevel[],
+            };
         const catalogThinkingLevels: ThinkingLevel[] = thinking.supportsReasoning
-          ? piModel?.thinkingLevelMap
-            ? THINKING_LEVELS.filter(
-                (level) => piModel.thinkingLevelMap?.[level] != null,
-              )
-            : ["low", "medium", "high"]
+          ? thinking.supportedThinkingLevels
           : [];
         if (thinking.supportsReasoning) capabilities.add("reasoning");
         else capabilities.delete("reasoning");
@@ -5598,17 +5614,19 @@ function registerIpc() {
           displayName: model.displayName,
           providerId: provider?.id ?? "",
           // Keep the model picker and context inspector aligned with the
-          // exact pi-ai model metadata sent to the sidecar. Provider discovery
-          // often returns only ids, so its context window may be absent.
-          contextWindow: piModel?.contextWindow ?? model.contextWindow,
+          // official pi-ai metadata used to prefill newly added models.
+          // Provider discovery often returns only ids, so its context window
+          // may be absent; an unknown/non-official model intentionally falls
+          // through to modelDraftFromInfo's fixed defaults.
+          contextWindow: draftModel?.contextWindow,
           capabilities: [...capabilities],
           supportedThinkingLevels: catalogThinkingLevels,
-          maxTokens: piModel?.maxTokens,
+          maxTokens: draftModel?.maxTokens,
           reasoning: thinking.supportsReasoning,
-          ...(piModel?.thinkingLevelMap
-            ? { thinkingLevelMap: { ...piModel.thinkingLevelMap } }
+          ...(draftModel?.thinkingLevelMap
+            ? { thinkingLevelMap: { ...draftModel.thinkingLevelMap } }
             : {}),
-          source: piModel ? ("bundled" as const) : model.source ?? ("discovered" as const),
+          source: draftModel || piModel ? ("bundled" as const) : model.source ?? ("discovered" as const),
         };
       };
 

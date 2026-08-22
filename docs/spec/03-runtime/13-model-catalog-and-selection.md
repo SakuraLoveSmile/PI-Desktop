@@ -193,6 +193,25 @@ Warnings are non-blocking unless execution is impossible.
    vision-capable model receives images within the 20 MiB app-side inline
    bound as transient image blocks; other cases receive a safe `@path`.
 
+### 11.3 Settings model-add metadata
+
+When the provider dialog adds a discovered model, its initial context window,
+output limit, and thinking defaults use a separate official-vendor lookup:
+
+1. A provider-vendor exact match is preferred when `vendorKey` maps to an
+   official pi-ai provider.
+2. Otherwise, exact and separator-bounded prefix matches search only official
+   providers: OpenAI, OpenAI Codex, Anthropic, DeepSeek, Google, xAI, Mistral,
+   MiniMax, Moonshot/Kimi, Z.AI, Qwen token-plan, Xiaomi token-plan, and
+   AntLing. Gateway, reseller, and subscription-proxy records do not supply
+   these defaults.
+3. This lookup ignores the configured `apiStyle`, so an OpenAI-compatible Chat
+   Completions provider can still prefill a model registered by pi-ai under
+   Responses.
+4. A miss leaves the fields unset so `modelDraftFromInfo` supplies the fixed
+   generic defaults. This is a settings-only enrichment path; runtime
+   `resolvePiModelConfig` and `resolveThinkingCapabilities` remain API-aware.
+
 ## 12. Refresh strategy
 
 - manual refresh button in settings/model picker
@@ -200,11 +219,11 @@ Warnings are non-blocking unless execution is impossible.
 - no aggressive background polling in MVP
 - refresh failures keep previous cache and surface non-fatal error
 
-Electron decorates cached and freshly discovered model rows with the matching
-`pi-ai` model record when one exists. Its `contextWindow` is the authoritative
-value for the picker and context inspector because the same record is passed to
-the agent sidecar. Provider discovery remains the fallback for models absent
-from the `pi-ai` catalog.
+Electron decorates cached and freshly discovered model rows with pi-ai model
+metadata when one exists. Runtime model resolution remains API-aware, while
+the settings add flow uses the official-vendor enrichment in §11.3 for initial
+model bindings. Provider discovery remains the fallback for models absent from
+the applicable pi-ai catalog path.
 
 ## 13. Search behavior
 

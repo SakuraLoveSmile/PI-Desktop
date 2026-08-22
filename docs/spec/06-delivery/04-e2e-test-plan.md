@@ -4511,6 +4511,33 @@ Each scenario is documented in this format:
   `bundled_plugins_refresh_from_disk_but_keep_user_state`; the packaged journey
   is Draft (do not run E2E locally unless explicitly requested)
 
+#### E2E-154: Model additions use official catalog metadata across API styles
+
+- **Preconditions**: A custom provider dialog can discover model ids including
+  `gpt-5.6-luna`, `deepseek-v4-flash`, a mixed-case model id, a separator-
+  bounded gateway alias, and a gateway-only id such as
+  `ai21/jamba-large-1.7`. The provider uses Chat Completions while the
+  first-party catalog registers some models under another API style.
+- **Steps**:
+  1. Select `gpt-5.6-luna` and inspect its newly added model card.
+  2. Select `deepseek-v4-flash`, the mixed-case id, and the bounded alias.
+  3. Select the gateway-only id and inspect its card.
+  4. Save the provider, then start a session using the provider and confirm
+     the request still uses the provider's configured base URL and API style.
+- **Expected**: OpenAI's official `gpt-5.6-luna` record prefills a 272,000
+  context window, 128,000 max output, and its supported thinking levels;
+  DeepSeek's official record supplies its published limits and thinking map;
+  case-insensitive exact and separator-bounded prefix matching work. The
+  gateway-only record does not supply settings metadata and receives the fixed
+  generic defaults. Saving the model does not make runtime model resolution
+  ignore the provider's API style or endpoint.
+- **Specs linked**: `03-runtime/11-provider-model-system.md` §6.2,
+  `03-runtime/13-model-catalog-and-selection.md` §11.3–§12
+- **Acceptance**: B (model config), C (conversation & stream)
+- **Milestone**: M6+
+- **Status**: Unit/source-contract covered; full provider-dialog journey Draft
+  (do not run E2E locally unless explicitly requested)
+
 ## 8. Traceability Matrix
 
 
@@ -4520,8 +4547,8 @@ Each scenario is documented in this format:
 | Acceptance | Scenarios |
 |---|---|
 | A — App startup | E2E-001, E2E-002, E2E-003, E2E-004, E2E-067, E2E-076, E2E-079, E2E-092, E2E-097, E2E-143, E2E-150 |
-| B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151 |
-| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-147, E2E-151 |
+| B — Model config | E2E-005, E2E-006, E2E-007, E2E-038, E2E-050, E2E-052, E2E-055, E2E-066, E2E-080, E2E-082, E2E-102c, E2E-102d, E2E-102e, E2E-151, E2E-154 |
+| C — Conversation & stream | E2E-008, E2E-008a, E2E-009, E2E-010, E2E-011, E2E-011a, E2E-011b, E2E-011d, E2E-011e, E2E-031, E2E-040, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-052, E2E-053, E2E-054, E2E-055, E2E-059, E2E-059a, E2E-060c, E2E-060d, E2E-061, E2E-061a, E2E-062, E2E-064, E2E-065, E2E-068, E2E-071, E2E-073, E2E-074, E2E-075, E2E-081, E2E-083, E2E-084, E2E-086, E2E-087, E2E-088, E2E-088b, E2E-089, E2E-090, E2E-094, E2E-095, E2E-096, E2E-097, E2E-098, E2E-099, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-106, E2E-109, E2E-111, E2E-114, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-121, E2E-AGENTS-001, E2E-142, E2E-144, E2E-145, E2E-146, E2E-147, E2E-151, E2E-154 |
 | D — Workspace | E2E-012, E2E-013, E2E-022B, E2E-024I, E2E-047, E2E-049, E2E-057, E2E-058, E2E-060, E2E-068, E2E-075, E2E-078, E2E-153 |
 | E — Tools & permissions | E2E-008a, E2E-014, E2E-015, E2E-016, E2E-017, E2E-018, E2E-019, E2E-024I, E2E-024K, E2E-040, E2E-049, E2E-074, E2E-093, E2E-097, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102d, E2E-102e, E2E-103, E2E-105, E2E-106, E2E-107, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-119, E2E-121, E2E-122, E2E-142, E2E-145, E2E-147 |
 | F — Persistence | E2E-020, E2E-021, E2E-036, E2E-037, E2E-038, E2E-040, E2E-042, E2E-047, E2E-048, E2E-051, E2E-054, E2E-056, E2E-061, E2E-062, E2E-064, E2E-066, E2E-068, E2E-071, E2E-072, E2E-073, E2E-082, E2E-084, E2E-096, E2E-098, E2E-102, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-103, E2E-AGENTS-001, E2E-061a, E2E-073a, E2E-104, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-112, E2E-118, E2E-119, E2E-120, E2E-121, E2E-123, E2E-142, E2E-146, E2E-148, E2E-151 |
@@ -4538,7 +4565,7 @@ Each scenario is documented in this format:
 | M4 | E2E-022, E2E-023, E2E-024, E2E-025, E2E-026, E2E-030, E2E-038 |
 | M5 | E2E-008a, E2E-032, E2E-033, E2E-034, E2E-039, E2E-043, E2E-044, E2E-045, E2E-046, E2E-047, E2E-048, E2E-048A, E2E-049, E2E-050, E2E-051, E2E-052, E2E-053, E2E-054, E2E-055, E2E-056, E2E-057, E2E-058, E2E-059, E2E-060, E2E-061, E2E-062, E2E-063, E2E-064, E2E-065, E2E-066, E2E-067, E2E-068, E2E-069, E2E-070, E2E-071, E2E-072, E2E-073, E2E-074, E2E-075, E2E-076, E2E-077, E2E-078, E2E-079, E2E-080, E2E-081, E2E-082, E2E-083, E2E-084, E2E-085, E2E-086, E2E-092, E2E-093, E2E-096, E2E-097, E2E-098, E2E-099, E2E-100, E2E-101, E2E-102, E2E-102a, E2E-102b, E2E-102c, E2E-102d, E2E-102e, E2E-AGENTS-001, E2E-059a, E2E-060b, E2E-060c, E2E-061a, E2E-073a, E2E-094, E2E-095, E2E-143, E2E-145, E2E-146, E2E-147 |
 | M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103 |
-| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151 |
+| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154 |
 | Post-MVP | E2E-022A, E2E-022B, E2E-022C, E2E-024I, E2E-024J, E2E-024K, E2E-024L, E2E-024M (plugin roadmap R2/R3/R6) |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the

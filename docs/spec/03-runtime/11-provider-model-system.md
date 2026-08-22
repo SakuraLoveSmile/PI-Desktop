@@ -127,6 +127,11 @@ PI-Desktop must not permanently restrict users to a short fixed model list.
    Renderer discovery, cached `vision` badges, and user-entered capability
    claims cannot promote an unknown model. The fallback is a path reference so
    the normal file-tool workflow remains available.
+6. The Settings provider dialog has a separate model-add enrichment path for
+   initial context/output/thinking defaults. It searches only official
+   first-party provider records and ignores `apiStyle` for that UI-only lookup;
+   gateway/reseller records cannot provide those defaults. Runtime
+   `resolvePiModelConfig` and `resolveThinkingCapabilities` remain API-aware.
 
 ### 6.3 Model families to cover
 Catalog and custom model entry must support common capability classes:

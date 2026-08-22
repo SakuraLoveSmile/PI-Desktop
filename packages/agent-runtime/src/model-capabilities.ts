@@ -55,6 +55,52 @@ function wireApiForStyle(apiStyle?: string): string {
 /** Separators after which a catalog id counts as a prefix of a gateway id. */
 const MODEL_ID_BOUNDARY = new Set(["-", "_", ".", ":", "@", "/"]);
 
+/**
+ * Providers whose catalog records describe the original model vendor rather
+ * than a gateway, reseller, or subscription proxy. This list is deliberately
+ * narrower than pi-ai's complete provider catalog because settings metadata
+ * must not inherit limits from an intermediary's copy of a model.
+ */
+const OFFICIAL_CATALOG_PROVIDER_ORDER = [
+  "openai",
+  "openai-codex",
+  "anthropic",
+  "deepseek",
+  "google",
+  "xai",
+  "mistral",
+  "minimax",
+  "minimax-cn",
+  "moonshotai",
+  "moonshotai-cn",
+  "kimi-coding",
+  "zai",
+  "zai-coding-cn",
+  "qwen-token-plan",
+  "qwen-token-plan-cn",
+  "qwen-token-plan-individual",
+  "xiaomi",
+  "ant-ling",
+] as const;
+
+const OFFICIAL_CATALOG_PROVIDER_RANK = new Map<string, number>(
+  OFFICIAL_CATALOG_PROVIDER_ORDER.map((provider, index) => [provider, index]),
+);
+
+function officialCatalogProviderRank(provider: string): number | undefined {
+  const normalized = provider.trim().toLowerCase();
+  const exactRank = OFFICIAL_CATALOG_PROVIDER_RANK.get(normalized);
+  if (exactRank !== undefined) return exactRank;
+  if (normalized.startsWith("xiaomi-token-plan-")) {
+    return OFFICIAL_CATALOG_PROVIDER_ORDER.length;
+  }
+  return undefined;
+}
+
+function isOfficialCatalogProvider(provider: string): boolean {
+  return officialCatalogProviderRank(provider) !== undefined;
+}
+
 type CatalogModel = ReturnType<
   ReturnType<typeof builtinModels>["getModels"]
 >[number];
@@ -69,6 +115,13 @@ function catalogInfoScore(model: CatalogModel): number {
   if (model.thinkingLevelMap) score += 2;
   if (model.input.includes("image")) score += 1;
   return score;
+}
+
+function compareOfficialCatalogModels(a: CatalogModel, b: CatalogModel): number {
+  const providerRank =
+    (officialCatalogProviderRank(a.provider) ?? Number.MAX_SAFE_INTEGER) -
+    (officialCatalogProviderRank(b.provider) ?? Number.MAX_SAFE_INTEGER);
+  return providerRank || catalogInfoScore(b) - catalogInfoScore(a);
 }
 
 function findCatalogModel(input: ModelCapabilityInput): CatalogModel | undefined {
@@ -100,6 +153,70 @@ function findCatalogModel(input: ModelCapabilityInput): CatalogModel | undefined
           b.id.length - a.id.length || catalogInfoScore(b) - catalogInfoScore(a),
       )[0]
   );
+}
+
+/**
+ * Resolve model metadata for adding a model in Settings.
+ *
+ * Unlike runtime resolution, this intentionally ignores apiStyle. A custom
+ * OpenAI-compatible provider may speak Chat Completions while selecting a
+ * model that pi-ai registers under Responses. Only records from the original
+ * model providers above may supply the settings defaults; gateway/reseller
+ * records are never used for this path.
+ */
+function findOfficialCatalogModel(
+  input: ModelCapabilityInput,
+): CatalogModel | undefined {
+  const requestedId = input.modelId.trim().toLowerCase();
+  if (!requestedId) return undefined;
+
+  const catalog = getBuiltinCatalog();
+  const officialModels = catalog
+    .getModels()
+    .filter((model) => isOfficialCatalogProvider(model.provider));
+  const vendorKey = input.vendorKey.trim().toLowerCase();
+
+  const vendorExact = officialModels
+    .filter(
+      (model) =>
+        model.provider.trim().toLowerCase() === vendorKey &&
+        model.id.toLowerCase() === requestedId,
+    )
+    .sort(compareOfficialCatalogModels);
+  if (vendorExact[0]) return vendorExact[0];
+
+  const exact = officialModels
+    .filter((model) => model.id.toLowerCase() === requestedId)
+    .sort(compareOfficialCatalogModels);
+  if (exact[0]) return exact[0];
+
+  return officialModels
+    .filter((model) => {
+      const id = model.id.toLowerCase();
+      return (
+        requestedId.length > id.length &&
+        requestedId.startsWith(id) &&
+        MODEL_ID_BOUNDARY.has(requestedId.charAt(id.length))
+      );
+    })
+    .sort(
+      (a, b) =>
+        b.id.length - a.id.length || compareOfficialCatalogModels(a, b),
+    )[0];
+}
+
+/**
+ * Resolve the official pi-ai metadata used to prefill a newly added model.
+ *
+ * This is deliberately separate from `resolvePiModelConfig`: changing the
+ * latter would change sidecar request configuration and session capability
+ * resolution, which remain api-aware by design.
+ */
+export function resolvePiModelConfigForModelDraft(
+  input: ModelCapabilityInput,
+): PiModelConfig | undefined {
+  const model = findOfficialCatalogModel(input);
+  return model ? piModelConfigFromModel(model) : undefined;
 }
 
 /** Resolve the complete serializable model metadata owned by pi-ai. */
