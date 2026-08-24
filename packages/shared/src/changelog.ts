@@ -23,6 +23,15 @@ export type ChangelogEntry = {
 
 const enEntries: ChangelogEntry[] = [
   {
+    version: "0.10.1",
+    date: "2026-08-24",
+    highlights: [
+      "Queue prompts sent while a run is active and deliver them in order without losing the current draft.",
+      "Bound background subagents with idle and total-duration timeouts and show when a delegate times out.",
+      "Load long session histories in bounded pages and fetch earlier messages as you scroll upward.",
+    ],
+  },
+  {
     version: "0.10.0",
     date: "2026-08-21",
     highlights: [
@@ -384,6 +393,15 @@ const enEntries: ChangelogEntry[] = [
 ];
 
 const zhCNEntries: ChangelogEntry[] = [
+  {
+    version: "0.10.1",
+    date: "2026-08-24",
+    highlights: [
+      "任务运行期间发送的消息会按顺序排队，不会丢失当前草稿。",
+      "为后台子代理增加空闲和总时长超时限制，并明确显示代理超时状态。",
+      "长会话历史改用分页加载，向上滚动时按需获取更早的消息。",
+    ],
+  },
   {
     version: "0.10.0",
     date: "2026-08-21",
