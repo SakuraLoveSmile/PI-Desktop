@@ -32,8 +32,8 @@
 }
 
 .composer-dock-home .composer-stack {
-  /* Keep home and docked modes on the same 768px content cap. */
-  width: min(100%, 768px);
+  /* Keep home and docked modes on the same state-aware content cap. */
+  width: min(100%, var(--chat-composer-max-width, 768px));
   max-width: 100%;
   gap: 0;
   overflow: visible;
@@ -41,11 +41,12 @@
 
 .composer-stack {
   pointer-events: auto;
-  width: min(100%, 768px);
+  width: min(100%, var(--chat-composer-max-width, 768px));
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0;
+  transition: width var(--chat-width-transition, var(--motion-duration-normal) var(--motion-ease-out));
 }
 
 /* Asktool uses the same decision surface as Plan and Goal approval. Its

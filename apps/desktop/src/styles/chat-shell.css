@@ -40,6 +40,20 @@
   flex: 1;
   flex-direction: column;
   background: var(--ds-bg-primary);
+  --chat-content-max-width: 760px;
+  --chat-composer-max-width: 768px;
+  --chat-width-transition: var(--motion-duration-normal) var(--motion-ease-out);
+}
+
+/*
+ * A collapsed sidebar gives the shell more room, but the chat content should
+ * not become a wide, low-density reading surface. Keep the outer pane fluid
+ * while tightening the centered content band to preserve focus.
+ */
+.app-shell.sidebar-collapsed .main-pane {
+  --chat-content-max-width: 640px;
+  --chat-composer-max-width: 640px;
+  --chat-width-transition: var(--motion-duration-fast) var(--motion-ease-in);
 }
 
 .chat-surface,
@@ -199,8 +213,9 @@
 }
 
 .thread-content {
-  width: min(100%, 760px);
+  width: min(100%, var(--chat-content-max-width));
   margin: 0 auto;
+  transition: width var(--chat-width-transition);
   /* Reserve exactly the composer's real height (+ a small gap) so the last
    * message sits just above the box instead of far below it. The variable is
    * published by Composer.tsx from the docked composer's measured height. */
@@ -350,8 +365,9 @@
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  width: min(100%, 768px);
+  width: min(100%, var(--chat-composer-max-width));
   max-width: 100%;
+  transition: width var(--chat-width-transition);
   /* Auto block margins center the stack when it fits and degrade to
      top-aligned scrolling when it overflows (unlike justify-content:center,
      which clips the top of overflowing content). */

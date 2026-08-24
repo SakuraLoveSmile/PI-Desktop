@@ -1677,6 +1677,7 @@ function AppShell() {
         "app-shell",
         !ready && "app-shell-boot",
         page === "settings" && ready && "settings-mode",
+        sidebarCollapsed && "sidebar-collapsed",
         showSplash && "is-booting",
       )}
     >

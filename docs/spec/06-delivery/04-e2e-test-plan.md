@@ -2636,6 +2636,28 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`sidebar-collapse-animation.test.mjs`); rendered
   interaction scenario Draft
 
+#### E2E-118: Collapsed sidebar tightens the centered chat content band
+
+- **Preconditions**: PI-Desktop is open with an active chat session at a
+  viewport wide enough for the expanded 760–768px chat content band; reduced
+  motion is off.
+- **Steps**: 1) Record the width of the centered transcript or empty-home
+  composer band with the sidebar expanded. 2) Collapse the sidebar. 3) Inspect
+  the same content band while the dock transition runs and after it settles.
+  4) Expand the sidebar and inspect the return transition.
+- **Expected**: The outer main pane fills the space released by the sidebar,
+  while the centered chat content band transitions from its expanded
+  760–768px ceiling to a 640px ceiling in the collapsed state. The transcript,
+  empty-home stack, and Composer use the same collapsed width envelope; no
+  content jumps, horizontal overflow, or clipped controls appear. Expanding
+  restores the expanded ceiling.
+- **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
+  `04-ux/08-component-spec.md`
+- **Acceptance**: Quality
+- **Milestone**: M5
+- **Status**: Unit-covered (`sidebar-collapse-animation.test.mjs`); rendered
+  interaction scenario Draft
+
 #### E2E-070: Native select menus follow the Windows theme across the app
 
 - **Preconditions**: PI-Desktop is running on Windows with light and dark

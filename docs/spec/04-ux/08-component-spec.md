@@ -1064,6 +1064,9 @@ Single message render — either user (plaintext) or assistant (markdown streami
 ### 8.3 Layout
 
 - Max content band: 760px thread column; assistant body max 720px
+- When the sidebar is collapsed, the centered thread column and composer band
+  use a 640px ceiling. The outer main pane remains fluid and the width
+  transition follows the sidebar dock transition.
 - User: right-aligned, theme-neutral soft plate (`color-mix` on primary ink,
   never a fixed accent tint), borderless, `radius-lg-plus` with a tighter
   bottom-right corner, capped at `min(82%, 600px)` so short prompts read as
