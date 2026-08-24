@@ -4397,6 +4397,8 @@ describe("DesktopAgentRuntime subagents", () => {
           delegationId,
           agent: "explorer",
           status: "failed",
+          startedAt: expect.any(Number),
+          completedAt: expect.any(Number),
         },
       ],
     });

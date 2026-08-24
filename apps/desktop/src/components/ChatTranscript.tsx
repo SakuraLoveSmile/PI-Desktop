@@ -37,15 +37,18 @@ import {
   buildToolPresentation,
   hasToolDetails,
   runOutcome,
+  toolResultPayload,
   toolResultChips,
 } from "../lib/tool-presentation";
 import {
   collectDelegationStatuses,
+  collectDelegationTimings,
   isDelegationActivityItem,
   subagentOutcome,
   summarizeSubagentActivity,
   type DelegationActivityItem,
   type SubagentOutcome,
+  type SubagentTiming,
 } from "../lib/subagent-topology";
 import { useOpenPreviewTarget } from "../lib/use-preview-target";
 import {
@@ -778,6 +781,7 @@ function ToolRow({
   delegate,
   variant = "default",
   delegationStatuses,
+  delegationTimings,
 }: {
   message: UiMessage;
   /** Rows the delegate produced, when this row is a `Task` call (ADR 0062). */
@@ -786,6 +790,8 @@ function ToolRow({
   variant?: "default" | "topology";
   /** Live delegation statuses read from the turn's lifecycle-tool rows. */
   delegationStatuses?: ReadonlyMap<string, SubagentOutcome>;
+  /** Runtime timings read from the turn's delegation lifecycle rows. */
+  delegationTimings?: ReadonlyMap<string, SubagentTiming>;
 }) {
   const { t } = useTranslation();
   const detailsId = useId();
@@ -855,9 +861,29 @@ function ToolRow({
           : status === "denied"
             ? t("chat.toolDenied")
             : t("chat.toolCompleted");
+  const delegationPayload =
+    variant === "topology" ? toolResultPayload(message) : undefined;
+  const delegationId =
+    delegationPayload && typeof delegationPayload === "object"
+      ? (delegationPayload as { delegationId?: unknown }).delegationId
+      : undefined;
+  const delegationTiming =
+    typeof delegationId === "string"
+      ? delegationTimings?.get(delegationId)
+      : undefined;
+  const [now, setNow] = useState(Date.now);
+  const durationMs =
+    delegationTiming?.startedAt !== undefined
+      ? Math.max(
+          0,
+          (delegationTiming.completedAt ??
+            (outcome === "running" ? now : delegationTiming.startedAt)) -
+            delegationTiming.startedAt,
+        )
+      : message.toolDurationMs;
   const duration =
-    typeof message.toolDurationMs === "number" && message.toolDurationMs > 0
-      ? formatToolDuration(message.toolDurationMs / 1000)
+    typeof durationMs === "number" && durationMs > 0
+      ? formatToolDuration(durationMs / 1000)
       : "";
 
   useEffect(() => {
@@ -866,6 +892,13 @@ function ToolRow({
 
   useEffect(() => {
     if (outcome === "failed") setOpen(true);
+  }, [outcome]);
+
+  useEffect(() => {
+    if (outcome !== "running") return;
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
   }, [outcome]);
 
   const statusTone =
@@ -1130,9 +1163,11 @@ function SubagentRunRows({
 function SubagentTopology({
   items,
   delegationStatuses,
+  delegationTimings,
 }: {
   items: DelegationActivityItem[];
   delegationStatuses?: ReadonlyMap<string, SubagentOutcome>;
+  delegationTimings?: ReadonlyMap<string, SubagentTiming>;
 }) {
   const { t } = useTranslation();
   const labelId = useId();
@@ -1164,6 +1199,7 @@ function SubagentTopology({
             {...(item.delegate ? { delegate: item.delegate } : {})}
             variant="topology"
             {...(delegationStatuses ? { delegationStatuses } : {})}
+            {...(delegationTimings ? { delegationTimings } : {})}
           />
         ))}
       </div>
@@ -1274,6 +1310,8 @@ type ActivityGroupProps = {
   endedAt?: string;
   /** Delegation statuses from the entire assistant turn (cross-activity-part). */
   turnDelegationStatuses?: ReadonlyMap<string, SubagentOutcome>;
+  /** Delegation timings from the entire assistant turn (cross-activity-part). */
+  turnDelegationTimings?: ReadonlyMap<string, SubagentTiming>;
 };
 
 /** Whether two activity items render identically, delegate rows included. */
@@ -1298,7 +1336,8 @@ function activityGroupPropsEqual(
     previous.isActive !== next.isActive ||
     previous.endedAt !== next.endedAt ||
     previous.items.length !== next.items.length ||
-    previous.turnDelegationStatuses !== next.turnDelegationStatuses
+    previous.turnDelegationStatuses !== next.turnDelegationStatuses ||
+    previous.turnDelegationTimings !== next.turnDelegationTimings
   ) {
     return false;
   }
@@ -1312,6 +1351,7 @@ const ActivityGroup = memo(function ActivityGroup({
   isActive,
   endedAt,
   turnDelegationStatuses,
+  turnDelegationTimings,
 }: ActivityGroupProps) {
   const { t } = useTranslation();
   const detailsId = useId();
@@ -1323,6 +1363,8 @@ const ActivityGroup = memo(function ActivityGroup({
   // and TaskWait), the turn-level statuses computed by the parent give us the
   // cross-part view we need.
   const delegationStatuses = turnDelegationStatuses ?? collectDelegationStatuses(items);
+  const delegationTimings =
+    turnDelegationTimings ?? collectDelegationTimings(items);
   const subagentSummary = summarizeSubagentActivity(
     delegateItems,
     delegationStatuses,
@@ -1407,6 +1449,7 @@ const ActivityGroup = memo(function ActivityGroup({
             key="subagent-topology"
             items={delegateItems}
             delegationStatuses={delegationStatuses}
+            delegationTimings={delegationTimings}
           />
         );
       }
@@ -1975,6 +2018,10 @@ const AssistantTurn = memo(function AssistantTurn({
     () => collectDelegationStatuses(turnAllActivityItems),
     [turnAllActivityItems],
   );
+  const turnDelegationTimings = useMemo(
+    () => collectDelegationTimings(turnAllActivityItems),
+    [turnAllActivityItems],
+  );
 
   return (
     <div
@@ -1992,6 +2039,7 @@ const AssistantTurn = memo(function AssistantTurn({
               endedAt={part.endedAt}
               isActive={isActive && index === entry.parts.length - 1}
               turnDelegationStatuses={turnDelegationStatuses}
+              turnDelegationTimings={turnDelegationTimings}
             />
           ) : (
             <div

@@ -2789,6 +2789,8 @@ Delegation rules:
           delegationId: record.delegationId,
           agent: record.agentName,
           status: record.status,
+          startedAt: record.startedAt,
+          ...(record.completedAt ? { completedAt: record.completedAt } : {}),
           report:
             record.result?.report ?? `(${record.status} without a report)`,
         }));

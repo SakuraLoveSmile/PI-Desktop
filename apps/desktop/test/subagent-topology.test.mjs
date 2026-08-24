@@ -7,12 +7,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
 const {
+  collectDelegationTimings,
   isDelegationActivityItem,
   subagentOutcome,
   summarizeSubagentActivity,
 } = await import("../src/lib/subagent-topology.ts");
 
-function task(id, toolStatus, resultStatus) {
+function task(id, toolStatus, resultStatus, timing = {}) {
   const message = {
     id,
     role: "tool",
@@ -23,10 +24,34 @@ function task(id, toolStatus, resultStatus) {
     toolStatus,
     toolArgs: { agent: "reviewer", description: `Task ${id}` },
     ...(resultStatus
-      ? { toolResult: { details: { status: resultStatus } } }
+      ? {
+          toolResult: {
+            details: {
+              delegationId: id,
+              status: resultStatus,
+              ...timing,
+            },
+          },
+        }
       : {}),
   };
   return { kind: "tool", message };
+}
+
+function lifecycle(toolName, details) {
+  return {
+    kind: "tool",
+    message: {
+      id: toolName,
+      role: "tool",
+      content: "",
+      createdAt: "2026-08-10T00:00:00.000Z",
+      toolName,
+      toolCallId: toolName,
+      toolStatus: "success",
+      toolResult: { details },
+    },
+  };
 }
 
 test("detects exact delegation activities without absorbing ordinary tools", () => {
@@ -82,6 +107,29 @@ test("prefers the structured delegate outcome over the transport status", () => 
     "failed",
   );
   assert.equal(subagentOutcome(task("denied", "denied").message), "denied");
+});
+
+test("uses delegation lifecycle timestamps instead of the immediate Task duration", () => {
+  const timings = collectDelegationTimings([
+    task("running", "success", "running", { startedAt: 1_000 }),
+    lifecycle("TaskWait", {
+      status: "completed",
+      delegations: [
+        {
+          delegationId: "running",
+          agent: "reviewer",
+          status: "completed",
+          startedAt: 1_000,
+          completedAt: 4_250,
+        },
+      ],
+    }),
+  ]);
+
+  assert.deepEqual(timings.get("running"), {
+    startedAt: 1_000,
+    completedAt: 4_250,
+  });
 });
 
 test("summarizes partial fan-out without deduplicating repeated agent names", () => {

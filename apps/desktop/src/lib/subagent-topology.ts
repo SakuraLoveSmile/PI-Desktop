@@ -17,6 +17,11 @@ export type SubagentOutcome =
   | "stopped"
   | "denied";
 
+export type SubagentTiming = {
+  startedAt?: number;
+  completedAt?: number;
+};
+
 export function isDelegationActivityItem(
   item: AssistantActivityItem,
 ): item is DelegationActivityItem {
@@ -49,6 +54,61 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function timestamp(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? value
+    : undefined;
+}
+
+function addTiming(
+  timings: Map<string, SubagentTiming>,
+  value: unknown,
+): void {
+  const record = asRecord(value);
+  const delegationId = record?.delegationId;
+  if (typeof delegationId !== "string" || !delegationId) return;
+  const startedAt = timestamp(record?.startedAt);
+  const completedAt = timestamp(record?.completedAt);
+  if (startedAt === undefined && completedAt === undefined) return;
+  const previous = timings.get(delegationId);
+  timings.set(delegationId, {
+    ...(previous?.startedAt !== undefined || startedAt !== undefined
+      ? { startedAt: startedAt ?? previous?.startedAt }
+      : {}),
+    ...(previous?.completedAt !== undefined || completedAt !== undefined
+      ? { completedAt: completedAt ?? previous?.completedAt }
+      : {}),
+  });
+}
+
+/**
+ * Runtime timing for each delegation, including the initial `Task` start and
+ * the later lifecycle snapshot that carries `completedAt`.
+ *
+ * A `Task` tool call ends as soon as the background delegate starts, so its
+ * `toolDurationMs` is not the delegate's runtime. TaskList/TaskWait/TaskStop
+ * repeat the registry timing and are the source of truth for settled nodes.
+ */
+export function collectDelegationTimings(
+  items: readonly AssistantActivityItem[],
+): ReadonlyMap<string, SubagentTiming> {
+  const timings = new Map<string, SubagentTiming>();
+  for (const item of items) {
+    if (item.kind !== "tool") continue;
+    const payload = asRecord(toolResultPayload(item.message));
+    if (!payload) continue;
+    if (isDelegationActivityItem(item)) addTiming(timings, payload);
+    const delegations = [
+      ...(Array.isArray(payload.delegations) ? payload.delegations : []),
+      ...(Array.isArray(payload.stopped) ? payload.stopped : []),
+    ];
+    for (const delegation of delegations) {
+      addTiming(timings, delegation);
+    }
+  }
+  return timings;
 }
 
 /**

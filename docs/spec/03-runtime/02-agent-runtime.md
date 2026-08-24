@@ -488,8 +488,11 @@ provider/model, its declared tools, and the same host connection. It runs under
 as the parent. Its statuses are `completed`, `truncated`, `failed`, `aborted`
 and `stopped`; the four terminal ones surface through `TaskWait`, whose text is
 the report (bounded to `MAX_SUBAGENT_REPORT_CHARS`, 12k) and whose details
-carry `delegationId`, `agent`, `status`, `turns`, `toolCalls` and, on failure,
-`error`.
+carry `delegationId`, `agent`, `status`, `startedAt`, `completedAt` when
+settled, `turns`, `toolCalls` and, on failure, `error`. `startedAt` and
+`completedAt` are runtime timestamps in milliseconds and are the source of
+truth for renderer delegation duration; the immediate `Task` tool-call
+duration only covers starting the background work.
 
 **Model pins.** `model: <provider>/<model>` in the frontmatter is resolved once
 per launch in Electron main, where credentials and the pi catalog live, against

@@ -1446,7 +1446,10 @@ argument. The row hint is the call's short `description`.
   delegate dependencies and forbids nested `Task`, so the renderer must not
   invent delegate-to-delegate edges or a downstream summary node.
 - Each node shows the definition name, short description, explicit outcome,
-  duration and step count. Outcome prefers the structured `Task` result
+  runtime duration and step count. The duration uses the delegation registry's
+  `startedAt`/`completedAt` timestamps (and ticks live while the node is
+  running), not the immediate `Task` tool-call duration. Outcome prefers the
+  structured `Task` result
   (`completed`, `truncated`, `aborted`, `failed`) and falls back to transport
   state (`running`, `error`, `denied`, `success`). Clicking the node expands the
   existing brief/report/counters and nested rows; the report remains printed

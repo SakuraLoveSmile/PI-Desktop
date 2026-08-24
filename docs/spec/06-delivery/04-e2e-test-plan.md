@@ -5964,7 +5964,9 @@ This test plan spec is accepted when:
   8. Prompt a turn where the agent starts two Task calls and then emits visible
      text before calling TaskWait (so Task and TaskWait land in different
      activity parts); confirm the topology card shows "completed" status on
-     both nodes once TaskWait returns, not stuck at "running".
+     both nodes once TaskWait returns, not stuck at "running", and that each
+     node shows a non-zero runtime duration derived from the delegation
+     lifecycle timestamps rather than the immediate `Task` start call.
   9. Edit `~/.agents/subagents/readonly.md` to declare `permission: auto` and reload the
      catalog; confirm the definition still loads but carries a warning, and
      that its delegate still resolves under the session's effective mode (a
