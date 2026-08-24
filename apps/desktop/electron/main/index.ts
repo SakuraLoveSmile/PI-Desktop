@@ -17,6 +17,8 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import {
+  constants as fsConstants,
+  createReadStream,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -24,6 +26,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { copyFile, readFile } from "node:fs/promises";
 import { listInstalledFonts } from "./system-fonts";
 import {
   APP_ID,
@@ -674,29 +677,61 @@ function ensureAttachmentBlob(dataRoot: string, bytes: Buffer): string {
   return `attachments/${hash}`;
 }
 
-function fallbackPathForStoredAttachment(
+async function hashFile(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  const stream = createReadStream(path);
+  for await (const chunk of stream) hash.update(chunk as Buffer);
+  return hash.digest("hex");
+}
+
+async function ensureAttachmentBlobFromFile(
+  dataRoot: string,
+  source: string,
+): Promise<string> {
+  const hash = await hashFile(source);
+  const root = join(dataRoot, "attachments");
+  mkdirSync(root, { recursive: true });
+  const target = join(root, hash);
+  if (!existsSync(target)) {
+    try {
+      await copyFile(source, target, fsConstants.COPYFILE_EXCL);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code !== "EEXIST") throw error;
+    }
+  }
+  return `attachments/${hash}`;
+}
+
+async function fallbackPathForStoredAttachment(
   dataRoot: string,
   sessionId: string,
   source: PromptPath,
   name: string,
-): string {
+): Promise<string> {
   if (source.root !== "attachment") return source.absolute;
   const root = join(dataRoot, "scratch", sessionId, "replayed");
   mkdirSync(root, { recursive: true });
   const safeName = name.replace(/[^\p{L}\p{N}._-]+/gu, "_") || "attachment";
   const target = join(root, `${safeName}-${createHash("sha256").update(source.absolute).digest("hex").slice(0, 12)}`);
-  if (!existsSync(target)) writeFileSync(target, readFileSync(source.absolute), { flag: "wx" });
+  if (!existsSync(target)) {
+    try {
+      await copyFile(source.absolute, target, fsConstants.COPYFILE_EXCL);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code !== "EEXIST") throw error;
+    }
+  }
   return target;
 }
 
-function preparePromptAttachments(
+async function preparePromptAttachments(
   dataRoot: string,
   sessionId: string,
   projectPath: string | undefined,
   attachments: readonly AgentPromptAttachment[],
   supportsVision: boolean,
-): PreparedPromptAttachment[] {
-  return attachments.map((attachment) => {
+): Promise<PreparedPromptAttachment[]> {
+  const prepared: PreparedPromptAttachment[] = [];
+  for (const attachment of attachments) {
     const source = resolvePromptPath(dataRoot, sessionId, projectPath, attachment.path);
     if (!source) {
       throw Object.assign(new Error(`Attachment path is outside the session roots: ${attachment.path}`), {
@@ -707,7 +742,7 @@ function preparePromptAttachments(
     const mimeType = promptMimeType(source.absolute, attachment.mimeType);
     const isImage = isImagePromptAttachment(attachment, source.absolute);
     if (!isImage) {
-      return {
+      prepared.push({
         message: {
           kind: "file",
           name,
@@ -716,31 +751,42 @@ function preparePromptAttachments(
           ...(Number.isFinite(attachment.size) ? { size: attachment.size } : {}),
         },
         fallbackPath: displayPromptPath(source, projectPath),
-      };
+      });
+      continue;
     }
 
-    const bytes = readFileSync(source.absolute);
-    const ref = ensureAttachmentBlob(dataRoot, bytes);
-    const fallbackPath = fallbackPathForStoredAttachment(
-      dataRoot,
-      sessionId,
-      source,
-      name,
-    );
-    return {
+    const size = statSync(source.absolute).size;
+    const inline = supportsVision && size <= MAX_INLINE_IMAGE_BYTES;
+    const bytes = inline ? await readFile(source.absolute) : undefined;
+    const ref =
+      source.root === "attachment" && attachment.path.trim().startsWith("attachments/")
+        ? attachment.path.trim()
+        : bytes
+          ? ensureAttachmentBlob(dataRoot, bytes)
+          : await ensureAttachmentBlobFromFile(dataRoot, source.absolute);
+    const fallbackPath = inline
+      ? displayPromptPath(source, projectPath)
+      : await fallbackPathForStoredAttachment(
+          dataRoot,
+          sessionId,
+          source,
+          name,
+        );
+    prepared.push({
       message: {
         kind: "image",
         name,
         ref,
         mimeType,
-        size: bytes.byteLength,
+        size,
       },
       fallbackPath,
-      ...(supportsVision && bytes.byteLength <= MAX_INLINE_IMAGE_BYTES
+      ...(bytes
         ? { inlineData: bytes.toString("base64") }
         : {}),
-    };
-  });
+    });
+  }
+  return prepared;
 }
 
 function appendPromptFallbackPaths(
@@ -6532,7 +6578,7 @@ function registerIpc() {
       launch.sidecarParams.provider.modelConfig?.input.includes("image") === true;
     let preparedAttachments: PreparedPromptAttachment[];
     try {
-      preparedAttachments = preparePromptAttachments(
+      preparedAttachments = await preparePromptAttachments(
         dataDir,
         req.sessionId,
         typeof session.projectPath === "string" && session.projectPath.trim()

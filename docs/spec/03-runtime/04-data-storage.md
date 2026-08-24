@@ -541,7 +541,9 @@ type Block =
   image block never enters the transcript, database, or renderer message.
   Non-vision and oversized-image turns retain a safe scratch/project `@path`
   fallback for the model. Replayed content-store images use
-  `scratch/<sessionId>/replayed/` when a path fallback is required.
+  `scratch/<sessionId>/replayed/` when a path fallback is required. Images
+  above the inline bound are hashed and copied with streaming file operations;
+  startup and history hydration must not load the whole image into memory.
 - Assistant thinking is stored only in `thinking` blocks inside the file. The
   derived `text` column contains final answer text, so transcript search and
   answer previews do not expose or mix reasoning.

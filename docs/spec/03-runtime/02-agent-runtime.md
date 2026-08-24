@@ -74,7 +74,9 @@ separate cancellation path.
    does not call this path until the current session reaches `agent_end`
 6. validate structured attachments at Electron main's session-bound path
    boundary, persist image bytes by SHA-256, and retain only attachment refs in
-   the durable user message
+   the durable user message. Only an image that is within the 20 MiB inline
+   bound for a vision model is read into memory; larger images use streamed
+   hashing/copying and the existing safe path fallback
 7. snapshot the effective shell ID and dialect for the turn
 8. start pi turn with the resolved session configuration and effective
    thinking level; HTTP 429 setup and stream failures use the runtime-owned
@@ -418,8 +420,9 @@ criterion-by-criterion report of what was met and the evidence observed.
 - Vision runtimes hydrate persisted image refs only from the session-bound
   attachment, scratch, and project roots. Images within the 20 MiB inline
   safety bound become transient pi-ai image blocks; oversized or unavailable
-  images become safe `@path` fallbacks. Base64 is never restored into durable
-  UI messages or transcript records.
+  images become safe `@path` fallbacks. Oversized history hydration copies
+  files without first loading their contents into memory. Base64 is never
+  restored into durable UI messages or transcript records.
 - Failed assistant messages remain durable diagnostic transcript entries but
   are never restored into pi model context on a later turn.
 - Restored checkpoints clear provider usage from retained assistant messages

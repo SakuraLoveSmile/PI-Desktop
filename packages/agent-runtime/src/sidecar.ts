@@ -5,7 +5,8 @@
  */
 import { createInterface } from "node:readline";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { copyFile, mkdir, readFile, realpath, stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { ModelAuth } from "@earendil-works/pi-ai";
 import { ParentHostProxy } from "./parent-host-proxy.js";
@@ -153,7 +154,6 @@ async function replayedAttachmentPath(
   params: RuntimeParams,
   attachment: NonNullable<UiMessage["attachments"]>[number],
   source: string,
-  bytes: Buffer,
 ): Promise<string> {
   if (!params.scratchDir || !attachment.ref.startsWith("attachments/")) {
     return source;
@@ -168,7 +168,7 @@ async function replayedAttachmentPath(
     .slice(0, 12);
   const target = resolve(root, `${safeName}-${suffix}`);
   try {
-    await writeFile(target, bytes, { flag: "wx" });
+    await copyFile(source, target, fsConstants.COPYFILE_EXCL);
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code !== "EEXIST") throw error;
   }
@@ -213,25 +213,14 @@ async function hydrateAttachmentHistory(
       if (!canonicalRoots.some((root) => root && pathInside(root, canonical))) {
         return { attachment };
       }
-      const needsBytes =
-        ref.startsWith("attachments/") ||
-        (attachment.kind === "image" && supportsVision);
-      const bytes = needsBytes ? await readFile(canonical) : undefined;
+      const shouldInline = attachment.kind === "image" && supportsVision;
+      const size = (await stat(canonical)).size;
+      const bytes =
+        shouldInline && size <= MAX_INLINE_IMAGE_BYTES
+          ? await readFile(canonical)
+          : undefined;
       if (attachment.kind === "image" && supportsVision && bytes) {
-        if (bytes.byteLength <= MAX_INLINE_IMAGE_BYTES) {
-          return { attachment: { ...attachment, data: bytes.toString("base64") } };
-        }
-      }
-      if (attachment.kind === "file" || !supportsVision || !bytes) {
-        return {
-          attachment,
-          fallbackPath: await replayedAttachmentPath(
-            params,
-            attachment,
-            canonical,
-            bytes ?? Buffer.alloc(0),
-          ),
-        };
+        return { attachment: { ...attachment, data: bytes.toString("base64") } };
       }
       return {
         attachment,
@@ -239,7 +228,6 @@ async function hydrateAttachmentHistory(
           params,
           attachment,
           canonical,
-          bytes,
         ),
       };
     } catch {

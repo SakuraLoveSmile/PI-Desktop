@@ -147,9 +147,11 @@ against the session scratch/project roots, persists image bytes in the
 content-addressed attachment store, and derives the exact model transport from
 the pi-ai model record. A known model whose `input` includes `image` receives
 eligible images as transient pi-ai image blocks. Unknown/non-vision models and
-images above the 20 MiB inline bound receive a safe `@path` fallback. The
-durable user message stores `content` plus attachment metadata/ref, never
-base64. Invalid attachment paths fail with `PATH_OUTSIDE_WORKSPACE`.
+images above the 20 MiB inline bound receive a safe `@path` fallback. Main
+uses streamed hashing and file copying for images above that bound, and the
+sidecar uses the same bounded-read rule when rebuilding history. The durable
+user message stores `content` plus attachment metadata/ref, never base64.
+Invalid attachment paths fail with `PATH_OUTSIDE_WORKSPACE`.
 
 Regenerate history (D109) also uses session channels:
 

@@ -6,12 +6,13 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
-const [composer, api, main, saver, protocol] = await Promise.all([
+const [composer, api, main, saver, protocol, sidecar] = await Promise.all([
   read("../src/components/Composer.tsx"),
   read("../src/lib/api.ts"),
   read("../electron/main/index.ts"),
   read("../electron/main/composer-paste.ts"),
   read("../../../packages/shared/src/protocol.ts"),
+  read("../../../packages/agent-runtime/src/sidecar.ts"),
 ]);
 
 test("composer keeps text paste native and materializes clipboard files", () => {
@@ -52,6 +53,17 @@ test("pasted bytes stay in the session scratch directory", () => {
   assert.match(saver, /MAX_TOTAL_BYTES/);
   assert.match(saver, /kind: isImageFile\(name, mimeType\) \? "image" : "file"/);
   assert.match(saver, /size: bytes\.byteLength/);
+});
+
+test("large image attachments avoid whole-file startup reads", () => {
+  assert.match(main, /async function hashFile\(path: string\)/);
+  assert.match(main, /createReadStream\(path\)/);
+  assert.match(main, /const inline = supportsVision && size <= MAX_INLINE_IMAGE_BYTES/);
+  assert.match(main, /await copyFile\(source, target, fsConstants\.COPYFILE_EXCL\)/);
+  assert.doesNotMatch(main, /const bytes = readFileSync\(source\.absolute\)/);
+  assert.match(sidecar, /const size = \(await stat\(canonical\)\)\.size/);
+  assert.match(sidecar, /shouldInline && size <= MAX_INLINE_IMAGE_BYTES/);
+  assert.match(sidecar, /await copyFile\(source, target, fsConstants\.COPYFILE_EXCL\)/);
 });
 
 test("paste results separate display names from unique storage paths", async () => {

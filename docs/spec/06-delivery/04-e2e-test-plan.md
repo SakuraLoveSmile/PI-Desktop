@@ -4248,6 +4248,32 @@ Each scenario is documented in this format:
 - **Status**: Unit-covered (`model-capabilities.test.ts`); provider/UI journey
   Draft (do not run E2E locally unless explicitly requested)
 
+#### E2E-102f: Oversized image references do not block session startup
+
+- **Preconditions**: A project contains an image larger than the 20 MiB inline
+  bound; a known vision-capable model is selected; the session has a valid
+  provider and workspace.
+- **Steps**: 1. Reference the oversized image from the Composer and send a
+  prompt. 2. Observe the turn lifecycle while the attachment is prepared. 3.
+  Dispose/recreate the runtime and send a follow-up about the image. 4. Inspect
+  the session transcript, the content-addressed attachment blob, and the
+  session `replayed/` path.
+- **Expected**: The session accepts the prompt and reaches the provider without
+  hanging the Electron main process or crashing the sidecar. Main hashes and
+  copies the image without constructing a whole-file in-memory buffer. The
+  provider receives the safe `@path` fallback rather than an oversized image
+  block/base64 payload. Runtime recreation copies the stored blob into the
+  scratch fallback path without reading the whole blob into memory. The durable
+  message retains only attachment metadata and the content-addressed ref.
+- **Specs linked**: `03-runtime/01-ipc-protocol.md` §5.1,
+  `03-runtime/02-agent-runtime.md` §5, `03-runtime/04-data-storage.md`,
+  ADR 0101
+- **Acceptance**: C (conversation & stream), E (tools & permissions),
+  F (persistence), Quality
+- **Milestone**: M5
+- **Status**: Unit-covered; full UI journey Draft (do not run E2E locally unless
+  explicitly requested)
+
 #### E2E-103: Settings Agent pages manage file-backed capabilities
 
 - **Preconditions**: The app is running with two registered projects, A and B,
