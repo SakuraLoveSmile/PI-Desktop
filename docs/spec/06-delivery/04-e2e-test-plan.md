@@ -309,13 +309,18 @@ Each scenario is documented in this format:
 
 - **Preconditions**: A session can produce both a deliberately delayed first
   token and a streaming response.
-- **Steps**: 1) Send ordinary text and stop before assistant text, thinking, or
-  a tool row begins. 2) Confirm the user row is undone and the text returns to
-  the composer. 3) Send again, wait for partial output, then stop during the
-  stream. 4) Observe the transcript and composer.
-- **Expected**: The unanswered send is undone and its draft restored. The
-  streaming send stops with its partial response preserved and no draft
-  restoration or duplicate user turn. The session remains usable.
+- **Steps**: 1) Send ordinary text and, before assistant text, thinking, or a
+  tool row begins, confirm the cleared draft exposes the single Stop control.
+  2) Type another draft while the turn is running and confirm the same slot
+  becomes an enabled Send control; send it to queue the prompt, then confirm
+  the empty draft exposes Stop again. 3) Stop before assistant output begins
+  and confirm the user row is undone and the text returns to the composer. 4)
+  Send again, wait for partial output, then stop during the stream. 5) Observe
+  the transcript and composer.
+- **Expected**: The running/non-empty state uses Send and queues the prompt;
+  the running/empty state uses Stop. The unanswered send is undone and its
+  draft restored. The streaming send stops with its partial response preserved
+  and no draft restoration or duplicate user turn. The session remains usable.
 - **Specs linked**: `03-runtime/02-agent-runtime.md`
 - **Acceptance**: C (abort)
 - **Milestone**: M2
@@ -384,7 +389,7 @@ Each scenario is documented in this format:
 #### E2E-011a: New session while another session is still streaming
 
 - **Preconditions**: Provider configured; session A is streaming a long
-  response (composer shows the stop/abort control).
+  response with an empty composer draft (the single submit slot shows Stop).
 - **Steps**: 1) While A is still streaming, click New task / New chat. 2)
   Observe the fresh session's composer. 3) Type a prompt and send it while A
   continues streaming in the background. 4) Let A finish and observe the
@@ -495,9 +500,10 @@ Each scenario is documented in this format:
   before either run completes. 5) Choose Send now on A's remaining queued row.
   6) Observe A through the current tool/reply boundary and then the next turn.
   7) Start another run in A, queue a prompt, press Stop, and inspect the queue.
-- **Expected**: Send and Stop coexist while a run is active. A's two prompts
-  appear in FIFO order, the removed row never sends, and B's queue remains
-  independent. Send now requests a graceful stop: the current batch completes
+- **Expected**: The single submit slot shows Send while the running draft has
+  content and queues that prompt on click; after the draft is empty it shows
+  Stop. A's two prompts appear in FIFO order, the removed row never sends, and
+  B's queue remains independent. Send now requests a graceful stop: the current batch completes
   with a normal `agent_end`/completed turn, then the selected row starts before
   any remaining A rows without `AGENT_BUSY`. Immediate Stop aborts the current
   reply and preserves A's queued row; switching sessions preserves both queues.
@@ -4369,7 +4375,8 @@ Each scenario is documented in this format:
      survives the restart.
   4. Start an Agent answer. While it streams, type the next draft and change
      Thinking, permission mode, and Agent/Plan/Goal. Confirm every selection is
-     editable, Stop remains present, and Send cannot dispatch.
+     editable; with a non-empty draft the single submit slot is Send and queues
+     the next prompt, while clearing the draft changes it to Stop.
   5. Stop after partial output. Confirm the partial answer remains, the queued
      configuration becomes durable only after termination, and the next turn
      uses the final selection rather than any intermediate selection.

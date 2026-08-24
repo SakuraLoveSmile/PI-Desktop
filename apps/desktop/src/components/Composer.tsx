@@ -1570,12 +1570,12 @@ export function Composer({
                   </div>
                 ) : null}
               </div>
-              {runActive ? (
+              {runActive && !hasDraftContent ? (
                 <button
                   type="button"
                   className="stop-btn"
-                  title={t("chat.abort")}
-                  aria-label={t("chat.abort")}
+                  title={t("chat.stopGenerating")}
+                  aria-label={t("chat.stopGenerating")}
                   onClick={() => void abort()}
                 >
                   <IconStop size={14} />

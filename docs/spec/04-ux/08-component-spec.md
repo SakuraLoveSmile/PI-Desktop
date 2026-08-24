@@ -201,15 +201,15 @@ combined model × reasoning selection (§11).
 |---|---|---|---|---|
 | Task title | session title (or untitled), capped at 10 characters with an ellipsis when needed | same | same | same |
 | New task / Search | icon buttons | same | same | same |
-| Abort button | hidden | visible, accent-hover pulse | hidden | hidden |
+| Composer stop control | hidden | visible only when the running composer draft is empty | hidden | hidden |
 | Project name | title tooltip only | same | same | omitted |
 
 ### 2.5 Accessibility
 
 - Every control is keyboard-reachable with Tab
-- Abort button has `aria-label="Abort active turn"`
+- Composer stop control has `aria-label="Stop generating"`
 - The topbar does not render a separate running-state indicator; the Composer
-  abort control and transcript working feedback remain the running-state cues.
+  submit control and transcript working feedback remain the running-state cues.
 
 ### 2.6 MVP constraints
 
@@ -1653,7 +1653,7 @@ reasoning-level control.
 ```text
 +----------------------------------------------------------+
 | [Agent/Plan/Goal] [permission mode]          | [model · reasoning ▾] |
-| queued messages (optional; one row per item) | [⏹ Stop] [→ Send]     |
+| queued messages (optional; one row per item) | [⏹ Stop / → Send] (one submit slot) |
 | textarea (auto-growing, 1 line → max 7)                         |
 | placeholder: welcome ↔ "Type / to invoke a command"            |
 | (EN/zh-CN welcome + hint pairs; home uses its own welcome key)   |
@@ -1686,7 +1686,7 @@ reasoning-level control.
   Goal displays the localized Auto label as a disabled, non-opening chip while
   the approval card remains the separate place for choosing execution policy.
 - The right toolbar owns one combined model × reasoning-level chip immediately
-  before Stop/Send. It shows Sparkles, the current model name, and the current
+  before the single Stop/Send submit slot. It shows Sparkles, the current model name, and the current
   reasoning level separated by `·`; `off` dims Sparkles and omits the level text.
 - The combined chip opens one anchored menu above itself. The menu starts with
   only Model and Reasoning level entries, each showing its current value and a
@@ -1731,10 +1731,10 @@ reasoning-level control.
 | Idle (ready) | textarea active, send button enabled | Send active |
 | Home/new-session initialization | textarea and mode/model × reasoning/permission triggers remain available while the durable empty session is loading; the session row is already present and the first configuration selection applies to that session | Configure the session, then send |
 | New session (reasoning model) | Combined model × reasoning chip shows the model and its highest published level | User may select any published level, including Off when supported |
-| New session / switch while another session is running | textarea active, send button enabled for the destination session's own run state | Send active, Abort hidden unless the destination session itself is running |
-| Running | textarea and mode/model × reasoning/permission controls remain editable for the next turn; Stop and Send buttons are both visible | Stop active, Send active; submitted prompts become queued |
-| Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Stop active, Send active |
-| Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled, abort visible |
+| New session / switch while another session is running | textarea active, send button enabled for the destination session's own run state | Send active, Stop hidden unless the destination session itself is running with an empty draft |
+| Running | textarea and mode/model × reasoning/permission controls remain editable for the next turn; the single submit slot shows Stop for an empty draft and Send for a non-empty draft | Stop active when empty; Send active when non-empty; submitted prompts become queued |
+| Context checkpoint | Same as Running until durable checkpoint completion; intermediate `turn_end` does not reactivate controls. A retained-tail fallback remains Running and shows a warning toast | Same single-slot Stop/Send behavior as Running |
+| Permission pending | textarea disabled (per [03-permission-ux.md](03-permission-ux.md) §7) | Send disabled; Stop remains active whenever the running empty-draft condition is met |
 | Plan / Goal / planning | textarea active while idle; contract badge and permission chip visible | inspect, send, or submit a contract |
 | Plan / Goal / awaiting approval | approval surface shows only the title and artifact opener for the exact `.pi/<kind>/*.md` approval; draft is preserved read-only and composer controls remain blocked for that session | approve or reject |
 | Plan / queued or running | Agent badge remains selected; queue/running state is visible; draft and next-turn controls remain editable | Stop; Send queues the next prompt; no replay control |
@@ -1752,13 +1752,17 @@ reasoning-level control.
   switching between home and session views resets to that view's welcome copy.
 - Escape: when textarea focused, clears input or blurs (not abort)
 - Send while running: clears the current draft and appends one FIFO row to the
-  active session's in-memory queue. The row is sent as a new normal prompt only
-  after the current run reaches `agent_end`; a different session's queue is not
-  affected by switching sessions.
+  active session's in-memory queue when the draft has content. The row is sent
+  as a new normal prompt only after the current run reaches `agent_end`; a
+  different session's queue is not affected by switching sessions. Running
+  with an empty draft changes this same submit slot to Stop, so clearing the
+  draft is the way to expose the immediate-stop action.
 - Send now: moves the selected row to the head, requests `agent/stop`, and
   releases it after the current reply/tool batch completes normally. It then
   starts before the remaining FIFO rows. When idle, Send now sends immediately.
-- Stop: stops the running turn and cancels pending permission. Before any
+- Stop: the single submit slot is shown only while a turn is running and the
+  draft is empty. It stops the running turn and cancels pending permission.
+  Before any
   assistant text, thinking, or tool row begins, it also removes the just-sent
   user row and restores the pre-serialization composer draft. Ordinary text
   returns to the textarea and file references return as leaf-name chips; their
@@ -1843,7 +1847,7 @@ reasoning-level control.
 - `role="textbox"` with `aria-label="Message input"`
 - Editable text controls never enable browser spellcheck or autocorrect (D145)
 - Send button: `aria-label="Send message"`
-- Abort button: `aria-label="Abort active turn"`
+- Stop button: `aria-label="Stop generating"`
 - Queued prompt list: `aria-label="Queued messages"`; each row has an
   accessible Remove button and a Send now button.
 - Disabled send: `aria-disabled="true"` with tooltip explanation
@@ -2460,8 +2464,9 @@ Sidebar footer                                        Popover (360px max)
 5. ToolCallCard shows status, args preview, result preview, duration per [01-ui-ia.md](01-ui-ia.md) §5
 6. PermissionCard shows tool name, risk, args, countdown, and three action buttons per [03-permission-ux.md](03-permission-ux.md)
 7. Composer: Enter sends, Shift+Enter newline, draft grows from one through
-   seven visible lines then scrolls, disabled during running/pending, abort
-   button visible during run
+   seven visible lines then scrolls, and the single submit slot shows Send for
+   a non-empty draft or an idle/empty draft, and Stop only for a running empty
+   draft
 8. Composer model × reasoning chip shows the provider/model pair; remains
    available for next-turn configuration during a stream; links to settings
    when unconfigured

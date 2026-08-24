@@ -310,6 +310,7 @@
   display: inline-flex;
   height: 28px;
   width: 28px; /* Codex spacing-token-button-composer = 28px */
+  flex: 0 0 28px;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
@@ -348,6 +349,7 @@
   display: inline-flex;
   height: 28px;
   width: 28px;
+  flex: 0 0 28px;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);

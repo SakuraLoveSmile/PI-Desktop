@@ -208,6 +208,7 @@ export const en = {
     sendNow: "Send now",
     sendNowPending: "Sending next",
     abort: "Stop",
+    stopGenerating: "Stop generating",
     running: "Working…",
     loadingEarlierMessages: "Loading earlier messages…",
     copy: "Copy",

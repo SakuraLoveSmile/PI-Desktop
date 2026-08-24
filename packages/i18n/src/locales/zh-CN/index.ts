@@ -203,6 +203,7 @@ export const zhCN = {
     sendNow: "立即发送",
     sendNowPending: "即将发送",
     abort: "停止",
+    stopGenerating: "停止生成",
     running: "正在处理…",
     loadingEarlierMessages: "正在加载更早的消息…",
     copy: "复制",
