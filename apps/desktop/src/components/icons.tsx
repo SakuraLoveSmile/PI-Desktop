@@ -78,6 +78,7 @@ import {
   Trash2,
   TriangleAlert,
   UserRound,
+  Undo2,
   Webhook,
   Workflow,
   Wrench,
@@ -142,6 +143,7 @@ export const IconChevronLeft = icon(ChevronLeft);
 export const IconChevronRight = icon(ChevronRight);
 export const IconExternal = icon(ExternalLink);
 export const IconArrowUpRight = icon(ArrowUpRight);
+export const IconUndo2 = icon(Undo2);
 export const IconCloudDown = icon(CloudDownload);
 export const IconDownload = icon(Download);
 export const IconImage = icon(Image);

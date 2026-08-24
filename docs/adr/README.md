@@ -135,3 +135,4 @@ Each ADR includes:
 | 0118 | Keep queued prompts renderer-owned and stop runs at turn boundaries | Accepted |
 | 0119 | Event-driven subagent timeouts | Accepted for implementation |
 | 0120 | Bounded session history windows | Accepted |
+| 0121 | Keep Composer prompt enhancement one-shot and main-owned | Accepted |

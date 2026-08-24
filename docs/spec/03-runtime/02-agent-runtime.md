@@ -603,6 +603,15 @@ Runtime responsibilities:
 
 Local models are supported through OpenAI-compatible endpoints (Ollama, LM Studio, vLLM, etc.).
 
+### 6.1 One-shot Composer enhancement
+
+Composer enhancement uses the same resolved provider binding and retry
+classification as an agent request, but creates a separate completion context
+with exactly one user message and the static enhancement system prompt. It
+does not instantiate a session agent, include transcript history, expose tools,
+or persist a turn. The renderer receives only the trimmed text result; API
+keys and vendor refresh credentials remain in Electron main.
+
 
 ## 7. System prompt composition
 

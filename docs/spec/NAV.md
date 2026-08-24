@@ -44,6 +44,7 @@
 - [07-ui-design-system.md](04-ux/07-ui-design-system.md)
 - [08-component-spec.md](04-ux/08-component-spec.md)
 - [09-interaction-patterns.md](04-ux/09-interaction-patterns.md)
+- [12-prompt-enhancement.md](04-ux/12-prompt-enhancement.md)
 
 ## 5. Security
 - [01-security.md](05-security/01-security.md)

@@ -36,6 +36,7 @@ import { AskToolCard } from "./AskToolCard";
 import { PlanApprovalBar } from "./PlanApprovalBar";
 import {
   IconArrowUp,
+  IconUndo2,
   IconShield,
   IconStop,
   IconChevronDown,
@@ -222,6 +223,11 @@ const HOME_DRAFT_KEY = "__home__";
 
 type ComposerMenuView = "root" | "model" | "thinking";
 
+type PromptEnhancementError = {
+  message: string;
+  code: string;
+};
+
 function draftKeyForSession(sessionId: string | null | undefined) {
   return sessionId ?? HOME_DRAFT_KEY;
 }
@@ -287,6 +293,12 @@ export function Composer({
   const modelListRef = useRef<HTMLDivElement>(null);
   const thinkingListRef = useRef<HTMLDivElement>(null);
   const [pasting, setPasting] = useState(false);
+  const [enhancingPrompt, setEnhancingPrompt] = useState(false);
+  const [enhancementUndoText, setEnhancementUndoText] = useState<string | null>(null);
+  const [enhancementError, setEnhancementError] =
+    useState<PromptEnhancementError | null>(null);
+  const enhancementVersionRef = useRef(0);
+  const enhancementRequestRef = useRef<symbol | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
   const draftKey = draftKeyForSession(activeSessionId);
@@ -317,6 +329,12 @@ export function Composer({
     composing ||
     (inputFocused && !placeholderFocusPauseReleasedRef.current);
 
+  const invalidatePromptEnhancement = () => {
+    enhancementVersionRef.current += 1;
+    setEnhancementUndoText(null);
+    setEnhancementError(null);
+  };
+
   useEffect(() => {
     setPlaceholderIndex(0);
     placeholderFocusPauseReleasedRef.current = false;
@@ -340,6 +358,7 @@ export function Composer({
   useEffect(() => {
     const previousKey = draftKeyRef.current;
     if (previousKey !== draftKey) {
+      invalidatePromptEnhancement();
       // Persist the outgoing draft before switching.
       draftCacheRef.current.set(previousKey, {
         text: valueRef.current,
@@ -821,6 +840,7 @@ export function Composer({
   };
 
   const clearDraftForKey = (key: string) => {
+    invalidatePromptEnhancement();
     draftCacheRef.current.delete(key);
     const currentKey = draftKeyForSession(useAppStore.getState().activeSessionId);
     if (currentKey !== key) return;
@@ -844,10 +864,96 @@ export function Composer({
     })),
   });
 
+  const enhancePrompt = async () => {
+    const sourceText = value;
+    const sourceKey = draftKey;
+    const sourceVersion = enhancementVersionRef.current;
+    if (
+      !sourceText.trim() ||
+      sourceText.trim().startsWith("/") ||
+      !modelReady ||
+      sendBlocked ||
+      enhancingPrompt
+    ) {
+      return;
+    }
+
+    const requestToken = Symbol("prompt-enhancement");
+    enhancementRequestRef.current = requestToken;
+    setEnhancingPrompt(true);
+    setEnhancementUndoText(null);
+    setEnhancementError(null);
+    try {
+      const result = await api.enhancePrompt({
+        sessionId: activeSessionId,
+        draft: sourceText,
+        providerId: provider?.id,
+        modelId,
+        thinkingLevel,
+      });
+      const currentKey = draftKeyForSession(useAppStore.getState().activeSessionId);
+      if (
+        enhancementRequestRef.current !== requestToken ||
+        currentKey !== sourceKey ||
+        enhancementVersionRef.current !== sourceVersion
+      ) {
+        return;
+      }
+      const enhancedDraft = result.enhancedDraft.trim();
+      if (!enhancedDraft) {
+        throw Object.assign(new Error("The model returned an empty enhanced draft."), {
+          code: "PROMPT_ENHANCEMENT_EMPTY",
+        });
+      }
+      enhancementVersionRef.current += 1;
+      setValue(enhancedDraft);
+      setCursor(enhancedDraft.length);
+      setEnhancementUndoText(sourceText);
+      requestAnimationFrame(() => {
+        const textarea = ref.current;
+        if (!textarea) return;
+        textarea.focus();
+        textarea.setSelectionRange(enhancedDraft.length, enhancedDraft.length);
+      });
+    } catch (error) {
+      const currentKey = draftKeyForSession(useAppStore.getState().activeSessionId);
+      if (
+        enhancementRequestRef.current !== requestToken ||
+        currentKey !== sourceKey ||
+        enhancementVersionRef.current !== sourceVersion
+      ) {
+        return;
+      }
+      const typed = error as Error & { code?: string };
+      setEnhancementError({
+        message: typed.message || t("chat.enhancementFailed"),
+        code: typed.code || "PROMPT_ENHANCEMENT_FAILED",
+      });
+    } finally {
+      if (enhancementRequestRef.current === requestToken) {
+        setEnhancingPrompt(false);
+      }
+    }
+  };
+
+  const undoPromptEnhancement = () => {
+    if (enhancementUndoText === null) return;
+    invalidatePromptEnhancement();
+    setValue(enhancementUndoText);
+    setCursor(enhancementUndoText.length);
+    requestAnimationFrame(() => {
+      const textarea = ref.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(enhancementUndoText.length, enhancementUndoText.length);
+    });
+  };
+
   const submit = async () => {
     const content = value.trim();
     const serializedContent = serializeComposerFileReferences(value, activeFileReferences);
     if (!serializedContent || sendBlocked) return;
+    invalidatePromptEnhancement();
     const submittedDraftKey = draftKey;
     // Slash dispatch (D123): builtin/plugin aliases execute locally without
     // a session or a model; templates and unknown /names stay prompt text
@@ -1088,6 +1194,23 @@ export function Composer({
             })}
           </div>
         ) : null}
+        {enhancementError ? (
+          <div className="composer-enhancement-error" role="alert">
+            <span className="composer-enhancement-error-message">
+              {t("chat.enhancementFailed")}: {enhancementError.message}
+            </span>
+            <code>{enhancementError.code}</code>
+            <button
+              type="button"
+              className="composer-enhancement-error-dismiss"
+              title={t("chat.dismissEnhancementError")}
+              aria-label={t("chat.dismissEnhancementError")}
+              onClick={() => setEnhancementError(null)}
+            >
+              <IconX size={13} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
         <div className={`composer-shell${inputBlocked ? " is-gated" : ""}`}>
           {inputFocused ? (
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
@@ -1159,6 +1282,7 @@ export function Composer({
                 onPaste={pasteClipboardFiles}
                 onChange={(e) => {
                   const nextValue = e.target.value;
+                  invalidatePromptEnhancement();
                   placeholderFocusPauseReleasedRef.current = nextValue.length === 0;
                   setValue(nextValue);
                   setCursor(e.target.selectionStart ?? nextValue.length);
@@ -1579,6 +1703,46 @@ export function Composer({
                   onClick={() => void abort()}
                 >
                   <IconStop size={14} />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={`icon-btn composer-enhance-btn${enhancingPrompt ? " is-loading" : ""}`}
+                title={t("chat.enhancePrompt")}
+                aria-label={
+                  enhancingPrompt
+                    ? t("chat.enhancingPrompt")
+                    : t("chat.enhancePrompt")
+                }
+                aria-busy={enhancingPrompt}
+                disabled={
+                  !value.trim() ||
+                  value.trim().startsWith("/") ||
+                  !modelReady ||
+                  sendBlocked ||
+                  enhancingPrompt
+                }
+                onClick={() => void enhancePrompt()}
+              >
+                {enhancingPrompt ? (
+                  <>
+                    <span className="tool-spinner" aria-hidden="true" />
+                    <span>{t("chat.enhancingPrompt")}</span>
+                  </>
+                ) : (
+                  <IconSparkles size={15} aria-hidden="true" />
+                )}
+              </button>
+              {enhancementUndoText !== null ? (
+                <button
+                  type="button"
+                  className="icon-btn composer-enhance-undo"
+                  title={t("chat.undoEnhancement")}
+                  aria-label={t("chat.undoEnhancement")}
+                  disabled={controlsBlocked}
+                  onClick={undoPromptEnhancement}
+                >
+                  <IconUndo2 size={15} aria-hidden="true" />
                 </button>
               ) : null}
               <button

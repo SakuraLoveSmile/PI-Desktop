@@ -62,6 +62,7 @@ import {
   type AgentEventEnvelope,
   type AgentPromptAttachment,
   type AgentPromptRequest,
+  type PromptEnhancementRequest,
   type AgentStopRequest,
   type AskToolResolution,
   type AppMenuCommand,
@@ -99,6 +100,7 @@ import {
   resolveVisionCapability,
   resolveThinkingCapabilities,
   expandSlashInvocation,
+  enhancePromptDraft,
   loadComposerTemplates,
   globalInstructionPath,
   loadInstructionChain,
@@ -106,6 +108,7 @@ import {
   resolveSubagentProviders,
   type ComposerTemplate,
   type ThinkingCapabilities,
+  type RuntimeProviderConfig,
   type UserSubagentDocument,
 } from "@pi-desktop/agent-runtime";
 import { isTemplateName, scaffold } from "@pi-desktop/plugin-devkit";
@@ -1172,7 +1175,13 @@ async function resolveAgentRuntimeLaunch(
   sessionId: string,
   session: any,
   settings: any,
-  overrides: { mode?: Mode; turnId?: string } = {},
+  overrides: {
+    mode?: Mode;
+    turnId?: string;
+    providerId?: string;
+    modelId?: string;
+    thinkingLevel?: ThinkingLevel;
+  } = {},
 ) {
   if (!host) throw new Error("host unavailable");
   const commandShell = (await resolveEffectiveCommandShell()).effective!;
@@ -1180,8 +1189,9 @@ async function resolveAgentRuntimeLaunch(
     "providers.list",
     { includeDisabled: false },
   );
+  const requestedProviderId = overrides.providerId ?? session.providerId;
   const provider =
-    providers.providers.find((item) => item.id === session.providerId) ||
+    providers.providers.find((item) => item.id === requestedProviderId) ||
     providers.providers.find((item) => item.id === settings.defaultProviderId) ||
     providers.providers.find(
       (item) => item.hasSecret || item.hasOauth || item.authKind === "none",
@@ -1207,7 +1217,9 @@ async function resolveAgentRuntimeLaunch(
     });
   }
   const modelId =
-    (provider.id === session.providerId ? session.modelId : undefined) ||
+    (provider.id === requestedProviderId
+      ? overrides.modelId ?? session.modelId
+      : undefined) ||
     (provider.id === settings.defaultProviderId
       ? settings.defaultModelId
       : undefined) ||
@@ -1236,7 +1248,11 @@ async function resolveAgentRuntimeLaunch(
   const storedModel = provider.models?.find((model) => model.id === modelId);
   const thinkingLevel = clampThinkingLevel(
     thinkingCapabilities,
-    normalizeThinkingLevel(session.thinkingLevel ?? storedModel?.defaultThinkingLevel),
+    normalizeThinkingLevel(
+      overrides.thinkingLevel ??
+        (provider.id === requestedProviderId ? session.thinkingLevel : undefined) ??
+        storedModel?.defaultThinkingLevel,
+    ),
   );
   const resolvedModelConfig =
     vendorBinding?.modelConfig ??
@@ -6452,6 +6468,62 @@ function registerIpc() {
     // the run so agent_end can close it via scheduled.finishRun.
     scheduledRunsBySession.set(res.sessionId, res.runId);
     return res;
+  });
+
+  handle(IPC.invoke.promptEnhance, async (req: PromptEnhancementRequest) => {
+    if (!host) throw new Error("backend unavailable");
+    const draft = typeof req?.draft === "string" ? req.draft : "";
+    if (!draft.trim()) {
+      throw Object.assign(new Error("Prompt draft must not be empty"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+    if (draft.trim().startsWith("/")) {
+      throw Object.assign(new Error("Slash command drafts cannot be enhanced"), {
+        errorCode: ErrorCodes.INVALID_ARGUMENT,
+      });
+    }
+
+    const sessionId =
+      typeof req.sessionId === "string" ? req.sessionId.trim() : "";
+    const session = sessionId
+      ? (await host.call<{ session?: any }>("session.get", { id: sessionId })).session
+      : {};
+    if (sessionId && !session) {
+      throw Object.assign(new Error("Session not found"), {
+        errorCode: ErrorCodes.NOT_FOUND,
+      });
+    }
+    const settings = await host.call<any>("settings.get");
+    const launchSessionId = sessionId || `prompt-enhancement:${crypto.randomUUID()}`;
+    const launch = await resolveAgentRuntimeLaunch(
+      launchSessionId,
+      session ?? {},
+      settings,
+      {
+        mode: "agent",
+        providerId:
+          typeof req.providerId === "string" ? req.providerId.trim() : undefined,
+        modelId: typeof req.modelId === "string" ? req.modelId.trim() : undefined,
+        thinkingLevel: req.thinkingLevel,
+      },
+    );
+    const runtimeProvider = {
+      ...launch.sidecarParams.provider,
+      ...(launch.sidecarParams.provider.authKind === OAUTH_AUTH_KIND
+        ? { resolveAuth: () => vendorOAuth.resolveAuth(launch.providerId) }
+        : {}),
+    } as RuntimeProviderConfig;
+    const enhancedDraft = await enhancePromptDraft(
+      runtimeProvider,
+      draft,
+      launch.sidecarParams.thinkingLevel,
+    );
+    logger.app("session", "info", "prompt enhanced", {
+      sessionId: sessionId || undefined,
+      data: { providerId: launch.providerId, modelId: launch.modelId },
+    });
+    return { enhancedDraft };
   });
 
   handle(IPC.invoke.agentPrompt, async (req: AgentPromptRequest) => {

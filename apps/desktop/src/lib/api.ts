@@ -8,6 +8,8 @@ import type {
   UiMessage,
   MessageRevisionSummary,
   AgentPromptResponse,
+  PromptEnhancementRequest,
+  PromptEnhancementResponse,
   AgentStopResponse,
   AgentStatus,
   AskToolResolution,
@@ -403,6 +405,8 @@ export const api = {
     invoke<{ messages: UiMessage[] }>(IPC.invoke.sessionActivateRevision, input),
   prompt: (req: AgentPromptRequest) =>
     invoke<AgentPromptResponse>(IPC.invoke.agentPrompt, req),
+  enhancePrompt: (req: PromptEnhancementRequest) =>
+    invoke<PromptEnhancementResponse>(IPC.invoke.promptEnhance, req),
   compact: (req: AgentCompactRequest) =>
     invoke<AgentCompactResponse>(IPC.invoke.agentCompact, req),
   abort: (sessionId: string) =>

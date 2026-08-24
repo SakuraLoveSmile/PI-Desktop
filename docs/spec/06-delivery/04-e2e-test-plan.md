@@ -4668,11 +4668,61 @@ Each scenario is documented in this format:
 - **Status**: Unit/source-contract covered; full provider-dialog journey Draft
   (do not run E2E locally unless explicitly requested)
 
+#### E2E-156: Composer enhances the visible draft and supports one-level undo
+
+- **Preconditions**: The Composer has a configured provider/model and a
+  session or home draft is visible.
+- **Steps**: 1) Enter a non-empty ordinary draft. 2) Confirm the sparkle
+  action is enabled and click it. 3) Observe the loading state while the
+  mocked completion is pending. 4) Resolve the completion with rewritten text.
+  5) Confirm the draft text is replaced, file-reference chips remain, and the
+  caret is at the end. 6) Click `Undo enhancement`. 7) Edit the restored text,
+  enhance again, send, and switch sessions while another request is pending.
+- **Expected**: The action uses the displayed provider/model/thinking level,
+  becomes disabled with the spinner and localized loading text, replaces only
+  text on success, and restores exactly one previous text snapshot. Editing,
+  sending, or switching sessions hides undo; a late response after any of
+  those changes is discarded.
+- **Specs linked**: `04-ux/12-prompt-enhancement.md`,
+  `03-runtime/01-ipc-protocol.md`, `03-runtime/02-agent-runtime.md`
+- **Acceptance**: B (model selection), C (conversation), F (persistence), Quality
+- **Milestone**: M6+
+- **Status**: Documented; agent-runtime unit and desktop source-contract tests
+  cover the protocol/flow, full UI automation pending
+
+#### E2E-157: Composer enhancement gates invalid drafts and preserves failures
+
+- **Preconditions**: The Composer can display configured and unconfigured
+  provider states; the provider stream can return classified failures and an
+  empty response.
+- **Steps**: 1) Check an empty draft, a `/command` draft, and a draft with no
+  available model. 2) Trigger enhancement with a valid draft and return
+  `PROVIDER_UNAUTHORIZED`, `NETWORK_ERROR`, `TIMEOUT`, and whitespace-only
+  responses in separate attempts. 3) Dismiss each error bar. 4) Inspect the
+  renderer bridge and process logs for credentials.
+- **Expected**: Invalid drafts keep the action disabled. Every failure leaves
+  the original text and chips untouched, shows a dismissible message with the
+  classified error code, and allows another attempt. The UI and logs contain
+  no API key or refresh token; only main resolves credentials.
+- **Specs linked**: `04-ux/12-prompt-enhancement.md`,
+  `03-runtime/01-ipc-protocol.md`, `03-runtime/08-error-codes.md`,
+  `05-security/01-security.md`
+- **Acceptance**: B (model config), C (conversation), H (diagnostics), Security, Quality
+- **Milestone**: M6+
+- **Status**: Documented; agent-runtime failure tests and desktop source-contract
+  tests cover the narrow path, full UI automation pending
+
 ## 8. Traceability Matrix
 
 
 
 
+
+> Prompt enhancement traceability: E2E-156 covers the successful rewrite,
+> loading, undo, edit/send/session-switch race guards, and current-model
+> forwarding; E2E-157 covers availability gates, classified failures, empty
+> output, dismissible error UI, and the main-process secret boundary. Both are
+> Acceptance B/C/Quality scenarios; E2E-157 also covers H and Security.
 
 | Acceptance | Scenarios |
 |---|---|

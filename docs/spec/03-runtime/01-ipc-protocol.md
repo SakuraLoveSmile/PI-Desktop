@@ -1310,6 +1310,23 @@ never enter the persisted prompt or host agent message as base64.
 Invalid sessions and malformed/oversized payloads fail with an IPC error, and
 the operation cannot write to the workspace.
 
+### prompt/enhance
+
+```ts
+prompt/enhance({
+  sessionId?: string | null;
+  draft: string;
+  providerId?: string;
+  modelId?: string;
+  thinkingLevel?: ThinkingLevel;
+}) -> { enhancedDraft: string }
+```
+
+This is an independent, one-shot completion with no session history, tools, or
+attachments. Electron main resolves the provider/model and credentials, so the
+renderer never receives a secret. Empty drafts, slash-command drafts, missing
+models, and provider failures return the common `Result` error envelope.
+
 ## 14. Error Codes — Initial registry (extensible)
 
 | code | Meaning |

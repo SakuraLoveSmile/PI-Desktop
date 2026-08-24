@@ -66,6 +66,7 @@ export const IPC = {
     notificationShowNative: "pi-desktop/notification/showNative",
     notificationSetViewingSession: "pi-desktop/notification/setViewingSession",
     agentPrompt: "pi-desktop/agent/prompt",
+    promptEnhance: "pi-desktop/prompt/enhance",
     agentCompact: "pi-desktop/agent/compact",
     agentAbort: "pi-desktop/agent/abort",
     agentStop: "pi-desktop/agent/stop",
