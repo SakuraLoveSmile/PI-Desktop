@@ -448,6 +448,16 @@ export type AgentAbortRequest = {
   turnId?: string;
 };
 
+/** Request a stop at the next completed agent turn boundary. */
+export type AgentStopRequest = {
+  sessionId: string;
+  turnId?: string;
+};
+
+export type AgentStopResponse = {
+  requested: boolean;
+};
+
 export type AgentCompactRequest = {
   sessionId: string;
 };

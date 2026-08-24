@@ -514,6 +514,11 @@ async function handle(method: string, params: any): Promise<unknown> {
       if (runtime) await runtime.abort();
       return { ok: true };
     }
+    case "agent.stop": {
+      const sessionId = String(params.sessionId);
+      const runtime = runtimes.get(sessionId);
+      return runtime?.requestGracefulStop() ?? { requested: false };
+    }
     case "asktool.resolve": {
       const sessionId = String(params.sessionId ?? "");
       const runtime = runtimes.get(sessionId);

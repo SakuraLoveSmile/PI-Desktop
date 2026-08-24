@@ -38,6 +38,17 @@ test("running session configuration is queued for the next turn", () => {
   assert.match(store, /event\.type === "agent_end"[\s\S]*flushPendingSessionConfiguration\(envelope\.sessionId\)/);
 });
 
+test("running prompts use a removable per-session FIFO queue", () => {
+  assert.match(store, /queuedPrompts: QueuedPrompts/);
+  assert.match(store, /enqueueQueuedPrompt\(state\.queuedPrompts, item\)/);
+  assert.match(store, /prioritizeQueuedPrompt\(/);
+  assert.match(store, /event\.type === "agent_end"[\s\S]*drainQueuedPrompts\(envelope\.sessionId\)/);
+  assert.match(composer, /data-testid="queued-prompt"/);
+  assert.match(composer, /removeQueuedPrompt\(item\.id\)/);
+  assert.match(composer, /sendQueuedNow\(item\.id\)/);
+  assert.match(composer, /approvalPending[\s\S]*item\.sendNowRequested/);
+});
+
 test("new task persists or reuses an empty session and keeps the run flag scoped", () => {
   const newSession = store.match(
     /newSession: async [\s\S]*?\n  forkSession: async/,
@@ -95,7 +106,7 @@ test("mode slash prefixes send the trailing prompt and retain failed drafts", ()
   );
   assert.match(store, /draft\?: ComposerDraftSnapshot/);
   const sendPrompt = store.match(
-    /sendPrompt: async \(content, draft\)[\s\S]*?\n  compactContext:/,
+    /sendPrompt: async \(content, draft, requestedSessionId\)[\s\S]*?\n  compactContext:/,
   )?.[0] ?? "";
   assert.match(sendPrompt, /return false;/);
   assert.match(

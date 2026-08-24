@@ -25,6 +25,7 @@ import type { ComposerDraftSnapshot } from "../lib/composer-smart-stop";
 import { api } from "../lib/api";
 import { isActivePlanExecution } from "../lib/plan-mode-state";
 import { headAsk, queuedAskCount } from "../lib/pending-asks";
+import type { QueuedPrompt } from "../lib/queued-prompts";
 import { runPaletteCommand } from "../lib/commands";
 import {
   resolveComposerCommand,
@@ -55,6 +56,7 @@ const COMPOSER_MIN_HEIGHT_PX = 28;
 const COMPOSER_MAX_VISIBLE_ROWS = 7;
 const PLACEHOLDER_CAROUSEL_INTERVAL_MS = 4_000;
 let composerFileReferenceSequence = 0;
+const EMPTY_QUEUED_PROMPTS: QueuedPrompt[] = [];
 
 type ComposerFileReference = {
   id: string;
@@ -233,6 +235,8 @@ export function Composer({
 }) {
   const { t } = useTranslation();
   const sendPrompt = useAppStore((s) => s.sendPrompt);
+  const removeQueuedPrompt = useAppStore((s) => s.removeQueuedPrompt);
+  const sendQueuedNow = useAppStore((s) => s.sendQueuedNow);
   const abort = useAppStore((s) => s.abort);
   const isRunning = useAppStore((s) => s.isRunning);
   const settings = useAppStore((s) => s.settings);
@@ -254,6 +258,11 @@ export function Composer({
   );
   const queuedAsks = useAppStore((s) =>
     queuedAskCount(s.pendingAsks, s.activeSessionId),
+  );
+  const queuedPrompts = useAppStore((s) =>
+    s.activeSessionId
+      ? s.queuedPrompts[s.activeSessionId] ?? EMPTY_QUEUED_PROMPTS
+      : EMPTY_QUEUED_PROMPTS,
   );
   const [value, setValue] = useState("");
   const [fileReferences, setFileReferences] = useState<ComposerFileReference[]>([]);
@@ -288,7 +297,7 @@ export function Composer({
   const runActive = isRunning || executionActive;
   const inputBlocked = approvalPending || pasting;
   const controlsBlocked = approvalPending;
-  const sendBlocked = runActive || approvalPending || pasting;
+  const sendBlocked = approvalPending || pasting;
   const referenceSessionId = activeSessionId ?? "";
   const activeFileReferences = fileReferences.filter(
     (fileReference) => fileReference.sessionId === referenceSessionId,
@@ -1031,6 +1040,54 @@ export function Composer({
         {pendingAsk ? (
           <AskToolCard request={pendingAsk} queued={queuedAsks} />
         ) : null}
+        {queuedPrompts.length ? (
+          <div
+            className="composer-queued-prompts"
+            role="list"
+            aria-label={t("chat.queuedPrompts")}
+          >
+            {queuedPrompts.map((item) => {
+              const label =
+                item.content.trim() ||
+                item.draft.fileReferences.map((reference) => reference.name).join(", ") ||
+                t("chat.queuedPromptEmpty");
+              return (
+                <div
+                  key={item.id}
+                  className="composer-queued-prompt"
+                  role="listitem"
+                  data-testid="queued-prompt"
+                >
+                  <span className="composer-queued-prompt-text" title={label}>
+                    {label}
+                  </span>
+                  <button
+                    type="button"
+                    className="composer-queued-prompt-action"
+                    title={t("chat.removeQueuedPrompt")}
+                    aria-label={t("chat.removeQueuedPrompt")}
+                    onClick={() => removeQueuedPrompt(item.id)}
+                  >
+                    <IconX size={13} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className="composer-queued-prompt-send-now"
+                    disabled={
+                      approvalPending ||
+                      (runActive && item.sendNowRequested === true)
+                    }
+                    onClick={() => void sendQueuedNow(item.id)}
+                  >
+                    {item.sendNowRequested
+                      ? t("chat.sendNowPending")
+                      : t("chat.sendNow")}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
         <div className={`composer-shell${inputBlocked ? " is-gated" : ""}`}>
           {inputFocused ? (
             <ComposerAutocomplete ac={composerAc} onAccept={acceptCompletion} />
@@ -1514,25 +1571,32 @@ export function Composer({
                 ) : null}
               </div>
               {runActive ? (
-                <button className="stop-btn" title={t("chat.abort")} onClick={() => void abort()}>
+                <button
+                  type="button"
+                  className="stop-btn"
+                  title={t("chat.abort")}
+                  aria-label={t("chat.abort")}
+                  onClick={() => void abort()}
+                >
                   <IconStop size={14} />
                 </button>
-              ) : (
-                <button
-                  className="send-btn"
-                  title={
-                    modelReady ? t("chat.send") : t("settings.addProvider")
-                  }
-                  disabled={
-                    !hasDraftContent ||
-                    sendBlocked ||
-                    (!modelReady && !value.trim().startsWith("/"))
-                  }
-                  onClick={() => void submit()}
-                >
-                  <IconArrowUp size={15} />
-                </button>
-              )}
+              ) : null}
+              <button
+                type="button"
+                className="send-btn"
+                aria-label={modelReady ? t("chat.send") : t("settings.addProvider")}
+                title={
+                  modelReady ? t("chat.send") : t("settings.addProvider")
+                }
+                disabled={
+                  !hasDraftContent ||
+                  sendBlocked ||
+                  (!modelReady && !value.trim().startsWith("/"))
+                }
+                onClick={() => void submit()}
+              >
+                <IconArrowUp size={15} />
+              </button>
             </div>
           </div>
         </div>

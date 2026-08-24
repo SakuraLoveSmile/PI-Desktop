@@ -56,6 +56,75 @@
   margin: 0 0 8px;
 }
 
+.composer-queued-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin: 0 0 8px;
+}
+
+.composer-queued-prompt {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 7px 8px 7px 12px;
+  background: var(--ds-bg-composer);
+  box-shadow: var(--ds-shadow-composer);
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm-plus);
+}
+
+.composer-queued-prompt-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-queued-prompt-action,
+.composer-queued-prompt-send-now {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--ds-text-muted);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.composer-queued-prompt-action {
+  width: 24px;
+  height: 24px;
+}
+
+.composer-queued-prompt-send-now {
+  min-height: 24px;
+  padding: 0 8px;
+  color: var(--ds-text-secondary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.composer-queued-prompt-action:hover,
+.composer-queued-prompt-action:focus-visible,
+.composer-queued-prompt-send-now:hover:not(:disabled),
+.composer-queued-prompt-send-now:focus-visible {
+  background: var(--ds-bg-hover);
+  color: var(--ds-text-primary);
+}
+
+.composer-queued-prompt-send-now:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .composer-shell {
   /* Positioning context for the autocomplete panel (D123–D125, ADR 0024). */
   position: relative;
