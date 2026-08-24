@@ -2233,12 +2233,14 @@ async function createWindow() {
     !window.isDestroyed() &&
     !window.webContents.isDestroyed();
 
-  // Keep the process resident and make every platform's minimize affordance
-  // consistent: minimizing hides the window into the application tray. The
-  // tray is the only way back, so a window whose tray icon could not be
-  // created stays a plain native minimize.
+  // Keep tray-resident minimize for native controls on macOS/Linux. Windows
+  // taskbar clicks are different: when the focused window is toggled from the
+  // taskbar, Electron emits `minimize`; allowing that native transition to
+  // continue keeps the app's taskbar entry available for the next click.
+  // Renderer/menu minimize actions still call `hide()` directly and therefore
+  // retain the explicit tray-resident behavior.
   window.on("minimize", () => {
-    if (quitting || !tray) return;
+    if (quitting || !tray || process.platform === "win32") return;
     window.hide();
   });
   let workPanelReconcileTimer: NodeJS.Timeout | null = null;

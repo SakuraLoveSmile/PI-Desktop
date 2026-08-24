@@ -42,7 +42,10 @@ test("choosing quit never destroys the resident tray", () => {
 test("minimize only hides when a tray exists to restore from", () => {
   const minimize = mainSource.slice(mainSource.indexOf('window.on("minimize"'));
   const body = minimize.slice(0, minimize.indexOf("});") + 3);
-  assert.match(body, /if \(quitting \|\| !tray\) return;/);
+  assert.match(
+    body,
+    /if \(quitting \|\| !tray \|\| process\.platform === "win32"\) return;/,
+  );
   assert.match(body, /window\.hide\(\)/);
 });
 

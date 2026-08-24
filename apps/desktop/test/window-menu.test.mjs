@@ -226,7 +226,7 @@ test("menu and window IPC reject actions outside their shared allowlists", () =>
   );
 });
 
-test("minimize is resident in the cross-platform tray", () => {
+test("explicit minimize paths remain resident in the cross-platform tray", () => {
   assert.match(mainSource, /import \{[\s\S]*Tray[\s\S]*\} from "electron"/);
   assert.match(mainSource, /function createTray\(\)/);
   assert.match(mainSource, /join\(resourceRoot, "tray-icon-mac\.png"\)/);
@@ -255,6 +255,21 @@ test("minimize is resident in the cross-platform tray", () => {
   ]);
   assert.match(iconScriptSource, /tray-icon-mac\.png/);
   assert.match(iconScriptSource, /ImageChops\.multiply/);
+});
+
+test("Windows taskbar minimize keeps the taskbar entry", () => {
+  const minimizeHandler = mainSource.slice(
+    mainSource.indexOf('window.on("minimize"'),
+    mainSource.indexOf('window.on("minimize"') + 420,
+  );
+  assert.match(
+    minimizeHandler,
+    /if \(quitting \|\| !tray \|\| process\.platform === "win32"\) return;/,
+  );
+  assert.match(
+    mainSource,
+    /function restoreMainWindow\(\)[\s\S]*if \(window\.isMinimized\(\)\) window\.restore\(\);[\s\S]*window\.focus\(\);/,
+  );
 });
 
 test("macOS activation resurfaces a tray-hidden window", () => {

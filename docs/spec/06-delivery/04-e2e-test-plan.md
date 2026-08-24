@@ -2373,9 +2373,10 @@ Each scenario is documented in this format:
   choice, that the D216 tray icon stays resident either way, that an unset
   preference shows no selection, and that search matches
   the row. 5) With `quit` stored, restart and close the window: the app
-  exits even though the tray icon is present. 6) Minimize from any setting
-  and verify the window hides into the tray (D216) and that the tray click
-  brings it back. 7) Invoke unknown values and `"ask"` on
+  exits even though the tray icon is present. 6) From any setting, use the
+  renderer minimize control and verify the window hides into the tray (D216)
+  and that the tray click brings it back. The Windows taskbar toggle is covered
+  separately by E2E-124. 7) Invoke unknown values and `"ask"` on
   `pi-desktop/window/closeBehavior/set` and verify they fail closed, and
   verify the channel is rejected outright on macOS.
 - **Expected**: The first close prompts exactly once per unset state and
@@ -2385,9 +2386,9 @@ Each scenario is documented in this format:
   way back to a hidden window. The preference survives restarts and is
   honored by both the window-control close button and the close shortcut,
   and a stored `quit` exits through the ordered `before-quit` shutdown
-  rather than depending on `window-all-closed`. Minimize hides to the tray
-  in every mode, and the bounds watchdog never force-restores a minimized
-  or tray-hidden window. The automated boot probe (`app.quit`) exits
+  rather than depending on `window-all-closed`. The renderer minimize control
+  hides to the tray in every mode, and the bounds watchdog never force-restores
+  a minimized or tray-hidden window. The automated boot probe (`app.quit`) exits
   without prompting.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`,
   `04-ux/01-ui-ia.md`, `04-ux/09-interaction-patterns.md`,
@@ -5360,26 +5361,33 @@ This test plan spec is accepted when:
 - **Milestone**: M5
 - **Status**: Draft (unit coverage active; desktop journey pending)
 
-#### E2E-124: Minimize hides the window in the cross-platform tray
+#### E2E-124: Minimize preserves the Windows taskbar toggle and supports tray hide
 
 - **Preconditions**: Built desktop app on macOS, Windows, and Linux; English
   and zh-CN locales are available; a normal main window is open.
-- **Steps**: 1) Minimize from the platform's window control (macOS traffic
-  light or Windows/Linux renderer control). 2) Confirm the main window is
-  hidden while the app process remains resident. 3) Click or double-click the
+- **Steps**: 1) On Windows, leave the focused main window visible and click its
+  taskbar button; confirm it minimizes while the PI-Desktop taskbar entry
+  remains. Click the same taskbar button again and confirm the window restores
+  and focuses. Cover the window with another app, click the PI-Desktop taskbar
+  entry, and confirm it comes to the front without entering the tray. 2) On
+  macOS, click the traffic-light minimize control; on Windows/Linux, use the
+  renderer minimize control; confirm the explicit minimize path hides the main
+  window while the app process remains resident. 3) Click or double-click the
   tray icon and confirm the same window is restored and focused. 4) Open the
   tray menu and choose Show, then repeat with Quit. 5) Repeat in zh-CN and
-  invoke macOS app activation while the window is hidden.
-- **Expected**: All minimize paths hide to one tray icon instead of quitting or
-  leaving a taskbar-minimized window. On macOS the menu bar icon is a readable
-  transparent monochrome PI mark without the rounded application tile.
-  Show/click/double-click/app activation restores the existing window; the
-  localized menu contains Show PI-Desktop and Quit PI-Desktop. Quit runs the
-  normal shutdown sequence and leaves no orphan host, sidecar, or tray process.
-  Closing the window remains an explicit quit action.
+  invoke macOS app activation while the window is tray-hidden.
+- **Expected**: Windows native taskbar toggling keeps the taskbar entry and
+  round-trips through native minimize/restore; a taskbar click on a covered
+  window brings it to the front. Explicit minimize paths hide to one tray icon
+  instead of quitting. On macOS the menu bar icon is a readable transparent
+  monochrome PI mark without the rounded application tile. Show/click/double-
+  click/app activation restores the existing window; the localized menu
+  contains Show PI-Desktop and Quit PI-Desktop. Quit runs the normal shutdown
+  sequence and leaves no orphan host, sidecar, or tray process. Closing the
+  window remains an explicit quit action.
 - **Specs linked**: `03-runtime/07-process-model.md`,
-  `04-ux/09-interaction-patterns.md`, `08-meta/decisions-log.md` (D216),
-  ADR 0078
+  `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
+  `08-meta/decisions-log.md` (D216, D252), ADR 0078, ADR 0117
 - **Acceptance**: A (app lifecycle), Quality
 - **Milestone**: M6+
 - **Status**: Unit/source-contract covered; native cross-platform tray journey

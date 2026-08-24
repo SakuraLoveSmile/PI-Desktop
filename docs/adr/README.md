@@ -131,3 +131,4 @@ Each ADR includes:
 | 0113 | Persist the New Task empty slot immediately and deduplicate it by message count | Accepted |
 | 0114 | Persist provider model bindings and thinking configuration | Accepted |
 | 0116 | Add OpenCode Go as a fixed provider preset | Accepted |
+| 0117 | Preserve the Windows taskbar entry for native minimize | Accepted |
